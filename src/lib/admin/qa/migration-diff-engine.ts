@@ -1,7 +1,50 @@
 /**
- * Migration Reconciliation Engine & Deep Media / Text Format Validator (PW1 -> PW2)
- * Supports full live database re-scanning & defect resolution simulation
+ * Migration Reconciliation Engine & Deep Field-by-Field Database Diff Inspector (PW1 -> PW2)
+ * Supports full 1-to-1 Entity Matching (legacy_id), 5 Data Groups, and Live Re-scan
  */
+
+export type EntityGroupType = "products" | "variants" | "categories" | "posts" | "settings" | "blocks";
+
+export interface FieldDiffItem {
+  fieldName: string;
+  fieldLabel: string;
+  legacyKey: string;      // e.g. "products.brand_id" (MySQL)
+  migratedKey: string;    // e.g. "products.brand" (PostgreSQL)
+  legacyValue: string | number | boolean | null;
+  migratedValue: string | number | boolean | null;
+  status: "match" | "warning" | "error";
+  classification: "P0 Blocker" | "P1 Warning" | "P2 Info" | "100% Match";
+  diffExplanation?: string;
+  remediationAction?: string;
+}
+
+export interface EntityDiffRecord {
+  id: string;
+  legacyId: string | number;
+  migratedId?: string | number | null;
+  entityGroup: EntityGroupType;
+  entityName: string;
+  entityIdentifier: string; // e.g. SKU "ONG-RUNG-500ML" or Slug "mat-ong-rung"
+  matchStatus: "match" | "warning" | "error" | "missing_in_pw2" | "orphan_in_pw2";
+  totalFields: number;
+  matchedFields: number;
+  discrepancyCount: number;
+  fields: FieldDiffItem[];
+}
+
+export interface StoreFieldDiffAudit {
+  storeId: string;
+  summary: {
+    totalEntitiesV1: number;
+    totalEntitiesV2: number;
+    matchedEntities: number;
+    missingInPW2Count: number;
+    orphanInPW2Count: number;
+    fieldMatchRate: string;
+    groupStats: Record<EntityGroupType, { total: number; pass: number; warn: number; fail: number }>;
+  };
+  records: EntityDiffRecord[];
+}
 
 export interface StoreSummary {
   id: string;
@@ -156,6 +199,7 @@ export interface StoreDeepDiff {
   totalPagesInPW2: number;
   missingPagesCount: number;
   pages: DynamicStorePage[];
+  fieldDiffAudit: StoreFieldDiffAudit;
   reconciliationAudit: {
     totalProductsV1: number;
     totalProductsV2: number;
@@ -353,8 +397,516 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
 }
 
 /**
- * Get deep store diff with specialized Media & Text Format audits
- * Allows live overrideStatus when QC clicks "Quét Lại Dữ Liệu" after fixing issues!
+ * Generate 1-to-1 Field-Level Database Diff Audit for any store
+ */
+export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreFieldDiffAudit {
+  const allStores = generateReconciliationCatalog(2000);
+  const store = allStores.find((s) => s.id === siteId) || allStores[0];
+  const currentStatus = overrideStatus || store.status;
+
+  const isFailed = currentStatus === "failed";
+  const isWarn = currentStatus === "warning";
+  const isPass = currentStatus === "passed";
+
+  const records: EntityDiffRecord[] = [
+    // 1. PRODUCTS (PROD-101: Mật Ong Rừng)
+    {
+      id: "ent-prod-101",
+      legacyId: "PROD-101",
+      migratedId: isPass ? "pw2_prod_101" : "pw2_prod_101",
+      entityGroup: "products",
+      entityName: "Sản Phẩm: Mật Ong Rừng Ba Vì Nguyên Chất",
+      entityIdentifier: "SKU: ONG-RUNG",
+      matchStatus: isFailed ? "error" : "match",
+      totalFields: 7,
+      matchedFields: isFailed ? 5 : 7,
+      discrepancyCount: isFailed ? 2 : 0,
+      fields: [
+        {
+          fieldName: "title",
+          fieldLabel: "Tên Sản Phẩm",
+          legacyKey: "products.title",
+          migratedKey: "products.title",
+          legacyValue: "Mật Ong Rừng Ba Vì Nguyên Chất",
+          migratedValue: "Mật Ong Rừng Ba Vì Nguyên Chất",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "slug",
+          fieldLabel: "Đường Dẫn Slug",
+          legacyKey: "products.slug",
+          migratedKey: "products.slug",
+          legacyValue: "mat-ong-rung-ba-vi",
+          migratedValue: "mat-ong-rung-ba-vi",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "brand_id",
+          fieldLabel: "Thương Hiệu (Brand)",
+          legacyKey: "products.brand_id",
+          migratedKey: "products.brand",
+          legacyValue: "Nông Trại Hữu Cơ Ba Vì",
+          migratedValue: isFailed ? null : "Nông Trại Hữu Cơ Ba Vì",
+          status: isFailed ? "error" : "match",
+          classification: isFailed ? "P0 Blocker" : "100% Match",
+          diffExplanation: isFailed ? "PW1 có brand 'Nông Trại Hữu Cơ Ba Vì' nhưng PW2 chưa có collection `brands` nên trường bị NULL" : undefined,
+          remediationAction: isFailed ? "Tạo collection `brands` và thêm relationship field vào collection `products`." : undefined,
+        },
+        {
+          fieldName: "category_id",
+          fieldLabel: "Danh Mục Chính",
+          legacyKey: "products.category_id",
+          migratedKey: "products.category",
+          legacyValue: "Mật Ong & Nông Sản",
+          migratedValue: "Mật Ong & Nông Sản",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "price",
+          fieldLabel: "Giá Niêm Yết",
+          legacyKey: "products.price",
+          migratedKey: "products.price",
+          legacyValue: 180000,
+          migratedValue: 180000,
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "cost",
+          fieldLabel: "Giá Vốn (Cost)",
+          legacyKey: "products.cost",
+          migratedKey: "products.cost",
+          legacyValue: 120000,
+          migratedValue: isWarn ? null : 120000,
+          status: isWarn ? "warning" : "match",
+          classification: isWarn ? "P1 Warning" : "100% Match",
+          diffExplanation: isWarn ? "Giá vốn bị bỏ trống khi migrate từ bảng products cũ" : undefined,
+          remediationAction: isWarn ? "Bổ sung map trường `cost` trong ETL transform" : undefined,
+        },
+        {
+          fieldName: "status",
+          fieldLabel: "Trạng Thái Xuất Bản",
+          legacyKey: "products.status",
+          migratedKey: "products._status",
+          legacyValue: "published",
+          migratedValue: "published",
+          status: "match",
+          classification: "100% Match",
+        },
+      ],
+    },
+
+    // 2. PRODUCT VARIANTS (VAR-201: Hũ 500ml)
+    {
+      id: "ent-var-201",
+      legacyId: "VAR-201",
+      migratedId: "pw2_var_201",
+      entityGroup: "variants",
+      entityName: "Biến Thể: Hũ Thủy Tinh 500ml",
+      entityIdentifier: "SKU: ONG-RUNG-500ML",
+      matchStatus: "match",
+      totalFields: 5,
+      matchedFields: 5,
+      discrepancyCount: 0,
+      fields: [
+        {
+          fieldName: "sku",
+          fieldLabel: "Mã SKU",
+          legacyKey: "product_variants.sku",
+          migratedKey: "variants[0].sku",
+          legacyValue: "ONG-RUNG-500ML",
+          migratedValue: "ONG-RUNG-500ML",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "price",
+          fieldLabel: "Giá Biến Thể",
+          legacyKey: "product_variants.price",
+          migratedKey: "variants[0].price",
+          legacyValue: 180000,
+          migratedValue: 180000,
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "cost",
+          fieldLabel: "Giá Vốn",
+          legacyKey: "product_variants.cost",
+          migratedKey: "variants[0].cost",
+          legacyValue: 120000,
+          migratedValue: 120000,
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "inventory_count",
+          fieldLabel: "Tồn Kho",
+          legacyKey: "product_variants.stock",
+          migratedKey: "variants[0].inventory",
+          legacyValue: 45,
+          migratedValue: 45,
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "options",
+          fieldLabel: "Tùy Chọn Dung Tích",
+          legacyKey: "product_variants.options",
+          migratedKey: "variants[0].options",
+          legacyValue: "Dung tích: 500ml",
+          migratedValue: "Dung tích: 500ml",
+          status: "match",
+          classification: "100% Match",
+        },
+      ],
+    },
+
+    // 3. PRODUCT VARIANTS (VAR-202: Can 1 Lít - Mất trong failed store)
+    {
+      id: "ent-var-202",
+      legacyId: "VAR-202",
+      migratedId: isFailed ? null : "pw2_var_202",
+      entityGroup: "variants",
+      entityName: "Biến Thể: Can Tiết Kiệm 1 Lít",
+      entityIdentifier: "SKU: ONG-RUNG-1L",
+      matchStatus: isFailed ? "missing_in_pw2" : "match",
+      totalFields: 5,
+      matchedFields: isFailed ? 0 : 5,
+      discrepancyCount: isFailed ? 5 : 0,
+      fields: [
+        {
+          fieldName: "sku",
+          fieldLabel: "Mã SKU",
+          legacyKey: "product_variants.sku",
+          migratedKey: "variants[1].sku",
+          legacyValue: "ONG-RUNG-1L",
+          migratedValue: isFailed ? null : "ONG-RUNG-1L",
+          status: isFailed ? "error" : "match",
+          classification: isFailed ? "P0 Blocker" : "100% Match",
+          diffExplanation: isFailed ? "Biến thể Can 1L có trong MySQL nhưng bị mất hoàn toàn trong mảng variants của PW2" : undefined,
+          remediationAction: isFailed ? "Chạy lại migration script cho bảng `product_variants` để import đủ biến thể" : undefined,
+        },
+        {
+          fieldName: "price",
+          fieldLabel: "Giá Biến Thể",
+          legacyKey: "product_variants.price",
+          migratedKey: "variants[1].price",
+          legacyValue: 320000,
+          migratedValue: isFailed ? null : 320000,
+          status: isFailed ? "error" : "match",
+          classification: isFailed ? "P0 Blocker" : "100% Match",
+        },
+        {
+          fieldName: "cost",
+          fieldLabel: "Giá Vốn",
+          legacyKey: "product_variants.cost",
+          migratedKey: "variants[1].cost",
+          legacyValue: 210000,
+          migratedValue: isFailed ? null : 210000,
+          status: isFailed ? "error" : "match",
+          classification: isFailed ? "P0 Blocker" : "100% Match",
+        },
+        {
+          fieldName: "inventory_count",
+          fieldLabel: "Tồn Kho",
+          legacyKey: "product_variants.stock",
+          migratedKey: "variants[1].inventory",
+          legacyValue: 20,
+          migratedValue: isFailed ? null : 20,
+          status: isFailed ? "error" : "match",
+          classification: isFailed ? "P0 Blocker" : "100% Match",
+        },
+        {
+          fieldName: "options",
+          fieldLabel: "Tùy Chọn Dung Tích",
+          legacyKey: "product_variants.options",
+          migratedKey: "variants[1].options",
+          legacyValue: "Dung tích: 1 Lít",
+          migratedValue: isFailed ? null : "Dung tích: 1 Lít",
+          status: isFailed ? "error" : "match",
+          classification: isFailed ? "P0 Blocker" : "100% Match",
+        },
+      ],
+    },
+
+    // 4. CATEGORIES (CAT-12: Mật Ong & Nông Sản)
+    {
+      id: "ent-cat-12",
+      legacyId: "CAT-12",
+      migratedId: "pw2_cat_12",
+      entityGroup: "categories",
+      entityName: "Danh Mục: Mật Ong & Nông Sản",
+      entityIdentifier: "Slug: mat-ong-nong-san",
+      matchStatus: "match",
+      totalFields: 4,
+      matchedFields: 4,
+      discrepancyCount: 0,
+      fields: [
+        {
+          fieldName: "name",
+          fieldLabel: "Tên Danh Mục",
+          legacyKey: "categories.name",
+          migratedKey: "categories.name",
+          legacyValue: "Mật Ong & Nông Sản",
+          migratedValue: "Mật Ong & Nông Sản",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "slug",
+          fieldLabel: "Slug Danh Mục",
+          legacyKey: "categories.slug",
+          migratedKey: "categories.slug",
+          legacyValue: "mat-ong-nong-san",
+          migratedValue: "mat-ong-nong-san",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "parent_id",
+          fieldLabel: "Danh Mục Cha (Hierarchy)",
+          legacyKey: "categories.parent_id",
+          migratedKey: "categories.parent",
+          legacyValue: null,
+          migratedValue: null,
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "seo_title",
+          fieldLabel: "SEO Title",
+          legacyKey: "categories.seo_title",
+          migratedKey: "categories.meta.title",
+          legacyValue: "Mật Ong & Nông Sản Sạch VietGAP",
+          migratedValue: "Mật Ong & Nông Sản Sạch VietGAP",
+          status: "match",
+          classification: "100% Match",
+        },
+      ],
+    },
+
+    // 5. BLOG POSTS (POST-88: Phân biệt mật ong)
+    {
+      id: "ent-post-88",
+      legacyId: "POST-88",
+      migratedId: "pw2_post_88",
+      entityGroup: "posts",
+      entityName: "Bài Viết: 5 Cách Phân Biệt Mật Ong Thật Và Giả",
+      entityIdentifier: "Slug: 5-cach-phan-biet-mat-ong-that-gia",
+      matchStatus: "match",
+      totalFields: 5,
+      matchedFields: 5,
+      discrepancyCount: 0,
+      fields: [
+        {
+          fieldName: "title",
+          fieldLabel: "Tiêu Đề Bài Viết",
+          legacyKey: "articles.title",
+          migratedKey: "posts.title",
+          legacyValue: "5 Cách Phân Biệt Mật Ong Thật Và Giả Tại Nhà",
+          migratedValue: "5 Cách Phân Biệt Mật Ong Thật Và Giả Tại Nhà",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "slug",
+          fieldLabel: "Đường Dẫn Slug",
+          legacyKey: "articles.slug",
+          migratedKey: "posts.slug",
+          legacyValue: "5-cach-phan-biet-mat-ong-that-gia",
+          migratedValue: "5-cach-phan-biet-mat-ong-that-gia",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "author",
+          fieldLabel: "Tác Giả",
+          legacyKey: "articles.author_name",
+          migratedKey: "posts.author",
+          legacyValue: "Nguyễn Văn An",
+          migratedValue: "Nguyễn Văn An",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "published_at",
+          fieldLabel: "Ngày Xuất Bản",
+          legacyKey: "articles.published_at",
+          migratedKey: "posts.publishedAt",
+          legacyValue: "2026-05-10T08:00:00Z",
+          migratedValue: "2026-05-10T08:00:00Z",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "tags",
+          fieldLabel: "Từ Khóa Tags",
+          legacyKey: "articles.tags",
+          migratedKey: "posts.tags",
+          legacyValue: "mật ong, sức khỏe",
+          migratedValue: "mật ong, sức khỏe",
+          status: "match",
+          classification: "100% Match",
+        },
+      ],
+    },
+
+    // 6. STORE SETTINGS (SET-01)
+    {
+      id: "ent-set-01",
+      legacyId: "SET-01",
+      migratedId: "pw2_settings_01",
+      entityGroup: "settings",
+      entityName: "Cài Đặt Cửa Hàng & Chân Trang (Settings)",
+      entityIdentifier: "Tenant: OrganicNest",
+      matchStatus: isWarn ? "warning" : "match",
+      totalFields: 5,
+      matchedFields: isWarn ? 4 : 5,
+      discrepancyCount: isWarn ? 1 : 0,
+      fields: [
+        {
+          fieldName: "store_name",
+          fieldLabel: "Tên Cửa Hàng",
+          legacyKey: "stores.name",
+          migratedKey: "tenants.name",
+          legacyValue: "OrganicNest Ba Vì",
+          migratedValue: "OrganicNest Ba Vì",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "hotline",
+          fieldLabel: "Hotline CSKH",
+          legacyKey: "stores.hotline",
+          migratedKey: "store_settings.hotline",
+          legacyValue: "1900 8888",
+          migratedValue: "1900 8888",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "currency",
+          fieldLabel: "Đơn Vị Tiền Tệ",
+          legacyKey: "stores.currency",
+          migratedKey: "store_settings.currency",
+          legacyValue: "VND",
+          migratedValue: "VND",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "address",
+          fieldLabel: "Địa Chỉ Trụ Sở",
+          legacyKey: "stores.address",
+          migratedKey: "store_settings.address",
+          legacyValue: "Xã Ba Trại, Huyện Ba Vì, Hà Nội",
+          migratedValue: "Xã Ba Trại, Huyện Ba Vì, Hà Nội",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "google_maps_url",
+          fieldLabel: "Iframe Bản Đồ Chỉ Đường",
+          legacyKey: "stores.map_url",
+          migratedKey: "store_settings.googleMapsUrl",
+          legacyValue: "https://maps.google.com/?q=bavi",
+          migratedValue: isWarn ? null : "https://maps.google.com/?q=bavi",
+          status: isWarn ? "warning" : "match",
+          classification: isWarn ? "P1 Warning" : "100% Match",
+          diffExplanation: isWarn ? "Chưa migrate trường Google Maps Embed URL vào store_settings của PW2" : undefined,
+          remediationAction: isWarn ? "Dev bổ sung trường `googleMapsUrl` trong global store-settings" : undefined,
+        },
+      ],
+    },
+
+    // 7. LAYOUT BLOCKS (BLOCKS-01: Hero Banner)
+    {
+      id: "ent-blk-01",
+      legacyId: "BLK-1365",
+      migratedId: "pw2_blk_hero",
+      entityGroup: "blocks",
+      entityName: "Khối Giao Diện: Hero Banner 1365",
+      entityIdentifier: "Pos: #01 (hero/split-left)",
+      matchStatus: "match",
+      totalFields: 3,
+      matchedFields: 3,
+      discrepancyCount: 0,
+      fields: [
+        {
+          fieldName: "component_type",
+          fieldLabel: "Loại Khối",
+          legacyKey: "page_components.component_type",
+          migratedKey: "pages.layout[0].blockType",
+          legacyValue: "hero_banner_1365",
+          migratedValue: "hero/split-left",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "order",
+          fieldLabel: "Thứ Tự Hiển Thị",
+          legacyKey: "page_components.order",
+          migratedKey: "pages.layout[0]._order",
+          legacyValue: 1,
+          migratedValue: 1,
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "config_json",
+          fieldLabel: "Cấu Hình Tuỳ Chọn",
+          legacyKey: "page_components.config",
+          migratedKey: "pages.layout[0].config",
+          legacyValue: "autoplay: true, speed: 5000",
+          migratedValue: "autoplay: true, speed: 5000",
+          status: "match",
+          classification: "100% Match",
+        },
+      ],
+    },
+  ];
+
+  // Calculate statistics
+  const totalEntitiesV1 = records.length;
+  const missingCount = records.filter((r) => r.matchStatus === "missing_in_pw2").length;
+  const totalEntitiesV2 = totalEntitiesV1 - missingCount;
+  const matchedEntities = records.filter((r) => r.matchStatus === "match").length;
+
+  const allFields = records.flatMap((r) => r.fields);
+  const matchedFieldCount = allFields.filter((f) => f.status === "match").length;
+  const totalFieldCount = allFields.length;
+  const fieldMatchRate = totalFieldCount > 0 ? `${((matchedFieldCount / totalFieldCount) * 100).toFixed(1)}%` : "100.0%";
+
+  const groupStats: Record<EntityGroupType, { total: number; pass: number; warn: number; fail: number }> = {
+    products: { total: 1, pass: isFailed ? 0 : 1, warn: 0, fail: isFailed ? 1 : 0 },
+    variants: { total: 2, pass: isFailed ? 1 : 2, warn: 0, fail: isFailed ? 1 : 0 },
+    categories: { total: 1, pass: 1, warn: 0, fail: 0 },
+    posts: { total: 1, pass: 1, warn: 0, fail: 0 },
+    settings: { total: 1, pass: isWarn ? 0 : 1, warn: isWarn ? 1 : 0, fail: 0 },
+    blocks: { total: 1, pass: 1, warn: 0, fail: 0 },
+  };
+
+  return {
+    storeId: siteId,
+    summary: {
+      totalEntitiesV1,
+      totalEntitiesV2,
+      matchedEntities,
+      missingInPW2Count: missingCount,
+      orphanInPW2Count: 0,
+      fieldMatchRate,
+      groupStats,
+    },
+    records,
+  };
+}
+
+/**
+ * Get deep store diff with specialized Media, Text Format & Field-by-Field audits
  */
 export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreDeepDiff | null {
   const allStores = generateReconciliationCatalog(2000);
@@ -1013,14 +1565,14 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
       ],
     },
 
-    // 6. CUSTOM MERCHANT LANDING PAGE (e.g. Policies or Campaign)
+    // 6. CUSTOM MERCHANT LANDING PAGE
     {
       id: "page-custom-policy",
       name: "Chính Sách Đổi Trả",
       path: "/chinh-sach-doi-tra",
       pageType: "custom_page",
       existsInPW1: true,
-      existsInPW2: !isFailed, // If failed store, this page was dropped in PW2!
+      existsInPW2: !isFailed,
       totalBlocks: 3,
       defects: isFailed
         ? [
@@ -1086,6 +1638,7 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
     totalPagesInPW2: isFailed ? dynamicPages.length - 1 : dynamicPages.length,
     missingPagesCount: isFailed ? 1 : 0,
     pages: dynamicPages,
+    fieldDiffAudit: getFieldDiffAuditForStore(siteId, currentStatus),
     reconciliationAudit: {
       totalProductsV1: 24,
       totalProductsV2: 24,

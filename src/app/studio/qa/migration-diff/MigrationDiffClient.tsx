@@ -9,6 +9,8 @@ import {
   type StoreSummary,
   type StoreDeepDiff,
   type DynamicStorePage,
+  type EntityGroupType,
+  type EntityDiffRecord,
 } from "@/lib/admin/qa/migration-diff-engine";
 import {
   Layers,
@@ -39,6 +41,13 @@ import {
   Globe,
   Check,
   Filter,
+  SlidersHorizontal,
+  Package,
+  Tags,
+  FolderTree,
+  Newspaper,
+  Settings,
+  Grid,
 } from "lucide-react";
 
 export function MigrationDiffClient() {
@@ -57,10 +66,15 @@ export function MigrationDiffClient() {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
-  const [activeAuditTab, setActiveAuditTab] = useState<"stream" | "media" | "typography">("stream");
+  const [activeAuditTab, setActiveAuditTab] = useState<"stream" | "media" | "typography" | "fields">("stream");
   const [resolvedStoreIds, setResolvedStoreIds] = useState<Set<string>>(new Set());
   const [isReloading, setIsReloading] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Field Diff Specific Filters
+  const [fieldEntityGroupFilter, setFieldEntityGroupFilter] = useState<"all" | EntityGroupType>("all");
+  const [fieldStatusFilter, setFieldStatusFilter] = useState<"all" | "error" | "warning" | "match">("all");
+  const [fieldSearchQuery, setFieldSearchQuery] = useState("");
 
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
     if (!activeStoreId) return null;
@@ -92,6 +106,36 @@ export function MigrationDiffClient() {
     const start = (currentPage - 1) * pageSize;
     return filteredStores.slice(start, start + pageSize);
   }, [filteredStores, currentPage, pageSize]);
+
+  // Filtered Field Diff Records
+  const filteredFieldRecords = useMemo(() => {
+    if (!selectedDiff?.fieldDiffAudit?.records) return [];
+    return selectedDiff.fieldDiffAudit.records.filter((r) => {
+      const matchGroup = fieldEntityGroupFilter === "all" || r.entityGroup === fieldEntityGroupFilter;
+      const matchStatus =
+        fieldStatusFilter === "all" ||
+        (fieldStatusFilter === "error" && (r.matchStatus === "error" || r.matchStatus === "missing_in_pw2")) ||
+        (fieldStatusFilter === "warning" && r.matchStatus === "warning") ||
+        (fieldStatusFilter === "match" && r.matchStatus === "match");
+
+      const q = fieldSearchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        r.entityName.toLowerCase().includes(q) ||
+        r.entityIdentifier.toLowerCase().includes(q) ||
+        String(r.legacyId).toLowerCase().includes(q) ||
+        r.fields.some(
+          (f) =>
+            f.fieldLabel.toLowerCase().includes(q) ||
+            f.legacyKey.toLowerCase().includes(q) ||
+            f.migratedKey.toLowerCase().includes(q) ||
+            String(f.legacyValue).toLowerCase().includes(q) ||
+            String(f.migratedValue).toLowerCase().includes(q)
+        );
+
+      return matchGroup && matchStatus && matchSearch;
+    });
+  }, [selectedDiff, fieldEntityGroupFilter, fieldStatusFilter, fieldSearchQuery]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -192,7 +236,7 @@ ${page.defects
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                So sánh đối chiếu toàn diện <strong>Bố Cục Tuần Tự, Hình Ảnh (404/CDN)</strong> & <strong>Định Dạng Văn Bản (UTF-8, Bảng &lt;table&gt;)</strong>
+                So sánh đối chiếu toàn diện <strong>Bố Cục Tuần Tự, Hình Ảnh (404/CDN), Văn Bản (UTF-8, Bảng &lt;table&gt;)</strong> & <strong>Từng Trường DB 1-to-1</strong>
               </p>
             </div>
           </div>
@@ -607,7 +651,7 @@ ${page.defects
                 })}
               </div>
 
-              {/* Right View Mode Controls */}
+              {/* Right View Mode Controls (4 Tabs) */}
               <div className="flex items-center gap-2 shrink-0">
                 <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
                   <button
@@ -637,6 +681,15 @@ ${page.defects
                     <TypeIcon className="size-3.5" />
                     <span>Soi Văn Bản & Bảng</span>
                   </button>
+                  <button
+                    onClick={() => setActiveAuditTab("fields")}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+                      activeAuditTab === "fields" ? "bg-indigo-600 text-white shadow" : "text-indigo-400 hover:text-indigo-200"
+                    }`}
+                  >
+                    <SlidersHorizontal className="size-3.5" />
+                    <span>Soi Từng Trường (Field Diff)</span>
+                  </button>
                 </div>
 
                 {/* Filter toggle */}
@@ -653,7 +706,248 @@ ${page.defects
             </div>
 
             {/* 3. MODAL CONTENT AREA */}
-            {activeAuditTab === "media" ? (
+            {activeAuditTab === "fields" ? (
+              /* DEEP FIELD-BY-FIELD DATABASE DIFF INSPECTOR TAB */
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/40 min-h-0">
+                {/* Header Summary & Stats */}
+                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div>
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      <SlidersHorizontal className="size-5 text-indigo-400" />
+                      <span>BẢNG ĐỐI SOÁT TRƯỜNG DỮ LIỆU 1-TO-1 (DATABASE FIELD RECONCILIATION)</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Khớp nối 1-1 theo <code>legacy_id</code> giữa MySQL PW1 và Postgres PW2 trên 5 nhóm thực thể: Sản Phẩm, Biến Thể, Danh Mục, Tin Tức, Cài Đặt Shop và Khối Bố Cục.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
+                      <div className="text-[10px] text-slate-500 uppercase font-mono font-bold">Độ Khớp Trường</div>
+                      <div className="font-black text-emerald-400 text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.fieldMatchRate}</div>
+                    </div>
+                    <div className="bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
+                      <div className="text-[10px] text-slate-500 uppercase font-mono font-bold">Tổng Record</div>
+                      <div className="font-black text-white text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.totalEntitiesV1}</div>
+                    </div>
+                    {selectedDiff.fieldDiffAudit.summary.missingInPW2Count > 0 && (
+                      <div className="bg-rose-950/60 px-3.5 py-2 rounded-xl border border-rose-500/50 text-xs animate-pulse">
+                        <div className="text-[10px] text-rose-400 uppercase font-mono font-bold">Thiếu Trên PW2</div>
+                        <div className="font-black text-rose-300 text-sm font-mono">🚨 {selectedDiff.fieldDiffAudit.summary.missingInPW2Count} Record</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sub-group & Search Filter Bar */}
+                <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                  <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto w-full md:w-auto">
+                    {(
+                      [
+                        { key: "all", label: "Tất Cả", icon: Grid },
+                        { key: "products", label: "Sản Phẩm", icon: Package },
+                        { key: "variants", label: "Biến Thể", icon: Tags },
+                        { key: "categories", label: "Danh Mục", icon: FolderTree },
+                        { key: "posts", label: "Tin Tức", icon: Newspaper },
+                        { key: "settings", label: "Cài Đặt", icon: Settings },
+                        { key: "blocks", label: "Khối Layout", icon: BlockTreeIcon },
+                      ] as const
+                    ).map((grp) => {
+                      const Icon = grp.icon;
+                      const count = grp.key === "all"
+                        ? selectedDiff.fieldDiffAudit.records.length
+                        : selectedDiff.fieldDiffAudit.records.filter((r) => r.entityGroup === grp.key).length;
+
+                      return (
+                        <button
+                          key={grp.key}
+                          onClick={() => setFieldEntityGroupFilter(grp.key)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition border ${
+                            fieldEntityGroupFilter === grp.key
+                              ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
+                              : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
+                          }`}
+                        >
+                          <Icon className="size-3.5" />
+                          <span>{grp.label}</span>
+                          <span className="text-[10px] bg-slate-950/80 px-1.5 py-0.2 rounded-md font-mono opacity-80">
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full md:w-auto">
+                    {/* Status Filter */}
+                    <div className="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-800 shrink-0">
+                      {(["all", "error", "warning", "match"] as const).map((st) => (
+                        <button
+                          key={st}
+                          onClick={() => setFieldStatusFilter(st)}
+                          className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition ${
+                            fieldStatusFilter === st
+                              ? "bg-indigo-600 text-white shadow"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          {st === "all" ? "Tất Cả" : st === "error" ? "Lỗi P0" : st === "warning" ? "Cần Xem" : "Khớp"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Search Field */}
+                    <div className="relative w-full md:w-64">
+                      <Search className="size-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Tìm trường, SKU, khóa..."
+                        value={fieldSearchQuery}
+                        onChange={(e) => setFieldSearchQuery(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Entity Cards & Field Breakdown Tables */}
+                <div className="space-y-4">
+                  {filteredFieldRecords.map((record) => (
+                    <div
+                      key={record.id}
+                      className={`rounded-2xl border overflow-hidden shadow-lg transition ${
+                        record.matchStatus === "missing_in_pw2" || record.matchStatus === "error"
+                          ? "bg-rose-950/15 border-rose-500 ring-1 ring-rose-500/40"
+                          : record.matchStatus === "warning"
+                          ? "bg-amber-950/15 border-amber-500 ring-1 ring-amber-500/40"
+                          : "bg-slate-950 border-slate-800"
+                      }`}
+                    >
+                      {/* Entity Card Header */}
+                      <div className="p-4 bg-slate-950/90 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-lg bg-slate-900 text-indigo-400 border border-slate-800">
+                            {record.entityGroup}
+                          </span>
+                          <div>
+                            <div className="font-black text-white text-sm flex items-center gap-2">
+                              <span>{record.entityName}</span>
+                              <span className="text-xs font-mono text-slate-400 font-normal">({record.entityIdentifier})</span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                              Legacy ID: <strong className="text-amber-400">{record.legacyId}</strong> ➔ Migrated ID:{" "}
+                              {record.migratedId ? (
+                                <strong className="text-indigo-300">{record.migratedId}</strong>
+                              ) : (
+                                <strong className="text-rose-400">🚨 CHƯA CÓ TRÊN PW2</strong>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          {record.matchStatus === "missing_in_pw2" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500 animate-pulse">
+                              <AlertOctagon className="size-3.5" /> 🚨 MẤT RECORD TRÊN PW2
+                            </span>
+                          ) : record.matchStatus === "error" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500/50">
+                              <AlertOctagon className="size-3.5" /> 🚨 LỆCH {record.discrepancyCount} TRƯỜNG P0
+                            </span>
+                          ) : record.matchStatus === "warning" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-950 text-amber-300 border border-amber-500/50">
+                              <AlertTriangle className="size-3.5" /> ⚠️ CẦN XEM {record.discrepancyCount} TRƯỜNG
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                              <CheckCircle2 className="size-3.5" /> ✓ Khớp {record.matchedFields}/{record.totalFields} Trường
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 1-to-1 Field Matrix Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs text-slate-300">
+                          <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800">
+                            <tr>
+                              <th className="py-3 px-4">Tên Trường (Field)</th>
+                              <th className="py-3 px-4">Khóa MySQL (PW1) ➔ Khóa Postgres (PW2)</th>
+                              <th className="py-3 px-4">Giá Trị Bản Cũ (PW1)</th>
+                              <th className="py-3 px-4">Giá Trị Bản Mới (PW2)</th>
+                              <th className="py-3 px-4">Đánh Giá</th>
+                              <th className="py-3 px-4">Hướng Dẫn Khắc Phục (Fix Action)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/50 text-[11px] font-mono">
+                            {record.fields.map((field, fIdx) => (
+                              <tr
+                                key={fIdx}
+                                className={`hover:bg-slate-900/40 transition ${
+                                  field.status === "error"
+                                    ? "bg-rose-950/20"
+                                    : field.status === "warning"
+                                    ? "bg-amber-950/20"
+                                    : ""
+                                }`}
+                              >
+                                <td className="py-3.5 px-4 font-sans font-bold text-white">
+                                  {field.fieldLabel}
+                                  <div className="text-[10px] text-slate-500 font-mono">{field.fieldName}</div>
+                                </td>
+                                <td className="py-3.5 px-4 text-slate-400">
+                                  <span className="text-amber-400/90">{field.legacyKey}</span>
+                                  <span className="text-slate-600 mx-1.5">➔</span>
+                                  <span className="text-indigo-400/90">{field.migratedKey}</span>
+                                </td>
+                                <td className="py-3.5 px-4 font-sans text-slate-200">
+                                  {field.legacyValue !== null ? (
+                                    String(field.legacyValue)
+                                  ) : (
+                                    <span className="text-slate-600 italic">null</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 font-sans">
+                                  {field.migratedValue !== null ? (
+                                    <span className="text-slate-200">{String(field.migratedValue)}</span>
+                                  ) : (
+                                    <span className="text-rose-400 font-bold italic">🚨 NULL (Bị Mất)</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 font-sans">
+                                  {field.status === "match" ? (
+                                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                      <Check className="size-3.5" /> Khớp 100%
+                                    </span>
+                                  ) : field.status === "warning" ? (
+                                    <span className="text-amber-400 font-bold flex items-center gap-1">
+                                      <AlertTriangle className="size-3.5" /> {field.classification}
+                                    </span>
+                                  ) : (
+                                    <span className="text-rose-400 font-bold flex items-center gap-1">
+                                      <AlertOctagon className="size-3.5" /> {field.classification}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 font-sans text-slate-300 max-w-xs">
+                                  {field.remediationAction ? (
+                                    <div className="text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-indigo-300">
+                                      {field.remediationAction}
+                                    </div>
+                                  ) : (
+                                    <span className="text-emerald-500/80 text-[11px]">✓ Không cần chỉnh sửa</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : activeAuditTab === "media" ? (
               /* CLEAN MEDIA INTEGRITY AUDIT TAB */
               <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-900/40 min-h-0">
                 <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 shadow-sm flex items-center justify-between">
