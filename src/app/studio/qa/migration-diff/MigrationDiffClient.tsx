@@ -258,8 +258,8 @@ export function MigrationDiffClient() {
           onClick={() => setFilterStatus("all")}
           className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
             filterStatus === "all"
-              ? "bg-indigo-950/60 border-indigo-500 shadow-lg shadow-indigo-500/20 ring-2 ring-indigo-500/50"
-              : "bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
+              ? "bg-slate-900 border-indigo-500/80 shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-500/30"
+              : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/90"
           }`}
         >
           <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tổng Số Website</div>
@@ -273,42 +273,42 @@ export function MigrationDiffClient() {
           onClick={() => setFilterStatus("passed")}
           className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
             filterStatus === "passed"
-              ? "bg-emerald-950/60 border-emerald-500 shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-500/50"
-              : "bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
+              ? "bg-emerald-950/30 border-emerald-500/80 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30"
+              : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/90"
           }`}
         >
           <div className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">Khớp Chuẩn (≥95%)</div>
           <div className="text-3xl font-black text-emerald-400 mt-1.5">{metrics.passedStores}</div>
-          <div className="text-[11px] text-emerald-500/90 mt-1.5 font-medium">Đủ điều kiện Cutover</div>
+          <div className="text-[11px] text-emerald-400/80 mt-1.5 font-medium">Đủ điều kiện Cutover</div>
         </div>
 
         <div
           onClick={() => setFilterStatus("warning")}
           className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
             filterStatus === "warning"
-              ? "bg-amber-950/60 border-amber-500 shadow-lg shadow-amber-500/20 ring-2 ring-amber-500/50"
-              : "bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
+              ? "bg-amber-950/30 border-amber-500/80 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/30"
+              : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/90"
           }`}
         >
           <div className="text-xs text-amber-400 font-semibold uppercase tracking-wider">Cần Xem Lại (85-94%)</div>
           <div className="text-3xl font-black text-amber-400 mt-1.5">{metrics.warningStores}</div>
-          <div className="text-[11px] text-amber-500/90 mt-1.5 font-medium">Lệch ảnh / Thiếu Map / Text</div>
+          <div className="text-[11px] text-amber-400/80 mt-1.5 font-medium">Lệch ảnh / Thiếu Map / Text</div>
         </div>
 
         <div
           onClick={() => setFilterStatus("failed")}
           className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
             filterStatus === "failed"
-              ? "bg-rose-950/60 border-rose-500 shadow-lg shadow-rose-500/20 ring-2 ring-rose-500/50"
-              : "bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
+              ? "bg-rose-950/30 border-rose-500/80 shadow-lg shadow-rose-500/10 ring-1 ring-rose-500/30"
+              : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/90"
           }`}
         >
           <div className="text-xs text-rose-400 font-semibold uppercase tracking-wider">Lỗi Dữ Liệu P0 (&lt;85%)</div>
           <div className="text-3xl font-black text-rose-400 mt-1.5">{metrics.failedStores}</div>
-          <div className="text-[11px] text-rose-500/90 mt-1.5 font-medium">Chặn Cutover</div>
+          <div className="text-[11px] text-rose-400/80 mt-1.5 font-medium">Chặn Cutover</div>
         </div>
 
-        <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/80">
+        <div className="p-4 rounded-2xl border border-slate-800/80 bg-slate-900/60">
           <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Độ Khớp Trung Bình</div>
           <div className="text-3xl font-black text-cyan-400 mt-1.5">{metrics.avgScore}</div>
           <div className="text-[11px] text-slate-500 mt-1.5 font-medium">Toàn bộ hệ thống</div>
