@@ -29,11 +29,9 @@ import {
   Sliders,
   Store,
   ArrowRight,
-  ShoppingBag,
-  Filter,
   FileText,
-  Search as SearchIcon,
-  PhoneCall,
+  Image as ImageIcon,
+  Table as TableIcon,
   Check,
 } from "lucide-react";
 
@@ -147,7 +145,7 @@ ${activePage.defects
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                Kiểm thử toàn diện 6 luồng e-commerce: <strong>Trang Chủ, Danh Mục & Filter, Chi Tiết SP & Biến Thể, Blog, Giỏ Hàng & Search, Tra Cứu Đơn</strong>
+                Kiểm thử toàn diện 7 luồng e-commerce: <strong>Trang Chủ, Khối RichText Word-like, Danh Mục & Filter, Chi Tiết SP, Blog, Giỏ Hàng & Search, Tra Cứu Đơn</strong>
               </p>
             </div>
           </div>
@@ -424,7 +422,7 @@ ${activePage.defects
       </div>
 
       {/* ========================================================================= */}
-      {/* REDESIGNED FULL-LIFECYCLE E-COMMERCE INSPECTOR MODAL (6 CORE PAGES) */}
+      {/* REDESIGNED FULL-LIFECYCLE E-COMMERCE INSPECTOR MODAL (7 CORE TABS) */}
       {/* ========================================================================= */}
       {selectedDiff && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
@@ -489,7 +487,7 @@ ${activePage.defects
               </div>
             </div>
 
-            {/* 6 Comprehensive Page & Flow Tabs */}
+            {/* 7 Comprehensive Page & Feature Tabs (including RichText) */}
             <div className="bg-slate-950 px-6 pt-3 border-b border-slate-800 flex items-center justify-between shrink-0 overflow-x-auto">
               <div className="flex items-center gap-2">
                 {selectedDiff.pages.map((p, idx) => (
@@ -578,11 +576,126 @@ ${activePage.defects
                 </div>
               )}
 
+              {/* SPECIAL RICHTEXT WYSIWYG AUDIT SECTION (If on RichText tab) */}
+              {selectedDiff.pages[activePageIndex]?.category === "richtext_editor" && (
+                <div className="bg-slate-950 p-5 rounded-2xl border border-indigo-500/40 space-y-4 shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-indigo-300">
+                      <FileText className="size-4 text-indigo-400" />
+                      <span>Đối Soát Văn Bản Trình Soạn Thảo (Word-like WYSIWYG HTML ➔ Lexical AST)</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="flex items-center gap-1 text-slate-300">
+                        <ImageIcon className="size-3.5 text-cyan-400" /> 2 Ảnh Nhúng Trong Bài
+                      </span>
+                      <span className="flex items-center gap-1 text-slate-300">
+                        <TableIcon className="size-3.5 text-amber-400" /> 1 Bảng 3 Cột Dinh Dưỡng
+                      </span>
+                      <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                        <Check className="size-3.5" /> 100% UTF-8
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dual Word Document Preview */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* PW1 RichText Word View */}
+                    <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                      <div className="text-[11px] font-bold text-amber-300 font-mono uppercase border-b border-slate-800 pb-2 flex items-center justify-between">
+                        <span>👈 Văn Bản Gốc PW1 (HTML TinyMCE)</span>
+                        <span className="text-slate-400 font-normal">850 từ • 2 ảnh</span>
+                      </div>
+                      <div className="text-xs text-slate-200 space-y-2 bg-slate-950 p-4 rounded-lg border border-slate-800">
+                        <h4 className="font-bold text-sm text-white">Hành Trình 10 Năm Nông Trại Hữu Cơ Ba Vì</h4>
+                        <p className="text-slate-300">
+                          Chúng tôi tự hào mang đến cho quý khách hàng những sản phẩm <strong>mật ong nguyên chất 100%</strong> được thu hoạch trực tiếp từ các cánh rừng tự nhiên tại Ba Vì...
+                        </p>
+                        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-center text-slate-400 text-[11px] flex items-center justify-center gap-2">
+                          <ImageIcon className="size-3 text-cyan-400" /> [Ảnh minh họa 1: farm_harvest_2026.jpg]
+                        </div>
+                        <div className="border border-slate-700 rounded overflow-hidden mt-2">
+                          <table className="w-full text-[10px] text-left">
+                            <thead className="bg-slate-800 text-slate-300 font-bold">
+                              <tr>
+                                <th className="p-1.5">Tiêu Chí</th>
+                                <th className="p-1.5">Mật Ong Thường</th>
+                                <th className="p-1.5">Mật Ong Ba Vì</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800 text-slate-400">
+                              <tr>
+                                <td className="p-1.5">Độ đậm đặc</td>
+                                <td className="p-1.5">Loãng 18%</td>
+                                <td className="p-1.5 text-emerald-400 font-bold">Đậm đặc &gt; 23%</td>
+                              </tr>
+                              <tr>
+                                <td className="p-1.5">Hương vị</td>
+                                <td className="p-1.5">Ngọt gắt đường</td>
+                                <td className="p-1.5 text-emerald-400 font-bold">Ngọt thanh hoa rừng</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PW2 RichText Lexical View */}
+                    <div className="bg-slate-900 border border-indigo-500/30 rounded-xl p-4 space-y-3">
+                      <div className="text-[11px] font-bold text-indigo-300 font-mono uppercase border-b border-slate-800 pb-2 flex items-center justify-between">
+                        <span>👉 Văn Bản Mới PW2 (Payload Lexical AST)</span>
+                        <span className="text-slate-400 font-normal">Next.js 15 Render</span>
+                      </div>
+                      <div className="text-xs text-slate-200 space-y-2 bg-slate-950 p-4 rounded-lg border border-slate-800">
+                        <h4 className="font-bold text-sm text-white">Hành Trình 10 Năm Nông Trại Hữu Cơ Ba Vì</h4>
+                        <p className="text-slate-300">
+                          Chúng tôi tự hào mang đến cho quý khách hàng những sản phẩm <strong>mật ong nguyên chất 100%</strong> được thu hoạch trực tiếp từ các cánh rừng tự nhiên tại Ba Vì...
+                        </p>
+                        <div className="p-2 bg-slate-900 border border-slate-800 rounded text-center text-slate-400 text-[11px] flex items-center justify-center gap-2">
+                          <ImageIcon className="size-3 text-cyan-400" /> [Ảnh minh họa 1: farm_harvest_2026.jpg]
+                        </div>
+                        {selectedDiff.status === "failed" ? (
+                          <div className="p-2.5 bg-rose-950/80 border border-rose-500 rounded text-rose-200 font-mono text-[11px] space-y-1">
+                            <div className="font-bold">🚨 PHÁT HIỆN LỖI P0: MẤT THẺ BẢNG &lt;table&gt;</div>
+                            <div className="text-slate-300 text-[10px]">
+                              Số liệu bị dồn: "Tiêu Chí Mật Ong Thường Mật Ong Ba Vì Độ đậm đặc Loãng 18% Đậm đặc &gt; 23%..."
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="border border-slate-700 rounded overflow-hidden mt-2">
+                            <table className="w-full text-[10px] text-left">
+                              <thead className="bg-slate-800 text-slate-300 font-bold">
+                                <tr>
+                                  <th className="p-1.5">Tiêu Chí</th>
+                                  <th className="p-1.5">Mật Ong Thường</th>
+                                  <th className="p-1.5">Mật Ong Ba Vì</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800 text-slate-400">
+                                <tr>
+                                  <td className="p-1.5">Độ đậm đặc</td>
+                                  <td className="p-1.5">Loãng 18%</td>
+                                  <td className="p-1.5 text-emerald-400 font-bold">Đậm đặc &gt; 23%</td>
+                                </tr>
+                                <tr>
+                                  <td className="p-1.5">Hương vị</td>
+                                  <td className="p-1.5">Ngọt gắt đường</td>
+                                  <td className="p-1.5 text-emerald-400 font-bold">Ngọt thanh hoa rừng</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* 1. INTERACTIVE FEATURE VALIDATION MATRIX (Filter, Search, Variant Selectors, Cart) */}
               {selectedDiff.pages[activePageIndex]?.interactiveChecks?.length > 0 && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
-                    <Sparkles className="size-4 text-cyan-400" /> Kiểm Thử Tính Năng Tương Tác (Filter, Search, Biến Thể, Giỏ Hàng)
+                    <Sparkles className="size-4 text-cyan-400" /> Kiểm Thử Tính Năng Tương Tác
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {selectedDiff.pages[activePageIndex].interactiveChecks.map((ic, i) => (

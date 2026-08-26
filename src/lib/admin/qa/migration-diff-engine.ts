@@ -1,12 +1,13 @@
 /**
  * Migration Reconciliation Engine & Data Diff Analyzer (PW1 -> PW2)
  * Supports complete e-commerce lifecycle parity:
- *   1. Home Page Layout (6 Canonical Blocks)
+ *   1. Home Page Layout (6 Canonical Blocks + Universal RichText)
  *   2. Product Catalog & Filter/Sort (/products)
- *   3. Product Detail & Variant Selector (/products/:slug)
- *   4. Blog Listing & Article Detail (/blog & /blog/:slug)
- *   5. Search Bar & Cart Drawer Flow (/search & /cart)
- *   6. Contact & Order Tracking (/contact & /order-tracking)
+ *   3. Product Detail & RichText Description (/products/:slug)
+ *   4. Universal RichText Editor Inspector (HTML WYSIWYG -> Lexical AST)
+ *   5. Blog Listing & Article RichText Detail (/blog & /blog/:slug)
+ *   6. Search Bar & Cart Drawer Flow (/search & /cart)
+ *   7. Contact & Order Tracking (/contact & /order-tracking)
  */
 
 export interface StoreSummary {
@@ -40,7 +41,7 @@ export interface DefectItem {
   desc: string;
   fix: string;
   affectedField?: string;
-  entityType?: "products" | "variants" | "categories" | "posts" | "stores" | "blocks";
+  entityType?: "products" | "variants" | "categories" | "posts" | "stores" | "blocks" | "richtext";
 }
 
 export interface BlockBreakdownItem {
@@ -56,11 +57,25 @@ export interface BlockBreakdownItem {
   fix: string;
 }
 
+export interface RichTextAuditItem {
+  sectionName: string;
+  location: string;
+  pw1HtmlSample: string;
+  pw2LexicalSample: string;
+  embeddedImagesCountPW1: number;
+  embeddedImagesCountPW2: number;
+  hasTablesPW1: boolean;
+  hasTablesPW2: boolean;
+  utf8VietnameseValid: boolean;
+  status: "pass" | "warn" | "fail";
+  notes: string;
+}
+
 export interface StorePageDetail {
   id: string;
   name: string;
   path: string;
-  category: "home" | "catalog" | "product_detail" | "blog" | "cart_search" | "contact_tracking";
+  category: "home" | "catalog" | "product_detail" | "richtext_editor" | "blog" | "cart_search" | "contact_tracking";
   defects: DefectItem[];
   breakdown: BlockBreakdownItem[];
   interactiveChecks: {
@@ -69,6 +84,7 @@ export interface StorePageDetail {
     pw2Behavior: string;
     status: "pass" | "warn" | "fail";
   }[];
+  richTextAudits?: RichTextAuditItem[];
 }
 
 export interface StoreDeepDiff {
@@ -100,6 +116,7 @@ export interface StoreDeepDiff {
     searchParity: string;
     cartParity: string;
     filterParity: string;
+    richTextParity: string;
   };
 }
 
@@ -231,7 +248,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       const val = (65 + (i % 15) * 1.1).toFixed(1);
       score = `${val}%`;
       status = "failed";
-      failedBlocks = ["Mất Biến Thể Size 1L", "Thiếu Brand ID (Layer 2)"];
+      failedBlocks = ["Mất Biến Thể Size 1L", "Thiếu Brand ID (Layer 2)", "RichText Rớt Bảng Báo Giá"];
       textScore = "85.0%";
       mediaScore = "90.0%";
       commerceScore = "65.0%";
@@ -270,7 +287,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       failedBlocks,
       subdomain1: `${slug}.ech.my`,
       subdomain2: `${slug}.primeweb.io`,
-      pageCount: 6,
+      pageCount: 7,
       textScore,
       mediaScore,
       commerceScore,
@@ -283,7 +300,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
 }
 
 /**
- * Get deep store diff across all 6 core e-commerce pages & flows
+ * Get deep store diff across all 7 core e-commerce pages & flows (including RichText)
  */
 export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
   const allStores = generateReconciliationCatalog(2000);
@@ -313,6 +330,15 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
         fix: "Dev chạy lại script ETL converter cho bảng `product_variants`.",
         affectedField: "variants[].sku",
         entityType: "variants",
+      },
+      {
+        type: "p0",
+        icon: "🚨",
+        title: "RichText: Bảng Biểu Báo Giá Bị Biến Dạng (Table AST Loss)",
+        desc: "Đoạn văn bản HTML chứa bảng so sánh dinh dưỡng <table> bị mất thẻ <tr> khiến số liệu bị dồn cục.",
+        fix: "Dev cập nhật Lexical HTML parser để hỗ trợ đầy đủ Table Block.",
+        affectedField: "rich_text.content",
+        entityType: "richtext",
       }
     );
   } else if (isWarn) {
@@ -416,6 +442,98 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
             pw1Behavior: "Header cố định khi cuộn, có logo + giỏ hàng",
             pw2Behavior: "Header Next.js 15 mượt mà, đồng bộ giỏ hàng",
             status: "pass",
+          },
+        ],
+      },
+      {
+        id: "page-richtext-editor",
+        name: "Khối RichText (WYSIWYG Word Editor)",
+        path: "/#story-richtext",
+        category: "richtext_editor",
+        defects: isFailed
+          ? [
+              {
+                type: "p0",
+                icon: "🚨",
+                title: "RichText: Mất Cấu Trúc Bảng Dinh Dưỡng <table>",
+                desc: "Đoạn văn bản HTML chứa bảng so sánh dinh dưỡng <table> bị mất thẻ <tr> khiến số liệu bị dồn cục.",
+                fix: "Dev cập nhật Lexical HTML parser để hỗ trợ đầy đủ Table Block.",
+                affectedField: "rich_text.content",
+                entityType: "richtext",
+              },
+            ]
+          : [],
+        breakdown: [
+          {
+            pos: "#01",
+            leg: "rich_text (Câu Chuyện Thương Hiệu & Giới Thiệu)",
+            mig: "about/split (Lexical AST)",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Văn bản HTML 850 chữ + In đậm + Tiêu đề H2",
+            pw2Val: "Văn bản Lexical 850 chữ + In đậm + Tiêu đề H2",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#02",
+            leg: "rich_text (Ảnh Chèn Xen Kẽ Giữa Đoạn Văn)",
+            mig: "lexical-image-nodes",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "2 Ảnh chụp nhà vườn xen kẽ đoạn văn bản",
+            pw2Val: "2 Ảnh chụp nhà vườn xen kẽ đoạn văn bản",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#03",
+            leg: "rich_text (Bảng Biểu Cam Kết Chất Lượng <table>)",
+            mig: "lexical-table-node",
+            layer: isFailed ? "Layer 2 Gap" : "Layer 1 (Mapped)",
+            layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: isFailed ? "MẤT CẤU TRÚC BẢNG" : "KHỚP 100%",
+            badge: isFailed ? "badge-fail" : "badge-pass",
+            pw1Val: "Bảng 3 cột: Tiêu chí | Chuẩn VietGAP | OrganicNest",
+            pw2Val: isFailed ? "Dữ liệu bị dồn thành 1 dòng text thô" : "Bảng 3 cột hiển thị chuẩn xác",
+            fix: isFailed ? "Dev bổ sung lexical TablePlugin" : "✓ Khớp chuẩn 100%",
+          },
+        ],
+        interactiveChecks: [
+          {
+            name: "Giữ nguyên định dạng In đậm, In nghiêng, Căn giữa",
+            pw1Behavior: "Chữ in đậm và căn giữa đẹp mắt",
+            pw2Behavior: "Chữ in đậm và căn giữa đẹp mắt",
+            status: "pass",
+          },
+          {
+            name: "Hiển thị ảnh chèn trong bài viết (Inline Images)",
+            pw1Behavior: "2 Ảnh hiển thị đúng vị trí giữa đoạn 2 và 3",
+            pw2Behavior: "2 Ảnh hiển thị đúng vị trí",
+            status: "pass",
+          },
+          {
+            name: "Mã hóa tiếng Việt có dấu UTF-8",
+            pw1Behavior: "100% Tiếng Việt chuẩn dấu (Đ, ê, ư, ơ, ố)",
+            pw2Behavior: "100% Tiếng Việt chuẩn dấu",
+            status: "pass",
+          },
+        ],
+        richTextAudits: [
+          {
+            sectionName: "Câu Chuyện Nông Trại Hữu Cơ Ba Vì",
+            location: "Trang Chủ / Khối RichText #06",
+            pw1HtmlSample: "<h2>Hành Trình 10 Năm</h2><p>Chúng tôi cam kết mang lại <strong>thực phẩm sạch 100%</strong>...</p><img src='https://cdn.../farm.jpg' />",
+            pw2LexicalSample: "{\"root\":{\"children\":[{\"type\":\"heading\",\"tag\":\"h2\"},{\"type\":\"paragraph\"},{\"type\":\"image\"}]}}",
+            embeddedImagesCountPW1: 2,
+            embeddedImagesCountPW2: 2,
+            hasTablesPW1: true,
+            hasTablesPW2: !isFailed,
+            utf8VietnameseValid: true,
+            status: isFailed ? "fail" : "pass",
+            notes: isFailed ? "Bị mất bảng <table> khi convert sang Lexical" : "Convert hoàn hảo 100%",
           },
         ],
       },
@@ -702,6 +820,7 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       searchParity: "100% Match",
       cartParity: "100% Match",
       filterParity: "100% Match",
+      richTextParity: isFailed ? "65% (Bị mất table)" : "100% Match",
     },
   };
 }
