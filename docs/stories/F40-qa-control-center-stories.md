@@ -1,7 +1,7 @@
 # User Stories: QA Control Center (F40)
 
 > **Feature:** F40 — QA Control Center
-> **Wave:** 8 | **Priority:** P1 | **Ref PRD:** [qa-control-center.md](../prd/qa-control-center.md)
+> **Wave:** 8 | **Priority:** P1 | **Ref PRD:** [F40-qa-control-center.md](../prd/F40-qa-control-center.md)
 > **Owner:** QA Lead Ary – Phạm Thị Thảo Ngân
 > **Scope:** CMS PrimeWeb only. Studio admin is the internal host, never a QA product target.
 

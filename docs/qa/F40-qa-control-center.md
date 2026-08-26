@@ -18,7 +18,7 @@ AND the terminal run records target editor-productgrid-variants, fixture QA-Tshi
 
 **Safety:** the pack is staging-only, uses the registered fixture lease, runs no arbitrary command and never creates a GitHub issue.
 
-> Source: `docs/prd/qa-control-center.md`, `docs/design/qa-control-center-ux.md`, and `docs/stories/F40-qa-control-center-stories.md`.
+> Source: `docs/prd/F40-qa-control-center.md`, `docs/design/qa-control-center-ux.md`, and `docs/stories/F40-qa-control-center-stories.md`.
 
 ## US-F40-05 — GitHub Issue Sync and Confirmed Target Mapping
 
