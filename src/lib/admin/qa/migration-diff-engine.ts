@@ -1,15 +1,16 @@
 /**
  * Migration Reconciliation Engine & Deep Field-by-Field Database Diff Inspector (PW1 -> PW2)
- * Supports full 1-to-1 Entity Matching (legacy_id), 5 Data Groups, and Live Re-scan
+ * Comprehensive 1-to-1 Field Matching across ALL Merchant Data:
+ * Products & Variants, Banners & Media Links, RichText & Embeds, Categories & Nav Menus, Posts, Store Settings & Footer
  */
 
-export type EntityGroupType = "products" | "variants" | "categories" | "posts" | "settings" | "blocks";
+export type EntityGroupType = "products" | "variants" | "banners" | "richtext" | "categories" | "navigation" | "posts" | "settings" | "blocks";
 
 export interface FieldDiffItem {
   fieldName: string;
   fieldLabel: string;
-  legacyKey: string;      // e.g. "products.brand_id" (MySQL)
-  migratedKey: string;    // e.g. "products.brand" (PostgreSQL)
+  legacyKey: string;      // e.g. "banners.link_url" (MySQL)
+  migratedKey: string;    // e.g. "hero.cta.url" (PostgreSQL)
   legacyValue: string | number | boolean | null;
   migratedValue: string | number | boolean | null;
   status: "match" | "warning" | "error";
@@ -24,7 +25,7 @@ export interface EntityDiffRecord {
   migratedId?: string | number | null;
   entityGroup: EntityGroupType;
   entityName: string;
-  entityIdentifier: string; // e.g. SKU "ONG-RUNG-500ML" or Slug "mat-ong-rung"
+  entityIdentifier: string; // e.g. "Vị trí: Hero #01" or "SKU: ONG-RUNG"
   matchStatus: "match" | "warning" | "error" | "missing_in_pw2" | "orphan_in_pw2";
   totalFields: number;
   matchedFields: number;
@@ -397,7 +398,8 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
 }
 
 /**
- * Generate 1-to-1 Field-Level Database Diff Audit for any store
+ * Generate Complete 1-to-1 Field-Level Database Diff Audit for any store
+ * Covers Products, Variants, Banners & Links, RichText & Tables, Categories & Navigation, Posts, Settings & Footer
  */
 export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreFieldDiffAudit {
   const allStores = generateReconciliationCatalog(2000);
@@ -413,7 +415,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     {
       id: "ent-prod-101",
       legacyId: "PROD-101",
-      migratedId: isPass ? "pw2_prod_101" : "pw2_prod_101",
+      migratedId: "pw2_prod_101",
       entityGroup: "products",
       entityName: "Sản Phẩm: Mật Ong Rừng Ba Vì Nguyên Chất",
       entityIdentifier: "SKU: ONG-RUNG",
@@ -633,7 +635,283 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
       ],
     },
 
-    // 4. CATEGORIES (CAT-12: Mật Ong & Nông Sản)
+    // 4. BANNERS & HERO MEDIA LINKS (BAN-01: Hero Banner)
+    {
+      id: "ent-ban-01",
+      legacyId: "BAN-1365",
+      migratedId: "pw2_hero_01",
+      entityGroup: "banners",
+      entityName: "Banner Hero: Tasty & Healthy Organic Food",
+      entityIdentifier: "Vị trí: Đầu Trang Chủ (Hero #01)",
+      matchStatus: "match",
+      totalFields: 7,
+      matchedFields: 7,
+      discrepancyCount: 0,
+      fields: [
+        {
+          fieldName: "image_url",
+          fieldLabel: "Đường Dẫn Ảnh Desktop",
+          legacyKey: "banners.image_url",
+          migratedKey: "hero.image.url",
+          legacyValue: "https://tm-prime-web.sgp1.digitaloceanspaces.com/hero_banner_organic.jpg",
+          migratedValue: "https://assets.primeweb.io/media/hero_banner_organic.webp",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "mobile_image_url",
+          fieldLabel: "Đường Dẫn Ảnh Mobile (375px)",
+          legacyKey: "banners.mobile_image_url",
+          migratedKey: "hero.mobileImage.url",
+          legacyValue: "https://tm-prime-web.sgp1.digitaloceanspaces.com/hero_mobile.jpg",
+          migratedValue: "https://assets.primeweb.io/media/hero_mobile.webp",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "headline",
+          fieldLabel: "Tiêu Đề Lớn (Headline)",
+          legacyKey: "banners.headline",
+          migratedKey: "hero.headline",
+          legacyValue: "Tasty & Healthy Organic Food",
+          migratedValue: "Tasty & Healthy Organic Food",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "subheadline",
+          fieldLabel: "Mô Tả Phụ (Subheadline)",
+          legacyKey: "banners.subheadline",
+          migratedKey: "hero.subheadline",
+          legacyValue: "Nông trại sạch tiêu chuẩn VietGAP thu hoạch hàng ngày.",
+          migratedValue: "Nông trại sạch tiêu chuẩn VietGAP thu hoạch hàng ngày.",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "link_url",
+          fieldLabel: "Đường Dẫn Nút Bấm (CTA Link)",
+          legacyKey: "banners.link_url",
+          migratedKey: "hero.cta.link",
+          legacyValue: "/products",
+          migratedValue: "/products",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "button_text",
+          fieldLabel: "Nhãn Nút Bấm (Button Text)",
+          legacyKey: "banners.button_text",
+          migratedKey: "hero.cta.text",
+          legacyValue: "Khám Phá Ngay",
+          migratedValue: "Khám Phá Ngay",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "open_new_tab",
+          fieldLabel: "Mở Tab Mới (_blank)",
+          legacyKey: "banners.open_in_new_tab",
+          migratedKey: "hero.cta.newTab",
+          legacyValue: false,
+          migratedValue: false,
+          status: "match",
+          classification: "100% Match",
+        },
+      ],
+    },
+
+    // 5. BANNERS (BAN-02: Small Promo Voucher)
+    {
+      id: "ent-ban-02",
+      legacyId: "BAN-1543",
+      migratedId: "pw2_promo_01",
+      entityGroup: "banners",
+      entityName: "Banner Khuyến Mãi Nhỏ: Voucher 50K Mật Ong Rừng",
+      entityIdentifier: "Vị trí: Banner Khuyến Mãi (#02)",
+      matchStatus: "match",
+      totalFields: 5,
+      matchedFields: 5,
+      discrepancyCount: 0,
+      fields: [
+        {
+          fieldName: "headline",
+          fieldLabel: "Tiêu Đề Voucher",
+          legacyKey: "banners.title",
+          migratedKey: "cta.title",
+          legacyValue: "VOUCHER 50K - MUA MẬT ONG RỪNG",
+          migratedValue: "VOUCHER 50K - MUA MẬT ONG RỪNG",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "badge_text",
+          fieldLabel: "Huy Hiệu (Badge)",
+          legacyKey: "banners.badge",
+          migratedKey: "cta.badge",
+          legacyValue: "Giảm 50.000đ",
+          migratedValue: "Giảm 50.000đ",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "link_url",
+          fieldLabel: "Đích Đến Khuyến Mãi (Target URL)",
+          legacyKey: "banners.link_url",
+          migratedKey: "cta.link",
+          legacyValue: "/products/mat-ong-rung-ba-vi",
+          migratedValue: "/products/mat-ong-rung-ba-vi",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "image_url",
+          fieldLabel: "Ảnh Banner Nhỏ",
+          legacyKey: "banners.image_url",
+          migratedKey: "cta.image.url",
+          legacyValue: "https://tm-prime-web.sgp1.digitaloceanspaces.com/voucher50k.jpg",
+          migratedValue: "https://assets.primeweb.io/media/voucher50k.webp",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "open_new_tab",
+          fieldLabel: "Mở Tab Mới",
+          legacyKey: "banners.open_in_new_tab",
+          migratedKey: "cta.newTab",
+          legacyValue: false,
+          migratedValue: false,
+          status: "match",
+          classification: "100% Match",
+        },
+      ],
+    },
+
+    // 6. RICHTEXT & EMBEDDED CONTENT (RT-01: Câu Chuyện & Bảng VietGAP)
+    {
+      id: "ent-rt-01",
+      legacyId: "RT-501",
+      migratedId: "pw2_rt_501",
+      entityGroup: "richtext",
+      entityName: "RichText: Bảng So Sánh Tiêu Chuẩn VietGAP & Link Nhúng",
+      entityIdentifier: "Khối: RichText #07 (Bảng Biểu)",
+      matchStatus: isFailed ? "error" : "match",
+      totalFields: 5,
+      matchedFields: isFailed ? 3 : 5,
+      discrepancyCount: isFailed ? 2 : 0,
+      fields: [
+        {
+          fieldName: "headline",
+          fieldLabel: "Tiêu Đề Khối Văn Bản",
+          legacyKey: "rich_text.headline",
+          migratedKey: "lexical.headline",
+          legacyValue: "Bảng So Sánh Tiêu Chuẩn Nông Sản VietGAP",
+          migratedValue: "Bảng So Sánh Tiêu Chuẩn Nông Sản VietGAP",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "table_structure",
+          fieldLabel: "Cấu Trúc Bảng Biểu (<table>, <tr>, <td>)",
+          legacyKey: "rich_text.html (<table> 3 cột x 2 hàng)",
+          migratedKey: "lexical.root.children[TableNode]",
+          legacyValue: "<table><tr><th>Tiêu Chí</th><th>Mật Ong Thường</th><th>Mật Ong Ba Vì</th></tr>...</table>",
+          migratedValue: isFailed ? "TextNode('Tiêu Chí Mật Ong Thường Mật Ong Ba Vì...')" : "TableNode(Columns: 3, Rows: 2)",
+          status: isFailed ? "error" : "match",
+          classification: isFailed ? "P0 Blocker" : "100% Match",
+          diffExplanation: isFailed ? "Bảng 3 cột bị mất thẻ <table> và sập thành 1 chuỗi text dồn cục" : undefined,
+          remediationAction: isFailed ? "Cập nhật Lexical HTML parser hỗ trợ TableBlock" : undefined,
+        },
+        {
+          fieldName: "inline_images",
+          fieldLabel: "Ảnh Nhúng Trong Đoạn Văn",
+          legacyKey: "rich_text.html (<img src='trang_trai_ba_vi.jpg'>)",
+          migratedKey: "lexical.root.children[ImageNode]",
+          legacyValue: "https://tm-prime-web.sgp1.digitaloceanspaces.com/posts/trang_trai_ba_vi.jpg",
+          migratedValue: "https://assets.primeweb.io/media/posts/trang_trai_ba_vi.webp",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "hyperlinks",
+          fieldLabel: "Link Nhúng Trong Chữ (Anchor <a>)",
+          legacyKey: "rich_text.html (<a href='/chinh-sach-doi-tra'>)",
+          migratedKey: "lexical.root.children[LinkNode]",
+          legacyValue: "href: '/chinh-sach-doi-tra', text: 'Xem Chính Sách Đổi Trả'",
+          migratedValue: "href: '/chinh-sach-doi-tra', text: 'Xem Chính Sách Đổi Trả'",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "formatting_tags",
+          fieldLabel: "Định Dạng In Đậm & Nghiêng (Strong, Em)",
+          legacyKey: "rich_text.html (<strong>, <em>)",
+          migratedKey: "lexical.format (BOLD | ITALIC)",
+          legacyValue: "Đậm: 4 đoạn, Nghiêng: 2 đoạn",
+          migratedValue: "Đậm: 4 đoạn, Nghiêng: 2 đoạn",
+          status: "match",
+          classification: "100% Match",
+        },
+      ],
+    },
+
+    // 7. NAVIGATION & HEADER MENUS (NAV-01: Header Menu)
+    {
+      id: "ent-nav-01",
+      legacyId: "NAV-HEADER",
+      migratedId: "pw2_nav_header",
+      entityGroup: "navigation",
+      entityName: "Menu Điều Hướng Đầu Trang (Header Navigation)",
+      entityIdentifier: "Menu Chính (4 Mục)",
+      matchStatus: "match",
+      totalFields: 4,
+      matchedFields: 4,
+      discrepancyCount: 0,
+      fields: [
+        {
+          fieldName: "item_home",
+          fieldLabel: "Mục 1: Trang Chủ",
+          legacyKey: "menu_items[0].url",
+          migratedKey: "header.navItems[0].link",
+          legacyValue: "Nhãn: 'Trang Chủ', Link: '/'",
+          migratedValue: "Nhãn: 'Trang Chủ', Link: '/'",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "item_products",
+          fieldLabel: "Mục 2: Sản Phẩm (Dropdown)",
+          legacyKey: "menu_items[1].url",
+          migratedKey: "header.navItems[1].link",
+          legacyValue: "Nhãn: 'Sản Phẩm', Link: '/products', Submenu: 3 mục",
+          migratedValue: "Nhãn: 'Sản Phẩm', Link: '/products', Submenu: 3 mục",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "item_blog",
+          fieldLabel: "Mục 3: Cẩm Nang",
+          legacyKey: "menu_items[2].url",
+          migratedKey: "header.navItems[2].link",
+          legacyValue: "Nhãn: 'Cẩm Nang', Link: '/blog'",
+          migratedValue: "Nhãn: 'Cẩm Nang', Link: '/blog'",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "item_contact",
+          fieldLabel: "Mục 4: Liên Hệ & Tra Cứu",
+          legacyKey: "menu_items[3].url",
+          migratedKey: "header.navItems[3].link",
+          legacyValue: "Nhãn: 'Liên Hệ', Link: '/contact'",
+          migratedValue: "Nhãn: 'Liên Hệ', Link: '/contact'",
+          status: "match",
+          classification: "100% Match",
+        },
+      ],
+    },
+
+    // 8. CATEGORIES (CAT-12: Mật Ong & Nông Sản)
     {
       id: "ent-cat-12",
       legacyId: "CAT-12",
@@ -689,7 +967,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
       ],
     },
 
-    // 5. BLOG POSTS (POST-88: Phân biệt mật ong)
+    // 9. BLOG POSTS (POST-88: Phân biệt mật ong)
     {
       id: "ent-post-88",
       legacyId: "POST-88",
@@ -755,17 +1033,17 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
       ],
     },
 
-    // 6. STORE SETTINGS (SET-01)
+    // 10. STORE SETTINGS & FOOTER (SET-01)
     {
       id: "ent-set-01",
       legacyId: "SET-01",
       migratedId: "pw2_settings_01",
       entityGroup: "settings",
-      entityName: "Cài Đặt Cửa Hàng & Chân Trang (Settings)",
+      entityName: "Cài Đặt Cửa Hàng, Chân Trang & Mạng Xã Hội",
       entityIdentifier: "Tenant: OrganicNest",
       matchStatus: isWarn ? "warning" : "match",
-      totalFields: 5,
-      matchedFields: isWarn ? 4 : 5,
+      totalFields: 7,
+      matchedFields: isWarn ? 6 : 7,
       discrepancyCount: isWarn ? 1 : 0,
       fields: [
         {
@@ -789,12 +1067,12 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
           classification: "100% Match",
         },
         {
-          fieldName: "currency",
-          fieldLabel: "Đơn Vị Tiền Tệ",
-          legacyKey: "stores.currency",
-          migratedKey: "store_settings.currency",
-          legacyValue: "VND",
-          migratedValue: "VND",
+          fieldName: "email",
+          fieldLabel: "Email Hỗ Trợ",
+          legacyKey: "stores.email",
+          migratedKey: "store_settings.email",
+          legacyValue: "contact@organicnest.vn",
+          migratedValue: "contact@organicnest.vn",
           status: "match",
           classification: "100% Match",
         },
@@ -820,10 +1098,30 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
           diffExplanation: isWarn ? "Chưa migrate trường Google Maps Embed URL vào store_settings của PW2" : undefined,
           remediationAction: isWarn ? "Dev bổ sung trường `googleMapsUrl` trong global store-settings" : undefined,
         },
+        {
+          fieldName: "social_facebook",
+          fieldLabel: "Link Facebook Fanpage",
+          legacyKey: "stores.facebook",
+          migratedKey: "store_settings.socialLinks.facebook",
+          legacyValue: "https://facebook.com/organicnest",
+          migratedValue: "https://facebook.com/organicnest",
+          status: "match",
+          classification: "100% Match",
+        },
+        {
+          fieldName: "social_zalo",
+          fieldLabel: "Link Zalo OA",
+          legacyKey: "stores.zalo",
+          migratedKey: "store_settings.socialLinks.zalo",
+          legacyValue: "https://zalo.me/0988888888",
+          migratedValue: "https://zalo.me/0988888888",
+          status: "match",
+          classification: "100% Match",
+        },
       ],
     },
 
-    // 7. LAYOUT BLOCKS (BLOCKS-01: Hero Banner)
+    // 11. LAYOUT BLOCKS (BLOCKS-01: Hero Banner)
     {
       id: "ent-blk-01",
       legacyId: "BLK-1365",
@@ -884,7 +1182,10 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
   const groupStats: Record<EntityGroupType, { total: number; pass: number; warn: number; fail: number }> = {
     products: { total: 1, pass: isFailed ? 0 : 1, warn: 0, fail: isFailed ? 1 : 0 },
     variants: { total: 2, pass: isFailed ? 1 : 2, warn: 0, fail: isFailed ? 1 : 0 },
+    banners: { total: 2, pass: 2, warn: 0, fail: 0 },
+    richtext: { total: 1, pass: isFailed ? 0 : 1, warn: 0, fail: isFailed ? 1 : 0 },
     categories: { total: 1, pass: 1, warn: 0, fail: 0 },
+    navigation: { total: 1, pass: 1, warn: 0, fail: 0 },
     posts: { total: 1, pass: 1, warn: 0, fail: 0 },
     settings: { total: 1, pass: isWarn ? 0 : 1, warn: isWarn ? 1 : 0, fail: 0 },
     blocks: { total: 1, pass: 1, warn: 0, fail: 0 },

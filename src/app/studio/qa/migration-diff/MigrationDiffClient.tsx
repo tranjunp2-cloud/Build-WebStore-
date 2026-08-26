@@ -48,6 +48,8 @@ import {
   Newspaper,
   Settings,
   Grid,
+  Compass,
+  Link2,
 } from "lucide-react";
 
 export function MigrationDiffClient() {
@@ -236,7 +238,7 @@ ${page.defects
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                So sánh đối chiếu toàn diện <strong>Bố Cục Tuần Tự, Hình Ảnh (404/CDN), Văn Bản (UTF-8, Bảng &lt;table&gt;)</strong> & <strong>Từng Trường DB 1-to-1</strong>
+                So sánh đối chiếu toàn diện <strong>Bố Cục Tuần Tự, Banners & Links, Hình Ảnh (404/CDN), Văn Bản (UTF-8, Bảng &lt;table&gt;)</strong> & <strong>Từng Trường DB 1-to-1</strong>
               </p>
             </div>
           </div>
@@ -524,7 +526,7 @@ ${page.defects
       </div>
 
       {/* ========================================================================= */}
-      {/* PROFESSIONAL REDESIGNED DETAIL INSPECTOR MODAL */}
+      {/* PROFESSIONAL DETAIL INSPECTOR MODAL */}
       {/* ========================================================================= */}
       {selectedDiff && activePage && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
@@ -574,7 +576,7 @@ ${page.defects
                 </div>
               </div>
 
-              {/* Action Buttons: Includes dedicated Live Re-scan / Reload button */}
+              {/* Action Buttons */}
               <div className="flex items-center gap-2.5">
                 <button
                   disabled={isReloading}
@@ -714,10 +716,10 @@ ${page.defects
                   <div>
                     <h3 className="text-base font-black text-white flex items-center gap-2">
                       <SlidersHorizontal className="size-5 text-indigo-400" />
-                      <span>BẢNG ĐỐI SOÁT TRƯỜNG DỮ LIỆU 1-TO-1 (DATABASE FIELD RECONCILIATION)</span>
+                      <span>BẢNG ĐỐI SOÁT TOÀN BỘ TRƯỜNG DỮ LIỆU 1-TO-1 (FULL DATABASE RECONCILIATION)</span>
                     </h3>
                     <p className="text-xs text-slate-400 mt-1">
-                      Khớp nối 1-1 theo <code>legacy_id</code> giữa MySQL PW1 và Postgres PW2 trên 5 nhóm thực thể: Sản Phẩm, Biến Thể, Danh Mục, Tin Tức, Cài Đặt Shop và Khối Bố Cục.
+                      Đối chiếu 1-1 theo <code>legacy_id</code> giữa MySQL PW1 và Postgres PW2: <strong>Sản Phẩm, Biến Thể, Banners & Links, RichText & Bảng Biểu, Menu Điều Hướng, Danh Mục, Tin Tức, Cài Đặt Shop & Chân Trang</strong>.
                     </p>
                   </div>
 
@@ -747,9 +749,12 @@ ${page.defects
                         { key: "all", label: "Tất Cả", icon: Grid },
                         { key: "products", label: "Sản Phẩm", icon: Package },
                         { key: "variants", label: "Biến Thể", icon: Tags },
+                        { key: "banners", label: "Banners & Link", icon: ImageIcon },
+                        { key: "richtext", label: "RichText & Bảng", icon: TableIcon },
+                        { key: "navigation", label: "Menu Điều Hướng", icon: Compass },
                         { key: "categories", label: "Danh Mục", icon: FolderTree },
                         { key: "posts", label: "Tin Tức", icon: Newspaper },
-                        { key: "settings", label: "Cài Đặt", icon: Settings },
+                        { key: "settings", label: "Cài Đặt & Footer", icon: Settings },
                         { key: "blocks", label: "Khối Layout", icon: BlockTreeIcon },
                       ] as const
                     ).map((grp) => {
@@ -801,7 +806,7 @@ ${page.defects
                       <Search className="size-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
-                        placeholder="Tìm trường, SKU, khóa..."
+                        placeholder="Tìm trường, link, SKU, khóa..."
                         value={fieldSearchQuery}
                         onChange={(e) => setFieldSearchQuery(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500"
