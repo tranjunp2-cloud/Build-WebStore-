@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   generateReconciliationCatalog,
   getStoreDeepDiff,
@@ -88,6 +88,17 @@ export function MigrationDiffClient() {
 
   const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
 
+  // Lock background body scroll when inspection modal is active
+  useEffect(() => {
+    if (activeStoreId) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [activeStoreId]);
+
   // Filter logic for overview table
   const filteredStores = useMemo(() => {
     return catalog.filter((s) => {
@@ -167,32 +178,6 @@ export function MigrationDiffClient() {
       setIsReloading(false);
       showToast(`✓ Đã quét lại Live DB! Phát hiện các lỗi đã được Dev sửa xong. Độ khớp: 99.8% (Pass)`);
     }, 500);
-  };
-
-  const handleCopyTicket = (store: StoreDeepDiff) => {
-    const page = store.pages[activePageIndex] || store.pages[0];
-    const text = `### 🚨 [QC MIGRATION AUDIT] Website: ${store.name} (${store.id})
-- **Template:** ${store.templateCode} (${store.templateName})
-- **Trang Đang Đối Soát:** ${page.name} (${page.path})
-- **Tổng Trang:** PW1 có ${store.totalPagesInPW1} trang ➔ PW2 có ${store.totalPagesInPW2} trang (Thiếu: ${store.missingPagesCount})
-- **Độ Tương Thích:** ${store.score} (Trạng Thái: ${store.status.toUpperCase()})
-- **Web Cũ (Phiên Bản V1):** ${store.legacyDomain}
-- **Web Mới (Phiên Bản V2):** ${store.migratedDomain}
-
-#### ❌ Chi Tiết Lỗi Dữ Liệu, Hình Ảnh & Định Dạng Văn Bản:
-${
-  page.defects
-    ?.map(
-      (d, i) =>
-        `${i + 1}. **[${d.type.toUpperCase()}] ${d.title}**\n   - Chi tiết: ${d.desc}\n   - Hướng khắc phục: \`${d.fix}\``
-    )
-    .join("\n") || "Khớp 100%"
-}
-
-*Xuất từ Studio QA Control Center F40 lúc ${new Date().toLocaleString("vi-VN")}*`;
-
-    navigator.clipboard?.writeText(text);
-    showToast(`Đã Copy Ticket Lỗi Cho ${store.id}!`);
   };
 
   const handleApprovePass = (storeId: string) => {
@@ -524,8 +509,8 @@ ${
       {/* PROFESSIONAL DETAIL INSPECTOR MODAL WITH FULL 2-WEBSITE STREAM + FIELD DIFF */}
       {/* ========================================================================= */}
       {selectedDiff && activePage && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-7xl h-[94vh] flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
+        <div className="fixed inset-0 z-[99999] bg-slate-950 flex flex-col p-0 md:p-3 overscroll-contain animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-none md:rounded-3xl w-full h-full flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
             
             {/* Top Modal Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
@@ -588,13 +573,6 @@ ${
                 >
                   <RefreshCw className={`size-3.5 ${isReloading ? "animate-spin text-indigo-400" : ""}`} />
                   <span>{isReloading ? "Đang Quét Lại..." : "Quét Lại Dữ Liệu (Re-scan)"}</span>
-                </button>
-                <button
-                  onClick={() => handleCopyTicket(selectedDiff)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl border border-slate-700 transition"
-                >
-                  <Copy className="size-3.5" />
-                  <span>Xuất Ticket</span>
                 </button>
                 <button
                   onClick={() => handleApprovePass(selectedDiff.id)}
