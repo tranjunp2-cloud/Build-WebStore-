@@ -39,6 +39,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
     '/studio/packs': Package,
     '/studio/performance': Zap,
     '/studio/generations': Activity,
+    '/studio/migration': Layers,
     '/studio/qa': ShieldCheck,
     '/studio/issues': Bug,
     '/studio/categories': FolderOpen,
@@ -78,6 +79,12 @@ const NAV: NavSection[] = [
             { href: '/studio/versions', label: 'Versions' },
             { href: '/studio/scheduled', label: 'Scheduled', count: (c) => c.scheduled },
             { href: '/studio/archived', label: 'Archived' },
+        ],
+    },
+    {
+        section: 'Migration',
+        items: [
+            { href: '/studio/migration', label: 'Website Migration' },
         ],
     },
     {

@@ -28,7 +28,6 @@ import {
 import { ManualRunPanel } from "./ManualRunPanel";
 import { TestCaseDirectoryTab } from "./TestCaseDirectoryTab";
 import { VisualCmsReviewClient } from "./visual-review/VisualCmsReviewClient";
-import { MigrationDiffClient } from "./migration-diff/MigrationDiffClient";
 import { ALL_TEST_CASES_DIRECTORY } from "@/lib/admin/qa/test-case-directory";
 
 interface ProjectHealthClientProps {
@@ -2232,11 +2231,11 @@ function ProjectHealthMap({
 }
 
 export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
-  const [activeTab, setActiveTab] = useState<"inbox" | "health" | "runs" | "testcases" | "visual_review" | "migration_diff">(
+  const [activeTab, setActiveTab] = useState<"inbox" | "health" | "runs" | "testcases" | "visual_review">(
     () => {
       if (typeof window === "undefined") return "inbox";
       const tab = new URLSearchParams(window.location.search).get("tab");
-      return tab === "health" || tab === "runs" || tab === "testcases" || tab === "visual_review" || tab === "migration_diff" ? tab : "inbox";
+      return tab === "health" || tab === "runs" || tab === "testcases" || tab === "visual_review" ? tab : "inbox";
     },
   );
   const [items, setItems] = useState(initialData.inbox.items);
@@ -2533,35 +2532,6 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
             100% UI
           </span>
         </button>
-
-        <button
-          ref={(element) => {
-            tabs.current[5] = element;
-          }}
-          type="button"
-          role="tab"
-          id="qa-migration-diff-tab"
-          data-testid="qa-migration-diff-tab"
-          aria-selected={activeTab === "migration_diff"}
-          aria-controls="qa-migration-diff-panel"
-          onKeyDown={(event) => onTabKeyDown(event, 5)}
-          onClick={() => setActiveTab("migration_diff")}
-          className={`relative ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-extrabold transition-all duration-200 ${
-            activeTab === "migration_diff"
-              ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25 ring-2 ring-indigo-300"
-              : "bg-indigo-950/40 hover:bg-indigo-900/50 text-indigo-300 border border-indigo-500/50 shadow-sm"
-          }`}
-        >
-          <Layers className={`size-4 shrink-0 ${activeTab === "migration_diff" ? "text-white" : "text-indigo-400 animate-pulse"}`} />
-          <span>Site Migration Diff</span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider uppercase ${
-            activeTab === "migration_diff"
-              ? "bg-white text-indigo-900"
-              : "bg-indigo-500 text-white"
-          }`}>
-            2,000 SITES
-          </span>
-        </button>
       </div>
       {activeTab === "inbox" ? (
         <section
@@ -2635,15 +2605,6 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           className="-mx-4 sm:-mx-6 -mb-6"
         >
           <VisualCmsReviewClient />
-        </section>
-      ) : activeTab === "migration_diff" ? (
-        <section
-          id="qa-migration-diff-panel"
-          role="tabpanel"
-          aria-labelledby="qa-migration-diff-tab"
-          className="-mx-4 sm:-mx-6 -mb-6"
-        >
-          <MigrationDiffClient />
         </section>
       ) : (
         <section
