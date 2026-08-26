@@ -227,13 +227,10 @@ ${
               <Layers className="size-6 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div>
                 <h1 className="text-2xl font-black tracking-tight text-white">
-                  ĐỐI SOÁT 2.000 WEBSITES KHÁCH HÀNG (PW1 ➔ PW2)
+                  Website Migration
                 </h1>
-                <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide">
-                  F40 Production Migration
-                </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
                 So sánh trực quan <strong>2 Website Song Song (PW1 vs PW2)</strong> kết hợp <strong>Đối Soát Toàn Bộ Trường CSDL 1-to-1</strong>
