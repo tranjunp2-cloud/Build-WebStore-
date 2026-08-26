@@ -743,13 +743,13 @@ export function MigrationDiffClient() {
                 </div>
 
                 {/* Right Main Area: Dual Browser Mockups Comparison Stream */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-900/30 min-h-0">
+                <div className="flex-1 flex flex-col min-h-0 bg-slate-900/30">
                   
-                  {/* Browser Dual Windows Header - 100% Solid Non-transparent Background */}
-                  <div className="sticky top-0 z-30 bg-slate-900 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 px-4 pt-4 sm:px-6 sm:pt-6 pb-4 border-b border-slate-800 shadow-xl">
+                  {/* Fixed Browser Dual Windows Header - Fixed Top Bar With Zero Gap */}
+                  <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800 bg-slate-950 shrink-0 shadow-md">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Left Browser Bar */}
-                      <div className="bg-slate-950 px-4 py-2.5 rounded-2xl border border-amber-500/40 flex items-center justify-between shadow-lg">
+                      <div className="bg-slate-900 px-4 py-2.5 rounded-2xl border border-amber-500/40 flex items-center justify-between shadow-inner">
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1.5">
                             <span className="size-2.5 rounded-full bg-rose-500" />
@@ -764,7 +764,7 @@ export function MigrationDiffClient() {
                       </div>
 
                       {/* Right Browser Bar */}
-                      <div className="bg-slate-950 px-4 py-2.5 rounded-2xl border border-indigo-500/40 flex items-center justify-between shadow-lg">
+                      <div className="bg-slate-900 px-4 py-2.5 rounded-2xl border border-indigo-500/40 flex items-center justify-between shadow-inner">
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1.5">
                             <span className="size-2.5 rounded-full bg-rose-500" />
@@ -783,6 +783,9 @@ export function MigrationDiffClient() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Scrollable Stream Content - Scrolls Smoothly Underneath Fixed Header */}
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 min-h-0">
 
                   {/* Defects Alert Card */}
                   {activePage.defects.length > 0 && (
@@ -936,6 +939,7 @@ export function MigrationDiffClient() {
                           </div>
                         </div>
                       ))}
+                    </div>
                   </div>
                 </div>
               </div>
