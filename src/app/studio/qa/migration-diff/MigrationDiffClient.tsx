@@ -529,7 +529,8 @@ export function MigrationDiffClient() {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
-  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "field_diff" | "media_audit" | "text_audit">("visual_stream");
+  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit">("visual_stream");
+  const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const [activeEntityGroup, setActiveEntityGroup] = useState<"all" | EntityGroupType>("all");
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
   const [resolvedStoreIds, setResolvedStoreIds] = useState<Set<string>>(new Set());
@@ -1239,7 +1240,7 @@ export function MigrationDiffClient() {
                 })}
               </div>
 
-              {/* View Mode Switcher (4 Modes) */}
+              {/* View Mode Switcher (5 Modes) */}
               <div className="flex items-center gap-2 shrink-0">
                 <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
                   <button
@@ -1248,8 +1249,17 @@ export function MigrationDiffClient() {
                       activeViewTab === "visual_stream" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <Monitor className="size-3.5" />
-                    <span>So Sánh 2 Website</span>
+                    <Layers className="size-3.5" />
+                    <span>So Sánh Khối</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveViewTab("live_webview")}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                      activeViewTab === "live_webview" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Globe className="size-3.5" />
+                    <span>Xem Web Thật (Live Iframe)</span>
                   </button>
                   <button
                     onClick={() => setActiveViewTab("field_diff")}
@@ -1258,7 +1268,7 @@ export function MigrationDiffClient() {
                     }`}
                   >
                     <SlidersHorizontal className="size-3.5" />
-                    <span>Soi Từng Trường (Field Diff)</span>
+                    <span>Soi CSDL 1-to-1</span>
                   </button>
                   <button
                     onClick={() => setActiveViewTab("media_audit")}
@@ -1545,6 +1555,189 @@ export function MigrationDiffClient() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+            ) : activeViewTab === "live_webview" ? (
+              /* ========================================================================= */
+              /* 1.5. LIVE STOREFRONT WEBVIEW (100% REAL COMPILED HTML/CSS/JS IFRAME) */
+              /* ========================================================================= */
+              <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
+                {/* Dual Browser URL Bar */}
+                <div className="px-4 py-2.5 sm:px-6 sm:py-2.5 border-b border-slate-800/80 bg-slate-900/80 shrink-0 shadow-sm">
+                  <div className={`grid gap-4 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2"}`}>
+                    {/* Left Browser URL Bar (PW1 Laravel) */}
+                    <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-amber-500/30 flex items-center justify-between gap-2 shadow-inner">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex gap-1">
+                          <span className="size-2 rounded-full bg-rose-500/80" />
+                          <span className="size-2 rounded-full bg-amber-500/80" />
+                          <span className="size-2 rounded-full bg-emerald-500/80" />
+                        </div>
+                        <span className="text-[11px] font-mono text-amber-300 truncate">
+                          {selectedDiff.legacyDomain}{activePage.path.replace("/", "")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIframeReloadKey((k) => k + 1)}
+                          className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+                          title="Tải lại iframe PW1"
+                        >
+                          <RefreshCw className="size-3" />
+                        </button>
+                        <a
+                          href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1 rounded-lg hover:bg-slate-800 text-amber-400 transition flex items-center gap-0.5 text-[11px] font-semibold"
+                          title="Mở tab mới ngoài trình duyệt"
+                        >
+                          <ExternalLink className="size-3" />
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Right Browser URL Bar (PW2 Next.js 15) */}
+                    <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-sky-500/30 flex items-center justify-between gap-2 shadow-inner">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex gap-1">
+                          <span className="size-2 rounded-full bg-rose-500/80" />
+                          <span className="size-2 rounded-full bg-amber-500/80" />
+                          <span className="size-2 rounded-full bg-emerald-500/80" />
+                        </div>
+                        <span className="text-[11px] font-mono text-sky-300 truncate">
+                          {selectedDiff.migratedDomain}{activePage.path.replace("/", "")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIframeReloadKey((k) => k + 1)}
+                          className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+                          title="Tải lại iframe PW2"
+                        >
+                          <RefreshCw className="size-3" />
+                        </button>
+                        {activePage.existsInPW2 ? (
+                          <a
+                            href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1 rounded-lg hover:bg-slate-800 text-sky-400 transition flex items-center gap-0.5 text-[11px] font-semibold"
+                            title="Mở tab mới ngoài trình duyệt"
+                          >
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-rose-400 font-bold font-mono">CHƯA CÓ TRANG</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Iframe Viewport Stream Area */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0 bg-slate-900/40">
+                  {deviceView === "mobile" ? (
+                    /* Mobile 375px Dual Phone Mockups with Real Iframes */
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-4">
+                      {/* PW1 Phone Shell */}
+                      <div className="w-full max-w-[390px] mx-auto bg-slate-950 border-4 border-amber-500/40 rounded-[3rem] p-3 shadow-2xl space-y-2 ring-1 ring-amber-500/20 flex flex-col items-center">
+                        {/* Dynamic Island / Speaker */}
+                        <div className="w-24 h-4 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner my-1">
+                          <div className="size-1.5 rounded-full bg-slate-700" />
+                          <div className="w-8 h-1 rounded-full bg-slate-800" />
+                        </div>
+                        {/* Iframe Container */}
+                        <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
+                          <iframe
+                            key={`pw1-mob-${iframeReloadKey}`}
+                            src={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`}
+                            title="PW1 Mobile Storefront"
+                            className="w-full h-full border-0"
+                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                          />
+                        </div>
+                        {/* Home Bar */}
+                        <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-1" />
+                      </div>
+
+                      {/* PW2 Phone Shell */}
+                      <div className="w-full max-w-[390px] mx-auto bg-slate-950 border-4 border-sky-500/40 rounded-[3rem] p-3 shadow-2xl space-y-2 ring-1 ring-sky-500/20 flex flex-col items-center">
+                        {/* Dynamic Island / Speaker */}
+                        <div className="w-24 h-4 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner my-1">
+                          <div className="size-1.5 rounded-full bg-slate-700" />
+                          <div className="w-8 h-1 rounded-full bg-slate-800" />
+                        </div>
+                        {/* Iframe Container */}
+                        <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
+                          {activePage.existsInPW2 ? (
+                            <iframe
+                              key={`pw2-mob-${iframeReloadKey}`}
+                              src={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`}
+                              title="PW2 Next.js Mobile Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center text-center p-6 space-y-3">
+                              <AlertOctagon className="size-12 text-rose-500 animate-pulse" />
+                              <div className="font-bold text-white text-sm">Trang Này Chưa Được Migrate</div>
+                              <div className="text-xs text-slate-400">Trang {activePage.name} ({activePage.path}) chưa có trên PW2.</div>
+                            </div>
+                          )}
+                        </div>
+                        {/* Home Bar */}
+                        <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-1" />
+                      </div>
+                    </div>
+                  ) : (
+                    /* Desktop Dual 50/50 Iframes */
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[720px]">
+                      {/* Left PW1 Full Iframe */}
+                      <div className="bg-slate-950 rounded-2xl border-2 border-amber-500/30 overflow-hidden flex flex-col shadow-xl">
+                        <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-amber-400 font-mono flex items-center justify-between">
+                          <span>👈 PW1 LARAVEL (LIVE STOREFRONT 100%)</span>
+                          <span className="text-slate-400 font-normal">Desktop Resolution</span>
+                        </div>
+                        <div className="flex-1 bg-white relative">
+                          <iframe
+                            key={`pw1-desk-${iframeReloadKey}`}
+                            src={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`}
+                            title="PW1 Desktop Storefront"
+                            className="w-full h-full border-0"
+                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right PW2 Full Iframe */}
+                      <div className="bg-slate-950 rounded-2xl border-2 border-sky-500/30 overflow-hidden flex flex-col shadow-xl">
+                        <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-sky-400 font-mono flex items-center justify-between">
+                          <span>👉 PW2 NEXT.JS 15 (LIVE STOREFRONT 100%)</span>
+                          <span className="text-slate-400 font-normal">Desktop Resolution</span>
+                        </div>
+                        <div className="flex-1 bg-white relative">
+                          {activePage.existsInPW2 ? (
+                            <iframe
+                              key={`pw2-desk-${iframeReloadKey}`}
+                              src={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`}
+                              title="PW2 Next.js Desktop Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center text-center p-6 space-y-3">
+                              <AlertOctagon className="size-12 text-rose-500 animate-pulse" />
+                              <div className="font-bold text-white text-sm">Trang Này Chưa Được Migrate</div>
+                              <div className="text-xs text-slate-400">Trang {activePage.name} ({activePage.path}) chưa có trên PW2.</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : activeViewTab === "field_diff" ? (
