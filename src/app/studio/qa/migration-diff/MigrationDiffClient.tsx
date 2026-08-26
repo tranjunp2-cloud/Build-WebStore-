@@ -213,59 +213,57 @@ export function MigrationDiffClient() {
       )}
 
       {/* Top Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800 pb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800/80 pb-5">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
-              <Layers className="size-6 text-white" />
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
+              <Layers className="size-5 text-white" />
             </div>
             <div>
-              <div>
-                <h1 className="text-2xl font-black tracking-tight text-white">
-                  Website Migration
-                </h1>
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                So sánh trực quan <strong>2 Website Song Song (PW1 vs PW2)</strong> kết hợp <strong>Đối Soát Toàn Bộ Trường CSDL 1-to-1</strong>
+              <h1 className="text-xl font-bold tracking-tight text-white">
+                Website Migration
+              </h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                So sánh trực quan <strong>2 Website Song Song (PW1 vs PW2)</strong> & <strong>Đối Soát Trường CSDL 1-to-1</strong>
               </p>
             </div>
           </div>
         </div>
 
         {/* Database Status Indicators */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
-            <span className="inline-block size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Web Cũ: <strong className="text-emerald-400 font-mono">MySQL PW1</strong></span>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-sm">
+            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-slate-400">PW1: <strong className="text-emerald-400 font-mono font-medium">MySQL</strong></span>
           </div>
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
-            <span className="inline-block size-2 rounded-full bg-indigo-400 animate-pulse" />
-            <span>Web Mới: <strong className="text-indigo-400 font-mono">Next.js 15 Postgres</strong></span>
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-sm">
+            <span className="size-2 rounded-full bg-sky-400 animate-pulse" />
+            <span className="text-slate-400">PW2: <strong className="text-sky-400 font-mono font-medium">Postgres</strong></span>
           </div>
           <button
             onClick={() => showToast("Đã quét lại đối soát cho toàn bộ 2.000 website!")}
-            className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl border border-slate-700 transition shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700/80 transition shadow-sm"
           >
-            <RefreshCw className="size-3.5" />
-            <span>Quét Lại CSDL (Re-scan)</span>
+            <RefreshCw className="size-3.5 text-slate-400" />
+            <span>Quét Lại CSDL</span>
           </button>
         </div>
       </div>
 
       {/* 5 Metric Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div
           onClick={() => setFilterStatus("all")}
           className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
             filterStatus === "all"
-              ? "bg-slate-900 border-indigo-500/80 shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-500/30"
-              : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/90"
+              ? "bg-slate-900 border-blue-500/80 shadow-[0_0_20px_-3px_rgba(59,130,246,0.2)] ring-1 ring-blue-500/40"
+              : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tổng Số Website</div>
-          <div className="text-3xl font-black text-white mt-1.5">{metrics.totalStores.toLocaleString()}</div>
-          <div className="text-[11px] text-indigo-400 mt-1.5 flex items-center gap-1 font-medium">
-            <Sparkles className="size-3" /> 2.000 Website Khách Hàng
+          <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Tổng Số Website</div>
+          <div className="text-2xl font-bold text-white mt-1">{metrics.totalStores.toLocaleString()}</div>
+          <div className="text-[11px] text-blue-400 mt-1 flex items-center gap-1 font-medium">
+            <Sparkles className="size-3" /> 2.000 Website
           </div>
         </div>
 
@@ -273,50 +271,50 @@ export function MigrationDiffClient() {
           onClick={() => setFilterStatus("passed")}
           className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
             filterStatus === "passed"
-              ? "bg-emerald-950/30 border-emerald-500/80 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30"
-              : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/90"
+              ? "bg-emerald-950/20 border-emerald-500/80 shadow-[0_0_20px_-3px_rgba(16,185,129,0.2)] ring-1 ring-emerald-500/40"
+              : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">Khớp Chuẩn (≥95%)</div>
-          <div className="text-3xl font-black text-emerald-400 mt-1.5">{metrics.passedStores}</div>
-          <div className="text-[11px] text-emerald-400/80 mt-1.5 font-medium">Đủ điều kiện Cutover</div>
+          <div className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">Khớp Chuẩn (≥95%)</div>
+          <div className="text-2xl font-bold text-emerald-400 mt-1">{metrics.passedStores}</div>
+          <div className="text-[11px] text-emerald-400/80 mt-1 font-medium">Đủ điều kiện Cutover</div>
         </div>
 
         <div
           onClick={() => setFilterStatus("warning")}
           className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
             filterStatus === "warning"
-              ? "bg-amber-950/30 border-amber-500/80 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/30"
-              : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/90"
+              ? "bg-amber-950/20 border-amber-500/80 shadow-[0_0_20px_-3px_rgba(245,158,11,0.2)] ring-1 ring-amber-500/40"
+              : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-xs text-amber-400 font-semibold uppercase tracking-wider">Cần Xem Lại (85-94%)</div>
-          <div className="text-3xl font-black text-amber-400 mt-1.5">{metrics.warningStores}</div>
-          <div className="text-[11px] text-amber-400/80 mt-1.5 font-medium">Lệch ảnh / Thiếu Map / Text</div>
+          <div className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider">Cần Xem Lại (85-94%)</div>
+          <div className="text-2xl font-bold text-amber-400 mt-1">{metrics.warningStores}</div>
+          <div className="text-[11px] text-amber-400/80 mt-1 font-medium">Lệch ảnh / Map / Text</div>
         </div>
 
         <div
           onClick={() => setFilterStatus("failed")}
           className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
             filterStatus === "failed"
-              ? "bg-rose-950/30 border-rose-500/80 shadow-lg shadow-rose-500/10 ring-1 ring-rose-500/30"
-              : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/90"
+              ? "bg-rose-950/20 border-rose-500/80 shadow-[0_0_20px_-3px_rgba(244,63,94,0.2)] ring-1 ring-rose-500/40"
+              : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-xs text-rose-400 font-semibold uppercase tracking-wider">Lỗi Dữ Liệu P0 (&lt;85%)</div>
-          <div className="text-3xl font-black text-rose-400 mt-1.5">{metrics.failedStores}</div>
-          <div className="text-[11px] text-rose-400/80 mt-1.5 font-medium">Chặn Cutover</div>
+          <div className="text-[11px] text-rose-400 font-semibold uppercase tracking-wider">Lỗi Dữ Liệu P0 (&lt;85%)</div>
+          <div className="text-2xl font-bold text-rose-400 mt-1">{metrics.failedStores}</div>
+          <div className="text-[11px] text-rose-400/80 mt-1 font-medium">Chặn Cutover</div>
         </div>
 
-        <div className="p-4 rounded-2xl border border-slate-800/80 bg-slate-900/60">
-          <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Độ Khớp Trung Bình</div>
-          <div className="text-3xl font-black text-cyan-400 mt-1.5">{metrics.avgScore}</div>
-          <div className="text-[11px] text-slate-500 mt-1.5 font-medium">Toàn bộ hệ thống</div>
+        <div className="p-4 rounded-2xl border border-slate-800/80 bg-slate-900/50">
+          <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Độ Khớp Trung Bình</div>
+          <div className="text-2xl font-bold text-sky-400 mt-1">{metrics.avgScore}</div>
+          <div className="text-[11px] text-slate-500 mt-1 font-medium">Toàn bộ hệ thống</div>
         </div>
       </div>
 
       {/* Filter Hub & Search Bar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-sm">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800/80 shadow-sm">
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800">
             {(["all", "passed", "warning", "failed"] as const).map((st) => (
@@ -328,7 +326,7 @@ export function MigrationDiffClient() {
                 }}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
                   filterStatus === st
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -343,7 +341,7 @@ export function MigrationDiffClient() {
               setFilterTemplate(e.target.value);
               setCurrentPage(1);
             }}
-            className="bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold rounded-xl px-3.5 py-2 outline-none focus:border-indigo-500 transition"
+            className="bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold rounded-xl px-3.5 py-2 outline-none focus:border-blue-500 transition"
           >
             <option value="all">Tất Cả 9 Nhóm Giao Diện Gốc</option>
             {CANONICAL_TEMPLATES.map((t) => (
@@ -364,16 +362,16 @@ export function MigrationDiffClient() {
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500 transition"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500 transition"
           />
         </div>
       </div>
 
       {/* 2,000 Stores Grid Table */}
-      <div className="bg-slate-900/90 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+      <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/90 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800 tracking-wider">
+            <thead className="bg-slate-900/90 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800 tracking-wider">
               <tr>
                 <th className="py-3.5 px-4 whitespace-nowrap">Email Khách Hàng / Domain</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Giao Diện Mẫu</th>
@@ -385,15 +383,16 @@ export function MigrationDiffClient() {
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {paginatedStores.map((store) => (
-                <tr key={store.id} className="hover:bg-slate-800/40 transition">
+                <tr key={store.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="py-4 px-4 font-semibold text-white whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-indigo-400 font-bold">{store.id}</span>
-                      <span className="text-slate-600">—</span>
+                      <span className="font-mono text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-md">
+                        {store.id}
+                      </span>
                       <span className="text-slate-100 font-semibold">{store.ownerEmail}</span>
                     </div>
-                    <div className="text-[12px] text-emerald-400 font-normal font-mono mt-1 flex items-center gap-1.5 font-medium">
-                      <Globe className="size-3 text-emerald-400 shrink-0" />
+                    <div className="text-[12px] text-slate-400 font-normal font-mono mt-1 flex items-center gap-1.5">
+                      <Globe className="size-3 text-slate-500 shrink-0" />
                       <span>{store.domain}</span>
                     </div>
                   </td>
@@ -404,7 +403,7 @@ export function MigrationDiffClient() {
                   <td className="py-4 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-2.5">
                       <span className="font-bold text-white font-mono text-sm">{store.score}</span>
-                      <div className="w-20 h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${
                             store.status === "passed"
@@ -423,24 +422,24 @@ export function MigrationDiffClient() {
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
                     {store.status === "passed" && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
                         <CheckCircle2 className="size-3.5" /> Khớp Chuẩn
                       </span>
                     )}
                     {store.status === "warning" && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
                         <AlertTriangle className="size-3.5" /> Cần Xem Lại
                       </span>
                     )}
                     {store.status === "failed" && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-950/80 text-rose-300 border border-rose-500/40 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 whitespace-nowrap">
                         <AlertOctagon className="size-3.5" /> Lỗi P0 Blocker
                       </span>
                     )}
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded whitespace-nowrap">
+                      <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/50 px-2 py-0.5 rounded whitespace-nowrap">
                         {store.pageCount} Trang
                       </span>
                       {store.failedBlocks.length > 0 ? (
@@ -450,8 +449,8 @@ export function MigrationDiffClient() {
                               key={idx}
                               className={`text-[10px] px-2 py-0.5 rounded-md font-mono border whitespace-nowrap ${
                                 store.status === "failed"
-                                  ? "bg-rose-950/50 text-rose-300 border-rose-500/30"
-                                  : "bg-amber-950/50 text-amber-300 border-amber-500/30"
+                                  ? "bg-rose-500/10 text-rose-300 border-rose-500/20"
+                                  : "bg-amber-500/10 text-amber-300 border-amber-500/20"
                               }`}
                             >
                               {fb}
@@ -473,9 +472,10 @@ export function MigrationDiffClient() {
                         setSelectedBlockId(null);
                         setActiveViewTab("visual_stream");
                       }}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/30 hover:scale-105 whitespace-nowrap"
+                      className="px-3.5 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-600 rounded-xl font-semibold text-xs transition-all shadow-sm flex items-center gap-1 ml-auto whitespace-nowrap"
                     >
-                      So Sánh ➔
+                      <span>So Sánh</span>
+                      <ChevronRight className="size-3.5" />
                     </button>
                   </td>
                 </tr>
