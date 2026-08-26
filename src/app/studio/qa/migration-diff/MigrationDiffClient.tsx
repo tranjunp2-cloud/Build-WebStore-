@@ -519,7 +519,7 @@ export function MigrationDiffClient() {
           <div className="bg-slate-900 border border-slate-700/80 rounded-none md:rounded-3xl w-full h-full flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
             
             {/* Top Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
+            <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-slate-950 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
               <div className="flex items-center gap-3.5">
                 <button
                   onClick={() => setActiveStoreId(null)}
@@ -528,40 +528,40 @@ export function MigrationDiffClient() {
                 >
                   <ArrowLeft className="size-4" />
                 </button>
-                <div className="p-2.5 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-400 border border-indigo-500/30 rounded-xl shadow-inner">
+                <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-xl shadow-md shadow-blue-500/20 ring-1 ring-white/20">
                   <Store className="size-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="text-lg font-black text-white">{selectedDiff.name}</h2>
-                    <span className="font-mono text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-lg font-bold text-white tracking-tight">{selectedDiff.name}</h2>
+                    <span className="font-mono text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-md">
                       {selectedDiff.id}
                     </span>
-                    <span className="text-xs text-slate-200 font-mono bg-slate-800 border border-slate-700 px-2.5 py-0.5 rounded-md font-semibold">
+                    <span className="text-xs text-slate-200 font-medium bg-slate-900 border border-slate-800 px-2.5 py-0.5 rounded-md">
                       📧 {selectedDiff.ownerEmail}
                     </span>
-                    <span className="text-xs text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-md font-semibold flex items-center gap-1">
-                      <Globe className="size-3 text-emerald-400" />
+                    <span className="text-xs text-slate-300 font-mono bg-slate-900 border border-slate-800 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                      <Globe className="size-3 text-slate-400" />
                       {selectedDiff.domain}
                     </span>
                     <span
-                      className={`text-[11px] px-3 py-0.5 rounded-full font-bold uppercase tracking-wider border shadow-sm ${
+                      className={`text-xs px-3 py-0.5 rounded-full font-semibold border ${
                         selectedDiff.status === "passed"
-                          ? "bg-emerald-950 text-emerald-300 border-emerald-500/40"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                           : selectedDiff.status === "warning"
-                          ? "bg-amber-950 text-amber-300 border-amber-500/40"
-                          : "bg-rose-950 text-rose-300 border-rose-500/40"
+                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          : "bg-rose-500/10 text-rose-400 border-rose-500/20"
                       }`}
                     >
                       {selectedDiff.status === "passed" ? "✓ QC Pass (99.8%)" : selectedDiff.status === "warning" ? "⚠️ Cần Xem Lại" : "🚨 Lỗi P0 Blocker"}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2 font-mono">
-                    <span>Gốc: <strong className="text-slate-300">{selectedDiff.templateCode} ({selectedDiff.templateName})</strong></span>
+                  <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+                    <span>Gốc: <strong className="text-slate-200">{selectedDiff.templateCode} ({selectedDiff.templateName})</strong></span>
                     <span>•</span>
                     <span>Tổng số trang: <strong className="text-white">{selectedDiff.totalPagesInPW1} Trang</strong></span>
                     {selectedDiff.missingPagesCount > 0 && (
-                      <span className="text-rose-400 font-bold bg-rose-950/60 border border-rose-500/40 px-2 py-0.2 rounded">
+                      <span className="text-rose-400 font-semibold bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-md">
                         🚨 Thiếu {selectedDiff.missingPagesCount} trang trên PW2
                       </span>
                     )}
@@ -574,22 +574,22 @@ export function MigrationDiffClient() {
                 <button
                   disabled={isReloading}
                   onClick={() => handleReloadStoreData(selectedDiff.id)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-white text-xs font-bold rounded-xl border border-indigo-500/40 transition shadow-sm disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700/80 transition shadow-sm disabled:opacity-50"
                   title="Quét lại dữ liệu từ MySQL PW1 và Postgres PW2 sau khi Dev đã sửa"
                 >
-                  <RefreshCw className={`size-3.5 ${isReloading ? "animate-spin text-indigo-400" : ""}`} />
-                  <span>{isReloading ? "Đang Quét Lại..." : "Quét Lại Dữ Liệu (Re-scan)"}</span>
+                  <RefreshCw className={`size-3.5 ${isReloading ? "animate-spin text-blue-400" : "text-slate-400"}`} />
+                  <span>{isReloading ? "Đang Quét Lại..." : "Quét Lại CSDL"}</span>
                 </button>
                 <button
                   onClick={() => handleApprovePass(selectedDiff.id)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-xl transition shadow-lg shadow-emerald-600/30"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl transition shadow-md shadow-emerald-600/20"
                 >
                   <CheckCircle2 className="size-4" />
                   <span>Duyệt QC Pass</span>
                 </button>
                 <button
                   onClick={() => setActiveStoreId(null)}
-                  className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition"
+                  className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition border border-slate-700/60"
                 >
                   <X className="size-4" />
                 </button>
@@ -597,11 +597,11 @@ export function MigrationDiffClient() {
             </div>
 
             {/* Navigation Bar: Page Selectors & Mode Switcher */}
-            <div className="bg-slate-950 px-5 py-2.5 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shrink-0">
+            <div className="bg-slate-950 px-5 py-2.5 border-b border-slate-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shrink-0">
               {/* Page Tabs */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0 flex items-center gap-1">
-                  <Globe className="size-3.5 text-indigo-400" /> Trang:
+                  <Globe className="size-3.5 text-blue-400" /> Trang:
                 </span>
                 {selectedDiff.pages.map((p, idx) => {
                   const hasErrors = !p.existsInPW2 || p.defects.some((d) => d.type === "p0");
@@ -614,23 +614,23 @@ export function MigrationDiffClient() {
                         setActivePageIndex(idx);
                         setSelectedBlockId(null);
                       }}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition whitespace-nowrap border ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap border ${
                         activePageIndex === idx
-                          ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
+                          ? "bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/25"
                           : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white"
                       }`}
                     >
                       <span>{idx + 1}. {p.name}</span>
                       {!p.existsInPW2 ? (
-                        <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
+                        <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-md font-bold animate-pulse">
                           THIẾU
                         </span>
                       ) : hasErrors ? (
-                        <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                        <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-md font-bold">
                           LỖI
                         </span>
                       ) : hasWarnings ? (
-                        <span className="bg-amber-500 text-black text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                        <span className="bg-amber-500 text-slate-950 text-[9px] px-1.5 py-0.5 rounded-md font-bold">
                           CẦN XEM
                         </span>
                       ) : null}
@@ -644,8 +644,8 @@ export function MigrationDiffClient() {
                 <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
                   <button
                     onClick={() => setActiveViewTab("visual_stream")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "visual_stream" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                      activeViewTab === "visual_stream" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
                     <Monitor className="size-3.5" />
@@ -653,8 +653,8 @@ export function MigrationDiffClient() {
                   </button>
                   <button
                     onClick={() => setActiveViewTab("field_diff")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "field_diff" ? "bg-indigo-600 text-white shadow" : "text-indigo-400 hover:text-indigo-200"
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                      activeViewTab === "field_diff" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
                     <SlidersHorizontal className="size-3.5" />
@@ -662,8 +662,8 @@ export function MigrationDiffClient() {
                   </button>
                   <button
                     onClick={() => setActiveViewTab("media_audit")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "media_audit" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                      activeViewTab === "media_audit" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
                     <ImageIcon className="size-3.5" />
@@ -671,8 +671,8 @@ export function MigrationDiffClient() {
                   </button>
                   <button
                     onClick={() => setActiveViewTab("text_audit")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "text_audit" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                      activeViewTab === "text_audit" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
                     <TypeIcon className="size-3.5" />
@@ -686,7 +686,7 @@ export function MigrationDiffClient() {
                     type="checkbox"
                     checked={showOnlyErrors}
                     onChange={(e) => setShowOnlyErrors(e.target.checked)}
-                    className="rounded border-slate-700 text-indigo-600 focus:ring-0 size-3.5"
+                    className="rounded border-slate-700 text-blue-600 focus:ring-0 size-3.5"
                   />
                   <span className="font-semibold text-rose-400">Chỉ Lỗi</span>
                 </label>
@@ -701,10 +701,10 @@ export function MigrationDiffClient() {
               <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
                 
                 {/* Left Sidebar: Block Tree Navigator */}
-                <div className="w-full md:w-72 bg-slate-950/95 border-r border-slate-800 flex flex-col shrink-0 overflow-y-auto p-4 space-y-3 min-h-0">
+                <div className="w-full md:w-72 bg-slate-950 border-r border-slate-800/80 flex flex-col shrink-0 overflow-y-auto p-4 space-y-3 min-h-0">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-300">
-                      <BlockTreeIcon className="size-4 text-indigo-400" />
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+                      <BlockTreeIcon className="size-4 text-blue-400" />
                       <span>Cây Bố Cục ({activePage.blocks.length} Khối)</span>
                     </div>
                   </div>
@@ -716,22 +716,22 @@ export function MigrationDiffClient() {
                         onClick={() => scrollToBlock(block.id)}
                         className={`w-full text-left p-2.5 rounded-xl border text-xs transition flex items-center justify-between ${
                           selectedBlockId === block.id
-                            ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
+                            ? "bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/25 font-semibold"
                             : block.status === "fail"
-                            ? "bg-rose-950/30 text-rose-300 border-rose-500/40 hover:bg-rose-950/50"
+                            ? "bg-rose-500/10 text-rose-300 border-rose-500/20 hover:bg-rose-500/20"
                             : block.status === "warn"
-                            ? "bg-amber-950/30 text-amber-300 border-amber-500/40 hover:bg-amber-950/50"
-                            : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white"
+                            ? "bg-amber-500/10 text-amber-300 border-amber-500/20 hover:bg-amber-500/20"
+                            : "bg-slate-900/60 text-slate-300 border-slate-800/80 hover:bg-slate-800 hover:text-white"
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
                           <span className="font-mono text-[10px] font-bold opacity-60">
                             #{String(block.order).padStart(2, "0")}
                           </span>
-                          <span className="font-semibold truncate">{block.title.replace(/Khối #\d+:\s*/, "")}</span>
+                          <span className="font-medium truncate">{block.title.replace(/Khối #\d+:\s*/, "")}</span>
                         </div>
                         {block.status === "fail" ? (
-                          <span className="size-2 rounded-full bg-rose-500 shrink-0 animate-ping" />
+                          <span className="size-2 rounded-full bg-rose-500 shrink-0" />
                         ) : block.status === "warn" ? (
                           <span className="size-2 rounded-full bg-amber-400 shrink-0" />
                         ) : (
@@ -746,17 +746,17 @@ export function MigrationDiffClient() {
                 <div className="flex-1 flex flex-col min-h-0 bg-slate-900/30">
                   
                   {/* Fixed Browser Dual Windows Header - Fixed Top Bar With Zero Gap */}
-                  <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800 bg-slate-950 shrink-0 shadow-md">
+                  <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800/80 bg-slate-950 shrink-0 shadow-md">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Left Browser Bar */}
-                      <div className="bg-slate-900 px-4 py-2.5 rounded-2xl border border-amber-500/40 flex items-center justify-between shadow-inner">
+                      <div className="bg-slate-900/90 px-4 py-2.5 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-sm">
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1.5">
-                            <span className="size-2.5 rounded-full bg-rose-500" />
-                            <span className="size-2.5 rounded-full bg-amber-500" />
-                            <span className="size-2.5 rounded-full bg-emerald-500" />
+                            <span className="size-2.5 rounded-full bg-rose-500/80" />
+                            <span className="size-2.5 rounded-full bg-amber-500/80" />
+                            <span className="size-2.5 rounded-full bg-emerald-500/80" />
                           </div>
-                          <span className="font-bold text-xs text-amber-300 font-mono ml-2">👈 BẢN CŨ PW1 (LARAVEL)</span>
+                          <span className="font-bold text-xs text-amber-400 font-mono ml-2">👈 BẢN CŨ PW1 (LARAVEL)</span>
                         </div>
                         <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-medium">
                           <span>Live V1</span> <ExternalLink className="size-3" />
@@ -764,17 +764,17 @@ export function MigrationDiffClient() {
                       </div>
 
                       {/* Right Browser Bar */}
-                      <div className="bg-slate-900 px-4 py-2.5 rounded-2xl border border-indigo-500/40 flex items-center justify-between shadow-inner">
+                      <div className="bg-slate-900/90 px-4 py-2.5 rounded-xl border border-sky-500/30 flex items-center justify-between shadow-sm">
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1.5">
-                            <span className="size-2.5 rounded-full bg-rose-500" />
-                            <span className="size-2.5 rounded-full bg-amber-500" />
-                            <span className="size-2.5 rounded-full bg-emerald-500" />
+                            <span className="size-2.5 rounded-full bg-rose-500/80" />
+                            <span className="size-2.5 rounded-full bg-amber-500/80" />
+                            <span className="size-2.5 rounded-full bg-emerald-500/80" />
                           </div>
-                          <span className="font-bold text-xs text-indigo-300 font-mono ml-2">👉 BẢN MỚI PW2 (NEXT.JS 15)</span>
+                          <span className="font-bold text-xs text-sky-400 font-mono ml-2">👉 BẢN MỚI PW2 (NEXT.JS 15)</span>
                         </div>
                         {activePage.existsInPW2 ? (
-                          <a href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-indigo-400 hover:underline flex items-center gap-1 font-medium">
+                          <a href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-sky-400 hover:underline flex items-center gap-1 font-medium">
                             <span>Live V2</span> <ExternalLink className="size-3" />
                           </a>
                         ) : (
@@ -789,9 +789,9 @@ export function MigrationDiffClient() {
 
                   {/* Defects Alert Card */}
                   {activePage.defects.length > 0 && (
-                    <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 shadow-md">
-                      <div className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                        <Wrench className="size-4 text-indigo-400" />
+                    <div className="space-y-3 bg-slate-900/50 p-4 rounded-2xl border border-slate-800/80 shadow-sm">
+                      <div className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <Wrench className="size-4 text-blue-400" />
                         <span>Lỗi & Cảnh Báo Trên Trang Này ({activePage.defects.length} Vấn Đề)</span>
                       </div>
 
@@ -801,8 +801,8 @@ export function MigrationDiffClient() {
                             key={idx}
                             className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
                               defect.type === "p0"
-                                ? "bg-rose-950/40 border-rose-500/50 text-rose-200"
-                                : "bg-amber-950/40 border-amber-500/50 text-amber-200"
+                                ? "bg-rose-950/20 border-rose-500/30 text-rose-200"
+                                : "bg-amber-950/20 border-amber-500/30 text-amber-200"
                             }`}
                           >
                             <div className="flex items-center gap-2 font-bold text-white text-xs">
@@ -813,7 +813,7 @@ export function MigrationDiffClient() {
                               <span>{defect.title}</span>
                             </div>
                             <p className="text-slate-300 text-[11px] leading-relaxed">{defect.desc}</p>
-                            <div className="text-[11px] font-mono text-indigo-300 bg-slate-950/80 p-2 rounded border border-slate-800">
+                            <div className="text-[11px] font-mono text-blue-300 bg-slate-950/80 p-2 rounded border border-slate-800">
                               💡 Khắc phục: <strong>{defect.fix}</strong>
                             </div>
                           </div>
@@ -832,39 +832,39 @@ export function MigrationDiffClient() {
                           id={block.id}
                           className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 space-y-3.5 ${
                             block.status === "fail"
-                              ? "bg-rose-950/15 border-rose-500 ring-1 ring-rose-500/40 shadow-lg"
+                              ? "bg-rose-950/10 border-rose-500/40 ring-1 ring-rose-500/20 shadow-md"
                               : block.status === "warn"
-                              ? "bg-amber-950/15 border-amber-500 ring-1 ring-amber-500/40 shadow-lg"
+                              ? "bg-amber-950/10 border-amber-500/40 ring-1 ring-amber-500/20 shadow-md"
                               : selectedBlockId === block.id
-                              ? "bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/40 shadow-xl"
-                              : "bg-slate-950 border-slate-800 hover:border-slate-700 shadow-sm"
+                              ? "bg-slate-900 border-blue-500 ring-2 ring-blue-500/30 shadow-xl"
+                              : "bg-slate-900/40 border-slate-800/80 hover:border-slate-700/80 shadow-sm"
                           }`}
                         >
                           {/* Block Header */}
-                          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
                             <div className="flex items-center gap-3">
-                              <span className="px-2 py-1 bg-slate-900 text-indigo-400 font-mono font-bold text-xs rounded-lg border border-slate-800">
+                              <span className="px-2 py-1 bg-slate-900 text-sky-400 font-mono font-bold text-xs rounded-lg border border-slate-800">
                                 #{String(block.order).padStart(2, "0")}
                               </span>
                               <div>
                                 <h4 className="font-bold text-white text-sm">{block.title}</h4>
                                 <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                                  PW1: <strong className="text-slate-300">{block.pw1Component}</strong> ➔ PW2: <strong className="text-indigo-300">{block.pw2Block}</strong>
+                                  PW1: <strong className="text-slate-300">{block.pw1Component}</strong> ➔ PW2: <strong className="text-sky-300">{block.pw2Block}</strong>
                                 </div>
                               </div>
                             </div>
 
                             <div>
                               {block.status === "fail" ? (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500/40 animate-pulse">
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
                                   🚨 LỖI P0: {block.discrepancyNote || "Lệch dữ liệu"}
                                 </span>
                               ) : block.status === "warn" ? (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-950 text-amber-300 border border-amber-500/40">
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
                                   ⚠️ CẦN XEM: {block.discrepancyNote || "Cảnh báo"}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                   <CheckCircle2 className="size-3.5" /> KHỚP 100%
                                 </span>
                               )}
@@ -874,7 +874,7 @@ export function MigrationDiffClient() {
                           {/* Dual Column Content Preview */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* PW1 Preview Box */}
-                            <div className="bg-slate-900/80 border border-amber-500/20 rounded-xl p-4 text-xs text-slate-200 space-y-2">
+                            <div className="bg-slate-950/60 border border-amber-500/20 rounded-xl p-4 text-xs text-slate-200 space-y-2">
                               <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider">
                                 Giao Diện & Nội Dung Bản Gốc PW1
                               </div>
@@ -885,12 +885,12 @@ export function MigrationDiffClient() {
                                 <div className="text-slate-300 leading-relaxed">{block.pw1Preview.subheadline}</div>
                               )}
                               {block.pw1Preview.bodyText && (
-                                <div className="text-slate-300 leading-relaxed bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                                <div className="text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
                                   {block.pw1Preview.bodyText}
                                 </div>
                               )}
                               {block.pw1Preview.badgeText && (
-                                <span className="inline-block text-[10px] bg-emerald-950 text-emerald-300 px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30">
+                                <span className="inline-block text-[10px] bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/20">
                                   {block.pw1Preview.badgeText}
                                 </span>
                               )}
@@ -899,12 +899,12 @@ export function MigrationDiffClient() {
                             {/* PW2 Preview Box */}
                             <div className={`rounded-xl p-4 text-xs text-slate-200 space-y-2 border ${
                               block.status === "fail"
-                                ? "bg-rose-950/30 border-rose-500"
+                                ? "bg-rose-950/20 border-rose-500/40"
                                 : block.status === "warn"
-                                ? "bg-amber-950/30 border-amber-500"
-                                : "bg-slate-900/80 border-indigo-500/20"
+                                ? "bg-amber-950/20 border-amber-500/40"
+                                : "bg-slate-950/60 border-sky-500/20"
                             }`}>
-                              <div className="text-[10px] uppercase font-bold text-indigo-400 font-mono tracking-wider">
+                              <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider">
                                 Giao Diện & Nội Dung Bản Mới PW2 (Next.js 15)
                               </div>
                               {block.pw2Preview.headline && (
@@ -916,21 +916,21 @@ export function MigrationDiffClient() {
                               {block.pw2Preview.bodyText && (
                                 <div className={`leading-relaxed p-2.5 rounded-lg border ${
                                   block.status === "fail"
-                                    ? "bg-rose-950/60 border-rose-500 text-rose-200 font-semibold"
+                                    ? "bg-rose-950/40 border-rose-500/40 text-rose-200 font-medium"
                                     : block.status === "warn"
-                                    ? "bg-amber-950/60 border-amber-500 text-amber-200 font-semibold"
-                                    : "bg-slate-950 border-slate-800 text-slate-300"
+                                    ? "bg-amber-950/40 border-amber-500/40 text-amber-200 font-medium"
+                                    : "bg-slate-900/80 border-slate-800 text-slate-300"
                                 }`}>
                                   {block.pw2Preview.bodyText}
                                 </div>
                               )}
                               {block.pw2Preview.badgeText && (
-                                <span className={`inline-block text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
+                                <span className={`inline-block text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
                                   block.status === "fail"
-                                    ? "bg-rose-950 text-rose-300 border-rose-500"
+                                    ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
                                     : block.status === "warn"
-                                    ? "bg-amber-950 text-amber-300 border-amber-500"
-                                    : "bg-emerald-950 text-emerald-300 border-emerald-500/30"
+                                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                 }`}>
                                   {block.pw2Preview.badgeText}
                                 </span>
@@ -947,12 +947,12 @@ export function MigrationDiffClient() {
               /* ========================================================================= */
               /* 2. DEEP FIELD-BY-FIELD DATABASE DIFF INSPECTOR */
               /* ========================================================================= */
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/40 min-h-0">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/30 min-h-0">
                 {/* Header Summary Card */}
-                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800/80 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div>
-                    <h3 className="text-base font-black text-white flex items-center gap-2">
-                      <SlidersHorizontal className="size-5 text-indigo-400" />
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <SlidersHorizontal className="size-5 text-blue-400" />
                       <span>ĐỐI SOÁT TRƯỜNG DỮ LIỆU CSDL 1-TO-1 (DATABASE FIELD RECONCILIATION)</span>
                     </h3>
                     <p className="text-xs text-slate-400 mt-1">
@@ -961,25 +961,25 @@ export function MigrationDiffClient() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
-                      <div className="text-[10px] text-slate-500 uppercase font-mono font-bold">Độ Khớp Trường</div>
-                      <div className="font-black text-emerald-400 text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.fieldMatchRate}</div>
+                    <div className="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
+                      <div className="text-[10px] text-slate-400 uppercase font-mono font-semibold">Độ Khớp Trường</div>
+                      <div className="font-bold text-emerald-400 text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.fieldMatchRate}</div>
                     </div>
-                    <div className="bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
-                      <div className="text-[10px] text-slate-500 uppercase font-mono font-bold">Tổng Record</div>
-                      <div className="font-black text-white text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.totalEntitiesV1}</div>
+                    <div className="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
+                      <div className="text-[10px] text-slate-400 uppercase font-mono font-semibold">Tổng Record</div>
+                      <div className="font-bold text-white text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.totalEntitiesV1}</div>
                     </div>
                     {selectedDiff.fieldDiffAudit.summary.missingInPW2Count > 0 && (
-                      <div className="bg-rose-950/60 px-3.5 py-2 rounded-xl border border-rose-500/50 text-xs animate-pulse">
-                        <div className="text-[10px] text-rose-400 uppercase font-mono font-bold">Thiếu Trên PW2</div>
-                        <div className="font-black text-rose-300 text-sm font-mono">🚨 {selectedDiff.fieldDiffAudit.summary.missingInPW2Count} Record</div>
+                      <div className="bg-rose-950/30 px-3.5 py-2 rounded-xl border border-rose-500/40 text-xs">
+                        <div className="text-[10px] text-rose-400 uppercase font-mono font-semibold">Thiếu Trên PW2</div>
+                        <div className="font-bold text-rose-300 text-sm font-mono">🚨 {selectedDiff.fieldDiffAudit.summary.missingInPW2Count} Record</div>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Sub-group & Search Filter Bar */}
-                <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-900/50 p-4 rounded-2xl border border-slate-800/80">
                   <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto w-full md:w-auto">
                     {(
                       [
@@ -1004,10 +1004,10 @@ export function MigrationDiffClient() {
                         <button
                           key={grp.key}
                           onClick={() => setActiveEntityGroup(grp.key)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition border ${
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition border ${
                             activeEntityGroup === grp.key
-                              ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
-                              : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
+                              ? "bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/25"
+                              : "bg-slate-900/70 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800"
                           }`}
                         >
                           <Icon className="size-3.5" />
@@ -1027,7 +1027,7 @@ export function MigrationDiffClient() {
                       placeholder="Tìm trường, SKU, khóa CSDL..."
                       value={fieldSearchQuery}
                       onChange={(e) => setFieldSearchQuery(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
