@@ -34,6 +34,10 @@ import {
   FileX,
   Layers as BlockTreeIcon,
   Wrench,
+  Image as ImageIcon,
+  Type as TypeIcon,
+  Table as TableIcon,
+  ShieldCheck,
 } from "lucide-react";
 
 export function MigrationDiffClient() {
@@ -52,6 +56,7 @@ export function MigrationDiffClient() {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
+  const [activeAuditTab, setActiveAuditTab] = useState<"stream" | "media" | "typography">("stream");
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
@@ -99,7 +104,7 @@ export function MigrationDiffClient() {
 - **Web Cũ (Phiên Bản V1):** ${store.legacyDomain}
 - **Web Mới (Phiên Bản V2):** ${store.migratedDomain}
 
-#### ❌ Chi Tiết Lỗi Dữ Liệu & Điểm Cần Xem Lại:
+#### ❌ Chi Tiết Lỗi Dữ Liệu, Hình Ảnh & Định Dạng Văn Bản:
 ${page.defects
   ?.map(
     (d, i) =>
@@ -152,11 +157,11 @@ ${page.defects
                   ĐỐI SOÁT 2.000 WEBSITES KHÁCH HÀNG (PW1 ➔ PW2)
                 </h1>
                 <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide">
-                  F40 Dynamic Discovery
+                  F40 Media & Text Audit
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                Tự động đọc danh sách trang động & Đối soát chi tiết <strong>Lỗi P0 Blocker & Cảnh Báo Cần Xem Lại (P1/P2)</strong>
+                Kiểm tra sâu <strong>Hình Ảnh (Media 404/CDN)</strong> và <strong>Định Dạng Văn Bản User Input (UTF-8, Bảng &lt;table&gt;, WYSIWYG)</strong>
               </p>
             </div>
           </div>
@@ -350,7 +355,7 @@ ${page.defects
                       </div>
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1 font-mono">
-                      Sản Phẩm: {store.commerceScore} | Bố Cục: {store.blockScore}
+                      Văn Bản: {store.textScore} | Hình Ảnh: {store.mediaScore} | Bố Cục: {store.blockScore}
                     </div>
                   </td>
                   <td className="py-4 px-4">
@@ -403,6 +408,7 @@ ${page.defects
                         setActiveStoreId(store.id);
                         setActivePageIndex(0);
                         setSelectedBlockId(null);
+                        setActiveAuditTab("stream");
                       }}
                       className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/30 hover:scale-105"
                     >
@@ -556,43 +562,208 @@ ${page.defects
                 })}
               </div>
 
-              {/* Quick error/warning toggle */}
-              <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer pb-2 select-none shrink-0 ml-4">
-                <input
-                  type="checkbox"
-                  checked={showOnlyErrors}
-                  onChange={(e) => setShowOnlyErrors(e.target.checked)}
-                  className="rounded border-slate-700 text-indigo-600 focus:ring-0"
-                />
-                <span className="font-semibold text-amber-400">⚡ Chỉ hiện khối LỆCH / LỖI / CẦN XEM</span>
-              </label>
+              {/* Mode Switcher: Stream View vs Media Inspector vs Typography Inspector */}
+              <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                <button
+                  onClick={() => setActiveAuditTab("stream")}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                    activeAuditTab === "stream" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Dòng Chảy Khối
+                </button>
+                <button
+                  onClick={() => setActiveAuditTab("media")}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1 ${
+                    activeAuditTab === "media" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <ImageIcon className="size-3.5" />
+                  <span>Soi Hình Ảnh</span>
+                </button>
+                <button
+                  onClick={() => setActiveAuditTab("typography")}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1 ${
+                    activeAuditTab === "typography" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <TypeIcon className="size-3.5" />
+                  <span>Soi Văn Bản & Bảng</span>
+                </button>
+              </div>
             </div>
 
-            {/* Modal Body: Left Sidebar (Block Tree Navigator) + Right Main (Synchronized Vertical Page Stream) */}
-            <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-              {/* LEFT SIDEBAR: BLOCK TREE NAVIGATOR */}
-              <div className="w-full md:w-80 bg-slate-950/90 border-r border-slate-800 flex flex-col shrink-0 overflow-y-auto p-4 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400">
-                  <BlockTreeIcon className="size-4 text-indigo-400" />
-                  <span>Cây Bố Cục ({activePage.blocks.length} Khối)</span>
-                </div>
-                <div className="text-[11px] text-slate-500 font-mono">
-                  Đường dẫn: <strong className="text-slate-300">{activePage.path}</strong>
+            {/* Modal Body: Depends on activeAuditTab */}
+            {activeAuditTab === "media" ? (
+              /* MEDIA & IMAGE HEALTH INSPECTOR */
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/60">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-black text-white flex items-center gap-2">
+                      <ImageIcon className="size-5 text-indigo-400" />
+                      <span>BẢNG ĐỐI SOÁT TOÀN DIỆN HÌNH ẢNH (MEDIA INTEGRITY AUDIT)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Kiểm tra link ảnh có bị 404/403, CDN DigitalOcean sang WebP S3, Alt text SEO và kích thước hiển thị.
+                    </p>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  {activePage.blocks.map((block) => (
-                    <button
-                      key={block.id}
-                      onClick={() => scrollToBlock(block.id)}
-                      className={`w-full text-left p-2.5 rounded-xl border text-xs transition flex items-center justify-between ${
-                        selectedBlockId === block.id
-                          ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
-                          : block.status === "fail"
-                          ? "bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-950/60"
-                          : block.status === "warn"
-                          ? "bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-950/60"
-                          : "bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white"
+                <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800">
+                      <tr>
+                        <th className="py-3 px-4">Tên Ảnh / Vị Trí</th>
+                        <th className="py-3 px-4">Link Bản Cũ PW1 (DO S3)</th>
+                        <th className="py-3 px-4">Link Bản Mới PW2 (WebP CDN)</th>
+                        <th className="py-3 px-4">HTTP Status</th>
+                        <th className="py-3 px-4">Alt Text SEO</th>
+                        <th className="py-3 px-4">Kích Thước</th>
+                        <th className="py-3 px-4 text-right">Trạng Thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                      {activePage.mediaAudits.map((m) => (
+                        <tr key={m.id} className={m.status === "warn" ? "bg-amber-950/20" : ""}>
+                          <td className="py-3.5 px-4 font-sans font-bold text-white">{m.label}</td>
+                          <td className="py-3.5 px-4 text-slate-400 truncate max-w-[200px]">
+                            <a href={m.pw1Url} target="_blank" rel="noreferrer" className="text-amber-400 hover:underline">
+                              {m.pw1Url.split("/").pop()}
+                            </a>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-300 truncate max-w-[200px]">
+                            {m.status === "warn" ? (
+                              <span className="text-rose-400 font-bold">{m.pw2Url.split("/").pop()}</span>
+                            ) : (
+                              <a href={m.pw2Url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
+                                {m.pw2Url.split("/").pop()}
+                              </a>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {m.httpStatusV2 === 200 ? (
+                              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 font-bold">
+                                200 OK
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-500 font-bold animate-pulse">
+                                404 NOT FOUND
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 font-sans text-slate-300">
+                            {m.altTextV2 ? m.altTextV2 : <span className="text-rose-400 italic">Thiếu Alt Text</span>}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-400">{m.dimensionsV2}</td>
+                          <td className="py-3.5 px-4 text-right font-sans">
+                            {m.status === "pass" ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                                <CheckCircle2 className="size-3.5" /> Chuẩn 100%
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-amber-400 font-bold">
+                                <AlertTriangle className="size-3.5" /> {m.issueNote}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : activeAuditTab === "typography" ? (
+              /* DATA TEXT FORMAT & TYPOGRAPHY INSPECTOR */
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/60">
+                <div>
+                  <h2 className="text-base font-black text-white flex items-center gap-2">
+                    <TypeIcon className="size-5 text-indigo-400" />
+                    <span>BẢNG ĐỐI SOÁT ĐỊNH DẠNG VĂN BẢN & BẢNG BIỂU USER INPUT</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Kiểm tra mã hóa Tiếng Việt UTF-8 (không bị lỗi font rác), định dạng in đậm/nghiêng/danh sách và bảng biểu <code>&lt;table&gt;</code>.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {activePage.textFormatAudits.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`p-5 rounded-2xl border ${
+                        item.status === "fail"
+                          ? "bg-rose-950/20 border-rose-500 ring-1 ring-rose-500/40"
+                          : "bg-slate-950 border-slate-800"
+                      } space-y-3`}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <div className="font-bold text-white text-sm flex items-center gap-2">
+                          <ShieldCheck className="size-4 text-indigo-400" />
+                          <span>{item.context}</span>
+                        </div>
+                        <div>
+                          {item.status === "pass" ? (
+                            <span className="px-2.5 py-1 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1">
+                              <CheckCircle2 className="size-3.5" /> UTF-8 & Format Chuẩn 100%
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded bg-rose-950 text-rose-300 border border-rose-500 text-xs font-bold flex items-center gap-1 animate-pulse">
+                              <AlertOctagon className="size-3.5" /> {item.issueNote}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                        <div className="bg-slate-900 p-3.5 rounded-xl border border-amber-500/30 space-y-1.5">
+                          <div className="text-[10px] text-amber-400 font-bold uppercase">HTML Bản Cũ PW1 (TinyMCE)</div>
+                          <div className="text-slate-200 break-words">{item.pw1Html}</div>
+                          <div className="text-[10px] text-slate-400 pt-1 font-sans">
+                            Đặc tính: In đậm ({item.stylingCheck.hasBold ? "✓" : "✗"}) | In nghiêng ({item.stylingCheck.hasItalic ? "✓" : "✗"}) | Bảng biểu ({item.stylingCheck.hasTable ? `✓ (${item.stylingCheck.tableColumnsCount} cột)` : "✗"})
+                          </div>
+                        </div>
+
+                        <div className={`p-3.5 rounded-xl border space-y-1.5 ${
+                          item.status === "fail" ? "bg-rose-950/40 border-rose-500" : "bg-slate-900 border-indigo-500/30"
+                        }`}>
+                          <div className="text-[10px] text-indigo-400 font-bold uppercase">Lexical AST Bản Mới PW2</div>
+                          <div className={`break-words ${item.status === "fail" ? "text-rose-200 font-bold" : "text-slate-200"}`}>
+                            {item.pw2Lexical}
+                          </div>
+                          <div className="text-[10px] text-slate-400 pt-1 font-sans">
+                            Đặc tính: In đậm ({item.pw2StylingCheck.hasBold ? "✓" : "✗"}) | In nghiêng ({item.pw2StylingCheck.hasItalic ? "✓" : "✗"}) | Bảng biểu ({item.pw2StylingCheck.hasTable ? `✓ (${item.pw2StylingCheck.tableColumnsCount} cột)` : "🚨 MẤT BẢNG"})
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* STREAM VIEW (BLOCK TREE + SYNCHRONIZED SEQUENTIAL BLOCKS) */
+              <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+                {/* LEFT SIDEBAR: BLOCK TREE NAVIGATOR */}
+                <div className="w-full md:w-80 bg-slate-950/90 border-r border-slate-800 flex flex-col shrink-0 overflow-y-auto p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400">
+                    <BlockTreeIcon className="size-4 text-indigo-400" />
+                    <span>Cây Bố Cục ({activePage.blocks.length} Khối)</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    Đường dẫn: <strong className="text-slate-300">{activePage.path}</strong>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {activePage.blocks.map((block) => (
+                      <button
+                        key={block.id}
+                        onClick={() => scrollToBlock(block.id)}
+                        className={`w-full text-left p-2.5 rounded-xl border text-xs transition flex items-center justify-between ${
+                          selectedBlockId === block.id
+                            ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
+                            : block.status === "fail"
+                            ? "bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-950/60"
+                            : block.status === "warn"
+                            ? "bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-950/60"
+                            : "bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white"
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate">
@@ -799,9 +970,10 @@ ${page.defects
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 }

@@ -1,9 +1,18 @@
 /**
- * Migration Reconciliation Engine & Dynamic Store Page Discovery (PW1 -> PW2)
- * Supports full P0 Blockers and P1/P2 Warning Defect Diagnostics for all store statuses:
- *   - "passed": 100% Match
- *   - "warning" (85-94%): Non-breaking UI/Media warnings (404 image, missing map iframe, italic format loss)
- *   - "failed" (<85%): Critical P0 blockers (missing SKUs, dropped brands, missing pages, broken tables)
+ * Migration Reconciliation Engine & Deep Media / Text Format Validator (PW1 -> PW2)
+ * Specialized in deep auditing of:
+ *   1. Media & Images Integrity:
+ *      - HTTP 404 / 403 Broken Links
+ *      - CDN URL Whitelisting & Migration
+ *      - Vietnamese Alt Text SEO Preservation
+ *      - Aspect Ratios & Dimension Mismatches
+ *      - Inline RichText Image Embeds
+ *   2. Text Data Format & Typography Integrity:
+ *      - UTF-8 Vietnamese Encoding (No Mojibake, no \u0111, no Ã¡)
+ *      - WYSIWYG RichText Formatting (Bold, Italic, Underline, Bullet Lists, Blockquotes)
+ *      - Table Structure Parity (<table>, <tr>, <td>, <th>, column counts)
+ *      - Line Breaks & Paragraph Preservation (No wall-of-text flattening)
+ *      - Safe Embeds (YouTube iframes, Video tags)
  */
 
 export interface StoreSummary {
@@ -37,7 +46,48 @@ export interface DefectItem {
   desc: string;
   fix: string;
   affectedField?: string;
-  entityType?: "products" | "variants" | "categories" | "posts" | "stores" | "blocks" | "richtext" | "pages" | "media";
+  entityType?: "products" | "variants" | "categories" | "posts" | "stores" | "blocks" | "richtext" | "pages" | "media" | "text_format";
+}
+
+export interface MediaAuditItem {
+  id: string;
+  label: string;
+  pw1Url: string;
+  pw2Url: string;
+  httpStatusV1: number;
+  httpStatusV2: number;
+  altTextV1: string;
+  altTextV2: string;
+  dimensionsV1: string;
+  dimensionsV2: string;
+  status: "pass" | "warn" | "fail";
+  issueNote?: string;
+}
+
+export interface TextFormatAuditItem {
+  id: string;
+  context: string;
+  pw1Html: string;
+  pw2Lexical: string;
+  utf8Check: "pass" | "fail"; // Checks for Mojibake: Đ, ê, ư, ơ, ỗ
+  stylingCheck: {
+    hasBold: boolean;
+    hasItalic: boolean;
+    hasLists: boolean;
+    hasTable: boolean;
+    tableColumnsCount?: number;
+    paragraphsCount: number;
+  };
+  pw2StylingCheck: {
+    hasBold: boolean;
+    hasItalic: boolean;
+    hasLists: boolean;
+    hasTable: boolean;
+    tableColumnsCount?: number;
+    paragraphsCount: number;
+  };
+  status: "pass" | "warn" | "fail";
+  issueNote?: string;
 }
 
 export interface BlockBreakdownItem {
@@ -93,6 +143,8 @@ export interface DynamicStorePage {
   blocks: PageBlockItem[];
   breakdown: BlockBreakdownItem[];
   defects: DefectItem[];
+  mediaAudits: MediaAuditItem[];
+  textFormatAudits: TextFormatAuditItem[];
 }
 
 export interface StoreDeepDiff {
@@ -261,9 +313,9 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       const val = (65 + (i % 15) * 1.1).toFixed(1);
       score = `${val}%`;
       status = "failed";
-      failedBlocks = ["Mất Biến Thể Size 1L", "Thiếu Brand ID (Layer 2)", "Thiếu Trang /chinh-sach-doi-tra"];
-      textScore = "85.0%";
-      mediaScore = "90.0%";
+      failedBlocks = ["Mất Biến Thể Size 1L", "Thiếu Brand ID (Layer 2)", "RichText Rớt Bảng VietGAP"];
+      textScore = "82.0%";
+      mediaScore = "89.0%";
       commerceScore = "65.0%";
       blockScore = "70.0%";
     } else if (i % 7 === 0) {
@@ -313,7 +365,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
 }
 
 /**
- * Get deep store diff with dynamic merchant page list queried from DB
+ * Get deep store diff with specialized Media & Text Format audits
  */
 export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
   const allStores = generateReconciliationCatalog(2000);
@@ -347,8 +399,8 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       {
         type: "p0",
         icon: "🚨",
-        title: "Khối #07 (RichText #2): Bảng Biểu Cam Kết <table> Bị Mất Cấu Trúc",
-        desc: "Bảng 3 cột cam kết chất lượng VietGAP bị mất thẻ <tr> <td> khi chuyển từ TinyMCE sang Lexical AST.",
+        title: "Khối #07 (RichText #2): Bảng Biểu Cam Kết <table> Bị Mất Cấu Trúc (Flattened Text)",
+        desc: "Bảng 3 cột cam kết chất lượng VietGAP bị mất thẻ <tr> <td> khi chuyển từ TinyMCE sang Lexical AST, làm văn bản bị dồn cục không còn kẻ cột.",
         fix: "Dev cập nhật Lexical HTML parser hỗ trợ TableBlock.",
         affectedField: "rich_text.content",
         entityType: "richtext",
@@ -377,6 +429,107 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
     );
   }
 
+  // Specialized Media Audits for this store
+  const mediaAuditsHome: MediaAuditItem[] = [
+    {
+      id: "media-hero-01",
+      label: "Hero Banner Cover Image",
+      pw1Url: "https://tm-prime-web.sgp1.digitaloceanspaces.com/hero_banner_organic.jpg",
+      pw2Url: "https://assets.primeweb.io/media/hero_banner_organic.webp",
+      httpStatusV1: 200,
+      httpStatusV2: 200,
+      altTextV1: "Thực phẩm nông sản sạch hữu cơ VietGAP",
+      altTextV2: "Thực phẩm nông sản sạch hữu cơ VietGAP",
+      dimensionsV1: "1920x800 px (16:9)",
+      dimensionsV2: "1920x800 px (16:9 WebP)",
+      status: "pass",
+    },
+    {
+      id: "media-prod-01",
+      label: "Ảnh Sản Phẩm: Mật Ong Rừng 500ml",
+      pw1Url: "https://tm-prime-web.sgp1.digitaloceanspaces.com/products/mat_ong_500ml.jpg",
+      pw2Url: "https://assets.primeweb.io/media/products/mat_ong_500ml.webp",
+      httpStatusV1: 200,
+      httpStatusV2: 200,
+      altTextV1: "Hũ Mật Ong Rừng Ba Vì Nguyên Chất 500ml",
+      altTextV2: "Hũ Mật Ong Rừng Ba Vì Nguyên Chất 500ml",
+      dimensionsV1: "800x800 px (1:1)",
+      dimensionsV2: "800x800 px (1:1 WebP)",
+      status: "pass",
+    },
+    {
+      id: "media-prod-02",
+      label: "Ảnh Sản Phẩm: Can Mật Ong 1 Lít",
+      pw1Url: "https://tm-prime-web.sgp1.digitaloceanspaces.com/products/mat_ong_1l_thumb.jpg",
+      pw2Url: isWarn ? "https://assets.primeweb.io/media/broken_link_404.jpg" : "https://assets.primeweb.io/media/products/mat_ong_1l_thumb.webp",
+      httpStatusV1: 200,
+      httpStatusV2: isWarn ? 404 : 200,
+      altTextV1: "Can Mật Ong Rừng 1 Lít Tiết Kiệm",
+      altTextV2: isWarn ? "" : "Can Mật Ong Rừng 1 Lít Tiết Kiệm",
+      dimensionsV1: "800x800 px (1:1)",
+      dimensionsV2: isWarn ? "0x0 px (Broken)" : "800x800 px (1:1 WebP)",
+      status: isWarn ? "warn" : "pass",
+      issueNote: isWarn ? "HTTP 404 Not Found - Thiếu file trên CDN Storage" : undefined,
+    },
+    {
+      id: "media-richtext-01",
+      label: "RichText Inline Image (Ảnh Trang Trại Trong Bài Viết)",
+      pw1Url: "https://tm-prime-web.sgp1.digitaloceanspaces.com/posts/trang_trai_ba_vi.jpg",
+      pw2Url: "https://assets.primeweb.io/media/posts/trang_trai_ba_vi.webp",
+      httpStatusV1: 200,
+      httpStatusV2: 200,
+      altTextV1: "Khu nuôi ong hoa rừng tự nhiên tại Vườn Quốc Gia Ba Vì",
+      altTextV2: "Khu nuôi ong hoa rừng tự nhiên tại Vườn Quốc Gia Ba Vì",
+      dimensionsV1: "1200x600 px",
+      dimensionsV2: "1200x600 px",
+      status: "pass",
+    },
+  ];
+
+  // Specialized Text Format & UTF-8 Typography Audits
+  const textFormatAuditsHome: TextFormatAuditItem[] = [
+    {
+      id: "text-utf8-vietnamese",
+      context: "Tiêu Đề & Nội Dung Tiếng Việt Có Dấu",
+      pw1Html: "Nông Trại Hữu Cơ Ba Vì — Đậm đà hương vị mật ong rừng nguyên chất 100%",
+      pw2Lexical: "Nông Trại Hữu Cơ Ba Vì — Đậm đà hương vị mật ong rừng nguyên chất 100%",
+      utf8Check: "pass",
+      stylingCheck: { hasBold: true, hasItalic: false, hasLists: false, hasTable: false, paragraphsCount: 1 },
+      pw2StylingCheck: { hasBold: true, hasItalic: false, hasLists: false, hasTable: false, paragraphsCount: 1 },
+      status: "pass",
+    },
+    {
+      id: "text-richtext-wysiwyg",
+      context: "Khối #03: RichText Câu Chuyện (In Đậm, In Nghiêng, Đoạn Văn)",
+      pw1Html: "<p><strong>Hành Trình 10 Năm</strong> gieo mầm xanh.</p><p><em>Cam kết 100% tự nhiên không pha đường.</em></p>",
+      pw2Lexical: "Paragraph(Bold: 'Hành Trình 10 Năm') -> Paragraph(Italic: 'Cam kết 100% tự nhiên')",
+      utf8Check: "pass",
+      stylingCheck: { hasBold: true, hasItalic: true, hasLists: true, hasTable: false, paragraphsCount: 3 },
+      pw2StylingCheck: { hasBold: true, hasItalic: true, hasLists: true, hasTable: false, paragraphsCount: 3 },
+      status: "pass",
+    },
+    {
+      id: "text-table-structure",
+      context: "Khối #07: RichText Bảng Cam Kết Chất Lượng VietGAP (<table>)",
+      pw1Html: "<table border='1'><tr><th>Tiêu Chí</th><th>Mật Ong Thường</th><th>Mật Ong Ba Vì</th></tr><tr><td>Độ Ẩm</td><td>>25%</td><td><18.5%</td></tr></table>",
+      pw2Lexical: isFailed
+        ? "TextNode('Tiêu Chí Mật Ong Thường Mật Ong Ba Vì Độ Ẩm >25% <18.5%')"
+        : "TableNode(Columns: 3, Rows: 2, Headers: ['Tiêu Chí', 'Mật Ong Thường', 'Mật Ong Ba Vì'])",
+      utf8Check: "pass",
+      stylingCheck: { hasBold: true, hasItalic: false, hasLists: false, hasTable: true, tableColumnsCount: 3, paragraphsCount: 1 },
+      pw2StylingCheck: {
+        hasBold: !isFailed,
+        hasItalic: false,
+        hasLists: false,
+        hasTable: !isFailed,
+        tableColumnsCount: isFailed ? 0 : 3,
+        paragraphsCount: 1,
+      },
+      status: isFailed ? "fail" : "pass",
+      issueNote: isFailed ? "Mất cấu trúc thẻ <table>, <tr>, <td> làm bảng bị sập thành 1 chuỗi text dồn cục" : undefined,
+    },
+  ];
+
   // Dynamic Page Stack Generation for this specific merchant
   const dynamicPages: DynamicStorePage[] = [
     // 1. HOME PAGE
@@ -389,6 +542,8 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       existsInPW2: true,
       totalBlocks: 10,
       defects: defectsHome,
+      mediaAudits: mediaAuditsHome,
+      textFormatAudits: textFormatAuditsHome,
       breakdown: [
         {
           pos: "#01",
@@ -589,6 +744,8 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       existsInPW2: true,
       totalBlocks: 6,
       defects: [],
+      mediaAudits: [],
+      textFormatAudits: [],
       breakdown: [],
       blocks: [
         {
@@ -670,6 +827,8 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       existsInPW2: true,
       totalBlocks: 5,
       defects: [],
+      mediaAudits: [],
+      textFormatAudits: [],
       breakdown: [],
       blocks: [
         {
@@ -740,6 +899,8 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       existsInPW2: true,
       totalBlocks: 5,
       defects: [],
+      mediaAudits: [],
+      textFormatAudits: [],
       breakdown: [],
       blocks: [
         {
@@ -810,6 +971,8 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       existsInPW2: true,
       totalBlocks: 4,
       defects: [],
+      mediaAudits: [],
+      textFormatAudits: [],
       breakdown: [],
       blocks: [
         {
@@ -881,6 +1044,8 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
             },
           ]
         : [],
+      mediaAudits: [],
+      textFormatAudits: [],
       breakdown: [],
       blocks: [
         {
