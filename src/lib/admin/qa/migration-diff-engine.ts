@@ -1,8 +1,12 @@
 /**
  * Migration Reconciliation Engine & Data Diff Analyzer (PW1 -> PW2)
- * Dual-Mode Support:
- *   1. Live Read-Only Database Queries (MySQL PW1 + PostgreSQL PW2)
- *   2. Offline JSON Dump Ingestion & Mock Dataset Reconciliation
+ * Supports complete e-commerce lifecycle parity:
+ *   1. Home Page Layout (6 Canonical Blocks)
+ *   2. Product Catalog & Filter/Sort (/products)
+ *   3. Product Detail & Variant Selector (/products/:slug)
+ *   4. Blog Listing & Article Detail (/blog & /blog/:slug)
+ *   5. Search Bar & Cart Drawer Flow (/search & /cart)
+ *   6. Contact & Order Tracking (/contact & /order-tracking)
  */
 
 export interface StoreSummary {
@@ -53,12 +57,18 @@ export interface BlockBreakdownItem {
 }
 
 export interface StorePageDetail {
+  id: string;
   name: string;
   path: string;
+  category: "home" | "catalog" | "product_detail" | "blog" | "cart_search" | "contact_tracking";
   defects: DefectItem[];
   breakdown: BlockBreakdownItem[];
-  legVisual?: string;
-  migVisual?: string;
+  interactiveChecks: {
+    name: string;
+    pw1Behavior: string;
+    pw2Behavior: string;
+    status: "pass" | "warn" | "fail";
+  }[];
 }
 
 export interface StoreDeepDiff {
@@ -87,6 +97,9 @@ export interface StoreDeepDiff {
     droppedBrandCount: number;
     missingCostCount: number;
     brokenMediaCount: number;
+    searchParity: string;
+    cartParity: string;
+    filterParity: string;
   };
 }
 
@@ -218,7 +231,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       const val = (65 + (i % 15) * 1.1).toFixed(1);
       score = `${val}%`;
       status = "failed";
-      failedBlocks = ["Thiếu Brand ID (Layer 2)", "Mất Biến Thể Size 1L"];
+      failedBlocks = ["Mất Biến Thể Size 1L", "Thiếu Brand ID (Layer 2)"];
       textScore = "85.0%";
       mediaScore = "90.0%";
       commerceScore = "65.0%";
@@ -228,7 +241,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       const val = (88 + (i % 6) * 1.0).toFixed(1);
       score = `${val}%`;
       status = "warning";
-      failedBlocks = ["1 Ảnh Lookbook 404", "Footer lệch cột"];
+      failedBlocks = ["1 Ảnh Gallery 404", "Footer lệch cột"];
       textScore = "100%";
       mediaScore = "88.0%";
       commerceScore = "95.0%";
@@ -257,7 +270,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       failedBlocks,
       subdomain1: `${slug}.ech.my`,
       subdomain2: `${slug}.primeweb.io`,
-      pageCount: (i % 3) + 3,
+      pageCount: 6,
       textScore,
       mediaScore,
       commerceScore,
@@ -270,7 +283,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
 }
 
 /**
- * Get deep store diff with page-by-page breakdown and field-level discrepancy
+ * Get deep store diff across all 6 core e-commerce pages & flows
  */
 export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
   const allStores = generateReconciliationCatalog(2000);
@@ -306,132 +319,75 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
     defects.push({
       type: "p1",
       icon: "⚠️",
-      title: "1 Ảnh Lookbook Bị Lỗi Link (404 Not Found)",
-      desc: "Ảnh gallery lookbook_4_summer.jpg bị trả về mã HTTP 404 trên CDN mới.",
-      fix: "Dev/CS re-upload lại ảnh từ bản backup S3 cũ.",
+      title: "1 Ảnh Gallery Chi Tiết Bị Lỗi Link (404 Not Found)",
+      desc: "Ảnh gallery chi tiết mat_ong_1l_detail.jpg trả về mã HTTP 404 trên CDN mới.",
+      fix: "Dev re-upload lại ảnh từ bản backup S3 cũ.",
       affectedField: "media.url",
       entityType: "products",
     });
   }
 
-  const breakdown: BlockBreakdownItem[] = [
-    {
-      pos: "#01",
-      leg: "Hero Banner 1365",
-      mig: "hero/split-left",
-      layer: "Layer 1 (Mapped)",
-      layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-      status: "KHỚP 100%",
-      badge: "badge-pass",
-      pw1Val: "Headline 'Tasty & Healthy Organic Food' + Button Explore",
-      pw2Val: "Headline 'Tasty & Healthy Organic Food' + Button Explore",
-      fix: "✓ Khớp chuẩn 100%",
-    },
-    {
-      pos: "#02",
-      leg: "Category Listing 1540",
-      mig: "portfolio-grid/grid",
-      layer: "Layer 1 (Mapped)",
-      layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-      status: "KHỚP 100%",
-      badge: "badge-pass",
-      pw1Val: "3 Banners: Green lemon, Almonds, Honey",
-      pw2Val: "3 Banners: Green lemon, Almonds, Honey",
-      fix: "✓ Khớp chuẩn 100%",
-    },
-    {
-      pos: "#03",
-      leg: "Product Listing 1541",
-      mig: "products-grid/grid-4",
-      layer: isFailed ? "Layer 2 Gap" : "Layer 1 (Mapped)",
-      layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-      status: isFailed ? "MẤT BIẾN THỂ & BRAND" : "KHỚP 100%",
-      badge: isFailed ? "badge-fail" : "badge-pass",
-      pw1Val: "24 Sản phẩm | Đủ 2 biến thể 500ml & 1L | Brand: Nông Trại Ba Vì",
-      pw2Val: isFailed ? "24 Sản phẩm | Mất biến thể 1L | brand_id: NULL" : "24 Sản phẩm | Đầy đủ 100%",
-      fix: isFailed ? "Dev bổ sung collection brands & migrate đủ variant" : "✓ Khớp chuẩn 100%",
-    },
-    {
-      pos: "#04",
-      leg: "Small Banner 1543",
-      mig: "cta/banner",
-      layer: "Layer 1 (Mapped)",
-      layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-      status: "KHỚP 100%",
-      badge: "badge-pass",
-      pw1Val: "Original Stock Honey Combo Package",
-      pw2Val: "Original Stock Honey Combo Package",
-      fix: "✓ Khớp chuẩn 100%",
-    },
-    {
-      pos: "#05",
-      leg: "Footer Custom",
-      mig: "footer/dark-gradient",
-      layer: isWarn ? "Needs Review" : "Layer 1 (Mapped)",
-      layerCls: isWarn ? "bg-amber-950/40 text-amber-300 border-amber-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-      status: isWarn ? "THIẾU MAP NHÚNG" : "KHỚP 100%",
-      badge: isWarn ? "badge-warn" : "badge-pass",
-      pw1Val: "4 Cột + Google Maps nhúng",
-      pw2Val: isWarn ? "4 Cột chuẩn Payload CMS 3 (chưa có iframe map)" : "4 Cột chuẩn",
-      fix: isWarn ? "QC duyệt hoặc Dev thêm cấu hình Map" : "✓ Khớp chuẩn 100%",
-    },
-  ];
-
   return {
     ...store,
     pages: [
       {
+        id: "page-home",
         name: "Trang Chủ",
         path: "/",
+        category: "home",
         defects,
-        breakdown,
-      },
-      {
-        name: "Sản Phẩm & Danh Mục",
-        path: "/products",
-        defects: [],
         breakdown: [
           {
             pos: "#01",
-            leg: "Category Grid",
+            leg: "banner (Hero Banner 1365)",
+            mig: "hero/split-left",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Headline 'Tasty & Healthy Organic Food' + Button Explore",
+            pw2Val: "Headline 'Tasty & Healthy Organic Food' + Button Explore",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#02",
+            leg: "category_listing (1540)",
             mig: "portfolio-grid/grid",
             layer: "Layer 1 (Mapped)",
             layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
             status: "KHỚP 100%",
             badge: "badge-pass",
-            pw1Val: "4 Danh mục chính",
-            pw2Val: "4 Danh mục chính",
+            pw1Val: "3 Banners: Green lemon, Almonds, Honey",
+            pw2Val: "3 Banners: Green lemon, Almonds, Honey",
             fix: "✓ Khớp chuẩn 100%",
           },
-        ],
-      },
-      {
-        name: "Giới Thiệu",
-        path: "/about",
-        defects: [],
-        breakdown: [
           {
-            pos: "#01",
-            leg: "About Split Record",
-            mig: "about/split",
+            pos: "#03",
+            leg: "product_listing (1541)",
+            mig: "products-grid/grid-4",
+            layer: isFailed ? "Layer 2 Gap" : "Layer 1 (Mapped)",
+            layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: isFailed ? "MẤT BIẾN THỂ & BRAND" : "KHỚP 100%",
+            badge: isFailed ? "badge-fail" : "badge-pass",
+            pw1Val: "24 Sản phẩm | Đủ 2 biến thể 500ml & 1L | Brand: Nông Trại Ba Vì",
+            pw2Val: isFailed ? "24 Sản phẩm | Mất biến thể 1L | brand_id: NULL" : "24 Sản phẩm | Đầy đủ 100%",
+            fix: isFailed ? "Dev bổ sung collection brands & migrate đủ variant" : "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#04",
+            leg: "banner (Small Banner 1543)",
+            mig: "cta/banner",
             layer: "Layer 1 (Mapped)",
             layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
             status: "KHỚP 100%",
             badge: "badge-pass",
-            pw1Val: "Câu chuyện trang trại 100% hữu cơ",
-            pw2Val: "Câu chuyện trang trại 100% hữu cơ",
+            pw1Val: "Original Stock Honey Combo Package",
+            pw2Val: "Original Stock Honey Combo Package",
             fix: "✓ Khớp chuẩn 100%",
           },
-        ],
-      },
-      {
-        name: "Tin Tức & Blog",
-        path: "/blog",
-        defects: [],
-        breakdown: [
           {
-            pos: "#01",
-            leg: "Article Listing 1544",
+            pos: "#05",
+            leg: "article_listing (1544)",
             mig: "blog-list/cards",
             layer: "Layer 1 (Mapped)",
             layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
@@ -441,24 +397,296 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
             pw2Val: "3 Bài viết mới nhất",
             fix: "✓ Khớp chuẩn 100%",
           },
+          {
+            pos: "#06",
+            leg: "Footer Custom (1553)",
+            mig: "footer/dark-gradient",
+            layer: isWarn ? "Needs Review" : "Layer 1 (Mapped)",
+            layerCls: isWarn ? "bg-amber-950/40 text-amber-300 border-amber-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: isWarn ? "THIẾU MAP NHÚNG" : "KHỚP 100%",
+            badge: isWarn ? "badge-warn" : "badge-pass",
+            pw1Val: "4 Cột + Hotline + Bản đồ nhúng",
+            pw2Val: isWarn ? "4 Cột chuẩn (chưa có iframe map)" : "4 Cột chuẩn",
+            fix: isWarn ? "QC duyệt hoặc Dev thêm cấu hình Map" : "✓ Khớp chuẩn 100%",
+          },
+        ],
+        interactiveChecks: [
+          {
+            name: "Sticky Header Navigation",
+            pw1Behavior: "Header cố định khi cuộn, có logo + giỏ hàng",
+            pw2Behavior: "Header Next.js 15 mượt mà, đồng bộ giỏ hàng",
+            status: "pass",
+          },
         ],
       },
       {
-        name: "Liên Hệ",
-        path: "/contact",
+        id: "page-catalog",
+        name: "Danh Mục & Bộ Lọc Sản Phẩm",
+        path: "/products",
+        category: "catalog",
         defects: [],
         breakdown: [
           {
             pos: "#01",
-            leg: "Contact Form & Map",
-            mig: "contact/split",
+            leg: "product_filter (Bộ lọc danh mục & khoảng giá)",
+            mig: "products-filter/sidebar",
             layer: "Layer 1 (Mapped)",
             layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
             status: "KHỚP 100%",
             badge: "badge-pass",
-            pw1Val: "Form gửi thư + Hotline 1900 8888",
-            pw2Val: "Form gửi thư + Hotline 1900 8888",
+            pw1Val: "Lọc theo 4 Danh mục + Thanh kéo khoảng giá 0 - 500k",
+            pw2Val: "Lọc theo 4 Danh mục + Thanh kéo khoảng giá 0 - 500k",
             fix: "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#02",
+            leg: "product_sort (Sắp xếp giá & độ mới)",
+            mig: "products-sort/dropdown",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Mới nhất, Giá tăng dần, Giá giảm dần",
+            pw2Val: "Mới nhất, Giá tăng dần, Giá giảm dần",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#03",
+            leg: "product_listing (Lưới sản phẩm phân trang)",
+            mig: "products-grid/paginated",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "24 Sản phẩm, 12 SP/trang (2 trang)",
+            pw2Val: "24 Sản phẩm, 12 SP/trang (2 trang)",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+        ],
+        interactiveChecks: [
+          {
+            name: "Lọc theo danh mục 'Mật Ong & Dược Liệu'",
+            pw1Behavior: "Hiển thị 6 sản phẩm",
+            pw2Behavior: "Hiển thị đúng 6 sản phẩm tương ứng",
+            status: "pass",
+          },
+          {
+            name: "Sắp xếp theo 'Giá: Cao ➔ Thấp'",
+            pw1Behavior: "SP đắt nhất đứng đầu (320.000đ)",
+            pw2Behavior: "SP đắt nhất đứng đầu",
+            status: "pass",
+          },
+        ],
+      },
+      {
+        id: "page-product-detail",
+        name: "Chi Tiết Sản Phẩm & Biến Thể",
+        path: "/products/mat-ong-rung-ba-vi",
+        category: "product_detail",
+        defects: isFailed
+          ? [
+              {
+                type: "p0",
+                icon: "🚨",
+                title: "Mất Chọn Biến Thể Can 1 Lít (Variant Selector)",
+                desc: "Khi người dùng click chọn biến thể Can 1L, giá không nhảy sang 320.000đ do DB thiếu SKU.",
+                fix: "Dev chạy lại ETL cho `products_variants`.",
+                affectedField: "variants[].sku",
+                entityType: "variants",
+              },
+            ]
+          : [],
+        breakdown: [
+          {
+            pos: "#01",
+            leg: "Product Gallery (Ảnh lớn + 3 Ảnh phụ)",
+            mig: "product-gallery/thumbnails",
+            layer: isWarn ? "Needs Review" : "Layer 1 (Mapped)",
+            layerCls: isWarn ? "bg-amber-950/40 text-amber-300 border-amber-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: isWarn ? "1 ẢNH THUMBNAIL 404" : "KHỚP 100%",
+            badge: isWarn ? "badge-warn" : "badge-pass",
+            pw1Val: "4 Ảnh chụp hũ mật ong chất lượng cao",
+            pw2Val: isWarn ? "3 Ảnh hiển thị (1 ảnh lỗi 404)" : "4 Ảnh hiển thị đầy đủ",
+            fix: isWarn ? "Re-upload lại ảnh S3" : "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#02",
+            leg: "Variant Selector (Chọn Size / Dung tích)",
+            mig: "product-variants/pill-selector",
+            layer: isFailed ? "Layer 2 Gap" : "Layer 1 (Mapped)",
+            layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: isFailed ? "MẤT BIẾN THỂ CAN 1L" : "KHỚP 100%",
+            badge: isFailed ? "badge-fail" : "badge-pass",
+            pw1Val: "2 Nút chọn: Hũ 500ml (180k) & Can 1L (320k)",
+            pw2Val: isFailed ? "Chỉ có 1 nút: Hũ 500ml (180k)" : "Đủ 2 nút chọn",
+            fix: isFailed ? "Dev migrate đủ SKU" : "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#03",
+            leg: "Rich Text Description (Mô tả chi tiết)",
+            mig: "product-description/lexical",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Mô tả nguồn gốc mật ong rừng nguyên chất 100%",
+            pw2Val: "Mô tả nguồn gốc mật ong rừng nguyên chất 100%",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+        ],
+        interactiveChecks: [
+          {
+            name: "Click chọn nút 'Can 1 Lít'",
+            pw1Behavior: "Giá nhảy từ 180.000đ ➔ 320.000đ",
+            pw2Behavior: isFailed ? "Không có nút 1L để chọn (Lỗi P0)" : "Giá nhảy sang 320.000đ",
+            status: isFailed ? "fail" : "pass",
+          },
+          {
+            name: "Nút 'Thêm Vào Giỏ Hàng'",
+            pw1Behavior: "Bật popup giỏ hàng với đúng SKU",
+            pw2Behavior: "Bật Cart Drawer với đúng SKU",
+            status: "pass",
+          },
+        ],
+      },
+      {
+        id: "page-blog",
+        name: "Tin Tức & Chi Tiết Bài Viết",
+        path: "/blog/huong-dan-phan-biet-mat-ong-that",
+        category: "blog",
+        defects: [],
+        breakdown: [
+          {
+            pos: "#01",
+            leg: "article_filter (Bộ lọc danh mục bài viết)",
+            mig: "blog-categories/pills",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "3 Danh mục: Cẩm nang sức khỏe, Mẹo nhà nông, Khuyến mãi",
+            pw2Val: "3 Danh mục: Cẩm nang sức khỏe, Mẹo nhà nông, Khuyến mãi",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#02",
+            leg: "Article Detail RichText (Nội dung bài viết)",
+            mig: "article-content/lexical",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Bài viết 1.200 chữ + 2 ảnh minh họa",
+            pw2Val: "Bài viết 1.200 chữ + 2 ảnh minh họa Lexical",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+        ],
+        interactiveChecks: [
+          {
+            name: "Định dạng font chữ tiếng Việt UTF-8",
+            pw1Behavior: "Hiển thị chuẩn dấu tiếng Việt",
+            pw2Behavior: "Hiển thị chuẩn dấu tiếng Việt",
+            status: "pass",
+          },
+        ],
+      },
+      {
+        id: "page-cart-search",
+        name: "Giỏ Hàng & Tìm Kiếm Toàn Site",
+        path: "/cart",
+        category: "cart_search",
+        defects: [],
+        breakdown: [
+          {
+            pos: "#01",
+            leg: "Global Header Search Bar (Thanh tìm kiếm)",
+            mig: "search-dialog/instant-search",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Tìm theo từ khóa 'mật ong', trả về 4 kết quả",
+            pw2Val: "Tìm theo từ khóa 'mật ong', trả về 4 kết quả",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#02",
+            leg: "cart (Giỏ hàng & Cập nhật số lượng)",
+            mig: "cart-drawer/slide-over",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Thêm 2 hũ 500ml ➔ Tổng tiền: 360.000đ",
+            pw2Val: "Thêm 2 hũ 500ml ➔ Tổng tiền: 360.000đ",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#03",
+            leg: "checkout (Nút chuyển tiếp thanh toán)",
+            mig: "checkout/redirect",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Chuyển tới cổng thanh toán checkout",
+            pw2Val: "Chuyển tới cổng thanh toán checkout",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+        ],
+        interactiveChecks: [
+          {
+            name: "Tính năng Tìm kiếm tức thì (Live Search)",
+            pw1Behavior: "Gõ 'chanh' hiện gợi ý sản phẩm",
+            pw2Behavior: "Gõ 'chanh' hiện gợi ý sản phẩm mượt mà",
+            status: "pass",
+          },
+          {
+            name: "Cập nhật số lượng trong giỏ (+ / -)",
+            pw1Behavior: "Tự động tính lại tổng tiền",
+            pw2Behavior: "Tự động tính lại tổng tiền tức thì",
+            status: "pass",
+          },
+        ],
+      },
+      {
+        id: "page-contact-tracking",
+        name: "Liên Hệ & Tra Cứu Đơn Hàng",
+        path: "/order-tracking",
+        category: "contact_tracking",
+        defects: [],
+        breakdown: [
+          {
+            pos: "#01",
+            leg: "contact (Form gửi thư & Hotline)",
+            mig: "contact/split-form",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Hotline 1900 8888 + Email contact@organicnest.vn",
+            pw2Val: "Hotline 1900 8888 + Email contact@organicnest.vn",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+          {
+            pos: "#02",
+            leg: "order_tracking (Tra cứu trạng thái đơn hàng)",
+            mig: "order-tracking/lookup",
+            layer: "Layer 1 (Mapped)",
+            layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+            status: "KHỚP 100%",
+            badge: "badge-pass",
+            pw1Val: "Nhập mã đơn 'ORD-12345' ➔ Hiện trạng thái 'Đang giao'",
+            pw2Val: "Nhập mã đơn 'ORD-12345' ➔ Hiện trạng thái 'Đang giao'",
+            fix: "✓ Khớp chuẩn 100%",
+          },
+        ],
+        interactiveChecks: [
+          {
+            name: "Tra cứu đơn hàng bằng Mã Đơn + SĐT",
+            pw1Behavior: "Trả về timeline giao hàng",
+            pw2Behavior: "Trả về timeline giao hàng",
+            status: "pass",
           },
         ],
       },
@@ -471,6 +699,9 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
       droppedBrandCount: isFailed ? 24 : 0,
       missingCostCount: isFailed ? 2 : 0,
       brokenMediaCount: isWarn ? 1 : 0,
+      searchParity: "100% Match",
+      cartParity: "100% Match",
+      filterParity: "100% Match",
     },
   };
 }
