@@ -649,7 +649,7 @@ export function MigrationDiffClient() {
                     }`}
                   >
                     <Monitor className="size-3.5" />
-                    <span>🌐 So Sánh 2 Website</span>
+                    <span>So Sánh 2 Website</span>
                   </button>
                   <button
                     onClick={() => setActiveViewTab("field_diff")}
@@ -658,7 +658,7 @@ export function MigrationDiffClient() {
                     }`}
                   >
                     <SlidersHorizontal className="size-3.5" />
-                    <span>🔍 Soi Từng Trường (Field Diff)</span>
+                    <span>Soi Từng Trường (Field Diff)</span>
                   </button>
                   <button
                     onClick={() => setActiveViewTab("media_audit")}
@@ -667,7 +667,7 @@ export function MigrationDiffClient() {
                     }`}
                   >
                     <ImageIcon className="size-3.5" />
-                    <span>🖼️ Soi Ảnh & Link</span>
+                    <span>Soi Ảnh & Link</span>
                   </button>
                   <button
                     onClick={() => setActiveViewTab("text_audit")}
@@ -676,7 +676,7 @@ export function MigrationDiffClient() {
                     }`}
                   >
                     <TypeIcon className="size-3.5" />
-                    <span>🔤 Soi Chữ & Bảng</span>
+                    <span>Soi Chữ & Bảng</span>
                   </button>
                 </div>
 
