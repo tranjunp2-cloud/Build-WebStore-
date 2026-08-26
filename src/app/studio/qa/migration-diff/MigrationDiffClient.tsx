@@ -1653,7 +1653,7 @@ export function MigrationDiffClient() {
                         <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
                           <iframe
                             key={`pw1-mob-${iframeReloadKey}`}
-                            src={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`}
+                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
                             title="PW1 Mobile Storefront"
                             className="w-full h-full border-0"
                             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
@@ -1672,21 +1672,13 @@ export function MigrationDiffClient() {
                         </div>
                         {/* Iframe Container */}
                         <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
-                          {activePage.existsInPW2 ? (
-                            <iframe
-                              key={`pw2-mob-${iframeReloadKey}`}
-                              src={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`}
-                              title="PW2 Next.js Mobile Storefront"
-                              className="w-full h-full border-0"
-                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center text-center p-6 space-y-3">
-                              <AlertOctagon className="size-12 text-rose-500 animate-pulse" />
-                              <div className="font-bold text-white text-sm">Trang Này Chưa Được Migrate</div>
-                              <div className="text-xs text-slate-400">Trang {activePage.name} ({activePage.path}) chưa có trên PW2.</div>
-                            </div>
-                          )}
+                          <iframe
+                            key={`pw2-mob-${iframeReloadKey}`}
+                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
+                            title="PW2 Next.js Mobile Storefront"
+                            className="w-full h-full border-0"
+                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                          />
                         </div>
                         {/* Home Bar */}
                         <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-1" />
@@ -1704,7 +1696,7 @@ export function MigrationDiffClient() {
                         <div className="flex-1 bg-white relative">
                           <iframe
                             key={`pw1-desk-${iframeReloadKey}`}
-                            src={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`}
+                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
                             title="PW1 Desktop Storefront"
                             className="w-full h-full border-0"
                             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
@@ -1719,21 +1711,13 @@ export function MigrationDiffClient() {
                           <span className="text-slate-400 font-normal">Desktop Resolution</span>
                         </div>
                         <div className="flex-1 bg-white relative">
-                          {activePage.existsInPW2 ? (
-                            <iframe
-                              key={`pw2-desk-${iframeReloadKey}`}
-                              src={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`}
-                              title="PW2 Next.js Desktop Storefront"
-                              className="w-full h-full border-0"
-                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center text-center p-6 space-y-3">
-                              <AlertOctagon className="size-12 text-rose-500 animate-pulse" />
-                              <div className="font-bold text-white text-sm">Trang Này Chưa Được Migrate</div>
-                              <div className="text-xs text-slate-400">Trang {activePage.name} ({activePage.path}) chưa có trên PW2.</div>
-                            </div>
-                          )}
+                          <iframe
+                            key={`pw2-desk-${iframeReloadKey}`}
+                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
+                            title="PW2 Next.js Desktop Storefront"
+                            className="w-full h-full border-0"
+                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                          />
                         </div>
                       </div>
                     </div>

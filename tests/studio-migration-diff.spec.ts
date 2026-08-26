@@ -92,11 +92,39 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation API Tests", ()
     await compareBtn.click();
 
     // Modal should be visible
-    await expect(page.getByText("So Sánh 2 Website")).toBeVisible();
-    await expect(page.getByText("Soi Từng Trường (Field Diff)")).toBeVisible();
+    await expect(page.getByText("So Sánh Khối")).toBeVisible();
+    await expect(page.getByText("Soi CSDL 1-to-1")).toBeVisible();
 
     // Switch to Field Diff Tab
-    await page.getByText("Soi Từng Trường (Field Diff)").click();
+    await page.getByText("Soi CSDL 1-to-1").click();
     await expect(page.getByText("ĐỐI SOÁT TRƯỜNG DỮ LIỆU CSDL 1-TO-1")).toBeVisible();
+  });
+
+  test("[TC-F40-12-API-01] GET /api/qa/template-preview/fb101 returns full standalone html", async ({
+    request,
+  }) => {
+    const res = await request.get("/api/qa/template-preview/fb101");
+    expect(res.status()).toBe(200);
+    const contentType = res.headers()["content-type"];
+    expect(contentType).toContain("text/html");
+    const html = await res.text();
+    expect(html.length).toBeGreaterThan(1000);
+  });
+
+  test("[TC-F40-12-E2E-01] opens live iframe webview tab in detail modal", async ({
+    page,
+  }) => {
+    await page.goto("/studio/migration");
+    const compareBtn = page.getByRole("button", { name: "So Sánh" }).first();
+    await expect(compareBtn).toBeVisible();
+    await compareBtn.click();
+
+    // Click on Live Webview Tab
+    const liveTab = page.getByText("Xem Web Thật (Live Iframe)");
+    await expect(liveTab).toBeVisible();
+    await liveTab.click();
+
+    // Should render iframe container
+    await expect(page.locator("iframe").first()).toBeVisible();
   });
 });
