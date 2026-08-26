@@ -98,6 +98,8 @@ export function MigrationDiffClient() {
         !q ||
         s.name.toLowerCase().includes(q) ||
         s.id.toLowerCase().includes(q) ||
+        s.ownerEmail.toLowerCase().includes(q) ||
+        s.domain.toLowerCase().includes(q) ||
         s.subdomain1.toLowerCase().includes(q) ||
         s.templateCode.toLowerCase().includes(q);
 
@@ -382,7 +384,7 @@ ${
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950/90 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800 tracking-wider">
               <tr>
-                <th className="py-3.5 px-4">Mã Site / Tên Cửa Hàng Khách</th>
+                <th className="py-3.5 px-4">Email Khách Hàng / Domain</th>
                 <th className="py-3.5 px-4">Giao Diện Mẫu</th>
                 <th className="py-3.5 px-4">Độ Khớp Dữ Liệu</th>
                 <th className="py-3.5 px-4">Trạng Thái QC</th>
@@ -397,10 +399,11 @@ ${
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-indigo-400 font-bold">{store.id}</span>
                       <span className="text-slate-600">—</span>
-                      <span>{store.name}</span>
+                      <span className="text-slate-100 font-semibold">{store.ownerEmail}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500 font-normal font-mono mt-0.5">
-                      {store.subdomain1} <ArrowRight className="inline size-3 text-slate-600" /> <span className="text-slate-400">{store.subdomain2}</span>
+                    <div className="text-[12px] text-emerald-400 font-normal font-mono mt-1 flex items-center gap-1.5 font-medium">
+                      <Globe className="size-3 text-emerald-400 shrink-0" />
+                      <span>{store.domain}</span>
                     </div>
                   </td>
                   <td className="py-4 px-4">

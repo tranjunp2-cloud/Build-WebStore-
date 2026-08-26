@@ -50,6 +50,8 @@ export interface StoreFieldDiffAudit {
 export interface StoreSummary {
   id: string;
   name: string;
+  ownerEmail: string;
+  domain: string;
   templateCode: string;
   templateName: string;
   sector: string;
@@ -378,9 +380,14 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       failedBlocks = [];
     }
 
+    const ownerEmail = i === 1 ? "contact@organicnest.vn" : `${slug}@gmail.com`;
+    const domain = i === 1 ? "organicnest.vn" : `${slug}.com.vn`;
+
     catalog.push({
       id: `SITE-${String(i).padStart(4, "0")}`,
       name: storeName,
+      ownerEmail,
+      domain,
       templateCode: tpl.code,
       templateName: tpl.name,
       sector: tpl.sector,
