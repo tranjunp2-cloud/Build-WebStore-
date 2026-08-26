@@ -54,6 +54,7 @@ import {
   CheckCircle,
   FileSpreadsheet,
   Monitor,
+  Smartphone,
   Type as TypeIcon,
   ShieldCheck,
   Wrench,
@@ -77,6 +78,9 @@ export function MigrationDiffClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
+
+  // View Device State (Desktop vs Mobile 375px)
+  const [deviceView, setDeviceView] = useState<"desktop" | "mobile">("desktop");
 
   const selectedTemplateObj = useMemo(() => {
     if (filterTemplate === "all") return null;
@@ -714,7 +718,37 @@ export function MigrationDiffClient() {
               </div>
 
               {/* Header Action Buttons */}
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {/* Device View Mode Switcher (Desktop vs Mobile 375px) */}
+                <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-inner select-none">
+                  <button
+                    type="button"
+                    onClick={() => setDeviceView("desktop")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      deviceView === "desktop"
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                    title="Xem giao diện chuẩn Desktop (100% width)"
+                  >
+                    <Monitor className="size-3.5" />
+                    <span>Desktop</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeviceView("mobile")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      deviceView === "mobile"
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                    title="Xem giả lập điện thoại Mobile (375px viewport)"
+                  >
+                    <Smartphone className="size-3.5" />
+                    <span>Mobile (375px)</span>
+                  </button>
+                </div>
+
                 <button
                   disabled={isReloading}
                   onClick={() => handleReloadStoreData(selectedDiff.id)}
@@ -891,7 +925,7 @@ export function MigrationDiffClient() {
                   
                   {/* Fixed Browser Dual Windows Header - Fixed Top Bar With Zero Gap */}
                   <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800/80 bg-slate-950 shrink-0 shadow-md">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`grid gap-4 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2"}`}>
                       {/* Left Browser Bar */}
                       <div className="bg-slate-900/90 px-4 py-2.5 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-sm">
                         <div className="flex items-center gap-2">
@@ -900,7 +934,9 @@ export function MigrationDiffClient() {
                             <span className="size-2.5 rounded-full bg-amber-500/80" />
                             <span className="size-2.5 rounded-full bg-emerald-500/80" />
                           </div>
-                          <span className="font-bold text-xs text-amber-400 font-mono ml-2">👈 BẢN CŨ PW1 (LARAVEL)</span>
+                          <span className="font-bold text-xs text-amber-400 font-mono ml-2">
+                            {deviceView === "mobile" ? "📱 BẢN CŨ PW1 (MOBILE 375px)" : "👈 BẢN CŨ PW1 (LARAVEL)"}
+                          </span>
                         </div>
                         <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-medium">
                           <span>Live V1</span> <ExternalLink className="size-3" />
@@ -915,7 +951,9 @@ export function MigrationDiffClient() {
                             <span className="size-2.5 rounded-full bg-amber-500/80" />
                             <span className="size-2.5 rounded-full bg-emerald-500/80" />
                           </div>
-                          <span className="font-bold text-xs text-sky-400 font-mono ml-2">👉 BẢN MỚI PW2 (NEXT.JS 15)</span>
+                          <span className="font-bold text-xs text-sky-400 font-mono ml-2">
+                            {deviceView === "mobile" ? "📱 BẢN MỚI PW2 (MOBILE 375px)" : "👉 BẢN MỚI PW2 (NEXT.JS 15)"}
+                          </span>
                         </div>
                         {activePage.existsInPW2 ? (
                           <a href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-sky-400 hover:underline flex items-center gap-1 font-medium">
@@ -985,7 +1023,7 @@ export function MigrationDiffClient() {
                           }`}
                         >
                           {/* Block Header */}
-                          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
                             <div className="flex items-center gap-3">
                               <span className="px-2 py-1 bg-slate-900 text-sky-400 font-mono font-bold text-xs rounded-lg border border-slate-800">
                                 #{String(block.order).padStart(2, "0")}
@@ -1015,72 +1053,160 @@ export function MigrationDiffClient() {
                             </div>
                           </div>
 
-                          {/* Dual Column Content Preview */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* PW1 Preview Box */}
-                            <div className="bg-slate-950/60 border border-amber-500/20 rounded-xl p-4 text-xs text-slate-200 space-y-2">
-                              <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider">
-                                Giao Diện & Nội Dung Bản Gốc PW1
-                              </div>
-                              {block.pw1Preview.headline && (
-                                <div className="font-bold text-white text-sm">{block.pw1Preview.headline}</div>
-                              )}
-                              {block.pw1Preview.subheadline && (
-                                <div className="text-slate-300 leading-relaxed">{block.pw1Preview.subheadline}</div>
-                              )}
-                              {block.pw1Preview.bodyText && (
-                                <div className="text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-                                  {block.pw1Preview.bodyText}
+                          {/* Dual Column Content Preview - Switches between Desktop & Mobile Frame */}
+                          {deviceView === "mobile" ? (
+                            /* Mobile Phone Mockup View (375px) */
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-2">
+                              {/* PW1 Phone Mockup */}
+                              <div className="w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 border-amber-500/40 rounded-[2.5rem] p-4 shadow-2xl space-y-3 ring-1 ring-amber-500/20 relative">
+                                {/* Speaker / Notch */}
+                                <div className="w-24 h-3.5 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner">
+                                  <div className="size-1.5 rounded-full bg-slate-700" />
+                                  <div className="w-8 h-1 rounded-full bg-slate-800" />
                                 </div>
-                              )}
-                              {block.pw1Preview.badgeText && (
-                                <span className="inline-block text-[10px] bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/20">
-                                  {block.pw1Preview.badgeText}
-                                </span>
-                              )}
-                            </div>
+                                <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider text-center border-b border-slate-800 pb-1.5 flex items-center justify-center gap-1">
+                                  <Smartphone className="size-3" /> PW1 Mobile (375px)
+                                </div>
+                                <div className="p-2 space-y-2 text-xs">
+                                  {block.pw1Preview.headline && (
+                                    <div className="font-bold text-white text-xs leading-snug">{block.pw1Preview.headline}</div>
+                                  )}
+                                  {block.pw1Preview.subheadline && (
+                                    <div className="text-slate-300 text-[11px] leading-relaxed">{block.pw1Preview.subheadline}</div>
+                                  )}
+                                  {block.pw1Preview.bodyText && (
+                                    <div className="text-slate-300 text-[11px] leading-relaxed bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                                      {block.pw1Preview.bodyText}
+                                    </div>
+                                  )}
+                                  {block.pw1Preview.badgeText && (
+                                    <span className="inline-block text-[9px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full font-semibold border border-emerald-500/20">
+                                      {block.pw1Preview.badgeText}
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Home Bar */}
+                                <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
+                              </div>
 
-                            {/* PW2 Preview Box */}
-                            <div className={`rounded-xl p-4 text-xs text-slate-200 space-y-2 border ${
-                              block.status === "fail"
-                                ? "bg-rose-950/20 border-rose-500/40"
-                                : block.status === "warn"
-                                ? "bg-amber-950/20 border-amber-500/40"
-                                : "bg-slate-950/60 border-sky-500/20"
-                            }`}>
-                              <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider">
-                                Giao Diện & Nội Dung Bản Mới PW2 (Next.js 15)
-                              </div>
-                              {block.pw2Preview.headline && (
-                                <div className="font-bold text-white text-sm">{block.pw2Preview.headline}</div>
-                              )}
-                              {block.pw2Preview.subheadline && (
-                                <div className="text-slate-300 leading-relaxed">{block.pw2Preview.subheadline}</div>
-                              )}
-                              {block.pw2Preview.bodyText && (
-                                <div className={`leading-relaxed p-2.5 rounded-lg border ${
-                                  block.status === "fail"
-                                    ? "bg-rose-950/40 border-rose-500/40 text-rose-200 font-medium"
-                                    : block.status === "warn"
-                                    ? "bg-amber-950/40 border-amber-500/40 text-amber-200 font-medium"
-                                    : "bg-slate-900/80 border-slate-800 text-slate-300"
-                                }`}>
-                                  {block.pw2Preview.bodyText}
+                              {/* PW2 Phone Mockup */}
+                              <div className={`w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 rounded-[2.5rem] p-4 shadow-2xl space-y-3 relative ${
+                                block.status === "fail"
+                                  ? "border-rose-500/60 ring-2 ring-rose-500/30"
+                                  : block.status === "warn"
+                                  ? "border-amber-500/60 ring-2 ring-amber-500/30"
+                                  : "border-sky-500/40 ring-1 ring-sky-500/20"
+                              }`}>
+                                {/* Speaker / Notch */}
+                                <div className="w-24 h-3.5 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner">
+                                  <div className="size-1.5 rounded-full bg-slate-700" />
+                                  <div className="w-8 h-1 rounded-full bg-slate-800" />
                                 </div>
-                              )}
-                              {block.pw2Preview.badgeText && (
-                                <span className={`inline-block text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
-                                  block.status === "fail"
-                                    ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                                    : block.status === "warn"
-                                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                }`}>
-                                  {block.pw2Preview.badgeText}
-                                </span>
-                              )}
+                                <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider text-center border-b border-slate-800 pb-1.5 flex items-center justify-center gap-1">
+                                  <Smartphone className="size-3" /> PW2 Next.js Mobile (375px)
+                                </div>
+                                <div className="p-2 space-y-2 text-xs">
+                                  {block.pw2Preview.headline && (
+                                    <div className="font-bold text-white text-xs leading-snug">{block.pw2Preview.headline}</div>
+                                  )}
+                                  {block.pw2Preview.subheadline && (
+                                    <div className="text-slate-300 text-[11px] leading-relaxed">{block.pw2Preview.subheadline}</div>
+                                  )}
+                                  {block.pw2Preview.bodyText && (
+                                    <div className={`text-[11px] leading-relaxed p-2 rounded-lg border ${
+                                      block.status === "fail"
+                                        ? "bg-rose-950/40 border-rose-500/40 text-rose-200 font-medium"
+                                        : block.status === "warn"
+                                        ? "bg-amber-950/40 border-amber-500/40 text-amber-200 font-medium"
+                                        : "bg-slate-900/80 border-slate-800 text-slate-300"
+                                    }`}>
+                                      {block.pw2Preview.bodyText}
+                                    </div>
+                                  )}
+                                  {block.pw2Preview.badgeText && (
+                                    <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-semibold border ${
+                                      block.status === "fail"
+                                        ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                        : block.status === "warn"
+                                        ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                    }`}>
+                                      {block.pw2Preview.badgeText}
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Home Bar */}
+                                <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            /* Desktop Dual Column View */
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* PW1 Preview Box */}
+                              <div className="bg-slate-950/60 border border-amber-500/20 rounded-xl p-4 text-xs text-slate-200 space-y-2">
+                                <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider">
+                                  Giao Diện & Nội Dung Bản Gốc PW1
+                                </div>
+                                {block.pw1Preview.headline && (
+                                  <div className="font-bold text-white text-sm">{block.pw1Preview.headline}</div>
+                                )}
+                                {block.pw1Preview.subheadline && (
+                                  <div className="text-slate-300 leading-relaxed">{block.pw1Preview.subheadline}</div>
+                                )}
+                                {block.pw1Preview.bodyText && (
+                                  <div className="text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                                    {block.pw1Preview.bodyText}
+                                  </div>
+                                )}
+                                {block.pw1Preview.badgeText && (
+                                  <span className="inline-block text-[10px] bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/20">
+                                    {block.pw1Preview.badgeText}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* PW2 Preview Box */}
+                              <div className={`rounded-xl p-4 text-xs text-slate-200 space-y-2 border ${
+                                block.status === "fail"
+                                  ? "bg-rose-950/20 border-rose-500/40"
+                                  : block.status === "warn"
+                                  ? "bg-amber-950/20 border-amber-500/40"
+                                  : "bg-slate-950/60 border-sky-500/20"
+                              }`}>
+                                <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider">
+                                  Giao Diện & Nội Dung Bản Mới PW2 (Next.js 15)
+                                </div>
+                                {block.pw2Preview.headline && (
+                                  <div className="font-bold text-white text-sm">{block.pw2Preview.headline}</div>
+                                )}
+                                {block.pw2Preview.subheadline && (
+                                  <div className="text-slate-300 leading-relaxed">{block.pw2Preview.subheadline}</div>
+                                )}
+                                {block.pw2Preview.bodyText && (
+                                  <div className={`leading-relaxed p-2.5 rounded-lg border ${
+                                    block.status === "fail"
+                                      ? "bg-rose-950/40 border-rose-500/40 text-rose-200 font-medium"
+                                      : block.status === "warn"
+                                      ? "bg-amber-950/40 border-amber-500/40 text-amber-200 font-medium"
+                                      : "bg-slate-900/80 border-slate-800 text-slate-300"
+                                  }`}>
+                                    {block.pw2Preview.bodyText}
+                                  </div>
+                                )}
+                                {block.pw2Preview.badgeText && (
+                                  <span className={`inline-block text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
+                                    block.status === "fail"
+                                      ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                      : block.status === "warn"
+                                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  }`}>
+                                    {block.pw2Preview.badgeText}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
