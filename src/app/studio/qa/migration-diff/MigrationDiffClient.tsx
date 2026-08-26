@@ -925,9 +925,9 @@ export function MigrationDiffClient() {
                   
                   {/* Fixed Browser Dual Windows Header - Fixed Top Bar With Zero Gap */}
                   <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800/80 bg-slate-950 shrink-0 shadow-md">
-                    <div className={`grid gap-4 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2"}`}>
+                    <div className={`grid gap-6 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2 gap-4"}`}>
                       {/* Left Browser Bar */}
-                      <div className="bg-slate-900/90 px-4 py-2.5 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-sm">
+                      <div className={`bg-slate-900/90 px-4 py-2.5 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-sm ${deviceView === "mobile" ? "max-w-[375px] mx-auto w-full" : ""}`}>
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1.5">
                             <span className="size-2.5 rounded-full bg-rose-500/80" />
@@ -944,7 +944,7 @@ export function MigrationDiffClient() {
                       </div>
 
                       {/* Right Browser Bar */}
-                      <div className="bg-slate-900/90 px-4 py-2.5 rounded-xl border border-sky-500/30 flex items-center justify-between shadow-sm">
+                      <div className={`bg-slate-900/90 px-4 py-2.5 rounded-xl border border-sky-500/30 flex items-center justify-between shadow-sm ${deviceView === "mobile" ? "max-w-[375px] mx-auto w-full" : ""}`}>
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1.5">
                             <span className="size-2.5 rounded-full bg-rose-500/80" />
