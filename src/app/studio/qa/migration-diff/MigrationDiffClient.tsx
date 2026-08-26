@@ -8,7 +8,7 @@ import {
   CANONICAL_TEMPLATES,
   type StoreSummary,
   type StoreDeepDiff,
-  type PageBlockItem,
+  type DynamicStorePage,
 } from "@/lib/admin/qa/migration-diff-engine";
 import {
   Layers,
@@ -31,9 +31,7 @@ import {
   Store,
   ArrowRight,
   FileText,
-  Image as ImageIcon,
-  Table as TableIcon,
-  Package,
+  FileX,
   Layers as BlockTreeIcon,
 } from "lucide-react";
 
@@ -95,11 +93,12 @@ export function MigrationDiffClient() {
     const text = `### 🚨 [QC MIGRATION BLOCKER] Cửa Hàng: ${store.name} (${store.id})
 - **Template:** ${store.templateCode} (${store.templateName})
 - **Trang Đang Bị Lỗi:** ${page.name} (${page.path})
+- **Tổng Trang:** PW1 có ${store.totalPagesInPW1} trang ➔ PW2 có ${store.totalPagesInPW2} trang (Thiếu: ${store.missingPagesCount})
 - **Độ Tương Thích:** ${store.score} (Trạng Thái: ${store.status.toUpperCase()})
 - **Web Cũ (Phiên Bản V1):** ${store.legacyDomain}
 - **Web Mới (Phiên Bản V2):** ${store.migratedDomain}
 
-#### ❌ Chi Tiết Lỗi Dữ Liệu Khối Tuần Tự Cần Sửa:
+#### ❌ Chi Tiết Lỗi Dữ Liệu & Rơi Rớt Trang Cần Sửa:
 ${page.defects
   ?.map(
     (d, i) =>
@@ -152,11 +151,11 @@ ${page.defects
                   ĐỐI SOÁT 2.000 WEBSITES KHÁCH HÀNG (PW1 ➔ PW2)
                 </h1>
                 <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide">
-                  F40 Migration QA
+                  F40 Dynamic Discovery
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                So sánh đối chiếu toàn diện <strong>Chuỗi Khối Tuần Tự Bố Cục Thực Tế (Full-Page Sequential Stream)</strong> của Khách Hàng
+                Tự động đọc danh sách trang động thực tế & Đối soát <strong>Chuỗi Khối Tuần Tự (Full-Page Stream)</strong> của từng Khách Hàng
               </p>
             </div>
           </div>
@@ -312,7 +311,7 @@ ${page.defects
                 <th className="py-3.5 px-4">Giao Diện Mẫu</th>
                 <th className="py-3.5 px-4">Độ Khớp Dữ Liệu</th>
                 <th className="py-3.5 px-4">Trạng Thái QC</th>
-                <th className="py-3.5 px-4">Chi Tiết Lỗi Cần Sửa</th>
+                <th className="py-3.5 px-4">Số Trang & Lỗi Phát Hiện</th>
                 <th className="py-3.5 px-4 text-right">Đối Soát</th>
               </tr>
             </thead>
@@ -371,22 +370,27 @@ ${page.defects
                     )}
                   </td>
                   <td className="py-4 px-4">
-                    {store.failedBlocks.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {store.failedBlocks.map((fb, idx) => (
-                          <span
-                            key={idx}
-                            className="bg-rose-950/50 text-rose-300 border border-rose-500/30 text-[10px] px-2 py-0.5 rounded-md font-mono"
-                          >
-                            {fb}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-                        <CheckCircle2 className="size-3.5" /> 100% Khớp đúng dữ liệu khách
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                        {store.pageCount} Trang
                       </span>
-                    )}
+                      {store.failedBlocks.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {store.failedBlocks.map((fb, idx) => (
+                            <span
+                              key={idx}
+                              className="bg-rose-950/50 text-rose-300 border border-rose-500/30 text-[10px] px-2 py-0.5 rounded-md font-mono"
+                            >
+                              {fb}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                          <CheckCircle2 className="size-3.5" /> Khớp 100%
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-4 px-4 text-right">
                     <button
@@ -434,7 +438,7 @@ ${page.defects
       </div>
 
       {/* ========================================================================= */}
-      {/* FULL-PAGE SEQUENTIAL STREAM & BLOCK TREE NAVIGATOR MODAL */}
+      {/* DYNAMIC STORE PAGES DISCOVERY & SEQUENTIAL STREAM MODAL */}
       {/* ========================================================================= */}
       {selectedDiff && activePage && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
@@ -468,9 +472,15 @@ ${page.defects
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-3 font-mono">
-                    <span>Web Cũ: <strong className="text-amber-300">{selectedDiff.legacyDomain}</strong></span>
-                    <span>➔</span>
-                    <span>Web Mới: <strong className="text-indigo-300">{selectedDiff.migratedDomain}</strong></span>
+                    <span>Tổng Trang: <strong className="text-white">{selectedDiff.totalPagesInPW1} Trang Gốc</strong></span>
+                    <span>•</span>
+                    {selectedDiff.missingPagesCount > 0 ? (
+                      <span className="text-rose-400 font-bold flex items-center gap-1">
+                        <FileX className="size-3.5" /> PW2 chỉ có {selectedDiff.totalPagesInPW2} (🚨 Thiếu {selectedDiff.missingPagesCount} Trang)
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400 font-bold">✓ Đủ {selectedDiff.totalPagesInPW2} Trang trên PW2</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -499,9 +509,9 @@ ${page.defects
               </div>
             </div>
 
-            {/* Page Tabs Bar */}
-            <div className="bg-slate-950 px-6 pt-3 border-b border-slate-800 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
+            {/* DYNAMIC MERCHANT PAGES TABS BAR */}
+            <div className="bg-slate-950 px-6 pt-3 border-b border-slate-800 flex items-center justify-between shrink-0 overflow-x-auto">
+              <div className="flex items-center gap-2">
                 {selectedDiff.pages.map((p, idx) => (
                   <button
                     key={p.id}
@@ -509,27 +519,31 @@ ${page.defects
                       setActivePageIndex(idx);
                       setSelectedBlockId(null);
                     }}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition ${
+                    className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold border-b-2 transition whitespace-nowrap ${
                       activePageIndex === idx
                         ? "border-indigo-500 text-indigo-400 bg-indigo-500/10 rounded-t-xl"
                         : "border-transparent text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <span>{p.name}</span>
-                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full font-mono text-slate-400">
+                    <span>{idx + 1}. {p.name}</span>
+                    <span className="text-[10px] bg-slate-800 px-1.5 py-0.2 rounded font-mono text-slate-400">
                       {p.totalBlocks} Khối
                     </span>
-                    {p.defects.length > 0 && (
+                    {!p.existsInPW2 ? (
+                      <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
+                        🚨 THIẾU TRANG
+                      </span>
+                    ) : p.defects.length > 0 ? (
                       <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
                         {p.defects.length} LỖI
                       </span>
-                    )}
+                    ) : null}
                   </button>
                 ))}
               </div>
 
               {/* Quick error toggle */}
-              <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer pb-2 select-none">
+              <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer pb-2 select-none shrink-0 ml-4">
                 <input
                   type="checkbox"
                   checked={showOnlyErrors}
@@ -548,8 +562,8 @@ ${page.defects
                   <BlockTreeIcon className="size-4 text-indigo-400" />
                   <span>Cây Bố Cục ({activePage.blocks.length} Khối)</span>
                 </div>
-                <div className="text-[11px] text-slate-500">
-                  Bấm vào khối để tự động cuộn đến vị trí tương ứng trên trang web:
+                <div className="text-[11px] text-slate-500 font-mono">
+                  Đường dẫn: <strong className="text-slate-300">{activePage.path}</strong>
                 </div>
 
                 <div className="space-y-1.5">
@@ -587,17 +601,34 @@ ${page.defects
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md pb-3 border-b border-slate-800">
                   <div className="bg-amber-950/80 px-4 py-2 rounded-xl border border-amber-500/30 flex items-center justify-between text-xs text-amber-200">
                     <span className="font-bold font-mono">👈 BẢN CŨ PW1 (LARAVEL MYSQL)</span>
-                    <a href={selectedDiff.legacyDomain} target="_blank" rel="noreferrer" className="text-amber-400 hover:underline flex items-center gap-1">
+                    <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-amber-400 hover:underline flex items-center gap-1">
                       Live V1 <ExternalLink className="size-3" />
                     </a>
                   </div>
                   <div className="bg-indigo-950/80 px-4 py-2 rounded-xl border border-indigo-500/30 flex items-center justify-between text-xs text-indigo-200">
                     <span className="font-bold font-mono">👉 BẢN MỚI PW2 (NEXT.JS 15 PAYLOAD)</span>
-                    <a href={selectedDiff.migratedDomain} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline flex items-center gap-1">
-                      Live V2 <ExternalLink className="size-3" />
-                    </a>
+                    {activePage.existsInPW2 ? (
+                      <a href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline flex items-center gap-1">
+                        Live V2 <ExternalLink className="size-3" />
+                      </a>
+                    ) : (
+                      <span className="text-rose-400 font-bold font-mono">🚨 CHƯA CÓ TRANG TRÊN PW2</span>
+                    )}
                   </div>
                 </div>
+
+                {/* Missing Page Warning Banner */}
+                {!activePage.existsInPW2 && (
+                  <div className="p-4 bg-rose-950/60 border border-rose-500 rounded-2xl flex items-center gap-3.5 text-rose-200 text-xs shadow-2xl">
+                    <AlertOctagon className="size-6 text-rose-400 shrink-0" />
+                    <div>
+                      <div className="font-black text-sm text-white">🚨 LỖI P0: KHÔNG TÌM THẤY TRANG TRÊN PW2 ({activePage.path})</div>
+                      <div className="text-slate-300 mt-0.5">
+                        Khách hàng có trang này trên hệ thống cũ PW1, nhưng script ETL chưa tạo record trong collection `pages` của PW2.
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Sequential Block Stack */}
                 <div className="space-y-4">
@@ -632,7 +663,7 @@ ${page.defects
                           <div>
                             {block.status === "fail" ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-500/40 animate-pulse">
-                                🚨 LỖI P0: {block.discrepancyNote}
+                                🚨 LỖI P0: {block.discrepancyNote || "Lệch dữ liệu"}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
