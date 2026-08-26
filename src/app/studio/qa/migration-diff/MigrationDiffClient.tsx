@@ -12,7 +12,6 @@ import {
 } from "@/lib/admin/qa/migration-diff-engine";
 import {
   Layers,
-  Database,
   Search,
   CheckCircle2,
   AlertTriangle,
@@ -27,7 +26,6 @@ import {
   CheckCheck,
   ArrowLeft,
   X,
-  Sliders,
   Store,
   ArrowRight,
   FileText,
@@ -38,6 +36,9 @@ import {
   Type as TypeIcon,
   Table as TableIcon,
   ShieldCheck,
+  Globe,
+  Check,
+  Filter,
 } from "lucide-react";
 
 export function MigrationDiffClient() {
@@ -157,11 +158,11 @@ ${page.defects
                   ĐỐI SOÁT 2.000 WEBSITES KHÁCH HÀNG (PW1 ➔ PW2)
                 </h1>
                 <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide">
-                  F40 Media & Text Audit
+                  F40 Production QA
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                Kiểm tra sâu <strong>Hình Ảnh (Media 404/CDN)</strong> và <strong>Định Dạng Văn Bản User Input (UTF-8, Bảng &lt;table&gt;, WYSIWYG)</strong>
+                So sánh đối chiếu toàn diện <strong>Bố Cục Tuần Tự, Hình Ảnh (404/CDN)</strong> & <strong>Định Dạng Văn Bản (UTF-8, Bảng &lt;table&gt;)</strong>
               </p>
             </div>
           </div>
@@ -171,11 +172,11 @@ ${page.defects
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
             <span className="inline-block size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>DB Phiên Bản Cũ: <strong className="text-emerald-400 font-mono">MySQL Live</strong></span>
+            <span>DB Bản Cũ: <strong className="text-emerald-400 font-mono">MySQL Live</strong></span>
           </div>
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
             <span className="inline-block size-2 rounded-full bg-indigo-400 animate-pulse" />
-            <span>DB Phiên Bản Mới: <strong className="text-indigo-400 font-mono">Postgres Live</strong></span>
+            <span>DB Bản Mới: <strong className="text-indigo-400 font-mono">Postgres Live</strong></span>
           </div>
           <button
             onClick={() => showToast("Đã quét lại đối soát cho toàn bộ 2.000 website!")}
@@ -449,80 +450,88 @@ ${page.defects
       </div>
 
       {/* ========================================================================= */}
-      {/* DYNAMIC STORE PAGES DISCOVERY & SEQUENTIAL STREAM MODAL */}
+      {/* PROFESSIONAL REDESIGNED DETAIL INSPECTOR MODAL */}
       {/* ========================================================================= */}
       {selectedDiff && activePage && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-7xl max-h-[96vh] flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
-            {/* Modal Top Header */}
-            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 bg-slate-950/90 shrink-0">
+            
+            {/* 1. CLEAN TOP HEADER */}
+            <div className="p-5 border-b border-slate-800 bg-slate-950 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
               <div className="flex items-center gap-3.5">
                 <button
                   onClick={() => setActiveStoreId(null)}
-                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition"
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition shadow-sm"
+                  title="Quay lại danh sách"
                 >
                   <ArrowLeft className="size-4" />
                 </button>
-                <div className="p-2.5 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl">
+                <div className="p-2.5 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-400 border border-indigo-500/30 rounded-xl shadow-inner">
                   <Store className="size-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2.5 font-black text-white text-base sm:text-lg">
-                    <span>{selectedDiff.name}</span>
-                    <span className="text-xs font-mono text-indigo-400">({selectedDiff.id})</span>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-black text-white">{selectedDiff.name}</h2>
+                    <span className="font-mono text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
+                      {selectedDiff.id}
+                    </span>
                     <span
-                      className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase ${
+                      className={`text-[11px] px-3 py-0.5 rounded-full font-bold uppercase tracking-wider border shadow-sm ${
                         selectedDiff.status === "passed"
-                          ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
+                          ? "bg-emerald-950 text-emerald-300 border-emerald-500/40"
                           : selectedDiff.status === "warning"
-                          ? "bg-amber-950 text-amber-300 border border-amber-500/40"
-                          : "bg-rose-950 text-rose-300 border border-rose-500/40"
+                          ? "bg-amber-950 text-amber-300 border-amber-500/40"
+                          : "bg-rose-950 text-rose-300 border-rose-500/40"
                       }`}
                     >
-                      {selectedDiff.status === "passed" ? "QC Pass" : selectedDiff.status === "warning" ? "Cần Xem Lại (Warning)" : "Lỗi P0 Blocker"}
+                      {selectedDiff.status === "passed" ? "✓ QC Pass" : selectedDiff.status === "warning" ? "⚠️ Cần Xem Lại" : "🚨 Lỗi P0 Blocker"}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-3 font-mono">
-                    <span>Tổng Trang: <strong className="text-white">{selectedDiff.totalPagesInPW1} Trang Gốc</strong></span>
+                  <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2 font-mono">
+                    <span>Gốc: <strong className="text-slate-300">{selectedDiff.templateCode} ({selectedDiff.templateName})</strong></span>
                     <span>•</span>
-                    {selectedDiff.missingPagesCount > 0 ? (
-                      <span className="text-rose-400 font-bold flex items-center gap-1">
-                        <FileX className="size-3.5" /> PW2 chỉ có {selectedDiff.totalPagesInPW2} (🚨 Thiếu {selectedDiff.missingPagesCount} Trang)
+                    <span>Tổng số trang: <strong className="text-white">{selectedDiff.totalPagesInPW1} Trang</strong></span>
+                    {selectedDiff.missingPagesCount > 0 && (
+                      <span className="text-rose-400 font-bold bg-rose-950/60 border border-rose-500/40 px-2 py-0.2 rounded">
+                        🚨 Thiếu {selectedDiff.missingPagesCount} trang trên PW2
                       </span>
-                    ) : (
-                      <span className="text-emerald-400 font-bold">✓ Đủ {selectedDiff.totalPagesInPW2} Trang trên PW2</span>
                     )}
                   </div>
                 </div>
               </div>
 
+              {/* Action Buttons */}
               <div className="flex items-center gap-2.5">
                 <button
                   onClick={() => handleCopyTicket(selectedDiff)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl border border-slate-700 transition"
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl border border-slate-700 transition shadow-sm"
                 >
                   <Copy className="size-3.5" />
-                  <span className="hidden sm:inline">Xuất Ticket Lỗi</span>
+                  <span>Xuất Ticket</span>
                 </button>
                 <button
                   onClick={() => handleApprovePass(selectedDiff.id)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-xl transition shadow-lg shadow-emerald-600/30"
+                  className="flex items-center gap-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white rounded-xl transition shadow-lg shadow-emerald-600/30"
                 >
-                  <CheckCircle2 className="size-3.5" />
-                  <span className="hidden sm:inline">Đóng Dấu QC Pass</span>
+                  <CheckCircle2 className="size-4" />
+                  <span>Duyệt QC Pass</span>
                 </button>
                 <button
                   onClick={() => setActiveStoreId(null)}
-                  className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition ml-1"
+                  className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition ml-1"
                 >
                   <X className="size-4" />
                 </button>
               </div>
             </div>
 
-            {/* DYNAMIC MERCHANT PAGES TABS BAR */}
-            <div className="bg-slate-950 px-6 pt-3 border-b border-slate-800 flex items-center justify-between shrink-0 overflow-x-auto">
-              <div className="flex items-center gap-2">
+            {/* 2. UNIFIED CLEAN SECONDARY NAVIGATION BAR */}
+            <div className="bg-slate-950 px-6 py-3 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shrink-0">
+              {/* Page Selection Pills */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0 flex items-center gap-1">
+                  <Globe className="size-3.5 text-indigo-400" /> Trang:
+                </span>
                 {selectedDiff.pages.map((p, idx) => {
                   const hasErrors = !p.existsInPW2 || p.defects.some((d) => d.type === "p0");
                   const hasWarnings = p.defects.some((d) => d.type === "p1" || d.type === "p2") || p.blocks.some((b) => b.status === "warn");
@@ -534,27 +543,24 @@ ${page.defects
                         setActivePageIndex(idx);
                         setSelectedBlockId(null);
                       }}
-                      className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition whitespace-nowrap border ${
                         activePageIndex === idx
-                          ? "border-indigo-500 text-indigo-400 bg-indigo-500/10 rounded-t-xl"
-                          : "border-transparent text-slate-400 hover:text-slate-200"
+                          ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
+                          : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white"
                       }`}
                     >
                       <span>{idx + 1}. {p.name}</span>
-                      <span className="text-[10px] bg-slate-800 px-1.5 py-0.2 rounded font-mono text-slate-400">
-                        {p.totalBlocks} Khối
-                      </span>
                       {!p.existsInPW2 ? (
                         <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
-                          🚨 THIẾU TRANG
+                          THIẾU
                         </span>
                       ) : hasErrors ? (
                         <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
-                          {p.defects.filter((d) => d.type === "p0").length} LỖI
+                          LỖI
                         </span>
                       ) : hasWarnings ? (
-                        <span className="bg-amber-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
-                          {p.defects.length || p.blocks.filter((b) => b.status === "warn").length} CẦN XEM
+                        <span className="bg-amber-500 text-black text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                          CẦN XEM
                         </span>
                       ) : null}
                     </button>
@@ -562,107 +568,126 @@ ${page.defects
                 })}
               </div>
 
-              {/* Mode Switcher: Stream View vs Media Inspector vs Typography Inspector */}
-              <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
-                <button
-                  onClick={() => setActiveAuditTab("stream")}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
-                    activeAuditTab === "stream" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  Dòng Chảy Khối
-                </button>
-                <button
-                  onClick={() => setActiveAuditTab("media")}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1 ${
-                    activeAuditTab === "media" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  <ImageIcon className="size-3.5" />
-                  <span>Soi Hình Ảnh</span>
-                </button>
-                <button
-                  onClick={() => setActiveAuditTab("typography")}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1 ${
-                    activeAuditTab === "typography" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  <TypeIcon className="size-3.5" />
-                  <span>Soi Văn Bản & Bảng</span>
-                </button>
+              {/* Right View Mode Controls */}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => setActiveAuditTab("stream")}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+                      activeAuditTab === "stream" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <BlockTreeIcon className="size-3.5" />
+                    <span>Dòng Chảy Khối</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveAuditTab("media")}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+                      activeAuditTab === "media" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <ImageIcon className="size-3.5" />
+                    <span>Soi Hình Ảnh</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveAuditTab("typography")}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+                      activeAuditTab === "typography" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <TypeIcon className="size-3.5" />
+                    <span>Soi Văn Bản & Bảng</span>
+                  </button>
+                </div>
+
+                {/* Filter toggle */}
+                <label className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-800 cursor-pointer select-none text-xs text-slate-300 transition">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyErrors}
+                    onChange={(e) => setShowOnlyErrors(e.target.checked)}
+                    className="rounded border-slate-700 text-indigo-600 focus:ring-0 size-3.5"
+                  />
+                  <span className="font-semibold text-rose-400">Chỉ Lỗi</span>
+                </label>
               </div>
             </div>
 
-            {/* Modal Body: Depends on activeAuditTab */}
+            {/* 3. MODAL CONTENT AREA */}
             {activeAuditTab === "media" ? (
-              /* MEDIA & IMAGE HEALTH INSPECTOR */
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/60">
-                <div className="flex items-center justify-between">
+              /* CLEAN MEDIA INTEGRITY AUDIT TAB */
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-900/40">
+                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 shadow-sm flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-black text-white flex items-center gap-2">
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
                       <ImageIcon className="size-5 text-indigo-400" />
-                      <span>BẢNG ĐỐI SOÁT TOÀN DIỆN HÌNH ẢNH (MEDIA INTEGRITY AUDIT)</span>
-                    </h2>
+                      <span>ĐỐI SOÁT HÌNH ẢNH (MEDIA INTEGRITY AUDIT)</span>
+                    </h3>
                     <p className="text-xs text-slate-400 mt-1">
-                      Kiểm tra link ảnh có bị 404/403, CDN DigitalOcean sang WebP S3, Alt text SEO và kích thước hiển thị.
+                      Kiểm tra link ảnh có bị 404, đối chiếu CDN DigitalOcean S3 sang WebP Payload và thẻ Alt text SEO.
                     </p>
+                  </div>
+                  <div className="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                    Trang: <strong className="text-indigo-400">{activePage.name}</strong> ({activePage.path})
                   </div>
                 </div>
 
                 <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
                   <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800">
+                    <thead className="bg-slate-900/90 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800 tracking-wider">
                       <tr>
-                        <th className="py-3 px-4">Tên Ảnh / Vị Trí</th>
-                        <th className="py-3 px-4">Link Bản Cũ PW1 (DO S3)</th>
-                        <th className="py-3 px-4">Link Bản Mới PW2 (WebP CDN)</th>
-                        <th className="py-3 px-4">HTTP Status</th>
-                        <th className="py-3 px-4">Alt Text SEO</th>
-                        <th className="py-3 px-4">Kích Thước</th>
-                        <th className="py-3 px-4 text-right">Trạng Thái</th>
+                        <th className="py-3.5 px-5">Vị Trí Ảnh</th>
+                        <th className="py-3.5 px-5">Bản Cũ PW1 (DO S3)</th>
+                        <th className="py-3.5 px-5">Bản Mới PW2 (WebP CDN)</th>
+                        <th className="py-3.5 px-5">HTTP Status</th>
+                        <th className="py-3.5 px-5">Alt Text SEO</th>
+                        <th className="py-3.5 px-5">Kích Thước</th>
+                        <th className="py-3.5 px-5 text-right">Đánh Giá</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                    <tbody className="divide-y divide-slate-800/60">
                       {activePage.mediaAudits.map((m) => (
-                        <tr key={m.id} className={m.status === "warn" ? "bg-amber-950/20" : ""}>
-                          <td className="py-3.5 px-4 font-sans font-bold text-white">{m.label}</td>
-                          <td className="py-3.5 px-4 text-slate-400 truncate max-w-[200px]">
-                            <a href={m.pw1Url} target="_blank" rel="noreferrer" className="text-amber-400 hover:underline">
-                              {m.pw1Url.split("/").pop()}
+                        <tr key={m.id} className={`hover:bg-slate-900/40 transition ${m.status === "warn" ? "bg-amber-950/15" : ""}`}>
+                          <td className="py-4 px-5 font-bold text-white">{m.label}</td>
+                          <td className="py-4 px-5 font-mono text-[11px] text-slate-400 truncate max-w-[200px]">
+                            <a href={m.pw1Url} target="_blank" rel="noreferrer" className="text-amber-400 hover:underline flex items-center gap-1">
+                              <span>{m.pw1Url.split("/").pop()}</span>
+                              <ExternalLink className="size-3 shrink-0" />
                             </a>
                           </td>
-                          <td className="py-3.5 px-4 text-slate-300 truncate max-w-[200px]">
+                          <td className="py-4 px-5 font-mono text-[11px] text-slate-300 truncate max-w-[200px]">
                             {m.status === "warn" ? (
                               <span className="text-rose-400 font-bold">{m.pw2Url.split("/").pop()}</span>
                             ) : (
-                              <a href={m.pw2Url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
-                                {m.pw2Url.split("/").pop()}
+                              <a href={m.pw2Url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline flex items-center gap-1">
+                                <span>{m.pw2Url.split("/").pop()}</span>
+                                <ExternalLink className="size-3 shrink-0" />
                               </a>
                             )}
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-4 px-5">
                             {m.httpStatusV2 === 200 ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 font-bold">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
                                 200 OK
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-500 font-bold animate-pulse">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-500 text-[10px] font-bold animate-pulse">
                                 404 NOT FOUND
                               </span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 font-sans text-slate-300">
+                          <td className="py-4 px-5 text-slate-300">
                             {m.altTextV2 ? m.altTextV2 : <span className="text-rose-400 italic">Thiếu Alt Text</span>}
                           </td>
-                          <td className="py-3.5 px-4 text-slate-400">{m.dimensionsV2}</td>
-                          <td className="py-3.5 px-4 text-right font-sans">
+                          <td className="py-4 px-5 text-slate-400 font-mono text-[11px]">{m.dimensionsV2}</td>
+                          <td className="py-4 px-5 text-right font-bold">
                             {m.status === "pass" ? (
-                              <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
-                                <CheckCircle2 className="size-3.5" /> Chuẩn 100%
+                              <span className="text-emerald-400 inline-flex items-center gap-1">
+                                <CheckCircle2 className="size-4" /> Chuẩn 100%
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-amber-400 font-bold">
-                                <AlertTriangle className="size-3.5" /> {m.issueNote}
+                              <span className="text-amber-400 inline-flex items-center gap-1">
+                                <AlertTriangle className="size-4" /> {m.issueNote}
                               </span>
                             )}
                           </td>
@@ -673,64 +698,83 @@ ${page.defects
                 </div>
               </div>
             ) : activeAuditTab === "typography" ? (
-              /* DATA TEXT FORMAT & TYPOGRAPHY INSPECTOR */
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/60">
-                <div>
-                  <h2 className="text-base font-black text-white flex items-center gap-2">
-                    <TypeIcon className="size-5 text-indigo-400" />
-                    <span>BẢNG ĐỐI SOÁT ĐỊNH DẠNG VĂN BẢN & BẢNG BIỂU USER INPUT</span>
-                  </h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Kiểm tra mã hóa Tiếng Việt UTF-8 (không bị lỗi font rác), định dạng in đậm/nghiêng/danh sách và bảng biểu <code>&lt;table&gt;</code>.
-                  </p>
+              /* CLEAN TYPOGRAPHY & DATA TEXT FORMAT AUDIT TAB */
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-900/40">
+                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 shadow-sm flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      <TypeIcon className="size-5 text-indigo-400" />
+                      <span>ĐỐI SOÁT ĐỊNH DẠNG VĂN BẢN & BẢNG BIỂU USER INPUT</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Kiểm tra mã hóa Tiếng Việt UTF-8 (chống font rác), định dạng WYSIWYG và cấu trúc thẻ bảng <code>&lt;table&gt;</code>.
+                    </p>
+                  </div>
+                  <div className="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                    Trang: <strong className="text-indigo-400">{activePage.name}</strong> ({activePage.path})
+                  </div>
                 </div>
 
                 <div className="space-y-4">
                   {activePage.textFormatAudits.map((item) => (
                     <div
                       key={item.id}
-                      className={`p-5 rounded-2xl border ${
+                      className={`p-5 rounded-2xl border transition ${
                         item.status === "fail"
                           ? "bg-rose-950/20 border-rose-500 ring-1 ring-rose-500/40"
-                          : "bg-slate-950 border-slate-800"
-                      } space-y-3`}
+                          : "bg-slate-950 border-slate-800 shadow-lg"
+                      } space-y-3.5`}
                     >
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                         <div className="font-bold text-white text-sm flex items-center gap-2">
                           <ShieldCheck className="size-4 text-indigo-400" />
                           <span>{item.context}</span>
                         </div>
                         <div>
                           {item.status === "pass" ? (
-                            <span className="px-2.5 py-1 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1">
-                              <CheckCircle2 className="size-3.5" /> UTF-8 & Format Chuẩn 100%
+                            <span className="px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5">
+                              <CheckCircle2 className="size-3.5" /> UTF-8 & Cấu Trúc Khớp 100%
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 rounded bg-rose-950 text-rose-300 border border-rose-500 text-xs font-bold flex items-center gap-1 animate-pulse">
+                            <span className="px-3 py-1 rounded-full bg-rose-950 text-rose-300 border border-rose-500 text-xs font-bold flex items-center gap-1.5 animate-pulse">
                               <AlertOctagon className="size-3.5" /> {item.issueNote}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-                        <div className="bg-slate-900 p-3.5 rounded-xl border border-amber-500/30 space-y-1.5">
-                          <div className="text-[10px] text-amber-400 font-bold uppercase">HTML Bản Cũ PW1 (TinyMCE)</div>
-                          <div className="text-slate-200 break-words">{item.pw1Html}</div>
-                          <div className="text-[10px] text-slate-400 pt-1 font-sans">
-                            Đặc tính: In đậm ({item.stylingCheck.hasBold ? "✓" : "✗"}) | In nghiêng ({item.stylingCheck.hasItalic ? "✓" : "✗"}) | Bảng biểu ({item.stylingCheck.hasTable ? `✓ (${item.stylingCheck.tableColumnsCount} cột)` : "✗"})
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        {/* PW1 Box */}
+                        <div className="bg-slate-900/90 p-4 rounded-xl border border-amber-500/30 space-y-2">
+                          <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider font-mono">
+                            HTML Bản Cũ PW1 (TinyMCE)
+                          </div>
+                          <div className="text-slate-200 leading-relaxed font-sans bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                            {item.pw1Html}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-medium pt-1">
+                            Đặc tính: In đậm ({item.stylingCheck.hasBold ? "✓" : "✗"}) • In nghiêng ({item.stylingCheck.hasItalic ? "✓" : "✗"}) • Bảng biểu ({item.stylingCheck.hasTable ? `✓ (${item.stylingCheck.tableColumnsCount} cột)` : "✗"})
                           </div>
                         </div>
 
-                        <div className={`p-3.5 rounded-xl border space-y-1.5 ${
-                          item.status === "fail" ? "bg-rose-950/40 border-rose-500" : "bg-slate-900 border-indigo-500/30"
+                        {/* PW2 Box */}
+                        <div className={`p-4 rounded-xl border space-y-2 ${
+                          item.status === "fail"
+                            ? "bg-rose-950/30 border-rose-500"
+                            : "bg-slate-900/90 border-indigo-500/30"
                         }`}>
-                          <div className="text-[10px] text-indigo-400 font-bold uppercase">Lexical AST Bản Mới PW2</div>
-                          <div className={`break-words ${item.status === "fail" ? "text-rose-200 font-bold" : "text-slate-200"}`}>
+                          <div className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider font-mono">
+                            Lexical AST Bản Mới PW2 (Payload CMS)
+                          </div>
+                          <div className={`leading-relaxed font-sans p-3 rounded-lg border ${
+                            item.status === "fail"
+                              ? "bg-rose-950/50 border-rose-500 text-rose-200 font-semibold"
+                              : "bg-slate-950/60 border-slate-800 text-slate-200"
+                          }`}>
                             {item.pw2Lexical}
                           </div>
-                          <div className="text-[10px] text-slate-400 pt-1 font-sans">
-                            Đặc tính: In đậm ({item.pw2StylingCheck.hasBold ? "✓" : "✗"}) | In nghiêng ({item.pw2StylingCheck.hasItalic ? "✓" : "✗"}) | Bảng biểu ({item.pw2StylingCheck.hasTable ? `✓ (${item.pw2StylingCheck.tableColumnsCount} cột)` : "🚨 MẤT BẢNG"})
+                          <div className="text-[11px] text-slate-400 font-medium pt-1">
+                            Đặc tính: In đậm ({item.pw2StylingCheck.hasBold ? "✓" : "✗"}) • In nghiêng ({item.pw2StylingCheck.hasItalic ? "✓" : "✗"}) • Bảng biểu ({item.pw2StylingCheck.hasTable ? `✓ (${item.pw2StylingCheck.tableColumnsCount} cột)` : "🚨 MẤT THẺ TABLE"})
                           </div>
                         </div>
                       </div>
@@ -739,16 +783,16 @@ ${page.defects
                 </div>
               </div>
             ) : (
-              /* STREAM VIEW (BLOCK TREE + SYNCHRONIZED SEQUENTIAL BLOCKS) */
+              /* CLEAN DUAL STREAM VIEW WITH SYNCHRONIZED MOCK BROWSERS */
               <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-                {/* LEFT SIDEBAR: BLOCK TREE NAVIGATOR */}
-                <div className="w-full md:w-80 bg-slate-950/90 border-r border-slate-800 flex flex-col shrink-0 overflow-y-auto p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400">
-                    <BlockTreeIcon className="size-4 text-indigo-400" />
-                    <span>Cây Bố Cục ({activePage.blocks.length} Khối)</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-mono">
-                    Đường dẫn: <strong className="text-slate-300">{activePage.path}</strong>
+                
+                {/* LEFT SIDEBAR: CLEAN BLOCK TREE NAVIGATOR */}
+                <div className="w-full md:w-72 bg-slate-950/95 border-r border-slate-800 flex flex-col shrink-0 overflow-y-auto p-4 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-300">
+                      <BlockTreeIcon className="size-4 text-indigo-400" />
+                      <span>Cây Bố Cục ({activePage.blocks.length} Khối)</span>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
@@ -760,220 +804,229 @@ ${page.defects
                           selectedBlockId === block.id
                             ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
                             : block.status === "fail"
-                            ? "bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-950/60"
+                            ? "bg-rose-950/30 text-rose-300 border-rose-500/40 hover:bg-rose-950/50"
                             : block.status === "warn"
-                            ? "bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-950/60"
-                            : "bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <span className="font-mono text-[10px] font-bold opacity-70">
-                          #{String(block.order).padStart(2, "0")}
-                        </span>
-                        <span className="font-semibold truncate">{block.title.replace(/Khối #\d+:\s*/, "")}</span>
-                      </div>
-                      {block.status === "fail" ? (
-                        <span className="text-[9px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded">LỖI P0</span>
-                      ) : block.status === "warn" ? (
-                        <span className="text-[9px] bg-amber-600 text-white font-bold px-1.5 py-0.5 rounded">CẦN XEM</span>
-                      ) : (
-                        <span className="text-[10px] text-emerald-400 font-bold">✓</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* RIGHT MAIN AREA: DUAL FULL-PAGE SYNCHRONIZED VERTICAL STACK */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-900/50">
-                {/* Browser Windows Dual Top Banner */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md pb-3 border-b border-slate-800">
-                  <div className="bg-amber-950/80 px-4 py-2 rounded-xl border border-amber-500/30 flex items-center justify-between text-xs text-amber-200">
-                    <span className="font-bold font-mono">👈 BẢN CŨ PW1 (LARAVEL MYSQL)</span>
-                    <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-amber-400 hover:underline flex items-center gap-1">
-                      Live V1 <ExternalLink className="size-3" />
-                    </a>
-                  </div>
-                  <div className="bg-indigo-950/80 px-4 py-2 rounded-xl border border-indigo-500/30 flex items-center justify-between text-xs text-indigo-200">
-                    <span className="font-bold font-mono">👉 BẢN MỚI PW2 (NEXT.JS 15 PAYLOAD)</span>
-                    {activePage.existsInPW2 ? (
-                      <a href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline flex items-center gap-1">
-                        Live V2 <ExternalLink className="size-3" />
-                      </a>
-                    ) : (
-                      <span className="text-rose-400 font-bold font-mono">🚨 CHƯA CÓ TRANG TRÊN PW2</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Missing Page Warning Banner */}
-                {!activePage.existsInPW2 && (
-                  <div className="p-4 bg-rose-950/60 border border-rose-500 rounded-2xl flex items-center gap-3.5 text-rose-200 text-xs shadow-2xl">
-                    <AlertOctagon className="size-6 text-rose-400 shrink-0" />
-                    <div>
-                      <div className="font-black text-sm text-white">🚨 LỖI P0: KHÔNG TÌM THẤY TRANG TRÊN PW2 ({activePage.path})</div>
-                      <div className="text-slate-300 mt-0.5">
-                        Khách hàng có trang này trên hệ thống cũ PW1, nhưng script ETL chưa tạo record trong collection `pages` của PW2.
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Page Defects Hub (Lỗi & Cảnh Báo Cần Xem Lại Trên Trang Này) */}
-                {activePage.defects.length > 0 && (
-                  <div className="space-y-2.5">
-                    <div className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                      <Wrench className="size-4 text-indigo-400" />
-                      <span>Danh Sách Lỗi & Cảnh Báo Cần Xem Lại Trên Trang ({activePage.defects.length} Vấn Đề)</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {activePage.defects.map((defect, idx) => (
-                        <div
-                          key={idx}
-                          className={`p-3.5 rounded-xl border text-xs space-y-1.5 shadow-md ${
-                            defect.type === "p0"
-                              ? "bg-rose-950/50 border-rose-500/50 text-rose-200"
-                              : "bg-amber-950/50 border-amber-500/50 text-amber-200"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 font-bold text-white text-xs">
-                            <span>{defect.icon}</span>
-                            <span className="font-mono uppercase text-[10px] px-1.5 py-0.2 rounded bg-black/40">
-                              {defect.type.toUpperCase()}
-                            </span>
-                            <span>{defect.title}</span>
-                          </div>
-                          <p className="text-slate-300 text-[11px] leading-relaxed">{defect.desc}</p>
-                          <div className="text-[11px] font-mono text-indigo-300 bg-slate-950/70 p-2 rounded border border-slate-800">
-                            💡 Khắc phục: <strong>{defect.fix}</strong>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Sequential Block Stack */}
-                <div className="space-y-4">
-                  {activePage.blocks
-                    .filter((b) => !showOnlyErrors || b.status === "fail" || b.status === "warn")
-                    .map((block) => (
-                      <div
-                        key={block.id}
-                        id={block.id}
-                        className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 space-y-3 ${
-                          block.status === "fail"
-                            ? "bg-rose-950/20 border-rose-500 ring-1 ring-rose-500/40"
-                            : block.status === "warn"
-                            ? "bg-amber-950/20 border-amber-500 ring-1 ring-amber-500/40"
-                            : selectedBlockId === block.id
-                            ? "bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/40 shadow-xl"
-                            : "bg-slate-950/80 border-slate-800 hover:border-slate-700"
+                            ? "bg-amber-950/30 text-amber-300 border-amber-500/40 hover:bg-amber-950/50"
+                            : "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white"
                         }`}
                       >
-                        {/* Block Header */}
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                          <div className="flex items-center gap-3">
-                            <span className="p-1.5 bg-slate-800 text-indigo-400 font-mono font-bold text-xs rounded-lg">
-                              #{String(block.order).padStart(2, "0")}
-                            </span>
-                            <div>
-                              <div className="font-black text-white text-sm">{block.title}</div>
-                              <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                                PW1: <strong className="text-slate-300">{block.pw1Component}</strong> ➔ PW2: <strong className="text-indigo-300">{block.pw2Block}</strong>
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="font-mono text-[10px] font-bold opacity-60">
+                            #{String(block.order).padStart(2, "0")}
+                          </span>
+                          <span className="font-semibold truncate">{block.title.replace(/Khối #\d+:\s*/, "")}</span>
+                        </div>
+                        {block.status === "fail" ? (
+                          <span className="size-2 rounded-full bg-rose-500 shrink-0 animate-ping" />
+                        ) : block.status === "warn" ? (
+                          <span className="size-2 rounded-full bg-amber-400 shrink-0" />
+                        ) : (
+                          <span className="size-2 rounded-full bg-emerald-400 shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* RIGHT MAIN AREA: DUAL BROWSER SIMULATION STREAM */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-900/30">
+                  
+                  {/* Browser Dual Windows Header */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md pb-3 border-b border-slate-800">
+                    {/* Left Browser Bar */}
+                    <div className="bg-slate-950 px-4 py-2.5 rounded-2xl border border-amber-500/30 flex items-center justify-between shadow-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1.5">
+                          <span className="size-2.5 rounded-full bg-rose-500/80" />
+                          <span className="size-2.5 rounded-full bg-amber-500/80" />
+                          <span className="size-2.5 rounded-full bg-emerald-500/80" />
+                        </div>
+                        <span className="font-bold text-xs text-amber-300 font-mono ml-2">👈 BẢN CŨ PW1 (LARAVEL)</span>
+                      </div>
+                      <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1">
+                        <span>Live V1</span> <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+
+                    {/* Right Browser Bar */}
+                    <div className="bg-slate-950 px-4 py-2.5 rounded-2xl border border-indigo-500/30 flex items-center justify-between shadow-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1.5">
+                          <span className="size-2.5 rounded-full bg-rose-500/80" />
+                          <span className="size-2.5 rounded-full bg-amber-500/80" />
+                          <span className="size-2.5 rounded-full bg-emerald-500/80" />
+                        </div>
+                        <span className="font-bold text-xs text-indigo-300 font-mono ml-2">👉 BẢN MỚI PW2 (NEXT.JS 15)</span>
+                      </div>
+                      {activePage.existsInPW2 ? (
+                        <a href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-indigo-400 hover:underline flex items-center gap-1">
+                          <span>Live V2</span> <ExternalLink className="size-3" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-rose-400 font-bold font-mono">🚨 CHƯA CÓ TRANG</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Defects Hub Alert (If any defect on this page) */}
+                  {activePage.defects.length > 0 && (
+                    <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 shadow-md">
+                      <div className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <Wrench className="size-4 text-indigo-400" />
+                        <span>Danh Sách Lỗi & Cảnh Báo Trên Trang ({activePage.defects.length} Vấn Đề)</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {activePage.defects.map((defect, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                              defect.type === "p0"
+                                ? "bg-rose-950/40 border-rose-500/50 text-rose-200"
+                                : "bg-amber-950/40 border-amber-500/50 text-amber-200"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 font-bold text-white text-xs">
+                              <span>{defect.icon}</span>
+                              <span className="font-mono uppercase text-[10px] px-1.5 py-0.2 rounded bg-black/40">
+                                {defect.type.toUpperCase()}
+                              </span>
+                              <span>{defect.title}</span>
+                            </div>
+                            <p className="text-slate-300 text-[11px] leading-relaxed">{defect.desc}</p>
+                            <div className="text-[11px] font-mono text-indigo-300 bg-slate-950/80 p-2 rounded border border-slate-800">
+                              💡 Khắc phục: <strong>{defect.fix}</strong>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sequential Block Stack */}
+                  <div className="space-y-4">
+                    {activePage.blocks
+                      .filter((b) => !showOnlyErrors || b.status === "fail" || b.status === "warn")
+                      .map((block) => (
+                        <div
+                          key={block.id}
+                          id={block.id}
+                          className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 space-y-3.5 ${
+                            block.status === "fail"
+                              ? "bg-rose-950/15 border-rose-500 ring-1 ring-rose-500/40 shadow-lg"
+                              : block.status === "warn"
+                              ? "bg-amber-950/15 border-amber-500 ring-1 ring-amber-500/40 shadow-lg"
+                              : selectedBlockId === block.id
+                              ? "bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/40 shadow-xl"
+                              : "bg-slate-950 border-slate-800 hover:border-slate-700 shadow-sm"
+                          }`}
+                        >
+                          {/* Block Header */}
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <div className="flex items-center gap-3">
+                              <span className="px-2 py-1 bg-slate-900 text-indigo-400 font-mono font-bold text-xs rounded-lg border border-slate-800">
+                                #{String(block.order).padStart(2, "0")}
+                              </span>
+                              <div>
+                                <h4 className="font-bold text-white text-sm">{block.title}</h4>
+                                <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                                  PW1: <strong className="text-slate-300">{block.pw1Component}</strong> ➔ PW2: <strong className="text-indigo-300">{block.pw2Block}</strong>
+                                </div>
                               </div>
+                            </div>
+
+                            <div>
+                              {block.status === "fail" ? (
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500/40 animate-pulse">
+                                  🚨 LỖI P0: {block.discrepancyNote || "Lệch dữ liệu"}
+                                </span>
+                              ) : block.status === "warn" ? (
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-950 text-amber-300 border border-amber-500/40">
+                                  ⚠️ CẦN XEM: {block.discrepancyNote || "Cảnh báo"}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                                  <CheckCircle2 className="size-3.5" /> KHỚP 100%
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          <div>
-                            {block.status === "fail" ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-500/40 animate-pulse">
-                                🚨 LỖI P0: {block.discrepancyNote || "Lệch dữ liệu"}
-                              </span>
-                            ) : block.status === "warn" ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/40">
-                                ⚠️ CẦN XEM LẠI: {block.discrepancyNote || "Cảnh báo giao diện"}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
-                                <CheckCircle2 className="size-3" /> KHỚP 100%
-                              </span>
-                            )}
+                          {/* Dual Column Content Preview */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* PW1 Preview Box */}
+                            <div className="bg-slate-900/80 border border-amber-500/20 rounded-xl p-4 text-xs text-slate-200 space-y-2">
+                              <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider">
+                                Nội Dung Bản Gốc PW1
+                              </div>
+                              {block.pw1Preview.headline && (
+                                <div className="font-bold text-white text-sm">{block.pw1Preview.headline}</div>
+                              )}
+                              {block.pw1Preview.subheadline && (
+                                <div className="text-slate-300 leading-relaxed">{block.pw1Preview.subheadline}</div>
+                              )}
+                              {block.pw1Preview.bodyText && (
+                                <div className="text-slate-300 leading-relaxed bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                                  {block.pw1Preview.bodyText}
+                                </div>
+                              )}
+                              {block.pw1Preview.badgeText && (
+                                <span className="inline-block text-[10px] bg-emerald-950 text-emerald-300 px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30">
+                                  {block.pw1Preview.badgeText}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* PW2 Preview Box */}
+                            <div className={`rounded-xl p-4 text-xs text-slate-200 space-y-2 border ${
+                              block.status === "fail"
+                                ? "bg-rose-950/30 border-rose-500"
+                                : block.status === "warn"
+                                ? "bg-amber-950/30 border-amber-500"
+                                : "bg-slate-900/80 border-indigo-500/20"
+                            }`}>
+                              <div className="text-[10px] uppercase font-bold text-indigo-400 font-mono tracking-wider">
+                                Nội Dung Bản Mới PW2 (Next.js 15)
+                              </div>
+                              {block.pw2Preview.headline && (
+                                <div className="font-bold text-white text-sm">{block.pw2Preview.headline}</div>
+                              )}
+                              {block.pw2Preview.subheadline && (
+                                <div className="text-slate-300 leading-relaxed">{block.pw2Preview.subheadline}</div>
+                              )}
+                              {block.pw2Preview.bodyText && (
+                                <div className={`leading-relaxed p-2.5 rounded-lg border ${
+                                  block.status === "fail"
+                                    ? "bg-rose-950/60 border-rose-500 text-rose-200 font-semibold"
+                                    : block.status === "warn"
+                                    ? "bg-amber-950/60 border-amber-500 text-amber-200 font-semibold"
+                                    : "bg-slate-950 border-slate-800 text-slate-300"
+                                }`}>
+                                  {block.pw2Preview.bodyText}
+                                </div>
+                              )}
+                              {block.pw2Preview.badgeText && (
+                                <span className={`inline-block text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
+                                  block.status === "fail"
+                                    ? "bg-rose-950 text-rose-300 border-rose-500"
+                                    : block.status === "warn"
+                                    ? "bg-amber-950 text-amber-300 border-amber-500"
+                                    : "bg-emerald-950 text-emerald-300 border-emerald-500/30"
+                                }`}>
+                                  {block.pw2Preview.badgeText}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-
-                        {/* Dual Column Content Preview for this specific Block */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* PW1 Block Preview */}
-                          <div className="bg-slate-900/90 border border-amber-500/20 rounded-xl p-3.5 text-xs text-slate-200 space-y-1.5">
-                            <div className="text-[10px] uppercase font-bold text-amber-400 font-mono">Bản Gốc PW1</div>
-                            {block.pw1Preview.headline && (
-                              <div className="font-bold text-white text-sm">{block.pw1Preview.headline}</div>
-                            )}
-                            {block.pw1Preview.subheadline && (
-                              <div className="text-slate-300">{block.pw1Preview.subheadline}</div>
-                            )}
-                            {block.pw1Preview.bodyText && (
-                              <div className="text-slate-300 font-mono bg-slate-950 p-2 rounded border border-slate-800">
-                                {block.pw1Preview.bodyText}
-                              </div>
-                            )}
-                            {block.pw1Preview.badgeText && (
-                              <span className="inline-block text-[10px] bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded font-bold border border-emerald-500/30">
-                                {block.pw1Preview.badgeText}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* PW2 Block Preview */}
-                          <div className={`rounded-xl p-3.5 text-xs text-slate-200 space-y-1.5 border ${
-                            block.status === "fail"
-                              ? "bg-rose-950/40 border-rose-500"
-                              : block.status === "warn"
-                              ? "bg-amber-950/40 border-amber-500"
-                              : "bg-slate-900/90 border-indigo-500/20"
-                          }`}>
-                            <div className="text-[10px] uppercase font-bold text-indigo-400 font-mono">Bản Mới PW2 (Next.js 15)</div>
-                            {block.pw2Preview.headline && (
-                              <div className="font-bold text-white text-sm">{block.pw2Preview.headline}</div>
-                            )}
-                            {block.pw2Preview.subheadline && (
-                              <div className="text-slate-300">{block.pw2Preview.subheadline}</div>
-                            )}
-                            {block.pw2Preview.bodyText && (
-                              <div className={`font-mono p-2 rounded border ${
-                                block.status === "fail"
-                                  ? "bg-rose-950/60 border-rose-500 text-rose-200 font-bold"
-                                  : block.status === "warn"
-                                  ? "bg-amber-950/60 border-amber-500 text-amber-200 font-bold"
-                                  : "bg-slate-950 border-slate-800 text-slate-300"
-                              }`}>
-                                {block.pw2Preview.bodyText}
-                              </div>
-                            )}
-                            {block.pw2Preview.badgeText && (
-                              <span className={`inline-block text-[10px] px-2 py-0.5 rounded font-bold border ${
-                                block.status === "fail"
-                                  ? "bg-rose-950 text-rose-300 border-rose-500"
-                                  : block.status === "warn"
-                                  ? "bg-amber-950 text-amber-300 border-amber-500"
-                                  : "bg-emerald-950 text-emerald-300 border-emerald-500/30"
-                              }`}>
-                                {block.pw2Preview.badgeText}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    )}
-  </div>
-);
+      )}
+    </div>
+  );
 }
