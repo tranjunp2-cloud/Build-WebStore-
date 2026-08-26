@@ -1,9 +1,9 @@
 /**
  * Migration Reconciliation Engine & Dynamic Store Page Discovery (PW1 -> PW2)
- * Dynamically queries and reconciles the EXACT pages created by each merchant:
- *   - Core system pages: home (/), products (/products), blog (/blog), contact (/contact)
- *   - Custom merchant pages: /about, /chinh-sach-doi-tra, /huong-dan-mua-hang, /landing-tet
- *   - Automatically detects Missing Pages (Pages existing in PW1 but dropped in PW2)
+ * Supports full P0 Blockers and P1/P2 Warning Defect Diagnostics for all store statuses:
+ *   - "passed": 100% Match
+ *   - "warning" (85-94%): Non-breaking UI/Media warnings (404 image, missing map iframe, italic format loss)
+ *   - "failed" (<85%): Critical P0 blockers (missing SKUs, dropped brands, missing pages, broken tables)
  */
 
 export interface StoreSummary {
@@ -37,7 +37,7 @@ export interface DefectItem {
   desc: string;
   fix: string;
   affectedField?: string;
-  entityType?: "products" | "variants" | "categories" | "posts" | "stores" | "blocks" | "richtext" | "pages";
+  entityType?: "products" | "variants" | "categories" | "posts" | "stores" | "blocks" | "richtext" | "pages" | "media";
 }
 
 export interface BlockBreakdownItem {
@@ -254,7 +254,6 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
     let commerceScore = "100%";
     let blockScore = "98.0%";
 
-    // Vary dynamic page counts per store (e.g. 4 to 8 pages per merchant)
     const pageCount = 4 + (i % 5);
 
     if (i % 25 === 0) {
@@ -272,8 +271,8 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       const val = (88 + (i % 6) * 1.0).toFixed(1);
       score = `${val}%`;
       status = "warning";
-      failedBlocks = ["1 Ảnh Gallery 404", "Footer lệch cột"];
-      textScore = "100%";
+      failedBlocks = ["1 Ảnh Gallery 404", "Footer Thiếu Iframe Map"];
+      textScore = "95.0%";
       mediaScore = "88.0%";
       commerceScore = "95.0%";
       blockScore = "89.0%";
@@ -355,6 +354,27 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
         entityType: "richtext",
       }
     );
+  } else if (isWarn) {
+    defectsHome.push(
+      {
+        type: "p1",
+        icon: "⚠️",
+        title: "Khối #04 (Product Listing): 1 Ảnh Thumbnail Bị Lỗi Link (404 Not Found)",
+        desc: "Ảnh thumbnail sản phẩm mat_ong_1l_thumb.jpg trả về mã HTTP 404 do link CDN cũ chưa được whitelist.",
+        fix: "Dev re-upload lại ảnh từ bản backup S3 hoặc cập nhật CDN domain.",
+        affectedField: "media.url",
+        entityType: "media",
+      },
+      {
+        type: "p1",
+        icon: "⚠️",
+        title: "Khối #10 (Footer): Chưa Cấu Hình Nhúng Bản Đồ Google Maps",
+        desc: "Bản cũ PW1 có khung nhúng iframe Google Maps chỉ đường tới shop, nhưng bản mới PW2 đang thiếu trường mapUrl.",
+        fix: "Dev bổ sung trường `googleMapsEmbedUrl` vào footer settings.",
+        affectedField: "stores.map_url",
+        entityType: "stores",
+      }
+    );
   }
 
   // Dynamic Page Stack Generation for this specific merchant
@@ -398,13 +418,13 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
           pos: "#03",
           leg: "Product Listing 1541",
           mig: "products-grid/grid-4",
-          layer: isFailed ? "Layer 2 Gap" : "Layer 1 (Mapped)",
-          layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-          status: isFailed ? "MẤT BIẾN THỂ & BRAND" : "KHỚP 100%",
-          badge: isFailed ? "badge-fail" : "badge-pass",
+          layer: isFailed ? "Layer 2 Gap" : isWarn ? "Needs Review" : "Layer 1 (Mapped)",
+          layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : isWarn ? "bg-amber-950/40 text-amber-300 border-amber-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+          status: isFailed ? "MẤT BIẾN THỂ & BRAND" : isWarn ? "1 ẢNH THUMB 404" : "KHỚP 100%",
+          badge: isFailed ? "badge-fail" : isWarn ? "badge-warn" : "badge-pass",
           pw1Val: "24 Sản phẩm | Đủ 2 biến thể 500ml & 1L | Brand: Nông Trại Ba Vì",
-          pw2Val: isFailed ? "24 Sản phẩm | Mất biến thể 1L | brand_id: NULL" : "24 Sản phẩm | Đầy đủ 100%",
-          fix: isFailed ? "Dev bổ sung collection brands & migrate đủ variant" : "✓ Khớp chuẩn 100%",
+          pw2Val: isFailed ? "24 Sản phẩm | Mất biến thể 1L | brand_id: NULL" : isWarn ? "24 Sản phẩm | 1 ảnh thumb lỗi 404" : "24 Sản phẩm | Đầy đủ 100%",
+          fix: isFailed ? "Dev bổ sung collection brands & migrate đủ variant" : isWarn ? "Re-upload lại ảnh S3" : "✓ Khớp chuẩn 100%",
         },
         {
           pos: "#04",
@@ -473,9 +493,17 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
           pw1Component: "product_listing (1541)",
           pw2Block: "products-grid/grid-4",
           pw1Preview: { headline: "Sản Phẩm Tươi Ngon Bán Chạy", productCount: 8, badgeText: "Đủ 2 Biến Thể (500ml & 1L)" },
-          pw2Preview: { headline: "Sản Phẩm Tươi Ngon Bán Chạy", productCount: 8, badgeText: isFailed ? "🚨 MẤT BIẾN THỂ 1L" : "Đủ 2 Biến Thể (500ml & 1L)" },
-          status: isFailed ? "fail" : "pass",
-          discrepancyNote: isFailed ? "Mất biến thể Can 1L (giá 320.000đ) của SKU ONG-RUNG" : undefined,
+          pw2Preview: {
+            headline: "Sản Phẩm Tươi Ngon Bán Chạy",
+            productCount: 8,
+            badgeText: isFailed ? "🚨 MẤT BIẾN THỂ 1L" : isWarn ? "⚠️ 1 ẢNH THUMB LỖI 404" : "Đủ 2 Biến Thể (500ml & 1L)",
+          },
+          status: isFailed ? "fail" : isWarn ? "warn" : "pass",
+          discrepancyNote: isFailed
+            ? "Mất biến thể Can 1L (giá 320.000đ) của SKU ONG-RUNG"
+            : isWarn
+            ? "Ảnh thumbnail mat_ong_1l_thumb.jpg trả về mã HTTP 404 trên CDN"
+            : undefined,
         },
         {
           id: "home-05",
@@ -541,8 +569,12 @@ export function getStoreDeepDiff(siteId: string): StoreDeepDiff | null {
           pw1Component: "Footer Custom (1553)",
           pw2Block: "footer/dark-gradient",
           pw1Preview: { headline: "Thông Tin Shop, Hotline 1900 8888, Bản Quyền & Map", bodyText: "4 Cột chính sách đổi trả, phương thức thanh toán" },
-          pw2Preview: { headline: "Thông Tin Shop, Hotline 1900 8888, Bản Quyền & Map", bodyText: "4 Cột chính sách đổi trả, phương thức thanh toán" },
-          status: "pass",
+          pw2Preview: {
+            headline: "Thông Tin Shop, Hotline 1900 8888, Bản Quyền",
+            bodyText: isWarn ? "4 Cột chính sách (⚠️ Chưa có iframe Google Maps)" : "4 Cột chính sách đổi trả, phương thức thanh toán",
+          },
+          status: isWarn ? "warn" : "pass",
+          discrepancyNote: isWarn ? "Chưa cấu hình nhúng bản đồ Google Maps chỉ đường" : undefined,
         },
       ],
     },

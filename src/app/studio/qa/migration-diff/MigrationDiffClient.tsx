@@ -33,6 +33,7 @@ import {
   FileText,
   FileX,
   Layers as BlockTreeIcon,
+  Wrench,
 } from "lucide-react";
 
 export function MigrationDiffClient() {
@@ -90,15 +91,15 @@ export function MigrationDiffClient() {
 
   const handleCopyTicket = (store: StoreDeepDiff) => {
     const page = store.pages[activePageIndex] || store.pages[0];
-    const text = `### 🚨 [QC MIGRATION BLOCKER] Cửa Hàng: ${store.name} (${store.id})
+    const text = `### 🚨 [QC MIGRATION AUDIT] Cửa Hàng: ${store.name} (${store.id})
 - **Template:** ${store.templateCode} (${store.templateName})
-- **Trang Đang Bị Lỗi:** ${page.name} (${page.path})
+- **Trang Đang Đối Soát:** ${page.name} (${page.path})
 - **Tổng Trang:** PW1 có ${store.totalPagesInPW1} trang ➔ PW2 có ${store.totalPagesInPW2} trang (Thiếu: ${store.missingPagesCount})
 - **Độ Tương Thích:** ${store.score} (Trạng Thái: ${store.status.toUpperCase()})
 - **Web Cũ (Phiên Bản V1):** ${store.legacyDomain}
 - **Web Mới (Phiên Bản V2):** ${store.migratedDomain}
 
-#### ❌ Chi Tiết Lỗi Dữ Liệu & Rơi Rớt Trang Cần Sửa:
+#### ❌ Chi Tiết Lỗi Dữ Liệu & Điểm Cần Xem Lại:
 ${page.defects
   ?.map(
     (d, i) =>
@@ -155,7 +156,7 @@ ${page.defects
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                Tự động đọc danh sách trang động thực tế & Đối soát <strong>Chuỗi Khối Tuần Tự (Full-Page Stream)</strong> của từng Khách Hàng
+                Tự động đọc danh sách trang động & Đối soát chi tiết <strong>Lỗi P0 Blocker & Cảnh Báo Cần Xem Lại (P1/P2)</strong>
               </p>
             </div>
           </div>
@@ -221,7 +222,7 @@ ${page.defects
         >
           <div className="text-xs text-amber-400 font-semibold uppercase tracking-wider">Cần Xem Lại (85-94%)</div>
           <div className="text-3xl font-black text-amber-400 mt-1.5">{metrics.warningStores}</div>
-          <div className="text-[11px] text-amber-500/90 mt-1.5 font-medium">Lệch ảnh / Giao diện nhẹ</div>
+          <div className="text-[11px] text-amber-500/90 mt-1.5 font-medium">Lệch ảnh / Thiếu Map / Text</div>
         </div>
 
         <div
@@ -262,7 +263,7 @@ ${page.defects
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                {st === "all" ? "Tất Cả" : st === "passed" ? "QC Pass" : st === "warning" ? "Cần Sửa" : "Lỗi P0"}
+                {st === "all" ? "Tất Cả" : st === "passed" ? "QC Pass" : st === "warning" ? "Cần Xem Lại" : "Lỗi P0"}
               </button>
             ))}
           </div>
@@ -311,7 +312,7 @@ ${page.defects
                 <th className="py-3.5 px-4">Giao Diện Mẫu</th>
                 <th className="py-3.5 px-4">Độ Khớp Dữ Liệu</th>
                 <th className="py-3.5 px-4">Trạng Thái QC</th>
-                <th className="py-3.5 px-4">Số Trang & Lỗi Phát Hiện</th>
+                <th className="py-3.5 px-4">Số Trang & Lỗi / Cảnh Báo</th>
                 <th className="py-3.5 px-4 text-right">Đối Soát</th>
               </tr>
             </thead>
@@ -360,7 +361,7 @@ ${page.defects
                     )}
                     {store.status === "warning" && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40">
-                        <AlertTriangle className="size-3.5" /> Cần Sửa Nhẹ
+                        <AlertTriangle className="size-3.5" /> Cần Xem Lại
                       </span>
                     )}
                     {store.status === "failed" && (
@@ -379,7 +380,11 @@ ${page.defects
                           {store.failedBlocks.map((fb, idx) => (
                             <span
                               key={idx}
-                              className="bg-rose-950/50 text-rose-300 border border-rose-500/30 text-[10px] px-2 py-0.5 rounded-md font-mono"
+                              className={`text-[10px] px-2 py-0.5 rounded-md font-mono border ${
+                                store.status === "failed"
+                                  ? "bg-rose-950/50 text-rose-300 border-rose-500/30"
+                                  : "bg-amber-950/50 text-amber-300 border-amber-500/30"
+                              }`}
                             >
                               {fb}
                             </span>
@@ -468,7 +473,7 @@ ${page.defects
                           : "bg-rose-950 text-rose-300 border border-rose-500/40"
                       }`}
                     >
-                      {selectedDiff.status === "passed" ? "QC Pass" : selectedDiff.status === "warning" ? "Cần Sửa Nhẹ" : "Lỗi P0 Blocker"}
+                      {selectedDiff.status === "passed" ? "QC Pass" : selectedDiff.status === "warning" ? "Cần Xem Lại (Warning)" : "Lỗi P0 Blocker"}
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-3 font-mono">
@@ -512,37 +517,46 @@ ${page.defects
             {/* DYNAMIC MERCHANT PAGES TABS BAR */}
             <div className="bg-slate-950 px-6 pt-3 border-b border-slate-800 flex items-center justify-between shrink-0 overflow-x-auto">
               <div className="flex items-center gap-2">
-                {selectedDiff.pages.map((p, idx) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setActivePageIndex(idx);
-                      setSelectedBlockId(null);
-                    }}
-                    className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold border-b-2 transition whitespace-nowrap ${
-                      activePageIndex === idx
-                        ? "border-indigo-500 text-indigo-400 bg-indigo-500/10 rounded-t-xl"
-                        : "border-transparent text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <span>{idx + 1}. {p.name}</span>
-                    <span className="text-[10px] bg-slate-800 px-1.5 py-0.2 rounded font-mono text-slate-400">
-                      {p.totalBlocks} Khối
-                    </span>
-                    {!p.existsInPW2 ? (
-                      <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
-                        🚨 THIẾU TRANG
+                {selectedDiff.pages.map((p, idx) => {
+                  const hasErrors = !p.existsInPW2 || p.defects.some((d) => d.type === "p0");
+                  const hasWarnings = p.defects.some((d) => d.type === "p1" || d.type === "p2") || p.blocks.some((b) => b.status === "warn");
+
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setActivePageIndex(idx);
+                        setSelectedBlockId(null);
+                      }}
+                      className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+                        activePageIndex === idx
+                          ? "border-indigo-500 text-indigo-400 bg-indigo-500/10 rounded-t-xl"
+                          : "border-transparent text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <span>{idx + 1}. {p.name}</span>
+                      <span className="text-[10px] bg-slate-800 px-1.5 py-0.2 rounded font-mono text-slate-400">
+                        {p.totalBlocks} Khối
                       </span>
-                    ) : p.defects.length > 0 ? (
-                      <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
-                        {p.defects.length} LỖI
-                      </span>
-                    ) : null}
-                  </button>
-                ))}
+                      {!p.existsInPW2 ? (
+                        <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
+                          🚨 THIẾU TRANG
+                        </span>
+                      ) : hasErrors ? (
+                        <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                          {p.defects.filter((d) => d.type === "p0").length} LỖI
+                        </span>
+                      ) : hasWarnings ? (
+                        <span className="bg-amber-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                          {p.defects.length || p.blocks.filter((b) => b.status === "warn").length} CẦN XEM
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Quick error toggle */}
+              {/* Quick error/warning toggle */}
               <label className="text-xs text-slate-300 flex items-center gap-2 cursor-pointer pb-2 select-none shrink-0 ml-4">
                 <input
                   type="checkbox"
@@ -550,7 +564,7 @@ ${page.defects
                   onChange={(e) => setShowOnlyErrors(e.target.checked)}
                   className="rounded border-slate-700 text-indigo-600 focus:ring-0"
                 />
-                <span className="font-semibold text-rose-400">🔴 Chỉ hiện khối LỆCH / LỖI</span>
+                <span className="font-semibold text-amber-400">⚡ Chỉ hiện khối LỆCH / LỖI / CẦN XEM</span>
               </label>
             </div>
 
@@ -576,6 +590,8 @@ ${page.defects
                           ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30"
                           : block.status === "fail"
                           ? "bg-rose-950/40 text-rose-300 border-rose-500/40 hover:bg-rose-950/60"
+                          : block.status === "warn"
+                          ? "bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-950/60"
                           : "bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white"
                       }`}
                     >
@@ -586,7 +602,9 @@ ${page.defects
                         <span className="font-semibold truncate">{block.title.replace(/Khối #\d+:\s*/, "")}</span>
                       </div>
                       {block.status === "fail" ? (
-                        <span className="text-[9px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded">LỖI</span>
+                        <span className="text-[9px] bg-rose-600 text-white font-bold px-1.5 py-0.5 rounded">LỖI P0</span>
+                      ) : block.status === "warn" ? (
+                        <span className="text-[9px] bg-amber-600 text-white font-bold px-1.5 py-0.5 rounded">CẦN XEM</span>
                       ) : (
                         <span className="text-[10px] text-emerald-400 font-bold">✓</span>
                       )}
@@ -630,10 +648,45 @@ ${page.defects
                   </div>
                 )}
 
+                {/* Page Defects Hub (Lỗi & Cảnh Báo Cần Xem Lại Trên Trang Này) */}
+                {activePage.defects.length > 0 && (
+                  <div className="space-y-2.5">
+                    <div className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                      <Wrench className="size-4 text-indigo-400" />
+                      <span>Danh Sách Lỗi & Cảnh Báo Cần Xem Lại Trên Trang ({activePage.defects.length} Vấn Đề)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {activePage.defects.map((defect, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-3.5 rounded-xl border text-xs space-y-1.5 shadow-md ${
+                            defect.type === "p0"
+                              ? "bg-rose-950/50 border-rose-500/50 text-rose-200"
+                              : "bg-amber-950/50 border-amber-500/50 text-amber-200"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 font-bold text-white text-xs">
+                            <span>{defect.icon}</span>
+                            <span className="font-mono uppercase text-[10px] px-1.5 py-0.2 rounded bg-black/40">
+                              {defect.type.toUpperCase()}
+                            </span>
+                            <span>{defect.title}</span>
+                          </div>
+                          <p className="text-slate-300 text-[11px] leading-relaxed">{defect.desc}</p>
+                          <div className="text-[11px] font-mono text-indigo-300 bg-slate-950/70 p-2 rounded border border-slate-800">
+                            💡 Khắc phục: <strong>{defect.fix}</strong>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Sequential Block Stack */}
                 <div className="space-y-4">
                   {activePage.blocks
-                    .filter((b) => !showOnlyErrors || b.status === "fail")
+                    .filter((b) => !showOnlyErrors || b.status === "fail" || b.status === "warn")
                     .map((block) => (
                       <div
                         key={block.id}
@@ -641,6 +694,8 @@ ${page.defects
                         className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 space-y-3 ${
                           block.status === "fail"
                             ? "bg-rose-950/20 border-rose-500 ring-1 ring-rose-500/40"
+                            : block.status === "warn"
+                            ? "bg-amber-950/20 border-amber-500 ring-1 ring-amber-500/40"
                             : selectedBlockId === block.id
                             ? "bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/40 shadow-xl"
                             : "bg-slate-950/80 border-slate-800 hover:border-slate-700"
@@ -664,6 +719,10 @@ ${page.defects
                             {block.status === "fail" ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-500/40 animate-pulse">
                                 🚨 LỖI P0: {block.discrepancyNote || "Lệch dữ liệu"}
+                              </span>
+                            ) : block.status === "warn" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/40">
+                                ⚠️ CẦN XEM LẠI: {block.discrepancyNote || "Cảnh báo giao diện"}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
@@ -700,6 +759,8 @@ ${page.defects
                           <div className={`rounded-xl p-3.5 text-xs text-slate-200 space-y-1.5 border ${
                             block.status === "fail"
                               ? "bg-rose-950/40 border-rose-500"
+                              : block.status === "warn"
+                              ? "bg-amber-950/40 border-amber-500"
                               : "bg-slate-900/90 border-indigo-500/20"
                           }`}>
                             <div className="text-[10px] uppercase font-bold text-indigo-400 font-mono">Bản Mới PW2 (Next.js 15)</div>
@@ -713,6 +774,8 @@ ${page.defects
                               <div className={`font-mono p-2 rounded border ${
                                 block.status === "fail"
                                   ? "bg-rose-950/60 border-rose-500 text-rose-200 font-bold"
+                                  : block.status === "warn"
+                                  ? "bg-amber-950/60 border-amber-500 text-amber-200 font-bold"
                                   : "bg-slate-950 border-slate-800 text-slate-300"
                               }`}>
                                 {block.pw2Preview.bodyText}
@@ -722,6 +785,8 @@ ${page.defects
                               <span className={`inline-block text-[10px] px-2 py-0.5 rounded font-bold border ${
                                 block.status === "fail"
                                   ? "bg-rose-950 text-rose-300 border-rose-500"
+                                  : block.status === "warn"
+                                  ? "bg-amber-950 text-amber-300 border-amber-500"
                                   : "bg-emerald-950 text-emerald-300 border-emerald-500/30"
                               }`}>
                                 {block.pw2Preview.badgeText}
