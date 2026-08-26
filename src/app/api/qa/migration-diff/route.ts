@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
         !search ||
         s.name.toLowerCase().includes(search) ||
         s.id.toLowerCase().includes(search) ||
+        s.ownerEmail.toLowerCase().includes(search) ||
+        s.domain.toLowerCase().includes(search) ||
         s.subdomain1.toLowerCase().includes(search) ||
         s.templateCode.toLowerCase().includes(search);
 
@@ -68,9 +70,10 @@ export async function GET(request: NextRequest) {
       },
       stores: paginatedStores,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Internal reconciliation error", details: error?.message },
+      { error: "Internal reconciliation error", details: message },
       { status: 500 }
     );
   }
@@ -116,9 +119,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to execute migration diff action", details: error?.message },
+      { error: "Failed to execute migration diff action", details: message },
       { status: 500 }
     );
   }

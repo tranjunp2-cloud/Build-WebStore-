@@ -61,4 +61,42 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation API Tests", ()
     expect(json.success).toBe(true);
     expect(json.message).toContain("JSON dump ingested");
   });
+
+  test("[TC-F40-11-E2E-01] loads /studio/migration, displays 2,000 websites and filters by search", async ({
+    page,
+  }) => {
+    await page.goto("/studio/migration");
+    await expect(page.locator("h1")).toContainText("Website Migration");
+
+    // Check metric cards exist
+    await expect(page.getByText("Tổng Số Website")).toBeVisible();
+    await expect(page.getByText("2,000", { exact: true })).toBeVisible();
+
+    // Test search filter by domain
+    const searchInput = page.getByPlaceholder("Tìm theo Email khách hàng, Domain, Mã Site...");
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill("organicnest.vn");
+
+    // Table should filter to organicnest.vn
+    await expect(page.getByText("organicnest.vn").first()).toBeVisible();
+  });
+
+  test("[TC-F40-11-E2E-02] opens detail modal and switches to Field Diff tab", async ({
+    page,
+  }) => {
+    await page.goto("/studio/migration");
+
+    // Click "So Sánh" on the first store
+    const compareBtn = page.getByRole("button", { name: "So Sánh" }).first();
+    await expect(compareBtn).toBeVisible();
+    await compareBtn.click();
+
+    // Modal should be visible
+    await expect(page.getByText("So Sánh 2 Website")).toBeVisible();
+    await expect(page.getByText("Soi Từng Trường (Field Diff)")).toBeVisible();
+
+    // Switch to Field Diff Tab
+    await page.getByText("Soi Từng Trường (Field Diff)").click();
+    await expect(page.getByText("ĐỐI SOÁT TRƯỜNG DỮ LIỆU CSDL 1-TO-1")).toBeVisible();
+  });
 });
