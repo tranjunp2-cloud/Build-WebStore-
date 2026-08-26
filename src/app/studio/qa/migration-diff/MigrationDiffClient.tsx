@@ -10,6 +10,7 @@ import {
   type StoreSummary,
   type StoreDeepDiff,
   type DynamicStorePage,
+  type PageBlockItem,
   type EntityGroupType,
   type EntityDiffRecord,
   type FieldDiffItem,
@@ -59,7 +60,428 @@ import {
   ShieldCheck,
   Wrench,
   Layers as BlockTreeIcon,
+  Star,
+  ShoppingCart,
+  Truck,
+  Shield,
+  CreditCard,
+  MapPin,
+  Phone,
+  Mail,
+  Calendar,
+  Clock,
 } from "lucide-react";
+
+/**
+ * Renders authentic, high-fidelity visual layout components
+ * simulating real e-commerce blocks for both PW1 and PW2 in Desktop & Mobile.
+ */
+function RichVisualBlockRenderer({
+  block,
+  version,
+  deviceView,
+}: {
+  block: PageBlockItem;
+  version: "pw1" | "pw2";
+  deviceView: "desktop" | "mobile";
+}) {
+  const isPW1 = version === "pw1";
+  const preview = isPW1 ? block.pw1Preview : block.pw2Preview;
+  const isMobile = deviceView === "mobile";
+  const isFail = block.status === "fail";
+  const isWarn = block.status === "warn";
+
+  const blockType = block.blockType || "banner";
+  const titleLower = block.title.toLowerCase();
+
+  // 1. HERO / BANNER BLOCK
+  if (
+    blockType === "hero" ||
+    blockType === "banner" ||
+    titleLower.includes("banner") ||
+    titleLower.includes("hero")
+  ) {
+    return (
+      <div
+        className={`w-full rounded-2xl overflow-hidden border ${
+          isPW1
+            ? "border-amber-500/30 bg-gradient-to-br from-amber-950/40 via-slate-950 to-slate-900"
+            : isFail
+            ? "border-rose-500/40 bg-gradient-to-br from-rose-950/40 via-slate-950 to-slate-900"
+            : "border-sky-500/30 bg-gradient-to-br from-sky-950/40 via-slate-950 to-slate-900"
+        } p-4 sm:p-5 space-y-3 relative`}
+      >
+        <div className="flex items-center justify-between">
+          <span
+            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+              isPW1
+                ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                : "bg-sky-500/20 text-sky-300 border-sky-500/30"
+            }`}
+          >
+            <Sparkles className="size-3" /> {preview.badgeText || "ƯU ĐÃI MÙA NÔNG SẢN"}
+          </span>
+          <span className="text-[10px] font-mono text-slate-400">
+            {isPW1 ? "PW1 Hero (1365px)" : "PW2 Hero Block"}
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          <h5
+            className={`font-bold text-white leading-tight ${
+              isMobile ? "text-xs" : "text-sm sm:text-base"
+            }`}
+          >
+            {preview.headline || block.title}
+          </h5>
+          <p
+            className={`text-slate-300 leading-relaxed line-clamp-2 ${
+              isMobile ? "text-[11px]" : "text-xs"
+            }`}
+          >
+            {preview.subheadline ||
+              "Sản phẩm chọn lọc tự nhiên từ vùng nguyên liệu chuẩn VietGAP, tươi sạch mỗi ngày."}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition ${
+              isPW1
+                ? "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20"
+                : "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20"
+            }`}
+          >
+            <span>Khám Phá Ngay</span>
+            <ArrowRight className="size-3" />
+          </button>
+          {!isMobile && (
+            <span className="text-[11px] text-slate-400 font-medium px-2 py-1 bg-slate-900/60 rounded-lg border border-slate-800">
+              🚚 Giao hàng 2H
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 2. PRODUCT GRID / VARIANTS BLOCK
+  if (
+    blockType === "products" ||
+    blockType === "variants" ||
+    titleLower.includes("sản phẩm") ||
+    titleLower.includes("product") ||
+    titleLower.includes("lưới")
+  ) {
+    return (
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5">
+            <Package className="size-3.5 text-blue-400" />
+            <span>{preview.headline || "Danh Sách Sản Phẩm Nổi Bật"}</span>
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono">24 Sản Phẩm</span>
+        </div>
+
+        <div className={`grid gap-2.5 ${isMobile ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
+          {/* Product 1 */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between">
+            <div className="w-full aspect-square bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-500 relative overflow-hidden">
+              <span className="text-xl">🍯</span>
+              <span className="absolute top-1 left-1 text-[8px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1 rounded">
+                HOT
+              </span>
+            </div>
+            <div>
+              <div className="font-semibold text-white text-[11px] truncate">
+                Mật Ong Rừng U Minh
+              </div>
+              <div className="text-[10px] text-slate-400">Hũ 500ml</div>
+              <div className="font-bold text-sky-400 text-xs mt-0.5">180.000₫</div>
+            </div>
+            <button className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold rounded-lg border border-slate-700 transition">
+              + Giỏ Hàng
+            </button>
+          </div>
+
+          {/* Product 2 (Has Defect: Size 1L Variant Missing in PW2 if Fail) */}
+          <div
+            className={`rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between border ${
+              !isPW1 && isFail
+                ? "bg-rose-950/20 border-dashed border-rose-500/60 ring-1 ring-rose-500/30"
+                : "bg-slate-900/90 border-slate-800"
+            }`}
+          >
+            <div className="w-full aspect-square bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-500 relative overflow-hidden">
+              <span className="text-xl">🍯</span>
+              {!isPW1 && isFail ? (
+                <span className="absolute inset-0 bg-rose-950/80 flex items-center justify-center text-[9px] font-bold text-rose-300 text-center px-1">
+                  MẤT BIẾN THỂ 1L
+                </span>
+              ) : (
+                <span className="absolute top-1 left-1 text-[8px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1 rounded">
+                  SIZE 1L
+                </span>
+              )}
+            </div>
+            <div>
+              <div className="font-semibold text-white text-[11px] truncate">
+                Mật Ong Rừng Can 1L
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {!isPW1 && isFail ? "❌ Rớt data variant" : "Can 1.000ml"}
+              </div>
+              <div
+                className={`font-bold text-xs mt-0.5 ${
+                  !isPW1 && isFail ? "text-rose-400 line-through" : "text-sky-400"
+                }`}
+              >
+                320.000₫
+              </div>
+            </div>
+            <button
+              disabled={!isPW1 && isFail}
+              className={`w-full py-1 text-[10px] font-semibold rounded-lg border transition ${
+                !isPW1 && isFail
+                  ? "bg-rose-900/30 text-rose-400 border-rose-500/40 opacity-60"
+                  : "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700"
+              }`}
+            >
+              {!isPW1 && isFail ? "Lỗi Variant" : "+ Giỏ Hàng"}
+            </button>
+          </div>
+
+          {/* Product 3 */}
+          <div
+            className={`bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between ${
+              isMobile ? "col-span-2 sm:col-span-1" : ""
+            }`}
+          >
+            <div className="w-full aspect-square bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-500 relative overflow-hidden">
+              <span className="text-xl">🌾</span>
+              <span className="absolute top-1 left-1 text-[8px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1 rounded">
+                -15%
+              </span>
+            </div>
+            <div>
+              <div className="font-semibold text-white text-[11px] truncate">
+                Hạt Sen Sấy Giòn
+              </div>
+              <div className="text-[10px] text-slate-400">Gói 200g</div>
+              <div className="font-bold text-sky-400 text-xs mt-0.5">95.000₫</div>
+            </div>
+            <button className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold rounded-lg border border-slate-700 transition">
+              + Giỏ Hàng
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. FILTER / SORT CONTROLS
+  if (
+    blockType === "filter" ||
+    titleLower.includes("bộ lọc") ||
+    titleLower.includes("sắp xếp") ||
+    titleLower.includes("filter") ||
+    titleLower.includes("sort")
+  ) {
+    return (
+      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+        <div className="flex items-center justify-between text-xs text-slate-300">
+          <div className="flex items-center gap-1.5 font-semibold">
+            <SlidersHorizontal className="size-3.5 text-blue-400" />
+            <span>Bộ Lọc & Sắp Xếp Danh Mục</span>
+          </div>
+          <span className="text-[10px] text-slate-400">Sắp xếp: Bán chạy nhất ▾</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[10px] font-semibold shadow-sm">
+            Tất Cả (48)
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
+            🥬 Rau Củ
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
+            🍯 Mật Ong
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
+            🌾 Gạo & Hạt
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. CATEGORIES / COLLECTION HIGHLIGHTS
+  if (
+    blockType === "categories" ||
+    titleLower.includes("danh mục") ||
+    titleLower.includes("category")
+  ) {
+    return (
+      <div className="space-y-2">
+        <div className="font-bold text-white text-xs flex items-center gap-1.5">
+          <Grid className="size-3.5 text-sky-400" />
+          <span>{preview.headline || "3 Danh Mục Nổi Bật"}</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-1">
+            <span className="text-xl">🥬</span>
+            <div className="font-semibold text-white text-[10px] truncate">Rau Củ Tươi</div>
+            <div className="text-[9px] text-slate-400">48 Sản phẩm</div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-1">
+            <span className="text-xl">🍯</span>
+            <div className="font-semibold text-white text-[10px] truncate">Mật Ong Rừng</div>
+            <div className="text-[9px] text-slate-400">24 Sản phẩm</div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-1">
+            <span className="text-xl">🌾</span>
+            <div className="font-semibold text-white text-[10px] truncate">Nông Sản Sấy</div>
+            <div className="text-[9px] text-slate-400">36 Sản phẩm</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. RICHTEXT / COMMITMENT / CONTENT
+  if (
+    blockType === "richtext" ||
+    titleLower.includes("richtext") ||
+    titleLower.includes("cam kết") ||
+    titleLower.includes("hướng dẫn") ||
+    titleLower.includes("câu chuyện")
+  ) {
+    return (
+      <div
+        className={`p-4 rounded-xl border space-y-2.5 ${
+          !isPW1 && isFail
+            ? "bg-rose-950/20 border-rose-500/40"
+            : "bg-slate-950 border-slate-800"
+        }`}
+      >
+        <div className="font-bold text-white text-xs flex items-center gap-1.5">
+          <ShieldCheck className="size-3.5 text-emerald-400" />
+          <span>{preview.headline || "Cam Kết Chất Lượng & Nguồn Gốc"}</span>
+        </div>
+        <p className="text-slate-300 text-[11px] leading-relaxed">
+          {preview.bodyText ||
+            preview.subheadline ||
+            "Quy trình thu hoạch và đóng gói khép kín, đạt chuẩn kiểm định an toàn thực phẩm VietGAP."}
+        </p>
+
+        {/* 3 Quality Badges */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+          <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 text-[10px] text-slate-300 flex items-center gap-1.5">
+            <span className="text-emerald-400">✓</span> 100% Thuần Khiết
+          </div>
+          <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 text-[10px] text-slate-300 flex items-center gap-1.5">
+            <span className="text-blue-400">🚚</span> Giao Siêu Tốc 2H
+          </div>
+          <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 text-[10px] text-slate-300 flex items-center gap-1.5">
+            <span className="text-amber-400">🔄</span> Đổi Trả Miễn Phí
+          </div>
+        </div>
+
+        {!isPW1 && isFail && (
+          <div className="p-2 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-[10px] font-mono">
+            🚨 Cảnh Báo: Bảng biểu &lt;table&gt; bị rớt định dạng khi migrate sang Lexical AST.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 6. FOOTER BLOCK
+  if (
+    blockType === "footer" ||
+    titleLower.includes("footer") ||
+    titleLower.includes("chân trang")
+  ) {
+    return (
+      <div
+        className={`p-4 rounded-xl border space-y-3 ${
+          !isPW1 && isWarn
+            ? "bg-amber-950/20 border-amber-500/40"
+            : "bg-slate-950 border-slate-800"
+        }`}
+      >
+        <div
+          className={`grid gap-3 text-[10px] ${
+            isMobile ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="font-bold text-white text-[11px]">{preview.headline || "Store Farm"}</div>
+            <div className="text-slate-400">📞 1900 6868</div>
+            <div className="text-slate-400">📍 Hà Nội & TP.HCM</div>
+          </div>
+          <div className="space-y-1">
+            <div className="font-bold text-white text-[11px]">Về Chúng Tôi</div>
+            <div className="text-slate-400">Giới thiệu cửa hàng</div>
+            <div className="text-slate-400">Hệ thống phân phối</div>
+          </div>
+          <div className="space-y-1">
+            <div className="font-bold text-white text-[11px]">Hỗ Trợ</div>
+            <div className="text-slate-400">Chính sách đổi trả</div>
+            <div className="text-slate-400">Bảo mật thông tin</div>
+          </div>
+          <div className="space-y-1">
+            <div className="font-bold text-white text-[11px]">Thanh Toán</div>
+            <div className="flex gap-1 pt-0.5">
+              <span className="px-1 py-0.5 bg-slate-900 border border-slate-800 rounded text-[9px] text-slate-300">
+                VISA
+              </span>
+              <span className="px-1 py-0.5 bg-slate-900 border border-slate-800 rounded text-[9px] text-slate-300">
+                MOMO
+              </span>
+            </div>
+            {!isPW1 && isWarn ? (
+              <div className="text-amber-400 text-[9px] font-mono mt-1">⚠️ Thiếu Iframe Map</div>
+            ) : (
+              <div className="text-emerald-400 text-[9px]">🗺️ Bản đồ Google Map</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 7. DEFAULT GENERIC VISUAL BLOCK
+  return (
+    <div
+      className={`p-4 rounded-xl border space-y-2 ${
+        isPW1
+          ? "bg-slate-950 border-amber-500/20"
+          : isFail
+          ? "bg-rose-950/20 border-rose-500/30"
+          : isWarn
+          ? "bg-amber-950/20 border-amber-500/30"
+          : "bg-slate-950 border-slate-800"
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <h5 className="font-bold text-white text-xs">{preview.headline || block.title}</h5>
+        {preview.badgeText && (
+          <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            {preview.badgeText}
+          </span>
+        )}
+      </div>
+      {preview.subheadline && (
+        <p className="text-slate-300 text-[11px] leading-relaxed">{preview.subheadline}</p>
+      )}
+      {preview.bodyText && (
+        <div className="text-slate-300 text-[11px] leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+          {preview.bodyText}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function MigrationDiffClient() {
   const [mounted, setMounted] = useState(false);
@@ -1058,39 +1480,25 @@ export function MigrationDiffClient() {
                             /* Mobile Phone Mockup View (375px) */
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-2">
                               {/* PW1 Phone Mockup */}
-                              <div className="w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 border-amber-500/40 rounded-[2.5rem] p-4 shadow-2xl space-y-3 ring-1 ring-amber-500/20 relative">
+                              <div className="w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 border-amber-500/40 rounded-[2.5rem] p-4 shadow-2xl space-y-3.5 ring-1 ring-amber-500/20 relative">
                                 {/* Speaker / Notch */}
                                 <div className="w-24 h-3.5 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner">
                                   <div className="size-1.5 rounded-full bg-slate-700" />
                                   <div className="w-8 h-1 rounded-full bg-slate-800" />
                                 </div>
                                 <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider text-center border-b border-slate-800 pb-1.5 flex items-center justify-center gap-1">
-                                  <Smartphone className="size-3" /> PW1 Mobile (375px)
+                                  <Smartphone className="size-3" /> PW1 Mobile View (375px)
                                 </div>
-                                <div className="p-2 space-y-2 text-xs">
-                                  {block.pw1Preview.headline && (
-                                    <div className="font-bold text-white text-xs leading-snug">{block.pw1Preview.headline}</div>
-                                  )}
-                                  {block.pw1Preview.subheadline && (
-                                    <div className="text-slate-300 text-[11px] leading-relaxed">{block.pw1Preview.subheadline}</div>
-                                  )}
-                                  {block.pw1Preview.bodyText && (
-                                    <div className="text-slate-300 text-[11px] leading-relaxed bg-slate-900/80 p-2 rounded-lg border border-slate-800">
-                                      {block.pw1Preview.bodyText}
-                                    </div>
-                                  )}
-                                  {block.pw1Preview.badgeText && (
-                                    <span className="inline-block text-[9px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full font-semibold border border-emerald-500/20">
-                                      {block.pw1Preview.badgeText}
-                                    </span>
-                                  )}
-                                </div>
+
+                                {/* Rich Visual Block Render for PW1 */}
+                                <RichVisualBlockRenderer block={block} version="pw1" deviceView="mobile" />
+
                                 {/* Home Bar */}
                                 <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
                               </div>
 
                               {/* PW2 Phone Mockup */}
-                              <div className={`w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 rounded-[2.5rem] p-4 shadow-2xl space-y-3 relative ${
+                              <div className={`w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 rounded-[2.5rem] p-4 shadow-2xl space-y-3.5 relative ${
                                 block.status === "fail"
                                   ? "border-rose-500/60 ring-2 ring-rose-500/30"
                                   : block.status === "warn"
@@ -1105,36 +1513,10 @@ export function MigrationDiffClient() {
                                 <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider text-center border-b border-slate-800 pb-1.5 flex items-center justify-center gap-1">
                                   <Smartphone className="size-3" /> PW2 Next.js Mobile (375px)
                                 </div>
-                                <div className="p-2 space-y-2 text-xs">
-                                  {block.pw2Preview.headline && (
-                                    <div className="font-bold text-white text-xs leading-snug">{block.pw2Preview.headline}</div>
-                                  )}
-                                  {block.pw2Preview.subheadline && (
-                                    <div className="text-slate-300 text-[11px] leading-relaxed">{block.pw2Preview.subheadline}</div>
-                                  )}
-                                  {block.pw2Preview.bodyText && (
-                                    <div className={`text-[11px] leading-relaxed p-2 rounded-lg border ${
-                                      block.status === "fail"
-                                        ? "bg-rose-950/40 border-rose-500/40 text-rose-200 font-medium"
-                                        : block.status === "warn"
-                                        ? "bg-amber-950/40 border-amber-500/40 text-amber-200 font-medium"
-                                        : "bg-slate-900/80 border-slate-800 text-slate-300"
-                                    }`}>
-                                      {block.pw2Preview.bodyText}
-                                    </div>
-                                  )}
-                                  {block.pw2Preview.badgeText && (
-                                    <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-semibold border ${
-                                      block.status === "fail"
-                                        ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                                        : block.status === "warn"
-                                        ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                    }`}>
-                                      {block.pw2Preview.badgeText}
-                                    </span>
-                                  )}
-                                </div>
+
+                                {/* Rich Visual Block Render for PW2 */}
+                                <RichVisualBlockRenderer block={block} version="pw2" deviceView="mobile" />
+
                                 {/* Home Bar */}
                                 <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
                               </div>
@@ -1143,67 +1525,19 @@ export function MigrationDiffClient() {
                             /* Desktop Dual Column View */
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {/* PW1 Preview Box */}
-                              <div className="bg-slate-950/60 border border-amber-500/20 rounded-xl p-4 text-xs text-slate-200 space-y-2">
-                                <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider">
-                                  Giao Diện & Nội Dung Bản Gốc PW1
+                              <div className="space-y-1.5">
+                                <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider px-1">
+                                  Giao Diện Bản Gốc PW1 (Laravel)
                                 </div>
-                                {block.pw1Preview.headline && (
-                                  <div className="font-bold text-white text-sm">{block.pw1Preview.headline}</div>
-                                )}
-                                {block.pw1Preview.subheadline && (
-                                  <div className="text-slate-300 leading-relaxed">{block.pw1Preview.subheadline}</div>
-                                )}
-                                {block.pw1Preview.bodyText && (
-                                  <div className="text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-                                    {block.pw1Preview.bodyText}
-                                  </div>
-                                )}
-                                {block.pw1Preview.badgeText && (
-                                  <span className="inline-block text-[10px] bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/20">
-                                    {block.pw1Preview.badgeText}
-                                  </span>
-                                )}
+                                <RichVisualBlockRenderer block={block} version="pw1" deviceView="desktop" />
                               </div>
 
                               {/* PW2 Preview Box */}
-                              <div className={`rounded-xl p-4 text-xs text-slate-200 space-y-2 border ${
-                                block.status === "fail"
-                                  ? "bg-rose-950/20 border-rose-500/40"
-                                  : block.status === "warn"
-                                  ? "bg-amber-950/20 border-amber-500/40"
-                                  : "bg-slate-950/60 border-sky-500/20"
-                              }`}>
-                                <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider">
-                                  Giao Diện & Nội Dung Bản Mới PW2 (Next.js 15)
+                              <div className="space-y-1.5">
+                                <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider px-1">
+                                  Giao Diện Bản Mới PW2 (Next.js 15)
                                 </div>
-                                {block.pw2Preview.headline && (
-                                  <div className="font-bold text-white text-sm">{block.pw2Preview.headline}</div>
-                                )}
-                                {block.pw2Preview.subheadline && (
-                                  <div className="text-slate-300 leading-relaxed">{block.pw2Preview.subheadline}</div>
-                                )}
-                                {block.pw2Preview.bodyText && (
-                                  <div className={`leading-relaxed p-2.5 rounded-lg border ${
-                                    block.status === "fail"
-                                      ? "bg-rose-950/40 border-rose-500/40 text-rose-200 font-medium"
-                                      : block.status === "warn"
-                                      ? "bg-amber-950/40 border-amber-500/40 text-amber-200 font-medium"
-                                      : "bg-slate-900/80 border-slate-800 text-slate-300"
-                                  }`}>
-                                    {block.pw2Preview.bodyText}
-                                  </div>
-                                )}
-                                {block.pw2Preview.badgeText && (
-                                  <span className={`inline-block text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
-                                    block.status === "fail"
-                                      ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                                      : block.status === "warn"
-                                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                  }`}>
-                                    {block.pw2Preview.badgeText}
-                                  </span>
-                                )}
+                                <RichVisualBlockRenderer block={block} version="pw2" deviceView="desktop" />
                               </div>
                             </div>
                           )}
