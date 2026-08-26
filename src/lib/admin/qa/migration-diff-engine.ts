@@ -260,7 +260,7 @@ export const CANONICAL_TEMPLATES = [
   },
   {
     code: "FN104",
-    name: "Minimalist Market",
+    name: "Minimalist",
     sector: "Tối giản & Gia dụng",
     coverImg: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/fn104/cover.png",
     liveDomainV1: "https://fn104.web.dev.ecommercehub.my/",
@@ -270,7 +270,7 @@ export const CANONICAL_TEMPLATES = [
   },
   {
     code: "FN103",
-    name: "Viora Home",
+    name: "Viora",
     sector: "Nội thất cao cấp",
     coverImg: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/fn103/cover.png",
     liveDomainV1: "https://fn103.web.dev.ecommercehub.my/",
@@ -339,9 +339,18 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
     let commerceScore = "100%";
     let blockScore = "98.0%";
 
-    const pageCount = 4 + (i % 5);
+    const pageCount = 6;
 
-    if (i % 25 === 0) {
+    if (i === 1) {
+      // SITE-0001: Golden Demo Test Site with active defects for QA inspection
+      score = "84.5%";
+      status = "failed";
+      failedBlocks = ["Mất Biến Thể Size 1L", "Thiếu Brand ID (Layer 2)", "RichText Rớt Bảng VietGAP"];
+      textScore = "82.0%";
+      mediaScore = "89.0%";
+      commerceScore = "65.0%";
+      blockScore = "70.0%";
+    } else if (i % 25 === 0) {
       // Critical P0 Blocker
       const val = (65 + (i % 15) * 1.1).toFixed(1);
       score = `${val}%`;
@@ -399,7 +408,6 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
 
 /**
  * Generate Complete 1-to-1 Field-Level Database Diff Audit for any store
- * Covers Products, Variants, Banners & Links, RichText & Tables, Categories & Navigation, Posts, Settings & Footer
  */
 export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreFieldDiffAudit {
   const allStores = generateReconciliationCatalog(2000);
@@ -411,14 +419,14 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
   const isPass = currentStatus === "passed";
 
   const records: EntityDiffRecord[] = [
-    // 1. PRODUCTS (PROD-101: Mật Ong Rừng)
+    // 1. PRODUCTS (PROD-101: Mật Ong Rừng Ba Vì)
     {
       id: "ent-prod-101",
       legacyId: "PROD-101",
       migratedId: "pw2_prod_101",
       entityGroup: "products",
-      entityName: "Sản Phẩm: Mật Ong Rừng Ba Vì Nguyên Chất",
-      entityIdentifier: "SKU: ONG-RUNG",
+      entityName: "Sản Phẩm: Mật Ong Rừng Ba Vì Nguyên Chất 500ml",
+      entityIdentifier: "SKU: ONG-RUNG-500ML",
       matchStatus: isFailed ? "error" : "match",
       totalFields: 7,
       matchedFields: isFailed ? 5 : 7,
@@ -1051,8 +1059,8 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
           fieldLabel: "Tên Cửa Hàng",
           legacyKey: "stores.name",
           migratedKey: "tenants.name",
-          legacyValue: "OrganicNest Ba Vì",
-          migratedValue: "OrganicNest Ba Vì",
+          legacyValue: "OrganicNest",
+          migratedValue: "OrganicNest",
           status: "match",
           classification: "100% Match",
         },
@@ -1374,7 +1382,7 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
     },
   ];
 
-  // Dynamic Page Stack Generation for this specific merchant
+  // Dynamic 6 Pages Data
   const dynamicPages: DynamicStorePage[] = [
     // 1. HOME PAGE
     {
@@ -1397,8 +1405,8 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
           layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
           status: "KHỚP 100%",
           badge: "badge-pass",
-          pw1Val: "Headline 'Tasty & Healthy Organic Food' + Button Explore",
-          pw2Val: "Headline 'Tasty & Healthy Organic Food' + Button Explore",
+          pw1Val: "Headline 'Nông Trại Hữu Cơ Ba Vì' + Button Khám Phá",
+          pw2Val: "Headline 'Nông Trại Hữu Cơ Ba Vì' + Button Khám Phá",
           fix: "✓ Khớp chuẩn 100%",
         },
         {
@@ -1409,8 +1417,8 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
           layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
           status: "KHỚP 100%",
           badge: "badge-pass",
-          pw1Val: "3 Banners: Green lemon, Almonds, Honey",
-          pw2Val: "3 Banners: Green lemon, Almonds, Honey",
+          pw1Val: "3 Banners: Mật ong rừng, Hạnh nhân, Chanh vàng",
+          pw2Val: "3 Banners: Mật ong rừng, Hạnh nhân, Chanh vàng",
           fix: "✓ Khớp chuẩn 100%",
         },
         {
@@ -1421,33 +1429,33 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
           layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : isWarn ? "bg-amber-950/40 text-amber-300 border-amber-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
           status: isFailed ? "MẤT BIẾN THỂ & BRAND" : isWarn ? "1 ẢNH THUMB 404" : "KHỚP 100%",
           badge: isFailed ? "badge-fail" : isWarn ? "badge-warn" : "badge-pass",
-          pw1Val: "24 Sản phẩm | Đủ 2 biến thể 500ml & 1L | Brand: Nông Trại Ba Vì",
-          pw2Val: isFailed ? "24 Sản phẩm | Mất biến thể 1L | brand_id: NULL" : isWarn ? "24 Sản phẩm | 1 ảnh thumb lỗi 404" : "24 Sản phẩm | Đầy đủ 100%",
+          pw1Val: "8 Sản phẩm | Đủ 2 biến thể 500ml & 1L | Brand: Nông Trại Ba Vì",
+          pw2Val: isFailed ? "8 Sản phẩm | Mất biến thể 1L | brand_id: NULL" : isWarn ? "8 Sản phẩm | 1 ảnh thumb lỗi 404" : "8 Sản phẩm | Đầy đủ 100%",
           fix: isFailed ? "Dev bổ sung collection brands & migrate đủ variant" : isWarn ? "Re-upload lại ảnh S3" : "✓ Khớp chuẩn 100%",
         },
         {
           pos: "#04",
-          leg: "Small Promo Banner 1543",
-          mig: "cta/banner",
+          leg: "Promo Banner 1543",
+          mig: "cta/banner-promo",
           layer: "Layer 1 (Mapped)",
           layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
           status: "KHỚP 100%",
           badge: "badge-pass",
-          pw1Val: "Original Stock Honey Combo Package",
-          pw2Val: "Original Stock Honey Combo Package",
+          pw1Val: "Voucher 50K - Mua Mật Ong Rừng",
+          pw2Val: "Voucher 50K - Mua Mật Ong Rừng",
           fix: "✓ Khớp chuẩn 100%",
         },
         {
           pos: "#05",
-          leg: "Article Listing 1544",
-          mig: "blog-list/cards",
-          layer: "Layer 1 (Mapped)",
-          layerCls: "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
-          status: "KHỚP 100%",
-          badge: "badge-pass",
-          pw1Val: "3 Bài viết mới nhất",
-          pw2Val: "3 Bài viết mới nhất",
-          fix: "✓ Khớp chuẩn 100%",
+          leg: "RichText 501",
+          mig: "lexical-table-node",
+          layer: isFailed ? "Layer 2 Gap" : "Layer 1 (Mapped)",
+          layerCls: isFailed ? "bg-rose-950/40 text-rose-300 border-rose-500/30" : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30",
+          status: isFailed ? "MẤT THẺ TABLE" : "KHỚP 100%",
+          badge: isFailed ? "badge-fail" : "badge-pass",
+          pw1Val: "Bảng So Sánh Tiêu Chuẩn Nông Sản (3 Cột)",
+          pw2Val: isFailed ? "Dữ liệu bị dồn cục không có cột" : "Bảng 3 Cột Chuẩn",
+          fix: isFailed ? "Cập nhật Lexical Table parser" : "✓ Khớp chuẩn 100%",
         },
       ],
       blocks: [
@@ -1458,42 +1466,42 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
           title: "Khối #01: Hero Banner Đầu Trang",
           pw1Component: "banner (Hero Single 1365)",
           pw2Block: "hero/split-left",
-          pw1Preview: { headline: "Tasty & Healthy Organic Food", subheadline: "Nông trại sạch tiêu chuẩn VietGAP thu hoạch hàng ngày.", badgeText: "100% Organic" },
-          pw2Preview: { headline: "Tasty & Healthy Organic Food", subheadline: "Nông trại sạch tiêu chuẩn VietGAP thu hoạch hàng ngày.", badgeText: "100% Organic" },
+          pw1Preview: { headline: "Nông Trại Hữu Cơ Ba Vì — Đậm Đà Hương Vị Tự Nhiên", subheadline: "Thu hoạch tươi mỗi ngày tại thung lũng Ba Vì theo tiêu chuẩn hữu cơ VietGAP.", badgeText: "100% Thuần Khiết" },
+          pw2Preview: { headline: "Nông Trại Hữu Cơ Ba Vì — Đậm Đà Hương Vị Tự Nhiên", subheadline: "Thu hoạch tươi mỗi ngày tại thung lũng Ba Vì theo tiêu chuẩn hữu cơ VietGAP.", badgeText: "100% Thuần Khiết" },
           status: "pass",
         },
         {
           id: "home-02",
           order: 2,
           blockType: "banner",
-          title: "Khối #02: Banner Khuyến Mãi Nhỏ #1 (Voucher)",
-          pw1Component: "banner (Promo Banner 1543)",
-          pw2Block: "cta/banner-promo",
-          pw1Preview: { headline: "VOUCHER 50K - MUA MẬT ONG RỪNG", subheadline: "Áp dụng cho đơn hàng từ 300.000đ", badgeText: "Giảm 50.000đ" },
-          pw2Preview: { headline: "VOUCHER 50K - MUA MẬT ONG RỪNG", subheadline: "Áp dụng cho đơn hàng từ 300.000đ", badgeText: "Giảm 50.000đ" },
+          title: "Khối #02: Banner 3 Danh Mục Nổi Bật",
+          pw1Component: "category_listing (1540)",
+          pw2Block: "portfolio-grid/grid",
+          pw1Preview: { headline: "3 Danh Mục: Mật Ong Rừng, Hạt Sấy Mộc, Chanh Rừng VietGAP", badgeText: "3 Nhóm SP" },
+          pw2Preview: { headline: "3 Danh Mục: Mật Ong Rừng, Hạt Sấy Mộc, Chanh Rừng VietGAP", badgeText: "3 Nhóm SP" },
           status: "pass",
         },
         {
           id: "home-03",
           order: 3,
           blockType: "richtext",
-          title: "Khối #03: RichText #1 (Câu Chuyện Thương Hiệu)",
-          pw1Component: "rich_text (Word-like WYSIWYG)",
-          pw2Block: "about/split (Lexical RichText)",
-          pw1Preview: { headline: "Hành Trình 10 Năm Gieo Mầm Xanh Ba Vì", bodyText: "Chúng tôi cam kết mang lại thực phẩm thuần khiết 100% tự nhiên...", imageCount: 2, hasTable: false },
-          pw2Preview: { headline: "Hành Trình 10 Năm Gieo Mầm Xanh Ba Vì", bodyText: "Chúng tôi cam kết mang lại thực phẩm thuần khiết 100% tự nhiên...", imageCount: 2, hasTable: false },
+          title: "Khối #03: RichText Câu Chuyện Thương Hiệu (Word-like)",
+          pw1Component: "rich_text (WYSIWYG)",
+          pw2Block: "about/split (Lexical)",
+          pw1Preview: { headline: "Hành Trình 10 Năm Gieo Mầm Nông Sản Sạch Ba Vì", bodyText: "Khởi nguồn từ những đồi hoa tràm và hoa rừng tự nhiên, OrganicNest cam kết không pha đường, không chất bảo quản...", imageCount: 2, hasTable: false },
+          pw2Preview: { headline: "Hành Trình 10 Năm Gieo Mầm Nông Sản Sạch Ba Vì", bodyText: "Khởi nguồn từ những đồi hoa tràm và hoa rừng tự nhiên, OrganicNest cam kết không pha đường, không chất bảo quản...", imageCount: 2, hasTable: false },
           status: "pass",
         },
         {
           id: "home-04",
           order: 4,
           blockType: "products",
-          title: "Khối #04: Danh Sách Sản Phẩm Nổi Bật",
+          title: "Khối #04: Danh Sách Sản Phẩm Nổi Bật (8 SP)",
           pw1Component: "product_listing (1541)",
           pw2Block: "products-grid/grid-4",
-          pw1Preview: { headline: "Sản Phẩm Tươi Ngon Bán Chạy", productCount: 8, badgeText: "Đủ 2 Biến Thể (500ml & 1L)" },
+          pw1Preview: { headline: "Mật Ong Rừng 500ml (180k), Can 1L (320k), Hạnh Nhân (145k)", productCount: 8, badgeText: "Đủ 2 Biến Thể (500ml & 1L)" },
           pw2Preview: {
-            headline: "Sản Phẩm Tươi Ngon Bán Chạy",
+            headline: "Mật Ong Rừng 500ml (180k), Can 1L (320k), Hạnh Nhân (145k)",
             productCount: 8,
             badgeText: isFailed ? "🚨 MẤT BIẾN THỂ 1L" : isWarn ? "⚠️ 1 ẢNH THUMB LỖI 404" : "Đủ 2 Biến Thể (500ml & 1L)",
           },
@@ -1508,32 +1516,32 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
           id: "home-05",
           order: 5,
           blockType: "banner",
-          title: "Khối #05: Banner Khuyến Mãi Nhỏ #2 (Combo)",
-          pw1Component: "banner (Combo Promo Banner)",
-          pw2Block: "cta/banner-split",
-          pw1Preview: { headline: "COMBO SỨC KHỎE: MẬT ONG + CHANH VÀNG", subheadline: "Tiết kiệm 20% khi mua combo sáng nay", badgeText: "Tiết Kiệm 20%" },
-          pw2Preview: { headline: "COMBO SỨC KHỎE: MẬT ONG + CHANH VÀNG", subheadline: "Tiết kiệm 20% khi mua combo sáng nay", badgeText: "Tiết Kiệm 20%" },
+          title: "Khối #05: Banner Voucher 50K Giảm Giá",
+          pw1Component: "banner (Promo Banner 1543)",
+          pw2Block: "cta/banner-promo",
+          pw1Preview: { headline: "VOUCHER 50K - MUA MẬT ONG RỪNG", subheadline: "Áp dụng cho đơn hàng từ 300.000đ", badgeText: "Giảm 50.000đ" },
+          pw2Preview: { headline: "VOUCHER 50K - MUA MẬT ONG RỪNG", subheadline: "Áp dụng cho đơn hàng từ 300.000đ", badgeText: "Giảm 50.000đ" },
           status: "pass",
         },
         {
           id: "home-06",
           order: 6,
           blockType: "banner",
-          title: "Khối #06: Banner Khuyến Mãi Nhỏ #3 (Freeship)",
+          title: "Khối #06: Banner Miễn Phí Vận Chuyển Toàn Quốc",
           pw1Component: "banner (Freeship Banner)",
           pw2Block: "cta/banner-minimal",
-          pw1Preview: { headline: "MIỄN PHÍ VẬN CHUYỂN TOÀN QUỐC", subheadline: "Đơn hàng từ 500k được giao hỏa tốc 2H", badgeText: "Freeship 0đ" },
-          pw2Preview: { headline: "MIỄN PHÍ VẬN CHUYỂN TOÀN QUỐC", subheadline: "Đơn hàng từ 500k được giao hỏa tốc 2H", badgeText: "Freeship 0đ" },
+          pw1Preview: { headline: "MIỄN PHÍ VẬN CHUYỂN CHO ĐƠN TỪ 500K", subheadline: "Giao hỏa tốc 2H tại Hà Nội & TP.HCM", badgeText: "Freeship 0đ" },
+          pw2Preview: { headline: "MIỄN PHÍ VẬN CHUYỂN CHO ĐƠN TỪ 500K", subheadline: "Giao hỏa tốc 2H tại Hà Nội & TP.HCM", badgeText: "Freeship 0đ" },
           status: "pass",
         },
         {
           id: "home-07",
           order: 7,
           blockType: "richtext",
-          title: "Khối #07: RichText #2 (Bảng Cam Kết VietGAP)",
+          title: "Khối #07: RichText Bảng Cam Kết Chất Lượng VietGAP (<table>)",
           pw1Component: "rich_text (Bảng 3 Cột <table>)",
           pw2Block: "lexical-table-node",
-          pw1Preview: { headline: "Bảng So Sánh Tiêu Chuẩn Nông Sản", bodyText: "Tiêu Chí | Mật Ong Thường | Mật Ong Ba Vì (Đậm đặc >23%, Ngọt thanh)", hasTable: true, imageCount: 1 },
+          pw1Preview: { headline: "Bảng So Sánh Tiêu Chuẩn Nông Sản", bodyText: "Tiêu Chí | Mật Ong Thường | Mật Ong Ba Vì (Đậm đặc >23%, Độ ẩm <18.5%)", hasTable: true, imageCount: 1 },
           pw2Preview: { headline: "Bảng So Sánh Tiêu Chuẩn Nông Sản", bodyText: isFailed ? "Tiêu Chí Mật Ong Thường Mật Ong Ba Vì (Dữ liệu bị dồn cục)" : "Tiêu Chí | Mật Ong Thường | Mật Ong Ba Vì", hasTable: !isFailed, imageCount: 1 },
           status: isFailed ? "fail" : "pass",
           discrepancyNote: isFailed ? "Mất thẻ <table> làm số liệu bị dồn thành 1 dòng text thô" : undefined,
@@ -1542,7 +1550,7 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
           id: "home-08",
           order: 8,
           blockType: "banner",
-          title: "Khối #08: Banner Khuyến Mãi Nhỏ #4 (Tải App)",
+          title: "Khối #08: Banner Tải App Nhận Quà 100K",
           pw1Component: "banner (App Download Banner)",
           pw2Block: "cta/download-app",
           pw1Preview: { headline: "TẢI APP ORGANICNEST NHẬN QUÀ 100K", subheadline: "Có mặt trên cả App Store và Google Play", badgeText: "Quà 100K" },
@@ -1564,12 +1572,12 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
           id: "home-10",
           order: 10,
           blockType: "footer",
-          title: "Khối #10: Chân Trang Đa Cột (Footer)",
+          title: "Khối #10: Chân Trang Đa Cột & Bản Đồ (Footer)",
           pw1Component: "Footer Custom (1553)",
           pw2Block: "footer/dark-gradient",
-          pw1Preview: { headline: "Thông Tin Shop, Hotline 1900 8888, Bản Quyền & Map", bodyText: "4 Cột chính sách đổi trả, phương thức thanh toán" },
+          pw1Preview: { headline: "Hotline 1900 8888, Email contact@organicnest.vn, Bản Đồ Ba Vì", bodyText: "4 Cột chính sách đổi trả, phương thức thanh toán" },
           pw2Preview: {
-            headline: "Thông Tin Shop, Hotline 1900 8888, Bản Quyền",
+            headline: "Hotline 1900 8888, Email contact@organicnest.vn",
             bodyText: isWarn ? "4 Cột chính sách (⚠️ Chưa có iframe Google Maps)" : "4 Cột chính sách đổi trả, phương thức thanh toán",
           },
           status: isWarn ? "warn" : "pass",
@@ -1679,7 +1687,7 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
           id: "about-01",
           order: 1,
           blockType: "hero",
-          title: "Hero Banner Giới Thiệu Công Ty",
+          title: "Hero Banner Giới Thiệu Nông Trại",
           pw1Component: "banner (About Cover)",
           pw2Block: "hero/about-header",
           pw1Preview: { headline: "Về Nông Trại OrganicNest Ba Vì" },
@@ -1712,7 +1720,7 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
           id: "about-04",
           order: 4,
           blockType: "richtext",
-          title: "RichText: Giá Trị Cốt Lõi & Trách Nhiệm Xã Hội (rich_text)",
+          title: "RichText: Giá Trị Cốt Lõi & Trách Nhiệm Xã Hội",
           pw1Component: "rich_text (800 chữ)",
           pw2Block: "about/values (Lexical)",
           pw1Preview: { headline: "Tâm Huyết Với Người Tiêu Dùng Việt Nam" },

@@ -55,6 +55,8 @@ import {
   ShieldCheck,
   Wrench,
   Layers as BlockTreeIcon,
+  PlayCircle,
+  Flame,
 } from "lucide-react";
 
 export function MigrationDiffClient() {
@@ -209,6 +211,14 @@ ${
     }
   };
 
+  const openDemoTestStore = () => {
+    setActiveStoreId("SITE-0001");
+    setActivePageIndex(0);
+    setSelectedBlockId(null);
+    setActiveViewTab("visual_stream");
+    showToast("Đang mở Website Test Mẫu: OrganicNest Ba Vì (SITE-0001)!");
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans">
       {/* Toast Notification */}
@@ -236,30 +246,57 @@ ${
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                So sánh trực quan <strong>2 Website Song Song (PW1 vs PW2)</strong> kết hợp <strong>Đối Soát Toàn Bộ Trường CSDL 1-to-1 (Products, Banners, Links, RichText, Nav)</strong>
+                So sánh trực quan <strong>2 Website Song Song (PW1 vs PW2)</strong> kết hợp <strong>Đối Soát Toàn Bộ Trường CSDL 1-to-1</strong>
               </p>
             </div>
           </div>
         </div>
 
-        {/* Action & Database Status Bar */}
+        {/* Quick Launch Demo Test Website & Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={openDemoTestStore}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-orange-500/30 hover:scale-105 transition active:scale-95"
+          >
+            <Flame className="size-4" />
+            <span>MỞ WEBSITE TEST MẪU (ORGANICNEST)</span>
+          </button>
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
             <span className="inline-block size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Web Cũ: <strong className="text-emerald-400 font-mono">MySQL PW1 Live</strong></span>
+            <span>Web Cũ: <strong className="text-emerald-400 font-mono">MySQL PW1</strong></span>
           </div>
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-300 shadow-inner">
             <span className="inline-block size-2 rounded-full bg-indigo-400 animate-pulse" />
             <span>Web Mới: <strong className="text-indigo-400 font-mono">Next.js 15 Postgres</strong></span>
           </div>
-          <button
-            onClick={() => showToast("Đã quét lại đối soát cho toàn bộ 2.000 website!")}
-            className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl border border-slate-700 transition shadow-sm"
-          >
-            <RefreshCw className="size-3.5" />
-            <span>Quét Lại Toàn Bộ (Re-scan)</span>
-          </button>
         </div>
+      </div>
+
+      {/* Featured Test Site Quick Banner */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-900 border border-indigo-500/40 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="p-2.5 bg-amber-500/20 text-amber-300 rounded-xl border border-amber-500/40 shrink-0">
+            <Sparkles className="size-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 font-black text-white text-sm">
+              <span>Website Test Mẫu Thực Tế: OrganicNest - Nông Sản Hữu Cơ Ba Vì (SITE-0001)</span>
+              <span className="text-[10px] bg-rose-950 text-rose-300 border border-rose-500 px-2 py-0.2 rounded-full font-bold">
+                Có 3 Lỗi P0 Thật Để Test
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Đầy đủ 6 trang thật (Trang chủ, Sản phẩm, Giới thiệu, Tin tức, Liên hệ, Đổi trả), 24 sản phẩm, banner khuyến mãi, link CTA, bảng VietGAP <code>&lt;table&gt;</code> và bảng đối chiếu CSDL.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={openDemoTestStore}
+          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl transition shadow-lg shadow-indigo-600/30 shrink-0 flex items-center gap-2 hover:scale-105"
+        >
+          <PlayCircle className="size-4" />
+          <span>Bắt Đầu Test Đối Soát Ngay ➔</span>
+        </button>
       </div>
 
       {/* 5 Metric Summary Cards */}
