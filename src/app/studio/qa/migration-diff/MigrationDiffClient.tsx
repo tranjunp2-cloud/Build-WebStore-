@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   generateReconciliationCatalog,
   getStoreDeepDiff,
@@ -58,6 +59,11 @@ import {
 } from "lucide-react";
 
 export function MigrationDiffClient() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [catalog, setCatalog] = useState<StoreSummary[]>(() => generateReconciliationCatalog(2000));
   const metrics = useMemo(() => getDashboardMetrics(catalog), [catalog]);
 
@@ -508,8 +514,8 @@ export function MigrationDiffClient() {
       {/* ========================================================================= */}
       {/* PROFESSIONAL DETAIL INSPECTOR MODAL WITH FULL 2-WEBSITE STREAM + FIELD DIFF */}
       {/* ========================================================================= */}
-      {selectedDiff && activePage && (
-        <div className="fixed inset-0 z-[99999] bg-slate-950 flex flex-col p-0 md:p-3 overscroll-contain animate-in fade-in duration-200">
+      {mounted && typeof document !== "undefined" && selectedDiff && activePage && createPortal(
+        <div className="fixed inset-0 z-[999999] bg-slate-950 flex flex-col p-0 md:p-3 overscroll-contain animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700/80 rounded-none md:rounded-3xl w-full h-full flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
             
             {/* Top Modal Header */}
@@ -1331,7 +1337,8 @@ export function MigrationDiffClient() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
