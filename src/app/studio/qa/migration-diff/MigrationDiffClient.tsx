@@ -375,18 +375,18 @@ export function MigrationDiffClient() {
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950/90 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800 tracking-wider">
               <tr>
-                <th className="py-3.5 px-4">Email Khách Hàng / Domain</th>
-                <th className="py-3.5 px-4">Giao Diện Mẫu</th>
-                <th className="py-3.5 px-4">Độ Khớp Dữ Liệu</th>
-                <th className="py-3.5 px-4">Trạng Thái QC</th>
-                <th className="py-3.5 px-4">Số Trang & Lỗi / Cảnh Báo</th>
-                <th className="py-3.5 px-4 text-right">Đối Soát Chi Tiết</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Email Khách Hàng / Domain</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Giao Diện Mẫu</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Độ Khớp Dữ Liệu</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Trạng Thái QC</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Số Trang & Lỗi / Cảnh Báo</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Đối Soát Chi Tiết</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {paginatedStores.map((store) => (
                 <tr key={store.id} className="hover:bg-slate-800/40 transition">
-                  <td className="py-4 px-4 font-semibold text-white">
+                  <td className="py-4 px-4 font-semibold text-white whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-indigo-400 font-bold">{store.id}</span>
                       <span className="text-slate-600">—</span>
@@ -397,11 +397,11 @@ export function MigrationDiffClient() {
                       <span>{store.domain}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap">
                     <span className="font-bold text-slate-200">{store.templateCode}</span>
                     <div className="text-[11px] text-slate-400">{store.templateName}</div>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-2.5">
                       <span className="font-bold text-white font-mono text-sm">{store.score}</span>
                       <div className="w-20 h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -421,26 +421,26 @@ export function MigrationDiffClient() {
                       Văn Bản: {store.textScore} | Hình Ảnh: {store.mediaScore} | Bố Cục: {store.blockScore}
                     </div>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap">
                     {store.status === "passed" && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 whitespace-nowrap">
                         <CheckCircle2 className="size-3.5" /> Khớp Chuẩn
                       </span>
                     )}
                     {store.status === "warning" && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40 whitespace-nowrap">
                         <AlertTriangle className="size-3.5" /> Cần Xem Lại
                       </span>
                     )}
                     {store.status === "failed" && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-950/80 text-rose-300 border border-rose-500/40">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-950/80 text-rose-300 border border-rose-500/40 whitespace-nowrap">
                         <AlertOctagon className="size-3.5" /> Lỗi P0 Blocker
                       </span>
                     )}
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                      <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded whitespace-nowrap">
                         {store.pageCount} Trang
                       </span>
                       {store.failedBlocks.length > 0 ? (
@@ -448,7 +448,7 @@ export function MigrationDiffClient() {
                           {store.failedBlocks.map((fb, idx) => (
                             <span
                               key={idx}
-                              className={`text-[10px] px-2 py-0.5 rounded-md font-mono border ${
+                              className={`text-[10px] px-2 py-0.5 rounded-md font-mono border whitespace-nowrap ${
                                 store.status === "failed"
                                   ? "bg-rose-950/50 text-rose-300 border-rose-500/30"
                                   : "bg-amber-950/50 text-amber-300 border-amber-500/30"
@@ -459,13 +459,13 @@ export function MigrationDiffClient() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                        <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 whitespace-nowrap">
                           <CheckCircle2 className="size-3.5" /> Khớp 100%
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-right">
+                  <td className="py-4 px-4 text-right whitespace-nowrap">
                     <button
                       onClick={() => {
                         setActiveStoreId(store.id);
@@ -473,7 +473,7 @@ export function MigrationDiffClient() {
                         setSelectedBlockId(null);
                         setActiveViewTab("visual_stream");
                       }}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/30 hover:scale-105"
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/30 hover:scale-105 whitespace-nowrap"
                     >
                       So Sánh ➔
                     </button>
