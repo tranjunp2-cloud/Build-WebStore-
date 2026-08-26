@@ -483,6 +483,80 @@ function RichVisualBlockRenderer({
   );
 }
 
+/**
+ * Split Swipe Slider comparison with smooth CSS clip-path overlay
+ */
+function SwipeSliderBlockRenderer({
+  block,
+  deviceView,
+  sliderPosition,
+}: {
+  block: PageBlockItem;
+  deviceView: "desktop" | "mobile";
+  sliderPosition: number;
+}) {
+  const isMobile = deviceView === "mobile";
+  const [localPos, setLocalPos] = useState(sliderPosition);
+
+  useEffect(() => {
+    setLocalPos(sliderPosition);
+  }, [sliderPosition]);
+
+  return (
+    <div className={`space-y-2.5 ${isMobile ? "max-w-[390px] mx-auto" : ""}`}>
+      {/* Slider Header Control */}
+      <div className="flex items-center justify-between text-xs px-1 select-none">
+        <span className="font-mono text-amber-400 font-bold flex items-center gap-1">
+          <span>👈 Bản Gốc PW1 ({100 - localPos}%)</span>
+        </span>
+        <span className="font-mono text-sky-400 font-bold flex items-center gap-1">
+          <span>👉 Bản Mới PW2 ({localPos}%)</span>
+        </span>
+      </div>
+
+      {/* Interactive Range Input */}
+      <div className="px-1">
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={localPos}
+          onChange={(e) => setLocalPos(Number(e.target.value))}
+          className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-ew-resize accent-blue-500"
+        />
+      </div>
+
+      {/* Clipped Overlaid Containers */}
+      <div className="relative rounded-2xl overflow-hidden border border-slate-700/80 bg-slate-950 shadow-2xl min-h-[140px]">
+        {/* Underlay Layer: PW1 */}
+        <div className="w-full">
+          <RichVisualBlockRenderer block={block} version="pw1" deviceView={deviceView} />
+        </div>
+
+        {/* Overlay Layer: PW2 Clipped via CSS */}
+        <div
+          className="absolute inset-0 overflow-hidden"
+          style={{
+            clipPath: `polygon(${localPos}% 0, 100% 0, 100% 100%, ${localPos}% 100%)`,
+          }}
+        >
+          <RichVisualBlockRenderer block={block} version="pw2" deviceView={deviceView} />
+        </div>
+
+        {/* Draggable Vertical Splitter Line */}
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_12px_rgba(255,255,255,0.8)] pointer-events-none z-20"
+          style={{ left: `${localPos}%` }}
+        >
+          <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-7 bg-white text-slate-950 rounded-full shadow-xl flex items-center justify-center text-[10px] font-bold border-2 border-blue-600 cursor-ew-resize pointer-events-auto">
+            ↔
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MigrationDiffClient() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -495,27 +569,27 @@ export function MigrationDiffClient() {
   // Overview Table Filters
   const [filterStatus, setFilterStatus] = useState<"all" | "passed" | "warning" | "failed">("all");
   const [filterTemplate, setFilterTemplate] = useState<string>("all");
-  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
-  const templateDropdownRef = React.useRef<HTMLDivElement>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 15;
-
-  // View Device State (Desktop vs Mobile 375px)
-  const [deviceView, setDeviceView] = useState<"desktop" | "mobile">("desktop");
-
   const selectedTemplateObj = useMemo(() => {
     if (filterTemplate === "all") return null;
     return CANONICAL_TEMPLATES.find((t) => t.code === filterTemplate) || null;
   }, [filterTemplate]);
+  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
+  const templateDropdownRef = React.useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
+  const [deviceView, setDeviceView] = useState<"desktop" | "mobile">("desktop");
+  const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
+  const deviceDropdownRef = React.useRef<HTMLDivElement>(null);
 
+  // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        templateDropdownRef.current &&
-        !templateDropdownRef.current.contains(event.target as Node)
-      ) {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(event.target as Node)) {
         setIsTemplateDropdownOpen(false);
+      }
+      if (deviceDropdownRef.current && !deviceDropdownRef.current.contains(event.target as Node)) {
+        setIsDeviceDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -529,6 +603,8 @@ export function MigrationDiffClient() {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
+  const [parityMode, setParityMode] = useState<"dual_window" | "swipe_slider">("dual_window");
+  const [sliderPosition, setSliderPosition] = useState<number>(50);
   const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit">("visual_stream");
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const [activeEntityGroup, setActiveEntityGroup] = useState<"all" | EntityGroupType>("all");
@@ -1356,7 +1432,50 @@ export function MigrationDiffClient() {
                 <div className="flex-1 flex flex-col min-h-0 bg-slate-900/30">
                   
                   {/* Fixed Browser Dual Windows Header - Fixed Top Bar With Zero Gap */}
-                  <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800/80 bg-slate-950 shrink-0 shadow-md">
+                  <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800/80 bg-slate-950 shrink-0 shadow-md space-y-2.5">
+                    {/* Parity View Sub-Mode Switcher: Side-by-Side Dual vs Split Swipe Slider */}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setParityMode("dual_window")}
+                          className={`px-3 py-1 font-semibold rounded-lg transition ${
+                            parityMode === "dual_window"
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          📑 Song Song (Dual View)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setParityMode("swipe_slider")}
+                          className={`px-3 py-1 font-semibold rounded-lg transition ${
+                            parityMode === "swipe_slider"
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          ↔️ Kéo Trượt (Swipe Slider)
+                        </button>
+                      </div>
+
+                      {parityMode === "swipe_slider" && (
+                        <div className="flex items-center gap-2 text-xs font-mono bg-slate-900/80 px-3 py-1 rounded-xl border border-slate-800 text-slate-300">
+                          <span>Vị trí trượt:</span>
+                          <span className="font-bold text-sky-400">{sliderPosition}%</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={sliderPosition}
+                            onChange={(e) => setSliderPosition(Number(e.target.value))}
+                            className="w-24 h-1 bg-slate-800 rounded-lg appearance-none cursor-ew-resize accent-blue-500 ml-1"
+                          />
+                        </div>
+                      )}
+                    </div>
+
                     <div className={`grid gap-6 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2 gap-4"}`}>
                       {/* Left Browser Bar */}
                       <div className={`bg-slate-900/90 px-4 py-2.5 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-sm ${deviceView === "mobile" ? "max-w-[375px] mx-auto w-full" : ""}`}>
@@ -1485,8 +1604,15 @@ export function MigrationDiffClient() {
                             </div>
                           </div>
 
-                          {/* Dual Column Content Preview - Switches between Desktop & Mobile Frame */}
-                          {deviceView === "mobile" ? (
+                          {/* Dual Column Content Preview - Switches between Desktop, Mobile & Swipe Slider */}
+                          {parityMode === "swipe_slider" ? (
+                            /* Split Swipe Slider Mode (0% to 100%) */
+                            <SwipeSliderBlockRenderer
+                              block={block}
+                              deviceView={deviceView}
+                              sliderPosition={sliderPosition}
+                            />
+                          ) : deviceView === "mobile" ? (
                             /* Mobile Phone Mockup View (375px) */
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-2">
                               {/* PW1 Phone Mockup */}
