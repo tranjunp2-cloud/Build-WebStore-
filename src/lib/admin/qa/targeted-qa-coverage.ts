@@ -60,7 +60,7 @@ type TargetQaProfileContract = {
   testCases: readonly { id: string }[];
 };
 
-const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[] = [
+const BASE_CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[] = [
   {
     targetId: "identity-login-otp",
     packId: "identity-login-otp-contract",
@@ -937,6 +937,17 @@ const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[]
     approvalRef: "F40-08 QA approved test contract",
     stagedProofRef: "F40-08 catalog-v1",
   },
+];
+
+const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[] = [
+  ...BASE_CERTIFIED_PACKS,
+  ...BASE_CERTIFIED_PACKS.filter((p) => p.profile === "smoke").map((p) => ({
+    ...p,
+    profile: "regression" as const,
+    estimatedDurationMinutes: Math.min(30, p.estimatedDurationMinutes * 2),
+    approvalRef: "F40-08 QA approved regression contract",
+    stagedProofRef: "F40-08 catalog-regression-v1",
+  })),
 ];
 
 function defaultState(coverage: string): QaCertificationState {

@@ -53,7 +53,7 @@ const TARGETED_SPEC_PREFIX = "tests/targeted-smoke/";
 const API_TEST_PREFIX = "src/__tests__/api/";
 const UNIT_TEST_PREFIX = "src/__tests__/unit/";
 
-export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = [
+const RAW_TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = [
   {
     targetId: "identity-login-otp",
     packId: "identity-login-otp-contract",
@@ -1630,6 +1630,23 @@ function isSafeSpecPath(value: string, runner: TargetedQaRunner): boolean {
     /^[A-Za-z0-9_./-]+$/.test(value)
   );
 }
+
+export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = RAW_TARGETED_SMOKE_PACKS.map((pack) => {
+  if (pack.manualProfiles?.smoke && !pack.manualProfiles.regression) {
+    return {
+      ...pack,
+      manualProfiles: {
+        ...pack.manualProfiles,
+        regression: {
+          ...pack.manualProfiles.smoke,
+          estimatedDurationMinutes: Math.min(30, pack.manualProfiles.smoke.estimatedDurationMinutes * 2),
+          prerequisites: [...pack.manualProfiles.smoke.prerequisites, "Regression test contract ready"],
+        },
+      },
+    };
+  }
+  return pack;
+});
 
 /** Fails closed before a registry entry can become an executable CI input. */
 export function validateTargetedSmokePacks(
