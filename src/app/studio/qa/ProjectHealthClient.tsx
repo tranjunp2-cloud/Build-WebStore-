@@ -2588,6 +2588,7 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
         >
           <ManualRunPanel
             openRequest={manualRunRequest}
+            onConsumeOpenRequest={() => setManualRunRequest(0)}
             externalOpenButton={manualRunTrigger}
             targets={initialData.targets.map((target) => ({
               id: target.targetId,

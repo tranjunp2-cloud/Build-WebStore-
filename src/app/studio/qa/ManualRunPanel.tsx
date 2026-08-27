@@ -152,10 +152,12 @@ function formatWhen(value?: string) {
 export function ManualRunPanel({
   targets,
   openRequest = 0,
+  onConsumeOpenRequest,
   externalOpenButton,
 }: {
   targets: Target[];
   openRequest?: number;
+  onConsumeOpenRequest?: () => void;
   externalOpenButton?: RefObject<HTMLButtonElement | null>;
 }) {
   const [targetId, setTargetId] = useState("");
@@ -339,7 +341,8 @@ export function ManualRunPanel({
     setPreflight(undefined);
     setConfirmationKey(undefined);
     setDialogOpen(true);
-  }, [openRequest, targetId]);
+    onConsumeOpenRequest?.();
+  }, [openRequest, targetId, onConsumeOpenRequest]);
   useEffect(() => {
     if (!dialogOpen || !runTargetId) return;
     preflightRequestSequence.current += 1;
