@@ -89,4 +89,34 @@ describe("[TC-F40-08-04] Manual preflight coverage gate", () => {
     expect(preflight.pack).toBeUndefined();
     expect(payload.find).toHaveBeenCalledTimes(2);
   });
+
+  it("successfully resolves context and enables dispatch when qa_test_runs is empty in DB", async () => {
+    // Arrange: Simulate brand new staging deployment where qa_test_runs has 0 records
+    const payload = {
+      find: vi
+        .fn()
+        .mockResolvedValueOnce({
+          docs: [], // No prior test runs found
+        })
+        .mockResolvedValueOnce({
+          docs: [], // No active fixture lease conflicts
+        }),
+    } as unknown as Payload;
+
+    // Act: Request preflight with valid target and profile
+    const preflight = await getManualRunPreflight(payload, {
+      targetId: "identity-login-otp",
+      profile: "smoke",
+      context: { pullRequest: 1785, commitSha: "a1b2c3d4e5f6" },
+    });
+
+    // Assert: Preflight must succeed without STAGING_CONTEXT_UNAVAILABLE error
+    expect(preflight.canDispatch).toBe(true);
+    expect(preflight.reasons).toEqual([]);
+    expect(preflight.context).toEqual({
+      pullRequest: 1785,
+      commitSha: "a1b2c3d4e5f6",
+    });
+    expect(preflight.pack?.id).toBe("identity-login-otp-contract");
+  });
 });
