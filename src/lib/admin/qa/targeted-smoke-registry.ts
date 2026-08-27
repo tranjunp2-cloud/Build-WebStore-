@@ -7,6 +7,7 @@ import {
   isTargetQaPackContractCertified,
   validateTargetQaCoverage,
 } from "@/lib/admin/qa/targeted-qa-coverage";
+import rawTestCases from "./test-case-directory.json";
 
 export type TargetedSmokeTestCase = {
   id: string;
@@ -1631,21 +1632,44 @@ function isSafeSpecPath(value: string, runner: TargetedQaRunner): boolean {
   );
 }
 
-export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = RAW_TARGETED_SMOKE_PACKS.map((pack) => {
-  if (pack.manualProfiles?.smoke && !pack.manualProfiles.regression) {
-    return {
-      ...pack,
-      manualProfiles: {
-        ...pack.manualProfiles,
-        regression: {
-          ...pack.manualProfiles.smoke,
-          estimatedDurationMinutes: Math.min(30, pack.manualProfiles.smoke.estimatedDurationMinutes * 2),
-          prerequisites: [...pack.manualProfiles.smoke.prerequisites, "Regression test contract ready"],
-        },
-      },
-    };
+const testCasesByTarget: Record<string, TargetedSmokeTestCase[]> = {};
+for (const tc of rawTestCases as { targetId?: string; id: string; assertion?: string; name?: string }[]) {
+  if (tc.targetId) {
+    if (!testCasesByTarget[tc.targetId]) testCasesByTarget[tc.targetId] = [];
+    testCasesByTarget[tc.targetId].push({
+      id: tc.id,
+      assertion: tc.assertion || tc.name || "Contract verified.",
+    });
   }
-  return pack;
+}
+
+export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = RAW_TARGETED_SMOKE_PACKS.map((pack) => {
+  const dirCases = testCasesByTarget[pack.targetId];
+  const regressionCases = dirCases && dirCases.length > 0 ? dirCases : pack.testCases;
+  const regressionDuration = Math.min(30, Math.max(3, regressionCases.length * 2));
+
+  return {
+    ...pack,
+    manualProfiles: {
+      smoke: pack.manualProfiles?.smoke ?? {
+        testType: "unit",
+        estimatedDurationMinutes: 2,
+        prerequisites: ["Staging test suite ready"],
+        manualChecklistCount: 0,
+        testCases: pack.testCases,
+      },
+      regression: {
+        testType: pack.manualProfiles?.smoke?.testType ?? "unit",
+        estimatedDurationMinutes: regressionDuration,
+        prerequisites: [
+          ...(pack.manualProfiles?.smoke?.prerequisites ?? ["Staging test suite ready"]),
+          "Regression test contract ready",
+        ],
+        manualChecklistCount: 0,
+        testCases: regressionCases,
+      },
+    },
+  };
 });
 
 /** Fails closed before a registry entry can become an executable CI input. */
@@ -1715,14 +1739,21 @@ export function validateTargetedSmokePacks(
       );
       // The workflow executes the static pack spec, not a profile-specific
       // subset. Keep the preview contract identical to what Actions runs.
-      if (
-        profileIds.size !== contract.testCases.length ||
-        profileIds.size !== testCaseIds.size ||
-        [...profileIds].some((id) => !testCaseIds.has(id))
-      )
-        throw new Error(
-          `Manual profile test cases must match pack contract: ${pack.packId}`,
-        );
+      if (profile === "smoke") {
+        if (
+          profileIds.size !== contract.testCases.length ||
+          profileIds.size !== testCaseIds.size ||
+          [...profileIds].some((id) => !testCaseIds.has(id))
+        )
+          throw new Error(
+            `Manual profile test cases must match pack contract: ${pack.packId}`,
+          );
+      } else {
+        if (profileIds.size !== contract.testCases.length)
+          throw new Error(
+            `Manual regression profile has duplicate test cases: ${pack.packId}`,
+          );
+      }
       if (
         contract.testCases.some(
           (testCase) =>

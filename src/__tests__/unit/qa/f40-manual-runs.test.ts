@@ -26,7 +26,8 @@ describe("[TC-F40-07-01] Manual targeted pack contract", () => {
     ]);
     expect(regression?.pack.packId).toBe("editor-product-grid-variants-smoke");
     expect(regression?.profile.testCases.map((testCase) => testCase.id)).toEqual([
-      "TC-F40-04-02",
+      "TC-VIS-14.01",
+      "TC-VIS-14.02",
     ]);
     expect(
       getManualQaProfileAvailability("editor-productgrid-variants"),
