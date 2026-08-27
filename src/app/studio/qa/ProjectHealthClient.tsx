@@ -151,9 +151,11 @@ function formatDate(value?: string) {
 function FeatureHealthDetail({
   detail,
   onClose,
+  onNavigateToRuns,
 }: {
   detail: QaFeatureDetail;
   onClose: () => void;
+  onNavigateToRuns?: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -590,8 +592,24 @@ function FeatureHealthDetail({
           )}
 
           {retestStatus && (
-            <div role="status" className="rounded-lg bg-blue-50 dark:bg-blue-950/60 p-3 text-xs font-semibold text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-              {retestStatus}
+            <div
+              role="status"
+              className="mt-3 flex flex-col gap-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 p-4 text-xs text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 shadow-sm"
+            >
+              <div className="flex items-center gap-2 font-bold">
+                <span className="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[11px]">✓</span>
+                <span>{retestStatus}</span>
+              </div>
+              {onNavigateToRuns && (
+                <button
+                  type="button"
+                  onClick={onNavigateToRuns}
+                  className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow transition-all active:scale-95"
+                >
+                  <span>⏱️ Xem kết quả chi tiết trong Lịch sử chạy</span>
+                  <span>→</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -2648,7 +2666,14 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
         </section>
       )}
       {selected && (
-        <FeatureHealthDetail detail={selected} onClose={closeDetail} />
+        <FeatureHealthDetail
+          detail={selected}
+          onClose={closeDetail}
+          onNavigateToRuns={() => {
+            closeDetail();
+            setActiveTab("runs");
+          }}
+        />
       )}
       {selectedFinding && (
         <FindingReviewDialog
