@@ -1900,89 +1900,98 @@ export function MigrationDiffClient() {
 
                 {/* Iframe Viewport Stream Area */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0 bg-slate-900/40">
-                  {deviceView === "mobile" ? (
-                    /* Mobile 375px Dual Phone Mockups with Real Iframes */
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-4">
-                      {/* PW1 Phone Shell */}
-                      <div className="w-full max-w-[390px] mx-auto bg-slate-950 border-4 border-amber-500/40 rounded-[3rem] p-3 shadow-2xl space-y-2 ring-1 ring-amber-500/20 flex flex-col items-center">
-                        {/* Dynamic Island / Speaker */}
-                        <div className="w-24 h-4 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner my-1">
-                          <div className="size-1.5 rounded-full bg-slate-700" />
-                          <div className="w-8 h-1 rounded-full bg-slate-800" />
-                        </div>
-                        {/* Iframe Container */}
-                        <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
-                          <iframe
-                            key={`pw1-mob-${iframeReloadKey}`}
-                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
-                            title="PW1 Mobile Storefront"
-                            className="w-full h-full border-0"
-                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                          />
-                        </div>
-                        {/* Home Bar */}
-                        <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-1" />
-                      </div>
+                  {(() => {
+                    const pw1Url = selectedDiff.domain
+                      ? `https://${selectedDiff.domain}${activePage.path === "/" ? "" : activePage.path}`
+                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`;
+                    const pw2Url = selectedDiff.migratedDomain
+                      ? `${selectedDiff.migratedDomain}${activePage.path === "/" ? "" : activePage.path}`
+                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`;
 
-                      {/* PW2 Phone Shell */}
-                      <div className="w-full max-w-[390px] mx-auto bg-slate-950 border-4 border-sky-500/40 rounded-[3rem] p-3 shadow-2xl space-y-2 ring-1 ring-sky-500/20 flex flex-col items-center">
-                        {/* Dynamic Island / Speaker */}
-                        <div className="w-24 h-4 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner my-1">
-                          <div className="size-1.5 rounded-full bg-slate-700" />
-                          <div className="w-8 h-1 rounded-full bg-slate-800" />
+                    return deviceView === "mobile" ? (
+                      /* Mobile 375px Dual Phone Mockups with Real Iframes */
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-4">
+                        {/* PW1 Phone Shell */}
+                        <div className="w-full max-w-[390px] mx-auto bg-slate-950 border-4 border-amber-500/40 rounded-[3rem] p-3 shadow-2xl space-y-2 ring-1 ring-amber-500/20 flex flex-col items-center">
+                          {/* Dynamic Island / Speaker */}
+                          <div className="w-24 h-4 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner my-1">
+                            <div className="size-1.5 rounded-full bg-slate-700" />
+                            <div className="w-8 h-1 rounded-full bg-slate-800" />
+                          </div>
+                          {/* Iframe Container */}
+                          <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
+                            <iframe
+                              key={`pw1-mob-${iframeReloadKey}`}
+                              src={pw1Url}
+                              title="PW1 Mobile Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          </div>
+                          {/* Home Bar */}
+                          <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-1" />
                         </div>
-                        {/* Iframe Container */}
-                        <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
-                          <iframe
-                            key={`pw2-mob-${iframeReloadKey}`}
-                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
-                            title="PW2 Next.js Mobile Storefront"
-                            className="w-full h-full border-0"
-                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                          />
-                        </div>
-                        {/* Home Bar */}
-                        <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-1" />
-                      </div>
-                    </div>
-                  ) : (
-                    /* Desktop Dual 50/50 Iframes */
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[720px]">
-                      {/* Left PW1 Full Iframe */}
-                      <div className="bg-slate-950 rounded-2xl border-2 border-amber-500/30 overflow-hidden flex flex-col shadow-xl">
-                        <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-amber-400 font-mono flex items-center justify-between">
-                          <span>👈 PW1 LARAVEL (LIVE STOREFRONT 100%)</span>
-                          <span className="text-slate-400 font-normal">Desktop Resolution</span>
-                        </div>
-                        <div className="flex-1 bg-white relative">
-                          <iframe
-                            key={`pw1-desk-${iframeReloadKey}`}
-                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
-                            title="PW1 Desktop Storefront"
-                            className="w-full h-full border-0"
-                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                          />
-                        </div>
-                      </div>
 
-                      {/* Right PW2 Full Iframe */}
-                      <div className="bg-slate-950 rounded-2xl border-2 border-sky-500/30 overflow-hidden flex flex-col shadow-xl">
-                        <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-sky-400 font-mono flex items-center justify-between">
-                          <span>👉 PW2 NEXT.JS 15 (LIVE STOREFRONT 100%)</span>
-                          <span className="text-slate-400 font-normal">Desktop Resolution</span>
-                        </div>
-                        <div className="flex-1 bg-white relative">
-                          <iframe
-                            key={`pw2-desk-${iframeReloadKey}`}
-                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
-                            title="PW2 Next.js Desktop Storefront"
-                            className="w-full h-full border-0"
-                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                          />
+                        {/* PW2 Phone Shell */}
+                        <div className="w-full max-w-[390px] mx-auto bg-slate-950 border-4 border-sky-500/40 rounded-[3rem] p-3 shadow-2xl space-y-2 ring-1 ring-sky-500/20 flex flex-col items-center">
+                          {/* Dynamic Island / Speaker */}
+                          <div className="w-24 h-4 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner my-1">
+                            <div className="size-1.5 rounded-full bg-slate-700" />
+                            <div className="w-8 h-1 rounded-full bg-slate-800" />
+                          </div>
+                          {/* Iframe Container */}
+                          <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
+                            <iframe
+                              key={`pw2-mob-${iframeReloadKey}`}
+                              src={pw2Url}
+                              title="PW2 Next.js Mobile Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          </div>
+                          {/* Home Bar */}
+                          <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-1" />
                         </div>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      /* Desktop Dual 50/50 Iframes */
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[720px]">
+                        {/* Left PW1 Full Iframe */}
+                        <div className="bg-slate-950 rounded-2xl border-2 border-amber-500/30 overflow-hidden flex flex-col shadow-xl">
+                          <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-amber-400 font-mono flex items-center justify-between">
+                            <span>👈 PW1 LARAVEL (LIVE STOREFRONT 100%)</span>
+                            <span className="text-slate-400 font-normal">Desktop Resolution</span>
+                          </div>
+                          <div className="flex-1 bg-white relative">
+                            <iframe
+                              key={`pw1-desk-${iframeReloadKey}`}
+                              src={pw1Url}
+                              title="PW1 Desktop Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Right PW2 Full Iframe */}
+                        <div className="bg-slate-950 rounded-2xl border-2 border-sky-500/30 overflow-hidden flex flex-col shadow-xl">
+                          <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-sky-400 font-mono flex items-center justify-between">
+                            <span>👉 PW2 NEXT.JS 15 (LIVE STOREFRONT 100%)</span>
+                            <span className="text-slate-400 font-normal">Desktop Resolution</span>
+                          </div>
+                          <div className="flex-1 bg-white relative">
+                            <iframe
+                              key={`pw2-desk-${iframeReloadKey}`}
+                              src={pw2Url}
+                              title="PW2 Next.js Desktop Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ) : activeViewTab === "field_diff" ? (
