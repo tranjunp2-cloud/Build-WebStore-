@@ -824,6 +824,26 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     }
   }
 
+  // 9. Fetch Product Images
+  const prodIds = (products as any[]).map((p) => p.id);
+  let prodImages: any[] = [];
+  if (prodIds.length > 0) {
+    try {
+      prodImages = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
+        `SELECT product_id, url FROM product_images WHERE product_id IN (?) AND deleted_at IS NULL ORDER BY product_id, \`order\` ASC;`,
+        [prodIds],
+      );
+    } catch {
+      // ignore
+    }
+  }
+  const prodImgMap = new Map<number, string>();
+  for (const img of prodImages) {
+    if (!prodImgMap.has(img.product_id)) {
+      prodImgMap.set(img.product_id, img.url);
+    }
+  }
+
   // Dynamically generate pages from MySQL `pages` table
   let dynamicPages: any[] = [];
 
@@ -857,6 +877,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           let subheadline = `Khối ${c.label || c.fc_label}`;
           let bodyText = `Cấu hình component: ${c.tag_name || c.fc_name}`;
           let productCount: number | undefined = undefined;
+          let imageUrl: string | undefined = undefined;
+          let buttonText: string | undefined = undefined;
 
           if (fcName.includes("banner") || fcName.includes("hero")) {
             blockType = "hero";
@@ -865,7 +887,9 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             const compBanner = (banners as any[]).find((b) => b.page_component_id === c.id) || banners[0];
             let bannerH = store.name;
             let bannerSub = store.description || "Giao diện banner trang chủ";
+            let btnText = "Button";
             if (compBanner) {
+              imageUrl = compBanner.image || undefined;
               if (compBanner.header && typeof compBanner.header === "object" && compBanner.header.text) {
                 bannerH = compBanner.header.text;
               } else if (typeof compBanner.header === "string" && compBanner.header.trim()) {
@@ -879,28 +903,35 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
               } else if (typeof compBanner.subheader === "string" && compBanner.subheader.trim()) {
                 bannerSub = compBanner.subheader;
               }
+
+              if (compBanner.button && typeof compBanner.button === "object" && compBanner.button.text) {
+                btnText = compBanner.button.text;
+              } else if (typeof compBanner.button === "string" && compBanner.button.trim()) {
+                btnText = compBanner.button;
+              }
             }
             headline = bannerH;
             subheadline = bannerSub;
+            buttonText = btnText;
             bodyText = `Hotline: ${Array.isArray(store.hotline) ? store.hotline.join(", ") : store.hotline || "1900 8888"}`;
           } else if (fcName.includes("product")) {
             blockType = "products";
             pw2Block = "products_grid";
             title = `Khối Sản Phẩm: ${c.label || "Danh Sách Sản Phẩm"} (${products.length} SP)`;
-            headline = "Sản Phẩm Cửa Hàng";
+            headline = c.label || "Danh Sách Sản Phẩm";
             productCount = products.length;
             bodyText = products.slice(0, 3).map((pr: any) => pr.name).join(" • ") || "Chưa có sản phẩm";
           } else if (fcName.includes("category")) {
             blockType = "categories";
             pw2Block = "categories";
             title = `Khối Danh Mục: ${c.label || "Danh Mục Hàng Hóa"} (${categories.length} DM)`;
-            headline = "Danh Mục Sản Phẩm";
+            headline = c.label || "Danh Mục Sản Phẩm";
             bodyText = categories.slice(0, 4).map((cat: any) => cat.name).join(" • ") || "Chưa có danh mục";
           } else if (fcName.includes("article") || fcName.includes("blog")) {
             blockType = "blog";
             pw2Block = "posts";
-            title = `Khối Bài Viết: ${c.label || "Tin Tức & Blog"} (${posts.length} Bài)`;
-            headline = "Bài Viết & Cẩm Nang";
+            title = `Khối Bài Viết: ${c.label || "Our articles"} (${posts.length} Bài)`;
+            headline = c.label || "Our articles";
             bodyText = posts.slice(0, 3).map((pst: any) => pst.title).join(" • ") || "Chưa có bài viết";
           } else if (fcName.includes("rich_text") || fcName.includes("text")) {
             blockType = "text";
@@ -909,6 +940,24 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             headline = c.label || p.name;
             bodyText = `Văn bản nội dung trang ${p.name}`;
           }
+
+          const articleItems = (posts as any[]).slice(0, 3).map((pst) => ({
+            id: pst.id,
+            title: pst.title || pst.name || "Bài Viết",
+            image: pst.image || undefined,
+            summary: pst.summary || pst.content?.replace(/<[^>]+>/g, "").slice(0, 140) || "Nội dung bài viết...",
+            date: pst.created_at ? new Date(pst.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "19 May 2022",
+            slug: pst.slug || "",
+          }));
+
+          const productCards = (products as any[]).slice(0, 4).map((pr) => ({
+            id: pr.id,
+            name: pr.name,
+            price: pr.price ? (typeof pr.price === "number" ? `$${pr.price.toFixed(2)}` : `${pr.price}`) : "$0.00",
+            sku: pr.sku || "SKU-001",
+            image: prodImgMap.get(pr.id) || undefined,
+            category: pr.category_name || "Mặc định",
+          }));
 
           return {
             id: `blk-${c.id}`,
@@ -922,6 +971,10 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
               subheadline,
               bodyText,
               productCount,
+              imageUrl,
+              buttonText,
+              articleItems,
+              productCards,
               badgeText: c.label || undefined,
             },
             pw2Preview: {
@@ -929,6 +982,10 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
               subheadline,
               bodyText,
               productCount,
+              imageUrl,
+              buttonText,
+              articleItems,
+              productCards,
               badgeText: c.label || undefined,
             },
             status: "pass" as const,

@@ -152,6 +152,24 @@ export interface PageBlockItem {
     hasTable?: boolean;
     productCount?: number;
     badgeText?: string;
+    imageUrl?: string;
+    buttonText?: string;
+    articleItems?: Array<{
+      id?: number | string;
+      title: string;
+      image?: string;
+      summary?: string;
+      date?: string;
+      slug?: string;
+    }>;
+    productCards?: Array<{
+      id?: number | string;
+      name: string;
+      price: string;
+      sku: string;
+      image?: string;
+      category?: string;
+    }>;
   };
   pw2Preview: {
     headline?: string;
@@ -161,6 +179,24 @@ export interface PageBlockItem {
     hasTable?: boolean;
     productCount?: number;
     badgeText?: string;
+    imageUrl?: string;
+    buttonText?: string;
+    articleItems?: Array<{
+      id?: number | string;
+      title: string;
+      image?: string;
+      summary?: string;
+      date?: string;
+      slug?: string;
+    }>;
+    productCards?: Array<{
+      id?: number | string;
+      name: string;
+      price: string;
+      sku: string;
+      image?: string;
+      category?: string;
+    }>;
   };
   status: "pass" | "warn" | "fail";
   discrepancyNote?: string;

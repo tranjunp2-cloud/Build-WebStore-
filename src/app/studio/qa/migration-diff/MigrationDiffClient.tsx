@@ -103,68 +103,152 @@ function RichVisualBlockRenderer({
   ) {
     return (
       <div
-        className={`w-full rounded-2xl overflow-hidden border ${
+        className={`w-full rounded-2xl overflow-hidden border relative ${
           isPW1
-            ? "border-amber-500/30 bg-gradient-to-br from-amber-950/40 via-slate-950 to-slate-900"
+            ? "border-amber-500/30"
             : isFail
-            ? "border-rose-500/40 bg-gradient-to-br from-rose-950/40 via-slate-950 to-slate-900"
-            : "border-sky-500/30 bg-gradient-to-br from-sky-950/40 via-slate-950 to-slate-900"
-        } p-4 sm:p-5 space-y-3 relative`}
+            ? "border-rose-500/40"
+            : "border-sky-500/30"
+        } min-h-[200px] flex flex-col justify-between p-5 bg-cover bg-center shadow-lg transition`}
+        style={{
+          backgroundImage: preview.imageUrl
+            ? `linear-gradient(to right, rgba(10, 15, 30, 0.82) 0%, rgba(10, 15, 30, 0.45) 55%, rgba(10, 15, 30, 0.75) 100%), url(${preview.imageUrl})`
+            : "linear-gradient(to bottom right, #0f172a, #020617)",
+        }}
       >
-        <div className="flex items-center justify-between">
+        {/* Top bar info */}
+        <div className="flex items-center justify-between z-10">
           <span
-            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border backdrop-blur-md ${
               isPW1
-                ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                : "bg-sky-500/20 text-sky-300 border-sky-500/30"
+                ? "bg-amber-500/30 text-amber-200 border-amber-500/40"
+                : "bg-sky-500/30 text-sky-200 border-sky-500/40"
             }`}
           >
             <Sparkles className="size-3" /> {preview.badgeText || "BANNER CHÍNH"}
           </span>
-          <span className="text-[10px] font-mono text-slate-400">
+          <span className="text-[10px] font-mono text-slate-300 bg-black/60 px-2 py-0.5 rounded border border-white/10 backdrop-blur-md">
             {isPW1 ? `PW1: ${block.pw1Component}` : `PW2: ${block.pw2Block}`}
           </span>
         </div>
 
-        <div className="space-y-1">
-          <h5
-            className={`font-bold text-white leading-tight ${
-              isMobile ? "text-xs" : "text-sm sm:text-base"
+        {/* Content in center */}
+        <div className="space-y-1.5 max-w-md py-3 z-10">
+          <h4
+            className={`font-serif font-bold text-white tracking-wide leading-tight ${
+              isMobile ? "text-sm" : "text-lg sm:text-xl"
             }`}
           >
             {preview.headline || block.title}
-          </h5>
-          <p
-            className={`text-slate-300 leading-relaxed line-clamp-2 ${
-              isMobile ? "text-[11px]" : "text-xs"
-            }`}
-          >
-            {preview.subheadline || preview.bodyText || "Khối banner đầu trang của website"}
-          </p>
+          </h4>
+          {preview.subheadline && (
+            <p className="text-slate-200 text-xs font-sans tracking-wide uppercase">
+              {preview.subheadline}
+            </p>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 pt-1">
-          <button
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition ${
-              isPW1
-                ? "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20"
-                : "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20"
-            }`}
-          >
-            <span>Xem Chi Tiết</span>
-            <ArrowRight className="size-3" />
+        {/* Bottom Controls / Button */}
+        <div className="flex items-center justify-between z-10 pt-2 border-t border-white/10">
+          <button className="px-3.5 py-1.5 rounded bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5">
+            <span>{preview.buttonText || "Button"}</span>
           </button>
-          {preview.bodyText && (
-            <span className="text-[11px] text-slate-400 font-medium px-2 py-1 bg-slate-900/60 rounded-lg border border-slate-800 truncate max-w-xs">
-              {preview.bodyText}
+          <div className="flex items-center gap-1 text-slate-300">
+            <span className="size-6 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-xs hover:bg-black/80 cursor-pointer">
+              ‹
             </span>
-          )}
+            <span className="size-6 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-xs hover:bg-black/80 cursor-pointer">
+              ›
+            </span>
+          </div>
         </div>
       </div>
     );
   }
 
-  // 2. PRODUCT GRID / VARIANTS BLOCK
+  // 2. BLOG / ARTICLES LISTING BLOCK
+  if (
+    blockType === "blog" ||
+    titleLower.includes("bài viết") ||
+    titleLower.includes("blog") ||
+    titleLower.includes("article") ||
+    titleLower.includes("tin tức")
+  ) {
+    const articles = preview.articleItems && preview.articleItems.length > 0
+      ? preview.articleItems
+      : [
+          {
+            id: 1,
+            title: "11 Things the Media Hasn't Told You About Art 1",
+            date: "19 May 2022",
+            summary: "The weather started getting rough - the tiny ship was tossed.",
+            image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t010-6-1/blogs/blog-1.jpg"
+          },
+          {
+            id: 2,
+            title: "Don't Fall Prey to These Common Art Scams",
+            date: "19 May 2022",
+            summary: "Lorem ipsum dolor sit amet, eum eu labitur consetetur, ei paulo.",
+            image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t010-6-1/blogs/blog-2.jpg"
+          },
+          {
+            id: 3,
+            title: "Apple iPhone 16 Review: A Good Update… For Some",
+            date: "25 Feb 2025",
+            summary: "Apple iPhone 16 Review: A Good Update… For Some",
+            image: "https://tm-prime-web-dev.sgp1.digitaloceanspaces.com/tm-primeweb-dev/img/2025/5Vta1gxfTdexfoD2VJG9ahU_MpOaurhyXHpu6U44oFU.webp"
+          }
+        ];
+
+    return (
+      <div className="space-y-3">
+        <div className="text-center py-1">
+          <h3 className="font-serif font-bold text-white text-base sm:text-lg">
+            {preview.headline || "Our articles"}
+          </h3>
+        </div>
+
+        <div className={`grid gap-3 ${isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-3"}`}>
+          {articles.map((art: any, aIdx: number) => (
+            <div
+              key={aIdx}
+              className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden flex flex-col justify-between shadow-md group hover:border-slate-700 transition"
+            >
+              {art.image ? (
+                <div
+                  className="w-full h-28 bg-cover bg-center border-b border-slate-800"
+                  style={{ backgroundImage: `url(${art.image})` }}
+                />
+              ) : (
+                <div className="w-full h-28 bg-slate-800 flex items-center justify-center text-slate-500">
+                  <Newspaper className="size-6 text-slate-600" />
+                </div>
+              )}
+              <div className="p-3 space-y-1.5 flex-1 flex flex-col justify-between">
+                <div className="space-y-1">
+                  <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                    <Calendar className="size-3 text-slate-500" />
+                    <span>{art.date || "19 May 2022"}</span>
+                  </div>
+                  <h5 className="font-serif font-bold text-white text-xs leading-snug line-clamp-2">
+                    {art.title}
+                  </h5>
+                  <p className="text-slate-400 text-[10px] line-clamp-2 leading-relaxed">
+                    {art.summary}
+                  </p>
+                </div>
+                <div className="pt-2 text-[10px] font-semibold text-sky-400 flex items-center gap-1 group-hover:underline">
+                  <span>Read more</span> <ArrowRight className="size-2.5" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. PRODUCT GRID / VARIANTS BLOCK
   if (
     blockType === "products" ||
     blockType === "variants" ||
@@ -172,25 +256,56 @@ function RichVisualBlockRenderer({
     titleLower.includes("product") ||
     titleLower.includes("lưới")
   ) {
+    const pCards = preview.productCards && preview.productCards.length > 0
+      ? preview.productCards
+      : [
+          { id: 1, name: "Spring Leaf girls round neck sleeveless tops", price: "$16.52", sku: "A001", image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t006/2017/06/mg5076thumb.jpg" },
+          { id: 2, name: "BabyGap plain T-shirt", price: "$36.71", sku: "A003", image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t006/2017/06/mg5038thumb.jpg" },
+          { id: 3, name: "Boys shirt with Kangnam print", price: "$40.38", sku: "A004", image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t006/2017/06/mg5082thumb.jpg" }
+        ];
+
     return (
       <div className="space-y-2.5">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-          <div className="font-bold text-white text-xs flex items-center gap-1.5">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5 font-serif">
             <Package className="size-3.5 text-blue-400" />
-            <span>{preview.headline || block.title}</span>
+            <span>{preview.headline || "Featured Products"}</span>
           </div>
           <span className="text-[10px] text-slate-400 font-mono">
-            {preview.productCount !== undefined ? `${preview.productCount} Sản Phẩm` : "Danh Sách SP"}
+            {preview.productCount !== undefined ? `${preview.productCount} Sản Phẩm` : `${pCards.length} Sản Phẩm`}
           </span>
         </div>
 
-        <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300 space-y-1.5">
-          <div className="font-semibold text-white flex items-center gap-1.5">
-            <span>📦 Dữ liệu sản phẩm CSDL MySQL:</span>
-          </div>
-          <p className="text-slate-400 text-[11px] leading-relaxed">
-            {preview.bodyText || "Các sản phẩm đang được hiển thị trong danh mục của cửa hàng."}
-          </p>
+        <div className={`grid gap-2.5 ${isMobile ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
+          {pCards.slice(0, 3).map((prod: any, pIdx: number) => (
+            <div
+              key={pIdx}
+              className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between shadow-sm hover:border-slate-700 transition"
+            >
+              <div
+                className="w-full aspect-square bg-slate-800/80 rounded-lg bg-cover bg-center relative overflow-hidden"
+                style={{ backgroundImage: prod.image ? `url(${prod.image})` : undefined }}
+              >
+                {!prod.image && (
+                  <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
+                    No Image
+                  </div>
+                )}
+                <span className="absolute top-1 left-1 text-[8px] font-bold bg-black/60 text-amber-300 border border-white/10 px-1 rounded backdrop-blur-sm">
+                  {prod.sku}
+                </span>
+              </div>
+              <div>
+                <div className="font-semibold text-white text-[11px] truncate" title={prod.name}>
+                  {prod.name}
+                </div>
+                <div className="font-bold text-sky-400 text-xs mt-0.5">{prod.price}</div>
+              </div>
+              <button className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold rounded-lg border border-slate-700 transition">
+                + Add To Cart
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     );
