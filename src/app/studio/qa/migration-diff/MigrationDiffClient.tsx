@@ -1729,6 +1729,30 @@ export function MigrationDiffClient() {
                               </div>
                             </div>
                           )}
+
+                          {/* Raw Field Data & Configuration Inspector for this Block */}
+                          <div className="mt-2 bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center justify-between">
+                              <span className="text-amber-400">📋 Dữ Liệu MySQL Của Khối #{block.order} ({block.pw1Component})</span>
+                              <span className="text-slate-500 font-normal">Trường dữ liệu người dùng nhập</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
+                              <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800/80">
+                                <span className="text-slate-500 block text-[10px]">Tiêu đề (Headline):</span>
+                                <span className="text-white font-bold">{block.pw1Preview?.headline || "Không có"}</span>
+                              </div>
+                              <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800/80">
+                                <span className="text-slate-500 block text-[10px]">Tiêu đề phụ / Mô tả:</span>
+                                <span className="text-slate-300">{block.pw1Preview?.subheadline || "Không có"}</span>
+                              </div>
+                            </div>
+                            {block.pw1Preview?.bodyText && (
+                              <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800/80 text-[11px] font-mono text-slate-300">
+                                <span className="text-slate-500 block text-[10px]">Nội dung chi tiết / Danh sách:</span>
+                                <span className="text-sky-300">{block.pw1Preview.bodyText}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
