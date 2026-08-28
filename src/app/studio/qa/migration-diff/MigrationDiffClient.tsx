@@ -1220,7 +1220,7 @@ export function MigrationDiffClient() {
                         setActiveStoreId(store.id);
                         setActivePageIndex(0);
                         setSelectedBlockId(null);
-                        setActiveViewTab("visual_stream");
+                        setActiveViewTab("field_diff");
                       }}
                       className="px-3.5 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-600 rounded-xl font-semibold text-xs transition-all shadow-sm flex items-center gap-1 ml-auto whitespace-nowrap"
                     >

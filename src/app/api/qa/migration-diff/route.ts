@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
         if (liveDiff) {
           return NextResponse.json({ data: liveDiff, isLive: true });
         }
-      } catch {
-        // Fallback to static deep diff generator
+      } catch (err: any) {
+        console.error(`[Live Diff Error] Failed for ${storeId}:`, err?.message || err);
       }
 
       const diff = getStoreDeepDiff(storeId);
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     const template = searchParams.get("template") || "all";
     const search = (searchParams.get("search") || "").toLowerCase().trim();
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "20", 10)));
+    const limit = Math.max(1, Math.min(3000, parseInt(searchParams.get("limit") || "20", 10)));
 
     // Attempt to load Live Stores from PW1 MySQL if available
     let allStores: any[] = [];
