@@ -320,27 +320,152 @@ function RichVisualBlockRenderer({
     titleLower.includes("sort")
   ) {
     return (
-      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+      <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
         <div className="flex items-center justify-between text-xs text-slate-300">
-          <div className="flex items-center gap-1.5 font-semibold">
+          <div className="flex items-center gap-1.5 font-semibold font-serif">
             <SlidersHorizontal className="size-3.5 text-blue-400" />
-            <span>Bộ Lọc & Sắp Xếp Danh Mục</span>
+            <span>{preview.headline || "Bộ Lọc & Sắp Xếp Sản Phẩm"}</span>
           </div>
-          <span className="text-[10px] text-slate-400">Sắp xếp: Bán chạy nhất ▾</span>
+          <span className="text-[10px] text-slate-400 font-mono">Sắp xếp: Mới nhất ▾</span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[10px] font-semibold shadow-sm">
-            Tất Cả (48)
+            Tất Cả (50)
           </span>
           <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
-            🥬 Rau Củ
+            👗 Fashion
           </span>
           <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
-            🍯 Mật Ong
+            🧒 Kid
           </span>
           <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
-            🌾 Gạo & Hạt
+            👔 Men
           </span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
+            👠 Women
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 3.5. SHOPPING CART BLOCK
+  if (
+    blockType === "cart" ||
+    titleLower.includes("cart") ||
+    titleLower.includes("giỏ hàng")
+  ) {
+    return (
+      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5 font-serif">
+            <ShoppingCart className="size-3.5 text-sky-400" />
+            <span>{preview.headline || "Your Shopping Cart"}</span>
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono">2 Sản phẩm trong giỏ</span>
+        </div>
+
+        {/* Cart items */}
+        <div className="space-y-2 text-xs">
+          <div className="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="size-10 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-mono text-sm">
+                👗
+              </div>
+              <div>
+                <div className="font-semibold text-white text-[11px]">Spring Leaf girls round neck sleeveless tops</div>
+                <div className="text-[10px] text-slate-400 font-mono">SKU: A001 • Size: M</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-bold text-sky-400 text-xs">$16.52</div>
+              <div className="text-[10px] text-slate-400 font-mono">SL: 1</div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="size-10 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-mono text-sm">
+                👕
+              </div>
+              <div>
+                <div className="font-semibold text-white text-[11px]">BabyGap plain T-shirt</div>
+                <div className="text-[10px] text-slate-400 font-mono">SKU: A003 • Size: L</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-bold text-sky-400 text-xs">$36.71</div>
+              <div className="text-[10px] text-slate-400 font-mono">SL: 1</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+          <div>
+            <span className="text-slate-400 text-[10px]">Tạm tính: </span>
+            <strong className="text-white font-bold text-xs">$53.23</strong>
+          </div>
+          <button className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow transition">
+            Tiến Hành Thanh Toán ➔
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 3.6. ORDER TRACKING BLOCK
+  if (
+    blockType === "tracking" ||
+    titleLower.includes("tracking") ||
+    titleLower.includes("tra cứu")
+  ) {
+    return (
+      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3.5">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5 font-serif">
+            <Truck className="size-3.5 text-sky-400" />
+            <span>{preview.headline || "Tra Cứu Đơn Hàng (Order Tracking)"}</span>
+          </div>
+          <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+            Live Tracking
+          </span>
+        </div>
+
+        {/* Search Input Box */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="size-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              readOnly
+              value="ORD-2026-0205"
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white outline-none font-mono"
+            />
+          </div>
+          <button className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition">
+            Tra Cứu
+          </button>
+        </div>
+
+        {/* Progress Steps */}
+        <div className="grid grid-cols-4 gap-1 text-center pt-2">
+          <div className="space-y-1">
+            <div className="size-6 rounded-full bg-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center mx-auto">✓</div>
+            <div className="text-[10px] text-white font-semibold">Đã Đặt Hàng</div>
+          </div>
+          <div className="space-y-1">
+            <div className="size-6 rounded-full bg-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center mx-auto">✓</div>
+            <div className="text-[10px] text-white font-semibold">Đã Xác Nhận</div>
+          </div>
+          <div className="space-y-1">
+            <div className="size-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center mx-auto animate-pulse">🚚</div>
+            <div className="text-[10px] text-sky-400 font-semibold">Đang Giao Hàng</div>
+          </div>
+          <div className="space-y-1">
+            <div className="size-6 rounded-full bg-slate-800 text-slate-500 font-bold text-xs flex items-center justify-center mx-auto">4</div>
+            <div className="text-[10px] text-slate-500">Đã Giao</div>
+          </div>
         </div>
       </div>
     );

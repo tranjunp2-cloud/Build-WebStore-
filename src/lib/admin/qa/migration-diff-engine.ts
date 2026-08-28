@@ -140,7 +140,7 @@ export interface BlockBreakdownItem {
 export interface PageBlockItem {
   id: string;
   order: number;
-  blockType: "hero" | "banner" | "richtext" | "products" | "categories" | "blog" | "footer" | "contact" | "filter" | "tracking" | "gallery" | "variants";
+  blockType: "hero" | "banner" | "richtext" | "products" | "categories" | "blog" | "footer" | "contact" | "filter" | "tracking" | "gallery" | "variants" | "cart" | "checkout";
   title: string;
   pw1Component: string;
   pw2Block: string;

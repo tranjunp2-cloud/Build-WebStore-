@@ -909,7 +909,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
       if (pageComps.length > 0) {
         pageBlocks = pageComps.map((c, cIdx) => {
           const fcName = (c.fc_name || "").toLowerCase();
-          let blockType: "hero" | "products" | "categories" | "blog" | "richtext" | "text" | "footer" = "richtext";
+          let blockType: "hero" | "products" | "categories" | "blog" | "richtext" | "text" | "footer" | "filter" | "cart" | "checkout" | "tracking" = "richtext";
           let title = c.label || c.fc_label || `Khối #${c.position || cIdx + 1}`;
           let pw2Block = "rich_text";
           let headline = store.name;
@@ -953,6 +953,20 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             subheadline = bannerSub;
             buttonText = btnText;
             bodyText = `Hotline: ${Array.isArray(store.hotline) ? store.hotline.join(", ") : store.hotline || "1900 8888"}`;
+          } else if (fcName === "product_filter" || fcName.includes("filter")) {
+            blockType = "filter";
+            pw2Block = "products_filter";
+            title = `Bộ Lọc Sản Phẩm: ${c.label || "Product Filter"}`;
+            headline = "Bộ Lọc & Phân Loại Hàng Hóa";
+            subheadline = "Lọc theo danh mục, thương hiệu, mức giá";
+            bodyText = "Danh mục: " + categories.slice(0, 4).map((c: any) => c.name).join(", ");
+          } else if (fcName === "product_sort" || fcName.includes("sort")) {
+            blockType = "filter";
+            pw2Block = "products_sort";
+            title = `Sắp Xếp Sản Phẩm: ${c.label || "Product Sort"}`;
+            headline = "Tùy Chọn Sắp Xếp";
+            subheadline = "Sắp xếp theo: Mới nhất, Giá tăng dần, Bán chạy nhất";
+            bodyText = "Mặc định: Sắp xếp theo ngày tạo mới nhất";
           } else if (fcName.includes("product")) {
             blockType = "products";
             pw2Block = "products_grid";
@@ -978,6 +992,27 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             title = `Khối Bài Viết: ${c.label || "Our articles"} (${posts.length} Bài)`;
             headline = c.label || "Our articles";
             bodyText = posts.slice(0, 3).map((pst: any) => pst.title).join(" • ") || "Chưa có bài viết";
+          } else if (fcName.includes("cart")) {
+            blockType = "cart";
+            pw2Block = "cart";
+            title = `Giỏ Hàng: ${c.label || "Shopping Cart"}`;
+            headline = "Giỏ Hàng Trực Tuyến";
+            subheadline = "Quản lý sản phẩm đã chọn mua";
+            bodyText = `Hiển thị các sản phẩm trong giỏ hàng và tính tạm tính tổng tiền`;
+          } else if (fcName.includes("checkout")) {
+            blockType = "checkout";
+            pw2Block = "checkout";
+            title = `Thanh Toán: ${c.label || "Checkout"}`;
+            headline = "Thông Tin Thanh Toán & Đặt Hàng";
+            subheadline = "Nhập thông tin người nhận, địa chỉ giao hàng và phương thức thanh toán";
+            bodyText = `Hỗ trợ thanh toán: COD, Chuyển khoản, Thẻ tín dụng`;
+          } else if (fcName.includes("order_tracking") || fcName.includes("tracking")) {
+            blockType = "tracking";
+            pw2Block = "order_tracking";
+            title = `Tra Cứu Đơn Hàng: ${c.label || "Order Tracking"}`;
+            headline = "Tra Cứu Trạng Thái Đơn Hàng";
+            subheadline = "Nhập mã đơn hàng hoặc số điện thoại để kiểm tra tiến trình vận chuyển";
+            bodyText = `Quy trình 4 bước: Đã Đặt Hàng ➔ Đang Xử Lý ➔ Đang Giao ➔ Đã Giao Hàng`;
           } else if (fcName.includes("rich_text") || fcName.includes("text")) {
             blockType = "richtext";
             pw2Block = "rich_text";
