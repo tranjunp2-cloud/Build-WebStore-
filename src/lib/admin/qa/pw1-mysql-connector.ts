@@ -844,6 +844,26 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     }
   }
 
+  // 10. Fetch Component Settings from model_settings
+  let compSettings: any[] = [];
+  if (rawComponents.length > 0) {
+    try {
+      const compIds = rawComponents.map((c) => c.id);
+      if (compIds.length > 0) {
+        compSettings = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
+          `SELECT model_id, \`key\`, \`value\` FROM model_settings WHERE model_type = 'App\\\\Models\\\\PageComponent' AND model_id IN (?);`,
+          [compIds],
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
+  const compSettingMap = new Map<string, string>();
+  for (const s of compSettings) {
+    compSettingMap.set(`${s.model_id}_${s.key}`, s.value || "");
+  }
+
   // Dynamically generate pages from MySQL `pages` table
   let dynamicPages: any[] = [];
 
@@ -870,7 +890,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
       if (pageComps.length > 0) {
         pageBlocks = pageComps.map((c, cIdx) => {
           const fcName = (c.fc_name || "").toLowerCase();
-          let blockType: "hero" | "products" | "categories" | "blog" | "text" | "footer" = "text";
+          let blockType: "hero" | "products" | "categories" | "blog" | "richtext" | "text" | "footer" = "richtext";
           let title = c.label || c.fc_label || `Khối #${c.position || cIdx + 1}`;
           let pw2Block = "rich_text";
           let headline = store.name;
@@ -934,11 +954,19 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             headline = c.label || "Our articles";
             bodyText = posts.slice(0, 3).map((pst: any) => pst.title).join(" • ") || "Chưa có bài viết";
           } else if (fcName.includes("rich_text") || fcName.includes("text")) {
-            blockType = "text";
+            blockType = "richtext";
             pw2Block = "rich_text";
             title = `Khối Nội Dung: ${c.label || "Rich Text"}`;
-            headline = c.label || p.name;
-            bodyText = `Văn bản nội dung trang ${p.name}`;
+            const customContent = compSettingMap.get(`${c.id}_content`);
+            if (customContent && customContent.trim()) {
+              headline = c.label || "Nội Dung Văn Bản";
+              subheadline = "Văn bản định dạng HTML / Rich Text";
+              bodyText = customContent;
+            } else {
+              headline = c.label || "Khối Rich Text";
+              subheadline = "Khối văn bản chưa nhập nội dung trong CSDL (Khối trống)";
+              bodyText = "[Khối Trống - Người dùng chưa nhập văn bản vào khối này trong CSDL]";
+            }
           }
 
           const articleItems = (posts as any[]).slice(0, 3).map((pst) => ({

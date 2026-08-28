@@ -379,48 +379,51 @@ function RichVisualBlockRenderer({
     );
   }
 
-  // 5. RICHTEXT / COMMITMENT / CONTENT
+  // 5. RICHTEXT / CONTENT BLOCK
   if (
     blockType === "richtext" ||
     titleLower.includes("richtext") ||
-    titleLower.includes("cam kết") ||
-    titleLower.includes("hướng dẫn") ||
-    titleLower.includes("câu chuyện")
+    titleLower.includes("nội dung") ||
+    titleLower.includes("văn bản")
   ) {
+    const isEmpty = !preview.bodyText || preview.bodyText.includes("[Khối Trống") || preview.bodyText.includes("Chưa nhập");
+
     return (
       <div
         className={`p-4 rounded-xl border space-y-2.5 ${
-          !isPW1 && isFail
+          isEmpty
+            ? "bg-slate-950/60 border-dashed border-slate-800"
+            : !isPW1 && isFail
             ? "bg-rose-950/20 border-rose-500/40"
             : "bg-slate-950 border-slate-800"
         }`}
       >
-        <div className="font-bold text-white text-xs flex items-center gap-1.5">
-          <ShieldCheck className="size-3.5 text-emerald-400" />
-          <span>{preview.headline || "Cam Kết Chất Lượng & Nguồn Gốc"}</span>
-        </div>
-        <p className="text-slate-300 text-[11px] leading-relaxed">
-          {preview.bodyText ||
-            preview.subheadline ||
-            "Quy trình thu hoạch và đóng gói khép kín, đạt chuẩn kiểm định an toàn thực phẩm VietGAP."}
-        </p>
-
-        {/* 3 Quality Badges */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-          <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 text-[10px] text-slate-300 flex items-center gap-1.5">
-            <span className="text-emerald-400">✓</span> 100% Thuần Khiết
+        <div className="flex items-center justify-between">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5 font-serif">
+            <FileCode className="size-3.5 text-indigo-400" />
+            <span>{preview.headline || "Rich Text Content"}</span>
           </div>
-          <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 text-[10px] text-slate-300 flex items-center gap-1.5">
-            <span className="text-blue-400">🚚</span> Giao Siêu Tốc 2H
-          </div>
-          <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 text-[10px] text-slate-300 flex items-center gap-1.5">
-            <span className="text-amber-400">🔄</span> Đổi Trả Miễn Phí
-          </div>
+          <span className="text-[10px] font-mono text-slate-500">
+            {isPW1 ? `PW1: ${block.pw1Component}` : `PW2: ${block.pw2Block}`}
+          </span>
         </div>
 
-        {!isPW1 && isFail && (
-          <div className="p-2 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-[10px] font-mono">
-            🚨 Cảnh Báo: Bảng biểu &lt;table&gt; bị rớt định dạng khi migrate sang Lexical AST.
+        {isEmpty ? (
+          <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800/80 text-center space-y-1">
+            <div className="text-xs text-slate-400 font-medium">
+              📝 Khối Rich Text này đang để trống trong CSDL
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono">
+              (Người dùng tạo khối trong layout nhưng chưa nhập văn bản — Khớp 100% rỗng)
+            </div>
+          </div>
+        ) : (
+          <div className="text-slate-300 text-xs leading-relaxed space-y-1.5">
+            <div className="text-[11px] text-slate-400 font-mono">{preview.subheadline}</div>
+            <div
+              className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 font-sans text-xs text-slate-200 prose prose-invert max-w-none overflow-hidden [&_img]:max-h-60 [&_img]:rounded-lg [&_img]:mx-auto [&_iframe]:w-full [&_iframe]:rounded-lg [&_a]:text-blue-400 [&_a]:underline"
+              dangerouslySetInnerHTML={{ __html: preview.bodyText || "" }}
+            />
           </div>
         )}
       </div>
