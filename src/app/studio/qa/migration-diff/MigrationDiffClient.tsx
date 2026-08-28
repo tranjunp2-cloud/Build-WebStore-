@@ -686,11 +686,49 @@ export function MigrationDiffClient() {
     }
   };
 
+  const [liveStoreDiff, setLiveStoreDiff] = useState<StoreDeepDiff | null>(null);
+
+  const loadLiveCatalog = async () => {
+    try {
+      const res = await fetch("/api/qa/migration-diff?limit=2000");
+      const json = await res.json();
+      if (json.stores && json.stores.length > 0) {
+        setCatalog(json.stores);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    void loadLiveCatalog();
+  }, []);
+
+  useEffect(() => {
+    if (!activeStoreId) {
+      setLiveStoreDiff(null);
+      return;
+    }
+    const fetchDiff = async () => {
+      try {
+        const res = await fetch(`/api/qa/migration-diff?store_id=${activeStoreId}`);
+        const json = await res.json();
+        if (json.data) {
+          setLiveStoreDiff(json.data);
+        }
+      } catch {
+        // fallback to static
+      }
+    };
+    void fetchDiff();
+  }, [activeStoreId]);
+
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
     if (!activeStoreId) return null;
+    if (liveStoreDiff) return liveStoreDiff;
     const isResolved = resolvedStoreIds.has(activeStoreId);
     return getStoreDeepDiff(activeStoreId, isResolved ? "passed" : undefined);
-  }, [activeStoreId, resolvedStoreIds]);
+  }, [activeStoreId, resolvedStoreIds, liveStoreDiff]);
 
   const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
 

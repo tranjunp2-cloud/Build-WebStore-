@@ -8,6 +8,8 @@ import {
   testPw1Connection,
   introspectAllPw1Tables,
   fetchStoreTableRecords,
+  fetchLivePw1StoresCatalog,
+  fetchLivePw1StoreDeepDiff,
 } from "@/lib/admin/qa/pw1-mysql-connector";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +57,16 @@ export async function GET(request: NextRequest) {
     const storeId = searchParams.get("store_id");
 
     if (storeId) {
+      // Try live MySQL first if configured
+      try {
+        const liveDiff = await fetchLivePw1StoreDeepDiff(storeId);
+        if (liveDiff) {
+          return NextResponse.json({ data: liveDiff, isLive: true });
+        }
+      } catch {
+        // Fallback to static deep diff generator
+      }
+
       const diff = getStoreDeepDiff(storeId);
       if (!diff) {
         return NextResponse.json({ error: `Store ${storeId} not found` }, { status: 404 });
@@ -68,7 +80,23 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "20", 10)));
 
-    const allStores = generateReconciliationCatalog(2000);
+    // Attempt to load Live Stores from PW1 MySQL if available
+    let allStores: any[] = [];
+    let isLiveCatalog = false;
+
+    try {
+      allStores = await fetchLivePw1StoresCatalog(2000);
+      if (allStores.length > 0) {
+        isLiveCatalog = true;
+      }
+    } catch {
+      // Fallback
+    }
+
+    if (allStores.length === 0) {
+      allStores = generateReconciliationCatalog(2000);
+    }
+
     const metrics = getDashboardMetrics(allStores);
 
     const filtered = allStores.filter((s) => {
