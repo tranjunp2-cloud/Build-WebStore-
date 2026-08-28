@@ -4,6 +4,11 @@ import {
   getStoreDeepDiff,
   getDashboardMetrics,
 } from "@/lib/admin/qa/migration-diff-engine";
+import {
+  testPw1Connection,
+  introspectAllPw1Tables,
+  fetchStoreTableRecords,
+} from "@/lib/admin/qa/pw1-mysql-connector";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -11,6 +16,7 @@ export const maxDuration = 60;
 /**
  * GET /api/qa/migration-diff
  * Query params:
+ *   - mode: "db_status" | "db_tables" | "db_records"
  *   - store_id: Optional. If present, returns deep diff for a specific store.
  *   - filter: "all" | "passed" | "warning" | "failed"
  *   - template: "all" | "FB101" | "PA101" | ...
@@ -21,6 +27,31 @@ export const maxDuration = 60;
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const mode = searchParams.get("mode");
+
+    // 1. Live MySQL DB Connection Health & Ping
+    if (mode === "db_status") {
+      const status = await testPw1Connection();
+      return NextResponse.json({ data: status });
+    }
+
+    // 2. Dynamic Schema Introspection across ALL tables
+    if (mode === "db_tables") {
+      const tables = await introspectAllPw1Tables();
+      return NextResponse.json({ data: tables });
+    }
+
+    // 3. Fetch Records from a specific MySQL table
+    if (mode === "db_records") {
+      const tableName = searchParams.get("table");
+      if (!tableName) {
+        return NextResponse.json({ error: "Missing 'table' parameter" }, { status: 400 });
+      }
+      const storeId = searchParams.get("store_id") || undefined;
+      const records = await fetchStoreTableRecords(tableName, storeId);
+      return NextResponse.json({ data: records });
+    }
+
     const storeId = searchParams.get("store_id");
 
     if (storeId) {
@@ -90,6 +121,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const action = body?.action;
+
+    if (action === "test_db_connection") {
+      const dbConfig = body?.config;
+      const result = await testPw1Connection(dbConfig);
+      return NextResponse.json({
+        success: result.connected,
+        data: result,
+      });
+    }
 
     if (action === "approve_pass") {
       const storeId = body?.storeId;

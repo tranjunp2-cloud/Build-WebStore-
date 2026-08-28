@@ -613,6 +613,79 @@ export function MigrationDiffClient() {
   const [isReloading, setIsReloading] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // Live Database Modal States
+  const [dbModalOpen, setDbModalOpen] = useState(false);
+  const [dbStatus, setDbStatus] = useState<{
+    connected: boolean;
+    message: string;
+    database?: string;
+    serverVersion?: string;
+    tablesCount?: number;
+    latencyMs?: number;
+    tables?: string[];
+  } | null>(null);
+  const [isTestingDb, setIsTestingDb] = useState(false);
+  const [customDbUrl, setCustomDbUrl] = useState("");
+  const [customDbHost, setCustomDbHost] = useState("");
+  const [customDbPort, setCustomDbPort] = useState("3306");
+  const [customDbUser, setCustomDbUser] = useState("");
+  const [customDbPassword, setCustomDbPassword] = useState("");
+  const [customDbName, setCustomDbName] = useState("");
+  const [useSeparateFields, setUseSeparateFields] = useState(false);
+
+  const checkLiveDbStatus = async () => {
+    try {
+      const res = await fetch("/api/qa/migration-diff?mode=db_status");
+      const json = await res.json();
+      if (json.data) setDbStatus(json.data);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    void checkLiveDbStatus();
+  }, []);
+
+  const handleTestDbConnection = async () => {
+    setIsTestingDb(true);
+    try {
+      const config = useSeparateFields
+        ? {
+            host: customDbHost.trim(),
+            port: parseInt(customDbPort.trim() || "3306", 10),
+            user: customDbUser.trim(),
+            password: customDbPassword,
+            database: customDbName.trim(),
+          }
+        : customDbUrl.trim()
+          ? { url: customDbUrl.trim() }
+          : undefined;
+
+      const res = await fetch("/api/qa/migration-diff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "test_db_connection",
+          config,
+        }),
+      });
+      const json = await res.json();
+      if (json.data) {
+        setDbStatus(json.data);
+        if (json.data.connected) {
+          showToast(`🟢 Kết nối Live MySQL thành công! Đã tìm thấy ${json.data.tablesCount} bảng.`);
+        } else {
+          showToast(`🔴 Không thể kết nối: ${json.data.message}`);
+        }
+      }
+    } catch (err: any) {
+      showToast(`🔴 Lỗi kiểm tra: ${err.message || String(err)}`);
+    } finally {
+      setIsTestingDb(false);
+    }
+  };
+
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
     if (!activeStoreId) return null;
     const isResolved = resolvedStoreIds.has(activeStoreId);
@@ -765,16 +838,40 @@ export function MigrationDiffClient() {
 
         {/* Database Status Indicators */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-sm">
-            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-slate-400">PW1: <strong className="text-emerald-400 font-mono font-medium">MySQL</strong></span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setDbModalOpen(true)}
+            className={`flex items-center gap-2 border rounded-xl px-3 py-1.5 text-xs font-semibold shadow-sm transition ${
+              dbStatus?.connected
+                ? "bg-emerald-950/60 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/60"
+                : "bg-slate-900/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700"
+            }`}
+          >
+            <span
+              className={`size-2 rounded-full ${
+                dbStatus?.connected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
+              }`}
+            />
+            <span className="text-slate-400">
+              PW1:{" "}
+              <strong className="text-emerald-400 font-mono font-medium">
+                {dbStatus?.connected ? `Live MySQL (${dbStatus.tablesCount} bảng)` : "MySQL (Cấu hình Live DB)"}
+              </strong>
+            </span>
+            <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded ml-0.5 font-mono">
+              ⚙️
+            </span>
+          </button>
           <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-sm">
             <span className="size-2 rounded-full bg-sky-400 animate-pulse" />
-            <span className="text-slate-400">PW2: <strong className="text-sky-400 font-mono font-medium">Postgres</strong></span>
+            <span className="text-slate-400">PW2: <strong className="text-sky-400 font-mono font-medium">Postgres (Live)</strong></span>
           </div>
           <button
-            onClick={() => showToast("Đã quét lại đối soát cho toàn bộ 2.000 website!")}
+            type="button"
+            onClick={() => {
+              void checkLiveDbStatus();
+              showToast("Đã quét lại đối soát cho toàn bộ 2.000 website!");
+            }}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700/80 transition shadow-sm"
           >
             <RefreshCw className="size-3.5 text-slate-400" />
@@ -2249,6 +2346,187 @@ export function MigrationDiffClient() {
                 </div>
               </div>
             )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Live PW1 MySQL Configuration & Test Modal */}
+      {dbModalOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-5 text-slate-100 animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 rounded-2xl">
+                  <Database className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Kết Nối CSDL Live PW1 (MySQL)</h3>
+                  <p className="text-xs text-slate-400">Chế độ ĐỌC DỮ LIỆU AN TOÀN (Strictly Read-Only 100%)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDbModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Read-Only Safety Banner */}
+            <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5">
+              <ShieldCheck className="size-4 shrink-0 mt-0.5 text-emerald-400" />
+              <div className="space-y-1">
+                <strong className="font-semibold text-emerald-200">Cam Kết Bảo Mật Read-Only Tuyệt Đối:</strong>
+                <p className="text-emerald-400/90 leading-relaxed">
+                  Hệ thống chỉ chạy lệnh <code className="bg-emerald-900/60 px-1 py-0.5 rounded font-mono">SELECT</code> và <code className="bg-emerald-900/60 px-1 py-0.5 rounded font-mono">SHOW TABLES</code>. Mọi lệnh ghi (INSERT/UPDATE/DELETE/DROP) đều bị chặn cứng ở cấp mã nguồn và phiên làm việc.
+                </p>
+              </div>
+            </div>
+
+            {/* Connection Status Card */}
+            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Trạng Thái Kết Nối Hiện Tại</span>
+                {dbStatus?.latencyMs !== undefined && (
+                  <span className="text-[11px] font-mono text-slate-500">{dbStatus.latencyMs}ms</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span className={`size-3 rounded-full shrink-0 ${dbStatus?.connected ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
+                <span className={`text-sm font-bold ${dbStatus?.connected ? "text-emerald-400" : "text-slate-300"}`}>
+                  {dbStatus?.connected ? "Đã kết nối Live MySQL thành công" : "Chưa kết nối CSDL thật (Đang dùng dữ liệu mẫu)"}
+                </span>
+              </div>
+              {dbStatus?.message && (
+                <p className="text-xs text-slate-400 font-mono bg-slate-900 p-2 rounded-lg border border-slate-800/80 break-all">
+                  {dbStatus.message}
+                </p>
+              )}
+              {dbStatus?.connected && dbStatus.tables && (
+                <div className="pt-2 text-xs text-slate-300 space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <span>CSDL: <strong className="text-sky-300 font-mono">{dbStatus.database}</strong> (v{dbStatus.serverVersion})</span>
+                    <span>{dbStatus.tablesCount} Bảng</span>
+                  </div>
+                  <div className="max-h-24 overflow-y-auto bg-slate-900 p-2 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-400 flex flex-wrap gap-1">
+                    {dbStatus.tables.map((t) => (
+                      <span key={t} className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input Form */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300">
+                  {useSeparateFields ? "Nhập thông số Host / Port / User:" : "Chuỗi kết nối MySQL (PW1_DATABASE_URL):"}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setUseSeparateFields(!useSeparateFields)}
+                  className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium"
+                >
+                  {useSeparateFields ? "Nhập dạng URL string" : "Nhập từng trường riêng (Host, User...)"}
+                </button>
+              </div>
+
+              {!useSeparateFields ? (
+                <input
+                  type="text"
+                  placeholder="mysql://user:password@127.0.0.1:3306/legacy_db"
+                  value={customDbUrl}
+                  onChange={(e) => setCustomDbUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono"
+                />
+              ) : (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="col-span-2 sm:col-span-1">
+                    <input
+                      type="text"
+                      placeholder="Host (vd: 127.0.0.1 hoặc db.domain.com)"
+                      value={customDbHost}
+                      onChange={(e) => setCustomDbHost(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <input
+                      type="text"
+                      placeholder="Port (mặc định: 3306)"
+                      value={customDbPort}
+                      onChange={(e) => setCustomDbPort(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="User (vd: qa_readonly)"
+                      value={customDbUser}
+                      onChange={(e) => setCustomDbUser(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={customDbPassword}
+                      onChange={(e) => setCustomDbPassword(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="text"
+                      placeholder="Tên CSDL (Database Name)"
+                      value={customDbName}
+                      onChange={(e) => setCustomDbName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+              <p className="text-[11px] text-slate-500">
+                💡 <em>Mẹo:</em> Bạn cũng có thể lưu trực tiếp vào file <code className="text-slate-400 font-mono">.env.local</code> với biến <code className="text-emerald-400 font-mono">PW1_DATABASE_URL</code> để hệ thống tự động nhận diện vĩnh viễn.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDbModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                disabled={isTestingDb}
+                onClick={handleTestDbConnection}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-xs font-bold text-white rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center gap-2 disabled:opacity-50"
+              >
+                {isTestingDb ? (
+                  <>
+                    <RefreshCw className="size-3.5 animate-spin" />
+                    <span>Đang Thử Kết Nối...</span>
+                  </>
+                ) : (
+                  <>
+                    <Database className="size-3.5" />
+                    <span>⚡ Kiểm Tra Kết Nối MySQL (Ping Test)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>,
         document.body
