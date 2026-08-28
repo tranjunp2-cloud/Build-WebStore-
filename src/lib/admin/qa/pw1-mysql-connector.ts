@@ -864,6 +864,25 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     compSettingMap.set(`${s.model_id}_${s.key}`, s.value || "");
   }
 
+  // 11. Fetch Shortlist Items (Category / Brand / Product Cards on Components)
+  let shortlistItems: any[] = [];
+  if (rawComponents.length > 0) {
+    try {
+      const compIds = rawComponents.map((c) => c.id);
+      if (compIds.length > 0) {
+        shortlistItems = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
+          `SELECT id, page_component_id, name, model_type, model_id, image, cta_button_text, position
+           FROM shortlist_items
+           WHERE page_component_id IN (?) AND deleted_at IS NULL
+           ORDER BY page_component_id ASC, position ASC;`,
+          [compIds],
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   // Dynamically generate pages from MySQL `pages` table
   let dynamicPages: any[] = [];
 
@@ -944,9 +963,15 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           } else if (fcName.includes("category")) {
             blockType = "categories";
             pw2Block = "categories";
-            title = `Khối Danh Mục: ${c.label || "Danh Mục Hàng Hóa"} (${categories.length} DM)`;
-            headline = c.label || "Danh Mục Sản Phẩm";
-            bodyText = categories.slice(0, 4).map((cat: any) => cat.name).join(" • ") || "Chưa có danh mục";
+            title = `Khối Danh Mục: ${c.label || "Danh Mục Hàng Hóa"}`;
+            const customHeader = compSettingMap.get(`${c.id}_header`);
+            headline = customHeader || c.label || "Danh Mục Nổi Bật";
+            const compShortlists = shortlistItems.filter((s) => s.page_component_id === c.id);
+            if (compShortlists.length > 0) {
+              bodyText = compShortlists.map((s) => s.name || "Danh mục").join(" • ");
+            } else {
+              bodyText = categories.slice(0, 4).map((cat: any) => cat.name).join(" • ") || "Chưa có danh mục";
+            }
           } else if (fcName.includes("article") || fcName.includes("blog")) {
             blockType = "blog";
             pw2Block = "posts";
@@ -987,6 +1012,24 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             category: pr.category_name || "Mặc định",
           }));
 
+          const compShortlists = shortlistItems.filter((s) => s.page_component_id === c.id);
+          let categoryCards: any[] = [];
+          if (compShortlists.length > 0) {
+            categoryCards = compShortlists.map((s) => ({
+              id: s.id,
+              name: s.name || "Danh Mục",
+              image: s.image || undefined,
+              ctaText: s.cta_button_text || "Explore now",
+            }));
+          } else {
+            categoryCards = (categories as any[]).slice(0, 4).map((cat) => ({
+              id: cat.id,
+              name: cat.name,
+              image: cat.image || undefined,
+              ctaText: "Shop now",
+            }));
+          }
+
           return {
             id: `blk-${c.id}`,
             order: c.position || cIdx + 1,
@@ -1003,6 +1046,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
               buttonText,
               articleItems,
               productCards,
+              categoryCards,
               badgeText: c.label || undefined,
             },
             pw2Preview: {
@@ -1014,6 +1058,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
               buttonText,
               articleItems,
               productCards,
+              categoryCards,
               badgeText: c.label || undefined,
             },
             status: "pass" as const,

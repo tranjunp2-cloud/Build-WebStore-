@@ -170,6 +170,14 @@ export interface PageBlockItem {
       image?: string;
       category?: string;
     }>;
+    categoryCards?: Array<{
+      id?: number | string;
+      name: string;
+      image?: string;
+      ctaText?: string;
+      countText?: string;
+      slug?: string;
+    }>;
   };
   pw2Preview: {
     headline?: string;
@@ -196,6 +204,14 @@ export interface PageBlockItem {
       sku: string;
       image?: string;
       category?: string;
+    }>;
+    categoryCards?: Array<{
+      id?: number | string;
+      name: string;
+      image?: string;
+      ctaText?: string;
+      countText?: string;
+      slug?: string;
     }>;
   };
   status: "pass" | "warn" | "fail";

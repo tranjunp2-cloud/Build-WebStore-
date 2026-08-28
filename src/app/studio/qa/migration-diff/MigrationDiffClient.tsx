@@ -352,28 +352,48 @@ function RichVisualBlockRenderer({
     titleLower.includes("danh mục") ||
     titleLower.includes("category")
   ) {
+    const catCards = preview.categoryCards && preview.categoryCards.length > 0
+      ? preview.categoryCards
+      : [
+          { id: 1, name: "Fashion", ctaText: "Shop now", image: undefined },
+          { id: 2, name: "Kid", ctaText: "Shop now", image: undefined },
+          { id: 3, name: "Men", ctaText: "Shop now", image: undefined },
+        ];
+
     return (
-      <div className="space-y-2">
-        <div className="font-bold text-white text-xs flex items-center gap-1.5">
-          <Grid className="size-3.5 text-sky-400" />
-          <span>{preview.headline || "3 Danh Mục Nổi Bật"}</span>
+      <div className="space-y-3">
+        <div className="text-center py-1">
+          <h4 className="font-serif font-bold text-white text-xs sm:text-sm leading-snug line-clamp-2">
+            {preview.headline || "Categories"}
+          </h4>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-1">
-            <span className="text-xl">🥬</span>
-            <div className="font-semibold text-white text-[10px] truncate">Rau Củ Tươi</div>
-            <div className="text-[9px] text-slate-400">48 Sản phẩm</div>
-          </div>
-          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-1">
-            <span className="text-xl">🍯</span>
-            <div className="font-semibold text-white text-[10px] truncate">Mật Ong Rừng</div>
-            <div className="text-[9px] text-slate-400">24 Sản phẩm</div>
-          </div>
-          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-1">
-            <span className="text-xl">🌾</span>
-            <div className="font-semibold text-white text-[10px] truncate">Nông Sản Sấy</div>
-            <div className="text-[9px] text-slate-400">36 Sản phẩm</div>
-          </div>
+
+        <div className={`grid gap-2.5 ${isMobile ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
+          {catCards.slice(0, 3).map((cat: any, cIdx: number) => (
+            <div
+              key={cIdx}
+              className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between hover:border-slate-700 transition"
+            >
+              {cat.image ? (
+                <div
+                  className="w-full h-24 bg-cover bg-center border-b border-slate-800 relative"
+                  style={{ backgroundImage: `url(${cat.image})` }}
+                />
+              ) : (
+                <div className="w-full h-24 bg-slate-800 flex items-center justify-center text-slate-500 border-b border-slate-800">
+                  <Grid className="size-6 text-slate-600" />
+                </div>
+              )}
+              <div className="p-2.5 text-center space-y-1.5">
+                <div className="font-serif font-bold text-white text-[11px] truncate" title={cat.name}>
+                  {cat.name}
+                </div>
+                <button className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-sky-300 text-[10px] font-semibold rounded-lg border border-slate-700 transition">
+                  {cat.ctaText || "Explore now"}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
