@@ -877,6 +877,37 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
            ORDER BY page_component_id ASC, position ASC;`,
           [compIds],
         );
+
+        // Fetch detailed info for any shortlisted products not in products array
+        const shortlistedProdIds = shortlistItems
+          .filter((s) => s.model_type?.includes("Product") || !s.model_type)
+          .map((s) => s.model_id)
+          .filter((id) => id && !products.some((p) => p.id === id));
+
+        if (shortlistedProdIds.length > 0) {
+          const extraProds = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
+            `SELECT p.id, p.name, ps.sku, ps.price, c.name as category_name, pi.url as image
+             FROM products p
+             LEFT JOIN product_skus ps ON ps.product_id = p.id
+             LEFT JOIN categories c ON c.id = p.category_id
+             LEFT JOIN product_images pi ON pi.product_id = p.id
+             WHERE p.id IN (?)
+             GROUP BY p.id;`,
+            [shortlistedProdIds],
+          );
+          for (const ep of extraProds as any[]) {
+            (products as any[]).push({
+              id: ep.id,
+              name: ep.name,
+              sku: ep.sku || "SKU-001",
+              price: ep.price || 0,
+              category_name: ep.category_name || "Mặc định",
+            });
+            if (ep.image && !prodImgMap.has(ep.id)) {
+              prodImgMap.set(ep.id, ep.image);
+            }
+          }
+        }
       }
     } catch {
       // ignore
@@ -923,7 +954,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             blockType = "hero";
             pw2Block = "hero";
             title = `Khối Banner: ${c.label || "Hero Banner"}`;
-            const compBanner = (banners as any[]).find((b) => b.page_component_id === c.id) || banners[0];
+            const compBanners = (banners as any[]).filter((b) => b.page_component_id === c.id);
+            const compBanner = compBanners.length > 0 ? compBanners[0] : (banners as any[])[0];
             let bannerH = store.name;
             let bannerSub = store.description || "Giao diện banner trang chủ";
             let btnText = "Button";
@@ -1029,28 +1061,63 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             }
           }
 
-          const articleItems = (posts as any[]).slice(0, 3).map((pst) => ({
-            id: pst.id,
-            title: pst.title || pst.name || "Bài Viết",
-            image: pst.image || undefined,
-            summary: pst.summary || pst.content?.replace(/<[^>]+>/g, "").slice(0, 140) || "Nội dung bài viết...",
-            date: pst.created_at ? new Date(pst.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "19 May 2022",
-            slug: pst.slug || "",
-          }));
+          // Articles: Check shortlist items first, otherwise fallback to store blog posts
+          const compBlogShortlists = shortlistItems.filter((s) => s.page_component_id === c.id && (s.model_type?.includes("Blog") || s.model_type?.includes("Article") || s.model_type?.includes("Post")));
+          let articleItems: any[] = [];
+          if (compBlogShortlists.length > 0) {
+            articleItems = compBlogShortlists.map((s) => {
+              const matchedPst = (posts as any[]).find((pst) => pst.id === s.model_id);
+              return {
+                id: s.model_id,
+                title: matchedPst?.title || s.name || "Bài Viết",
+                image: matchedPst?.image || s.image || undefined,
+                summary: matchedPst?.summary || matchedPst?.content?.replace(/<[^>]+>/g, "").slice(0, 140) || "Nội dung bài viết...",
+                date: matchedPst?.created_at ? new Date(matchedPst.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "19 May 2022",
+                slug: matchedPst?.slug || "",
+              };
+            });
+          } else {
+            articleItems = (posts as any[]).slice(0, 3).map((pst) => ({
+              id: pst.id,
+              title: pst.title || pst.name || "Bài Viết",
+              image: pst.image || undefined,
+              summary: pst.summary || pst.content?.replace(/<[^>]+>/g, "").slice(0, 140) || "Nội dung bài viết...",
+              date: pst.created_at ? new Date(pst.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "19 May 2022",
+              slug: pst.slug || "",
+            }));
+          }
 
-          const productCards = (products as any[]).slice(0, 4).map((pr) => ({
-            id: pr.id,
-            name: pr.name,
-            price: pr.price ? (typeof pr.price === "number" ? `$${pr.price.toFixed(2)}` : `${pr.price}`) : "$0.00",
-            sku: pr.sku || "SKU-001",
-            image: prodImgMap.get(pr.id) || undefined,
-            category: pr.category_name || "Mặc định",
-          }));
+          // Products: Check shortlist items first, otherwise fallback to store products
+          const compProdShortlists = shortlistItems.filter((s) => s.page_component_id === c.id && (s.model_type?.includes("Product") || !s.model_type));
+          let productCards: any[] = [];
+          if (compProdShortlists.length > 0) {
+            productCards = compProdShortlists.map((s) => {
+              const matchedPr = (products as any[]).find((p) => p.id === s.model_id);
+              return {
+                id: s.model_id,
+                name: matchedPr?.name || s.name || "Sản Phẩm",
+                price: matchedPr?.price ? (typeof matchedPr.price === "number" ? `$${matchedPr.price.toFixed(2)}` : `${matchedPr.price}`) : "$0.00",
+                sku: matchedPr?.sku || "SKU-001",
+                image: prodImgMap.get(s.model_id) || s.image || undefined,
+                category: matchedPr?.category_name || "Mặc định",
+              };
+            });
+          } else {
+            productCards = (products as any[]).slice(0, 4).map((pr) => ({
+              id: pr.id,
+              name: pr.name,
+              price: pr.price ? (typeof pr.price === "number" ? `$${pr.price.toFixed(2)}` : `${pr.price}`) : "$0.00",
+              sku: pr.sku || "SKU-001",
+              image: prodImgMap.get(pr.id) || undefined,
+              category: pr.category_name || "Mặc định",
+            }));
+          }
 
-          const compShortlists = shortlistItems.filter((s) => s.page_component_id === c.id);
+          // Categories / Brands / Collections
+          const compCatShortlists = shortlistItems.filter((s) => s.page_component_id === c.id && !s.model_type?.includes("Product") && !s.model_type?.includes("Blog"));
           let categoryCards: any[] = [];
-          if (compShortlists.length > 0) {
-            categoryCards = compShortlists.map((s) => ({
+          if (compCatShortlists.length > 0) {
+            categoryCards = compCatShortlists.map((s) => ({
               id: s.id,
               name: s.name || "Danh Mục",
               image: s.image || undefined,
