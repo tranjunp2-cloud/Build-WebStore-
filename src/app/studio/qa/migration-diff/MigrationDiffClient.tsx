@@ -119,10 +119,10 @@ function RichVisualBlockRenderer({
                 : "bg-sky-500/20 text-sky-300 border-sky-500/30"
             }`}
           >
-            <Sparkles className="size-3" /> {preview.badgeText || "ƯU ĐÃI MÙA NÔNG SẢN"}
+            <Sparkles className="size-3" /> {preview.badgeText || "BANNER CHÍNH"}
           </span>
           <span className="text-[10px] font-mono text-slate-400">
-            {isPW1 ? "PW1 Hero (1365px)" : "PW2 Hero Block"}
+            {isPW1 ? `PW1: ${block.pw1Component}` : `PW2: ${block.pw2Block}`}
           </span>
         </div>
 
@@ -139,8 +139,7 @@ function RichVisualBlockRenderer({
               isMobile ? "text-[11px]" : "text-xs"
             }`}
           >
-            {preview.subheadline ||
-              "Sản phẩm chọn lọc tự nhiên từ vùng nguyên liệu chuẩn VietGAP, tươi sạch mỗi ngày."}
+            {preview.subheadline || preview.bodyText || "Khối banner đầu trang của website"}
           </p>
         </div>
 
@@ -152,12 +151,12 @@ function RichVisualBlockRenderer({
                 : "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20"
             }`}
           >
-            <span>Khám Phá Ngay</span>
+            <span>Xem Chi Tiết</span>
             <ArrowRight className="size-3" />
           </button>
-          {!isMobile && (
-            <span className="text-[11px] text-slate-400 font-medium px-2 py-1 bg-slate-900/60 rounded-lg border border-slate-800">
-              🚚 Giao hàng 2H
+          {preview.bodyText && (
+            <span className="text-[11px] text-slate-400 font-medium px-2 py-1 bg-slate-900/60 rounded-lg border border-slate-800 truncate max-w-xs">
+              {preview.bodyText}
             </span>
           )}
         </div>
@@ -178,102 +177,20 @@ function RichVisualBlockRenderer({
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
           <div className="font-bold text-white text-xs flex items-center gap-1.5">
             <Package className="size-3.5 text-blue-400" />
-            <span>{preview.headline || "Danh Sách Sản Phẩm Nổi Bật"}</span>
+            <span>{preview.headline || block.title}</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-mono">24 Sản Phẩm</span>
+          <span className="text-[10px] text-slate-400 font-mono">
+            {preview.productCount !== undefined ? `${preview.productCount} Sản Phẩm` : "Danh Sách SP"}
+          </span>
         </div>
 
-        <div className={`grid gap-2.5 ${isMobile ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
-          {/* Product 1 */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between">
-            <div className="w-full aspect-square bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-500 relative overflow-hidden">
-              <span className="text-xl">🍯</span>
-              <span className="absolute top-1 left-1 text-[8px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1 rounded">
-                HOT
-              </span>
-            </div>
-            <div>
-              <div className="font-semibold text-white text-[11px] truncate">
-                Mật Ong Rừng U Minh
-              </div>
-              <div className="text-[10px] text-slate-400">Hũ 500ml</div>
-              <div className="font-bold text-sky-400 text-xs mt-0.5">180.000₫</div>
-            </div>
-            <button className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold rounded-lg border border-slate-700 transition">
-              + Giỏ Hàng
-            </button>
+        <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300 space-y-1.5">
+          <div className="font-semibold text-white flex items-center gap-1.5">
+            <span>📦 Dữ liệu sản phẩm CSDL MySQL:</span>
           </div>
-
-          {/* Product 2 (Has Defect: Size 1L Variant Missing in PW2 if Fail) */}
-          <div
-            className={`rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between border ${
-              !isPW1 && isFail
-                ? "bg-rose-950/20 border-dashed border-rose-500/60 ring-1 ring-rose-500/30"
-                : "bg-slate-900/90 border-slate-800"
-            }`}
-          >
-            <div className="w-full aspect-square bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-500 relative overflow-hidden">
-              <span className="text-xl">🍯</span>
-              {!isPW1 && isFail ? (
-                <span className="absolute inset-0 bg-rose-950/80 flex items-center justify-center text-[9px] font-bold text-rose-300 text-center px-1">
-                  MẤT BIẾN THỂ 1L
-                </span>
-              ) : (
-                <span className="absolute top-1 left-1 text-[8px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1 rounded">
-                  SIZE 1L
-                </span>
-              )}
-            </div>
-            <div>
-              <div className="font-semibold text-white text-[11px] truncate">
-                Mật Ong Rừng Can 1L
-              </div>
-              <div className="text-[10px] text-slate-400">
-                {!isPW1 && isFail ? "❌ Rớt data variant" : "Can 1.000ml"}
-              </div>
-              <div
-                className={`font-bold text-xs mt-0.5 ${
-                  !isPW1 && isFail ? "text-rose-400 line-through" : "text-sky-400"
-                }`}
-              >
-                320.000₫
-              </div>
-            </div>
-            <button
-              disabled={!isPW1 && isFail}
-              className={`w-full py-1 text-[10px] font-semibold rounded-lg border transition ${
-                !isPW1 && isFail
-                  ? "bg-rose-900/30 text-rose-400 border-rose-500/40 opacity-60"
-                  : "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700"
-              }`}
-            >
-              {!isPW1 && isFail ? "Lỗi Variant" : "+ Giỏ Hàng"}
-            </button>
-          </div>
-
-          {/* Product 3 */}
-          <div
-            className={`bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between ${
-              isMobile ? "col-span-2 sm:col-span-1" : ""
-            }`}
-          >
-            <div className="w-full aspect-square bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-500 relative overflow-hidden">
-              <span className="text-xl">🌾</span>
-              <span className="absolute top-1 left-1 text-[8px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1 rounded">
-                -15%
-              </span>
-            </div>
-            <div>
-              <div className="font-semibold text-white text-[11px] truncate">
-                Hạt Sen Sấy Giòn
-              </div>
-              <div className="text-[10px] text-slate-400">Gói 200g</div>
-              <div className="font-bold text-sky-400 text-xs mt-0.5">95.000₫</div>
-            </div>
-            <button className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold rounded-lg border border-slate-700 transition">
-              + Giỏ Hàng
-            </button>
-          </div>
+          <p className="text-slate-400 text-[11px] leading-relaxed">
+            {preview.bodyText || "Các sản phẩm đang được hiển thị trong danh mục của cửa hàng."}
+          </p>
         </div>
       </div>
     );

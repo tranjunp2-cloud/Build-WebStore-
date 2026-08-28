@@ -691,6 +691,24 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
   const tCode = (store.tpl_code || "T001").toUpperCase();
   const domain = store.domain || `${store.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.web.dev.ecommercehub.my`;
 
+  // 8. Fetch Real Page Components (Layout Blocks) from MySQL
+  const pageIds = (rawPages as any[]).map((p) => p.id);
+  let rawComponents: any[] = [];
+  if (pageIds.length > 0) {
+    try {
+      rawComponents = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
+        `SELECT c.*, fc.name as fc_name, fc.label as fc_label
+         FROM page_components c
+         LEFT JOIN frontend_components fc ON fc.id = c.frontend_component_id
+         WHERE c.page_id IN (?) AND c.status = 1
+         ORDER BY c.page_id ASC, c.position ASC;`,
+        [pageIds],
+      );
+    } catch {
+      // ignore
+    }
+  }
+
   // Dynamically generate pages from MySQL `pages` table
   let dynamicPages: any[] = [];
 
@@ -710,15 +728,81 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
         pageType = "contact";
       }
 
-      return {
-        id: `page-${p.id}`,
-        name: p.name || p.title || `Trang #${idx + 1}`,
-        path: pUrl,
-        pageType,
-        existsInPW1: true,
-        existsInPW2: true,
-        totalBlocks: 4,
-        blocks: [
+      // Find real page components for this page
+      const pageComps = rawComponents.filter((c) => c.page_id === p.id);
+      let pageBlocks: any[] = [];
+
+      if (pageComps.length > 0) {
+        pageBlocks = pageComps.map((c, cIdx) => {
+          const fcName = (c.fc_name || "").toLowerCase();
+          let blockType: "hero" | "products" | "categories" | "blog" | "text" | "footer" = "text";
+          let title = c.label || c.fc_label || `Khối #${c.position || cIdx + 1}`;
+          let pw2Block = "rich_text";
+          let headline = store.name;
+          let subheadline = `Khối ${c.label || c.fc_label}`;
+          let bodyText = `Cấu hình component: ${c.tag_name || c.fc_name}`;
+          let productCount: number | undefined = undefined;
+
+          if (fcName.includes("banner") || fcName.includes("hero")) {
+            blockType = "hero";
+            pw2Block = "hero";
+            title = `Khối Banner: ${c.label || "Hero Banner"}`;
+            headline = banners[0]?.name || store.name;
+            subheadline = banners[0]?.subheader || store.description || "Giao diện banner trang chủ";
+            bodyText = `Hotline: ${Array.isArray(store.hotline) ? store.hotline.join(", ") : store.hotline || "1900 8888"}`;
+          } else if (fcName.includes("product")) {
+            blockType = "products";
+            pw2Block = "products_grid";
+            title = `Khối Sản Phẩm: ${c.label || "Danh Sách Sản Phẩm"} (${products.length} SP)`;
+            headline = "Sản Phẩm Cửa Hàng";
+            productCount = products.length;
+            bodyText = products.slice(0, 3).map((pr: any) => pr.name).join(" • ") || "Chưa có sản phẩm";
+          } else if (fcName.includes("category")) {
+            blockType = "categories";
+            pw2Block = "categories";
+            title = `Khối Danh Mục: ${c.label || "Danh Mục Hàng Hóa"} (${categories.length} DM)`;
+            headline = "Danh Mục Sản Phẩm";
+            bodyText = categories.slice(0, 4).map((cat: any) => cat.name).join(" • ") || "Chưa có danh mục";
+          } else if (fcName.includes("article") || fcName.includes("blog")) {
+            blockType = "blog";
+            pw2Block = "posts";
+            title = `Khối Bài Viết: ${c.label || "Tin Tức & Blog"} (${posts.length} Bài)`;
+            headline = "Bài Viết & Cẩm Nang";
+            bodyText = posts.slice(0, 3).map((pst: any) => pst.title).join(" • ") || "Chưa có bài viết";
+          } else if (fcName.includes("rich_text") || fcName.includes("text")) {
+            blockType = "text";
+            pw2Block = "rich_text";
+            title = `Khối Nội Dung: ${c.label || "Rich Text"}`;
+            headline = c.label || p.name;
+            bodyText = `Văn bản nội dung trang ${p.name}`;
+          }
+
+          return {
+            id: `blk-${c.id}`,
+            order: c.position || cIdx + 1,
+            blockType,
+            title,
+            pw1Component: c.tag_name || c.fc_name || "CustomComponent",
+            pw2Block,
+            pw1Preview: {
+              headline,
+              subheadline,
+              bodyText,
+              productCount,
+              badgeText: c.label || undefined,
+            },
+            pw2Preview: {
+              headline,
+              subheadline,
+              bodyText,
+              productCount,
+              badgeText: c.label || undefined,
+            },
+            status: "pass" as const,
+          };
+        });
+      } else {
+        pageBlocks = [
           {
             id: `blk-${p.id}-header`,
             order: 1,
@@ -774,7 +858,18 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             },
             status: "pass" as const,
           },
-        ],
+        ];
+      }
+
+      return {
+        id: `page-${p.id}`,
+        name: p.name || p.title || `Trang #${idx + 1}`,
+        path: pUrl,
+        pageType,
+        existsInPW1: true,
+        existsInPW2: true,
+        totalBlocks: pageBlocks.length,
+        blocks: pageBlocks,
         breakdown: [],
         defects: [],
         mediaAudits: [],
