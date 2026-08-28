@@ -444,7 +444,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
 
   // 4. Fetch Banners
   const banners = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-    `SELECT id, name, image, url, status FROM banners WHERE store_id = ? LIMIT 10;`,
+    `SELECT id, name, header, subheader, image, url, status, page_component_id FROM banners WHERE store_id = ? AND deleted_at IS NULL ORDER BY position ASC, id ASC;`,
     [numericId],
   );
 
@@ -747,8 +747,26 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             blockType = "hero";
             pw2Block = "hero";
             title = `Khối Banner: ${c.label || "Hero Banner"}`;
-            headline = banners[0]?.name || store.name;
-            subheadline = banners[0]?.subheader || store.description || "Giao diện banner trang chủ";
+            const compBanner = (banners as any[]).find((b) => b.page_component_id === c.id) || banners[0];
+            let bannerH = store.name;
+            let bannerSub = store.description || "Giao diện banner trang chủ";
+            if (compBanner) {
+              if (compBanner.header && typeof compBanner.header === "object" && compBanner.header.text) {
+                bannerH = compBanner.header.text;
+              } else if (typeof compBanner.header === "string" && compBanner.header.trim()) {
+                bannerH = compBanner.header;
+              } else if (compBanner.name) {
+                bannerH = compBanner.name;
+              }
+
+              if (compBanner.subheader && typeof compBanner.subheader === "object" && compBanner.subheader.text) {
+                bannerSub = compBanner.subheader.text;
+              } else if (typeof compBanner.subheader === "string" && compBanner.subheader.trim()) {
+                bannerSub = compBanner.subheader;
+              }
+            }
+            headline = bannerH;
+            subheadline = bannerSub;
             bodyText = `Hotline: ${Array.isArray(store.hotline) ? store.hotline.join(", ") : store.hotline || "1900 8888"}`;
           } else if (fcName.includes("product")) {
             blockType = "products";
