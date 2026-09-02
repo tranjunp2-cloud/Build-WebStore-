@@ -15,7 +15,7 @@ body:
     id: feature-code
     attributes:
       label: "Feature code"
-      description: "FXX de bot auto label feature:FXX"
+      description: "FXX (VD F40). PM/dev add label feature:FXX manual sau khi triage"
       placeholder: "F40"
     validations:
       required: true
@@ -114,31 +114,41 @@ body:
       required: true
 
   - type: dropdown
-    id: risk
+    id: risk-severity
     attributes:
-      label: "Risk assessment"
-      description: "Neu high risk, PR se can extra review"
+      label: "Risk severity"
+      description: "Muc do rui ro tong the neu bug (chon dua tren blast radius)"
       options:
         - Low — thay doi UI/UX rieng feature
         - Medium — anh huong 1-2 modules
         - High — anh huong nhieu features hoac shared code
-        - risk:security — cham auth/credential/PII
-        - risk:data-loss — migration/batch update/delete
-        - risk:breaking-change — API/schema breaking
     validations:
       required: true
+
+  - type: dropdown
+    id: risk-category
+    attributes:
+      label: "Risk category (specialized)"
+      description: "Neu task cham auth/data/API contract, chon category tuong ung de PM/reviewer add label risk:* tuong ung"
+      options:
+        - None
+        - "risk:security — cham auth/credential/PII"
+        - "risk:data-loss — migration/batch update/delete"
+        - "risk:breaking-change — API/schema breaking"
+    validations:
+      required: false
 
   - type: dropdown
     id: agent-routing
     attributes:
       label: "AI agent routing"
-      description: "Task nay AI (Claude/Codex) co lam duoc khong?"
+      description: "Task nay AI (Claude/Codex) co lam duoc khong? (Optional - default agent:needs-context neu bo trong)"
       options:
         - "agent:ai-ok — AI co the tu implement"
         - "agent:needs-context — AI can dev cung cap them context truoc"
         - "agent:human-needed — Can dev/PM tay quyet dinh"
     validations:
-      required: true
+      required: false
 
   - type: input
     id: start-date

@@ -78,14 +78,28 @@ bun test src/collections/products
 
 ### Label lifecycle sau khi ghi handoff
 
-| Truoc handoff | Sau handoff | Ai lam |
+Team ech-prime-web-v2 dung **ECH Sprint Board (Project #8) Status field** cho trang thai
+implementation (Ready / In Progress / Review / Done). Handoff writer chi cham cac label
+duoi day (khong dung `status:in-progress` / `status:blocked` — 2 label do khong ton tai
+trong repo).
+
+| Truong hop handoff | Action | Ai lam |
 |---|---|---|
-| `status:in-progress` | `status:ready` (neu chuyen owner) | Handoff writer |
-| `agent:human-needed` | Add + tag @person | Handoff writer |
-| `agent:needs-context` | Add + ghi context can bo sung | Handoff writer |
-| `status:blocked` | Add + ghi blocker chi tiet | Handoff writer |
+| Chuyen task cho AI (Claude/Codex) implement | Add `agent:ai-ok` | Handoff writer |
+| Blocker: can dev/PM quyet dinh | Add `agent:human-needed` + tag @person | Handoff writer |
+| Blocker: thieu context, can dev bo sung | Add `agent:needs-context` + ghi list cau hoi | Handoff writer |
+| Task cham auth/PII/security | Add `risk:security` | Handoff writer |
+| Task migration/batch delete/data | Add `risk:data-loss` | Handoff writer |
+| Task doi API/schema | Add `risk:breaking-change` | Handoff writer |
+| PR ready → QC test tren staging | Add `qa:pending` | Dev sau khi merge |
+| QC test pass tren staging | Doi `qa:pending` → `qa:passed` | QC sau khi test |
+| QC phat hien bug | Doi `qa:pending` → `qa:failed` (issue-lifecycle bot se auto-post bug template) | QC |
+
+**Update Project board Status field** (khong phai label) cho trang thai implementation:
+Ready → In Progress → Review → Done.
 
 Xem full label taxonomy: `.github/GIT_AND_CI_RULES.md`
+Xem workflow tu dong: `.github/workflows/issue-lifecycle.yml`
 
 ---
 
