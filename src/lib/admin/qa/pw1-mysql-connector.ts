@@ -270,6 +270,24 @@ export async function introspectAllPw1Tables(databaseName?: string): Promise<Tab
   return result;
 }
 
+export const ALLOWED_AUDIT_TABLES = new Set([
+  "products",
+  "product_skus",
+  "product_images",
+  "categories",
+  "banners",
+  "blog_posts",
+  "pages",
+  "stores",
+  "model_settings",
+  "menus",
+  "menu_items",
+  "page_components",
+  "frontend_templates",
+  "store_domains",
+  "brands",
+]);
+
 /**
  * Fetches all records from a given table for a specific store/merchant ID with safety limits.
  */
@@ -281,6 +299,13 @@ export async function fetchStoreTableRecords(
   // Sanitize table name (only alphanumeric and underscore)
   if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
     throw new Error(`Invalid table name: ${tableName}`);
+  }
+
+  // Security: Enforce strict whitelist to block users, passwords, tokens, sessions, credentials
+  if (!ALLOWED_AUDIT_TABLES.has(tableName.toLowerCase())) {
+    throw new Error(
+      `[SECURITY ERROR] Access to table '${tableName}' is restricted. Only audited storefront and catalog tables can be queried.`
+    );
   }
 
   let sql = `SELECT * FROM \`${tableName}\``;
@@ -409,40 +434,39 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     throw new Error(`Store with ID ${numericId} not found in PW1 MySQL`);
   }
 
-  // 2. Fetch Products & SKUs
-  const products = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-    `SELECT p.id, p.name, p.slug, p.status, p.brand_id, p.category_id, k.sku, k.price, k.cost, k.stock, b.name as brand_name, c.name as category_name
-     FROM products p
-     LEFT JOIN product_skus k ON k.product_id = p.id
-     LEFT JOIN brands b ON b.id = p.brand_id
-     LEFT JOIN categories c ON c.id = p.category_id
-     WHERE p.store_id = ?
-     LIMIT 50;`,
-    [numericId],
-  );
-
-  // 3. Fetch Categories
-  const categories = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-    `SELECT id, name, slug, status FROM categories WHERE store_id = ? LIMIT 20;`,
-    [numericId],
-  );
-
-  // 4. Fetch Banners
-  const banners = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-    `SELECT id, name, header, subheader, image, url, status, page_component_id FROM banners WHERE store_id = ? AND deleted_at IS NULL ORDER BY position ASC, id ASC;`,
-    [numericId],
-  );
-
-  // 5. Fetch Blog Posts
-  const posts = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-    `SELECT id, title, slug, image, status, created_at FROM blog_posts WHERE store_id = ? LIMIT 10;`,
-    [numericId],
-  );
-
-  // 5.5. Fetch Product SKUs (Variants)
-  let rawSkus: mysql.RowDataPacket[] = [];
-  try {
-    rawSkus = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
+  // 2. Parallel Query Execution across all core entity groups
+  const [
+    products,
+    categories,
+    banners,
+    posts,
+    rawSkus,
+    rawPages,
+    rawMenus,
+  ] = await Promise.all([
+    queryPw1ReadOnly<mysql.RowDataPacket[]>(
+      `SELECT p.id, p.name, p.slug, p.status, p.brand_id, p.category_id, k.sku, k.price, k.cost, k.stock, b.name as brand_name, c.name as category_name
+       FROM products p
+       LEFT JOIN product_skus k ON k.product_id = p.id
+       LEFT JOIN brands b ON b.id = p.brand_id
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.store_id = ?
+       LIMIT 50;`,
+      [numericId],
+    ),
+    queryPw1ReadOnly<mysql.RowDataPacket[]>(
+      `SELECT id, name, slug, status FROM categories WHERE store_id = ? LIMIT 20;`,
+      [numericId],
+    ),
+    queryPw1ReadOnly<mysql.RowDataPacket[]>(
+      `SELECT id, name, header, subheader, image, url, status, page_component_id FROM banners WHERE store_id = ? AND deleted_at IS NULL ORDER BY position ASC, id ASC;`,
+      [numericId],
+    ),
+    queryPw1ReadOnly<mysql.RowDataPacket[]>(
+      `SELECT id, title, slug, image, status, created_at FROM blog_posts WHERE store_id = ? LIMIT 10;`,
+      [numericId],
+    ),
+    queryPw1ReadOnly<mysql.RowDataPacket[]>(
       `SELECT ps.id, ps.product_id, ps.sku, ps.price, ps.stock, ps.cost, ps.status, p.name as prod_name
        FROM product_skus ps
        JOIN products p ON p.id = ps.product_id
@@ -450,22 +474,19 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
        ORDER BY ps.product_id ASC, ps.id ASC
        LIMIT 50;`,
       [numericId],
-    );
-  } catch {
-    // ignore
-  }
-
-  // 6. Fetch Active Pages
-  const rawPages = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-    `SELECT id, name, title, slug, url, type, status FROM pages WHERE store_id = ? AND deleted_at IS NULL ORDER BY id ASC;`,
-    [numericId],
-  );
-
-  // 7. Fetch Menus & Menu Items
-  const rawMenus = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-    `SELECT m.id as menu_id, m.name as menu_name, i.id as item_id, i.name as item_name, i.url as item_url, i.position FROM menus m JOIN menu_items i ON i.menu_id = m.id WHERE m.store_id = ? AND m.deleted_at IS NULL ORDER BY m.id ASC, i.position ASC;`,
-    [numericId],
-  );
+    ).catch((err) => {
+      console.warn(`[pw1-mysql-connector] Could not fetch product_skus for store ${numericId}:`, err);
+      return [] as mysql.RowDataPacket[];
+    }),
+    queryPw1ReadOnly<mysql.RowDataPacket[]>(
+      `SELECT id, name, title, slug, url, type, status FROM pages WHERE store_id = ? AND deleted_at IS NULL ORDER BY id ASC;`,
+      [numericId],
+    ),
+    queryPw1ReadOnly<mysql.RowDataPacket[]>(
+      `SELECT m.id as menu_id, m.name as menu_name, i.id as item_id, i.name as item_name, i.url as item_url, i.position FROM menus m JOIN menu_items i ON i.menu_id = m.id WHERE m.store_id = ? AND m.deleted_at IS NULL ORDER BY m.id ASC, i.position ASC;`,
+      [numericId],
+    ),
+  ]);
 
   const records: any[] = [];
 
@@ -865,37 +886,35 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
   const tCode = (store.tpl_code || "T001").toUpperCase();
   const domain = store.domain || `${store.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.web.dev.ecommercehub.my`;
 
-  // 8. Fetch Real Page Components (Layout Blocks) from MySQL
+  // 8. Fetch Real Page Components & Product Images in parallel
   const pageIds = (rawPages as any[]).map((p) => p.id);
-  let rawComponents: any[] = [];
-  if (pageIds.length > 0) {
-    try {
-      rawComponents = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-        `SELECT c.*, fc.name as fc_name, fc.label as fc_label
-         FROM page_components c
-         LEFT JOIN frontend_components fc ON fc.id = c.frontend_component_id
-         WHERE c.page_id IN (?) AND c.status = 1
-         ORDER BY c.page_id ASC, c.position ASC;`,
-        [pageIds],
-      );
-    } catch {
-      // ignore
-    }
-  }
-
-  // 9. Fetch Product Images
   const prodIds = (products as any[]).map((p) => p.id);
-  let prodImages: any[] = [];
-  if (prodIds.length > 0) {
-    try {
-      prodImages = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-        `SELECT product_id, url FROM product_images WHERE product_id IN (?) AND deleted_at IS NULL ORDER BY product_id, \`order\` ASC;`,
-        [prodIds],
-      );
-    } catch {
-      // ignore
-    }
-  }
+
+  const [rawComponents, prodImages] = await Promise.all([
+    pageIds.length > 0
+      ? queryPw1ReadOnly<mysql.RowDataPacket[]>(
+          `SELECT c.*, fc.name as fc_name, fc.label as fc_label
+           FROM page_components c
+           LEFT JOIN frontend_components fc ON fc.id = c.frontend_component_id
+           WHERE c.page_id IN (?) AND c.status = 1
+           ORDER BY c.page_id ASC, c.position ASC;`,
+          [pageIds],
+        ).catch((err) => {
+          console.warn("[pw1-mysql-connector] Could not fetch page_components:", err);
+          return [] as mysql.RowDataPacket[];
+        })
+      : Promise.resolve([] as mysql.RowDataPacket[]),
+    prodIds.length > 0
+      ? queryPw1ReadOnly<mysql.RowDataPacket[]>(
+          `SELECT product_id, url FROM product_images WHERE product_id IN (?) AND deleted_at IS NULL ORDER BY product_id, \`order\` ASC;`,
+          [prodIds],
+        ).catch((err) => {
+          console.warn("[pw1-mysql-connector] Could not fetch product_images:", err);
+          return [] as mysql.RowDataPacket[];
+        })
+      : Promise.resolve([] as mysql.RowDataPacket[]),
+  ]);
+
   const prodImgMap = new Map<number, string>();
   for (const img of prodImages) {
     if (!prodImgMap.has(img.product_id)) {
@@ -914,8 +933,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           [compIds],
         );
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[pw1-mysql-connector] Could not fetch model_settings:", err);
     }
   }
   const compSettingMap = new Map<string, string>();
@@ -968,8 +987,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           }
         }
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[pw1-mysql-connector] Could not fetch shortlist_items:", err);
     }
   }
 

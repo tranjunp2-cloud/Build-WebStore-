@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withSuperAdmin } from "@/lib/admin/api-utils";
 import {
   generateReconciliationCatalog,
   getStoreDeepDiff,
@@ -17,16 +18,9 @@ export const maxDuration = 60;
 
 /**
  * GET /api/qa/migration-diff
- * Query params:
- *   - mode: "db_status" | "db_tables" | "db_records"
- *   - store_id: Optional. If present, returns deep diff for a specific store.
- *   - filter: "all" | "passed" | "warning" | "failed"
- *   - template: "all" | "FB101" | "PA101" | ...
- *   - search: string keyword
- *   - page: number (default 1)
- *   - limit: number (default 20)
+ * Super-Admin only route for database reconciliation and diff inspection.
  */
-export async function GET(request: NextRequest) {
+export const GET = withSuperAdmin(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode");
@@ -89,8 +83,8 @@ export async function GET(request: NextRequest) {
       if (allStores.length > 0) {
         isLiveCatalog = true;
       }
-    } catch {
-      // Fallback
+    } catch (err: unknown) {
+      console.error("[MigrationDiff] Failed to load live stores from MySQL, falling back to mock catalog:", err);
     }
 
     if (allStores.length === 0) {
@@ -136,23 +130,24 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
 /**
  * POST /api/qa/migration-diff
- * Actions:
+ * Super-Admin only actions:
  *   - approve_pass: Mark store as passed
  *   - scan_batch: Trigger fresh re-scan
  *   - ingest_json: Parse uploaded JSON payload
+ *   - test_db_connection: Test server-configured DB connection (no arbitrary hosts allowed)
  */
-export async function POST(request: NextRequest) {
+export const POST = withSuperAdmin(async (request: NextRequest, { user }) => {
   try {
     const body = await request.json();
     const action = body?.action;
 
     if (action === "test_db_connection") {
-      const dbConfig = body?.config;
-      const result = await testPw1Connection(dbConfig);
+      // Security: Strictly test server-configured PW1_DATABASE_URL to prevent SSRF
+      const result = await testPw1Connection();
       return NextResponse.json({
         success: result.connected,
         data: result,
@@ -164,6 +159,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: `Store ${storeId} certified QC Pass for cutover.`,
+        certifiedBy: user?.email || "super-admin",
         certifiedAt: new Date().toISOString(),
       });
     }
@@ -194,4 +190,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

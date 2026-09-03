@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
+import DOMPurify from "dompurify";
 import {
   generateReconciliationCatalog,
   getStoreDeepDiff,
@@ -567,7 +568,7 @@ function RichVisualBlockRenderer({
             <div className="text-[11px] text-slate-400 font-mono">{preview.subheadline}</div>
             <div
               className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 font-sans text-xs text-slate-200 prose prose-invert max-w-none overflow-hidden [&_img]:max-h-60 [&_img]:rounded-lg [&_img]:mx-auto [&_iframe]:w-full [&_iframe]:rounded-lg [&_a]:text-blue-400 [&_a]:underline"
-              dangerouslySetInnerHTML={{ __html: preview.bodyText || "" }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(preview.bodyText || "") }}
             />
           </div>
         )}
@@ -818,8 +819,8 @@ export function MigrationDiffClient() {
       const res = await fetch("/api/qa/migration-diff?mode=db_status");
       const json = await res.json();
       if (json.data) setDbStatus(json.data);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("[MigrationDiffClient] Failed to check live DB status:", err);
     }
   };
 
@@ -875,8 +876,8 @@ export function MigrationDiffClient() {
       if (json.stores && json.stores.length > 0) {
         setCatalog(json.stores);
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("[MigrationDiffClient] Failed to load live catalog:", err);
     }
   };
 
@@ -896,8 +897,8 @@ export function MigrationDiffClient() {
         if (json.data) {
           setLiveStoreDiff(json.data);
         }
-      } catch {
-        // fallback to static
+      } catch (err) {
+        console.error("[MigrationDiffClient] Failed to fetch deep diff, falling back:", err);
       }
     };
     void fetchDiff();

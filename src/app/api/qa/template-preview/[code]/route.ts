@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { withSuperAdmin } from "@/lib/admin/api-utils";
 import fs from "fs";
 import path from "path";
 
@@ -17,12 +18,12 @@ const TEMPLATE_FILE_MAP: Record<string, string> = {
   pa101: "pa101-standalone-full.html",
 };
 
-export async function GET(
+export const GET = withSuperAdmin(async (
   _request: NextRequest,
-  { params }: { params: Promise<{ code: string }> }
-) {
+  { params }: { params?: Record<string, string> }
+) => {
   try {
-    const { code } = await params;
+    const code = params?.code || "";
     const normalizedCode = (code || "").toLowerCase().trim();
     const fileName = TEMPLATE_FILE_MAP[normalizedCode];
 
@@ -67,4 +68,4 @@ export async function GET(
       }
     );
   }
-}
+});
