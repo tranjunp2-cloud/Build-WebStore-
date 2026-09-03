@@ -70,10 +70,7 @@ async function resolvedStagingContext(
   payload: Payload,
   requested?: ManualRunContext,
 ): Promise<ManualRunContext | undefined> {
-  const currentSha =
-    process.env.VERCEL_GIT_COMMIT_SHA ||
-    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ||
-    process.env.COMMIT_SHA;
+  const currentSha = process.env.VERCEL_GIT_COMMIT_SHA;
 
   if (
     requested &&
@@ -146,12 +143,8 @@ async function resolvedStagingContext(
 
   // Fallback 2: If deployed on Vercel/Staging with current SHA, fallback to current deployment
   if (currentSha) {
-    const prNumber =
-      Number(process.env.VERCEL_GIT_PULL_REQUEST_ID || 0) ||
-      Number(process.env.STAGING_PR_NUMBER || 0) ||
-      1;
     return {
-      pullRequest: prNumber,
+      pullRequest: 1,
       commitSha: currentSha,
     };
   }
