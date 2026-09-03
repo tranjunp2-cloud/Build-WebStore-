@@ -54,21 +54,6 @@ export function getPw1DbConfig(): Pw1DbConfig | null {
     return { url: url.trim() };
   }
 
-  const host = process.env.PW1_DB_HOST;
-  const user = process.env.PW1_DB_USER;
-  const database = process.env.PW1_DB_NAME;
-
-  if (host && user && database) {
-    return {
-      host,
-      port: process.env.PW1_DB_PORT ? parseInt(process.env.PW1_DB_PORT, 10) : 3306,
-      user,
-      password: process.env.PW1_DB_PASSWORD || "",
-      database,
-      ssl: process.env.PW1_DB_SSL === "true",
-    };
-  }
-
   return null;
 }
 
@@ -124,7 +109,7 @@ export function getPw1ConnectionPool(overrideConfig?: Pw1DbConfig): mysql.Pool {
   const config = overrideConfig || getPw1DbConfig();
   if (!config) {
     throw new Error(
-      "PW1 database configuration is missing. Please set PW1_DATABASE_URL or PW1_DB_HOST in .env.local",
+      "PW1 database configuration is missing. Please set PW1_DATABASE_URL in .env.local",
     );
   }
 
