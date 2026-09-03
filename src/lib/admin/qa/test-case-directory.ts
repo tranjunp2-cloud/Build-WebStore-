@@ -65,3 +65,21 @@ export function getTestCaseDirectorySummary(testCases = ALL_TEST_CASES_DIRECTORY
     testCases,
   };
 }
+
+const testCasesByTargetMap: Record<string, DirectoryTestCase[]> = {};
+for (const tc of ALL_TEST_CASES_DIRECTORY) {
+  if (tc.targetId) {
+    if (!testCasesByTargetMap[tc.targetId]) testCasesByTargetMap[tc.targetId] = [];
+    testCasesByTargetMap[tc.targetId].push(tc);
+  }
+}
+
+export function getTestCasesForTarget(targetId: string): DirectoryTestCase[] {
+  return testCasesByTargetMap[targetId] ?? [];
+}
+
+export function getTestCaseIdsForTarget(targetId: string): string[] {
+  return (testCasesByTargetMap[targetId] ?? []).map((tc) => tc.id);
+}
+
+export { testCasesByTargetMap };

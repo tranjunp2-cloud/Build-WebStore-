@@ -14,6 +14,7 @@ import { resolveManualQaPack } from "@/lib/admin/qa/targeted-smoke-registry";
 import { claimTargetedSmokeDispatch, blockTargetedSmokeDispatch, TargetedSmokeDispatchConflictError } from "@/lib/admin/qa/targeted-smoke-dispatch";
 import { dispatchTargetedSmokeWorkflow, githubAppConfigFromEnv, GitHubWorkflowDispatchRejectedError } from "@/lib/admin/qa/github-targeted-smoke";
 import { withQaTargetedDispatchTransaction } from "@/lib/payload/qa-targeted-dispatch-transaction";
+import { simulateLocalTestRun } from "@/lib/admin/qa/dev-test-runner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -156,89 +157,28 @@ export const POST = withSuperAdmin(async (req: NextRequest, { user }) => {
     // Local QA tests must prove the full browser confirmation and durable
     // ledger transition without ever dispatching an external Actions workflow.
     if (process.env.NODE_ENV === "development") {
-      const devPR = preflight.context.pullRequest;
-      const devSHA = preflight.context.commitSha;
-      setTimeout(async () => {
-        try {
-          const runId = `local-${outcome.dispatch.id}-${Date.now()}`;
-          const digest = crypto.createHash("sha256").update(runId).digest("hex");
-          const testCaseIds = resolved.pack.testCases.map((tc) => tc.id);
+      simulateLocalTestRun(payload, {
+        dispatchId: outcome.dispatch.id,
+        targetId: parsed.data.targetId,
+        profile: parsed.data.profile === "smoke" ? "manual-smoke" : "manual-regression",
+        runner: resolved.pack.runner ?? "smoke",
+        testCaseIds: resolved.pack.testCases.map((tc) => tc.id),
+        pullRequest: preflight.context.pullRequest,
+        commitSha: preflight.context.commitSha,
+        durationMs: 420,
+      });
 
-          const run = await payload.create({
-            collection: "qa_test_runs",
-            data: {
-              workflowRunId: runId,
-              attempt: 1,
-              ingestDigest: digest,
-              targetId: parsed.data.targetId,
-              suite: "targeted-smoke",
-              profile: parsed.data.profile === "smoke" ? "manual-smoke" : "manual-regression",
-              runner: resolved.pack.runner ?? "smoke",
-              environment: "staging",
-              status: "passed",
-              pullRequest: devPR,
-              commitSha: devSHA,
-              startedAt: new Date(Date.now() - 1500).toISOString(),
-              finishedAt: new Date().toISOString(),
-              summary: {
-                passed: testCaseIds.length,
-                failed: 0,
-                skipped: 0,
-                blocked: 0,
-              },
-            },
-            overrideAccess: true,
-          });
-
-          for (const tcId of testCaseIds) {
-            await payload.create({
-              collection: "qa_test_results",
-              data: {
-                run: run.id,
-                suite: "targeted-smoke",
-                testCaseId: tcId,
-                status: "passed",
-                durationMs: 420,
-                assertionCode: `ASSERTION_${tcId.replace(/[^A-Za-z0-9]/g, "_").toUpperCase()}_OK`,
-                actualSummary: "All assertions passed successfully in local environment.",
-                expectedSummary: "Flow executed cleanly within SLA without errors.",
-              },
-              overrideAccess: true,
-            });
-          }
-
-          await payload.update({
-            collection: "qa_smoke_dispatches",
+      return NextResponse.json(
+        {
+          data: {
             id: outcome.dispatch.id,
-            data: {
-              status: "terminal",
-              workflowRunId: runId,
-            },
-            overrideAccess: true,
-          });
-
-          const leases = await payload.find({
-            collection: "qa_fixture_leases",
-            where: { and: [{ dispatch: { equals: outcome.dispatch.id } }, { status: { equals: "active" } }] },
-            limit: 10,
-            overrideAccess: true,
-          });
-          await Promise.all(
-            leases.docs.map((lease) =>
-              payload.update({
-                collection: "qa_fixture_leases",
-                id: lease.id,
-                data: { status: "released", releasedAt: new Date().toISOString() },
-                overrideAccess: true,
-              })
-            )
-          );
-        } catch (e) {
-          console.error("Local simulated test execution error:", e);
-        }
-      }, 1500);
-
-      return NextResponse.json({ data: { id: outcome.dispatch.id, status: "dispatched", packId: resolved.pack.packId, packVersion: resolved.pack.packVersion } }, { status: 202 });
+            status: "dispatched",
+            packId: resolved.pack.packId,
+            packVersion: resolved.pack.packVersion,
+          },
+        },
+        { status: 202 },
+      );
     }
     if (!github) throw new Error("GitHub App configuration disappeared during dispatch");
     await dispatchTargetedSmokeWorkflow(github, {

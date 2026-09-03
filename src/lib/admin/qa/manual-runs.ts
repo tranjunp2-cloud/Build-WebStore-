@@ -141,19 +141,11 @@ async function resolvedStagingContext(
     };
   }
 
-  // Fallback 2: If deployed on Vercel/Staging with current SHA, fallback to current deployment
-  if (currentSha) {
-    return {
-      pullRequest: 1,
-      commitSha: currentSha,
-    };
-  }
-
-  // Fallback 3: In development environment without Vercel SHA
+  // Fallback 2: In development environment, supply local test context
   if (process.env.NODE_ENV === "development") {
     return {
-      pullRequest: 1746,
-      commitSha: "abcdef123456",
+      pullRequest: 0,
+      commitSha: currentSha || "dev-local-commit-sha",
     };
   }
 

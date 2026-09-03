@@ -14,6 +14,7 @@ import {
   GitHubWorkflowDispatchRejectedError,
   githubAppConfigFromEnv,
 } from "@/lib/admin/qa/github-targeted-smoke";
+import { simulateLocalTestRun } from "@/lib/admin/qa/dev-test-runner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -92,82 +93,17 @@ export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
     markedDispatched = true;
 
     if (process.env.NODE_ENV === "development") {
-      setTimeout(async () => {
-        try {
-          const runId = `local-retest-${outcome.dispatch.id}-${Date.now()}`;
-          const digest = crypto.createHash("sha256").update(runId).digest("hex");
-          const testCases = pack.manualProfiles?.[requestedProfile]?.testCases ?? pack.testCases;
-
-          const run = await payload.create({
-            collection: "qa_test_runs",
-            data: {
-              workflowRunId: runId,
-              attempt: 1,
-              ingestDigest: digest,
-              targetId,
-              suite: "targeted-smoke",
-              profile: runProfile,
-              runner: pack.runner ?? "smoke",
-              environment: "staging",
-              status: "passed",
-              pullRequest,
-              commitSha: commitSha ?? "abcdef1",
-              startedAt: new Date(Date.now() - 1500).toISOString(),
-              finishedAt: new Date().toISOString(),
-              summary: {
-                passed: testCases.length,
-                failed: 0,
-                skipped: 0,
-                blocked: 0,
-              },
-            },
-            overrideAccess: true,
-          });
-
-          for (const tc of testCases) {
-            await payload.create({
-              collection: "qa_test_results",
-              data: {
-                run: run.id,
-                suite: "targeted-smoke",
-                testCaseId: tc.id,
-                status: "passed",
-                durationMs: 350,
-                assertionCode: `ASSERTION_${tc.id.replace(/[^A-Za-z0-9]/g, "_").toUpperCase()}_OK`,
-                actualSummary: "Retest completed cleanly in local environment.",
-                expectedSummary: tc.assertion || "Target verified against contract.",
-              },
-              overrideAccess: true,
-            });
-          }
-
-          await payload.update({
-            collection: "qa_smoke_dispatches",
-            id: outcome.dispatch.id,
-            data: { status: "terminal", workflowRunId: runId },
-            overrideAccess: true,
-          });
-
-          const leases = await payload.find({
-            collection: "qa_fixture_leases",
-            where: { and: [{ dispatch: { equals: outcome.dispatch.id } }, { status: { equals: "active" } }] },
-            limit: 10,
-            overrideAccess: true,
-          });
-          await Promise.all(
-            leases.docs.map((lease) =>
-              payload.update({
-                collection: "qa_fixture_leases",
-                id: lease.id,
-                data: { status: "released", releasedAt: new Date().toISOString() },
-                overrideAccess: true,
-              }),
-            ),
-          );
-        } catch (e) {
-          console.error("Local simulated retest execution error:", e);
-        }
-      }, 1500);
+      const testCases = pack.manualProfiles?.[requestedProfile]?.testCases ?? pack.testCases;
+      simulateLocalTestRun(payload, {
+        dispatchId: outcome.dispatch.id,
+        targetId,
+        profile: runProfile,
+        runner: pack.runner ?? "smoke",
+        testCaseIds: testCases.map((tc) => tc.id),
+        pullRequest,
+        commitSha,
+        durationMs: 350,
+      });
 
       return NextResponse.json(
         {

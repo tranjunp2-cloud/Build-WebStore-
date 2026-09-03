@@ -515,6 +515,7 @@ function FeatureHealthDetail({
                 <div className="flex items-center gap-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 p-0.5">
                   <button
                     type="button"
+                    aria-pressed={retestProfile === "smoke"}
                     onClick={() => {
                       setRetestProfile("smoke");
                       setRetestConfirming(false);
@@ -525,6 +526,7 @@ function FeatureHealthDetail({
                   </button>
                   <button
                     type="button"
+                    aria-pressed={retestProfile === "regression"}
                     onClick={() => {
                       setRetestProfile("regression");
                       setRetestConfirming(false);

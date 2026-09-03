@@ -2,7 +2,7 @@ import {
   CMS_TARGET_REGISTRY,
   type TargetDomain,
 } from "@/lib/admin/qa/target-registry";
-import rawTestCases from "./test-case-directory.json";
+import { getTestCaseIdsForTarget } from "./test-case-directory";
 
 export type QaCoveragePriority =
   | "critical"
@@ -940,18 +940,10 @@ const BASE_CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string
   },
 ];
 
-const testCasesByTarget: Record<string, string[]> = {};
-for (const tc of rawTestCases as { targetId?: string; id: string }[]) {
-  if (tc.targetId) {
-    if (!testCasesByTarget[tc.targetId]) testCasesByTarget[tc.targetId] = [];
-    testCasesByTarget[tc.targetId].push(tc.id);
-  }
-}
-
 const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[] = [
   ...BASE_CERTIFIED_PACKS,
   ...BASE_CERTIFIED_PACKS.filter((p) => p.profile === "smoke").map((p) => {
-    const dirIds = testCasesByTarget[p.targetId];
+    const dirIds = getTestCaseIdsForTarget(p.targetId);
     const regressionIds = dirIds && dirIds.length > 0 ? dirIds : p.testCaseIds;
     const regressionDuration = Math.min(30, Math.max(3, regressionIds.length * 2));
     return {
@@ -1080,6 +1072,12 @@ export function isTargetQaPackContractCertified(
       executionIds.every((id, index) => id === profileIds[index])
     );
   }
+  // Architectural Note (US-F40-07 / US-F40-08):
+  // For non-smoke profiles (e.g., "regression"), the profileContract defines the comprehensive
+  // test suite populated from the Test Case Directory (e.g. TC-VIS-*, TC-SEC-*), whereas
+  // pack.testCases contains only the base smoke sanity check (e.g. TC-F40-*).
+  // Consequently, regression execution contracts are validated strictly 1:1 against profileIds
+  // (both ordering and contents) rather than packIds.
   return (
     executionIds.length === profileIds.length &&
     executionIds.every((id, index) => id === profileIds[index])
