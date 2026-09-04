@@ -157,12 +157,13 @@ export const POST = withSuperAdmin(async (req: NextRequest, { user }) => {
     // Local QA tests must prove the full browser confirmation and durable
     // ledger transition without ever dispatching an external Actions workflow.
     if (process.env.NODE_ENV === "development") {
+      const testCases = resolved.profile?.testCases ?? resolved.pack.testCases;
       simulateLocalTestRun(payload, {
         dispatchId: outcome.dispatch.id,
         targetId: parsed.data.targetId,
         profile: parsed.data.profile === "smoke" ? "manual-smoke" : "manual-regression",
         runner: resolved.pack.runner ?? "smoke",
-        testCaseIds: resolved.pack.testCases.map((tc) => tc.id),
+        testCaseIds: testCases.map((tc) => tc.id),
         pullRequest: preflight.context.pullRequest,
         commitSha: preflight.context.commitSha,
         durationMs: 420,

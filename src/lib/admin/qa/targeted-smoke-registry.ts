@@ -7,7 +7,7 @@ import {
   isTargetQaPackContractCertified,
   validateTargetQaCoverage,
 } from "@/lib/admin/qa/targeted-qa-coverage";
-import { getTestCasesForTarget } from "./test-case-directory";
+import { TARGET_TEST_CASES_MAP } from "./test-case-directory";
 
 export type TargetedSmokeTestCase = {
   id: string;
@@ -1633,10 +1633,7 @@ function isSafeSpecPath(value: string, runner: TargetedQaRunner): boolean {
 }
 
 export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = RAW_TARGETED_SMOKE_PACKS.map((pack) => {
-  const dirCases = getTestCasesForTarget(pack.targetId).map((tc) => ({
-    id: tc.id,
-    assertion: tc.assertion || tc.name || "Contract verified.",
-  }));
+  const dirCases = TARGET_TEST_CASES_MAP[pack.targetId];
   const regressionCases = dirCases && dirCases.length > 0 ? dirCases : pack.testCases;
   const regressionDuration = Math.min(30, Math.max(3, regressionCases.length * 2));
 
@@ -1743,9 +1740,16 @@ export function validateTargetedSmokePacks(
       } else {
         // Regression profiles expand test cases using Test Case Directory entries (e.g. TC-VIS-*)
         // which may use dedicated IDs distinct from the primary smoke pack sanity test.
-        if (profileIds.size !== contract.testCases.length)
+        if (
+          profileIds.size !== contract.testCases.length ||
+          contract.testCases.length === 0 ||
+          contract.testCases.some(
+            (testCase) =>
+              !TEST_CASE_ID.test(testCase.id) || !testCase.assertion.trim(),
+          )
+        )
           throw new Error(
-            `Manual regression profile has duplicate test cases: ${pack.packId}`,
+            `Manual regression profile has invalid or duplicate test cases: ${pack.packId}`,
           );
       }
       if (

@@ -2,7 +2,7 @@ import {
   CMS_TARGET_REGISTRY,
   type TargetDomain,
 } from "@/lib/admin/qa/target-registry";
-import { getTestCaseIdsForTarget } from "./test-case-directory";
+import { TARGET_CASE_IDS_MAP } from "./test-case-directory";
 
 export type QaCoveragePriority =
   | "critical"
@@ -53,6 +53,7 @@ type TargetQaPackContract = {
   fixtureKey?: string;
   spec: string;
   testCases: readonly { id: string }[];
+  manualProfiles?: Record<string, TargetQaProfileContract | undefined>;
 };
 
 type TargetQaProfileContract = {
@@ -943,7 +944,7 @@ const BASE_CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string
 const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[] = [
   ...BASE_CERTIFIED_PACKS,
   ...BASE_CERTIFIED_PACKS.filter((p) => p.profile === "smoke").map((p) => {
-    const dirIds = getTestCaseIdsForTarget(p.targetId);
+    const dirIds = TARGET_CASE_IDS_MAP[p.targetId];
     const regressionIds = dirIds && dirIds.length > 0 ? dirIds : p.testCaseIds;
     const regressionDuration = Math.min(30, Math.max(3, regressionIds.length * 2));
     return {
@@ -951,8 +952,8 @@ const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[]
       profile: "regression" as const,
       testCaseIds: regressionIds,
       estimatedDurationMinutes: regressionDuration,
-      approvalRef: "F40-08 QA approved regression contract",
-      stagedProofRef: "F40-08 catalog-regression-v1",
+      approvalRef: "auto-generated-from-smoke",
+      stagedProofRef: "auto-generated-from-smoke",
     };
   }),
 ];
@@ -1063,22 +1064,13 @@ export function isTargetQaPackContractCertified(
   const profileIds = profileContract.testCases
     .map((testCase) => testCase.id)
     .sort();
-  if (profile === "smoke") {
-    const packIds = pack.testCases.map((testCase) => testCase.id).sort();
-    return (
-      executionIds.length === packIds.length &&
-      executionIds.every((id, index) => id === packIds[index]) &&
-      executionIds.length === profileIds.length &&
-      executionIds.every((id, index) => id === profileIds[index])
-    );
-  }
-  // Architectural Note (US-F40-07 / US-F40-08):
-  // For non-smoke profiles (e.g., "regression"), the profileContract defines the comprehensive
-  // test suite populated from the Test Case Directory (e.g. TC-VIS-*, TC-SEC-*), whereas
-  // pack.testCases contains only the base smoke sanity check (e.g. TC-F40-*).
-  // Consequently, regression execution contracts are validated strictly 1:1 against profileIds
-  // (both ordering and contents) rather than packIds.
+  const profileCases = profile === "smoke"
+    ? pack.testCases
+    : (pack.manualProfiles?.[profile]?.testCases ?? profileContract.testCases);
+  const packIds = profileCases.map((testCase) => testCase.id).sort();
   return (
+    executionIds.length === packIds.length &&
+    executionIds.every((id, index) => id === packIds[index]) &&
     executionIds.length === profileIds.length &&
     executionIds.every((id, index) => id === profileIds[index])
   );

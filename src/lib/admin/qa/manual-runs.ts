@@ -133,12 +133,26 @@ async function resolvedStagingContext(
     }
   }
 
-  // Fallback 1: If user explicitly requested PR and SHA, use requested context directly
+  // Fallback 1: If user explicitly requested PR and SHA, verify against deployment SHA or development mode
   if (requested) {
-    return {
-      pullRequest: requested.pullRequest,
-      commitSha: requested.commitSha,
-    };
+    if (currentSha) {
+      const cSha = currentSha.toLowerCase();
+      const rSha = requested.commitSha.toLowerCase();
+      if (cSha === rSha || cSha.startsWith(rSha) || rSha.startsWith(cSha)) {
+        return {
+          pullRequest: requested.pullRequest,
+          commitSha: requested.commitSha,
+        };
+      }
+      return undefined;
+    }
+    if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+      return {
+        pullRequest: requested.pullRequest,
+        commitSha: requested.commitSha,
+      };
+    }
+    return undefined;
   }
 
   // Fallback 2: In development environment, supply local test context
