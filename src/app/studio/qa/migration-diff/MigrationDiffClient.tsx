@@ -566,20 +566,6 @@ export function MigrationDiffClient() {
   const [catalog, setCatalog] = useState<StoreSummary[]>(() => generateReconciliationCatalog(2000));
   const metrics = useMemo(() => getDashboardMetrics(catalog), [catalog]);
 
-  if (!mounted) {
-    return (
-      <div className="p-8 space-y-6 max-w-7xl mx-auto animate-pulse">
-        <div className="h-10 bg-slate-800/60 rounded-xl w-1/3" />
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-24 bg-slate-800/40 rounded-2xl border border-slate-800/50" />
-          ))}
-        </div>
-        <div className="h-96 bg-slate-800/30 rounded-2xl border border-slate-800/50" />
-      </div>
-    );
-  }
-
   // Overview Table Filters
   const [filterStatus, setFilterStatus] = useState<"all" | "passed" | "warning" | "failed">("all");
   const [filterTemplate, setFilterTemplate] = useState<string>("all");
@@ -748,6 +734,20 @@ export function MigrationDiffClient() {
       element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="p-8 space-y-6 max-w-7xl mx-auto animate-pulse">
+        <div className="h-10 bg-slate-800/60 rounded-xl w-1/3" />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-24 bg-slate-800/40 rounded-2xl border border-slate-800/50" />
+          ))}
+        </div>
+        <div className="h-96 bg-slate-800/30 rounded-2xl border border-slate-800/50" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans">
