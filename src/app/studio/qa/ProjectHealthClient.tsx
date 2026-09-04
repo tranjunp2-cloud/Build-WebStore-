@@ -23,6 +23,7 @@ import {
   History,
   FolderTree,
   Sparkles,
+  Layers,
 } from "lucide-react";
 import { ManualRunPanel } from "./ManualRunPanel";
 import { TestCaseDirectoryTab } from "./TestCaseDirectoryTab";
@@ -2559,7 +2560,7 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           aria-controls="qa-visual-review-panel"
           onKeyDown={(event) => onTabKeyDown(event, 4)}
           onClick={() => setActiveTab("visual_review")}
-          className={`relative ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-extrabold transition-all duration-200 ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-extrabold transition-all duration-200 ${
             activeTab === "visual_review"
               ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 shadow-lg shadow-cyan-500/25 ring-2 ring-cyan-300"
               : "bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 border border-cyan-500/50 shadow-sm"
