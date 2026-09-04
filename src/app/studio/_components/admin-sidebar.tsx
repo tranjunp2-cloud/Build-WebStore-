@@ -19,7 +19,7 @@ import { usePathname } from 'next/navigation'
 import {
     LayoutDashboard, BarChart2, FileText, FileEdit, GitPullRequest,
     History, CalendarClock, Archive, Boxes, Package, Zap,
-    Activity, Bug, Tag, FolderOpen, Settings, Layers, ShieldCheck,
+    Activity, Bug, Tag, FolderOpen, Settings, Layers, ShieldCheck, Sparkles, Database,
 } from 'lucide-react'
 import { useStudioPreferences } from './theme-density-accent-switcher'
 import type { SidebarCounts } from './sidebar-counts'
@@ -39,6 +39,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
     '/studio/packs': Package,
     '/studio/performance': Zap,
     '/studio/generations': Activity,
+    '/studio/migration': Layers,
     '/studio/qa': ShieldCheck,
     '/studio/issues': Bug,
     '/studio/categories': FolderOpen,
@@ -78,6 +79,12 @@ const NAV: NavSection[] = [
             { href: '/studio/versions', label: 'Versions' },
             { href: '/studio/scheduled', label: 'Scheduled', count: (c) => c.scheduled },
             { href: '/studio/archived', label: 'Archived' },
+        ],
+    },
+    {
+        section: 'Migration',
+        items: [
+            { href: '/studio/migration', label: 'Website Migration' },
         ],
     },
     {
