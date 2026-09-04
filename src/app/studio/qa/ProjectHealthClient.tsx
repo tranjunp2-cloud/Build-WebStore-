@@ -152,9 +152,11 @@ function formatDate(value?: string) {
 function FeatureHealthDetail({
   detail,
   onClose,
+  onNavigateToRuns,
 }: {
   detail: QaFeatureDetail;
   onClose: () => void;
+  onNavigateToRuns?: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -174,6 +176,7 @@ function FeatureHealthDetail({
   }, [onClose]);
 
   const result = detail.result;
+  const [retestProfile, setRetestProfile] = useState<"smoke" | "regression">("smoke");
   const [retestStatus, setRetestStatus] = useState("");
   const [retestPending, setRetestPending] = useState(false);
   const [retestConfirming, setRetestConfirming] = useState(false);
@@ -182,7 +185,7 @@ function FeatureHealthDetail({
     setRetestStatus("");
     try {
       const response = await fetch(
-        `/api/admin/qa/targets/${encodeURIComponent(detail.target.targetId)}/retest`,
+        `/api/admin/qa/targets/${encodeURIComponent(detail.target.targetId)}/retest?profile=${retestProfile}`,
         { method: "POST", credentials: "same-origin" },
       );
       const body = (await response.json()) as {
@@ -192,7 +195,7 @@ function FeatureHealthDetail({
       if (!response.ok)
         throw new Error(body.error ?? "Không thể dispatch retest.");
       setRetestStatus(
-        `✓ Đã kích hoạt chạy test thành công (Dispatch #${body.data?.id ?? "1"}). Kết quả đã được đồng bộ vào 'Lịch sử chạy'.`,
+        `✓ Đã kích hoạt chạy ${retestProfile === "regression" ? "Regression" : "Smoke"} test thành công (Dispatch #${body.data?.id ?? "1"}). Kết quả đã được đồng bộ vào 'Lịch sử chạy'.`,
       );
     } catch (error) {
       setRetestStatus(
@@ -509,7 +512,32 @@ function FeatureHealthDetail({
             </div>
 
             {detail.retest.available && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 p-0.5">
+                  <button
+                    type="button"
+                    aria-pressed={retestProfile === "smoke"}
+                    onClick={() => {
+                      setRetestProfile("smoke");
+                      setRetestConfirming(false);
+                    }}
+                    className={`rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${retestProfile === "smoke" ? "bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"}`}
+                  >
+                    🚀 Smoke (Nhanh)
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={retestProfile === "regression"}
+                    onClick={() => {
+                      setRetestProfile("regression");
+                      setRetestConfirming(false);
+                    }}
+                    className={`rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${retestProfile === "regression" ? "bg-white dark:bg-zinc-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"}`}
+                  >
+                    🛡️ Regression (Toàn diện)
+                  </button>
+                </div>
+
                 {retestConfirming ? (
                   <div className="flex items-center gap-2">
                     <button
@@ -535,7 +563,7 @@ function FeatureHealthDetail({
                       ) : (
                         <>
                           <span>✓</span>
-                          <span>Xác nhận chạy ngay</span>
+                          <span>Xác nhận chạy {retestProfile === "regression" ? "Regression" : "Smoke"}</span>
                         </>
                       )}
                     </button>
@@ -546,10 +574,10 @@ function FeatureHealthDetail({
                     data-testid="qa-retest"
                     disabled={retestPending || Boolean(retestStatus)}
                     onClick={() => setRetestConfirming(true)}
-                    className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-5 py-2 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-60"
+                    className={`flex items-center gap-1.5 rounded-lg ${retestProfile === "regression" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-blue-600 hover:bg-blue-700"} px-5 py-2 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-60`}
                   >
-                    <span>🚀</span>
-                    <span>Retest Smoke Ngay</span>
+                    <span>{retestProfile === "regression" ? "🛡️" : "🚀"}</span>
+                    <span>{retestProfile === "regression" ? "Retest Regression Ngay" : "Retest Smoke Ngay"}</span>
                   </button>
                 )}
               </div>
@@ -567,8 +595,24 @@ function FeatureHealthDetail({
           )}
 
           {retestStatus && (
-            <div role="status" className="rounded-lg bg-blue-50 dark:bg-blue-950/60 p-3 text-xs font-semibold text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-              {retestStatus}
+            <div
+              role="status"
+              className="mt-3 flex flex-col gap-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 p-4 text-xs text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 shadow-sm"
+            >
+              <div className="flex items-center gap-2 font-bold">
+                <span className="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[11px]">✓</span>
+                <span>{retestStatus}</span>
+              </div>
+              {onNavigateToRuns && (
+                <button
+                  type="button"
+                  onClick={onNavigateToRuns}
+                  className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow transition-all active:scale-95"
+                >
+                  <span>⏱️ Xem kết quả chi tiết trong Lịch sử chạy</span>
+                  <span>→</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -2589,6 +2633,7 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
         >
           <ManualRunPanel
             openRequest={manualRunRequest}
+            onConsumeOpenRequest={() => setManualRunRequest(0)}
             externalOpenButton={manualRunTrigger}
             targets={initialData.targets.map((target) => ({
               id: target.targetId,
@@ -2624,7 +2669,14 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
         </section>
       )}
       {selected && (
-        <FeatureHealthDetail detail={selected} onClose={closeDetail} />
+        <FeatureHealthDetail
+          detail={selected}
+          onClose={closeDetail}
+          onNavigateToRuns={() => {
+            closeDetail();
+            setActiveTab("runs");
+          }}
+        />
       )}
       {selectedFinding && (
         <FindingReviewDialog

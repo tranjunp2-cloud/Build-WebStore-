@@ -64,7 +64,8 @@ export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
       ...options,
     })) as { id: number; status?: string; workflowRunId?: string };
     status = dispatch.status;
-    if (dispatch.status === "queued") {
+    if (dispatch.status !== "queued" && dispatch.status !== "dispatched" && dispatch.status !== "cancel_requested") return;
+    if (dispatch.status === "queued" || !dispatch.workflowRunId) {
       await payload.update({
         collection: "qa_smoke_dispatches",
         id,
