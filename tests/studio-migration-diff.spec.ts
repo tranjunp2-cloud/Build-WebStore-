@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation API Tests", () => {
-  test("[TC-F40-09-API-01] GET /api/qa/migration-diff returns 2,000 stores aggregate metrics", async ({
+test.describe("F40 US-F40-12 Visual Parity Inspector & Reconciliation Tests", () => {
+  test("[TC-F40-12-API-01] GET /api/qa/migration-diff returns 2,000 stores aggregate metrics", async ({
     request,
   }) => {
     const res = await request.get("/api/qa/migration-diff?filter=all&page=1&limit=15");

@@ -566,6 +566,20 @@ export function MigrationDiffClient() {
   const [catalog, setCatalog] = useState<StoreSummary[]>(() => generateReconciliationCatalog(2000));
   const metrics = useMemo(() => getDashboardMetrics(catalog), [catalog]);
 
+  if (!mounted) {
+    return (
+      <div className="p-8 space-y-6 max-w-7xl mx-auto animate-pulse">
+        <div className="h-10 bg-slate-800/60 rounded-xl w-1/3" />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-24 bg-slate-800/40 rounded-2xl border border-slate-800/50" />
+          ))}
+        </div>
+        <div className="h-96 bg-slate-800/30 rounded-2xl border border-slate-800/50" />
+      </div>
+    );
+  }
+
   // Overview Table Filters
   const [filterStatus, setFilterStatus] = useState<"all" | "passed" | "warning" | "failed">("all");
   const [filterTemplate, setFilterTemplate] = useState<string>("all");
@@ -766,19 +780,22 @@ export function MigrationDiffClient() {
         {/* Database Status Indicators */}
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-sm">
-            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-slate-400">PW1: <strong className="text-emerald-400 font-mono font-medium">MySQL</strong></span>
+            <span className="size-2 rounded-full bg-emerald-400" />
+            <span className="text-slate-400">Snapshot: <strong className="text-emerald-400 font-mono font-medium">PW1 Audit Data</strong></span>
           </div>
           <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-sm">
-            <span className="size-2 rounded-full bg-sky-400 animate-pulse" />
-            <span className="text-slate-400">PW2: <strong className="text-sky-400 font-mono font-medium">Postgres</strong></span>
+            <span className="size-2 rounded-full bg-sky-400" />
+            <span className="text-slate-400">Target: <strong className="text-sky-400 font-mono font-medium">PW2 Next.js</strong></span>
           </div>
+          <span className="px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] font-semibold text-amber-400">
+            Audit Mode
+          </span>
           <button
-            onClick={() => showToast("Đã quét lại đối soát cho toàn bộ 2.000 website!")}
+            onClick={() => showToast("Đã làm mới dữ liệu đối soát cho toàn bộ 2.000 website!")}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700/80 transition shadow-sm"
           >
             <RefreshCw className="size-3.5 text-slate-400" />
-            <span>Quét Lại CSDL</span>
+            <span>Làm Mới Đối Soát</span>
           </button>
         </div>
       </div>
@@ -939,7 +956,7 @@ export function MigrationDiffClient() {
                     >
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] font-bold px-1.5 py-0.2 bg-slate-800 text-sky-400 rounded border border-slate-700">
+                          <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 bg-slate-800 text-sky-400 rounded border border-slate-700">
                             {t.code}
                           </span>
                           <span className="font-bold text-white text-xs">{t.name}</span>
@@ -1540,7 +1557,7 @@ export function MigrationDiffClient() {
                           >
                             <div className="flex items-center gap-2 font-bold text-white text-xs">
                               <span>{defect.icon}</span>
-                              <span className="font-mono uppercase text-[10px] px-1.5 py-0.2 rounded bg-black/40">
+                              <span className="font-mono uppercase text-[10px] px-1.5 py-0.5 rounded bg-black/40">
                                 {defect.type.toUpperCase()}
                               </span>
                               <span>{defect.title}</span>
@@ -1779,10 +1796,10 @@ export function MigrationDiffClient() {
                         <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
                           <iframe
                             key={`pw1-mob-${iframeReloadKey}`}
-                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
+                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw1`}
                             title="PW1 Mobile Storefront"
                             className="w-full h-full border-0"
-                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            sandbox="allow-scripts allow-forms allow-popups"
                           />
                         </div>
                         {/* Home Bar */}
@@ -1800,10 +1817,10 @@ export function MigrationDiffClient() {
                         <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
                           <iframe
                             key={`pw2-mob-${iframeReloadKey}`}
-                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
+                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2`}
                             title="PW2 Next.js Mobile Storefront"
                             className="w-full h-full border-0"
-                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            sandbox="allow-scripts allow-forms allow-popups"
                           />
                         </div>
                         {/* Home Bar */}
@@ -1816,16 +1833,16 @@ export function MigrationDiffClient() {
                       {/* Left PW1 Full Iframe */}
                       <div className="bg-slate-950 rounded-2xl border-2 border-amber-500/30 overflow-hidden flex flex-col shadow-xl">
                         <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-amber-400 font-mono flex items-center justify-between">
-                          <span>👈 PW1 LARAVEL (LIVE STOREFRONT 100%)</span>
+                          <span>👈 PW1 LARAVEL (SNAPSHOT CSDL CŨ)</span>
                           <span className="text-slate-400 font-normal">Desktop Resolution</span>
                         </div>
                         <div className="flex-1 bg-white relative">
                           <iframe
                             key={`pw1-desk-${iframeReloadKey}`}
-                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
+                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw1`}
                             title="PW1 Desktop Storefront"
                             className="w-full h-full border-0"
-                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            sandbox="allow-scripts allow-forms allow-popups"
                           />
                         </div>
                       </div>
@@ -1833,16 +1850,16 @@ export function MigrationDiffClient() {
                       {/* Right PW2 Full Iframe */}
                       <div className="bg-slate-950 rounded-2xl border-2 border-sky-500/30 overflow-hidden flex flex-col shadow-xl">
                         <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-sky-400 font-mono flex items-center justify-between">
-                          <span>👉 PW2 NEXT.JS 15 (LIVE STOREFRONT 100%)</span>
+                          <span>👉 PW2 NEXT.JS 15 (BẢN MIGRATE MỚI)</span>
                           <span className="text-slate-400 font-normal">Desktop Resolution</span>
                         </div>
                         <div className="flex-1 bg-white relative">
                           <iframe
                             key={`pw2-desk-${iframeReloadKey}`}
-                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`}
+                            src={`/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2`}
                             title="PW2 Next.js Desktop Storefront"
                             className="w-full h-full border-0"
-                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            sandbox="allow-scripts allow-forms allow-popups"
                           />
                         </div>
                       </div>
@@ -1919,7 +1936,7 @@ export function MigrationDiffClient() {
                         >
                           <Icon className="size-3.5" />
                           <span>{grp.label}</span>
-                          <span className="text-[10px] bg-slate-950/80 px-1.5 py-0.2 rounded-md font-mono opacity-80">
+                          <span className="text-[10px] bg-slate-950/80 px-1.5 py-0.5 rounded-md font-mono opacity-80">
                             {count}
                           </span>
                         </button>

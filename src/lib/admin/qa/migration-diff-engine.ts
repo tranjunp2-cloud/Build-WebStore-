@@ -324,10 +324,115 @@ export const CANONICAL_TEMPLATES = [
   },
 ];
 
+let cachedCatalog: StoreSummary[] | null = null;
+
+export interface SectorThemeData {
+  productName: string;
+  productSku: string;
+  categoryName: string;
+  bannerTitle: string;
+  voucherTitle: string;
+  articleTitle: string;
+  tags: string;
+}
+
+export const SECTOR_DATA_MAP: Record<string, SectorThemeData> = {
+  FB101: {
+    productName: "Mật Ong Rừng Ba Vì Nguyên Chất 500ml",
+    productSku: "ONG-RUNG-500",
+    categoryName: "Mật Ong & Nông Sản Sạch",
+    bannerTitle: "MẬT ONG RỪNG TỰ NHIÊN",
+    voucherTitle: "VOUCHER 50K - MUA MẬT ONG RỪNG",
+    articleTitle: "5 Cách Phân Biệt Mật Ong Thật Và Giả Tại Nhà",
+    tags: "mật ong, nông sản, sức khỏe",
+  },
+  PA101: {
+    productName: "Viên Uống Vitamin C 1000mg Tăng Đề Kháng",
+    productSku: "VITA-C-1000",
+    categoryName: "Dược Phẩm & Thực Phẩm Chức Năng",
+    bannerTitle: "CHĂM SÓC SỨC KHỎE GIA ĐÌNH",
+    voucherTitle: "VOUCHER 50K - ĐƠN DƯỢC PHẨM",
+    articleTitle: "Cẩm Nang Bổ Sung Vi Chất Đúng Cách",
+    tags: "vitamin, dược phẩm, sức khỏe",
+  },
+  F102: {
+    productName: "Áo Sơ Mi Linen Form Rộng Thoáng Mát",
+    productSku: "SHIRT-LINEN-01",
+    categoryName: "Thời Trang Nam Nữ Mùa Hè",
+    bannerTitle: "BỘ SƯU TẬP THỜI TRANG HÈ",
+    voucherTitle: "GIẢM 50K - THỜI TRANG TỪ 300K",
+    articleTitle: "Xu Hướng Phối Đồ Tối Giản Thanh Lịch",
+    tags: "thời trang, áo sơ mi, phong cách",
+  },
+  FN104: {
+    productName: "Kệ Sách Đa Năng 4 Tầng Gỗ Thông Tự Nhiên",
+    productSku: "SHELF-PINE-04",
+    categoryName: "Nội Thất & Tiện Ích Gia Đình",
+    bannerTitle: "KHÔNG GIAN SỐNG TỐI GIẢN",
+    voucherTitle: "GIẢM 50K - COMBO GIA DỤNG",
+    articleTitle: "Bí Quyết Sắp Xếp Bàn Làm Việc Gọn Gàng",
+    tags: "kệ sách, gia dụng, tối giản",
+  },
+  FN103: {
+    productName: "Sofa Góc Bọc Da Ý Cao Cấp Sang Trọng",
+    productSku: "SOFA-ITALY-L",
+    categoryName: "Nội Thất Phòng Khách Cao Cấp",
+    bannerTitle: "NỘI THẤT HOÀNG GIA Ý",
+    voucherTitle: "VOUCHER 500K - ĐƠN NỘI THẤT",
+    articleTitle: "Cách Lựa Chọn Sofa Phù Hợp Không Gian Căn Hộ",
+    tags: "sofa, nội thất, sang trọng",
+  },
+  C102: {
+    productName: "Serum Dưỡng Trắng Mờ Thâm Niacinamide 10%",
+    productSku: "SERUM-NIA-10",
+    categoryName: "Mỹ Phẩm & Tinh Chất Phục Hồi",
+    bannerTitle: "LÀN DA TỎA SÁNG KHÔNG TỲ VẾT",
+    voucherTitle: "TẶNG 50K - MỸ PHẨM CHÍNH HÃNG",
+    articleTitle: "Quy Trình Chăm Sóc Da Ban Đêm Chuẩn Hàn Quốc",
+    tags: "serum, mỹ phẩm, skincare",
+  },
+  C101: {
+    productName: "Kem Dưỡng Ẩm Chuyên Sâu Cấp Nước 72H",
+    productSku: "CREAM-AQUA-72",
+    categoryName: "Chăm Sóc Da & Làm Đẹp",
+    bannerTitle: "CẤP ẨM CHUYÊN SÂU LÀN DA",
+    voucherTitle: "GIẢM 50K - BỘ ĐÔI DƯỠNG ẨM",
+    articleTitle: "Nguyên Nhân Khiến Da Khô Ráp Mùa Đông Và Cách Trị",
+    tags: "kem dưỡng, làm đẹp, da khô",
+  },
+  FN102: {
+    productName: "Bàn Trà Gỗ Hương Khảm Trai Tinh Xảo",
+    productSku: "TABLE-HUONG-01",
+    categoryName: "Đồ Gỗ Mỹ Nghệ Truyền Thống",
+    bannerTitle: "TINH HOA ĐỒ GỖ VIỆT",
+    voucherTitle: "ƯU ĐÃI 100K - ĐỒ GỖ NGHỆ THUẬT",
+    articleTitle: "Tìm Hiểu Giá Trị Phong Thủy Của Bàn Trà Gỗ Tự Nhiên",
+    tags: "bàn trà, gỗ hương, mỹ nghệ",
+  },
+  FN101: {
+    productName: "Thảm Trải Sàn Nỉ Dệt Hoa Văn Bohemian",
+    productSku: "RUG-BOHO-200",
+    categoryName: "Trang Trí Phòng Khách & Nhà Ở",
+    bannerTitle: "SẮC MÀU KHÔNG GIAN SỐNG",
+    voucherTitle: "VOUCHER 50K - THẢM CAO CẤP",
+    articleTitle: "Mẹo Vệ Sinh Thảm Nỉ Luôn Sạch Sẽ Như Mới",
+    tags: "thảm, trang trí, bohemian",
+  },
+};
+
+export function getSectorTheme(templateCode?: string): SectorThemeData {
+  const code = (templateCode || "FB101").toUpperCase().trim();
+  return SECTOR_DATA_MAP[code] || SECTOR_DATA_MAP.FB101;
+}
+
 /**
  * Generate 2,000 canonical store index for fast QA review
  */
 export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[] {
+  if (cachedCatalog && cachedCatalog.length === totalCount) {
+    return cachedCatalog;
+  }
+
   const catalog: StoreSummary[] = [];
 
   for (let i = 1; i <= totalCount; i++) {
@@ -411,7 +516,7 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       lastCheckedAt: new Date().toISOString(),
     });
   }
-
+  cachedCatalog = catalog;
   return catalog;
 }
 
@@ -420,8 +525,14 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
  */
 export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreFieldDiffAudit {
   const allStores = generateReconciliationCatalog(2000);
-  const store = allStores.find((s) => s.id === siteId) || allStores[0];
+  const store = allStores.find((s) => s.id === siteId);
+  if (!store) {
+    throw new Error(`Store ${siteId} not found`);
+  }
   const currentStatus = overrideStatus || store.status;
+  const theme = siteId === "SITE-0001" || siteId === "SITE-0025"
+    ? SECTOR_DATA_MAP.FB101
+    : getSectorTheme(store.templateCode);
 
   const isFailed = currentStatus === "failed";
   const isWarn = currentStatus === "warning";
@@ -434,8 +545,8 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
       legacyId: "PROD-101",
       migratedId: "pw2_prod_101",
       entityGroup: "products",
-      entityName: "Sản Phẩm: Mật Ong Rừng Ba Vì Nguyên Chất 500ml",
-      entityIdentifier: "SKU: ONG-RUNG-500ML",
+      entityName: `Sản Phẩm: ${theme.productName}`,
+      entityIdentifier: `SKU: ${theme.productSku}`,
       matchStatus: isFailed ? "error" : "match",
       totalFields: 7,
       matchedFields: isFailed ? 5 : 7,
@@ -446,8 +557,8 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
           fieldLabel: "Tên Sản Phẩm",
           legacyKey: "products.title",
           migratedKey: "products.title",
-          legacyValue: "Mật Ong Rừng Ba Vì Nguyên Chất",
-          migratedValue: "Mật Ong Rừng Ba Vì Nguyên Chất",
+          legacyValue: theme.productName,
+          migratedValue: theme.productName,
           status: "match",
           classification: "100% Match",
         },
@@ -478,8 +589,8 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
           fieldLabel: "Danh Mục Chính",
           legacyKey: "products.category_id",
           migratedKey: "products.category",
-          legacyValue: "Mật Ong & Nông Sản",
-          migratedValue: "Mật Ong & Nông Sản",
+          legacyValue: theme.categoryName,
+          migratedValue: theme.categoryName,
           status: "match",
           classification: "100% Match",
         },
@@ -744,7 +855,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
       legacyId: "BAN-1543",
       migratedId: "pw2_promo_01",
       entityGroup: "banners",
-      entityName: "Banner Khuyến Mãi Nhỏ: Voucher 50K Mật Ong Rừng",
+      entityName: `Banner Khuyến Mãi Nhỏ: ${theme.voucherTitle}`,
       entityIdentifier: "Vị trí: Banner Khuyến Mãi (#02)",
       matchStatus: "match",
       totalFields: 5,
@@ -756,8 +867,8 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
           fieldLabel: "Tiêu Đề Voucher",
           legacyKey: "banners.title",
           migratedKey: "cta.title",
-          legacyValue: "VOUCHER 50K - MUA MẬT ONG RỪNG",
-          migratedValue: "VOUCHER 50K - MUA MẬT ONG RỪNG",
+          legacyValue: theme.voucherTitle,
+          migratedValue: theme.voucherTitle,
           status: "match",
           classification: "100% Match",
         },
@@ -928,14 +1039,14 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
       ],
     },
 
-    // 8. CATEGORIES (CAT-12: Mật Ong & Nông Sản)
+    // 8. CATEGORIES
     {
       id: "ent-cat-12",
       legacyId: "CAT-12",
       migratedId: "pw2_cat_12",
       entityGroup: "categories",
-      entityName: "Danh Mục: Mật Ong & Nông Sản",
-      entityIdentifier: "Slug: mat-ong-nong-san",
+      entityName: `Danh Mục: ${theme.categoryName}`,
+      entityIdentifier: "Slug: danh-muc-chinh",
       matchStatus: "match",
       totalFields: 4,
       matchedFields: 4,
@@ -946,8 +1057,8 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
           fieldLabel: "Tên Danh Mục",
           legacyKey: "categories.name",
           migratedKey: "categories.name",
-          legacyValue: "Mật Ong & Nông Sản",
-          migratedValue: "Mật Ong & Nông Sản",
+          legacyValue: theme.categoryName,
+          migratedValue: theme.categoryName,
           status: "match",
           classification: "100% Match",
         },
@@ -962,36 +1073,36 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
           classification: "100% Match",
         },
         {
-          fieldName: "parent_id",
-          fieldLabel: "Danh Mục Cha (Hierarchy)",
-          legacyKey: "categories.parent_id",
-          migratedKey: "categories.parent",
-          legacyValue: null,
-          migratedValue: null,
+          fieldName: "description",
+          fieldLabel: "Mô Tả Danh Mục",
+          legacyKey: "categories.description",
+          migratedKey: "categories.description",
+          legacyValue: `${theme.categoryName} Chuẩn Chất Lượng`,
+          migratedValue: `${theme.categoryName} Chuẩn Chất Lượng`,
           status: "match",
           classification: "100% Match",
         },
         {
           fieldName: "seo_title",
-          fieldLabel: "SEO Title",
-          legacyKey: "categories.seo_title",
+          fieldLabel: "Tiêu Đề SEO",
+          legacyKey: "categories.meta_title",
           migratedKey: "categories.meta.title",
-          legacyValue: "Mật Ong & Nông Sản Sạch VietGAP",
-          migratedValue: "Mật Ong & Nông Sản Sạch VietGAP",
+          legacyValue: `${theme.categoryName} Chính Hãng`,
+          migratedValue: `${theme.categoryName} Chính Hãng`,
           status: "match",
           classification: "100% Match",
         },
       ],
     },
 
-    // 9. BLOG POSTS (POST-88: Phân biệt mật ong)
+    // 9. BLOG POSTS
     {
       id: "ent-post-88",
       legacyId: "POST-88",
       migratedId: "pw2_post_88",
       entityGroup: "posts",
-      entityName: "Bài Viết: 5 Cách Phân Biệt Mật Ong Thật Và Giả",
-      entityIdentifier: "Slug: 5-cach-phan-biet-mat-ong-that-gia",
+      entityName: `Bài Viết: ${theme.articleTitle}`,
+      entityIdentifier: "Slug: bai-viet-huong-dan",
       matchStatus: "match",
       totalFields: 5,
       matchedFields: 5,
@@ -1002,8 +1113,8 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
           fieldLabel: "Tiêu Đề Bài Viết",
           legacyKey: "articles.title",
           migratedKey: "posts.title",
-          legacyValue: "5 Cách Phân Biệt Mật Ong Thật Và Giả Tại Nhà",
-          migratedValue: "5 Cách Phân Biệt Mật Ong Thật Và Giả Tại Nhà",
+          legacyValue: theme.articleTitle,
+          migratedValue: theme.articleTitle,
           status: "match",
           classification: "100% Match",
         },
@@ -1228,10 +1339,13 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
  */
 export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreDeepDiff | null {
   const allStores = generateReconciliationCatalog(2000);
-  const store = allStores.find((s) => s.id === siteId) || allStores[0];
+  const store = allStores.find((s) => s.id === siteId);
   if (!store) return null;
 
   const currentStatus = overrideStatus || store.status;
+  const theme = siteId === "SITE-0001" || siteId === "SITE-0025"
+    ? SECTOR_DATA_MAP.FB101
+    : getSectorTheme(store.templateCode);
   const isFailed = currentStatus === "failed";
   const isWarn = currentStatus === "warning";
   const isPass = currentStatus === "passed";
