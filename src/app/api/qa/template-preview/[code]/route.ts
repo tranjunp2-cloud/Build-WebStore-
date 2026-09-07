@@ -18,8 +18,19 @@ const TEMPLATE_FILE_MAP: Record<string, string> = {
   pa101: "pa101-standalone-full.html",
 };
 
-function generateFallbackTemplateHtml(code: string, version: string): string {
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function generateFallbackTemplateHtml(code: string, version: "pw1" | "pw2"): string {
   const isPw1 = version === "pw1";
+  const safeCode = escapeHtml(code.toUpperCase());
+  const safeVersion = escapeHtml(version.toUpperCase());
   const badgeColor = isPw1 ? "#b45309" : "#0284c7";
   const bannerTitle = isPw1
     ? "👈 PW1 LARAVEL STOREFRONT (SNAPSHOT CSDL CŨ)"
@@ -31,7 +42,7 @@ function generateFallbackTemplateHtml(code: string, version: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Template ${code.toUpperCase()} (${version.toUpperCase()}) Preview</title>
+  <title>Template ${safeCode} (${safeVersion}) Preview</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
@@ -55,7 +66,7 @@ function generateFallbackTemplateHtml(code: string, version: string): string {
   <div class="version-bar">${bannerTitle}</div>
   <div class="spacer"></div>
   <header>
-    <div class="logo">STORE ${code.toUpperCase()} (${isPw1 ? "Laravel Legacy" : "Next.js 15"})</div>
+    <div class="logo">STORE ${safeCode} (${isPw1 ? "Laravel Legacy" : "Next.js 15"})</div>
     <div class="nav">
       <a href="#">Trang Chủ</a>
       <a href="#">Sản Phẩm</a>
@@ -64,7 +75,7 @@ function generateFallbackTemplateHtml(code: string, version: string): string {
     </div>
   </header>
   <div class="hero">
-    <h1>Cửa Hàng Trực Tuyến ${code.toUpperCase()}</h1>
+    <h1>Cửa Hàng Trực Tuyến ${safeCode}</h1>
     <p>Giao diện kiểm thử trực quan đối soát giữa bản cũ PW1 (PHP Laravel) và bản chuyển đổi PW2 (Next.js 15 Payload CMS).</p>
   </div>
   <div class="grid">
@@ -101,18 +112,21 @@ export const GET = withSuperAdmin(async (
     const fileName = TEMPLATE_FILE_MAP[normalizedCode];
 
     const url = new URL(request.url);
-    const version = (url.searchParams.get("version") || "pw1").toLowerCase().trim();
+    const rawVersion = (url.searchParams.get("version") || "pw1").toLowerCase().trim();
+    const version: "pw1" | "pw2" = rawVersion === "pw2" ? "pw2" : "pw1";
 
     const headers = {
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": "default-src 'self' 'unsafe-inline' data: https:; frame-ancestors 'self';",
       "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "SAMEORIGIN",
       "Cache-Control": "private, no-store, max-age=0",
     };
 
     if (!fileName) {
+      const safeCode = escapeHtml(code);
       return new NextResponse(
-        `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;background:#0f172a;color:#f8fafc;text-align:center;"><h2>Template "${code}" not found</h2><p style="color:#94a3b8">Valid codes: ${Object.keys(TEMPLATE_FILE_MAP).join(", ")}</p></body></html>`,
+        `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;background:#0f172a;color:#f8fafc;text-align:center;"><h2>Template "${safeCode}" not found</h2><p style="color:#94a3b8">Valid codes: ${Object.keys(TEMPLATE_FILE_MAP).join(", ")}</p></body></html>`,
         { status: 404, headers }
       );
     }
@@ -143,13 +157,16 @@ export const GET = withSuperAdmin(async (
       headers,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal Server Error";
+    const rawMessage = error instanceof Error ? error.message : "Internal Server Error";
+    const safeMessage = escapeHtml(rawMessage);
     return new NextResponse(
-      `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;background:#0f172a;color:#f8fafc;text-align:center;"><h2>Error loading template</h2><p style="color:#ef4444">${message}</p></body></html>`,
+      `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;background:#0f172a;color:#f8fafc;text-align:center;"><h2>Error loading template</h2><p style="color:#ef4444">${safeMessage}</p></body></html>`,
       {
         status: 500,
         headers: {
           "Content-Type": "text/html; charset=utf-8",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "SAMEORIGIN",
           "Cache-Control": "private, no-store, max-age=0",
         },
       }

