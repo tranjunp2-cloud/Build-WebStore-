@@ -192,3 +192,107 @@ MVP đưa toàn bộ 67 target CMS lên Project Health với coverage và trạn
 ## 9. Story source of truth
 
 Backlog delivery, Acceptance Criteria và Definition of Done theo từng đơn vị PR nằm tại [`F40-qa-control-center-stories.md`](../stories/F40-qa-control-center-stories.md). Mỗi `US-F40-xx` tương ứng đúng một GitHub Issue, branch và PR vào `staging`.
+
+---
+
+## 10. Phân Hệ Đối Soát & Kiểm Thử Di Chuyển Dữ Liệu 2.000 Website (Migration Reconciliation Studio)
+
+### 10.1. Bối cảnh & Bài toán kinh doanh
+
+Dự án Prime Web v2 thực hiện di chuyển dữ liệu (data migration) của **2.000 website bán hàng đang hoạt động** từ nền tảng cũ **PW1 (Laravel + MySQL)** sang nền tảng mới **PW2 (Next.js 15 + Payload CMS 3 + PostgreSQL Neon)**.
+
+Do sự khác biệt căn bản về cấu trúc schema (từ RDBMS bảng phẳng sang Document / Lexical AST / Blocks), quá trình chuyển đổi đối mặt với nhiều rủi ro nghiêm trọng:
+1. **Mất mát dữ liệu thương mại (E-commerce Data Loss):** Rớt biến thể size/màu (Variants), mất SKU, lệch giá bán hoặc số lượng tồn kho.
+2. **Hỏng liên kết & Hình ảnh (Broken Assets):** Ảnh banner không tải được, kích thước lệch aspect ratio, link CTA bị 404.
+3. **Biến dạng nội dung văn bản (RichText Degraded):** Bảng biểu `<table>` bị mất cấu trúc cột, format in đậm/nghiêng/danh sách bị rớt khi chuyển đổi từ raw HTML sang Lexical Node AST.
+4. **Sai lệch bố cục & Thiếu trang (Layout & Page Gaps):** Trang phụ (About, Contact, Policy) chưa được migrate, iframe bản đồ hoặc video nhúng bị rớt.
+
+Để đảm bảo an toàn tuyệt đối trước khi trỏ tên miền chính thức (Cutover), phân hệ **Migration Reconciliation Studio** tại route `/studio/migration` được xây dựng để cung cấp công cụ đối soát tự động, phát hiện lỗi lệch CSDL và nghiệm thu trực quan 1-to-1 trên quy mô 2.000 website.
+
+---
+
+### 10.2. Mục tiêu sản phẩm & Success Metrics
+
+| Chỉ số (KPIs) | Mục tiêu nghiệm thu | Cơ chế đo lường |
+|---|---:|---|
+| **Độ phủ đối soát 2.000 website** | 100% (2.000/2.000 stores) | Dashboard tự động tổng hợp metric từ CSDL |
+| **Độ khớp trường CSDL 1-to-1** | $\ge 99.0\%$ | So sánh chi tiết từng trường theo `legacy_id` |
+| **Phát hiện lỗi P0 Blocker tự động** | 100% | Cảnh báo đỏ ngay khi rớt biến thể, thiếu trang hoặc link 404 |
+| **Thời gian tải & render Storefront Thật** | $\le 2$ giây | Endpoint API `/api/qa/template-preview/[code]` |
+| **Độ chính xác giả lập Mobile (375px)** | 100% Pixel-Perfect | Khung iPhone 375px có Dynamic Island, loa thoại & Home Bar |
+
+---
+
+### 10.3. Kiến trúc Tính Năng & Các Chế Độ So Sánh (6 Lớp Đối Soát)
+
+```mermaid
+graph TD
+    A["Màn Hình Tổng Quan (/studio/migration)<br/>Dashboard 2.000 Website"] --> B["Thanh Tìm Kiếm & Bộ Lọc<br/>(Email, Domain, 9 Canonical Themes)"]
+    A --> C["Modal Chi Tiết Đối Soát (Detail Parity Inspector)"]
+    
+    C --> D1["1. So Sánh Khối Trực Quan<br/>(High-Fidelity Visual Blocks)"]
+    C --> D2["2. Kéo Trượt So Sánh<br/>(Split Swipe Slider 0-100%)"]
+    C --> D3["3. Giả Lập Mobile 375px<br/>(Desktop 100% vs iPhone Shell)"]
+    C --> D4["4. Xem Web Thật 100%<br/>(Dual Live Iframe Storefront)"]
+    C --> D5["5. Soi CSDL 1-to-1<br/>(Database Field Reconciliation)"]
+    C --> D6["6. Soi Ảnh & Link / Chữ & Bảng<br/>(Media & Lexical Text Audit)"]
+```
+
+#### 1. Dashboard Tổng Quan 2.000 Website (`US-F40-09`)
+* Thanh đo đếm thời gian thực: Tổng số web, Tỷ lệ Đạt chuẩn (Pass), Cần xem lại (Warning), Lỗi P0 Blocker (Fail).
+* Bộ lọc đa năng: Tìm kiếm tức thì theo **Email Chủ Store** hoặc **Tên Miền (Domain)**.
+* Dropdown lọc theo **9 Bộ Theme Giao Diện Gốc**:
+  * `FB101`: OrganicNest Farm (Nông sản & Thực phẩm sạch)
+  * `C101`: BeautyStore (Mỹ phẩm & Chăm sóc da)
+  * `C102`: GlowBeauty (Spa & Làm đẹp)
+  * `F102`: FashionEase (Thời trang nam nữ)
+  * `FN101` / `FN102` / `FN104`: SofaDecor, FurnitureHub, Minimalist (Nội thất & Gia dụng)
+  * `FN103`: Viora (Thời trang cao cấp)
+  * `PA101`: EcoGarden (Cây cảnh & Hoa tươi)
+
+#### 2. So Sánh Khối Trực Quan Sinh Động (`US-F40-12`)
+* Render các Component giao diện mô phỏng chân thực: Hero Banners, Thẻ sản phẩm kèm biến thể và giá tiền, Thanh lọc danh mục, Thẻ cam kết chất lượng, Chân trang 4 cột.
+* Highlight viền đỏ phát sáng (`ring-2 ring-rose-500`) và gạch ngang giá tiền ngay tại nơi xảy ra lỗi (ví dụ: mất biến thể Can 1L trên PW2).
+
+#### 3. Thanh Trượt Kéo Trượt So Sánh (Split Swipe Slider — `US-F40-12`)
+* Sử dụng CSS `clipPath: polygon(...)` tăng tốc phần cứng (GPU Accelerated) cho phép QA kéo thanh trượt từ 0% đến 100% mượt mà 60 FPS để đối chiếu độ sai lệch bố cục giữa 2 phiên bản.
+
+#### 4. Chế Độ Xem Storefront Web Thật 100% (Live Webview Iframe — `US-F40-12`)
+* Nhúng trực tiếp mã nguồn HTML/CSS/JS Storefront hoàn chỉnh thông qua endpoint `/api/qa/template-preview/[code]`.
+* Hỗ trợ đầy đủ tương tác cuộn trang, click xem sản phẩm, thử nghiệm Responsive ở cả 2 kích thước: **Desktop Màn Hình Lớn** và **Khung iPhone Mobile chuẩn 375px**.
+
+#### 5. Đối Soát CSDL 1-to-1 Từng Trường (Field-by-Field Reconciliation — `US-F40-11`)
+* Đối chiếu từng trường dữ liệu chi tiết theo 7 nhóm:
+  * 🛍️ **Sản Phẩm (Products):** Tên, SKU, Giá bán, Giá khuyến mãi, Tồn kho.
+  * 🏷️ **Biến Thể (Variants):** Size, Màu sắc, Dung tích, Giá theo biến thể.
+  * 🖼️ **Banners & Link:** Ảnh desktop/mobile, Tiêu đề, Link CTA, Thứ tự hiển thị.
+  * 📝 **RichText & Bảng Biểu:** Độ dài văn bản, định dạng bảng biểu, AST JSON.
+  * 🧭 **Menu Điều Hướng:** Cây danh mục cha/con, link URL, vị trí Header/Footer.
+  * 📂 **Danh Mục (Categories):** Tên danh mục, slug, ảnh thumbnail.
+  * ⚙️ **Cài Đặt Shop:** Tên cửa hàng, Hotline, Email, Địa chỉ, Tọa độ bản đồ.
+
+#### 6. Soi Ảnh & Link / Chữ & Bảng (`US-F40-10`)
+* **Media Audit:** Kiểm tra HTTP Status (200 vs 404), Alt Text, Kích thước pixel gốc.
+* **Text Format Audit:** Đếm số đoạn văn, kiểm tra format Đậm/Nghiêng/Danh sách, phát hiện bảng biểu bị phẳng thành text thường.
+
+---
+
+### 10.4. Danh Mục User Stories & Liên Kết PR
+
+| User Story ID | Tiêu đề User Story | Pull Request | Trạng thái |
+| :--- | :--- | :---: | :---: |
+| **US-F40-09** | Dual-Mode Store Ingestion & Aggregate Reconciliation Dashboard | [PR #1792](https://github.com/primeproduction/ech-prime-web-v2/pull/1792) | ✅ Merged/Approved |
+| **US-F40-10** | Deep Visual Block Tree, Media & RichText Formatting Audit | [PR #1793](https://github.com/primeproduction/ech-prime-web-v2/pull/1793) | ✅ Merged/Approved |
+| **US-F40-11** | Field-by-Field Database Entity Diff Inspector & Fix Recommendations | [PR #1794](https://github.com/primeproduction/ech-prime-web-v2/pull/1794) | ✅ Merged/Approved |
+| **US-F40-12** | Visual & Layout Parity Inspector (Swipe Slider, 375px Mobile & Live Webview) | [PR #1795](https://github.com/primeproduction/ech-prime-web-v2/pull/1795) | ✅ Merged/Approved |
+| **US-F40-13** | 1-Click Ticket Export & QC Provenance Sign-Off | Out-of-Scope / Backlog | ⏸️ Deprecated |
+
+---
+
+### 10.5. Quy trình Nghiệm Thu & Chứng Thực QC (Cutover Readiness Gate)
+
+1. **Bước 1 — Quét CSDL & Lọc Web Lỗi:** QA mở `/studio/migration`, chọn bộ lọc `Cần Xem Lại` hoặc `Lỗi P0 Blocker`.
+2. **Bước 2 — Soi Lỗi CSDL & Trực Quan:** Bấm `[ So Sánh > ]`, kiểm tra nguyên nhân lỗi tại tab `So Sánh Khối`, `Soi CSDL 1-to-1` hoặc `Xem Web Thật (Live Iframe)`.
+3. **Bước 3 — Dev Sửa ETL Script & Quét Lại:** Dev cập nhật migration script, QA bấm `[ Quét Lại CSDL ]` để re-sync dữ liệu tức thì.
+4. **Bước 4 — Đóng Dấu QC Pass:** Khi đạt Parity Score $\ge 99.0\%$ và 0 lỗi P0, QA bấm **`[ Duyệt QC Pass ]`** để đưa website vào danh sách sẵn sàng chuyển đổi tên miền (Cutover Certified).
+

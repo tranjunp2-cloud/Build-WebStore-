@@ -140,7 +140,7 @@ export interface BlockBreakdownItem {
 export interface PageBlockItem {
   id: string;
   order: number;
-  blockType: "hero" | "banner" | "richtext" | "products" | "categories" | "blog" | "footer" | "contact" | "filter" | "tracking" | "gallery" | "variants";
+  blockType: "hero" | "banner" | "richtext" | "products" | "categories" | "blog" | "footer" | "contact" | "filter" | "tracking" | "gallery" | "variants" | "cart" | "checkout";
   title: string;
   pw1Component: string;
   pw2Block: string;
@@ -152,6 +152,32 @@ export interface PageBlockItem {
     hasTable?: boolean;
     productCount?: number;
     badgeText?: string;
+    imageUrl?: string;
+    buttonText?: string;
+    articleItems?: Array<{
+      id?: number | string;
+      title: string;
+      image?: string;
+      summary?: string;
+      date?: string;
+      slug?: string;
+    }>;
+    productCards?: Array<{
+      id?: number | string;
+      name: string;
+      price: string;
+      sku: string;
+      image?: string;
+      category?: string;
+    }>;
+    categoryCards?: Array<{
+      id?: number | string;
+      name: string;
+      image?: string;
+      ctaText?: string;
+      countText?: string;
+      slug?: string;
+    }>;
   };
   pw2Preview: {
     headline?: string;
@@ -161,6 +187,32 @@ export interface PageBlockItem {
     hasTable?: boolean;
     productCount?: number;
     badgeText?: string;
+    imageUrl?: string;
+    buttonText?: string;
+    articleItems?: Array<{
+      id?: number | string;
+      title: string;
+      image?: string;
+      summary?: string;
+      date?: string;
+      slug?: string;
+    }>;
+    productCards?: Array<{
+      id?: number | string;
+      name: string;
+      price: string;
+      sku: string;
+      image?: string;
+      category?: string;
+    }>;
+    categoryCards?: Array<{
+      id?: number | string;
+      name: string;
+      image?: string;
+      ctaText?: string;
+      countText?: string;
+      slug?: string;
+    }>;
   };
   status: "pass" | "warn" | "fail";
   discrepancyNote?: string;
@@ -480,9 +532,9 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
       commerceScore = "95.0%";
       blockScore = "89.0%";
     } else {
-      // Passed
+      // Passed - Clean score calculation without dead > 100 branch
       const val = (95 + (i % 5) * 0.9).toFixed(1);
-      score = parseFloat(val) > 100 ? "99.4%" : `${val}%`;
+      score = `${val}%`;
       status = "passed";
       failedBlocks = [];
     }
@@ -539,7 +591,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
   const isPass = currentStatus === "passed";
 
   const records: EntityDiffRecord[] = [
-    // 1. PRODUCTS (PROD-101: Mật Ong Rừng Ba Vì)
+    // 1. PRODUCTS
     {
       id: "ent-prod-101",
       legacyId: "PROD-101",

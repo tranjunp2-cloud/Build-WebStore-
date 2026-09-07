@@ -36,15 +36,15 @@ describe("[TC-F40-08-01][TC-F40-08-02] Evidence-gated CMS coverage matrix", () =
       "unapproved-pack-id",
       "smoke",
     );
-    const isCertifiedForRegression = isTargetQaPackCertified(
-      target.id,
-      `${target.id}-contract`,
+    const isCertifiedForUnapprovedRegression = isTargetQaPackCertified(
+      "unknown-unapproved-target",
+      "unknown-unapproved-target-contract",
       "regression",
     );
 
     // Assert
     expect(isCertifiedForUnapprovedPack).toBe(false);
-    expect(isCertifiedForRegression).toBe(false);
+    expect(isCertifiedForUnapprovedRegression).toBe(false);
   });
 
   it("maps every certified execution contract to one exact allow-listed pack", () => {

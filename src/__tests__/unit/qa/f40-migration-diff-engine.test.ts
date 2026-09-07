@@ -92,7 +92,7 @@ describe("F40 US-F40-09 Migration Reconciliation Engine Unit Tests", () => {
     expect(variantDefect?.type).toBe("p0");
   });
 
-  it("[TC-F40-12-06] returns null for non-existent store id (no silent fallback)", () => {
+  it("[TC-F40-11-06] returns null for non-existent store id (no silent fallback)", () => {
     const diff = getStoreDeepDiff("SITE-9999");
     expect(diff).toBeNull();
   });

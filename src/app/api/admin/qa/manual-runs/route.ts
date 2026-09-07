@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
 import config from "@payload-config";
@@ -13,6 +14,7 @@ import { resolveManualQaPack } from "@/lib/admin/qa/targeted-smoke-registry";
 import { claimTargetedSmokeDispatch, blockTargetedSmokeDispatch, TargetedSmokeDispatchConflictError } from "@/lib/admin/qa/targeted-smoke-dispatch";
 import { dispatchTargetedSmokeWorkflow, githubAppConfigFromEnv, GitHubWorkflowDispatchRejectedError } from "@/lib/admin/qa/github-targeted-smoke";
 import { withQaTargetedDispatchTransaction } from "@/lib/payload/qa-targeted-dispatch-transaction";
+import { simulateLocalTestRun } from "@/lib/admin/qa/dev-test-runner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -154,8 +156,31 @@ export const POST = withSuperAdmin(async (req: NextRequest, { user }) => {
       return NextResponse.json({ data: { id: outcome.dispatch.id, status: transitionStatus ?? "queued" } }, { status: 202 });
     // Local QA tests must prove the full browser confirmation and durable
     // ledger transition without ever dispatching an external Actions workflow.
-    if (process.env.NODE_ENV === "development")
-      return NextResponse.json({ data: { id: outcome.dispatch.id, status: "dispatched", packId: resolved.pack.packId, packVersion: resolved.pack.packVersion } }, { status: 202 });
+    if (process.env.NODE_ENV === "development") {
+      const testCases = resolved.profile?.testCases ?? resolved.pack.testCases;
+      simulateLocalTestRun(payload, {
+        dispatchId: outcome.dispatch.id,
+        targetId: parsed.data.targetId,
+        profile: parsed.data.profile === "smoke" ? "manual-smoke" : "manual-regression",
+        runner: resolved.pack.runner ?? "smoke",
+        testCaseIds: testCases.map((tc) => tc.id),
+        pullRequest: preflight.context.pullRequest,
+        commitSha: preflight.context.commitSha,
+        durationMs: 420,
+      });
+
+      return NextResponse.json(
+        {
+          data: {
+            id: outcome.dispatch.id,
+            status: "dispatched",
+            packId: resolved.pack.packId,
+            packVersion: resolved.pack.packVersion,
+          },
+        },
+        { status: 202 },
+      );
+    }
     if (!github) throw new Error("GitHub App configuration disappeared during dispatch");
     await dispatchTargetedSmokeWorkflow(github, {
       dispatchId: String(outcome.dispatch.id),
