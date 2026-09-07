@@ -2161,10 +2161,10 @@ export function MigrationDiffClient() {
                   {(() => {
                     const pw1Url = selectedDiff.domain
                       ? `https://${selectedDiff.domain}${activePage.path === "/" ? "" : activePage.path}`
-                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`;
+                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw1`;
                     const pw2Url = selectedDiff.migratedDomain
                       ? `${selectedDiff.migratedDomain}${activePage.path === "/" ? "" : activePage.path}`
-                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`;
+                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2`;
 
                     return deviceView === "mobile" ? (
                       /* Mobile 375px Dual Phone Mockups with Real Iframes */
@@ -2183,7 +2183,7 @@ export function MigrationDiffClient() {
                               src={pw1Url}
                               title="PW1 Mobile Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                              sandbox="allow-scripts allow-forms allow-popups"
                             />
                           </div>
                           {/* Home Bar */}
@@ -2204,7 +2204,7 @@ export function MigrationDiffClient() {
                               src={pw2Url}
                               title="PW2 Next.js Mobile Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                              sandbox="allow-scripts allow-forms allow-popups"
                             />
                           </div>
                           {/* Home Bar */}
@@ -2217,7 +2217,7 @@ export function MigrationDiffClient() {
                         {/* Left PW1 Full Iframe */}
                         <div className="bg-slate-950 rounded-2xl border-2 border-amber-500/30 overflow-hidden flex flex-col shadow-xl">
                           <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-amber-400 font-mono flex items-center justify-between">
-                            <span>👈 PW1 LARAVEL (LIVE STOREFRONT 100%)</span>
+                            <span>👈 PW1 LARAVEL (SNAPSHOT CSDL CŨ)</span>
                             <span className="text-slate-400 font-normal">Desktop Resolution</span>
                           </div>
                           <div className="flex-1 bg-white relative">
@@ -2226,7 +2226,7 @@ export function MigrationDiffClient() {
                               src={pw1Url}
                               title="PW1 Desktop Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                              sandbox="allow-scripts allow-forms allow-popups"
                             />
                           </div>
                         </div>
@@ -2234,7 +2234,7 @@ export function MigrationDiffClient() {
                         {/* Right PW2 Full Iframe */}
                         <div className="bg-slate-950 rounded-2xl border-2 border-sky-500/30 overflow-hidden flex flex-col shadow-xl">
                           <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-sky-400 font-mono flex items-center justify-between">
-                            <span>👉 PW2 NEXT.JS 15 (LIVE STOREFRONT 100%)</span>
+                            <span>👉 PW2 NEXT.JS 15 (BẢN MIGRATE MỚI)</span>
                             <span className="text-slate-400 font-normal">Desktop Resolution</span>
                           </div>
                           <div className="flex-1 bg-white relative">
@@ -2243,7 +2243,7 @@ export function MigrationDiffClient() {
                               src={pw2Url}
                               title="PW2 Next.js Desktop Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                              sandbox="allow-scripts allow-forms allow-popups"
                             />
                           </div>
                         </div>
