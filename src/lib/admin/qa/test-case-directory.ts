@@ -65,3 +65,42 @@ export function getTestCaseDirectorySummary(testCases = ALL_TEST_CASES_DIRECTORY
     testCases,
   };
 }
+
+const testCasesByTargetMap: Record<string, DirectoryTestCase[]> = {};
+for (const tc of ALL_TEST_CASES_DIRECTORY) {
+  if (tc.targetId) {
+    if (!testCasesByTargetMap[tc.targetId]) testCasesByTargetMap[tc.targetId] = [];
+    testCasesByTargetMap[tc.targetId].push(tc);
+  }
+}
+
+export function getTestCasesForTarget(targetId: string): DirectoryTestCase[] {
+  return testCasesByTargetMap[targetId] ?? [];
+}
+
+export function getTestCaseIdsForTarget(targetId: string): string[] {
+  return (testCasesByTargetMap[targetId] ?? []).map((tc) => tc.id);
+}
+
+export interface TargetCaseDirectoryItem {
+  id: string;
+  assertion: string;
+}
+
+export const TARGET_CASE_IDS_MAP: Record<string, string[]> = {};
+export const TARGET_TEST_CASES_MAP: Record<string, TargetCaseDirectoryItem[]> = {};
+
+for (const tc of ALL_TEST_CASES_DIRECTORY) {
+  if (tc.targetId) {
+    if (!TARGET_CASE_IDS_MAP[tc.targetId]) TARGET_CASE_IDS_MAP[tc.targetId] = [];
+    TARGET_CASE_IDS_MAP[tc.targetId].push(tc.id);
+
+    if (!TARGET_TEST_CASES_MAP[tc.targetId]) TARGET_TEST_CASES_MAP[tc.targetId] = [];
+    TARGET_TEST_CASES_MAP[tc.targetId].push({
+      id: tc.id,
+      assertion: tc.assertion || tc.name || "Contract verified.",
+    });
+  }
+}
+
+export { testCasesByTargetMap };

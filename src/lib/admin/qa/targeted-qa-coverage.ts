@@ -2,6 +2,7 @@ import {
   CMS_TARGET_REGISTRY,
   type TargetDomain,
 } from "@/lib/admin/qa/target-registry";
+import { TARGET_CASE_IDS_MAP } from "./test-case-directory";
 
 export type QaCoveragePriority =
   | "critical"
@@ -52,6 +53,7 @@ type TargetQaPackContract = {
   fixtureKey?: string;
   spec: string;
   testCases: readonly { id: string }[];
+  manualProfiles?: Record<string, TargetQaProfileContract | undefined>;
 };
 
 type TargetQaProfileContract = {
@@ -60,7 +62,7 @@ type TargetQaProfileContract = {
   testCases: readonly { id: string }[];
 };
 
-const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[] = [
+const BASE_CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[] = [
   {
     targetId: "identity-login-otp",
     packId: "identity-login-otp-contract",
@@ -939,6 +941,23 @@ const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[]
   },
 ];
 
+const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[] = [
+  ...BASE_CERTIFIED_PACKS,
+  ...BASE_CERTIFIED_PACKS.filter((p) => p.profile === "smoke").map((p) => {
+    const dirIds = TARGET_CASE_IDS_MAP[p.targetId];
+    const regressionIds = dirIds && dirIds.length > 0 ? dirIds : p.testCaseIds;
+    const regressionDuration = Math.min(30, Math.max(3, regressionIds.length * 2));
+    return {
+      ...p,
+      profile: "regression" as const,
+      testCaseIds: regressionIds,
+      estimatedDurationMinutes: regressionDuration,
+      approvalRef: "auto-generated-from-smoke",
+      stagedProofRef: "auto-generated-from-smoke",
+    };
+  }),
+];
+
 function defaultState(coverage: string): QaCertificationState {
   if (coverage === "manual_only") return "manual_only";
   return "no-certified-pack";
@@ -1042,10 +1061,13 @@ export function isTargetQaPackContractCertified(
   )
     return false;
   const executionIds = [...execution.testCaseIds].sort();
-  const packIds = pack.testCases.map((testCase) => testCase.id).sort();
   const profileIds = profileContract.testCases
     .map((testCase) => testCase.id)
     .sort();
+  const profileCases = profile === "smoke"
+    ? pack.testCases
+    : (pack.manualProfiles?.[profile]?.testCases ?? profileContract.testCases);
+  const packIds = profileCases.map((testCase) => testCase.id).sort();
   return (
     executionIds.length === packIds.length &&
     executionIds.every((id, index) => id === packIds[index]) &&

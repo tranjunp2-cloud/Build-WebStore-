@@ -5,26 +5,62 @@ import {
   getStoreDeepDiff,
   getDashboardMetrics,
 } from "@/lib/admin/qa/migration-diff-engine";
+import {
+  testPw1Connection,
+  introspectAllPw1Tables,
+  fetchStoreTableRecords,
+  fetchLivePw1StoresCatalog,
+  fetchLivePw1StoreDeepDiff,
+} from "@/lib/admin/qa/pw1-mysql-connector";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
  * GET /api/qa/migration-diff
- * Query params:
- *   - store_id: Optional. If present, returns deep diff for a specific store.
- *   - filter: "all" | "passed" | "warning" | "failed"
- *   - template: "all" | "FB101" | "PA101" | ...
- *   - search: string keyword
- *   - page: number (default 1)
- *   - limit: number (default 20)
+ * Super-Admin only route for database reconciliation and diff inspection.
  */
 export const GET = withSuperAdmin(async (request: NextRequest) => {
   try {
     const { searchParams } = new URL(request.url);
+    const mode = searchParams.get("mode");
+
+    // 1. Live MySQL DB Connection Health & Ping
+    if (mode === "db_status") {
+      const status = await testPw1Connection();
+      return NextResponse.json({ data: status });
+    }
+
+    // 2. Dynamic Schema Introspection across ALL tables
+    if (mode === "db_tables") {
+      const tables = await introspectAllPw1Tables();
+      return NextResponse.json({ data: tables });
+    }
+
+    // 3. Fetch Records from a specific MySQL table
+    if (mode === "db_records") {
+      const tableName = searchParams.get("table");
+      if (!tableName) {
+        return NextResponse.json({ error: "Missing 'table' parameter" }, { status: 400 });
+      }
+      const storeId = searchParams.get("store_id") || undefined;
+      const records = await fetchStoreTableRecords(tableName, storeId);
+      return NextResponse.json({ data: records });
+    }
+
     const storeId = searchParams.get("store_id");
 
     if (storeId) {
+      // Try live MySQL first if configured
+      try {
+        const liveDiff = await fetchLivePw1StoreDeepDiff(storeId);
+        if (liveDiff) {
+          return NextResponse.json({ data: liveDiff, isLive: true });
+        }
+      } catch (err: any) {
+        console.error(`[Live Diff Error] Failed for ${storeId}:`, err?.message || err);
+      }
+
       const diff = getStoreDeepDiff(storeId);
       if (!diff) {
         return NextResponse.json({ error: `Store ${storeId} not found` }, { status: 404 });
@@ -35,13 +71,24 @@ export const GET = withSuperAdmin(async (request: NextRequest) => {
     const filter = searchParams.get("filter") || "all";
     const template = searchParams.get("template") || "all";
     const search = (searchParams.get("search") || "").toLowerCase().trim();
-
     const rawPage = parseInt(searchParams.get("page") || "1", 10);
     const page = Number.isFinite(rawPage) && rawPage >= 1 ? rawPage : 1;
     const rawLimit = parseInt(searchParams.get("limit") || "20", 10);
-    const limit = Number.isFinite(rawLimit) && rawLimit >= 1 ? Math.min(rawLimit, 100) : 20;
+    const limit = Number.isFinite(rawLimit) && rawLimit >= 1 ? Math.min(rawLimit, 3000) : 20;
 
-    const allStores = generateReconciliationCatalog(2000);
+    // Attempt to load Live Stores from PW1 MySQL if available
+    let allStores: any[] = [];
+
+    try {
+      allStores = await fetchLivePw1StoresCatalog(2000);
+    } catch (err: unknown) {
+      console.error("[MigrationDiff] Failed to load live stores from MySQL, falling back to mock catalog:", err);
+    }
+
+    if (allStores.length === 0) {
+      allStores = generateReconciliationCatalog(2000);
+    }
+
     const metrics = getDashboardMetrics(allStores);
 
     const filtered = allStores.filter((s) => {
@@ -86,15 +133,25 @@ export const GET = withSuperAdmin(async (request: NextRequest) => {
 
 /**
  * POST /api/qa/migration-diff
- * Actions:
+ * Super-Admin only actions:
  *   - approve_pass: Mark store as passed
  *   - scan_batch: Trigger fresh re-scan
  *   - ingest_json: Parse uploaded JSON payload
+ *   - test_db_connection: Test server-configured DB connection (no arbitrary hosts allowed)
  */
-export const POST = withSuperAdmin(async (request: NextRequest) => {
+export const POST = withSuperAdmin(async (request: NextRequest, { user }) => {
   try {
     const body = await request.json().catch(() => ({}));
     const action = body?.action;
+
+    if (action === "test_db_connection") {
+      // Security: Strictly test server-configured PW1_DATABASE_URL to prevent SSRF
+      const result = await testPw1Connection();
+      return NextResponse.json({
+        success: result.connected,
+        data: result,
+      });
+    }
 
     if (action === "approve_pass") {
       const storeId = typeof body?.storeId === "string" ? body.storeId.trim() : "";
@@ -104,6 +161,7 @@ export const POST = withSuperAdmin(async (request: NextRequest) => {
       return NextResponse.json({
         success: true,
         message: `Store ${storeId} certified QC Pass for cutover.`,
+        certifiedBy: user?.email || "super-admin",
         certifiedAt: new Date().toISOString(),
       });
     }

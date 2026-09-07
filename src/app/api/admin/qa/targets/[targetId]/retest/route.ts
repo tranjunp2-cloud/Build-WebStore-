@@ -14,12 +14,13 @@ import {
   GitHubWorkflowDispatchRejectedError,
   githubAppConfigFromEnv,
 } from "@/lib/admin/qa/github-targeted-smoke";
+import { executeLocalDevRun } from "@/lib/admin/qa/dev-test-runner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /** Starts one allow-listed pack for the currently deployed staging revision. */
-export const POST = withSuperAdmin(async (_req: NextRequest, { params }) => {
+export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
   const targetId = params?.targetId;
   if (!targetId || !getTargetById(targetId))
     return NextResponse.json({ error: "Unknown QA target" }, { status: 404 });
@@ -29,23 +30,31 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { params }) => {
       { error: "No active targeted Smoke pack is registered" },
       { status: 409 },
     );
-  const commitSha = process.env.VERCEL_GIT_COMMIT_SHA;
+  const url = new URL(req.url);
+  const requestedProfile = url.searchParams.get("profile") === "regression" ? "regression" : "smoke";
+  const runProfile = requestedProfile === "regression" ? "manual-regression" : "manual-retest";
+  const isDev = process.env.NODE_ENV === "development";
+  const commitSha = process.env.VERCEL_GIT_COMMIT_SHA || (isDev ? "abcdef1" : undefined);
   const github = githubAppConfigFromEnv();
-  if (!commitSha || !github)
+  if ((!commitSha || !github) && !isDev)
     return NextResponse.json(
       { error: "Targeted Smoke is not configured for this staging revision" },
       { status: 503 },
     );
 
   const payload = await getPayload({ config });
+  const andClauses: Array<{ targetId?: { equals: string }; commitSha?: { equals: string }; environment?: { equals: string } }> = [
+    { targetId: { equals: targetId } },
+    { environment: { equals: "staging" } },
+  ];
+  if (commitSha) {
+    andClauses.push({ commitSha: { equals: commitSha } });
+  }
+
   const latest = await payload.find({
     collection: "qa_test_runs",
     where: {
-      and: [
-        { targetId: { equals: targetId } },
-        { commitSha: { equals: commitSha } },
-        { environment: { equals: "staging" } },
-      ],
+      and: andClauses,
     },
     sort: "-finishedAt",
     limit: 1,
@@ -53,7 +62,8 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { params }) => {
     overrideAccess: true,
   });
   const sourceRun = latest.docs[0];
-  if (!sourceRun?.pullRequest)
+  const pullRequest = sourceRun?.pullRequest ?? (isDev ? 1746 : undefined);
+  if (!pullRequest)
     return NextResponse.json(
       { error: "Retest requires a recorded staging PR/SHA for this target" },
       { status: 409 },
@@ -61,13 +71,13 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { params }) => {
 
   const requestDigest = crypto
     .createHash("sha256")
-    .update(`${targetId}:${commitSha}:${sourceRun.pullRequest}:${Date.now()}`)
+    .update(`${targetId}:${commitSha}:${pullRequest}:${Date.now()}`)
     .digest("hex");
   const outcome = await claimTargetedSmokeDispatch(payload, {
-    pullRequest: sourceRun.pullRequest,
-    commitSha,
+    pullRequest,
+    commitSha: commitSha!,
     environment: "staging",
-    profile: "manual-retest",
+    profile: runProfile,
     requestDigest,
     retestNonce: crypto.randomUUID(),
     pack,
@@ -86,18 +96,42 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { params }) => {
       overrideAccess: true,
     });
     markedDispatched = true;
+
+    if (isDev) {
+      const testCases = pack.manualProfiles?.[requestedProfile]?.testCases ?? pack.testCases;
+      await executeLocalDevRun(payload, {
+        dispatchId: outcome.dispatch.id,
+        targetId,
+        profile: runProfile,
+        runner: pack.runner ?? "smoke",
+        testCaseIds: testCases.map((tc) => tc.id),
+        pullRequest,
+        commitSha: commitSha!,
+        durationMs: 350,
+      });
+
+      return NextResponse.json(
+        {
+          data: {
+            id: outcome.dispatch.id,
+            status: "dispatched",
+            packId: pack.packId,
+            profile: requestedProfile,
+          },
+        },
+        { status: 202 },
+      );
+    }
+
+    if (!github) throw new Error("GitHub App configuration disappeared during dispatch");
     await dispatchTargetedSmokeWorkflow(github, {
       dispatchId: String(outcome.dispatch.id),
-      commitSha,
+      commitSha: commitSha!,
       packId: pack.packId,
       workflowNonce: outcome.dispatch.workflowNonce ?? "",
-      runProfile: "manual-retest",
+      runProfile,
     });
   } catch (error) {
-    // Before the external call has started, a local failure is definite and
-    // its queued lease must be released. After it starts, only an explicit
-    // GitHub rejection is safe to compensate: a network error can mean the
-    // workflow was accepted, so reconciliation owns that ambiguous lease.
     if (
       !markedDispatched ||
       error instanceof GitHubWorkflowDispatchRejectedError
@@ -119,6 +153,7 @@ export const POST = withSuperAdmin(async (_req: NextRequest, { params }) => {
         id: outcome.dispatch.id,
         status: "dispatched",
         packId: pack.packId,
+        profile: requestedProfile,
       },
     },
     { status: 202 },

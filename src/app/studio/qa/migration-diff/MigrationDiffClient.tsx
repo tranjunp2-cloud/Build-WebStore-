@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
+import DOMPurify from "dompurify";
 import {
   generateReconciliationCatalog,
   getStoreDeepDiff,
@@ -10,6 +11,7 @@ import {
   type StoreSummary,
   type StoreDeepDiff,
   type DynamicStorePage,
+  type PageBlockItem,
   type EntityGroupType,
   type EntityDiffRecord,
   type FieldDiffItem,
@@ -54,11 +56,687 @@ import {
   CheckCircle,
   FileSpreadsheet,
   Monitor,
+  Smartphone,
   Type as TypeIcon,
   ShieldCheck,
   Wrench,
   Layers as BlockTreeIcon,
+  Star,
+  ShoppingCart,
+  Truck,
+  Shield,
+  CreditCard,
+  MapPin,
+  Phone,
+  Mail,
+  Calendar,
+  Clock,
 } from "lucide-react";
+
+/**
+ * Renders authentic, high-fidelity visual layout components
+ * simulating real e-commerce blocks for both PW1 and PW2 in Desktop & Mobile.
+ */
+function RichVisualBlockRenderer({
+  block,
+  version,
+  deviceView,
+}: {
+  block: PageBlockItem;
+  version: "pw1" | "pw2";
+  deviceView: "desktop" | "mobile";
+}) {
+  const isPW1 = version === "pw1";
+  const preview = isPW1 ? block.pw1Preview : block.pw2Preview;
+  const isMobile = deviceView === "mobile";
+  const isFail = block.status === "fail";
+  const isWarn = block.status === "warn";
+
+  const blockType = block.blockType || "banner";
+  const titleLower = block.title.toLowerCase();
+
+  // 1. HERO / BANNER BLOCK
+  if (
+    blockType === "hero" ||
+    blockType === "banner" ||
+    titleLower.includes("banner") ||
+    titleLower.includes("hero")
+  ) {
+    return (
+      <div
+        className={`w-full rounded-2xl overflow-hidden border relative ${
+          isPW1
+            ? "border-amber-500/30"
+            : isFail
+            ? "border-rose-500/40"
+            : "border-sky-500/30"
+        } min-h-[200px] flex flex-col justify-between p-5 bg-cover bg-center shadow-lg transition`}
+        style={{
+          backgroundImage: preview.imageUrl
+            ? `linear-gradient(to right, rgba(10, 15, 30, 0.82) 0%, rgba(10, 15, 30, 0.45) 55%, rgba(10, 15, 30, 0.75) 100%), url(${preview.imageUrl})`
+            : "linear-gradient(to bottom right, #0f172a, #020617)",
+        }}
+      >
+        {/* Top bar info */}
+        <div className="flex items-center justify-between z-10">
+          <span
+            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border backdrop-blur-md ${
+              isPW1
+                ? "bg-amber-500/30 text-amber-200 border-amber-500/40"
+                : "bg-sky-500/30 text-sky-200 border-sky-500/40"
+            }`}
+          >
+            <Sparkles className="size-3" /> {preview.badgeText || "BANNER CHÍNH"}
+          </span>
+          <span className="text-[10px] font-mono text-slate-300 bg-black/60 px-2 py-0.5 rounded border border-white/10 backdrop-blur-md">
+            {isPW1 ? `PW1: ${block.pw1Component}` : `PW2: ${block.pw2Block}`}
+          </span>
+        </div>
+
+        {/* Content in center */}
+        <div className="space-y-1.5 max-w-md py-3 z-10">
+          <h4
+            className={`font-serif font-bold text-white tracking-wide leading-tight ${
+              isMobile ? "text-sm" : "text-lg sm:text-xl"
+            }`}
+          >
+            {preview.headline || block.title}
+          </h4>
+          {preview.subheadline && (
+            <p className="text-slate-200 text-xs font-sans tracking-wide uppercase">
+              {preview.subheadline}
+            </p>
+          )}
+        </div>
+
+        {/* Bottom Controls / Button */}
+        <div className="flex items-center justify-between z-10 pt-2 border-t border-white/10">
+          <button className="px-3.5 py-1.5 rounded bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5">
+            <span>{preview.buttonText || "Button"}</span>
+          </button>
+          <div className="flex items-center gap-1 text-slate-300">
+            <span className="size-6 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-xs hover:bg-black/80 cursor-pointer">
+              ‹
+            </span>
+            <span className="size-6 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-xs hover:bg-black/80 cursor-pointer">
+              ›
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. BLOG / ARTICLES LISTING BLOCK
+  if (
+    blockType === "blog" ||
+    titleLower.includes("bài viết") ||
+    titleLower.includes("blog") ||
+    titleLower.includes("article") ||
+    titleLower.includes("tin tức")
+  ) {
+    const articles = preview.articleItems && preview.articleItems.length > 0
+      ? preview.articleItems
+      : [
+          {
+            id: 1,
+            title: "11 Things the Media Hasn't Told You About Art 1",
+            date: "19 May 2022",
+            summary: "The weather started getting rough - the tiny ship was tossed.",
+            image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t010-6-1/blogs/blog-1.jpg"
+          },
+          {
+            id: 2,
+            title: "Don't Fall Prey to These Common Art Scams",
+            date: "19 May 2022",
+            summary: "Lorem ipsum dolor sit amet, eum eu labitur consetetur, ei paulo.",
+            image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t010-6-1/blogs/blog-2.jpg"
+          },
+          {
+            id: 3,
+            title: "Apple iPhone 16 Review: A Good Update… For Some",
+            date: "25 Feb 2025",
+            summary: "Apple iPhone 16 Review: A Good Update… For Some",
+            image: "https://tm-prime-web-dev.sgp1.digitaloceanspaces.com/tm-primeweb-dev/img/2025/5Vta1gxfTdexfoD2VJG9ahU_MpOaurhyXHpu6U44oFU.webp"
+          }
+        ];
+
+    return (
+      <div className="space-y-3">
+        <div className="text-center py-1">
+          <h3 className="font-serif font-bold text-white text-base sm:text-lg">
+            {preview.headline || "Our articles"}
+          </h3>
+        </div>
+
+        <div className={`grid gap-3 ${isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-3"}`}>
+          {articles.map((art: any, aIdx: number) => (
+            <div
+              key={aIdx}
+              className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden flex flex-col justify-between shadow-md group hover:border-slate-700 transition"
+            >
+              {art.image ? (
+                <div
+                  className="w-full h-28 bg-cover bg-center border-b border-slate-800"
+                  style={{ backgroundImage: `url(${art.image})` }}
+                />
+              ) : (
+                <div className="w-full h-28 bg-slate-800 flex items-center justify-center text-slate-500">
+                  <Newspaper className="size-6 text-slate-600" />
+                </div>
+              )}
+              <div className="p-3 space-y-1.5 flex-1 flex flex-col justify-between">
+                <div className="space-y-1">
+                  <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                    <Calendar className="size-3 text-slate-500" />
+                    <span>{art.date || "19 May 2022"}</span>
+                  </div>
+                  <h5 className="font-serif font-bold text-white text-xs leading-snug line-clamp-2">
+                    {art.title}
+                  </h5>
+                  <p className="text-slate-400 text-[10px] line-clamp-2 leading-relaxed">
+                    {art.summary}
+                  </p>
+                </div>
+                <div className="pt-2 text-[10px] font-semibold text-sky-400 flex items-center gap-1 group-hover:underline">
+                  <span>Read more</span> <ArrowRight className="size-2.5" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. PRODUCT GRID / VARIANTS BLOCK
+  if (
+    blockType === "products" ||
+    blockType === "variants" ||
+    titleLower.includes("sản phẩm") ||
+    titleLower.includes("product") ||
+    titleLower.includes("lưới")
+  ) {
+    const pCards = preview.productCards && preview.productCards.length > 0
+      ? preview.productCards
+      : [
+          { id: 1, name: "Spring Leaf girls round neck sleeveless tops", price: "$16.52", sku: "A001", image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t006/2017/06/mg5076thumb.jpg" },
+          { id: 2, name: "BabyGap plain T-shirt", price: "$36.71", sku: "A003", image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t006/2017/06/mg5038thumb.jpg" },
+          { id: 3, name: "Boys shirt with Kangnam print", price: "$40.38", sku: "A004", image: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/t006/2017/06/mg5082thumb.jpg" }
+        ];
+
+    return (
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5 font-serif">
+            <Package className="size-3.5 text-blue-400" />
+            <span>{preview.headline || "Featured Products"}</span>
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono">
+            {preview.productCount !== undefined ? `${preview.productCount} Sản Phẩm` : `${pCards.length} Sản Phẩm`}
+          </span>
+        </div>
+
+        <div className={`grid gap-2.5 ${isMobile ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
+          {pCards.slice(0, 3).map((prod: any, pIdx: number) => (
+            <div
+              key={pIdx}
+              className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between shadow-sm hover:border-slate-700 transition"
+            >
+              <div
+                className="w-full aspect-square bg-slate-800/80 rounded-lg bg-cover bg-center relative overflow-hidden"
+                style={{ backgroundImage: prod.image ? `url(${prod.image})` : undefined }}
+              >
+                {!prod.image && (
+                  <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
+                    No Image
+                  </div>
+                )}
+                <span className="absolute top-1 left-1 text-[8px] font-bold bg-black/60 text-amber-300 border border-white/10 px-1 rounded backdrop-blur-sm">
+                  {prod.sku}
+                </span>
+              </div>
+              <div>
+                <div className="font-semibold text-white text-[11px] truncate" title={prod.name}>
+                  {prod.name}
+                </div>
+                <div className="font-bold text-sky-400 text-xs mt-0.5">{prod.price}</div>
+              </div>
+              <button className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold rounded-lg border border-slate-700 transition">
+                + Add To Cart
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. FILTER / SORT CONTROLS
+  if (
+    blockType === "filter" ||
+    titleLower.includes("bộ lọc") ||
+    titleLower.includes("sắp xếp") ||
+    titleLower.includes("filter") ||
+    titleLower.includes("sort")
+  ) {
+    return (
+      <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
+        <div className="flex items-center justify-between text-xs text-slate-300">
+          <div className="flex items-center gap-1.5 font-semibold font-serif">
+            <SlidersHorizontal className="size-3.5 text-blue-400" />
+            <span>{preview.headline || "Bộ Lọc & Sắp Xếp Sản Phẩm"}</span>
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono">Sắp xếp: Mới nhất ▾</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[10px] font-semibold shadow-sm">
+            Tất Cả (50)
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
+            👗 Fashion
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
+            🧒 Kid
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
+            👔 Men
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-800">
+            👠 Women
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 3.5. SHOPPING CART BLOCK
+  if (
+    blockType === "cart" ||
+    titleLower.includes("cart") ||
+    titleLower.includes("giỏ hàng")
+  ) {
+    return (
+      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5 font-serif">
+            <ShoppingCart className="size-3.5 text-sky-400" />
+            <span>{preview.headline || "Your Shopping Cart"}</span>
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono">2 Sản phẩm trong giỏ</span>
+        </div>
+
+        {/* Cart items */}
+        <div className="space-y-2 text-xs">
+          <div className="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="size-10 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-mono text-sm">
+                👗
+              </div>
+              <div>
+                <div className="font-semibold text-white text-[11px]">Spring Leaf girls round neck sleeveless tops</div>
+                <div className="text-[10px] text-slate-400 font-mono">SKU: A001 • Size: M</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-bold text-sky-400 text-xs">$16.52</div>
+              <div className="text-[10px] text-slate-400 font-mono">SL: 1</div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="size-10 rounded bg-slate-800 flex items-center justify-center text-slate-400 font-mono text-sm">
+                👕
+              </div>
+              <div>
+                <div className="font-semibold text-white text-[11px]">BabyGap plain T-shirt</div>
+                <div className="text-[10px] text-slate-400 font-mono">SKU: A003 • Size: L</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-bold text-sky-400 text-xs">$36.71</div>
+              <div className="text-[10px] text-slate-400 font-mono">SL: 1</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+          <div>
+            <span className="text-slate-400 text-[10px]">Tạm tính: </span>
+            <strong className="text-white font-bold text-xs">$53.23</strong>
+          </div>
+          <button className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow transition">
+            Tiến Hành Thanh Toán ➔
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 3.6. ORDER TRACKING BLOCK
+  if (
+    blockType === "tracking" ||
+    titleLower.includes("tracking") ||
+    titleLower.includes("tra cứu")
+  ) {
+    return (
+      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3.5">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5 font-serif">
+            <Truck className="size-3.5 text-sky-400" />
+            <span>{preview.headline || "Tra Cứu Đơn Hàng (Order Tracking)"}</span>
+          </div>
+          <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+            Live Tracking
+          </span>
+        </div>
+
+        {/* Search Input Box */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="size-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              readOnly
+              value="ORD-2026-0205"
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white outline-none font-mono"
+            />
+          </div>
+          <button className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition">
+            Tra Cứu
+          </button>
+        </div>
+
+        {/* Progress Steps */}
+        <div className="grid grid-cols-4 gap-1 text-center pt-2">
+          <div className="space-y-1">
+            <div className="size-6 rounded-full bg-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center mx-auto">✓</div>
+            <div className="text-[10px] text-white font-semibold">Đã Đặt Hàng</div>
+          </div>
+          <div className="space-y-1">
+            <div className="size-6 rounded-full bg-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center mx-auto">✓</div>
+            <div className="text-[10px] text-white font-semibold">Đã Xác Nhận</div>
+          </div>
+          <div className="space-y-1">
+            <div className="size-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center mx-auto animate-pulse">🚚</div>
+            <div className="text-[10px] text-sky-400 font-semibold">Đang Giao Hàng</div>
+          </div>
+          <div className="space-y-1">
+            <div className="size-6 rounded-full bg-slate-800 text-slate-500 font-bold text-xs flex items-center justify-center mx-auto">4</div>
+            <div className="text-[10px] text-slate-500">Đã Giao</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. CATEGORIES / COLLECTION HIGHLIGHTS
+  if (
+    blockType === "categories" ||
+    titleLower.includes("danh mục") ||
+    titleLower.includes("category")
+  ) {
+    const catCards = preview.categoryCards && preview.categoryCards.length > 0
+      ? preview.categoryCards
+      : [
+          { id: 1, name: "Fashion", ctaText: "Shop now", image: undefined },
+          { id: 2, name: "Kid", ctaText: "Shop now", image: undefined },
+          { id: 3, name: "Men", ctaText: "Shop now", image: undefined },
+        ];
+
+    return (
+      <div className="space-y-3">
+        <div className="text-center py-1">
+          <h4 className="font-serif font-bold text-white text-xs sm:text-sm leading-snug line-clamp-2">
+            {preview.headline || "Categories"}
+          </h4>
+        </div>
+
+        <div className={`grid gap-2.5 ${isMobile ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
+          {catCards.slice(0, 3).map((cat: any, cIdx: number) => (
+            <div
+              key={cIdx}
+              className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between hover:border-slate-700 transition"
+            >
+              {cat.image ? (
+                <div
+                  className="w-full h-24 bg-cover bg-center border-b border-slate-800 relative"
+                  style={{ backgroundImage: `url(${cat.image})` }}
+                />
+              ) : (
+                <div className="w-full h-24 bg-slate-800 flex items-center justify-center text-slate-500 border-b border-slate-800">
+                  <Grid className="size-6 text-slate-600" />
+                </div>
+              )}
+              <div className="p-2.5 text-center space-y-1.5">
+                <div className="font-serif font-bold text-white text-[11px] truncate" title={cat.name}>
+                  {cat.name}
+                </div>
+                <button className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-sky-300 text-[10px] font-semibold rounded-lg border border-slate-700 transition">
+                  {cat.ctaText || "Explore now"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 5. RICHTEXT / CONTENT BLOCK
+  if (
+    blockType === "richtext" ||
+    titleLower.includes("richtext") ||
+    titleLower.includes("nội dung") ||
+    titleLower.includes("văn bản")
+  ) {
+    const isEmpty = !preview.bodyText || preview.bodyText.includes("[Khối Trống") || preview.bodyText.includes("Chưa nhập");
+
+    return (
+      <div
+        className={`p-4 rounded-xl border space-y-2.5 ${
+          isEmpty
+            ? "bg-slate-950/60 border-dashed border-slate-800"
+            : !isPW1 && isFail
+            ? "bg-rose-950/20 border-rose-500/40"
+            : "bg-slate-950 border-slate-800"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5 font-serif">
+            <FileCode className="size-3.5 text-indigo-400" />
+            <span>{preview.headline || "Rich Text Content"}</span>
+          </div>
+          <span className="text-[10px] font-mono text-slate-500">
+            {isPW1 ? `PW1: ${block.pw1Component}` : `PW2: ${block.pw2Block}`}
+          </span>
+        </div>
+
+        {isEmpty ? (
+          <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800/80 text-center space-y-1">
+            <div className="text-xs text-slate-400 font-medium">
+              📝 Khối Rich Text này đang để trống trong CSDL
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono">
+              (Người dùng tạo khối trong layout nhưng chưa nhập văn bản — Khớp 100% rỗng)
+            </div>
+          </div>
+        ) : (
+          <div className="text-slate-300 text-xs leading-relaxed space-y-1.5">
+            <div className="text-[11px] text-slate-400 font-mono">{preview.subheadline}</div>
+            <div
+              className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 font-sans text-xs text-slate-200 prose prose-invert max-w-none overflow-hidden [&_img]:max-h-60 [&_img]:rounded-lg [&_img]:mx-auto [&_iframe]:w-full [&_iframe]:rounded-lg [&_a]:text-blue-400 [&_a]:underline"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(preview.bodyText || "") }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 6. FOOTER BLOCK
+  if (
+    blockType === "footer" ||
+    titleLower.includes("footer") ||
+    titleLower.includes("chân trang")
+  ) {
+    return (
+      <div
+        className={`p-4 rounded-xl border space-y-3 ${
+          !isPW1 && isWarn
+            ? "bg-amber-950/20 border-amber-500/40"
+            : "bg-slate-950 border-slate-800"
+        }`}
+      >
+        <div
+          className={`grid gap-3 text-[10px] ${
+            isMobile ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="font-bold text-white text-[11px]">{preview.headline || "Store Farm"}</div>
+            <div className="text-slate-400">📞 1900 6868</div>
+            <div className="text-slate-400">📍 Hà Nội & TP.HCM</div>
+          </div>
+          <div className="space-y-1">
+            <div className="font-bold text-white text-[11px]">Về Chúng Tôi</div>
+            <div className="text-slate-400">Giới thiệu cửa hàng</div>
+            <div className="text-slate-400">Hệ thống phân phối</div>
+          </div>
+          <div className="space-y-1">
+            <div className="font-bold text-white text-[11px]">Hỗ Trợ</div>
+            <div className="text-slate-400">Chính sách đổi trả</div>
+            <div className="text-slate-400">Bảo mật thông tin</div>
+          </div>
+          <div className="space-y-1">
+            <div className="font-bold text-white text-[11px]">Thanh Toán</div>
+            <div className="flex gap-1 pt-0.5">
+              <span className="px-1 py-0.5 bg-slate-900 border border-slate-800 rounded text-[9px] text-slate-300">
+                VISA
+              </span>
+              <span className="px-1 py-0.5 bg-slate-900 border border-slate-800 rounded text-[9px] text-slate-300">
+                MOMO
+              </span>
+            </div>
+            {!isPW1 && isWarn ? (
+              <div className="text-amber-400 text-[9px] font-mono mt-1">⚠️ Thiếu Iframe Map</div>
+            ) : (
+              <div className="text-emerald-400 text-[9px]">🗺️ Bản đồ Google Map</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 7. DEFAULT GENERIC VISUAL BLOCK
+  return (
+    <div
+      className={`p-4 rounded-xl border space-y-2 ${
+        isPW1
+          ? "bg-slate-950 border-amber-500/20"
+          : isFail
+          ? "bg-rose-950/20 border-rose-500/30"
+          : isWarn
+          ? "bg-amber-950/20 border-amber-500/30"
+          : "bg-slate-950 border-slate-800"
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <h5 className="font-bold text-white text-xs">{preview.headline || block.title}</h5>
+        {preview.badgeText && (
+          <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            {preview.badgeText}
+          </span>
+        )}
+      </div>
+      {preview.subheadline && (
+        <p className="text-slate-300 text-[11px] leading-relaxed">{preview.subheadline}</p>
+      )}
+      {preview.bodyText && (
+        <div className="text-slate-300 text-[11px] leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+          {preview.bodyText}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Split Swipe Slider comparison with smooth CSS clip-path overlay
+ */
+function SwipeSliderBlockRenderer({
+  block,
+  deviceView,
+  sliderPosition,
+}: {
+  block: PageBlockItem;
+  deviceView: "desktop" | "mobile";
+  sliderPosition: number;
+}) {
+  const isMobile = deviceView === "mobile";
+  const [localPos, setLocalPos] = useState(sliderPosition);
+
+  useEffect(() => {
+    setLocalPos(sliderPosition);
+  }, [sliderPosition]);
+
+  return (
+    <div className={`space-y-2.5 ${isMobile ? "max-w-[390px] mx-auto" : ""}`}>
+      {/* Slider Header Control */}
+      <div className="flex items-center justify-between text-xs px-1 select-none">
+        <span className="font-mono text-amber-400 font-bold flex items-center gap-1">
+          <span>👈 Bản Gốc PW1 ({100 - localPos}%)</span>
+        </span>
+        <span className="font-mono text-sky-400 font-bold flex items-center gap-1">
+          <span>👉 Bản Mới PW2 ({localPos}%)</span>
+        </span>
+      </div>
+
+      {/* Interactive Range Input */}
+      <div className="px-1">
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={localPos}
+          onChange={(e) => setLocalPos(Number(e.target.value))}
+          className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-ew-resize accent-blue-500"
+        />
+      </div>
+
+      {/* Clipped Overlaid Containers */}
+      <div className="relative rounded-2xl overflow-hidden border border-slate-700/80 bg-slate-950 shadow-2xl min-h-[140px]">
+        {/* Underlay Layer: PW1 */}
+        <div className="w-full">
+          <RichVisualBlockRenderer block={block} version="pw1" deviceView={deviceView} />
+        </div>
+
+        {/* Overlay Layer: PW2 Clipped via CSS */}
+        <div
+          className="absolute inset-0 overflow-hidden"
+          style={{
+            clipPath: `polygon(${localPos}% 0, 100% 0, 100% 100%, ${localPos}% 100%)`,
+          }}
+        >
+          <RichVisualBlockRenderer block={block} version="pw2" deviceView={deviceView} />
+        </div>
+
+        {/* Draggable Vertical Splitter Line */}
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_12px_rgba(255,255,255,0.8)] pointer-events-none z-20"
+          style={{ left: `${localPos}%` }}
+        >
+          <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-7 bg-white text-slate-950 rounded-full shadow-xl flex items-center justify-center text-[10px] font-bold border-2 border-blue-600 cursor-ew-resize pointer-events-auto">
+            ↔
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function MigrationDiffClient() {
   const [mounted, setMounted] = useState(false);
@@ -72,24 +750,27 @@ export function MigrationDiffClient() {
   // Overview Table Filters
   const [filterStatus, setFilterStatus] = useState<"all" | "passed" | "warning" | "failed">("all");
   const [filterTemplate, setFilterTemplate] = useState<string>("all");
-  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
-  const templateDropdownRef = React.useRef<HTMLDivElement>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 15;
-
   const selectedTemplateObj = useMemo(() => {
     if (filterTemplate === "all") return null;
     return CANONICAL_TEMPLATES.find((t) => t.code === filterTemplate) || null;
   }, [filterTemplate]);
+  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
+  const templateDropdownRef = React.useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
+  const [deviceView, setDeviceView] = useState<"desktop" | "mobile">("desktop");
+  const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
+  const deviceDropdownRef = React.useRef<HTMLDivElement>(null);
 
+  // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        templateDropdownRef.current &&
-        !templateDropdownRef.current.contains(event.target as Node)
-      ) {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(event.target as Node)) {
         setIsTemplateDropdownOpen(false);
+      }
+      if (deviceDropdownRef.current && !deviceDropdownRef.current.contains(event.target as Node)) {
+        setIsDeviceDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -103,18 +784,132 @@ export function MigrationDiffClient() {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
-  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "field_diff" | "media_audit" | "text_audit">("visual_stream");
+  const [parityMode, setParityMode] = useState<"dual_window" | "swipe_slider">("dual_window");
+  const [sliderPosition, setSliderPosition] = useState<number>(50);
+  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit">("visual_stream");
+  const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const [activeEntityGroup, setActiveEntityGroup] = useState<"all" | EntityGroupType>("all");
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
   const [resolvedStoreIds, setResolvedStoreIds] = useState<Set<string>>(new Set());
   const [isReloading, setIsReloading] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // Live Database Modal States
+  const [dbModalOpen, setDbModalOpen] = useState(false);
+  const [dbStatus, setDbStatus] = useState<{
+    connected: boolean;
+    message: string;
+    database?: string;
+    serverVersion?: string;
+    tablesCount?: number;
+    latencyMs?: number;
+    tables?: string[];
+  } | null>(null);
+  const [isTestingDb, setIsTestingDb] = useState(false);
+  const [customDbUrl, setCustomDbUrl] = useState("");
+  const [customDbHost, setCustomDbHost] = useState("");
+  const [customDbPort, setCustomDbPort] = useState("3306");
+  const [customDbUser, setCustomDbUser] = useState("");
+  const [customDbPassword, setCustomDbPassword] = useState("");
+  const [customDbName, setCustomDbName] = useState("");
+  const [useSeparateFields, setUseSeparateFields] = useState(false);
+
+  const checkLiveDbStatus = async () => {
+    try {
+      const res = await fetch("/api/qa/migration-diff?mode=db_status");
+      const json = await res.json();
+      if (json.data) setDbStatus(json.data);
+    } catch (err) {
+      console.error("[MigrationDiffClient] Failed to check live DB status:", err);
+    }
+  };
+
+  useEffect(() => {
+    void checkLiveDbStatus();
+  }, []);
+
+  const handleTestDbConnection = async () => {
+    setIsTestingDb(true);
+    try {
+      const config = useSeparateFields
+        ? {
+            host: customDbHost.trim(),
+            port: parseInt(customDbPort.trim() || "3306", 10),
+            user: customDbUser.trim(),
+            password: customDbPassword,
+            database: customDbName.trim(),
+          }
+        : customDbUrl.trim()
+          ? { url: customDbUrl.trim() }
+          : undefined;
+
+      const res = await fetch("/api/qa/migration-diff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "test_db_connection",
+          config,
+        }),
+      });
+      const json = await res.json();
+      if (json.data) {
+        setDbStatus(json.data);
+        if (json.data.connected) {
+          showToast(`🟢 Kết nối Live MySQL thành công! Đã tìm thấy ${json.data.tablesCount} bảng.`);
+        } else {
+          showToast(`🔴 Không thể kết nối: ${json.data.message}`);
+        }
+      }
+    } catch (err: any) {
+      showToast(`🔴 Lỗi kiểm tra: ${err.message || String(err)}`);
+    } finally {
+      setIsTestingDb(false);
+    }
+  };
+
+  const [liveStoreDiff, setLiveStoreDiff] = useState<StoreDeepDiff | null>(null);
+
+  const loadLiveCatalog = async () => {
+    try {
+      const res = await fetch("/api/qa/migration-diff?limit=2000");
+      const json = await res.json();
+      if (json.stores && json.stores.length > 0) {
+        setCatalog(json.stores);
+      }
+    } catch (err) {
+      console.error("[MigrationDiffClient] Failed to load live catalog:", err);
+    }
+  };
+
+  useEffect(() => {
+    void loadLiveCatalog();
+  }, []);
+
+  useEffect(() => {
+    if (!activeStoreId) {
+      setLiveStoreDiff(null);
+      return;
+    }
+    const fetchDiff = async () => {
+      try {
+        const res = await fetch(`/api/qa/migration-diff?store_id=${activeStoreId}`);
+        const json = await res.json();
+        if (json.data) {
+          setLiveStoreDiff(json.data);
+        }
+      } catch (err) {
+        console.error("[MigrationDiffClient] Failed to fetch deep diff, falling back:", err);
+      }
+    };
+    void fetchDiff();
+  }, [activeStoreId]);
+
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
     if (!activeStoreId) return null;
+    if (liveStoreDiff) return liveStoreDiff;
     const isResolved = resolvedStoreIds.has(activeStoreId);
     return getStoreDeepDiff(activeStoreId, isResolved ? "passed" : undefined);
-  }, [activeStoreId, resolvedStoreIds]);
+  }, [activeStoreId, resolvedStoreIds, liveStoreDiff]);
 
   const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
 
@@ -298,10 +1093,39 @@ export function MigrationDiffClient() {
 
         {/* Database Status Indicators */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-sm">
-            <span className="size-2 rounded-full bg-emerald-400" />
-            <span className="text-slate-400">Snapshot: <strong className="text-emerald-400 font-mono font-medium">PW1 Audit Data</strong></span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setDbModalOpen(true)}
+            className={`flex items-center gap-2 border rounded-xl px-3 py-1.5 text-xs font-semibold shadow-sm transition ${
+              dbStatus?.connected
+                ? "bg-emerald-950/60 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/60"
+                : "bg-slate-900/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700"
+            }`}
+          >
+            <span
+              className={`size-2 rounded-full ${
+                dbStatus?.connected ? "bg-emerald-400" : "bg-amber-400"
+              }`}
+            />
+            <span className="text-slate-400">
+              {dbStatus?.connected ? (
+                <>
+                  PW1:{" "}
+                  <strong className="text-emerald-400 font-mono font-medium">
+                    Live MySQL ({dbStatus.tablesCount} bảng)
+                  </strong>
+                </>
+              ) : (
+                <>
+                  Snapshot:{" "}
+                  <strong className="text-emerald-400 font-mono font-medium">PW1 Audit Data</strong>
+                </>
+              )}
+            </span>
+            <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded ml-0.5 font-mono">
+              ⚙️
+            </span>
+          </button>
           <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-sm">
             <span className="size-2 rounded-full bg-sky-400" />
             <span className="text-slate-400">Target: <strong className="text-sky-400 font-mono font-medium">PW2 Next.js</strong></span>
@@ -310,7 +1134,11 @@ export function MigrationDiffClient() {
             Audit Mode
           </span>
           <button
-            onClick={() => showToast("Đã làm mới dữ liệu đối soát cho toàn bộ 2.000 website!")}
+            type="button"
+            onClick={() => {
+              void checkLiveDbStatus();
+              showToast("Đã làm mới dữ liệu đối soát cho toàn bộ 2.000 website!");
+            }}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700/80 transition shadow-sm"
           >
             <RefreshCw className="size-3.5 text-slate-400" />
@@ -621,7 +1449,7 @@ export function MigrationDiffClient() {
                         setActiveStoreId(store.id);
                         setActivePageIndex(0);
                         setSelectedBlockId(null);
-                        setActiveViewTab("visual_stream");
+                        setActiveViewTab("field_diff");
                       }}
                       className="px-3.5 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-600 rounded-xl font-semibold text-xs transition-all shadow-sm flex items-center gap-1 ml-auto whitespace-nowrap"
                     >
@@ -758,7 +1586,37 @@ export function MigrationDiffClient() {
               </div>
 
               {/* Header Action Buttons */}
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {/* Device View Mode Switcher (Desktop vs Mobile 375px) */}
+                <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-inner select-none">
+                  <button
+                    type="button"
+                    onClick={() => setDeviceView("desktop")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      deviceView === "desktop"
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                    title="Xem giao diện chuẩn Desktop (100% width)"
+                  >
+                    <Monitor className="size-3.5" />
+                    <span>Desktop</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeviceView("mobile")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      deviceView === "mobile"
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                    title="Xem giả lập điện thoại Mobile (375px viewport)"
+                  >
+                    <Smartphone className="size-3.5" />
+                    <span>Mobile (375px)</span>
+                  </button>
+                </div>
+
                 <button
                   disabled={isReloading}
                   onClick={() => handleReloadStoreData(selectedDiff.id)}
@@ -827,7 +1685,7 @@ export function MigrationDiffClient() {
                 })}
               </div>
 
-              {/* View Mode Switcher (4 Modes) */}
+              {/* View Mode Switcher (5 Modes) */}
               <div className="flex items-center gap-2 shrink-0">
                 <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
                   <button
@@ -836,8 +1694,17 @@ export function MigrationDiffClient() {
                       activeViewTab === "visual_stream" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <Monitor className="size-3.5" />
-                    <span>So Sánh 2 Website</span>
+                    <Layers className="size-3.5" />
+                    <span>So Sánh Khối</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveViewTab("live_webview")}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                      activeViewTab === "live_webview" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Globe className="size-3.5" />
+                    <span>Xem Web Thật (Live Iframe)</span>
                   </button>
                   <button
                     onClick={() => setActiveViewTab("field_diff")}
@@ -846,7 +1713,7 @@ export function MigrationDiffClient() {
                     }`}
                   >
                     <SlidersHorizontal className="size-3.5" />
-                    <span>Soi Từng Trường (Field Diff)</span>
+                    <span>Soi CSDL 1-to-1</span>
                   </button>
                   <button
                     onClick={() => setActiveViewTab("media_audit")}
@@ -934,17 +1801,62 @@ export function MigrationDiffClient() {
                 <div className="flex-1 flex flex-col min-h-0 bg-slate-900/30">
                   
                   {/* Fixed Browser Dual Windows Header - Fixed Top Bar With Zero Gap */}
-                  <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800/80 bg-slate-950 shrink-0 shadow-md">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800/80 bg-slate-950 shrink-0 shadow-md space-y-2.5">
+                    {/* Parity View Sub-Mode Switcher: Side-by-Side Dual vs Split Swipe Slider */}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setParityMode("dual_window")}
+                          className={`px-3 py-1 font-semibold rounded-lg transition ${
+                            parityMode === "dual_window"
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          📑 Song Song (Dual View)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setParityMode("swipe_slider")}
+                          className={`px-3 py-1 font-semibold rounded-lg transition ${
+                            parityMode === "swipe_slider"
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          ↔️ Kéo Trượt (Swipe Slider)
+                        </button>
+                      </div>
+
+                      {parityMode === "swipe_slider" && (
+                        <div className="flex items-center gap-2 text-xs font-mono bg-slate-900/80 px-3 py-1 rounded-xl border border-slate-800 text-slate-300">
+                          <span>Vị trí trượt:</span>
+                          <span className="font-bold text-sky-400">{sliderPosition}%</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={sliderPosition}
+                            onChange={(e) => setSliderPosition(Number(e.target.value))}
+                            className="w-24 h-1 bg-slate-800 rounded-lg appearance-none cursor-ew-resize accent-blue-500 ml-1"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className={`grid gap-6 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2 gap-4"}`}>
                       {/* Left Browser Bar */}
-                      <div className="bg-slate-900/90 px-4 py-2.5 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-sm">
+                      <div className={`bg-slate-900/90 px-4 py-2.5 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-sm ${deviceView === "mobile" ? "max-w-[375px] mx-auto w-full" : ""}`}>
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1.5">
                             <span className="size-2.5 rounded-full bg-rose-500/80" />
                             <span className="size-2.5 rounded-full bg-amber-500/80" />
                             <span className="size-2.5 rounded-full bg-emerald-500/80" />
                           </div>
-                          <span className="font-bold text-xs text-amber-400 font-mono ml-2">👈 BẢN CŨ PW1 (LARAVEL)</span>
+                          <span className="font-bold text-xs text-amber-400 font-mono ml-2">
+                            {deviceView === "mobile" ? "📱 BẢN CŨ PW1 (MOBILE 375px)" : "👈 BẢN CŨ PW1 (LARAVEL)"}
+                          </span>
                         </div>
                         <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-medium">
                           <span>Live V1</span> <ExternalLink className="size-3" />
@@ -952,14 +1864,16 @@ export function MigrationDiffClient() {
                       </div>
 
                       {/* Right Browser Bar */}
-                      <div className="bg-slate-900/90 px-4 py-2.5 rounded-xl border border-sky-500/30 flex items-center justify-between shadow-sm">
+                      <div className={`bg-slate-900/90 px-4 py-2.5 rounded-xl border border-sky-500/30 flex items-center justify-between shadow-sm ${deviceView === "mobile" ? "max-w-[375px] mx-auto w-full" : ""}`}>
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1.5">
                             <span className="size-2.5 rounded-full bg-rose-500/80" />
                             <span className="size-2.5 rounded-full bg-amber-500/80" />
                             <span className="size-2.5 rounded-full bg-emerald-500/80" />
                           </div>
-                          <span className="font-bold text-xs text-sky-400 font-mono ml-2">👉 BẢN MỚI PW2 (NEXT.JS 15)</span>
+                          <span className="font-bold text-xs text-sky-400 font-mono ml-2">
+                            {deviceView === "mobile" ? "📱 BẢN MỚI PW2 (MOBILE 375px)" : "👉 BẢN MỚI PW2 (NEXT.JS 15)"}
+                          </span>
                         </div>
                         {activePage.existsInPW2 ? (
                           <a href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-sky-400 hover:underline flex items-center gap-1 font-medium">
@@ -1029,7 +1943,7 @@ export function MigrationDiffClient() {
                           }`}
                         >
                           {/* Block Header */}
-                          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
                             <div className="flex items-center gap-3">
                               <span className="px-2 py-1 bg-slate-900 text-sky-400 font-mono font-bold text-xs rounded-lg border border-slate-800">
                                 #{String(block.order).padStart(2, "0")}
@@ -1059,76 +1973,283 @@ export function MigrationDiffClient() {
                             </div>
                           </div>
 
-                          {/* Dual Column Content Preview */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* PW1 Preview Box */}
-                            <div className="bg-slate-950/60 border border-amber-500/20 rounded-xl p-4 text-xs text-slate-200 space-y-2">
-                              <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider">
-                                Giao Diện & Nội Dung Bản Gốc PW1
-                              </div>
-                              {block.pw1Preview.headline && (
-                                <div className="font-bold text-white text-sm">{block.pw1Preview.headline}</div>
-                              )}
-                              {block.pw1Preview.subheadline && (
-                                <div className="text-slate-300 leading-relaxed">{block.pw1Preview.subheadline}</div>
-                              )}
-                              {block.pw1Preview.bodyText && (
-                                <div className="text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-                                  {block.pw1Preview.bodyText}
+                          {/* Dual Column Content Preview - Switches between Desktop, Mobile & Swipe Slider */}
+                          {parityMode === "swipe_slider" ? (
+                            /* Split Swipe Slider Mode (0% to 100%) */
+                            <SwipeSliderBlockRenderer
+                              block={block}
+                              deviceView={deviceView}
+                              sliderPosition={sliderPosition}
+                            />
+                          ) : deviceView === "mobile" ? (
+                            /* Mobile Phone Mockup View (375px) */
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-2">
+                              {/* PW1 Phone Mockup */}
+                              <div className="w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 border-amber-500/40 rounded-[2.5rem] p-4 shadow-2xl space-y-3.5 ring-1 ring-amber-500/20 relative">
+                                {/* Speaker / Notch */}
+                                <div className="w-24 h-3.5 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner">
+                                  <div className="size-1.5 rounded-full bg-slate-700" />
+                                  <div className="w-8 h-1 rounded-full bg-slate-800" />
                                 </div>
-                              )}
-                              {block.pw1Preview.badgeText && (
-                                <span className="inline-block text-[10px] bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/20">
-                                  {block.pw1Preview.badgeText}
-                                </span>
-                              )}
-                            </div>
+                                <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider text-center border-b border-slate-800 pb-1.5 flex items-center justify-center gap-1">
+                                  <Smartphone className="size-3" /> PW1 Mobile View (375px)
+                                </div>
 
-                            {/* PW2 Preview Box */}
-                            <div className={`rounded-xl p-4 text-xs text-slate-200 space-y-2 border ${
-                              block.status === "fail"
-                                ? "bg-rose-950/20 border-rose-500/40"
-                                : block.status === "warn"
-                                ? "bg-amber-950/20 border-amber-500/40"
-                                : "bg-slate-950/60 border-sky-500/20"
-                            }`}>
-                              <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider">
-                                Giao Diện & Nội Dung Bản Mới PW2 (Next.js 15)
+                                {/* Rich Visual Block Render for PW1 */}
+                                <RichVisualBlockRenderer block={block} version="pw1" deviceView="mobile" />
+
+                                {/* Home Bar */}
+                                <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
                               </div>
-                              {block.pw2Preview.headline && (
-                                <div className="font-bold text-white text-sm">{block.pw2Preview.headline}</div>
-                              )}
-                              {block.pw2Preview.subheadline && (
-                                <div className="text-slate-300 leading-relaxed">{block.pw2Preview.subheadline}</div>
-                              )}
-                              {block.pw2Preview.bodyText && (
-                                <div className={`leading-relaxed p-2.5 rounded-lg border ${
-                                  block.status === "fail"
-                                    ? "bg-rose-950/40 border-rose-500/40 text-rose-200 font-medium"
-                                    : block.status === "warn"
-                                    ? "bg-amber-950/40 border-amber-500/40 text-amber-200 font-medium"
-                                    : "bg-slate-900/80 border-slate-800 text-slate-300"
-                                }`}>
-                                  {block.pw2Preview.bodyText}
+
+                              {/* PW2 Phone Mockup */}
+                              <div className={`w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 rounded-[2.5rem] p-4 shadow-2xl space-y-3.5 relative ${
+                                block.status === "fail"
+                                  ? "border-rose-500/60 ring-2 ring-rose-500/30"
+                                  : block.status === "warn"
+                                  ? "border-amber-500/60 ring-2 ring-amber-500/30"
+                                  : "border-sky-500/40 ring-1 ring-sky-500/20"
+                              }`}>
+                                {/* Speaker / Notch */}
+                                <div className="w-24 h-3.5 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner">
+                                  <div className="size-1.5 rounded-full bg-slate-700" />
+                                  <div className="w-8 h-1 rounded-full bg-slate-800" />
                                 </div>
-                              )}
-                              {block.pw2Preview.badgeText && (
-                                <span className={`inline-block text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
-                                  block.status === "fail"
-                                    ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                                    : block.status === "warn"
-                                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                }`}>
-                                  {block.pw2Preview.badgeText}
-                                </span>
-                              )}
+                                <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider text-center border-b border-slate-800 pb-1.5 flex items-center justify-center gap-1">
+                                  <Smartphone className="size-3" /> PW2 Next.js Mobile (375px)
+                                </div>
+
+                                {/* Rich Visual Block Render for PW2 */}
+                                <RichVisualBlockRenderer block={block} version="pw2" deviceView="mobile" />
+
+                                {/* Home Bar */}
+                                <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
+                              </div>
                             </div>
+                          ) : (
+                            /* Desktop Dual Column View */
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* PW1 Preview Box */}
+                              <div className="space-y-1.5">
+                                <div className="text-[10px] uppercase font-bold text-amber-400 font-mono tracking-wider px-1">
+                                  Giao Diện Bản Gốc PW1 (Laravel)
+                                </div>
+                                <RichVisualBlockRenderer block={block} version="pw1" deviceView="desktop" />
+                              </div>
+
+                              {/* PW2 Preview Box */}
+                              <div className="space-y-1.5">
+                                <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider px-1">
+                                  Giao Diện Bản Mới PW2 (Next.js 15)
+                                </div>
+                                <RichVisualBlockRenderer block={block} version="pw2" deviceView="desktop" />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Raw Field Data & Configuration Inspector for this Block */}
+                          <div className="mt-2 bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center justify-between">
+                              <span className="text-amber-400">📋 Dữ Liệu MySQL Của Khối #{block.order} ({block.pw1Component})</span>
+                              <span className="text-slate-500 font-normal">Trường dữ liệu người dùng nhập</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
+                              <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800/80">
+                                <span className="text-slate-500 block text-[10px]">Tiêu đề (Headline):</span>
+                                <span className="text-white font-bold">{block.pw1Preview?.headline || "Không có"}</span>
+                              </div>
+                              <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800/80">
+                                <span className="text-slate-500 block text-[10px]">Tiêu đề phụ / Mô tả:</span>
+                                <span className="text-slate-300">{block.pw1Preview?.subheadline || "Không có"}</span>
+                              </div>
+                            </div>
+                            {block.pw1Preview?.bodyText && (
+                              <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800/80 text-[11px] font-mono text-slate-300">
+                                <span className="text-slate-500 block text-[10px]">Nội dung chi tiết / Danh sách:</span>
+                                <span className="text-sky-300">{block.pw1Preview.bodyText}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+            ) : activeViewTab === "live_webview" ? (
+              /* ========================================================================= */
+              /* 1.5. LIVE STOREFRONT WEBVIEW (100% REAL COMPILED HTML/CSS/JS IFRAME) */
+              /* ========================================================================= */
+              <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
+                {/* Dual Browser URL Bar */}
+                <div className="px-4 py-2.5 sm:px-6 sm:py-2.5 border-b border-slate-800/80 bg-slate-900/80 shrink-0 shadow-sm">
+                  <div className={`grid gap-4 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2"}`}>
+                    {/* Left Browser URL Bar (PW1 Laravel) */}
+                    <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-amber-500/30 flex items-center justify-between gap-2 shadow-inner">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex gap-1">
+                          <span className="size-2 rounded-full bg-rose-500/80" />
+                          <span className="size-2 rounded-full bg-amber-500/80" />
+                          <span className="size-2 rounded-full bg-emerald-500/80" />
+                        </div>
+                        <span className="text-[11px] font-mono text-amber-300 truncate">
+                          {selectedDiff.legacyDomain}{activePage.path.replace("/", "")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIframeReloadKey((k) => k + 1)}
+                          className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+                          title="Tải lại iframe PW1"
+                        >
+                          <RefreshCw className="size-3" />
+                        </button>
+                        <a
+                          href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1 rounded-lg hover:bg-slate-800 text-amber-400 transition flex items-center gap-0.5 text-[11px] font-semibold"
+                          title="Mở tab mới ngoài trình duyệt"
+                        >
+                          <ExternalLink className="size-3" />
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Right Browser URL Bar (PW2 Next.js 15) */}
+                    <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-sky-500/30 flex items-center justify-between gap-2 shadow-inner">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex gap-1">
+                          <span className="size-2 rounded-full bg-rose-500/80" />
+                          <span className="size-2 rounded-full bg-amber-500/80" />
+                          <span className="size-2 rounded-full bg-emerald-500/80" />
+                        </div>
+                        <span className="text-[11px] font-mono text-sky-300 truncate">
+                          {selectedDiff.migratedDomain}{activePage.path.replace("/", "")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIframeReloadKey((k) => k + 1)}
+                          className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
+                          title="Tải lại iframe PW2"
+                        >
+                          <RefreshCw className="size-3" />
+                        </button>
+                        {activePage.existsInPW2 ? (
+                          <a
+                            href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1 rounded-lg hover:bg-slate-800 text-sky-400 transition flex items-center gap-0.5 text-[11px] font-semibold"
+                            title="Mở tab mới ngoài trình duyệt"
+                          >
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-rose-400 font-bold font-mono">CHƯA CÓ TRANG</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Iframe Viewport Stream Area */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0 bg-slate-900/40">
+                  {(() => {
+                    const pw1Url = selectedDiff.domain
+                      ? `https://${selectedDiff.domain}${activePage.path === "/" ? "" : activePage.path}`
+                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`;
+                    const pw2Url = selectedDiff.migratedDomain
+                      ? `${selectedDiff.migratedDomain}${activePage.path === "/" ? "" : activePage.path}`
+                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}`;
+
+                    return deviceView === "mobile" ? (
+                      /* Mobile 375px Dual Phone Mockups with Real Iframes */
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-4">
+                        {/* PW1 Phone Shell */}
+                        <div className="w-full max-w-[390px] mx-auto bg-slate-950 border-4 border-amber-500/40 rounded-[3rem] p-3 shadow-2xl space-y-2 ring-1 ring-amber-500/20 flex flex-col items-center">
+                          {/* Dynamic Island / Speaker */}
+                          <div className="w-24 h-4 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner my-1">
+                            <div className="size-1.5 rounded-full bg-slate-700" />
+                            <div className="w-8 h-1 rounded-full bg-slate-800" />
+                          </div>
+                          {/* Iframe Container */}
+                          <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
+                            <iframe
+                              key={`pw1-mob-${iframeReloadKey}`}
+                              src={pw1Url}
+                              title="PW1 Mobile Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          </div>
+                          {/* Home Bar */}
+                          <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-1" />
+                        </div>
+
+                        {/* PW2 Phone Shell */}
+                        <div className="w-full max-w-[390px] mx-auto bg-slate-950 border-4 border-sky-500/40 rounded-[3rem] p-3 shadow-2xl space-y-2 ring-1 ring-sky-500/20 flex flex-col items-center">
+                          {/* Dynamic Island / Speaker */}
+                          <div className="w-24 h-4 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner my-1">
+                            <div className="size-1.5 rounded-full bg-slate-700" />
+                            <div className="w-8 h-1 rounded-full bg-slate-800" />
+                          </div>
+                          {/* Iframe Container */}
+                          <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
+                            <iframe
+                              key={`pw2-mob-${iframeReloadKey}`}
+                              src={pw2Url}
+                              title="PW2 Next.js Mobile Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          </div>
+                          {/* Home Bar */}
+                          <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-1" />
+                        </div>
+                      </div>
+                    ) : (
+                      /* Desktop Dual 50/50 Iframes */
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[720px]">
+                        {/* Left PW1 Full Iframe */}
+                        <div className="bg-slate-950 rounded-2xl border-2 border-amber-500/30 overflow-hidden flex flex-col shadow-xl">
+                          <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-amber-400 font-mono flex items-center justify-between">
+                            <span>👈 PW1 LARAVEL (LIVE STOREFRONT 100%)</span>
+                            <span className="text-slate-400 font-normal">Desktop Resolution</span>
+                          </div>
+                          <div className="flex-1 bg-white relative">
+                            <iframe
+                              key={`pw1-desk-${iframeReloadKey}`}
+                              src={pw1Url}
+                              title="PW1 Desktop Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Right PW2 Full Iframe */}
+                        <div className="bg-slate-950 rounded-2xl border-2 border-sky-500/30 overflow-hidden flex flex-col shadow-xl">
+                          <div className="bg-slate-900/90 px-3.5 py-2 border-b border-slate-800 text-[11px] font-bold text-sky-400 font-mono flex items-center justify-between">
+                            <span>👉 PW2 NEXT.JS 15 (LIVE STOREFRONT 100%)</span>
+                            <span className="text-slate-400 font-normal">Desktop Resolution</span>
+                          </div>
+                          <div className="flex-1 bg-white relative">
+                            <iframe
+                              key={`pw2-desk-${iframeReloadKey}`}
+                              src={pw2Url}
+                              title="PW2 Next.js Desktop Storefront"
+                              className="w-full h-full border-0"
+                              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ) : activeViewTab === "field_diff" ? (
@@ -1530,6 +2651,187 @@ export function MigrationDiffClient() {
                 </div>
               </div>
             )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Live PW1 MySQL Configuration & Test Modal */}
+      {dbModalOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-5 text-slate-100 animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 rounded-2xl">
+                  <Database className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Kết Nối CSDL Live PW1 (MySQL)</h3>
+                  <p className="text-xs text-slate-400">Chế độ ĐỌC DỮ LIỆU AN TOÀN (Strictly Read-Only 100%)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDbModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Read-Only Safety Banner */}
+            <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5">
+              <ShieldCheck className="size-4 shrink-0 mt-0.5 text-emerald-400" />
+              <div className="space-y-1">
+                <strong className="font-semibold text-emerald-200">Cam Kết Bảo Mật Read-Only Tuyệt Đối:</strong>
+                <p className="text-emerald-400/90 leading-relaxed">
+                  Hệ thống chỉ chạy lệnh <code className="bg-emerald-900/60 px-1 py-0.5 rounded font-mono">SELECT</code> và <code className="bg-emerald-900/60 px-1 py-0.5 rounded font-mono">SHOW TABLES</code>. Mọi lệnh ghi (INSERT/UPDATE/DELETE/DROP) đều bị chặn cứng ở cấp mã nguồn và phiên làm việc.
+                </p>
+              </div>
+            </div>
+
+            {/* Connection Status Card */}
+            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Trạng Thái Kết Nối Hiện Tại</span>
+                {dbStatus?.latencyMs !== undefined && (
+                  <span className="text-[11px] font-mono text-slate-500">{dbStatus.latencyMs}ms</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span className={`size-3 rounded-full shrink-0 ${dbStatus?.connected ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
+                <span className={`text-sm font-bold ${dbStatus?.connected ? "text-emerald-400" : "text-slate-300"}`}>
+                  {dbStatus?.connected ? "Đã kết nối Live MySQL thành công" : "Chưa kết nối CSDL thật (Đang dùng dữ liệu mẫu)"}
+                </span>
+              </div>
+              {dbStatus?.message && (
+                <p className="text-xs text-slate-400 font-mono bg-slate-900 p-2 rounded-lg border border-slate-800/80 break-all">
+                  {dbStatus.message}
+                </p>
+              )}
+              {dbStatus?.connected && dbStatus.tables && (
+                <div className="pt-2 text-xs text-slate-300 space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <span>CSDL: <strong className="text-sky-300 font-mono">{dbStatus.database}</strong> (v{dbStatus.serverVersion})</span>
+                    <span>{dbStatus.tablesCount} Bảng</span>
+                  </div>
+                  <div className="max-h-24 overflow-y-auto bg-slate-900 p-2 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-400 flex flex-wrap gap-1">
+                    {dbStatus.tables.map((t) => (
+                      <span key={t} className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input Form */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300">
+                  {useSeparateFields ? "Nhập thông số Host / Port / User:" : "Chuỗi kết nối MySQL (PW1_DATABASE_URL):"}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setUseSeparateFields(!useSeparateFields)}
+                  className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium"
+                >
+                  {useSeparateFields ? "Nhập dạng URL string" : "Nhập từng trường riêng (Host, User...)"}
+                </button>
+              </div>
+
+              {!useSeparateFields ? (
+                <input
+                  type="text"
+                  placeholder="mysql://user:password@127.0.0.1:3306/legacy_db"
+                  value={customDbUrl}
+                  onChange={(e) => setCustomDbUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono"
+                />
+              ) : (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="col-span-2 sm:col-span-1">
+                    <input
+                      type="text"
+                      placeholder="Host (vd: 127.0.0.1 hoặc db.domain.com)"
+                      value={customDbHost}
+                      onChange={(e) => setCustomDbHost(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <input
+                      type="text"
+                      placeholder="Port (mặc định: 3306)"
+                      value={customDbPort}
+                      onChange={(e) => setCustomDbPort(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="User (vd: qa_readonly)"
+                      value={customDbUser}
+                      onChange={(e) => setCustomDbUser(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={customDbPassword}
+                      onChange={(e) => setCustomDbPassword(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="text"
+                      placeholder="Tên CSDL (Database Name)"
+                      value={customDbName}
+                      onChange={(e) => setCustomDbName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+              <p className="text-[11px] text-slate-500">
+                💡 <em>Mẹo:</em> Bạn cũng có thể lưu trực tiếp vào file <code className="text-slate-400 font-mono">.env.local</code> với biến <code className="text-emerald-400 font-mono">PW1_DATABASE_URL</code> để hệ thống tự động nhận diện vĩnh viễn.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDbModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                disabled={isTestingDb}
+                onClick={handleTestDbConnection}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-xs font-bold text-white rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center gap-2 disabled:opacity-50"
+              >
+                {isTestingDb ? (
+                  <>
+                    <RefreshCw className="size-3.5 animate-spin" />
+                    <span>Đang Thử Kết Nối...</span>
+                  </>
+                ) : (
+                  <>
+                    <Database className="size-3.5" />
+                    <span>⚡ Kiểm Tra Kết Nối MySQL (Ping Test)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>,
         document.body

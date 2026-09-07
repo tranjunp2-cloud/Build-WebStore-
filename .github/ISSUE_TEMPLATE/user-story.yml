@@ -1,0 +1,169 @@
+name: "📖 User Story"
+description: "US-FXX-YY: tinh nang user-facing voi Acceptance Criteria dang Gherkin"
+labels: ["user-story"]
+body:
+  - type: input
+    id: story-id
+    attributes:
+      label: "Story ID"
+      description: "US-FXX-YY (khop feature code trong docs/prd/)"
+      placeholder: "US-F40-13"
+    validations:
+      required: true
+
+  - type: input
+    id: feature-code
+    attributes:
+      label: "Feature code"
+      description: "FXX (VD F40). PM/dev add label feature:FXX manual sau khi triage"
+      placeholder: "F40"
+    validations:
+      required: true
+
+  - type: input
+    id: wave
+    attributes:
+      label: "Wave"
+      description: "Sprint/wave hien tai (wave:N label se auto add)"
+      placeholder: "8"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Muc do uu tien"
+      options:
+        - P0 — Blocker (can cho release)
+        - P1 — High (sprint hien tai)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: "Size estimate"
+      options:
+        - "size:S — < 1 day"
+        - "size:M — 1-3 days"
+        - "size:L — 3-5 days"
+        - "size:XL — > 1 week (nen chia nho)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-story
+    attributes:
+      label: "User Story"
+      description: "Format chuan: As a / I want / So that"
+      value: |
+        As a [user role]
+        I want [action / capability]
+        So that [business value / benefit]
+    validations:
+      required: true
+
+  - type: textarea
+    id: context-scope
+    attributes:
+      label: "Context & Scope"
+      description: "Files chinh trong scope, related PRs, dependencies"
+      placeholder: |
+        - Scope: `src/app/studio/qa/**`
+        - Related PRs: #1234
+        - Blocked by: #5678
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: "Acceptance Criteria (Gherkin)"
+      description: "Moi AC 1 block Gherkin - QA se dua vao day de viet test"
+      value: |
+        ### AC-1: [Ten AC ngan gon]
+        ```gherkin
+        GIVEN [precondition]
+        WHEN [user action]
+        THEN [expected result]
+        AND [additional expectation]
+        ```
+
+        ### AC-2: [Ten AC thu 2]
+        ```gherkin
+        GIVEN ...
+        WHEN ...
+        THEN ...
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition-of-done
+    attributes:
+      label: "Definition of Done"
+      description: "Checklist bat buoc pass truoc khi close issue"
+      value: |
+        - [ ] Code implemented + `tsc --noEmit` pass
+        - [ ] Unit test viet moi + coverage >= 80% code moi
+        - [ ] E2E test (Playwright) cover happy path
+        - [ ] QA test tren staging (label `qa:passed`)
+        - [ ] Docs updated (docs/prd/F*.md, docs/architecture/F*.md neu can)
+        - [ ] Merge PR vao staging (Relates to #issue)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk-severity
+    attributes:
+      label: "Risk severity"
+      description: "Muc do rui ro tong the neu bug (chon dua tren blast radius)"
+      options:
+        - Low — thay doi UI/UX rieng feature
+        - Medium — anh huong 1-2 modules
+        - High — anh huong nhieu features hoac shared code
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk-category
+    attributes:
+      label: "Risk category (specialized)"
+      description: "Neu task cham auth/data/API contract, chon category tuong ung de PM/reviewer add label risk:* tuong ung"
+      options:
+        - None
+        - "risk:security — cham auth/credential/PII"
+        - "risk:data-loss — migration/batch update/delete"
+        - "risk:breaking-change — API/schema breaking"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: agent-routing
+    attributes:
+      label: "AI agent routing"
+      description: "Task nay AI (Claude/Codex) co lam duoc khong? (Optional - default agent:needs-context neu bo trong)"
+      options:
+        - "agent:ai-ok — AI co the tu implement"
+        - "agent:needs-context — AI can dev cung cap them context truoc"
+        - "agent:human-needed — Can dev/PM tay quyet dinh"
+    validations:
+      required: false
+
+  - type: input
+    id: start-date
+    attributes:
+      label: "Start Date"
+      description: "Ngay bat dau (YYYY-MM-DD)"
+      placeholder: "2026-08-28"
+    validations:
+      required: false
+
+  - type: input
+    id: end-date
+    attributes:
+      label: "End Date"
+      description: "Deadline (YYYY-MM-DD)"
+      placeholder: "2026-09-04"
+    validations:
+      required: false

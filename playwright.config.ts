@@ -136,6 +136,16 @@ export default defineConfig({
             },
             dependencies: ['setup'],
         },
+        {
+            name: 'f40-migration-diff',
+            testDir: './tests',
+            testMatch: /studio-migration-diff\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: hasE2EAccount ? './e2e/.auth/user.json' : undefined,
+            },
+            dependencies: hasE2EAccount ? ['setup'] : [],
+        },
         // GH-1687: authenticated category-management flow that verifies the
         // Parent Category dropdown follows tree preorder instead of API order.
         {
