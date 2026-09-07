@@ -913,13 +913,20 @@ export function MigrationDiffClient() {
 
   const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
 
-  // Lock background body scroll when inspection modal is active
+  // Lock background body scroll and listen for Escape key when inspection modal is active
   useEffect(() => {
     if (activeStoreId) {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          setActiveStoreId(null);
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
       return () => {
         document.body.style.overflow = originalOverflow;
+        window.removeEventListener("keydown", handleKeyDown);
       };
     }
   }, [activeStoreId]);
@@ -1007,7 +1014,7 @@ export function MigrationDiffClient() {
         )
       );
       setIsReloading(false);
-      showToast(`✓ Đã quét lại Live DB! Phát hiện các lỗi đã được Dev sửa xong. Độ khớp: 99.8% (Pass)`);
+      showToast(`✓ Đã làm mới dữ liệu đối soát! Phát hiện các lỗi đã được Dev sửa xong. Độ khớp: 99.8% (Pass)`);
     }, 500);
   };
 
@@ -1026,6 +1033,35 @@ export function MigrationDiffClient() {
       element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans animate-pulse">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800/80 pb-5">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 bg-slate-800 rounded-2xl" />
+            <div className="space-y-2">
+              <div className="h-6 w-48 bg-slate-800 rounded" />
+              <div className="h-4 w-72 bg-slate-800/60 rounded" />
+            </div>
+          </div>
+          <div className="flex gap-2.5">
+            <div className="h-8 w-36 bg-slate-800 rounded-xl" />
+            <div className="h-8 w-36 bg-slate-800 rounded-xl" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80 h-24 space-y-2">
+              <div className="h-3 w-20 bg-slate-800 rounded" />
+              <div className="h-7 w-16 bg-slate-800 rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="h-96 rounded-2xl bg-slate-900/40 border border-slate-800/80" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans">
@@ -1068,33 +1104,45 @@ export function MigrationDiffClient() {
           >
             <span
               className={`size-2 rounded-full ${
-                dbStatus?.connected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
+                dbStatus?.connected ? "bg-emerald-400" : "bg-amber-400"
               }`}
             />
             <span className="text-slate-400">
-              PW1:{" "}
-              <strong className="text-emerald-400 font-mono font-medium">
-                {dbStatus?.connected ? `Live MySQL (${dbStatus.tablesCount} bảng)` : "MySQL (Cấu hình Live DB)"}
-              </strong>
+              {dbStatus?.connected ? (
+                <>
+                  PW1:{" "}
+                  <strong className="text-emerald-400 font-mono font-medium">
+                    Live MySQL ({dbStatus.tablesCount} bảng)
+                  </strong>
+                </>
+              ) : (
+                <>
+                  Snapshot:{" "}
+                  <strong className="text-emerald-400 font-mono font-medium">PW1 Audit Data</strong>
+                </>
+              )}
             </span>
             <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded ml-0.5 font-mono">
               ⚙️
             </span>
           </button>
           <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-sm">
-            <span className="size-2 rounded-full bg-sky-400 animate-pulse" />
-            <span className="text-slate-400">PW2: <strong className="text-sky-400 font-mono font-medium">Postgres (Live)</strong></span>
+            <span className="size-2 rounded-full bg-sky-400" />
+            <span className="text-slate-400">Target: <strong className="text-sky-400 font-mono font-medium">PW2 Next.js</strong></span>
           </div>
+          <span className="px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] font-semibold text-amber-400">
+            Audit Mode
+          </span>
           <button
             type="button"
             onClick={() => {
               void checkLiveDbStatus();
-              showToast("Đã quét lại đối soát cho toàn bộ 2.000 website!");
+              showToast("Đã làm mới dữ liệu đối soát cho toàn bộ 2.000 website!");
             }}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700/80 transition shadow-sm"
           >
             <RefreshCw className="size-3.5 text-slate-400" />
-            <span>Quét Lại CSDL</span>
+            <span>Làm Mới Đối Soát</span>
           </button>
         </div>
       </div>
@@ -1255,7 +1303,7 @@ export function MigrationDiffClient() {
                     >
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] font-bold px-1.5 py-0.2 bg-slate-800 text-sky-400 rounded border border-slate-700">
+                          <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 bg-slate-800 text-sky-400 rounded border border-slate-700">
                             {t.code}
                           </span>
                           <span className="font-bold text-white text-xs">{t.name}</span>
@@ -1478,7 +1526,12 @@ export function MigrationDiffClient() {
       {/* PROFESSIONAL DETAIL INSPECTOR MODAL WITH FULL 2-WEBSITE STREAM + FIELD DIFF */}
       {/* ========================================================================= */}
       {mounted && typeof document !== "undefined" && selectedDiff && activePage && createPortal(
-        <div className="fixed inset-0 z-[999999] bg-slate-950 flex flex-col p-0 md:p-3 overscroll-contain animate-in fade-in duration-200">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-store-title"
+          className="fixed inset-0 z-[999999] bg-slate-950 flex flex-col p-0 md:p-3 overscroll-contain animate-in fade-in duration-200"
+        >
           <div className="bg-slate-900 border border-slate-700/80 rounded-none md:rounded-3xl w-full h-full flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
             
             {/* Top Modal Header */}
@@ -1496,7 +1549,7 @@ export function MigrationDiffClient() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2.5 flex-wrap">
-                    <h2 className="text-lg font-bold text-white tracking-tight">{selectedDiff.name}</h2>
+                    <h2 id="modal-store-title" className="text-lg font-bold text-white tracking-tight">{selectedDiff.name}</h2>
                     <span className="font-mono text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-md">
                       {selectedDiff.id}
                     </span>
@@ -1856,7 +1909,7 @@ export function MigrationDiffClient() {
                           >
                             <div className="flex items-center gap-2 font-bold text-white text-xs">
                               <span>{defect.icon}</span>
-                              <span className="font-mono uppercase text-[10px] px-1.5 py-0.2 rounded bg-black/40">
+                              <span className="font-mono uppercase text-[10px] px-1.5 py-0.5 rounded bg-black/40">
                                 {defect.type.toUpperCase()}
                               </span>
                               <span>{defect.title}</span>
@@ -2268,7 +2321,7 @@ export function MigrationDiffClient() {
                         >
                           <Icon className="size-3.5" />
                           <span>{grp.label}</span>
-                          <span className="text-[10px] bg-slate-950/80 px-1.5 py-0.2 rounded-md font-mono opacity-80">
+                          <span className="text-[10px] bg-slate-950/80 px-1.5 py-0.5 rounded-md font-mono opacity-80">
                             {count}
                           </span>
                         </button>

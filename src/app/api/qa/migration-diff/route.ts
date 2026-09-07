@@ -71,18 +71,16 @@ export const GET = withSuperAdmin(async (request: NextRequest) => {
     const filter = searchParams.get("filter") || "all";
     const template = searchParams.get("template") || "all";
     const search = (searchParams.get("search") || "").toLowerCase().trim();
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.max(1, Math.min(3000, parseInt(searchParams.get("limit") || "20", 10)));
+    const rawPage = parseInt(searchParams.get("page") || "1", 10);
+    const page = Number.isFinite(rawPage) && rawPage >= 1 ? rawPage : 1;
+    const rawLimit = parseInt(searchParams.get("limit") || "20", 10);
+    const limit = Number.isFinite(rawLimit) && rawLimit >= 1 ? Math.min(rawLimit, 3000) : 20;
 
     // Attempt to load Live Stores from PW1 MySQL if available
     let allStores: any[] = [];
-    let isLiveCatalog = false;
 
     try {
       allStores = await fetchLivePw1StoresCatalog(2000);
-      if (allStores.length > 0) {
-        isLiveCatalog = true;
-      }
     } catch (err: unknown) {
       console.error("[MigrationDiff] Failed to load live stores from MySQL, falling back to mock catalog:", err);
     }
@@ -125,6 +123,7 @@ export const GET = withSuperAdmin(async (request: NextRequest) => {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[migration-diff] GET error:", message);
     return NextResponse.json(
       { error: "Internal reconciliation error", details: message },
       { status: 500 }
@@ -142,7 +141,7 @@ export const GET = withSuperAdmin(async (request: NextRequest) => {
  */
 export const POST = withSuperAdmin(async (request: NextRequest, { user }) => {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const action = body?.action;
 
     if (action === "test_db_connection") {
@@ -155,7 +154,10 @@ export const POST = withSuperAdmin(async (request: NextRequest, { user }) => {
     }
 
     if (action === "approve_pass") {
-      const storeId = body?.storeId;
+      const storeId = typeof body?.storeId === "string" ? body.storeId.trim() : "";
+      if (!storeId) {
+        return NextResponse.json({ error: "storeId is required" }, { status: 400 });
+      }
       return NextResponse.json({
         success: true,
         message: `Store ${storeId} certified QC Pass for cutover.`,
@@ -185,6 +187,7 @@ export const POST = withSuperAdmin(async (request: NextRequest, { user }) => {
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[migration-diff] POST error:", message);
     return NextResponse.json(
       { error: "Failed to execute migration diff action", details: message },
       { status: 500 }
