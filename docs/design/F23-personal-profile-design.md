@@ -5,13 +5,16 @@
 > **Interactive Demo:** [F23-profile-ui-demo.html](F23-profile-ui-demo.html)
 > - [Figma Design](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=31543-4488&t=5iRs7zduIFWCE9h3-1)
 
-Tài liệu này là bản vẽ Wireframe + User Flow cho tính năng Hồ sơ Cá nhân (F23), bám sát PRD, User Stories và **demo tương tác** ở trên. Tất cả giao diện tuân thủ **F18 CMS Global Layout** (Sidebar trái + Topbar) và [Design System](Design%20system.md).
+Tài liệu này là bản vẽ Wireframe + User Flow cho tính năng Hồ sơ Cá nhân (F23), bám sát PRD, User Stories và **demo tương tác** ở trên. Tất cả giao diện tuân thủ **F18 CMS Global Layout** (Sidebar trái + Topbar) và [Design System](Design%20system/Design%20system.md).
 
-> **⚠️ Trạng thái (2026-07-13, branch `chore/ux-audit-system-wide`):** Đây là **thiết kế mục tiêu (redesign)** sau vòng UX audit — **single-page, đã bỏ sub-tabs**. Code hiện tại (`src/app/(dashboard)/settings/profile/`) vẫn là bản tab cũ; việc migrate code theo bản này là task riêng, chưa thực hiện.
+> **⚠️ Trạng thái:** UX audit đã chốt **single-page, không có sub-tabs**. Code hiện tại render Owner view hoặc các Staff sections xếp dọc trong `/settings/profile`; tên component legacy `GeneralInfoTab`/`SecurityTab` không đại diện cho tab navigation.
+
+> [!IMPORTANT]
+> **F23 v1.3 integration handoff — 2026-09-08:** Owner avatar rule trong tài liệu này đã bị supersede bởi [PRD F23 v1.3](../prd/F23-personal-profile.md) và [US-F23-01/05](../stories/F23-personal-profile-stories.md). Owner avatar phải Read-only và do SSO quản lý; dòng Owner upload local cũ không còn hiệu lực. UI/UX cần bổ sung loading/sync, last-known, initials và error states sau khi SSO/Architecture contract được duyệt.
 
 **Thay đổi cốt lõi so với bản cũ:**
 - **Bỏ sub-tabs** "General Info / Security". Cả Staff và Owner đều là **1 trang cuộn dọc**.
-- **Staff:** 2 section card xếp dọc — *Personal Information* + *Password & Security*, mỗi card có save bar riêng (chỉ hiện khi dirty).
+- **Staff:** 2 section card xếp dọc — *Personal Information* + *Password & Security*. Personal Information save bar chỉ hiện khi dirty; Password action bar luôn hiện sau khi form được expand và Submit disabled cho đến khi hợp lệ.
 - **Owner:** 1 trang read-only — *Account Information card* (bên trái) + *SSO widget* (bên phải), 1 CTA duy nhất ra SSO.
 - **Banner compact** (avatar 72px), bỏ chỉ báo "Active Now" (trước đây hard-code).
 
@@ -53,10 +56,9 @@ Tài liệu này là bản vẽ Wireframe + User Flow cho tính năng Hồ sơ C
 ├── Current Password (👁 toggle)
 ├── New Password + Confirm New Password (👁 toggle)
 │   └── Checklist realtime (3 rule): ≥ 8 ký tự · 1 chữ hoa · 1 chữ số
-├── Field dirty → Save bar (Update Password / Cancel)
+├── Form expanded → Action bar luôn hiện (Update Password / Cancel); Submit disabled đến khi hợp lệ
 └── Click "Update Password" → validation?
     ├── ✅ POST /api/users/me/password → Toast "Password changed successfully"
-    │       (server đăng xuất các phiên khác)
     └── ❌ Inline error:
         ├── Current sai        → "Current password is incorrect"
         ├── New = Current      → "New password must differ from current password"
@@ -68,11 +70,11 @@ Tài liệu này là bản vẽ Wireframe + User Flow cho tính năng Hồ sơ C
 ```
 [Owner Profile — không có sub-tabs]
     │
-    ├── Upload Avatar → hoạt động bình thường (Avatar độc lập SSO)
+    ├── Avatar → Read-only, hiển thị cached SSO avatar hoặc initials; không có local upload action
     │
     ├── Account Information Card (read-only, không editable)
     │   ├── Personal Details: Full Name · Email · Phone (mỗi ô có 🔒)
-    │   └── Security & Auth:  Password (••••••) · 2FA: Enabled *(đề xuất)*
+    │   └── Security & Auth: Password (••••••) · Authentication Provider: SSO
     │
     └── SSO Widget (sidebar)
         ├── "Account Managed by SSO" + mô tả đồng bộ
@@ -81,7 +83,7 @@ Tài liệu này là bản vẽ Wireframe + User Flow cho tính năng Hồ sơ C
 
 ---
 
-## 2. Wireframe: Compact Banner
+## 2. Wireframe: Staff Compact Banner
 
 *Banner nền `--background` + viền, bo `16px`. Avatar 72px (nền `--info`, viền glow). Tên + role badge inline; email ngay dưới. **Không** còn "Active Now".*
 
@@ -90,22 +92,22 @@ Tài liệu này là bản vẽ Wireframe + User Flow cho tính năng Hồ sơ C
 │ 📊 Dashboard │ Account Settings                          │
 │ 🌐 Webstore  │                                          │
 │ 📦 Products  │ ┌─ Banner ───────────────────────────┐  │
-│ 🛒 Orders    │ │ ┌────┐  Jun Tran-02   [ OWNER ]     │  │
-│ ⚙️ Config    │ │ │ J📷│  juntran02@yopmail.com       │  │
+│ 🛒 Orders    │ │ ┌────┐  Nguyen Van A   [ STAFF ]     │  │
+│ ⚙️ Config    │ │ │ N📷│  staff@example.com            │  │
 │              │ │ └────┘                              │  │
 │              │ └─────────────────────────────────────┘  │
 │              │ ...Nội dung theo Role render bên dưới... │
 └──────────────┴──────────────────────────────────────────┘
 ```
-- Avatar 72px · initial 30px · nút camera bo `10px` (nền `--primary`).
+- Staff avatar 72px · initial 30px · nút camera bo `10px` (nền `--primary`). Owner không dùng banner/upload control này.
 - Role badge: pill `--primary`/10 + viền `--primary`/20, chữ 10px uppercase.
-- Email hiện cho **cả Staff và Owner**.
+- Staff email hiển thị trong compact banner; Owner dùng Profile Card riêng tại Section 4.
 
 ---
 
 ## 3. Wireframe: Staff — Single Page (2 section card)
 
-*Không tabs. Hai card xếp dọc, mỗi card tiêu đề + mô tả riêng. Save bar chỉ hiện khi form dirty, nằm **trong** card (không trôi nổi).*
+*Không tabs. Hai card xếp dọc, mỗi card có tiêu đề + mô tả riêng. Personal Information save bar chỉ hiện khi dirty; Password action bar luôn hiện khi form expanded. Các action bar nằm **trong** card.*
 
 ### 3.1 Card — Personal Information
 
@@ -149,7 +151,7 @@ Expanded (sau khi click):
 │  ✓ At least 8 characters   ✕ One uppercase   ✕ One number│
 │   (✓ = teal khi đạt · ✕ = xám khi chưa đạt)              │
 │                                                          │
-│ ──────────────── (chỉ hiện khi dirty) ────────────────── │
+│ ───── (luôn hiện khi expanded; Update disabled đến khi hợp lệ) ───── │
 │                       [ ↺ Cancel ]  [ ✓ Update Password ]│
 └──────────────────────────────────────────────────────────┘
 ```
@@ -169,16 +171,16 @@ Expanded (sau khi click):
 │  EMAIL ADDRESS          PHONE NUMBER      │  │ SSO                  │
 │  juntran02@yopmail.com  094448462579      │  │                      │
 │                                           │  │ Your personal profile│
-│  PASSWORD               TWO-FACTOR (2FA)  │  │ fields, password &   │
-│  ••••••••••••           ● Enabled         │  │ security are managed │
+│  PASSWORD               AUTH PROVIDER      │  │ fields, password &   │
+│  ••••••••••••           SSO               │  │ security are managed │
 │                                           │  │ centrally by SSO.    │
 │                                           │  │                      │
 │                                           │  │ [ Go to SSO Portal ↗]│
 └───────────────────────────────────────────┘  └──────────────────────┘
 ```
-- **Card trái gộp identity + info:** avatar 72px + tên + tag OWNER trên cùng; divider (24px trên/dưới); rồi info **text thuần** dạng grid 2 cột đều — Email | Phone (hàng 1), Password | 2FA (hàng 2).
+- **Card trái gộp identity + info:** avatar 72px + tên + tag OWNER trên cùng; divider (24px trên/dưới); rồi info **text thuần** dạng grid 2 cột đều — Email | Phone (hàng 1), Password | Authentication Provider (hàng 2).
 - **KHÔNG dùng ô input xám, KHÔNG icon 🔒.** Nhãn nhỏ (uppercase, dim) trên — giá trị (đậm hơn) dưới → user hiểu ngay là trang "xem", không phải form điền.
-- **2FA**: tag tĩnh (chấm xanh + "Enabled"). *Đề xuất — chưa có trong data model.*
+- **2FA:** không hiển thị trong F23 hiện tại vì chưa có field/data contract; nếu bổ sung sẽ là requirement riêng.
 - **SSO widget (phải):** full-height bằng card trái; 1 button `--info` "Go to SSO Portal ↗" neo đáy (mở tab mới). Thay cho 2 text-link rời rạc bản cũ.
 - **Đã bỏ:** banner riêng ở trên, bảng "Account Info" cũ (Auth Provider / Last Login / Sessions), các ô xám + khóa.
 
@@ -197,7 +199,7 @@ Expanded (sau khi click):
 │ staff@…asia           │        │ │ (J) Jun · OWNER   │ │
 │ ┌ Personal Info ────┐ │        │ │ ───────────────   │ │
 │ │ First / Last …    │ │        │ │ Email / Phone     │ │
-│ │ Phone / Email 🔒   │ │        │ │ Password / 2FA    │ │
+│ │ Phone / Email 🔒   │ │        │ │ Password / SSO    │ │
 │ └───────────────────┘ │        │ │ (text thuần)      │ │
 │ ┌ Password & Security┐│        │ └───────────────────┘ │
 │ │ [Change Password]  ││        │ ┌ SSO Widget ───────┐ │
@@ -217,8 +219,7 @@ Expanded (sau khi click):
 | Text Input | Border `#2A3645`, nền `#161E2E` | — | Border + ring **Teal `#2DD4BF`** (1px) | Nền `#1F2937`, `cursor-not-allowed`, 🔒 | Border `#EF4444` + helper đỏ |
 | Primary Button (Save/Update) | Gradient **Blue→Teal** (`#3B82F6`→`#2DD4BF`), chữ trắng | Opacity 90% | ring | — | — |
 | SSO CTA Button | Nền `--info` `#3B82F6`, chữ trắng, icon ↗ | Opacity 90% | — | — | — |
-| Avatar Upload | Camera icon (nền `--primary`) | Opacity 90% | — | Spinner khi uploading | Toast error |
-| 2FA Status (Owner) | Badge tĩnh: ● + "Enabled" (xanh) | — | — | — | — |
+| Avatar Upload (Staff only) | Camera icon (nền `--primary`) | Opacity 90% | — | Spinner khi uploading | Toast error |
 | Password rule | ✕ xám (chưa đạt) | — | — | — | ✓ Teal (đạt) |
 
 ### 6.2 Toast Notifications (i18n `profile.*`, EN)
@@ -247,7 +248,7 @@ Expanded (sau khi click):
 
 ## 7. Design System Compliance
 
-Bám [Design System](Design%20system.md) (dark theme tokens):
+Bám [Design System](Design%20system/Design%20system.md) (dark theme tokens):
 
 | Token | Value | Ghi chú |
 |-------|-------|---------|

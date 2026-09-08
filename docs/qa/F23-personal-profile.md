@@ -1,15 +1,15 @@
 # Test Cases — F23 Personal Profile (Team & Account)
 
-> **Status:** Automated (unit) — backfilled 2026-07-14; tests existed before this doc
+> **Status:** Existing baseline automated; US-F23-05 planned and blocked by SSO Contract
 > **Screen:** Settings → Team & Account (`src/app/(dashboard)/settings/profile/`)
-> **Refs:** PRD `docs/prd/F23-personal-profile.md` · Stories `docs/stories/F23-personal-profile-stories.md` (US-F23-01..04) · GH #1604
+> **Refs:** PRD `docs/prd/F23-personal-profile.md` · Stories `docs/stories/F23-personal-profile-stories.md` (US-F23-01..05) · GH #1604 · GH #1723
 > ⚠️ **Số F23 bị trùng** với `F23-custom-subdomain-slug` (feature khác, PRD/QA riêng). TC-ID của doc này luôn có ngữ cảnh profile.
 
 ---
 
 ## Test Case Matrix
 
-TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác nghĩa giữa 2 file** (đánh dấu ♻ — nợ pre-existing, không renumber để khỏi phá git blame; TC mới PHẢI tra bảng này trước khi lấy số).
+TC-ID scheme hiện hữu: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác nghĩa giữa 2 file** (đánh dấu ♻ — nợ pre-existing, không renumber để khỏi phá git blame). Vì `TC-F23-05-01..09` đã thuộc Role Guard, US-F23-05 mới bắt buộc dùng namespace `TC-F23-SSO-{seq}`.
 
 ### US-F23-01 — Avatar & profile read
 
@@ -76,6 +76,24 @@ TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác 
 | TC-ID | File | Description | AUTO |
 |-------|------|-------------|------|
 | TC-F23-05-01..09 | `role-guard.test.ts` | Owner detection qua tenant role (incl. GH-905 regression), 403 owner, null staff | ✓ |
+
+### US-F23-05 — SSO Owner Avatar Synchronization (planned)
+
+> BA-proposed traceability; QA sign-off và automation plan còn blocked bởi written SSO Integration Contract và Architecture review.
+
+| TC-ID | AC Ref | Description | AUTO |
+|---|---|---|---|
+| TC-F23-SSO-01 | AC-05.1 | Backfill Owner có SSO avatar; thay legacy local reference và hiển thị Header/Profile | Planned |
+| TC-F23-SSO-02 | AC-05.1 | Authenticated `ABSENT` khi backfill; retire/purge legacy local media và dùng initials | Planned |
+| TC-F23-SSO-03 | AC-05.2 | Confirmed update đạt propagation p95 ≤ 5 phút | Planned |
+| TC-F23-SSO-04 | AC-05.3 | Missed webhook được login reconciliation; failure không block login | Planned |
+| TC-F23-SSO-05 | AC-05.4 | Authenticated `ABSENT` purge reference, stored object, derivatives/CDN theo retention | Planned |
+| TC-F23-SSO-06 | AC-05.5 | `UNKNOWN`/SSO outage giữ last-known avatar và retry/monitor | Planned |
+| TC-F23-SSO-07 | AC-05.6 | Duplicate/out-of-order event idempotent; event cũ không rollback | Planned |
+| TC-F23-SSO-08 | AC-05.7 | Invalid/expired/unsafe resource không persist/render hoặc fetch private network | Planned |
+| TC-F23-SSO-09 | AC-05.8 | Immutable identity và cross-user/cross-tenant isolation | Planned |
+| TC-F23-SSO-10 | AC-05.9 | Owner local mutation bị chặn; Staff avatar flow không regression | Planned |
+| TC-F23-SSO-11 | AC-05.10, AC-05.11 | Identity preflight quarantine và `PRESENT`/`ABSENT`/`UNKNOWN` semantics | Planned |
 
 ---
 

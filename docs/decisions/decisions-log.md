@@ -293,3 +293,19 @@
 | **Impact** | **Docs:** [brief.md](../plans/reports/260703-ep-cod-proof/brief.md) (primary evidence); [F36 PRD §8](../prd/F36-easyparcel-delivery.md) bảng R1–R5; [F10 PRD §20.2](../prd/F10-orders-management.md) shared COD constraints + AC hard-gate; F19 PRD; [F36 design](../design/F36-easyparcel-delivery-design.md) checkout COD gating UI (disabled + helper text theo lý do R1/R2/R3, fee disclosure R5); stories AC-4b. Dòng "COD = West-MY-only" trong PD-020 hết hiệu lực. **Code (rework 2026-07-06):** `cod-block.ts` (East hardcode) → thay bằng `cod-eligibility.ts` (R1/R2/R3 từ live rates); `get-rates.ts` extract `codMinSen` + enforce min/max khi auto-pick; checkout server hard-reject `COD_NOT_ELIGIBLE` khi không courier nào đủ điều kiện; storefront probe eligibility ngay khi đủ địa chỉ (`codProbeSen`) và khi COD vi phạm → hiện error hướng dẫn buyer đổi địa chỉ/giá trị đơn + chặn Place Order (**không tự đổi payment method của buyer** — UX decision 2026-07-06); create-label re-validate live trước submit; order-detail state `cod-blocked` chuyển từ static East check → live check. |
 | **Status** | ✅ Decided 2026-07-03 (Domin, sandbox-verified) — Docs synced 2026-07-03 · Code rework 2026-07-06. Còn treo: param `cod_amount` (flat) vs `feature.cod` (nested, per official docs) cần verify EP support trước go-live COD; xác nhận auto-complete khi delivered. |
 
+---
+
+## PD-022 — F23 Owner Avatar Source of Truth and SSO Synchronization
+
+| | |
+|---|---|
+| **Date** | 2026-09-08 |
+| **Decision** | Store Owner avatar dùng **SSO làm authoritative source**; Staff avatar tiếp tục được PWv2 quản lý local. Owner không upload/override avatar tại PWv2. |
+| **Issue** | [#1723](https://github.com/primeproduction/ech-prime-web-v2/issues/1723) — Owner avatar updated on SSO is not synchronized to PWv2 |
+| **Options** | 1. Giữ avatar Owner độc lập tại PWv2; 2. Đồng bộ Owner avatar từ SSO, Staff giữ local |
+| **Chosen** | **Option 2 — Role-based source of truth.** Webhook update/delete là primary trigger; SSO Profile API reconciliation khi successful login là fallback; PWv2 lưu cached copy theo approved SSO permission. Caching permission là hard prerequisite; nếu SSO không cho phép cache, Product phải quyết định lại solution. |
+| **Behavior** | Target propagation p95 ≤ 5 phút. Immutable identity preflight chạy trước avatar backfill; missing/duplicate/ambiguous mapping bị skip/quarantine/report và không fallback email. Existing Owner được one-time backfill và login reconciliation cho account bị bỏ sót. Backfill thay legacy Owner-local avatar bằng confirmed SSO state. State chuẩn hóa thành `PRESENT`, `ABSENT`, `UNKNOWN`; chỉ authenticated `ABSENT` mới purge stored/derived/CDN copies theo retention limit và dùng initials. `UNKNOWN` hoặc transient failure giữ last-known avatar. |
+| **Rationale** | Owner identity đã do SSO quản lý và PWv2 Owner Profile là Read-only. Dùng cùng source of truth loại bỏ thao tác lặp, giải quyết avatar không nhất quán và tránh runtime dependency vào SSO trên mọi page render. Staff là local account nên giữ local avatar flow hiện tại. |
+| **Supersedes** | F23 PRD v1.2 BR-23-02 `Avatar Independence` và wording cũ của US-F23-01 cho phép Owner upload local avatar. |
+| **Dependency** | Written SSO Integration Contract phải xác nhận immutable identity/preflight, avatar field/format, `PRESENT`/`ABSENT`/`UNKNOWN` semantics, webhook/Profile API, authentication, caching permission, purge retention, retry/rate limit, SLA capability, backfill access và Staging fixtures. |
+| **Status** | ✅ Product behavior decided — ⏳ Development blocked by SSO Contract and cross-team reviews |
