@@ -1,5 +1,5 @@
 # PRD: Template Gallery — AI Editor Integration (F07)
-> **Version:** 2.2 | **Updated:** 2026-03-19 | **Agent:** `Antigravity-BA-Copilot`
+> **Version:** 2.3 | **Updated:** 2026-09-08 | **Status:** Draft — US-F07-07 BA scope confirmed
 > **Priority:** P1 | **Sprint:** Wave 3 | **Size:** L
 > **Depends on:** F05 AI Editor, F04 Block Renderer
 
@@ -26,7 +26,7 @@
 | US-F07-04 | AI-Powered Template Search | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Ready |
 | US-F07-05 | Content-Preserving Template Swap | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Ready |
 | US-F07-06 | Undo Template Application | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Ready |
-| US-F07-07 | Full Preview (View Only) | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Draft |
+| US-F07-07 | Full Preview (View Only) | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Refinement — BA scope confirmed |
 | US-F07-08 | Mobile Web UX — Touch-Friendly Template Gallery | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Ready |
 
 > ⚠️ **Kiểm tra:** Mọi FR trong Section 7 phải có Story ID ở bảng trên.
@@ -68,10 +68,18 @@ Tích hợp Template Gallery vào AI Editor như một module chức năng. Ngư
 - Cơ chế Apply & Smart Mapping hình ảnh/text hiện có sang template mới — (US-F07-05)
 - Tính năng Undo trạng thái Editor (1 bước) — (US-F07-06)
 - Xem trước Full Preview (View only) trong modal/fullscreen — (US-F07-07)
+- Full Preview trong Editor dùng current site content sau Smart Mapping dạng dry-run — (US-F07-07)
+- Multi-page Preview với Page Selector nằm ngoài website preview — (US-F07-07)
+- Confirmation Dialog trước khi kích hoạt Apply từ Preview — (US-F07-07)
 - Hiệu ứng chuyển đổi mượt mà giữa các template — (US-F07-05)
 
 ### Out of Scope
 - Chỉnh sửa trực tiếp trên chế độ Preview.
+- Điều hướng, submit form hoặc thực thi CTA của website bên trong Preview.
+- Ghi dữ liệu, tạo revision/Undo point hoặc tính quota Apply trong lúc chỉ Preview.
+- Thay đổi bộ device viewport toggle hiện có.
+- Mobile-specific Full Preview UX; phạm vi mobile của F07 được quản lý bởi US-F07-08.
+- Public/Guest Preview, Auth Resume và Preview Deep Link; các nhu cầu này phải có User Story riêng trước khi đưa vào scope.
 - Custom Template Creation từ phía người dùng.
 
 ---
@@ -84,6 +92,8 @@ Tích hợp Template Gallery vào AI Editor như một module chức năng. Ngư
 | Data Retention Rate | 100% (cho các block tương ứng) | QA Testing |
 | AI Search Accuracy | > 85% relevant results | User Feedback |
 | Template Weight | Medium/Optimized | LCP / PageSpeed |
+| Preview Content Correctness | 100% đúng site, template và page được chọn | QA / Integration test |
+| Preview Side-effect Rate | 0 mutation lên site/content trước khi xác nhận Apply | Audit log / Integration test |
 
 ---
 
@@ -113,14 +123,21 @@ SO THAT tôi có thể thay đổi thiết kế mà không mất công nhập l�
 | FR-04 | Smart Mapping: Giữ lại Text/Image khi đổi template | US-F07-05 | P0 | Copy blocks content |
 | FR-05 | Hiển thị thông báo khi block không có tương ứng ở template mới | US-F07-05 | P1 | Edge case handling |
 | FR-06 | Smooth Transition: Hiệu ứng chuyển đổi ≤ 500ms | US-F07-05 | P1 | Fade/Glide animation |
-| FR-07 | Full Preview (View Only) dạng modal fullscreen | US-F07-07 | P0 | iframe sandbox |
-| FR-08 | Nút "Apply This Template" visible trong Preview mode | US-F07-07 | P0 | Fixed bottom button |
+| FR-07 | Full Preview dạng modal fullscreen, render template bằng current site content sau Smart Mapping dry-run | US-F07-07 | P0 | Unmatched target chỉ dùng template default với nhãn "Sample content" |
+| FR-08 | Preview chỉ cho phép scroll; link, button, form và navigation bên trong website preview không có tác dụng | US-F07-07 | P0 | Preview shell controls vẫn hoạt động |
 | FR-09 | Undo Mechanism: Hoàn tác trạng thái 1 bước trước khi apply | US-F07-06 | P0 | Editor state stack |
 | FR-10 | Undo bị overwrite nếu apply template tiếp theo | US-F07-06 | P0 | Single-step undo |
 | FR-11 | Guard Rail: Cảnh báo không thể Undo sau khi Save | US-F07-06 | P0 | Modal confirmation |
 | FR-12 | Nút Undo disabled/ẩn sau khi Save thành công | US-F07-06 | P1 | UI clarity |
 | FR-13 | **[Mobile]** Giao diện Modal Template Gallery chuyển đổi thành Bottom Sheet (swipe up/down) trên viewport < 768px. | US-F07-08 | P1 | Ergonomics |
 | FR-14 | **[Mobile]** Template list hiển thị dưới dạng grid 2 cột để tiết kiệm không gian và tăng số lượng mẫu được xem lướt. | US-F07-08 | P1 | |
+| FR-15 | Multi-page Preview lấy page inventory từ template được chọn; Page Selector nằm ngoài website preview và ẩn nếu chỉ có một page | US-F07-07 | P0 | Yêu cầu đúng một `isHomepage`; source mapping ưu tiên cùng role/normalized slug |
+| FR-16 | Page được chọn phải được render chính xác; page không tồn tại/tải lỗi phải hiển thị Error state và không silent fallback | US-F07-07 | P0 | Có hành động Retry/Close |
+| FR-17 | Nút "Apply This Template" nằm tại fixed bottom action bar, mở Confirmation Dialog và chỉ kích hoạt US-F07-05 sau khi xác nhận | US-F07-07 | P0 | Disabled/loading khi đang Apply |
+| FR-18 | Mở, đóng, scroll hoặc đổi page Preview không mutate/persist site content, tạo revision/Undo point hoặc tính quota Apply | US-F07-07 | P0 | Technical telemetry/audit log vẫn được phép |
+| FR-19 | Back/Close/Escape đóng Preview an toàn và trả focus về điểm mở modal | US-F07-07 | P1 | Accessibility |
+| FR-20 | Preview phải kiểm tra quyền truy cập site và không hiển thị/fallback sang content của site hoặc tenant khác | US-F07-07 | P0 | Data isolation |
+| FR-21 | Initial Preview p95 ≤ 3 giây, page switch p95 ≤ 2 giây; một lần tải quá 10 giây phải chuyển sang Error state | US-F07-07 | P1 | Reference test dataset / supported environment |
 
 > **Priority key:** P0 = must have (blocker) / P1 = important / P2 = nice to have
 
@@ -137,10 +154,13 @@ SO THAT tôi có thể thay đổi thiết kế mà không mất công nhập l�
 - **BR-05:** Template phải đạt tiêu chuẩn: Thẩm mỹ cao, layout đa dạng nhưng tối ưu (không bloating), đảm bảo tốc độ load.
 - **BR-06:** Nếu hệ thống lỗi trong quá trình swap, bắt buộc rollback về trạng thái cũ — không được để mất dữ liệu content.
 - **BR-07:** **[Performance]** Sử dụng cơ chế Cuộn vô cực (Infinite Scroll) thay vì gọi 1 lần toàn bộ danh sách. Bắt đầu fetch thêm Template khi user cuộn gần tới đáy danh sách Grid.
-- **BR-08:** **[Security]** Modal Preview nhúng Iframe bắt buộc mang cờ bảo mật `sandbox="allow-scripts allow-same-origin"` để vô hiệu hóa target="_top", ngăn rủi ro Clickjacking.
-- **BR-09:** **[UX Auth]** Flow Đăng nhập (Login): Nếu Guest bấm Template, trạng thái Template ID được ghi nhớ truyền qua route Auth. Ngay khi cấp Login/Token thành công hệ thống tự động bắt tiếp luồng tạo Site ngay lập tức, không bắt quay về Dashboard.
-- **BR-10:** **[Growth]** Shareability Deep Link: Khi truy cập `domain.com/templates?previewId=XYZ`, hệ thống tự hook ID và Open Overlay Modal Template tức thì.
-- **BR-11:** **[UI Rule]** Chức năng "Clear Filter" được ẩn ý qua tab "All" cố định. Click `All` sẽ gỡ nhãn Category/Tag đang ngắm.
+- **BR-08:** **[Security]** Full Preview phải được cô lập với Editor và parent window; giải pháp kỹ thuật do Tech Lead xác nhận nhưng phải đáp ứng hành vi view-only và data isolation của US-F07-07.
+- **BR-09:** Matched field/block luôn dùng current site content. Unmatched target field/block/page chỉ được dùng template default content khi có nhãn "Sample content"; không được thay toàn bộ Preview bằng sample content.
+- **BR-10:** Multi-page Preview dùng template page inventory và yêu cầu đúng một `isHomepage`. Smart Mapping ưu tiên source page cùng page role hoặc normalized slug; source page không có target tương ứng không hiển thị và không bị Preview thay đổi.
+- **BR-11:** Page/template không hợp lệ phải trả lỗi rõ ràng; không silent fallback về Home/page đầu tiên.
+- **BR-12:** CTA chuẩn trong Full Preview là "Apply This Template", luôn hiển thị tại fixed bottom action bar.
+- **BR-13:** Chỉ thao tác Confirm Apply mới được kích hoạt US-F07-05. Cancel, Back, Close, Escape, scroll và đổi page không làm thay đổi site.
+- **BR-14:** CTA Apply phải chống double-submit và không được tạo nhiều yêu cầu Apply cho một lần xác nhận.
 
 ---
 
@@ -154,12 +174,21 @@ graph TD
     C --> E[Option 2: Chat with AI Search]
     D --> F[Select Template]
     E --> F
-    F --> G[Full Preview - View Only]
-    G --> H[Click Apply Template]
-    H --> I[System Maps Content & Re-renders]
-    I --> J[User Reviews in Editor]
+    F --> G[Dry-run Smart Mapping current site content]
+    G --> H[Full Preview - View Only]
+    H --> P{More than one template page?}
+    P -- Yes --> Q[Select template page to preview]
+    Q --> U[Evaluate selected page]
+    P -- No --> R[Keep Page Selector hidden]
+    R --> U
+    U --> I[Click Apply This Template]
+    I --> O{Confirm Apply?}
+    O -- Cancel --> U
+    O -- Confirm --> S[Run US-F07-05 once]
+    S --> T[System Maps Content & Re-renders]
+    T --> J[User Reviews in Editor]
     J -- Not Satisfied --> K[Click Undo]
-    K --> I
+    K --> J
     J -- Satisfied --> L[Click Save]
     L --> M[Warning: Cannot Undo after Save]
     M -- Confirm --> N[Commit Changes & Exit Undo State]
@@ -189,10 +218,12 @@ graph TD
 ### 10.2. Màn hình Chi tiết (Full View-Only Preview Mode)
 - **Mô tả:** Fullscreen modal để xem trước kết quả áp dụng Template với dữ liệu site hiện tại.
 - **Components chính:**
-  - Header Navbar (Fixed): Nút tắt chế độ Preview, Nút [Apply This Template] ở trên cùng.
-  - Iframe Content Area: Trang web rendered bởi component view-only (disable events).
+  - Header Navbar (Fixed): Back, tên template, Page Selector khi template có nhiều page và nút Close (X). Device viewport toggle hiện có không thay đổi trong US-F07-07.
+  - Website Preview Area: Render đúng template, current site content và page được chọn; chỉ cho phép scroll, không cho phép edit/navigation/form action.
+  - Bottom Action Bar (Fixed): CTA chuẩn [Apply This Template], luôn nhìn thấy trong mọi trạng thái scroll.
+  - Confirmation Dialog: Hiển thị sau khi user click Apply; chỉ khi Confirm mới kích hoạt US-F07-05.
 - **Design / Wireframe:**
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
+  - [F07 Template Gallery — Design & Wireframe Report](../design/F07-template-gallery-design.md)
 
 ### 10.3. Mobile View (Bottom Sheet Gallery)
 - **Mô tả:** Gallery chọn Template được đổi kiểu thành Bottom sheet vuốt từ dưới lên, danh sách Card chia 2 cột.
@@ -204,6 +235,11 @@ graph TD
 - **Loading State:** Skeleton Image Loader cho các Cards lúc đang fetching.
 - **Error State / Edge Cases:** Hiện Toast + "Thử Lại" khi load templates bị timeout.
 - **Modals:** (Ngoài Template Preview), hiển thị Guard Rail Warn modal (Confirmation Dialog) chống Undo khi bấm núy Save ở editor.
+- **Preview Loading State:** Hiển thị loader tại Website Preview Area khi mở Preview hoặc đổi page.
+- **Preview Error State:** Hiển thị lỗi tại Website Preview Area kèm "Thử lại" hoặc "Đóng"; không hiển thị Home/sample content thay cho page/content bị lỗi.
+- **Preview Applying State:** CTA Apply disabled và có loading indicator để chống double-submit.
+- **Single-page State:** Không hiển thị Page Selector.
+- **Unmatched Mapping State:** Template default content chỉ xuất hiện tại field/block/page không có source tương ứng và phải có nhãn "Sample content".
 
 ---
 
@@ -262,17 +298,116 @@ THEN  hệ thống hiển thị modal cảnh báo xác nhận: "Thay đổi sẽ
   AND có 2 nút: "Xác nhận Lưu" và "Huỷ"
 ```
 
-### AC-4: Full Preview — View Only
-> 📌 Source: [US-F07-07](../stories/F07-template-gallery-stories.md) — AC-1, AC-2
+### AC-4: Full Preview — Current Content, Multi-page, View Only và Safe Apply
+> 📌 Source: [US-F07-07](../stories/F07-template-gallery-stories.md) — AC-1 đến AC-7
 
 ```gherkin
-GIVEN user đang xem danh sách templates trong Templates Modal
-WHEN  user click "Preview" trên 1 template cụ thể
-THEN  modal full-screen mở ra hiển thị template rendered đầy đủ với nội dung hiện tại của site
+GIVEN user đang chỉnh sửa một site trong AI Editor
+  AND site có nội dung hiện tại gồm text, image và các page đã lưu hoặc đang có trong Editor
+WHEN  user click "Preview" trên một template cụ thể trong Templates Modal
+THEN  Full Preview modal mở ở chế độ full-screen
+  AND template được render bằng nội dung hiện tại của chính site đó sau khi chạy Smart Mapping ở chế độ dry-run
   AND người dùng có thể cuộn trang (scroll) để xem toàn bộ
+  AND các field/block map được luôn dùng current site content
+  AND field/block đích không có source tương ứng chỉ được dùng template default content khi có nhãn "Sample content" rõ ràng
+  AND không thay thế toàn bộ Preview hoặc current content đã map được bằng sample/default content
+```
+
+```gherkin
+GIVEN template được chọn có nhiều hơn một page khả dụng trong template page inventory
+  AND user đang ở Full Preview mode
+WHEN  Full Preview được tải thành công
+THEN  Page Selector hiển thị bên ngoài vùng website preview
+  AND liệt kê các page của template được chọn
+  AND page được template khai báo `isHomepage` được chọn mặc định
+  AND template phải có đúng một page `isHomepage`; nếu thiếu hoặc có nhiều hơn một thì hiển thị lỗi theo AC-6
+WHEN  user chọn một page khác
+THEN  hệ thống render đúng template page được chọn
+  AND ưu tiên map current site page có cùng page role hoặc normalized slug
+  AND nếu không có source page tương ứng, chỉ được dùng template default content kèm nhãn "Sample content"
+  AND current site page không có target template page tương ứng không xuất hiện trong Page Selector và không bị thay đổi trong quá trình Preview
+  AND không tự động fallback về Home hoặc page đầu tiên nếu page được chọn không tồn tại hoặc tải lỗi
+  AND hiển thị lỗi tại vùng preview kèm hành động "Thử lại"
+```
+
+```gherkin
+GIVEN template chỉ có một page khả dụng trong template page inventory
+WHEN  Full Preview được tải thành công
+THEN  Page Selector không hiển thị
+```
+
+```gherkin
 GIVEN user đang ở Full Preview mode
-WHEN  user thử click/tap vào các elements trong preview
-THEN  không có gì thay đổi — preview chỉ là view-only
+WHEN  user click/tap vào link, button, form field hoặc thành phần tương tác bên trong website preview
+THEN  dữ liệu và trạng thái Editor không thay đổi
+  AND không điều hướng sang page, route hoặc website khác
+  AND không submit form hoặc thực thi CTA của website
+  AND form control không nhận focus, không cho nhập dữ liệu và không thay đổi local preview state
+  AND user vẫn có thể scroll để xem toàn bộ page
+  AND không hiển thị editor controls hay hover effects của editor
+```
+
+```gherkin
+GIVEN user đang ở Full Preview mode và hài lòng với template
+WHEN  user click nút "Apply This Template" tại fixed bottom action bar
+THEN  hệ thống hiển thị Confirmation Dialog trước khi thay đổi site
+WHEN  user xác nhận Apply
+THEN  Preview đóng lại
+  AND US-F07-05 (Content-Preserving Template Swap) được kích hoạt đúng một lần
+```
+
+```gherkin
+GIVEN user đang xem Confirmation Dialog của thao tác Apply
+WHEN  user chọn Cancel
+THEN  Confirmation Dialog đóng
+  AND user vẫn ở Full Preview
+  AND site không thay đổi
+```
+
+```gherkin
+GIVEN user đang ở Full Preview mode
+WHEN  user click nút Close (X), chọn Back hoặc nhấn phím Escape
+THEN  Full Preview đóng lại
+  AND focus được trả về Template Card hoặc nút Preview đã mở modal
+  AND không có thay đổi nào được ghi vào site
+  AND không tạo Undo point hoặc revision mới
+```
+
+```gherkin
+GIVEN user mở Full Preview hoặc chuyển page trong Preview
+WHEN  hệ thống đang chuẩn bị nội dung preview
+THEN  hiển thị Loading state tại vùng preview
+```
+
+```gherkin
+GIVEN session của user hết hạn khi mở Preview
+WHEN  hệ thống nhận lỗi Authentication Required (401)
+THEN  không hiển thị website content
+  AND hiển thị hành động "Đăng nhập lại"
+```
+
+```gherkin
+GIVEN site/template không tồn tại hoặc user không có quyền truy cập
+WHEN  hệ thống nhận lỗi Forbidden (403) hoặc Not Found (404)
+THEN  không tiết lộ site/template có tồn tại hay không
+  AND không hiển thị content của site/tenant khác hoặc sample content để thay thế
+  AND hiển thị thông báo "Preview unavailable" kèm hành động "Quay lại" hoặc "Đóng"
+```
+
+```gherkin
+GIVEN Preview bị timeout hoặc render failure
+WHEN  hệ thống không thể hoàn tất Preview
+THEN  hiển thị Error state kèm hành động "Thử lại" hoặc "Đóng"
+  AND không silent fallback về Home, page đầu tiên hoặc sample content
+```
+
+```gherkin
+GIVEN user sử dụng môi trường được hỗ trợ với reference test dataset
+WHEN  user mở Full Preview
+THEN  Preview sẵn sàng để xem trong p95 không quá 3 giây
+WHEN  user chuyển sang một page khác
+THEN  page được chọn sẵn sàng để xem trong p95 không quá 2 giây
+  AND nếu một lần tải vượt quá 10 giây, hệ thống dừng Loading state và hiển thị Error state theo AC-6
 ```
 
 ### AC-5: Trải Nghiệm Khách Hàng Mobile (Touch-Friendly)
@@ -282,85 +417,39 @@ Khi sử dụng trên điện thoại (< 768px), hệ thống thay thế Modal g
 
 ---
 
-### AC-6: Business Rules & Edge Cases (Security, UX & Growth)
-> 📌 Source: Copilot Ambiguities Resolutions
-
-```gherkin
-GIVEN user là Guest (Chưa đăng nhập) đang xem xem 1 Template
-WHEN  click nút "Use Template"
-THEN  bị điều hướng sang trang Login/Register
-  AND url chứa tham số `returnUrl` kèm `templateId` (Hoặc persist trong Session storage)
-WHEN  đăng nhập thành công
-THEN  tự động redirect đến màn hình Setup Web ban đầu có pick sẵn Template đó.
-
-GIVEN designer upload 1 Template Master HTML
-WHEN  Template chứa mã độc script đổi hướng top level `window.top.location = "malicious.com"`
-THEN  khi mở Modal Preview, thao tác này bị Block ngầm bởi thuộc tính `sandbox` của iframe
-  AND hệ thống Editor PrimeWeb an toàn
-
-GIVEN user nhận được đường link chia sẻ có đính URL Query: `/editor?previewId=123`
-WHEN  site khởi tạo
-THEN  layer Frontend tự đọc Query Parameter và fetch dữ liệu ID 123
-  AND tự động Open pop-up Preview của Template đó lập tức
-```
-
----
-
 ## 12. Non-Functional Requirements
 
 | Category | Requirement | Notes |
 |----------|-------------|-------|
 | **Performance** | Template swap re-render < 2s | |
 | **Performance** | AI Search response < 2s | |
-| **Security** | Preview iframe dùng sandbox để isolate | |
+| **Performance** | Initial Preview p95 ≤ 3s; page switch p95 ≤ 2s trên reference test dataset; hard timeout 10s | Chuyển Error state khi timeout |
+| **Security** | Preview được cô lập với Editor/parent window; chặn navigation, form action và truy cập trái phép | Tech Lead chọn giải pháp kỹ thuật |
+| **Privacy / Data isolation** | Chỉ hiển thị content của site/tenant mà user có quyền truy cập; không fallback chéo dữ liệu | Blocker |
+| **Reliability** | Preview không mutate/persist site content, tạo revision, Undo point hoặc Apply quota trước Confirm Apply | Technical telemetry/audit log vẫn được phép |
 | **Usability** | UI Chat popup đơn giản, không che khuất quá nhiều workspace | |
 | **Reliability** | Rollback đảm bảo không mất dữ liệu nếu hệ thống lỗi trong quá trình swap | |
+| **Accessibility** | Escape đóng modal và focus trở về điểm mở; Preview shell controls hỗ trợ keyboard | |
 | **Browser support** | Chrome, Safari, Edge latest 2 versions | |
 | **Device support** | Desktop 1280px+, Tablet 768px | |
 
 ---
 
-## 13. Technical Architecture
+## 13. Technical Architecture Handoff
 
-### 13.1 Components
+> Tài liệu Architecture chính thức do Tech Lead/Solution Architect sở hữu tại
+> [`docs/architecture/F07-template-gallery.md`](../architecture/F07-template-gallery.md).
+> PRD chỉ định nghĩa outcome và constraint nghiệp vụ; không khóa trước component, endpoint hoặc cơ chế sandbox.
 
-| Component | File | Description |
-|-----------|------|-------------|
-| `AIEditorTemplates` | `components/editor/TemplatesPanel.tsx` | Module tích hợp trong F05-AI-Editor |
-| `TemplateAISearch` | `components/editor/TemplateAISearch.tsx` | Popup component với Chat UI |
-| `TemplatePreviewModal` | `components/editor/TemplatePreviewModal.tsx` | Full-screen preview modal (iframe) |
-| `ContentMapper` | `utils/templateContentMapper.ts` | Utility function để map dữ liệu giữa các template schema |
-| `UndoStackManager` | `store/editorUndoStore.ts` | Quản lý history của editor state (1 step) |
+Architecture Document cần xác nhận tối thiểu:
 
-### 13.2 API Endpoints
-
-```
-POST /api/templates/search
-Request: { query: string, locale: "en" | "vi" | "ms" }
-Response: { success: boolean, data: { templates: Template[] } }
-Auth: Bearer JWT (required)
-
-GET /api/templates
-Request: { category?: string, page?: number }
-Response: { success: boolean, data: { templates: Template[], total: number } }
-Auth: Bearer JWT (required)
-```
-
-### 13.3 Data Flow
-
-```
-[User types in AI Search] → POST /api/templates/search
-  ↓
-[AI/Vector Search returns matching templates]
-  ↓
-[User clicks Preview] → iframe loads template with current site content
-  ↓
-[User clicks Apply] → ContentMapper.map(currentBlocks, newTemplate.schema)
-  ↓
-[UndoStackManager.push(previousState)] → Editor re-renders with new template
-  ↓
-[User Saves] → Guard modal confirmation → Commit to DB → Clear undo stack
-```
+1. Cách truyền `site context`, `template` và `selected page` vào Preview dry-run.
+2. Cách Smart Mapping tạo preview result mà không persist dữ liệu hoặc tiêu thụ Apply quota.
+3. Authorization theo user/tenant/site và biện pháp ngăn cross-tenant data leakage.
+4. Cơ chế bảo đảm website preview inert nhưng vẫn cho phép scroll.
+5. Hành vi exact-page rendering và error response, không silent fallback về Home/page đầu tiên.
+6. Ranh giới transaction giữa Preview, Confirm Apply và US-F07-05; Apply phải idempotent/chống double-submit.
+7. Loading, timeout, retry, observability và audit evidence để QA chứng minh không có site/content mutation trước Confirm Apply.
 
 ---
 
@@ -372,22 +461,24 @@ Auth: Bearer JWT (required)
 | F04 Block Renderer | ✅ | ContentMapper cần hiểu block schema |
 | Template content in Payload CMS | ⬜ | Cần ≥ 10 templates được chuẩn bị trước launch |
 | AI Search API / Vector Search | ⬜ | Dev cần implement endpoint hoặc dùng third-party |
+| F07 Architecture update | ⬜ | Tech Lead xác nhận dry-run, authorization, isolation, exact-page và Apply boundary |
+| F07 Design update | ⬜ | UI/UX đồng bộ Header, Page Selector, fixed bottom CTA, Confirmation và các UI states |
+| F07 QA update | ⬜ | QA bổ sung test current content, multi-page, inert behavior, no-write và tenant isolation |
 
 ---
 
-## 15. API Contract
+## 15. Business Data Contract for Preview
 
-> Full details trong Technical Architecture §13.2
+> Endpoint, transport và schema kỹ thuật cuối cùng do Tech Lead chốt trong Architecture Document.
 
-```
-POST /api/templates/search
-Request:  { query: string, locale: string }
-Response: { success: boolean, data: { templates: [{ id, name, thumbnail, category, tags }] } }
-
-GET /api/templates
-Request:  { category?: string }
-Response: { success: boolean, data: { templates: [...], total: number } }
-```
+| Input / Output | Business requirement |
+|----------------|----------------------|
+| Input identity | Phải xác định được user, tenant, site, template và selected page |
+| Input content | Current site content dùng cho Smart Mapping dry-run |
+| Page inventory | Danh sách page khả dụng để Preview shell tạo Page Selector |
+| Preview result | Render result đúng template, current content và page được chọn; không persist |
+| Error result | Phân biệt tối thiểu: unauthorized/forbidden, site/template/page not found và render failure |
+| Apply command | Chỉ được gửi sau Confirm; một lần xác nhận tạo tối đa một Apply operation |
 
 ---
 
@@ -397,31 +488,50 @@ Response: { success: boolean, data: { templates: [...], total: number } }
 |---|----------|-------|--------|
 | 1 | AI Search dùng giải pháp gì? Vector embedding (OpenAI) hay rule-based tag matching? | Tech Lead | ⬜ Open |
 | 2 | Số lượng template tối thiểu để launch là bao nhiêu? (Current target: ≥ 10) | PO | ⬜ Open |
-| 3 | Template có support multiple pages hay chỉ single-page trong Phase 1? | BA | ⬜ Open |
-| 4 | ContentMapper xử lý conflict thế nào khi template mới có block mà source content không có? | Dev | ⬜ Open |
+| 3 | Template có support multiple pages hay chỉ single-page trong Phase 1? | BA | ✅ Resolved — Multi-page nằm trong scope US-F07-07 |
+| 4 | ContentMapper xử lý conflict thế nào khi template mới có block/page mà source content không có? | BA / Tech Lead | ✅ Business outcome resolved tại DEC-F07-07-01; thuật toán mapping do Tech Lead chốt |
+
+### 16.1 BA Decision Log for Issue #193
+
+> **Approved by PO/BA:** 2026-09-08 thông qua plan hoàn thiện BA cho US-F07-07.
+
+| Decision ID | BA confirmation | Business rationale |
+|-------------|-----------------|--------------------|
+| DEC-F07-07-01 | Editor dùng current site content sau Smart Mapping dry-run. Matched content không bị thay bằng sample; unmatched target chỉ dùng template default với nhãn "Sample content". | User cần đánh giá template bằng dữ liệu thật nhưng vẫn phải nhận biết phần chưa có source. |
+| DEC-F07-07-02 | Strict view-only cho website preview; scroll được, interaction/navigation/form action bị chặn. | Ngăn Preview làm thay đổi dữ liệu hoặc đưa user ra khỏi flow đánh giá. |
+| DEC-F07-07-03 | "Apply This Template" ở fixed bottom và mở Confirmation Dialog; chỉ Confirm mới chạy US-F07-05. | Giảm Apply nhầm; Save guard của US-F07-06 vẫn là lớp bảo vệ riêng cho thời điểm persist cuối. |
+| DEC-F07-07-04 | Multi-page giữ trong scope; selector dùng target template page inventory, yêu cầu đúng một `isHomepage`, mapping source theo role/normalized slug. | Đảm bảo user đánh giá toàn bộ layout của template và Dev có một page source-of-truth duy nhất. |
+| DEC-F07-07-05 | Invalid page/template hiển thị lỗi đúng loại; không silent fallback. | Tránh user tưởng đang xem đúng page/content trong khi hệ thống đã thay thế ngầm. |
+| DEC-F07-07-06 | Preview không mutate/persist site content, tạo revision, Undo point hoặc Apply quota trước Confirm; telemetry/audit log vẫn được phép. | Tách rõ hành vi đánh giá và hành vi thay đổi site. |
+| DEC-F07-07-07 | Public/Guest Preview, Auth Resume, Deep Link và thay đổi device toggle không thuộc US-F07-07. | Tránh hidden scope; cần Story riêng nếu Product muốn triển khai. |
+
+**Delivery status:** `Refinement`. BA scope đã hoàn tất; chưa chuyển `Ready for Development` cho đến khi Architecture, Design, QA handoff được cập nhật/review và Dev re-estimate.
 
 ---
 
-## 17. 9-Point Done Checklist
+## 17. 10-Point Done Checklist
 
-- [ ] Loading State — Skeleton cards khi đang fetch template list
+- [ ] Loading State — Skeleton cards cho template list và loader tại Preview Area khi mở/đổi page
 - [ ] Empty State — "Không tìm thấy mẫu phù hợp" illustration khi search trả về empty
-- [ ] Error State — "Không thể tải templates" kèm nút Retry
+- [ ] Error State — Template list và Preview có lỗi rõ ràng kèm Retry/Close; không silent fallback sai page/content
 - [ ] Form Validation — N/A (search input là optional, không bắt buộc)
-- [ ] Button States — "Apply Template" disabled trong khi đang swap; "Undo" disabled sau Save
+- [ ] Button States — "Apply This Template" disabled trong khi đang Apply; chống double-submit; "Undo" disabled sau Save
 - [ ] Toast Feedback — Toast success khi apply template thành công
 - [ ] Auth Redirect — 401 → /login (template API yêu cầu auth)
 - [ ] Mobile 375px — Templates Modal responsive, scroll-friendly trên mobile
 - [ ] TypeScript Clean — `tsc --noEmit` pass
+- [ ] Tests Pass — Unit, integration và E2E/UAT liên quan đều pass
 
 ---
 
 ## 18. Definition of Ready
 
-- [ ] User Stories approved và linked ở Section 0
+- [x] US-F07-07 BA Confirmed và linked ở Section 0
 - [ ] AC ở Section 11 đã được copy từ story file
 - [ ] FR ở Section 7 có đầy đủ Story Ref
-- [ ] Architecture doc exists (`docs/architecture/F07-template-gallery.md`)
+- [ ] Architecture doc được Tech Lead cập nhật/review theo Section 13
+- [ ] Design doc được UI/UX cập nhật/review theo Section 10.2 và US-F07-07
+- [ ] QA Spec được QA cập nhật/review theo AC-4 và BA Decisions
 - [ ] ≥ 10 templates ready trong Payload CMS
 - [ ] AI Search API endpoint defined
 - [ ] Content mapping schema logic approved
@@ -432,9 +542,10 @@ Response: { success: boolean, data: { templates: [...], total: number } }
 
 - [ ] All FR items implemented và verified
 - [ ] All AC in Section 11 pass (traced back to story)
-- [ ] 9-Point Checklist all pass
+- [ ] 10-Point Checklist all pass
 - [ ] QA report written (`docs/qa/F07-template-gallery.md`)
 - [ ] Hiệu ứng chuyển đổi đạt yêu cầu "Smooth" (< 500ms)
 - [ ] Không xảy ra lỗi mất dữ liệu người dùng khi swap template
 - [ ] Mobile responsive verified (375px)
 - [ ] Non-Functional Requirements validated
+- [ ] US-F07-07 xác nhận đúng current site content, đúng selected page, strict view-only và 0 side effect trước Confirm Apply
