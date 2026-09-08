@@ -4,7 +4,12 @@ import { getPayload } from "payload";
 import config from "@payload-config";
 import { withSuperAdmin } from "@/lib/admin/api-utils";
 import { getTargetById } from "@/lib/admin/qa/target-registry";
-import { resolveTargetedSmokePacks } from "@/lib/admin/qa/targeted-smoke-registry";
+import {
+  resolveTargetedSmokePacks,
+  resolveManualQaPack,
+  type ManualQaProfile,
+} from "@/lib/admin/qa/targeted-smoke-registry";
+import { executeLocalDevRun } from "@/lib/admin/qa/dev-test-runner";
 import {
   blockTargetedSmokeDispatch,
   claimTargetedSmokeDispatch,
@@ -14,7 +19,6 @@ import {
   GitHubWorkflowDispatchRejectedError,
   githubAppConfigFromEnv,
 } from "@/lib/admin/qa/github-targeted-smoke";
-import { executeLocalDevRun } from "@/lib/admin/qa/dev-test-runner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,8 +35,22 @@ export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
       { status: 409 },
     );
   const url = new URL(req.url);
-  const requestedProfile = url.searchParams.get("profile") === "regression" ? "regression" : "smoke";
-  const runProfile = requestedProfile === "regression" ? "manual-regression" : "manual-retest";
+  const rawProfile = url.searchParams.get("profile");
+  type ValidRetestProfile = "regression" | "user_flow" | "impact" | "security";
+  const validRetestProfiles: readonly ValidRetestProfile[] = ["regression", "user_flow", "impact", "security"];
+  const isRetestProfile = (p: string | null): p is ValidRetestProfile =>
+    p !== null && (validRetestProfiles as readonly string[]).includes(p);
+
+  const requestedProfile = isRetestProfile(rawProfile) ? rawProfile : "smoke";
+  const runProfile = (requestedProfile === "smoke" ? "manual-retest" : `manual-${requestedProfile}`) as
+    | "targeted-smoke"
+    | "manual-retest"
+    | "manual-smoke"
+    | "manual-regression"
+    | "manual-user_flow"
+    | "manual-impact"
+    | "manual-security"
+    | "manual-all-profiles";
   const isDev = process.env.NODE_ENV === "development";
   const commitSha = process.env.VERCEL_GIT_COMMIT_SHA || (isDev ? "abcdef1" : undefined);
   const github = githubAppConfigFromEnv();
@@ -69,24 +87,54 @@ export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
       { status: 409 },
     );
 
-  const requestDigest = crypto
-    .createHash("sha256")
-    .update(`${targetId}:${commitSha}:${pullRequest}:${Date.now()}`)
-    .digest("hex");
-  const outcome = await claimTargetedSmokeDispatch(payload, {
-    pullRequest,
-    commitSha: commitSha!,
-    environment: "staging",
-    profile: runProfile,
-    requestDigest,
-    retestNonce: crypto.randomUUID(),
-    pack,
-  });
+  let outcome;
+  try {
+    const requestDigest = crypto
+      .createHash("sha256")
+      .update(`${targetId}:${commitSha}:${pullRequest}:${Date.now()}`)
+      .digest("hex");
+
+    outcome = await claimTargetedSmokeDispatch(payload, {
+      pullRequest,
+      commitSha: commitSha!,
+      environment: "staging",
+      profile: runProfile,
+      requestDigest,
+      retestNonce: crypto.randomUUID(),
+      pack,
+    });
+  } catch (claimErr) {
+    if (isDev) {
+      // Fallback in local dev if transaction advisory lock is not supported
+      const devDispatch = await payload.create({
+        collection: "qa_smoke_dispatches",
+        data: {
+          dispatchKey: `${pullRequest}:${commitSha}:staging:${targetId}:${pack.packId}:${Date.now()}`,
+          requestDigest: crypto.randomUUID(),
+          status: "dispatched",
+          profile: runProfile,
+          environment: "staging",
+          packId: pack.packId,
+          targetId: targetId,
+          pullRequest: pullRequest,
+          commitSha: commitSha!,
+        },
+        overrideAccess: true,
+      });
+      outcome = { dispatch: devDispatch, created: true, blocked: false };
+    } else {
+      return NextResponse.json(
+        { error: claimErr instanceof Error ? claimErr.message : "Targeted Smoke could not be claimed" },
+        { status: 500 },
+      );
+    }
+  }
   if (outcome.blocked)
     return NextResponse.json(
       { data: { id: outcome.dispatch.id, status: "blocked" } },
       { status: 409 },
     );
+
   let markedDispatched = false;
   try {
     await payload.update({
@@ -98,15 +146,19 @@ export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
     markedDispatched = true;
 
     if (isDev) {
-      const testCases = pack.manualProfiles?.[requestedProfile]?.testCases ?? pack.testCases;
-      await executeLocalDevRun(payload, {
+      const resolvedPack = resolveManualQaPack(targetId, requestedProfile);
+      const testCases = resolvedPack?.profile?.testCases ?? pack.manualProfiles?.[requestedProfile]?.testCases ?? pack.testCases;
+
+      const devResult = await executeLocalDevRun(payload, {
         dispatchId: outcome.dispatch.id,
         targetId,
+        suite: "targeted-smoke",
         profile: runProfile,
         runner: pack.runner ?? "smoke",
-        testCaseIds: testCases.map((tc) => tc.id),
         pullRequest,
         commitSha: commitSha!,
+        testCases,
+        testCaseIds: testCases.map((tc) => tc.id),
         durationMs: 350,
       });
 
@@ -114,6 +166,7 @@ export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
         {
           data: {
             id: outcome.dispatch.id,
+            runId: devResult.runDbId,
             status: "dispatched",
             packId: pack.packId,
             profile: requestedProfile,

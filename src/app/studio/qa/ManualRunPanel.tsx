@@ -4,7 +4,7 @@ import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { ALL_TEST_CASES_DIRECTORY } from "@/lib/admin/qa/test-case-directory";
 
 type Target = { id: string; name: string; domain: string };
-type Profile = "smoke" | "regression";
+type Profile = "smoke" | "regression" | "user_flow" | "impact" | "security";
 type Preflight = {
   canDispatch: boolean;
   reasons: Array<{ code: string; recovery: string }>;
@@ -89,8 +89,27 @@ function statusTone(status: string) {
   if (status === "passed") return "var(--success)";
   if (["failed", "blocked"].includes(status)) return "var(--danger)";
   if (["queued", "dispatched", "cancel_requested"].includes(status))
-    return "var(--warn)";
+    return "var(--accent)";
   return "var(--text-2)";
+}
+
+function getHistoryItemTimestamp(item: HistoryItem): number {
+  const ts = item.finishedAt || item.startedAt;
+  if (!ts) return 0;
+  const time = Date.parse(ts);
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function sortHistoryNewestFirst(items: HistoryItem[]): HistoryItem[] {
+  return [...items].sort((a, b) => {
+    const timeA = getHistoryItemTimestamp(a);
+    const timeB = getHistoryItemTimestamp(b);
+    if (timeA !== timeB) return timeB - timeA;
+    const idA = String(a.id).replace(/\D/g, "");
+    const idB = String(b.id).replace(/\D/g, "");
+    if (idA && idB && idA !== idB) return Number(idB) - Number(idA);
+    return String(b.id).localeCompare(String(a.id));
+  });
 }
 
 function evidenceLabel(state: string) {
@@ -181,7 +200,6 @@ export function ManualRunPanel({
   const [selectedRun, setSelectedRun] = useState<HistoryItem>();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const openRunButton = useRef<HTMLButtonElement>(null);
   const openedExternally = useRef(false);
   const lastOpenRequest = useRef(0);
   const requestSequence = useRef(0);
@@ -236,8 +254,8 @@ export function ManualRunPanel({
         ...(body.completed ?? []),
         ...(body.data ?? []),
       ];
-      setHistory((current) =>
-        append
+      setHistory((current) => {
+        const combined = append
           ? [
               ...current,
               ...records.filter(
@@ -255,8 +273,9 @@ export function ManualRunPanel({
                     ),
                 ),
               ]
-            : records,
-      );
+            : records;
+        return sortHistoryNewestFirst(combined);
+      });
       if (!preserve) setNextCursor(body.meta?.nextCursor);
     } catch {
       if (sequence === requestSequence.current)
@@ -326,10 +345,7 @@ export function ManualRunPanel({
     window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      (openedExternally.current
-        ? externalOpenButton?.current
-        : openRunButton.current
-      )?.focus();
+      externalOpenButton?.current?.focus();
       openedExternally.current = false;
     };
   }, [dialogOpen, externalOpenButton]);
@@ -484,8 +500,7 @@ export function ManualRunPanel({
             Lịch sử chạy test
           </h2>
           <p className="mt-1 text-[13px] text-[var(--text-2)]">
-            Theo dõi lịch sử chạy test hoặc chạy một target cụ thể; không có nút
-            chạy toàn dự án.
+            Theo dõi chi tiết lịch sử thực thi và kết quả kiểm thử trên Staging.
           </p>
         </div>
         <div className="hidden gap-2 sm:grid sm:grid-cols-4">
@@ -538,7 +553,12 @@ export function ManualRunPanel({
             <option value="cancelled">Đã hủy</option>
           </select>
           <select aria-label="Lọc Profile" value={filters.profile} onChange={(event) => updateFilter("profile", event.target.value)} className={toolbarFieldClass}>
-            <option value="">Profile: Tất cả</option><option value="smoke">Smoke</option><option value="regression">Regression</option>
+            <option value="">Profile: Tất cả</option>
+            <option value="smoke">Smoke</option>
+            <option value="regression">Regression</option>
+            <option value="user_flow">User Flows</option>
+            <option value="impact">Functional Impact</option>
+            <option value="security">Security</option>
           </select>
           <input aria-label="Lọc PR" value={filters.pullRequest} onChange={(event) => updateFilter("pullRequest", event.target.value)} placeholder="PR #" className={toolbarFieldClass} />
           <input aria-label="Lọc SHA" value={filters.commitSha} onChange={(event) => updateFilter("commitSha", event.target.value)} placeholder="Commit SHA" className={toolbarFieldClass} />
@@ -551,19 +571,6 @@ export function ManualRunPanel({
               Staging only · evidence liên kết GitHub an toàn.
             </p>
           </div>
-          <button
-            ref={openRunButton}
-            type="button"
-            onClick={() => {
-              setRunTargetId(targetId);
-              setPreflight(undefined);
-              setConfirmationKey(undefined);
-              setDialogOpen(true);
-            }}
-            className="min-h-11 rounded-[var(--radius)] bg-[var(--text)] px-4 text-[13px] font-bold text-[var(--bg)] shadow-[0_4px_10px_color-mix(in_srgb,var(--text)_20%,transparent)] sm:min-h-9"
-          >
-            Chạy test theo target
-          </button>
         </div>
         <div className="border-b border-[var(--border)] bg-[var(--bg-sunk)] p-3 sm:hidden">
           <button
@@ -1018,12 +1025,11 @@ function DispatchDialog({
               <div className="mt-2 space-y-2">
                 {(
                   [
-                    ["smoke", "Smoke", "Kiểm tra phạm vi tác động đã map"],
-                    [
-                      "regression",
-                      "Regression",
-                      "Chỉ chạy khi target có pack regression được chứng nhận",
-                    ],
+                    ["smoke", "Smoke (Sanity Core)", "Kiểm tra phạm vi tác động và sống còn"],
+                    ["regression", "Regression (Toàn diện nghiệp vụ)", "Chạy bộ kiểm thử toàn diện mọi tính năng"],
+                    ["user_flow", "User Flows & E2E (Luồng người dùng)", "Kiểm thử luồng nghiệp vụ liên hoàn từ đầu đến cuối"],
+                    ["impact", "Functional & Change Impact", "Kiểm thử vùng ảnh hưởng và độ ổn định giao diện"],
+                    ["security", "Security & Multi-tenant", "Kiểm tra cách ly dữ liệu và quyền truy cập"],
                   ] as const
                 ).map(([value, label, description]) => {
                   const available = availableProfiles?.[value] ?? false;
@@ -1628,7 +1634,12 @@ function MobileFilters({
             <option value="cancelled">Đã hủy</option>
           </select>
           <select aria-label="Lọc Profile mobile" value={filters.profile} onChange={(event) => updateFilter("profile", event.target.value)} className={fieldClass}>
-            <option value="">Profile: Tất cả</option><option value="smoke">Smoke</option><option value="regression">Regression</option>
+            <option value="">Profile: Tất cả</option>
+            <option value="smoke">Smoke</option>
+            <option value="regression">Regression</option>
+            <option value="user_flow">User Flows</option>
+            <option value="impact">Functional Impact</option>
+            <option value="security">Security</option>
           </select>
           <input
             aria-label="Lọc PR mobile"

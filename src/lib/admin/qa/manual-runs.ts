@@ -178,7 +178,7 @@ export async function getManualRunPreflight(
   const certification = target ? getTargetQaCoverage(target.id) : undefined;
   const availableProfiles = target?.active
     ? getManualQaProfileAvailability(target.id)
-    : { smoke: false, regression: false };
+    : { smoke: false, regression: false, user_flow: false, impact: false, security: false };
   const reasons: ManualRunPreflight["reasons"] = [];
   if (!target || !target.active)
     reasons.push({

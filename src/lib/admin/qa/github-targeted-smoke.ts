@@ -97,7 +97,11 @@ export async function dispatchTargetedSmokeWorkflow(
       | "targeted-smoke"
       | "manual-retest"
       | "manual-smoke"
-      | "manual-regression";
+      | "manual-regression"
+      | "manual-user_flow"
+      | "manual-impact"
+      | "manual-security"
+      | "manual-all-profiles";
   },
   fetcher: typeof fetch = fetch,
 ): Promise<void> {

@@ -2,7 +2,12 @@ import {
   CMS_TARGET_REGISTRY,
   type TargetDomain,
 } from "@/lib/admin/qa/target-registry";
-import { TARGET_CASE_IDS_MAP } from "./test-case-directory";
+import {
+  TARGET_CASE_IDS_MAP,
+  TARGET_USER_FLOW_IDS_MAP,
+  TARGET_IMPACT_IDS_MAP,
+  TARGET_SECURITY_IDS_MAP,
+} from "./test-case-directory";
 
 export type QaCoveragePriority =
   | "critical"
@@ -15,7 +20,7 @@ export type QaCertificationState =
   | "manual_only"
   | "no-certified-pack"
   | "deprecated";
-export type QaPackProfile = "smoke" | "regression";
+export type QaPackProfile = "smoke" | "regression" | "user_flow" | "impact" | "security";
 
 export type CertifiedPackEvidence = {
   packId: string;
@@ -952,6 +957,39 @@ const CERTIFIED_PACKS: readonly (CertifiedPackEvidence & { targetId: string })[]
       profile: "regression" as const,
       testCaseIds: regressionIds,
       estimatedDurationMinutes: regressionDuration,
+      approvalRef: "auto-generated-from-smoke",
+      stagedProofRef: "auto-generated-from-smoke",
+    };
+  }),
+  ...BASE_CERTIFIED_PACKS.filter((p) => p.profile === "smoke").map((p) => {
+    const flowIds = TARGET_USER_FLOW_IDS_MAP[p.targetId] ?? p.testCaseIds;
+    return {
+      ...p,
+      profile: "user_flow" as const,
+      testCaseIds: flowIds,
+      estimatedDurationMinutes: Math.min(30, Math.max(3, flowIds.length * 2)),
+      approvalRef: "auto-generated-from-smoke",
+      stagedProofRef: "auto-generated-from-smoke",
+    };
+  }),
+  ...BASE_CERTIFIED_PACKS.filter((p) => p.profile === "smoke").map((p) => {
+    const impactIds = TARGET_IMPACT_IDS_MAP[p.targetId] ?? p.testCaseIds;
+    return {
+      ...p,
+      profile: "impact" as const,
+      testCaseIds: impactIds,
+      estimatedDurationMinutes: Math.min(30, Math.max(3, impactIds.length * 2)),
+      approvalRef: "auto-generated-from-smoke",
+      stagedProofRef: "auto-generated-from-smoke",
+    };
+  }),
+  ...BASE_CERTIFIED_PACKS.filter((p) => p.profile === "smoke").map((p) => {
+    const secIds = TARGET_SECURITY_IDS_MAP[p.targetId] ?? p.testCaseIds;
+    return {
+      ...p,
+      profile: "security" as const,
+      testCaseIds: secIds,
+      estimatedDurationMinutes: Math.min(30, Math.max(3, secIds.length * 2)),
       approvalRef: "auto-generated-from-smoke",
       stagedProofRef: "auto-generated-from-smoke",
     };

@@ -72,6 +72,8 @@ export function TestCaseDirectoryTab({
       performance: 0,
       resilience: 0,
       qa_core: 0,
+      user_flow: 0,
+      impact: 0,
     };
     for (const tc of ALL_TEST_CASES_DIRECTORY) {
       if (tc.category in counts) {
@@ -251,6 +253,42 @@ export function TestCaseDirectoryTab({
           <span>💳 Idempotency & AI</span>
           <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/60 px-1.5 py-0.2 text-[11px] font-black text-emerald-700 dark:text-emerald-300">
             {summaryCounts.resilience}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCategory("user_flow");
+            setPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all shadow-sm ${
+            selectedCategory === "user_flow"
+              ? "border border-purple-500 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/40"
+              : "border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:border-purple-400"
+          }`}
+        >
+          <span>🔄 User Flows & Logic</span>
+          <span className="rounded-full bg-purple-100 dark:bg-purple-900/60 px-1.5 py-0.2 text-[11px] font-black text-purple-700 dark:text-purple-300">
+            {summaryCounts.user_flow}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCategory("impact");
+            setPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all shadow-sm ${
+            selectedCategory === "impact"
+              ? "border border-pink-500 bg-pink-50 dark:bg-pink-950 text-pink-700 dark:text-pink-300 ring-2 ring-pink-500/40"
+              : "border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:border-pink-400"
+          }`}
+        >
+          <span>🎯 Functional Impact</span>
+          <span className="rounded-full bg-pink-100 dark:bg-pink-900/60 px-1.5 py-0.2 text-[11px] font-black text-pink-700 dark:text-pink-300">
+            {summaryCounts.impact}
           </span>
         </button>
 

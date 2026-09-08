@@ -11,17 +11,17 @@ import {
   validateManualIdempotencyKey,
 } from "@/lib/admin/qa/manual-runs";
 import { resolveManualQaPack } from "@/lib/admin/qa/targeted-smoke-registry";
+import { executeLocalDevRun, simulateLocalTestRun } from "@/lib/admin/qa/dev-test-runner";
 import { claimTargetedSmokeDispatch, blockTargetedSmokeDispatch, TargetedSmokeDispatchConflictError } from "@/lib/admin/qa/targeted-smoke-dispatch";
 import { dispatchTargetedSmokeWorkflow, githubAppConfigFromEnv, GitHubWorkflowDispatchRejectedError } from "@/lib/admin/qa/github-targeted-smoke";
 import { withQaTargetedDispatchTransaction } from "@/lib/payload/qa-targeted-dispatch-transaction";
-import { simulateLocalTestRun } from "@/lib/admin/qa/dev-test-runner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const RequestSchema = z.object({
   targetId: z.string().regex(/^[a-z][a-z0-9-]*$/),
-  profile: z.enum(["smoke", "regression"]),
+  profile: z.enum(["smoke", "regression", "user_flow", "impact", "security"]),
   pullRequest: z.number().int().positive().optional(),
   commitSha: z.string().regex(/^[a-f0-9]{7,64}$/i).optional(),
   idempotencyKey: z.string().min(16).max(100),
@@ -161,8 +161,10 @@ export const POST = withSuperAdmin(async (req: NextRequest, { user }) => {
       simulateLocalTestRun(payload, {
         dispatchId: outcome.dispatch.id,
         targetId: parsed.data.targetId,
+        suite: "targeted-smoke",
         profile: parsed.data.profile === "smoke" ? "manual-smoke" : "manual-regression",
         runner: resolved.pack.runner ?? "smoke",
+        testCases,
         testCaseIds: testCases.map((tc) => tc.id),
         pullRequest: preflight.context.pullRequest,
         commitSha: preflight.context.commitSha,

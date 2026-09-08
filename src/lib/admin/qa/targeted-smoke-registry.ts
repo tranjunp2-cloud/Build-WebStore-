@@ -7,7 +7,12 @@ import {
   isTargetQaPackContractCertified,
   validateTargetQaCoverage,
 } from "@/lib/admin/qa/targeted-qa-coverage";
-import { TARGET_TEST_CASES_MAP } from "./test-case-directory";
+import {
+  TARGET_TEST_CASES_MAP,
+  TARGET_USER_FLOW_CASES_MAP,
+  TARGET_IMPACT_CASES_MAP,
+  TARGET_SECURITY_CASES_MAP,
+} from "./test-case-directory";
 
 export type TargetedSmokeTestCase = {
   id: string;
@@ -15,7 +20,7 @@ export type TargetedSmokeTestCase = {
 };
 
 /** Browser clients choose one of these labels, never a spec or command. */
-export type ManualQaProfile = "smoke" | "regression";
+export type ManualQaProfile = "smoke" | "regression" | "user_flow" | "impact" | "security";
 /**
  * A server-owned test runner classification. Deployment payloads and browser
  * clients never choose this value; it is part of the checked-in contract.
@@ -1636,6 +1641,9 @@ export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = RAW_TARGETED_S
   const dirCases = TARGET_TEST_CASES_MAP[pack.targetId];
   const regressionCases = dirCases && dirCases.length > 0 ? dirCases : pack.testCases;
   const regressionDuration = Math.min(30, Math.max(3, regressionCases.length * 2));
+  const userFlowCases = TARGET_USER_FLOW_CASES_MAP[pack.targetId] ?? pack.testCases;
+  const impactCases = TARGET_IMPACT_CASES_MAP[pack.targetId] ?? pack.testCases;
+  const securityCases = TARGET_SECURITY_CASES_MAP[pack.targetId] ?? pack.testCases;
 
   return {
     ...pack,
@@ -1656,6 +1664,36 @@ export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = RAW_TARGETED_S
         ],
         manualChecklistCount: 0,
         testCases: regressionCases,
+      },
+      user_flow: {
+        testType: pack.manualProfiles?.smoke?.testType ?? "unit",
+        estimatedDurationMinutes: Math.min(30, Math.max(3, userFlowCases.length * 2)),
+        prerequisites: [
+          ...(pack.manualProfiles?.smoke?.prerequisites ?? ["Staging test suite ready"]),
+          "User flow & E2E contract ready",
+        ],
+        manualChecklistCount: 0,
+        testCases: userFlowCases,
+      },
+      impact: {
+        testType: pack.manualProfiles?.smoke?.testType ?? "unit",
+        estimatedDurationMinutes: Math.min(30, Math.max(3, impactCases.length * 2)),
+        prerequisites: [
+          ...(pack.manualProfiles?.smoke?.prerequisites ?? ["Staging test suite ready"]),
+          "Change impact contract ready",
+        ],
+        manualChecklistCount: 0,
+        testCases: impactCases,
+      },
+      security: {
+        testType: pack.manualProfiles?.smoke?.testType ?? "unit",
+        estimatedDurationMinutes: Math.min(30, Math.max(3, securityCases.length * 2)),
+        prerequisites: [
+          ...(pack.manualProfiles?.smoke?.prerequisites ?? ["Staging test suite ready"]),
+          "Security isolation contract ready",
+        ],
+        manualChecklistCount: 0,
+        testCases: securityCases,
       },
     },
   };
@@ -1712,7 +1750,7 @@ export function validateTargetedSmokePacks(
     for (const [profile, contract] of Object.entries(
       pack.manualProfiles ?? {},
     )) {
-      if (profile !== "smoke" && profile !== "regression")
+      if (!["smoke", "regression", "user_flow", "impact", "security"].includes(profile))
         throw new Error(`Unknown manual profile for pack: ${pack.packId}`);
       if (
         !contract ||
@@ -1759,7 +1797,7 @@ export function validateTargetedSmokePacks(
         )
       )
         throw new Error(`Invalid manual profile test case: ${pack.packId}`);
-      if (!isTargetQaPackContractCertified(pack, profile, contract))
+      if (!isTargetQaPackContractCertified(pack, profile as ManualQaProfile, contract))
         throw new Error(
           `Targeted Smoke pack is not certified in coverage matrix: ${pack.packId}`,
         );
@@ -1827,6 +1865,9 @@ export function getManualQaProfileAvailability(
   return {
     smoke: Boolean(resolveManualQaPack(targetId, "smoke", packs)),
     regression: Boolean(resolveManualQaPack(targetId, "regression", packs)),
+    user_flow: Boolean(resolveManualQaPack(targetId, "user_flow", packs)),
+    impact: Boolean(resolveManualQaPack(targetId, "impact", packs)),
+    security: Boolean(resolveManualQaPack(targetId, "security", packs)),
   };
 }
 

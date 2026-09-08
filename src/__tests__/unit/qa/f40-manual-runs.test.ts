@@ -28,10 +28,17 @@ describe("[TC-F40-07-01] Manual targeted pack contract", () => {
     expect(regression?.profile.testCases.map((testCase) => testCase.id)).toEqual([
       "TC-VIS-14.01",
       "TC-VIS-14.02",
+      "TC-EDIT-01.03",
     ]);
     expect(
       getManualQaProfileAvailability("editor-productgrid-variants"),
-    ).toEqual({ smoke: true, regression: true });
+    ).toEqual({
+      smoke: true,
+      regression: true,
+      user_flow: true,
+      impact: true,
+      security: true,
+    });
   });
 
   it("requires paired immutable PR/SHA context and bounded idempotency key", () => {

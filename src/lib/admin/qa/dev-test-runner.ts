@@ -3,17 +3,26 @@ import type { Payload } from "payload";
 
 export type DevTestRunnerType = "unit" | "logic" | "api" | "smoke";
 
+export interface TestCaseItem {
+  id: string;
+  assertion?: string;
+}
+
 export interface SimulateLocalTestRunOptions {
-  dispatchId: string | number;
+  dispatchId?: string | number;
   targetId: string;
   suite?: string;
   profile: string;
   runner?: DevTestRunnerType | string;
-  testCaseIds: string[];
+  testCaseIds?: string[];
+  testCases?: readonly TestCaseItem[];
   pullRequest?: number;
   commitSha?: string;
   durationMs?: number;
+  durationMsPerTest?: number;
 }
+
+export type DevRunOptions = SimulateLocalTestRunOptions;
 
 export interface DevRunResult {
   runId: string;
@@ -34,16 +43,22 @@ export async function executeLocalDevRun(
 ): Promise<DevRunResult> {
   const devPR = options.pullRequest ?? 0;
   const devSHA = options.commitSha ?? "dev-local-commit-sha";
-  const durationMs = options.durationMs ?? 420;
+  const durationMs = options.durationMsPerTest ?? options.durationMs ?? 420;
 
   const validRunners: readonly DevTestRunnerType[] = ["unit", "logic", "api", "smoke"];
-  const runner: DevTestRunnerType = options.runner && (validRunners as readonly string[]).includes(options.runner)
-    ? (options.runner as DevTestRunnerType)
-    : "smoke";
+  const runner: DevTestRunnerType =
+    options.runner && (validRunners as readonly string[]).includes(options.runner)
+      ? (options.runner as DevTestRunnerType)
+      : "smoke";
 
-  const runId = `local-simulation-${options.dispatchId}-${Date.now()}`;
+  const runId = `local-simulation-${options.dispatchId ?? "run"}-${Date.now()}`;
   const digest = crypto.createHash("sha256").update(runId).digest("hex");
-  const testCount = options.testCaseIds.length;
+
+  const normalizedTestCases: TestCaseItem[] = options.testCases
+    ? options.testCases.map((tc) => ({ id: tc.id, assertion: tc.assertion }))
+    : (options.testCaseIds || []).map((id) => ({ id }));
+
+  const testCount = normalizedTestCases.length;
 
   const run = await payload.create({
     collection: "qa_test_runs",
@@ -73,18 +88,18 @@ export async function executeLocalDevRun(
 
   // Parallel DB writes for test results (avoids N+1 sequential writes)
   await Promise.all(
-    options.testCaseIds.map((tcId) =>
+    normalizedTestCases.map((tc) =>
       payload.create({
         collection: "qa_test_results",
         data: {
           run: run.id,
           suite: options.suite ?? "local-simulation",
-          testCaseId: tcId,
+          testCaseId: tc.id,
           status: "passed",
           durationMs,
-          assertionCode: `SIMULATED_${tcId.replace(/[^A-Za-z0-9]/g, "_").toUpperCase()}_DEV`,
+          assertionCode: `SIMULATED_${tc.id.replace(/[^A-Za-z0-9]/g, "_").toUpperCase()}_DEV`,
           actualSummary: "[LOCAL DEV SIMULATION] Assertion verified cleanly in local development environment.",
-          expectedSummary: "[LOCAL DEV SIMULATION] Mock verification for development testing.",
+          expectedSummary: tc.assertion || "[LOCAL DEV SIMULATION] Mock verification for development testing.",
         },
         overrideAccess: true,
       }),
