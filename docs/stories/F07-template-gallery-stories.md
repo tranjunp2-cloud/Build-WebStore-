@@ -52,7 +52,7 @@ THEN  hệ thống trả về danh sách template liên quan trong < 2 giây
 
 ### Definition of Done
 
-- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] 10-Point Checklist pass (ref: `SPEC.md §13`)
 - [ ] AI search response < 2 giây với query BM và VI
 - [ ] Templates Modal hiển thị đúng trên mobile 375px
 
@@ -103,7 +103,7 @@ THEN  các block không có tương ứng bị bỏ qua (không làm mất nội
 
 ### Definition of Done
 
-- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] 10-Point Checklist pass (ref: `SPEC.md §13`)
 - [ ] QA verify 0% data loss trên 10+ template swaps
 - [ ] Smooth animation hoạt động trên Chrome, Safari, Edge latest 2 versions
 
@@ -173,7 +173,7 @@ THEN  nút Undo bị ẩn hoặc disabled (không thể click)
 
 ### Definition of Done
 
-- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] 10-Point Checklist pass (ref: `SPEC.md §13`)
 - [ ] Modal cảnh báo Save hiển thị đúng và có đủ 2 nút hành động
 - [ ] Nút Undo disabled/ẩn sau khi Save thành công
 
@@ -181,7 +181,9 @@ THEN  nút Undo bị ẩn hoặc disabled (không thể click)
 
 ## US-F07-07: Full Preview (View Only)
 
-**Wave 3** | **P2** | **S** | **Status:** Ready
+**Wave 3** | **P1** | **M** | **Status:** Refinement
+
+> **BA scope confirmed:** 2026-09-08. Pending Architecture, Design, QA handoff và Dev re-estimate trước khi chuyển `Ready`.
 
 ### Story
 
@@ -193,37 +195,147 @@ So that I can evaluate the design before deciding to apply it
 
 ### Acceptance Criteria
 
-#### AC-1: Happy Path — Mở Full Preview modal
+#### AC-1: Happy Path — Preview bằng nội dung hiện tại của site
 
 ```gherkin
-GIVEN user đang xem danh sách templates trong Templates Modal
-WHEN  user click "Preview" trên 1 template cụ thể
-THEN  modal full-screen mở ra hiển thị template rendered đầy đủ với nội dung hiện tại của site
+GIVEN user đang chỉnh sửa một site trong AI Editor
+  AND site có nội dung hiện tại gồm text, image và các page đã lưu hoặc đang có trong Editor
+WHEN  user click "Preview" trên một template cụ thể trong Templates Modal
+THEN  Full Preview modal mở ở chế độ full-screen
+  AND template được render bằng nội dung hiện tại của chính site đó sau khi chạy Smart Mapping ở chế độ dry-run
   AND người dùng có thể cuộn trang (scroll) để xem toàn bộ
-  AND nếu template có nhiều trang, có thể switch giữa các trang
+  AND các field/block map được luôn dùng current site content
+  AND field/block đích không có source tương ứng chỉ được dùng template default content khi có nhãn "Sample content" rõ ràng
+  AND không thay thế toàn bộ Preview hoặc current content đã map được bằng sample/default content
 ```
 
-#### AC-2: View Only — Không thể edit trong Preview
+#### AC-2: Multi-page Preview — Chọn đúng trang cần xem
+
+```gherkin
+GIVEN template được chọn có nhiều hơn một page khả dụng trong template page inventory
+  AND user đang ở Full Preview mode
+WHEN  Full Preview được tải thành công
+THEN  Page Selector hiển thị bên ngoài vùng website preview
+  AND liệt kê các page của template được chọn
+  AND page được template khai báo `isHomepage` được chọn mặc định
+  AND template phải có đúng một page `isHomepage`; nếu thiếu hoặc có nhiều hơn một thì hiển thị lỗi theo AC-6
+WHEN  user chọn một page khác
+THEN  hệ thống render đúng template page được chọn
+  AND ưu tiên map current site page có cùng page role hoặc normalized slug
+  AND nếu không có source page tương ứng, chỉ được dùng template default content kèm nhãn "Sample content"
+  AND current site page không có target template page tương ứng không xuất hiện trong Page Selector và không bị thay đổi trong quá trình Preview
+  AND không tự động fallback về Home hoặc page đầu tiên nếu page được chọn không tồn tại hoặc tải lỗi
+  AND hiển thị lỗi tại vùng preview kèm hành động "Thử lại"
+```
+
+```gherkin
+GIVEN template chỉ có một page khả dụng trong template page inventory
+WHEN  Full Preview được tải thành công
+THEN  Page Selector không hiển thị
+```
+
+#### AC-3: View Only — Không thể edit hoặc điều hướng trong Preview
 
 ```gherkin
 GIVEN user đang ở Full Preview mode
-WHEN  user thử click/tap vào các elements trong preview
-THEN  không có gì thay đổi — preview chỉ là view-only
+WHEN  user click/tap vào link, button, form field hoặc thành phần tương tác bên trong website preview
+THEN  dữ liệu và trạng thái Editor không thay đổi
+  AND không điều hướng sang page, route hoặc website khác
+  AND không submit form hoặc thực thi CTA của website
+  AND form control không nhận focus, không cho nhập dữ liệu và không thay đổi local preview state
+  AND user vẫn có thể scroll để xem toàn bộ page
   AND không hiển thị editor controls hay hover effects của editor
 ```
 
-#### AC-3: Apply từ Preview
+#### AC-4: Apply từ Preview có bước xác nhận
 
 ```gherkin
 GIVEN user đang ở Full Preview mode và hài lòng với template
-WHEN  user click nút "Apply This Template" (nổi bật, fixed bottom)
-THEN  preview đóng lại và US-F07-05 (Content-Preserving Swap) được kích hoạt
+WHEN  user click nút "Apply This Template" tại fixed bottom action bar
+THEN  hệ thống hiển thị Confirmation Dialog trước khi thay đổi site
+WHEN  user xác nhận Apply
+THEN  Preview đóng lại
+  AND US-F07-05 (Content-Preserving Template Swap) được kích hoạt đúng một lần
 ```
+
+```gherkin
+GIVEN user đang xem Confirmation Dialog của thao tác Apply
+WHEN  user chọn Cancel
+THEN  Confirmation Dialog đóng
+  AND user vẫn ở Full Preview
+  AND site không thay đổi
+```
+
+#### AC-5: Close Preview — Thoát an toàn
+
+```gherkin
+GIVEN user đang ở Full Preview mode
+WHEN  user click nút Close (X), chọn Back hoặc nhấn phím Escape
+THEN  Full Preview đóng lại
+  AND focus được trả về Template Card hoặc nút Preview đã mở modal
+  AND không có thay đổi nào được ghi vào site
+  AND không tạo Undo point hoặc revision mới
+```
+
+#### AC-6: Loading và Error — Phản hồi đúng theo từng loại lỗi
+
+```gherkin
+GIVEN user mở Full Preview hoặc chuyển page trong Preview
+WHEN  hệ thống đang chuẩn bị nội dung preview
+THEN  hiển thị Loading state tại vùng preview
+```
+
+```gherkin
+GIVEN session của user hết hạn khi mở Preview
+WHEN  hệ thống nhận lỗi Authentication Required (401)
+THEN  không hiển thị website content
+  AND hiển thị hành động "Đăng nhập lại"
+```
+
+```gherkin
+GIVEN site/template không tồn tại hoặc user không có quyền truy cập
+WHEN  hệ thống nhận lỗi Forbidden (403) hoặc Not Found (404)
+THEN  không tiết lộ site/template có tồn tại hay không
+  AND không hiển thị content của site/tenant khác hoặc sample content để thay thế
+  AND hiển thị thông báo "Preview unavailable" kèm hành động "Quay lại" hoặc "Đóng"
+```
+
+```gherkin
+GIVEN Preview bị timeout hoặc render failure
+WHEN  hệ thống không thể hoàn tất Preview
+THEN  hiển thị Error state kèm hành động "Thử lại" hoặc "Đóng"
+  AND không silent fallback về Home, page đầu tiên hoặc sample content
+```
+
+#### AC-7: Performance và Timeout
+
+```gherkin
+GIVEN user sử dụng môi trường được hỗ trợ với reference test dataset
+WHEN  user mở Full Preview
+THEN  Preview sẵn sàng để xem trong p95 không quá 3 giây
+WHEN  user chuyển sang một page khác
+THEN  page được chọn sẵn sàng để xem trong p95 không quá 2 giây
+  AND nếu một lần tải vượt quá 10 giây, hệ thống dừng Loading state và hiển thị Error state theo AC-6
+```
+
+### Business Rules / BA Decisions
+
+- **Content source trong Editor:** luôn dùng nội dung hiện tại của site sau Smart Mapping dạng **dry-run**; Preview không được ghi dữ liệu vào site.
+- **Mapping fallback:** matched field/block luôn dùng current content. Unmatched target field/block/page chỉ được dùng template default content khi có nhãn **"Sample content"**; không được thay thế toàn bộ Preview bằng sample content.
+- **View-only:** chỉ cho phép scroll và các control thuộc Preview shell (Back/Close, Page Selector, Apply); mọi tương tác bên trong website preview phải inert. Device viewport toggle hiện có không thay đổi trong US-F07-07.
+- **Multi-page:** nằm trong scope hiện tại. Selector lấy page inventory từ template được chọn và yêu cầu đúng một `isHomepage`. Smart Mapping ưu tiên source page cùng role hoặc normalized slug; source page không có target tương ứng không hiển thị và không bị Preview thay đổi.
+- **CTA:** tên chuẩn là **"Apply This Template"**, đặt tại fixed bottom action bar và luôn nhìn thấy khi user scroll.
+- **Apply safety:** user phải xác nhận trước khi bắt đầu US-F07-05; trong lúc Apply, CTA bị disabled để chống double-submit.
+- **No side effects:** mở, đóng, scroll hoặc đổi page Preview không được mutate/persist site content, tạo revision/Undo point hoặc tính quota Apply; technical telemetry/audit log vẫn được phép.
+- **Data isolation:** chỉ preview site thuộc tenant mà user có quyền truy cập; tuyệt đối không fallback sang dữ liệu site khác.
 
 ### Additional Criteria
 
 - [ ] Modal có nút "Đóng" (✕) rõ ràng ở góc trên phải.
-- [ ] Preview sử dụng iframe sandbox để không ảnh hưởng đến editor state hiện tại.
+- [ ] Preview shell hỗ trợ Back/Close và Page Selector (khi cần); thay đổi device viewport toggle hiện có không thuộc scope US-F07-07.
+- [ ] Full Preview của US-F07-07 bắt buộc hỗ trợ Desktop (1280px+) và Tablet (768px); Mobile Gallery/Preview UX thuộc US-F07-08.
+- [ ] Giải pháp kỹ thuật phải cô lập preview và đáp ứng toàn bộ hành vi view-only; cơ chế cụ thể do Tech Lead xác nhận trong Architecture Document.
+- [ ] CTA Apply có Loading/Disabled state và không gửi trùng request.
 
 ### Market Notes
 
@@ -231,9 +343,16 @@ THEN  preview đóng lại và US-F07-05 (Content-Preserving Swap) được kíc
 
 ### Definition of Done
 
-- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] 10-Point Checklist pass (ref: `SPEC.md §13`)
 - [ ] Full Preview hoạt động trên Desktop (1280px+) và Tablet (768px)
 - [ ] Nút "Apply This Template" visible và clickable trong mọi trạng thái scroll
+- [ ] QA verify Preview dùng current site content sau dry-run Smart Mapping, không dùng sample content trong Editor context
+- [ ] QA verify scroll hoạt động nhưng link/button/form/navigation bên trong preview không có tác dụng
+- [ ] QA verify đúng page được chọn; không silent fallback về Home/page đầu tiên
+- [ ] QA verify Preview không mutate/persist site content, tạo revision, Undo point hoặc Apply quota trước khi user xác nhận
+- [ ] QA verify tenant authorization và không rò rỉ content giữa các site/tenant
+- [ ] QA verify initial Preview p95 ≤ 3 giây, page switch p95 ≤ 2 giây và timeout sau 10 giây trên reference test dataset
+- [ ] Architecture, Design và QA Spec đã được owner tương ứng cập nhật theo BA Decisions phía trên
 
 ---
 
@@ -271,7 +390,4 @@ THEN  the templates are displayed in a 2-column grid to maximize visible options
 
 ### Definition of Done
 
-- [ ] 9-Point Checklist pass.
-
-
-
+- [ ] 10-Point Checklist pass.
