@@ -4,9 +4,34 @@ import {
   assertReadOnlyQuery,
   getPw1ComponentShortlistItems,
   getPw1DbConfig,
+  selectPrimarySkusByProductId,
+  selectUniqueProducts,
 } from "@/lib/admin/qa/pw1-mysql-connector";
 
 describe("[US-F40-PW1-Connector] Read-Only Security Guardrails", () => {
+  it("[TC-F40-11-08] creates one product entity candidate per product ID when products have multiple SKUs", () => {
+    // Arrange
+    const products = [
+      { id: 7523, name: "Product with variants" },
+      { id: 7523, name: "Product with variants" },
+      { id: 7524, name: "Standalone product" },
+    ];
+    const skus = [
+      { id: 101, product_id: 7523, sku: "P-RED" },
+      { id: 102, product_id: 7523, sku: "P-BLUE" },
+      { id: 103, product_id: 7524, sku: "S-ONE" },
+    ];
+
+    // Act
+    const uniqueProducts = selectUniqueProducts(products);
+    const primarySkuByProductId = selectPrimarySkusByProductId(skus);
+
+    // Assert
+    expect(uniqueProducts.map((product) => product.id)).toEqual([7523, 7524]);
+    expect(primarySkuByProductId.get("7523")?.sku).toBe("P-RED");
+    expect(primarySkuByProductId.get("7524")?.sku).toBe("S-ONE");
+  });
+
   it("allows safe SELECT, SHOW, DESCRIBE and EXPLAIN queries", () => {
     expect(() => assertReadOnlyQuery("SELECT * FROM products;")).not.toThrow();
     expect(() => assertReadOnlyQuery("SELECT id, title, price FROM products WHERE store_id = 1;")).not.toThrow();

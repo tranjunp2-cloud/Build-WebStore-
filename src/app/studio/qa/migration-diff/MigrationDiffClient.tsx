@@ -9,6 +9,8 @@ import {
   getStoreDeepDiff,
   getDashboardMetrics,
   CANONICAL_TEMPLATES,
+  getVisualDiffGapLabel,
+  hasEntityDiffIssue,
   isStoreDomainSslReady,
   type StoreSummary,
   type StoreDeepDiff,
@@ -666,6 +668,28 @@ function RichVisualBlockRenderer({
   );
 }
 
+function PW2DiffGapOverlay({
+  block,
+  enabled,
+}: {
+  block: PageBlockItem;
+  enabled: boolean;
+}) {
+  const label = enabled ? getVisualDiffGapLabel(block.status, block.discrepancyNote) : null;
+  if (!label) return null;
+
+  return (
+    <div
+      aria-label={`Highlight Diff Gaps: ${label}`}
+      className="pointer-events-none absolute inset-0 z-10 rounded-2xl border-2 border-rose-400 bg-rose-500/10 ring-2 ring-rose-400/30 animate-pulse"
+    >
+      <span className="absolute right-2 top-2 rounded-full border border-rose-300/70 bg-rose-600 px-2 py-1 text-[10px] font-bold text-white shadow-lg">
+        Highlight Diff Gaps · {label}
+      </span>
+    </div>
+  );
+}
+
 /**
  * Split Swipe Slider comparison with smooth CSS clip-path overlay
  */
@@ -673,10 +697,12 @@ function SwipeSliderBlockRenderer({
   block,
   deviceView,
   sliderPosition,
+  highlightDiffGaps,
 }: {
   block: PageBlockItem;
   deviceView: "desktop" | "mobile";
   sliderPosition: number;
+  highlightDiffGaps: boolean;
 }) {
   const isMobile = deviceView === "mobile";
   const [localPos, setLocalPos] = useState(sliderPosition);
@@ -724,6 +750,7 @@ function SwipeSliderBlockRenderer({
           }}
         >
           <RichVisualBlockRenderer block={block} version="pw2" deviceView={deviceView} />
+          <PW2DiffGapOverlay block={block} enabled={highlightDiffGaps} />
         </div>
 
         {/* Draggable Vertical Splitter Line */}
@@ -787,6 +814,7 @@ export function MigrationDiffClient() {
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [parityMode, setParityMode] = useState<"dual_window" | "swipe_slider">("dual_window");
+  const [showDiffGaps, setShowDiffGaps] = useState(false);
   const [sliderPosition, setSliderPosition] = useState<number>(50);
   const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit">("live_webview");
   const [previewSource, setPreviewSource] = useState<"template" | "live_domain">("template");
@@ -1020,7 +1048,7 @@ export function MigrationDiffClient() {
     if (!selectedDiff?.fieldDiffAudit?.records || !activePage) return [];
     return getFieldDiffRecordsForPage(selectedDiff.fieldDiffAudit, activePage.id).filter((r) => {
       const matchGroup = activeEntityGroup === "all" || r.entityGroup === activeEntityGroup;
-      const matchErrors = !showOnlyErrors || r.matchStatus !== "match";
+      const matchErrors = !showOnlyErrors || hasEntityDiffIssue(r);
       const q = fieldSearchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -1908,6 +1936,19 @@ export function MigrationDiffClient() {
                         </button>
                       </div>
 
+                      <button
+                        type="button"
+                        aria-pressed={showDiffGaps}
+                        onClick={() => setShowDiffGaps((current) => !current)}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition ${
+                          showDiffGaps
+                            ? "bg-rose-500/20 text-rose-200 border-rose-400/70 shadow-md shadow-rose-500/20"
+                            : "bg-slate-900 text-slate-300 border-slate-800 hover:border-rose-500/50 hover:text-rose-200"
+                        }`}
+                      >
+                        {showDiffGaps ? "✓ Highlight Diff Gaps" : "Highlight Diff Gaps"}
+                      </button>
+
                       {parityMode === "swipe_slider" && (
                         <div className="flex items-center gap-2 text-xs font-mono bg-slate-900/80 px-3 py-1 rounded-xl border border-slate-800 text-slate-300">
                           <span>Vị trí trượt:</span>
@@ -2067,6 +2108,7 @@ export function MigrationDiffClient() {
                               block={block}
                               deviceView={deviceView}
                               sliderPosition={sliderPosition}
+                              highlightDiffGaps={showDiffGaps}
                             />
                           ) : deviceView === "mobile" ? (
                             /* Mobile Phone Mockup View (375px) */
@@ -2108,6 +2150,7 @@ export function MigrationDiffClient() {
 
                                 {/* Rich Visual Block Render for PW2 */}
                                 <RichVisualBlockRenderer block={block} version="pw2" deviceView="mobile" />
+                                <PW2DiffGapOverlay block={block} enabled={showDiffGaps} />
 
                                 {/* Home Bar */}
                                 <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
@@ -2125,11 +2168,12 @@ export function MigrationDiffClient() {
                               </div>
 
                               {/* PW2 Preview Box */}
-                              <div className="space-y-1.5">
+                              <div className="relative space-y-1.5">
                                 <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider px-1">
                                   Giao Diện Bản Mới PW2 (Next.js 15)
                                 </div>
                                 <RichVisualBlockRenderer block={block} version="pw2" deviceView="desktop" />
+                                <PW2DiffGapOverlay block={block} enabled={showDiffGaps} />
                               </div>
                             </div>
                           )}

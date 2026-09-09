@@ -105,3 +105,16 @@ The stateful test intentionally skips when its fixture variables are absent. Bef
 | TC-F40-06-03 | API  | Critical | Finding reads/promotions require super-admin, validate strictly, and cancel never contacts GitHub.                           | [x] AUTO | `src/__tests__/api/f40-findings.test.ts`     |
 | TC-F40-06-04 | API  | Critical | Confirming promotion creates/reconciles exactly one marked GitHub issue; remote failure retains the internal finding safely. | [x] AUTO | `src/__tests__/api/f40-findings.test.ts`     |
 | TC-F40-06-05 | E2E  | Critical | QA reviews a finding, cancels without issue creation, then confirms one linked GitHub ticket.                                | [x] AUTO | `tests/f40-findings.spec.ts`                 |
+
+## US-F40-11 — Deep Field-by-Field Database Diff Inspector
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-11-07 | Unit | High | A record with `matchStatus = match` but an error/warning field remains visible when **Chỉ Lỗi** is enabled. | [x] AUTO | `src/__tests__/unit/qa/f40-field-diff-inspector.test.ts` |
+| TC-F40-11-08 | Unit | High | A Product with multiple SKU rows produces one Product entity candidate while retaining a deterministic primary SKU. | [x] AUTO | `src/__tests__/unit/qa/f40-pw1-mysql-connector.test.ts` |
+
+## US-F40-12 — Visual Parity Inspector
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-12-11 | Unit | High | **Highlight Diff Gaps** identifies P0/P1 PW2 visual gaps with an explanatory label and ignores matched blocks. | [x] AUTO | `src/__tests__/unit/qa/f40-visual-parity-inspector.test.ts` |

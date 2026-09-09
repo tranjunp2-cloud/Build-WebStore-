@@ -3,6 +3,7 @@ import {
   CANONICAL_TEMPLATES,
   generateReconciliationCatalog,
   getSectorTheme,
+  getVisualDiffGapLabel,
   getStoreDeepDiff,
   isStoreDomainSslReady,
   SECTOR_DATA_MAP,
@@ -16,6 +17,13 @@ import {
 } from "@/app/api/qa/template-preview/[code]/route";
 
 describe("F40 US-F40-12 Visual Parity Inspector Unit Tests", () => {
+  it("[TC-F40-12-11] explains PW2 visual diff gaps for P0 and P1 blocks", () => {
+    // Arrange / Act / Assert
+    expect(getVisualDiffGapLabel("fail", "Hero image missing")).toBe("P0 lệch dữ liệu: Hero image missing");
+    expect(getVisualDiffGapLabel("warn", "Product sort differs")).toBe("P1 cần xem lại: Product sort differs");
+    expect(getVisualDiffGapLabel("pass")).toBeNull();
+  });
+
   it("[TC-F40-12-01] calculates clip-path coordinates for SwipeSlider at various slider percentages", () => {
     // Test clip-path polygon generator for swipe slider overlay
     const calculateClipPath = (pos: number) =>
@@ -435,4 +443,3 @@ describe("F40 US-F40-12 Visual Parity Inspector Unit Tests", () => {
     expect(isStoreDomainSslReady({ domain: "" })).toBe(false);
   });
 });
-
