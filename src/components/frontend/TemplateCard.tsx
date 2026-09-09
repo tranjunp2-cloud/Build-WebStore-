@@ -96,17 +96,19 @@ export function TemplateCard({
                 </div>
 
                 {/* Hover overlay with actions */}
-                <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/50 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 backdrop-blur-[3px]">
+                <div className="absolute inset-0 z-10 flex items-center justify-center gap-3 bg-black/50 opacity-100 backdrop-blur-[3px] transition-all duration-300 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                     <button
+                        type="button"
                         onClick={() => onPreview(template)}
-                        className="flex items-center gap-1.5 rounded-xl bg-white/10 backdrop-blur-xl px-4 py-2.5 text-xs font-semibold text-white hover:bg-white/20 border border-white/10 transition-all active:scale-95"
+                        className="flex min-h-11 items-center gap-1.5 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-xl transition-all hover:bg-white/20 active:scale-95"
                     >
                         <Eye className="h-3.5 w-3.5" /> {t.gallery.preview}
                     </button>
                     <button
+                        type="button"
                         onClick={() => onUse(template.id)}
                         disabled={isThisApplying}
-                        className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:brightness-110 transition-all active:scale-95 disabled:opacity-50"
+                        className="flex min-h-11 items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:brightness-110 hover:shadow-blue-500/40 active:scale-95 disabled:opacity-50"
                     >
                         {isThisApplying ? (
                             <>

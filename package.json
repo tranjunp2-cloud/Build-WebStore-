@@ -15,6 +15,7 @@
     "db:push": "node scripts/db-push-once.js",
     "db:migrate": "node --require ./scripts/seed-preload.cjs scripts/db-setup.js --migrate-only",
     "db:seed": "tsx --require ./scripts/seed-preload.cjs scripts/seed.ts",
+    "templates:seed": "tsx --require ./scripts/seed-preload.cjs scripts/seed-template-blueprints.ts",
     "db:seed-sso": "tsx --require ./scripts/seed-preload.cjs scripts/seed-sso-account.ts",
     "db:reset": "tsx --require ./scripts/seed-preload.cjs scripts/reset-account.ts",
     "db:seed-qc": "tsx --require ./scripts/seed-preload.cjs scripts/seed-qc-data.ts",

@@ -10,7 +10,10 @@ import { NextResponse } from 'next/server'
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url)
-        const limit = parseInt(searchParams.get('limit') || '100', 10)
+        const requestedLimit = Number.parseInt(searchParams.get('limit') ?? '', 10)
+        const limit = Number.isFinite(requestedLimit)
+            ? Math.min(Math.max(requestedLimit, 1), 100)
+            : 100
         const sort = searchParams.get('sort') || '-createdAt'
 
         const payload = await getPayload({ config })
@@ -18,6 +21,7 @@ export async function GET(req: Request) {
             collection: 'templates',
             limit,
             sort,
+            where: { status: { equals: 'live' } },
         })
 
         return NextResponse.json(result)

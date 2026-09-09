@@ -11,7 +11,7 @@
  */
 
 import { composeFromBlueprint, type TemplateSeed } from './template-composer'
-import { TEMPLATE_PRESETS, selectTemplatePreset } from './template-definitions'
+import { GENERATION_TEMPLATE_PRESETS, selectTemplatePreset } from './template-definitions'
 import type { TemplatePreset } from './template-definitions'
 import { resolveFontPairing } from './font-pairings'
 import {
@@ -78,7 +78,7 @@ function findFirstImage(blocks: GeneratedBlock[]): string | undefined {
  * Throws if no presets exist for the category (should never happen — all 14 have 4 each).
  */
 function hasPresets(category: ComposerCategory): boolean {
-    return TEMPLATE_PRESETS.some((p) => p.category === category)
+    return GENERATION_TEMPLATE_PRESETS.some((p) => p.category === category)
 }
 
 function pickPreset(category: ComposerCategory, seed: number): TemplatePreset {

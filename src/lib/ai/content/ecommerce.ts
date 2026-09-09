@@ -64,6 +64,30 @@ export const ecommerceContent: CategoryContent = {
       heroSubheadline:
         'From strollers to organic baby food — quality products with 30-day hassle-free returns.',
     },
+    {
+      name: 'Apex Activewear MY',
+      tagline: 'Performance Apparel Built for Every Move',
+      description:
+        'Apex Activewear MY sells breathable running tops, training shorts, sports hijabs, and performance footwear for Malaysian athletes. Shop technical apparel designed for tropical weather, with nationwide delivery and easy size exchanges.',
+      address: 'Lot 2-18, Pavilion Bukit Jalil, 57000 Kuala Lumpur',
+      phone: '+60 3-2783 4410',
+      email: 'move@apexactivewear.my',
+      heroHeadline: 'Move Faster. Train Stronger.',
+      heroSubheadline:
+        'Shop high-performance activewear and footwear engineered for Malaysia\'s heat, humidity, and everyday athletes.',
+    },
+    {
+      name: 'Arena Sports Supply',
+      tagline: 'Equipment for Training, Teams, and Competition',
+      description:
+        'Arena Sports Supply is a Malaysian online store for gym equipment, football gear, racquets, recovery tools, and team kits. We serve home athletes, schools, clubs, and fitness studios with reliable equipment and nationwide shipping.',
+      address: 'No. 21, Jalan SS 15/4, 47500 Subang Jaya',
+      phone: '+60 3-5632 9088',
+      email: 'team@arenasports.my',
+      heroHeadline: 'Gear Up for Your Next Personal Best',
+      heroSubheadline:
+        'Training equipment, team sports essentials, and recovery gear for athletes at every level.',
+    },
   ],
   testimonials: [
     {

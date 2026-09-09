@@ -14,6 +14,21 @@ describe('template gallery demand', () => {
     })
   })
 
+  it('keeps search-only sports presets out of generic ecommerce generation', () => {
+    const selectedIds = Array.from({ length: 12 }, (_, seed) => (
+      selectTemplatePreset('ecommerce', seed)?.id
+    ))
+
+    expect(selectedIds).not.toContain('ecommerce-activewear-performance')
+    expect(selectedIds).not.toContain('ecommerce-sports-equipment-pro')
+    expect(new Set(selectedIds)).toEqual(new Set([
+      'ecommerce-shopfront-clean',
+      'ecommerce-midnight-luxe',
+      'ecommerce-artisan-market',
+      'ecommerce-minimal-boutique',
+    ]))
+  })
+
   it('does not reserve gallery images for a preset without gallery blocks', () => {
     expect(getTemplateGalleryDemand('tech', 0)).toEqual({
       presetId: 'tech-cyber-saas',

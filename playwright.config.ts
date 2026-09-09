@@ -136,6 +136,17 @@ export default defineConfig({
             },
             dependencies: ['setup'],
         },
+        // US-F07-04 verifies the authenticated search API and the 375px editor flow.
+        {
+            name: 'f07-template-search',
+            testDir: './tests',
+            testMatch: /f07-template-search\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
         {
             name: 'f40-migration-diff',
             testDir: './tests',

@@ -138,10 +138,16 @@ export async function getCurrentUser(req?: Request) {
  */
 export function withAuth<TContext extends { params: Promise<any> } = never>(
     handler: (user: User, req: Request, ctx: TContext) => Promise<NextResponse>,
+    options?: {
+        unauthorizedResponse?: (req: Request) => NextResponse
+    },
 ) {
     return async (req: Request, ctx: TContext): Promise<NextResponse> => {
         const user = await getCurrentUser(req)
         if (!user) {
+            if (options?.unauthorizedResponse) {
+                return options.unauthorizedResponse(req)
+            }
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
         return handler(user as User, req, ctx)

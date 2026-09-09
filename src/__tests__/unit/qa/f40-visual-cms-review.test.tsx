@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, act, cleanup } from "@testing-library/react";
 import React from "react";
 
 // Mock next/navigation
@@ -23,6 +23,43 @@ vi.mock("next/link", () => ({
 }));
 
 import { VisualCmsReviewClient } from "@/app/studio/qa/visual-review/VisualCmsReviewClient";
+
+describe("Visual CMS toast timer lifecycle", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    cleanup();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  function showPassToast() {
+    fireEvent.click(screen.getAllByTestId("impact-node-discount-rules-coupons")[1]);
+    fireEvent.click(screen.getByRole("button", { name: /Đánh Dấu ĐÃ PASS/i }));
+  }
+
+  it("cancels the pending toast timer on unmount", () => {
+    const { unmount } = render(<VisualCmsReviewClient />);
+    fireEvent.click(screen.getByTestId("nav-discounts"));
+    showPassToast();
+    expect(vi.getTimerCount()).toBe(1);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("keeps a replacement toast visible for its full lifetime", () => {
+    render(<VisualCmsReviewClient />);
+    fireEvent.click(screen.getByTestId("nav-email-templates"));
+    fireEvent.click(screen.getByText("Order Confirmation"));
+    fireEvent.click(screen.getByRole("button", { name: "Send test" }));
+    act(() => vi.advanceTimersByTime(3000));
+    fireEvent.click(screen.getByRole("button", { name: "Send test" }));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByText("Đã gửi email test mẫu!")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(screen.queryByText("Đã gửi email test mẫu!")).not.toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
 
 describe("[TC-F40-04] Visual CMS Review Client Exhaustive Test Suite", () => {
   beforeEach(() => {

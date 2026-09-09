@@ -225,6 +225,30 @@ describe('withAuth [TC-F02.33]', () => {
 
         expect(handler).not.toHaveBeenCalled()
         expect(result.status).toBe(401)
+        expect(result).toMatchObject({ body: { error: 'Unauthorized' } })
+    })
+
+    it('uses a route-specific unauthorized response without changing the default', async () => {
+        mockGet.mockReturnValue(undefined)
+        const handler = vi.fn()
+        const unauthorizedResponse = vi.fn((req: Request) => NextResponse.json(
+            { success: false, error: { code: 'UNAUTHORIZED', path: new URL(req.url).pathname } },
+            { status: 401 },
+        ))
+        const wrappedHandler = withAuth<{ params: Promise<Record<string, never>> }>(handler, { unauthorizedResponse })
+        const request = new Request('http://localhost/api/protected')
+
+        const result = await wrappedHandler(request, { params: Promise.resolve({}) })
+
+        expect(handler).not.toHaveBeenCalled()
+        expect(unauthorizedResponse).toHaveBeenCalledWith(request)
+        expect(result).toMatchObject({
+            status: 401,
+            body: {
+                success: false,
+                error: { code: 'UNAUTHORIZED', path: '/api/protected' },
+            },
+        })
     })
 
     it('calls handler with user when authenticated', async () => {

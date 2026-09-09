@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -540,10 +540,15 @@ export function VisualCmsReviewClient() {
 
   const showToast = (type: "success" | "error" | "info", text: string) => {
     setToastMessage({ type, text });
-    setTimeout(() => {
+  };
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => {
       setToastMessage(null);
     }, 4000);
-  };
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
 
   const activePR = useMemo(() => {
     if (selectedPrId === "all") return null;
