@@ -8,6 +8,7 @@ import {
   getStoreDeepDiff,
   getDashboardMetrics,
   CANONICAL_TEMPLATES,
+  isStoreDomainSslReady,
   type StoreSummary,
   type StoreDeepDiff,
   type DynamicStorePage,
@@ -786,8 +787,13 @@ export function MigrationDiffClient() {
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [parityMode, setParityMode] = useState<"dual_window" | "swipe_slider">("dual_window");
   const [sliderPosition, setSliderPosition] = useState<number>(50);
-  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit">("visual_stream");
+  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit">("live_webview");
+  const [previewSource, setPreviewSource] = useState<"template" | "live_domain">("template");
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
+  const pw1DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
+  const pw2DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
+  const pw1MobIframeRef = React.useRef<HTMLIFrameElement>(null);
+  const pw2MobIframeRef = React.useRef<HTMLIFrameElement>(null);
   const [activeEntityGroup, setActiveEntityGroup] = useState<"all" | EntityGroupType>("all");
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
   const [resolvedStoreIds, setResolvedStoreIds] = useState<Set<string>>(new Set());
@@ -871,7 +877,9 @@ export function MigrationDiffClient() {
 
   const loadLiveCatalog = async () => {
     try {
-      const res = await fetch("/api/qa/migration-diff?limit=2000");
+      const res = await fetch(`/api/qa/migration-diff?limit=2000&_t=${Date.now()}`, {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (json.stores && json.stores.length > 0) {
         setCatalog(json.stores);
@@ -892,7 +900,9 @@ export function MigrationDiffClient() {
     }
     const fetchDiff = async () => {
       try {
-        const res = await fetch(`/api/qa/migration-diff?store_id=${activeStoreId}`);
+        const res = await fetch(`/api/qa/migration-diff?store_id=${encodeURIComponent(activeStoreId)}&_t=${Date.now()}`, {
+          cache: "no-store",
+        });
         const json = await res.json();
         if (json.data) {
           setLiveStoreDiff(json.data);
@@ -906,12 +916,54 @@ export function MigrationDiffClient() {
 
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
     if (!activeStoreId) return null;
-    if (liveStoreDiff) return liveStoreDiff;
+    if (liveStoreDiff && liveStoreDiff.id === activeStoreId) return liveStoreDiff;
     const isResolved = resolvedStoreIds.has(activeStoreId);
-    return getStoreDeepDiff(activeStoreId, isResolved ? "passed" : undefined);
-  }, [activeStoreId, resolvedStoreIds, liveStoreDiff]);
+    const catalogStore = catalog.find((s) => s.id === activeStoreId);
+    const diff = getStoreDeepDiff(activeStoreId, isResolved ? "passed" : undefined);
+    if (diff && catalogStore) {
+      return {
+        ...diff,
+        name: catalogStore.name || diff.name,
+        templateCode: catalogStore.templateCode || diff.templateCode,
+        templateName: catalogStore.templateName || diff.templateName,
+        domain: catalogStore.domain || diff.domain,
+      };
+    }
+    return diff;
+  }, [activeStoreId, resolvedStoreIds, liveStoreDiff, catalog]);
 
   const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
+
+  // Dispatch smooth SPA navigation to live storefront iframes when user switches page tabs
+  useEffect(() => {
+    if (activePage && previewSource === "template") {
+      const navMsg = {
+        type: "spa-navigate",
+        path: activePage.path,
+        title: activePage.name,
+        storeId: selectedDiff?.id,
+      };
+      try {
+        pw1DeskIframeRef.current?.contentWindow?.postMessage(navMsg, "*");
+        pw2DeskIframeRef.current?.contentWindow?.postMessage(navMsg, "*");
+        pw1MobIframeRef.current?.contentWindow?.postMessage(navMsg, "*");
+        pw2MobIframeRef.current?.contentWindow?.postMessage(navMsg, "*");
+      } catch (e) {
+        console.warn("[MigrationDiffClient] postMessage failed:", e);
+      }
+    }
+  }, [activePageIndex, activePage, previewSource, selectedDiff?.id]);
+
+  // Default preview source to 'live_domain' if SSL is verified and ready, otherwise use 'template' (authentic MySQL prototype).
+  useEffect(() => {
+    if (selectedDiff?.id) {
+      if (isStoreDomainSslReady(selectedDiff)) {
+        setPreviewSource("live_domain");
+      } else {
+        setPreviewSource("template");
+      }
+    }
+  }, [selectedDiff?.id, selectedDiff?.domain, selectedDiff?.sslReady]);
 
   // Lock background body scroll and listen for Escape key when inspection modal is active
   useEffect(() => {
@@ -992,30 +1044,52 @@ export function MigrationDiffClient() {
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  const handleReloadStoreData = (storeId: string) => {
+  const handleReloadStoreData = async (storeId: string) => {
     setIsReloading(true);
-    setResolvedStoreIds((prev) => new Set([...prev, storeId]));
 
-    setTimeout(() => {
-      setCatalog((prev) =>
-        prev.map((s) =>
-          s.id === storeId
-            ? {
-                ...s,
-                status: "passed",
-                score: "99.8%",
-                failedBlocks: [],
-                textScore: "100%",
-                mediaScore: "100%",
-                blockScore: "100%",
-                commerceScore: "100%",
-              }
-            : s
-        )
-      );
+    try {
+      const res = await fetch(`/api/qa/migration-diff?store_id=${encodeURIComponent(storeId)}&_t=${Date.now()}`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setLiveStoreDiff(json.data);
+          if (json.data.status === "passed") {
+            setResolvedStoreIds((prev) => new Set([...prev, storeId]));
+          } else {
+            setResolvedStoreIds((prev) => {
+              const next = new Set(prev);
+              next.delete(storeId);
+              return next;
+            });
+          }
+          setCatalog((prev) =>
+            prev.map((s) =>
+              s.id === storeId
+                ? {
+                    ...s,
+                    name: json.data.name || s.name,
+                    score: json.data.score || s.score,
+                    status: json.data.status || s.status,
+                    failedBlocks: json.data.failedBlocks || [],
+                    textScore: json.data.textScore || s.textScore,
+                    mediaScore: json.data.mediaScore || s.mediaScore,
+                    blockScore: json.data.blockScore || s.blockScore,
+                    commerceScore: json.data.commerceScore || s.commerceScore,
+                  }
+                : s
+            )
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[MigrationDiffClient] Failed to reload store diff:", err);
+    } finally {
+      setIframeReloadKey((k) => k + 1);
       setIsReloading(false);
-      showToast(`✓ Đã làm mới dữ liệu đối soát! Phát hiện các lỗi đã được Dev sửa xong. Độ khớp: 99.8% (Pass)`);
-    }, 500);
+      showToast("✓ Đã quét lại CSDL thành công! Dữ liệu PW1 và PW2 đã được đồng bộ mới nhất.");
+    }
   };
 
   const handleApprovePass = (storeId: string) => {
@@ -1137,7 +1211,8 @@ export function MigrationDiffClient() {
             type="button"
             onClick={() => {
               void checkLiveDbStatus();
-              showToast("Đã làm mới dữ liệu đối soát cho toàn bộ 2.000 website!");
+              void loadLiveCatalog();
+              showToast("Đã làm mới dữ liệu đối soát cho toàn bộ website!");
             }}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700/80 transition shadow-sm"
           >
@@ -1446,10 +1521,12 @@ export function MigrationDiffClient() {
                   <td className="py-4 px-4 text-right whitespace-nowrap">
                     <button
                       onClick={() => {
+                        setLiveStoreDiff(null);
                         setActiveStoreId(store.id);
                         setActivePageIndex(0);
                         setSelectedBlockId(null);
-                        setActiveViewTab("field_diff");
+                        setActiveViewTab("live_webview");
+                        setPreviewSource(isStoreDomainSslReady(store) ? "live_domain" : "template");
                       }}
                       className="px-3.5 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-600 rounded-xl font-semibold text-xs transition-all shadow-sm flex items-center gap-1 ml-auto whitespace-nowrap"
                     >
@@ -1689,15 +1766,6 @@ export function MigrationDiffClient() {
               <div className="flex items-center gap-2 shrink-0">
                 <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
                   <button
-                    onClick={() => setActiveViewTab("visual_stream")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "visual_stream" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <Layers className="size-3.5" />
-                    <span>So Sánh Khối</span>
-                  </button>
-                  <button
                     onClick={() => setActiveViewTab("live_webview")}
                     className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
                       activeViewTab === "live_webview" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
@@ -1705,6 +1773,15 @@ export function MigrationDiffClient() {
                   >
                     <Globe className="size-3.5" />
                     <span>Xem Web Thật (Live Iframe)</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveViewTab("visual_stream")}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                      activeViewTab === "visual_stream" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Layers className="size-3.5" />
+                    <span>So Sánh Khối</span>
                   </button>
                   <button
                     onClick={() => setActiveViewTab("field_diff")}
@@ -1858,9 +1935,17 @@ export function MigrationDiffClient() {
                             {deviceView === "mobile" ? "📱 BẢN CŨ PW1 (MOBILE 375px)" : "👈 BẢN CŨ PW1 (LARAVEL)"}
                           </span>
                         </div>
-                        <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-medium">
-                          <span>Live V1</span> <ExternalLink className="size-3" />
-                        </a>
+                        {(() => {
+                          const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+                          const pw1HeaderLiveUrl = cleanDomain
+                            ? `https://${cleanDomain}${activePage.path === "/" ? "/" : activePage.path.startsWith("/") ? activePage.path : `/${activePage.path}`}`
+                            : `${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`;
+                          return (
+                            <a href={pw1HeaderLiveUrl} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-medium">
+                              <span>Live V1</span> <ExternalLink className="size-3" />
+                            </a>
+                          );
+                        })()}
                       </div>
 
                       {/* Right Browser Bar */}
@@ -2081,8 +2166,71 @@ export function MigrationDiffClient() {
               /* 1.5. LIVE STOREFRONT WEBVIEW (100% REAL COMPILED HTML/CSS/JS IFRAME) */
               /* ========================================================================= */
               <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
-                {/* Dual Browser URL Bar */}
-                <div className="px-4 py-2.5 sm:px-6 sm:py-2.5 border-b border-slate-800/80 bg-slate-900/80 shrink-0 shadow-sm">
+                {/* Preview Source Selector & Status Header */}
+                <div className="px-4 py-2 sm:px-6 sm:py-2.5 border-b border-slate-800/80 bg-slate-900/90 shrink-0 shadow-sm space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                        Nguồn Preview:
+                      </span>
+                      {(() => {
+                        const isDomainSslReady = isStoreDomainSslReady(selectedDiff);
+                        return (
+                          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewSource("template")}
+                              className={`px-3 py-1 font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                                previewSource === "template" || !isDomainSslReady
+                                  ? "bg-blue-600 text-white shadow-sm"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                              title="Hiển thị giao diện trực quan 100% từ CSDL MySQL gốc không phụ thuộc mạng máy chủ cũ"
+                            >
+                              <Sparkles className="size-3" />
+                              <span>Giao Diện Mẫu (100% CSDL)</span>
+                            </button>
+                            {isDomainSslReady ? (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewSource("live_domain")}
+                                className={`px-3 py-1 font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                                  previewSource === "live_domain"
+                                    ? "bg-blue-600 text-white shadow-sm"
+                                    : "text-slate-400 hover:text-slate-200"
+                                }`}
+                                title="Tải trực tiếp qua tên miền khách hàng có bảo mật SSL"
+                              >
+                                <Globe className="size-3" />
+                                <span>Tên Miền Trực Tiếp (Live Domain)</span>
+                              </button>
+                            ) : (
+                              <a
+                                href={`https://${(selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "")}${activePage.path === "/" ? "" : activePage.path}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2.5 py-1 font-semibold rounded-lg transition flex items-center gap-1 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40"
+                                title="Tên miền này chưa có SSL hợp lệ trên máy chủ PW1 cũ nên trình duyệt chặn nhúng iframe. Bấm để mở tab mới ngoài trình duyệt."
+                              >
+                                <Globe className="size-3" />
+                                <span>Mở Live Tab Ngoài (SSL Cũ)</span>
+                                <ExternalLink className="size-2.5 ml-0.5 opacity-70" />
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="size-3" />
+                        <span>Trang: <strong>{activePage.name}</strong> ({activePage.path})</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dual Browser URL Bar */}
                   <div className={`grid gap-4 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2"}`}>
                     {/* Left Browser URL Bar (PW1 Laravel) */}
                     <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-amber-500/30 flex items-center justify-between gap-2 shadow-inner">
@@ -2093,7 +2241,15 @@ export function MigrationDiffClient() {
                           <span className="size-2 rounded-full bg-emerald-500/80" />
                         </div>
                         <span className="text-[11px] font-mono text-amber-300 truncate">
-                          {selectedDiff.legacyDomain}{activePage.path.replace("/", "")}
+                          {(() => {
+                            const isSslReady = isStoreDomainSslReady(selectedDiff);
+                            const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+                            return previewSource === "template" || !isSslReady
+                              ? `👈 PW1 Legacy • Theme ${selectedDiff.templateCode} • ${activePage.path}`
+                              : cleanDomain
+                                ? `https://${cleanDomain}${activePage.path === "/" ? "/" : activePage.path.startsWith("/") ? activePage.path : `/${activePage.path}`}`
+                                : `${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`;
+                          })()}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -2106,7 +2262,15 @@ export function MigrationDiffClient() {
                           <RefreshCw className="size-3" />
                         </button>
                         <a
-                          href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`}
+                          href={(() => {
+                            const isSslReady = isStoreDomainSslReady(selectedDiff);
+                            const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+                            return previewSource === "template" || !isSslReady
+                              ? `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw1&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodeURIComponent(activePage.path)}&title=${encodeURIComponent(activePage.name)}#${activePage.path}`
+                              : cleanDomain
+                                ? `https://${cleanDomain}${activePage.path === "/" ? "/" : activePage.path.startsWith("/") ? activePage.path : `/${activePage.path}`}`
+                                : `${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`;
+                          })()}
                           target="_blank"
                           rel="noreferrer"
                           className="p-1 rounded-lg hover:bg-slate-800 text-amber-400 transition flex items-center gap-0.5 text-[11px] font-semibold"
@@ -2126,7 +2290,9 @@ export function MigrationDiffClient() {
                           <span className="size-2 rounded-full bg-emerald-500/80" />
                         </div>
                         <span className="text-[11px] font-mono text-sky-300 truncate">
-                          {selectedDiff.migratedDomain}{activePage.path.replace("/", "")}
+                          {previewSource === "template"
+                            ? `👉 PW2 Next.js 15 • Theme ${selectedDiff.templateCode} • ${activePage.path}`
+                            : `👉 PW2 Next.js 15 • ${selectedDiff.name} • ${activePage.path}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -2138,9 +2304,13 @@ export function MigrationDiffClient() {
                         >
                           <RefreshCw className="size-3" />
                         </button>
-                        {activePage.existsInPW2 ? (
+                        {activePage.existsInPW2 || previewSource === "template" ? (
                           <a
-                            href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`}
+                            href={
+                              previewSource === "template"
+                                ? `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodeURIComponent(activePage.path)}&title=${encodeURIComponent(activePage.name)}#${activePage.path}`
+                                : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodeURIComponent(activePage.path)}&title=${encodeURIComponent(activePage.name)}#${activePage.path}`
+                            }
                             target="_blank"
                             rel="noreferrer"
                             className="p-1 rounded-lg hover:bg-slate-800 text-sky-400 transition flex items-center gap-0.5 text-[11px] font-semibold"
@@ -2159,12 +2329,25 @@ export function MigrationDiffClient() {
                 {/* Iframe Viewport Stream Area */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0 bg-slate-900/40">
                   {(() => {
-                    const pw1Url = selectedDiff.domain
-                      ? `https://${selectedDiff.domain}${activePage.path === "/" ? "" : activePage.path}`
-                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw1`;
-                    const pw2Url = selectedDiff.migratedDomain
-                      ? `${selectedDiff.migratedDomain}${activePage.path === "/" ? "" : activePage.path}`
-                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2`;
+                    const activePath = activePage?.path || "/";
+                    const encodedPath = encodeURIComponent(activePath);
+                    const pageTitle = encodeURIComponent(activePage?.name || "Trang");
+                    const tplCode = (selectedDiff.templateCode || "fb101").toLowerCase();
+
+                    const pw1TemplateUrl = `/api/qa/template-preview/${tplCode}?version=pw1&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodedPath}&title=${pageTitle}&_t=${iframeReloadKey}#${activePath}`;
+                    const pw2TemplateUrl = `/api/qa/template-preview/${tplCode}?version=pw2&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodedPath}&title=${pageTitle}&_t=${iframeReloadKey}#${activePath}`;
+
+                    const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+                    const liveDomainPath = activePath === "/" ? "" : activePath.startsWith("/") ? activePath : `/${activePath}`;
+                    const pw1LiveDomainUrl = cleanDomain
+                      ? `https://${cleanDomain}${liveDomainPath || "/"}${cleanDomain.includes("?") ? `&_t=${iframeReloadKey}` : `?_t=${iframeReloadKey}`}`
+                      : pw1TemplateUrl;
+                    const pw2LiveDomainUrl = pw2TemplateUrl;
+
+                    const isDomainSslReady = isStoreDomainSslReady(selectedDiff);
+                    const pw1Url = (previewSource === "live_domain" && isDomainSslReady) ? pw1LiveDomainUrl : pw1TemplateUrl;
+                    const pw2Url = previewSource === "template" ? pw2TemplateUrl : pw2LiveDomainUrl;
+                    const iframeSandbox = "allow-scripts allow-same-origin allow-forms allow-popups";
 
                     return deviceView === "mobile" ? (
                       /* Mobile 375px Dual Phone Mockups with Real Iframes */
@@ -2179,11 +2362,22 @@ export function MigrationDiffClient() {
                           {/* Iframe Container */}
                           <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
                             <iframe
-                              key={`pw1-mob-${iframeReloadKey}`}
+                              ref={pw1MobIframeRef}
+                              key={`pw1-mob-${iframeReloadKey}-${previewSource}-${activePath}`}
                               src={pw1Url}
                               title="PW1 Mobile Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-scripts allow-forms allow-popups"
+                              sandbox={iframeSandbox}
+                              onLoad={() => {
+                                if (previewSource === "template" || !isDomainSslReady) {
+                                  pw1MobIframeRef.current?.contentWindow?.postMessage({
+                                    type: "spa-navigate",
+                                    path: activePath,
+                                    title: activePage?.name,
+                                    storeId: selectedDiff?.id,
+                                  }, "*");
+                                }
+                              }}
                             />
                           </div>
                           {/* Home Bar */}
@@ -2200,11 +2394,22 @@ export function MigrationDiffClient() {
                           {/* Iframe Container */}
                           <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
                             <iframe
-                              key={`pw2-mob-${iframeReloadKey}`}
+                              ref={pw2MobIframeRef}
+                              key={`pw2-mob-${iframeReloadKey}-${previewSource}-${activePath}`}
                               src={pw2Url}
                               title="PW2 Next.js Mobile Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-scripts allow-forms allow-popups"
+                              sandbox={iframeSandbox}
+                              onLoad={() => {
+                                if (previewSource === "template") {
+                                  pw2MobIframeRef.current?.contentWindow?.postMessage({
+                                    type: "spa-navigate",
+                                    path: activePath,
+                                    title: activePage?.name,
+                                    storeId: selectedDiff?.id,
+                                  }, "*");
+                                }
+                              }}
                             />
                           </div>
                           {/* Home Bar */}
@@ -2222,11 +2427,22 @@ export function MigrationDiffClient() {
                           </div>
                           <div className="flex-1 bg-white relative">
                             <iframe
-                              key={`pw1-desk-${iframeReloadKey}`}
+                              ref={pw1DeskIframeRef}
+                              key={`pw1-desk-${iframeReloadKey}-${previewSource}-${activePath}`}
                               src={pw1Url}
                               title="PW1 Desktop Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-scripts allow-forms allow-popups"
+                              sandbox={iframeSandbox}
+                              onLoad={() => {
+                                if (previewSource === "template" || !isDomainSslReady) {
+                                  pw1DeskIframeRef.current?.contentWindow?.postMessage({
+                                    type: "spa-navigate",
+                                    path: activePath,
+                                    title: activePage?.name,
+                                    storeId: selectedDiff?.id,
+                                  }, "*");
+                                }
+                              }}
                             />
                           </div>
                         </div>
@@ -2239,11 +2455,22 @@ export function MigrationDiffClient() {
                           </div>
                           <div className="flex-1 bg-white relative">
                             <iframe
-                              key={`pw2-desk-${iframeReloadKey}`}
+                              ref={pw2DeskIframeRef}
+                              key={`pw2-desk-${iframeReloadKey}-${previewSource}-${activePath}`}
                               src={pw2Url}
                               title="PW2 Next.js Desktop Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-scripts allow-forms allow-popups"
+                              sandbox={iframeSandbox}
+                              onLoad={() => {
+                                if (previewSource === "template") {
+                                  pw2DeskIframeRef.current?.contentWindow?.postMessage({
+                                    type: "spa-navigate",
+                                    path: activePath,
+                                    title: activePage?.name,
+                                    storeId: selectedDiff?.id,
+                                  }, "*");
+                                }
+                              }}
                             />
                           </div>
                         </div>

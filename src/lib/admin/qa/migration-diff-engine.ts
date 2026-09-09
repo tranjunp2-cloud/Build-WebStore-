@@ -52,6 +52,7 @@ export interface StoreSummary {
   name: string;
   ownerEmail: string;
   domain: string;
+  sslReady?: boolean;
   templateCode: string;
   templateName: string;
   sector: string;
@@ -71,6 +72,17 @@ export interface StoreSummary {
   commerceScore: string;
   blockScore: string;
   lastCheckedAt?: string;
+}
+
+/**
+ * Checks whether a merchant store domain supports SSL for secure iframe embedding.
+ * Prioritizes database verified sslReady flag, fallback to wildcard or HTTPS domains.
+ */
+export function isStoreDomainSslReady(store?: { domain?: string; sslReady?: boolean } | null): boolean {
+  if (!store || !store.domain) return false;
+  if (typeof store.sslReady === "boolean") return store.sslReady;
+  const lower = store.domain.toLowerCase();
+  return lower.includes("ecommercehub.my") || lower.includes("vnami") || lower.startsWith("https://");
 }
 
 export interface DefectItem {
@@ -238,6 +250,7 @@ export interface StoreDeepDiff {
   name: string;
   ownerEmail: string;
   domain: string;
+  sslReady?: boolean;
   templateCode: string;
   templateName: string;
   sector: string;
@@ -474,7 +487,17 @@ export const SECTOR_DATA_MAP: Record<string, SectorThemeData> = {
 
 export function getSectorTheme(templateCode?: string): SectorThemeData {
   const code = (templateCode || "FB101").toUpperCase().trim();
-  return SECTOR_DATA_MAP[code] || SECTOR_DATA_MAP.FB101;
+  if (SECTOR_DATA_MAP[code]) return SECTOR_DATA_MAP[code];
+
+  // Map legacy template codes and prefixes to correct sector data
+  if (code.startsWith("F0") || code.startsWith("F1")) return SECTOR_DATA_MAP.F102;
+  if (code.startsWith("C1") || code.startsWith("MP")) return SECTOR_DATA_MAP.C101;
+  if (code.startsWith("FN")) return SECTOR_DATA_MAP.FN101;
+  if (code.startsWith("PA")) return SECTOR_DATA_MAP.PA101;
+  if (code.startsWith("TG") || code.startsWith("T006")) return SECTOR_DATA_MAP.FN104;
+  if (code.startsWith("T010")) return SECTOR_DATA_MAP.F102;
+
+  return SECTOR_DATA_MAP.FB101;
 }
 
 /**

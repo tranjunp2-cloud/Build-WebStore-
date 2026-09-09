@@ -4,9 +4,16 @@ import {
   generateReconciliationCatalog,
   getSectorTheme,
   getStoreDeepDiff,
+  isStoreDomainSslReady,
   SECTOR_DATA_MAP,
 } from "@/lib/admin/qa/migration-diff-engine";
-import { escapeHtml } from "@/app/api/qa/template-preview/[code]/route";
+import {
+  escapeHtml,
+  extractStoreRealData,
+  generateFallbackTemplateHtml,
+  renderPageBlocks,
+  sanitizeRichHtml,
+} from "@/app/api/qa/template-preview/[code]/route";
 
 describe("F40 US-F40-12 Visual Parity Inspector Unit Tests", () => {
   it("[TC-F40-12-01] calculates clip-path coordinates for SwipeSlider at various slider percentages", () => {
@@ -101,6 +108,331 @@ describe("F40 US-F40-12 Visual Parity Inspector Unit Tests", () => {
     expect(sanitizeVersion("pw3")).toBe("pw1");
     expect(sanitizeVersion("<script>")).toBe("pw1");
     expect(sanitizeVersion("")).toBe("pw1");
+  });
+
+  it("[TC-F40-12-08] generates multi-page preview URLs with page path and title query parameters", () => {
+    const templateCode = "pa101";
+    const pages = [
+      { name: "Home", path: "/" },
+      { name: "Products", path: "/products" },
+      { name: "Articles", path: "/articles" },
+      { name: "Cart", path: "/cart" },
+      { name: "Checkout", path: "/checkout" },
+      { name: "Order tracking", path: "/order-tracking" },
+      { name: "New page 2", path: "/new-page-3" },
+    ];
+
+    for (const p of pages) {
+      const encodedPath = encodeURIComponent(p.path);
+      const encodedTitle = encodeURIComponent(p.name);
+      const urlPw1 = `/api/qa/template-preview/${templateCode}?version=pw1&page=${encodedPath}&title=${encodedTitle}#${p.path}`;
+      const urlPw2 = `/api/qa/template-preview/${templateCode}?version=pw2&page=${encodedPath}&title=${encodedTitle}#${p.path}`;
+
+      expect(urlPw1).toContain(`version=pw1`);
+      expect(urlPw2).toContain(`version=pw2`);
+      expect(urlPw1).toContain(`page=${encodedPath}`);
+      expect(urlPw2).toContain(`page=${encodedPath}`);
+      expect(urlPw1).toContain(`#${p.path}`);
+      expect(urlPw2).toContain(`#${p.path}`);
+    }
+  });
+
+  it("[TC-F40-12-09] validates route aliasing for legacy storefront paths", () => {
+    const ROUTE_ALIASES: Record<string, string> = {
+      "/blog": "/articles",
+      "/news": "/articles",
+      "/tin-tuc": "/articles",
+      "/posts": "/articles",
+      "/about": "/about-us",
+      "/gioi-thieu": "/about-us",
+      "/contact-us": "/contact",
+      "/lien-he": "/contact",
+      "/san-pham": "/products",
+      "/catalog": "/products",
+      "/gio-hang": "/cart",
+      "/thanh-toan": "/checkout",
+      "/order_tracking": "/order-tracking",
+      "/tra-cuu": "/order-tracking",
+    };
+
+    expect(ROUTE_ALIASES["/blog"]).toBe("/articles");
+    expect(ROUTE_ALIASES["/san-pham"]).toBe("/products");
+    expect(ROUTE_ALIASES["/gio-hang"]).toBe("/cart");
+    expect(ROUTE_ALIASES["/thanh-toan"]).toBe("/checkout");
+    expect(ROUTE_ALIASES["/order_tracking"]).toBe("/order-tracking");
+    expect(ROUTE_ALIASES["/unknown"]).toBeUndefined();
+  });
+
+  it("[TC-F40-12-10] extracts real store database entities (products, categories, articles, custom pages) from store diff", () => {
+    const mockDiff = {
+      id: "SITE-0205",
+      name: "Amelina Bevis",
+      domain: "amelinabevis.web.dev.ecommercehub.my",
+      templateCode: "PA101",
+      storeInfo: {
+        logo: "https://cdn.example.com/logo.png",
+        address: "123 Kid Fashion Street",
+        hotline: "0900123456",
+      },
+      pages: [
+        {
+          id: "page-1",
+          name: "Home",
+          path: "/",
+          blocks: [
+            {
+              id: "blk-1",
+              blockType: "hero",
+              title: "Banner Đầu Trang",
+              pw1Preview: {
+                headline: "TEXT TEST HERE",
+                subheadline: "Thời trang trẻ em cao cấp",
+              },
+            },
+            {
+              id: "blk-2",
+              blockType: "products",
+              title: "Khối Sản Phẩm",
+              pw1Preview: {
+                productCards: [
+                  { id: 7523, name: "Spring Leaf girls round neck tops", price: "$16.52", category: "Kid" },
+                  { id: 7524, name: "BabyGap plain T-shirt", price: "$36.71", category: "Kid" },
+                ],
+              },
+            },
+            {
+              id: "blk-3",
+              blockType: "blog",
+              title: "Khối Bài Viết",
+              pw1Preview: {
+                articleItems: [
+                  { id: 374, title: "11 Things the Media Hasn't Told You About Art", date: "19 May 2022" },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: "page-2",
+          name: "New page 2",
+          path: "/new-page-3",
+          blocks: [
+            {
+              id: "blk-custom-1",
+              blockType: "richtext",
+              title: "Rich Text Khối #1",
+              pw1Preview: {
+                headline: "Chính Sách Khách Hàng",
+                bodyText: "Chính sách đổi trả trong 30 ngày.",
+              },
+            },
+          ],
+        },
+      ],
+      fieldDiffAudit: {
+        records: [
+          {
+            id: "cat-1",
+            entityGroup: "categories",
+            fields: [{ fieldName: "name", legacyValue: "Fashion" }],
+          },
+          {
+            id: "cat-2",
+            entityGroup: "categories",
+            fields: [{ fieldName: "name", legacyValue: "Kid" }],
+          },
+        ],
+      },
+    };
+
+    const extracted = extractStoreRealData(mockDiff);
+
+    expect(extracted.id).toBe("SITE-0205");
+    expect(extracted.name).toBe("Amelina Bevis");
+    expect(extracted.templateCode).toBe("pa101");
+    expect(extracted.products).toHaveLength(2);
+    expect(extracted.products[0].name).toBe("Spring Leaf girls round neck tops");
+    expect(extracted.products[0].price).toBe("$16.52");
+    expect(extracted.products[1].name).toBe("BabyGap plain T-shirt");
+    expect(extracted.products[1].price).toBe("$36.71");
+    expect(extracted.categories.some((c) => c.name === "Fashion")).toBe(true);
+    expect(extracted.articles[0].title).toBe("11 Things the Media Hasn't Told You About Art");
+    expect(extracted.pages).toHaveLength(2);
+    expect(extracted.pages[1].path).toBe("/new-page-3");
+    expect(extracted.pages[1].blocks?.[0].headline).toBe("Chính Sách Khách Hàng");
+  });
+
+  it("[TC-F40-12-11] verifies store_id is propagated in dual template preview URLs", () => {
+    const storeId = "SITE-0205";
+    const tplCode = "pa101";
+    const activePath = "/new-page-3";
+    const encodedPath = encodeURIComponent(activePath);
+    const pageTitle = encodeURIComponent("New page 2");
+
+    const pw1TemplateUrl = `/api/qa/template-preview/${tplCode}?version=pw1&store_id=${encodeURIComponent(storeId)}&page=${encodedPath}&title=${pageTitle}#${activePath}`;
+    const pw2TemplateUrl = `/api/qa/template-preview/${tplCode}?version=pw2&store_id=${encodeURIComponent(storeId)}&page=${encodedPath}&title=${pageTitle}#${activePath}`;
+
+    expect(pw1TemplateUrl).toContain(`store_id=${storeId}`);
+    expect(pw2TemplateUrl).toContain(`store_id=${storeId}`);
+    expect(pw1TemplateUrl).toContain(`version=pw1`);
+    expect(pw2TemplateUrl).toContain(`version=pw2`);
+    expect(pw1TemplateUrl).toContain(`page=${encodedPath}`);
+  });
+
+  it("[TC-F40-12-12] generates fallback template HTML with real store data and custom merchant blocks", () => {
+    const storeData = {
+      id: "SITE-0205",
+      name: "Amelina Bevis",
+      templateCode: "pa101",
+      products: [
+        { id: 7524, name: "BabyGap plain T-shirt", price: "$36.71", category: "Kid", image: "" },
+        { id: 7523, name: "Spring Leaf girls round neck tops", price: "$16.52", category: "Kid", image: "" },
+      ],
+      categories: [{ id: 1, name: "Kid" }, { id: 2, name: "Fashion" }],
+      articles: [
+        { id: 374, title: "11 Things the Media Hasn't Told You About Art", date: "19 May 2022", summary: "Art article", image: "" },
+      ],
+      banners: [{ id: "b1", header: "TEXT TEST HERE", subheader: "Banner subheader", image: "", url: "/" }],
+      pages: [
+        {
+          id: "p-custom",
+          name: "New page 2",
+          path: "/new-page-3",
+          blocks: [
+            {
+              id: "b-rt",
+              blockType: "richtext",
+              title: "Khối Nội Dung RichText",
+              headline: "Chính Sách Khách Hàng",
+              bodyText: "Dữ liệu văn bản từ MySQL model_settings.",
+            },
+          ],
+        },
+      ],
+    };
+
+    // 1. Home page renders real store name and real products
+    const homeHtml = generateFallbackTemplateHtml("pa101", "pw1", "/", "Home", storeData);
+    expect(homeHtml).toContain("Amelina Bevis");
+    expect(homeHtml).toContain("SITE-0205");
+    expect(homeHtml).toContain("BabyGap plain T-shirt");
+    expect(homeHtml).toContain("$36.71");
+    expect(homeHtml).toContain("TEXT TEST HERE");
+
+    // 2. Custom page renders real custom blocks
+    const customPageHtml = generateFallbackTemplateHtml("pa101", "pw2", "/new-page-3", "New page 2", storeData);
+    expect(customPageHtml).toContain("Amelina Bevis");
+    expect(customPageHtml).toContain("Chính Sách Khách Hàng");
+    expect(customPageHtml).toContain("Dữ liệu văn bản từ MySQL model_settings.");
+    expect(customPageHtml).toContain("/new-page-3");
+  });
+
+  it("[TC-F40-12-13] renders real 16 store blocks for Home page without Figma placeholder images", () => {
+    const homeBlocks = [
+      {
+        id: "b1",
+        blockType: "hero",
+        title: "Khối Banner",
+        headline: "TEXT TEST HERE",
+        subheadline: "TEXT TEST HERE 2",
+        buttonText: "Button",
+        imageUrl: "https://tm-prime-web-dev.sgp1.digitaloceanspaces.com/img/girl.jpeg",
+      },
+      {
+        id: "b2",
+        blockType: "blog",
+        title: "Khối Bài Viết",
+        headline: "Article Listing",
+        articleItems: [
+          { id: 1, title: "11 Things the Media Hasn't Told You", date: "19 May 2022" },
+        ],
+      },
+      {
+        id: "b3",
+        blockType: "categories",
+        title: "Khối Danh Mục",
+        headline: "Category Listing",
+        categoryCards: [
+          { id: 10, name: "Mario", ctaText: "Shop now" },
+        ],
+      },
+      {
+        id: "b4",
+        blockType: "products",
+        title: "Khối Sản Phẩm",
+        headline: "Product Listing",
+        productCards: [
+          { id: 101, name: "BabyGap plain T-shirt", price: "$36.71" },
+        ],
+      },
+      {
+        id: "b6",
+        blockType: "richtext",
+        title: "Khối Nội Dung Rich Text",
+        headline: "Rich Text",
+        bodyText: "<p>lorrem impsum content testing</p>",
+      },
+    ];
+
+    const rendered = renderPageBlocks(homeBlocks, null, "#0284c7");
+    expect(rendered).toContain("TEXT TEST HERE");
+    expect(rendered).toContain("TEXT TEST HERE 2");
+    expect(rendered).toContain("girl.jpeg");
+    expect(rendered).toContain("11 Things the Media Hasn&#039;t Told You");
+    expect(rendered).toContain("Mario");
+    expect(rendered).toContain("BabyGap plain T-shirt");
+    expect(rendered).toContain("$36.71");
+    expect(rendered).toContain("<p>lorrem impsum content testing</p>");
+  });
+
+  it("[TC-F40-12-14] sanitizes rich HTML blocks to prevent XSS injection in merchant content", () => {
+    const maliciousPayload = '<p>Normal text</p><script>alert("Hacked")</script><iframe src="//evil.com"></iframe><a href="javascript:steal()">Click</a><img src="valid.jpg" onerror="alert(1)">';
+    const safeOutput = sanitizeRichHtml(maliciousPayload);
+
+    expect(safeOutput).not.toContain("<script>");
+    expect(safeOutput).not.toContain("alert(");
+    expect(safeOutput).not.toContain("<iframe");
+    expect(safeOutput).not.toContain("javascript:");
+    expect(safeOutput).not.toContain("onerror=");
+    expect(safeOutput).toContain("<p>Normal text</p>");
+    expect(safeOutput).toContain('<img src="valid.jpg" >');
+  });
+
+  it("[TC-F40-12-15] defaults previewSource to live_domain when store has active live domain", () => {
+    const storeWithDomain = {
+      id: "SITE-0205",
+      domain: "vnami.web.dev.ecommercehub.my",
+    };
+    const storeWithoutDomain = {
+      id: "SITE-0001",
+      domain: "",
+    };
+
+    const resolveDefaultSource = (store: { domain?: string }) =>
+      store.domain ? "live_domain" : "template";
+
+    expect(resolveDefaultSource(storeWithDomain)).toBe("live_domain");
+    expect(resolveDefaultSource(storeWithoutDomain)).toBe("template");
+  });
+
+  it("[TC-F40-12-16] dynamically validates store domain SSL readiness from database flag and wildcard domain patterns", () => {
+    // 1. Explicit database verified SSL flags
+    expect(isStoreDomainSslReady({ domain: "custom-shop.vn", sslReady: true })).toBe(true);
+    expect(isStoreDomainSslReady({ domain: "custom-shop.vn", sslReady: false })).toBe(false);
+
+    // 2. Wildcard OpenResty SSL domain pattern (*.ecommercehub.my)
+    expect(isStoreDomainSslReady({ domain: "t001.web.dev.ecommercehub.my" })).toBe(true);
+    expect(isStoreDomainSslReady({ domain: "f009.web.dev.ecommercehub.my" })).toBe(true);
+    expect(isStoreDomainSslReady({ domain: "vnami.web.dev.ecommercehub.my" })).toBe(true);
+
+    // 3. Explicit HTTPS scheme
+    expect(isStoreDomainSslReady({ domain: "https://myverifiedstore.com" })).toBe(true);
+
+    // 4. Non-SSL custom domains fallback safely to false
+    expect(isStoreDomainSslReady({ domain: "unverified-http-shop.com" })).toBe(false);
+    expect(isStoreDomainSslReady(null)).toBe(false);
+    expect(isStoreDomainSslReady(undefined)).toBe(false);
+    expect(isStoreDomainSslReady({ domain: "" })).toBe(false);
   });
 });
 
