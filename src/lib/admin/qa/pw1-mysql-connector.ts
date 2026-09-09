@@ -45,6 +45,140 @@ export interface TableSchemaInfo {
   rowCount?: number;
 }
 
+interface PageScopedFieldRecord {
+  id: string;
+  entityGroup: string;
+  pageIds?: string[];
+}
+
+interface Pw1PageComponentRef {
+  id: string | number;
+  page_id: string | number;
+  fc_name?: string | null;
+}
+
+interface Pw1BannerRef {
+  id: string | number;
+  page_component_id?: string | number | null;
+}
+
+interface DiffPageRef {
+  id: string;
+  blocks: Array<{ id: string; blockType: string }>;
+}
+
+interface Pw1ShortlistItemRef {
+  page_component_id: string | number;
+  model_type?: string | null;
+  model_id?: string | number | null;
+}
+
+interface FieldDiffPageScopeInput {
+  shortlistItems: Pw1ShortlistItemRef[];
+  productIds: Array<string | number>;
+  categoryIds: Array<string | number>;
+  postIds: Array<string | number>;
+  variantProductIds: Map<string, string | number>;
+}
+
+/** MySQL drivers can return the same foreign key as either a number or string. */
+function samePw1Id(left: string | number | null | undefined, right: string | number | null | undefined): boolean {
+  return left != null && right != null && String(left) === String(right);
+}
+
+export function getPw1ComponentShortlistItems<T extends Pw1ShortlistItemRef>(
+  shortlistItems: T[],
+  componentId: string | number,
+): T[] {
+  return shortlistItems.filter((item) => samePw1Id(item.page_component_id, componentId));
+}
+
+/**
+ * Assign page scope to field-diff records. Page-owned PW1 entities use their
+ * source foreign keys; block-type fallback is reserved for global entities.
+ */
+export function assignFieldDiffRecordPageIds<T extends PageScopedFieldRecord>(
+  records: T[],
+  pages: DiffPageRef[],
+  components: Pw1PageComponentRef[],
+  banners: Pw1BannerRef[],
+  scopeInput: FieldDiffPageScopeInput,
+): Array<T & { pageIds: string[] }> {
+  const validPageIds = new Set(pages.map((page) => page.id));
+  const componentPageIds = new Map(
+    components.map((component) => [String(component.id), `page-${component.page_id}`]),
+  );
+  const bannerPageIds = new Map(
+    banners.map((banner) => [String(banner.id), componentPageIds.get(String(banner.page_component_id))]),
+  );
+
+  return records.map((record) => {
+    if (Array.isArray(record.pageIds) && record.pageIds.length > 0) {
+      return { ...record, pageIds: record.pageIds.filter((pageId) => validPageIds.has(pageId)) };
+    }
+
+    const pageOwnedId = record.entityGroup === "banners"
+      ? bannerPageIds.get(record.id.replace("ent-banner-", ""))
+      : record.entityGroup === "richtext"
+        ? componentPageIds.get(record.id.replace("ent-richtext-", ""))
+        : record.entityGroup === "blocks"
+          ? componentPageIds.get(record.id.replace("ent-block-", ""))
+          : undefined;
+
+    // Do not use a block-type heuristic for a page-owned entity: it would leak
+    // records across tabs when several pages use the same block type.
+    if (record.entityGroup === "banners" || record.entityGroup === "richtext" || record.entityGroup === "blocks") {
+      return { ...record, pageIds: pageOwnedId && validPageIds.has(pageOwnedId) ? [pageOwnedId] : [] };
+    }
+
+    if (record.entityGroup === "navigation" || record.entityGroup === "settings") {
+      return { ...record, pageIds: pages.map((page) => page.id) };
+    }
+
+    const entityId = record.id.replace(/^ent-(?:prod|sku|cat|post)-/, "");
+    const targetId = record.entityGroup === "variants"
+      ? scopeInput.variantProductIds.get(entityId)
+      : entityId;
+    const fallbackIds = record.entityGroup === "products" || record.entityGroup === "variants"
+      ? scopeInput.productIds.slice(0, 4)
+      : record.entityGroup === "categories"
+        ? scopeInput.categoryIds.slice(0, 4)
+        : record.entityGroup === "posts"
+          ? scopeInput.postIds.slice(0, 3)
+          : [];
+    const pageIds = components.flatMap((component) => {
+      const pageId = componentPageIds.get(String(component.id));
+      if (!pageId || !validPageIds.has(pageId)) return [];
+
+      const componentName = (component.fc_name || "").toLowerCase();
+      const isProducts = componentName.includes("product") && !componentName.includes("filter") && !componentName.includes("sort");
+      const isCategories = componentName.includes("category");
+      const isPosts = componentName.includes("article") || componentName.includes("blog");
+      const matchesGroup = (record.entityGroup === "products" || record.entityGroup === "variants")
+        ? isProducts
+        : record.entityGroup === "categories"
+          ? isCategories
+          : record.entityGroup === "posts" && isPosts;
+      if (!matchesGroup) return [];
+
+      const shortlistIds = scopeInput.shortlistItems
+        .filter((item) => samePw1Id(item.page_component_id, component.id))
+        .filter((item) => {
+          const modelType = item.model_type || "";
+          if (record.entityGroup === "products" || record.entityGroup === "variants") return modelType.includes("Product") || !modelType;
+          if (record.entityGroup === "categories") return !modelType || modelType.includes("Category") || modelType.includes("Brand");
+          return modelType.includes("Blog") || modelType.includes("Article") || modelType.includes("Post");
+        })
+        .map((item) => String(item.model_id));
+      const renderedIds = shortlistIds.length > 0 ? shortlistIds : fallbackIds.map(String);
+
+      return targetId !== undefined && renderedIds.includes(String(targetId)) ? [pageId] : [];
+    });
+
+    return { ...record, pageIds: [...new Set(pageIds)] };
+  });
+}
+
 let pool: mysql.Pool | null = null;
 
 /**
@@ -972,7 +1106,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
         const shortlistedProdIds = shortlistItems
           .filter((s) => s.model_type?.includes("Product") || !s.model_type)
           .map((s) => s.model_id)
-          .filter((id) => id && !products.some((p) => p.id === id));
+          .filter((id) => id && !products.some((p) => samePw1Id(p.id, id)));
 
         if (shortlistedProdIds.length > 0) {
           const extraProds = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
@@ -1007,7 +1141,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
   // Map Rich Text Blocks into CSDL Diff records
   const richTextComps = rawComponents.filter((c) => (c.fc_name || "").includes("rich_text") || (c.tag_name || "").includes("rich-text"));
   for (const rtc of richTextComps as any[]) {
-    const pageName = (rawPages as any[]).find((p) => p.id === rtc.page_id)?.name || "Home";
+    const pageName = (rawPages as any[]).find((p) => samePw1Id(p.id, rtc.page_id))?.name || "Home";
     const customContent = compSettingMap.get(`${rtc.id}_content`);
     const isBlank = !customContent || !customContent.trim();
     const contentSnippet = isBlank
@@ -1016,6 +1150,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
 
     records.push({
       id: `ent-richtext-${rtc.id}`,
+      pageIds: [`page-${rtc.page_id}`],
       legacyId: `RICHTEXT-${rtc.id}`,
       migratedId: isBlank ? null : `pw2_richtext_${rtc.id}`,
       entityGroup: "richtext",
@@ -1064,7 +1199,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
 
   // Map Page Components (Layout Blocks) into CSDL Diff records
   for (const comp of rawComponents as any[]) {
-    const pageName = (rawPages as any[]).find((p) => p.id === comp.page_id)?.name || "Home";
+    const pageName = (rawPages as any[]).find((p) => samePw1Id(p.id, comp.page_id))?.name || "Home";
     const fcName = (comp.fc_name || "").toLowerCase();
     const isFilterOrSort = fcName.includes("filter") || fcName.includes("sort");
     const isBlankRichText = (fcName.includes("rich_text") || fcName.includes("text")) && !compSettingMap.get(`${comp.id}_content`)?.trim();
@@ -1077,6 +1212,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
 
     records.push({
       id: `ent-block-${comp.id}`,
+      pageIds: [`page-${comp.page_id}`],
       legacyId: `BLOCK-${comp.id}`,
       migratedId: isWarnBlock ? null : `pw2_layout_block_${comp.id}`,
       entityGroup: "blocks",
@@ -1143,7 +1279,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
       }
 
       // Find real page components for this page
-      const pageComps = rawComponents.filter((c) => c.page_id === p.id);
+      const pageComps = rawComponents.filter((c) => samePw1Id(c.page_id, p.id));
       let pageBlocks: any[] = [];
 
       if (pageComps.length > 0) {
@@ -1165,7 +1301,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             blockType = "hero";
             pw2Block = "hero";
             title = `Khối Banner: ${c.label || "Hero Banner"}`;
-            const compBanners = (banners as any[]).filter((b) => b.page_component_id === c.id);
+            const compBanners = (banners as any[]).filter((b) => samePw1Id(b.page_component_id, c.id));
             const compBanner = compBanners.length > 0 ? compBanners[0] : (banners as any[])[0];
             let bannerH = store.name;
             let bannerSub = store.description || "Giao diện banner trang chủ";
@@ -1232,7 +1368,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             title = `Khối Danh Mục: ${c.label || "Danh Mục Hàng Hóa"}`;
             const customHeader = compSettingMap.get(`${c.id}_header`);
             headline = customHeader || c.label || "Danh Mục Nổi Bật";
-            const compShortlists = shortlistItems.filter((s) => s.page_component_id === c.id);
+            const compShortlists = getPw1ComponentShortlistItems(shortlistItems, c.id);
             if (compShortlists.length > 0) {
               bodyText = compShortlists.map((s) => s.name || "Danh mục").join(" • ");
             } else {
@@ -1299,11 +1435,12 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           }
 
           // Articles: Check shortlist items first, otherwise fallback to store blog posts
-          const compBlogShortlists = shortlistItems.filter((s) => s.page_component_id === c.id && (s.model_type?.includes("Blog") || s.model_type?.includes("Article") || s.model_type?.includes("Post")));
+          const compBlogShortlists = getPw1ComponentShortlistItems(shortlistItems, c.id)
+            .filter((s) => s.model_type?.includes("Blog") || s.model_type?.includes("Article") || s.model_type?.includes("Post"));
           let articleItems: any[] = [];
           if (compBlogShortlists.length > 0) {
             articleItems = compBlogShortlists.map((s) => {
-              const matchedPst = (posts as any[]).find((pst) => pst.id === s.model_id);
+              const matchedPst = (posts as any[]).find((pst) => samePw1Id(pst.id, s.model_id));
               return {
                 id: s.model_id,
                 title: matchedPst?.title || s.name || "Bài Viết",
@@ -1325,11 +1462,12 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           }
 
           // Products: Check shortlist items first, otherwise fallback to store products
-          const compProdShortlists = shortlistItems.filter((s) => s.page_component_id === c.id && (s.model_type?.includes("Product") || !s.model_type));
+          const compProdShortlists = getPw1ComponentShortlistItems(shortlistItems, c.id)
+            .filter((s) => s.model_type?.includes("Product") || !s.model_type);
           let productCards: any[] = [];
           if (compProdShortlists.length > 0) {
             productCards = compProdShortlists.map((s) => {
-              const matchedPr = (products as any[]).find((p) => p.id === s.model_id);
+              const matchedPr = (products as any[]).find((p) => samePw1Id(p.id, s.model_id));
               return {
                 id: s.model_id,
                 name: matchedPr?.name || s.name || "Sản Phẩm",
@@ -1351,7 +1489,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           }
 
           // Categories / Brands / Collections
-          const compCatShortlists = shortlistItems.filter((s) => s.page_component_id === c.id && !s.model_type?.includes("Product") && !s.model_type?.includes("Blog"));
+          const compCatShortlists = getPw1ComponentShortlistItems(shortlistItems, c.id)
+            .filter((s) => !s.model_type || s.model_type.includes("Category") || s.model_type.includes("Brand"));
           let categoryCards: any[] = [];
           if (compCatShortlists.length > 0) {
             categoryCards = compCatShortlists.map((s) => ({
@@ -1595,6 +1734,20 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     ];
   }
 
+  const recordsWithPageIds = assignFieldDiffRecordPageIds(
+    records,
+    dynamicPages,
+    rawComponents as Pw1PageComponentRef[],
+    banners as Pw1BannerRef[],
+    {
+      shortlistItems: shortlistItems as Pw1ShortlistItemRef[],
+      productIds: (products as any[]).map((product) => product.id),
+      categoryIds: (categories as any[]).map((category) => category.id),
+      postIds: (posts as any[]).map((post) => post.id),
+      variantProductIds: new Map((rawSkus as any[]).map((sku) => [String(sku.id), sku.product_id])),
+    },
+  );
+
   // Dynamically calculate block and field parity across all entities and pages
   let totalBlocksCount = 0;
   let passedBlocksCount = 0;
@@ -1697,7 +1850,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           },
         },
       },
-      records,
+      records: recordsWithPageIds,
     },
     reconciliationAudit: {
       totalProductsV1: products.length,

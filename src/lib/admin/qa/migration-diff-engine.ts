@@ -21,6 +21,8 @@ export interface FieldDiffItem {
 
 export interface EntityDiffRecord {
   id: string;
+  /** Page IDs where this entity is rendered in the migrated storefront. */
+  pageIds: string[];
   legacyId: string | number;
   migratedId?: string | number | null;
   entityGroup: EntityGroupType;
@@ -31,6 +33,21 @@ export interface EntityDiffRecord {
   matchedFields: number;
   discrepancyCount: number;
   fields: FieldDiffItem[];
+}
+
+/**
+ * Keeps the field inspector scoped to the storefront page the QA tester has
+ * selected. An entity can belong to more than one page (for example products
+ * are rendered on both Home and Catalog), so ownership is intentionally an
+ * array rather than a single page ID.
+ */
+export function getFieldDiffRecordsForPage(
+  audit: StoreFieldDiffAudit,
+  pageId: string,
+): EntityDiffRecord[] {
+  return audit.records.filter(
+    (record) => Array.isArray(record.pageIds) && record.pageIds.includes(pageId),
+  );
 }
 
 export interface StoreFieldDiffAudit {
@@ -617,6 +634,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 1. PRODUCTS
     {
       id: "ent-prod-101",
+      pageIds: ["page-home", "page-catalog"],
       legacyId: "PROD-101",
       migratedId: "pw2_prod_101",
       entityGroup: "products",
@@ -707,6 +725,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 2. PRODUCT VARIANTS (VAR-201: Hũ 500ml)
     {
       id: "ent-var-201",
+      pageIds: ["page-home", "page-catalog"],
       legacyId: "VAR-201",
       migratedId: "pw2_var_201",
       entityGroup: "variants",
@@ -773,6 +792,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 3. PRODUCT VARIANTS (VAR-202: Can 1 Lít - Mất trong failed store)
     {
       id: "ent-var-202",
+      pageIds: ["page-home", "page-catalog"],
       legacyId: "VAR-202",
       migratedId: isFailed ? null : "pw2_var_202",
       entityGroup: "variants",
@@ -841,6 +861,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 4. BANNERS & HERO MEDIA LINKS (BAN-01: Hero Banner)
     {
       id: "ent-ban-01",
+      pageIds: ["page-home"],
       legacyId: "BAN-1365",
       migratedId: "pw2_hero_01",
       entityGroup: "banners",
@@ -927,6 +948,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 5. BANNERS (BAN-02: Small Promo Voucher)
     {
       id: "ent-ban-02",
+      pageIds: ["page-home"],
       legacyId: "BAN-1543",
       migratedId: "pw2_promo_01",
       entityGroup: "banners",
@@ -993,6 +1015,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 6. RICHTEXT & EMBEDDED CONTENT (RT-01: Câu Chuyện & Bảng VietGAP)
     {
       id: "ent-rt-01",
+      pageIds: ["page-home"],
       legacyId: "RT-501",
       migratedId: "pw2_rt_501",
       entityGroup: "richtext",
@@ -1061,6 +1084,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 7. NAVIGATION & HEADER MENUS (NAV-01: Header Menu)
     {
       id: "ent-nav-01",
+      pageIds: ["page-home", "page-catalog", "page-about", "page-blog", "page-contact", "page-custom-policy"],
       legacyId: "NAV-HEADER",
       migratedId: "pw2_nav_header",
       entityGroup: "navigation",
@@ -1117,6 +1141,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 8. CATEGORIES
     {
       id: "ent-cat-12",
+      pageIds: ["page-home", "page-catalog"],
       legacyId: "CAT-12",
       migratedId: "pw2_cat_12",
       entityGroup: "categories",
@@ -1173,6 +1198,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 9. BLOG POSTS
     {
       id: "ent-post-88",
+      pageIds: ["page-home", "page-blog"],
       legacyId: "POST-88",
       migratedId: "pw2_post_88",
       entityGroup: "posts",
@@ -1239,6 +1265,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 10. STORE SETTINGS & FOOTER (SET-01)
     {
       id: "ent-set-01",
+      pageIds: ["page-home", "page-catalog", "page-about", "page-blog", "page-contact", "page-custom-policy"],
       legacyId: "SET-01",
       migratedId: "pw2_settings_01",
       entityGroup: "settings",
@@ -1327,6 +1354,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 11. LAYOUT BLOCKS (BLOCKS-01: Hero Banner)
     {
       id: "ent-blk-01",
+      pageIds: ["page-home"],
       legacyId: "BLK-1365",
       migratedId: "pw2_blk_hero",
       entityGroup: "blocks",

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import {
   generateReconciliationCatalog,
+  getFieldDiffRecordsForPage,
   getStoreDeepDiff,
   getDashboardMetrics,
   CANONICAL_TEMPLATES,
@@ -1016,8 +1017,8 @@ export function MigrationDiffClient() {
 
   // Filtered Field Diff Records
   const filteredFieldRecords = useMemo(() => {
-    if (!selectedDiff?.fieldDiffAudit?.records) return [];
-    return selectedDiff.fieldDiffAudit.records.filter((r) => {
+    if (!selectedDiff?.fieldDiffAudit?.records || !activePage) return [];
+    return getFieldDiffRecordsForPage(selectedDiff.fieldDiffAudit, activePage.id).filter((r) => {
       const matchGroup = activeEntityGroup === "all" || r.entityGroup === activeEntityGroup;
       const matchErrors = !showOnlyErrors || r.matchStatus !== "match";
       const q = fieldSearchQuery.toLowerCase().trim();
@@ -1037,7 +1038,7 @@ export function MigrationDiffClient() {
 
       return matchGroup && matchErrors && matchSearch;
     });
-  }, [selectedDiff, activeEntityGroup, showOnlyErrors, fieldSearchQuery]);
+  }, [selectedDiff, activePage?.id, activeEntityGroup, showOnlyErrors, fieldSearchQuery]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -1733,6 +1734,7 @@ export function MigrationDiffClient() {
                   return (
                     <button
                       key={p.id}
+                      data-testid={`migration-page-tab-${p.id}`}
                       onClick={() => {
                         setActivePageIndex(idx);
                         setSelectedBlockId(null);
@@ -2494,6 +2496,9 @@ export function MigrationDiffClient() {
                     <p className="text-xs text-slate-400 mt-1">
                       Đối chiếu từng trường theo <code>legacy_id</code> giữa MySQL PW1 và Postgres PW2: <strong>Sản Phẩm, Biến Thể, Banners, Link CTA, RichText & Bảng Biểu, Menu Điều Hướng, Danh Mục, Cài Đặt Shop</strong>.
                     </p>
+                    <p className="text-xs text-indigo-300 mt-2" data-testid="field-diff-page-scope">
+                      Phạm vi trang: <strong>{activePage.name}</strong> ({activePage.path})
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -2533,8 +2538,8 @@ export function MigrationDiffClient() {
                     ).map((grp) => {
                       const Icon = grp.icon;
                       const count = grp.key === "all"
-                        ? selectedDiff.fieldDiffAudit.records.length
-                        : selectedDiff.fieldDiffAudit.records.filter((r) => r.entityGroup === grp.key).length;
+                        ? getFieldDiffRecordsForPage(selectedDiff.fieldDiffAudit, activePage.id).length
+                        : getFieldDiffRecordsForPage(selectedDiff.fieldDiffAudit, activePage.id).filter((r) => r.entityGroup === grp.key).length;
 
                       return (
                         <button
@@ -2573,6 +2578,7 @@ export function MigrationDiffClient() {
                   {filteredFieldRecords.map((record) => (
                     <div
                       key={record.id}
+                      data-testid={`field-diff-record-${record.id}`}
                       className={`rounded-2xl border overflow-hidden shadow-lg transition ${
                         record.matchStatus === "missing_in_pw2" || record.matchStatus === "error"
                           ? "bg-rose-950/15 border-rose-500 ring-1 ring-rose-500/40"

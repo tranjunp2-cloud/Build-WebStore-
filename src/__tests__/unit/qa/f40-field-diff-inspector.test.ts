@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   getFieldDiffAuditForStore,
+  getFieldDiffRecordsForPage,
   getStoreDeepDiff,
   type EntityDiffRecord,
   type FieldDiffItem,
@@ -92,5 +93,38 @@ describe("[TC-F40-11] Deep Field-by-Field Database Diff Inspector Suite", () => 
     expect(resolvedAudit.summary.fieldMatchRate).toBe("100.0%");
     const allErrors = resolvedAudit.records.flatMap((r) => r.fields).filter((f) => f.status === "error");
     expect(allErrors.length).toBe(0);
+  });
+
+  it("[TC-F40-11-07] scopes field records to the selected storefront page", () => {
+    const diff = getStoreDeepDiff("SITE-0025");
+    expect(diff).not.toBeNull();
+    if (!diff) return;
+
+    const pageIds = new Set(diff.pages.map((page) => page.id));
+    expect(diff.fieldDiffAudit.records.every((record) => record.pageIds.length > 0 && record.pageIds.every((id) => pageIds.has(id)))).toBe(true);
+
+    const homeRecords = getFieldDiffRecordsForPage(diff.fieldDiffAudit, "page-home");
+    const catalogRecords = getFieldDiffRecordsForPage(diff.fieldDiffAudit, "page-catalog");
+    const blogRecords = getFieldDiffRecordsForPage(diff.fieldDiffAudit, "page-blog");
+
+    expect(homeRecords.map((record) => record.id)).toContain("ent-ban-01");
+    expect(catalogRecords.map((record) => record.id)).toContain("ent-cat-12");
+    expect(blogRecords.map((record) => record.id)).toContain("ent-post-88");
+    expect(catalogRecords.map((record) => record.id)).not.toContain("ent-ban-01");
+    expect(blogRecords.map((record) => record.id)).not.toContain("ent-prod-101");
+  });
+
+  it("[TC-F40-11-08] classifies a missing product cost as P1 with remediation", () => {
+    const warningAudit = getFieldDiffAuditForStore("SITE-0007");
+    const product = warningAudit.records.find((record) => record.id === "ent-prod-101");
+    const cost = product?.fields.find((field) => field.fieldName === "cost");
+
+    expect(cost).toMatchObject({
+      status: "warning",
+      classification: "P1 Warning",
+      legacyValue: 120000,
+      migratedValue: null,
+    });
+    expect(cost?.remediationAction).toContain("cost");
   });
 });

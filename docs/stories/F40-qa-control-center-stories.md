@@ -479,6 +479,14 @@ WHEN I select an entity group (Products, Variants, Banners, RichText, Menus, Cat
 THEN the table shows exact database fields comparing Legacy PW1 Value vs Migrated PW2 Value with Match/Mismatch/Missing status.
 ```
 
+#### AC-1a: Page-Scoped Field Breakdown
+```gherkin
+GIVEN I have selected a storefront page tab in the Diff Inspector
+WHEN I view or filter the 'Soi CSDL 1-to-1' grid
+THEN the records and group counts only represent entities rendered on that page
+AND an entity shared by multiple pages remains visible on each of its owning pages.
+```
+
 #### AC-2: Dev Remediation & Migration Script Guidance
 ```gherkin
 GIVEN a field with missing data (e.g. missing 1L variant price)
@@ -522,4 +530,3 @@ GIVEN I switch to the 'Xem Web Thật (Live Iframe)' tab
 WHEN a store is selected
 THEN dual iframes load the 100% full working HTML/CSS/JS storefront for that template archetype via /api/qa/template-preview/[code].
 ```
-
