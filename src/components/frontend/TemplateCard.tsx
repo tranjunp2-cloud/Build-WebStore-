@@ -17,6 +17,20 @@ export type Template = {
         primaryColor: string
         secondaryColor?: string
         colorMode: string
+        [key: string]: unknown
+    }
+    defaultBlocks?: Record<string, unknown>[] | null
+    templatePages?: Array<{
+        isHomepage?: boolean
+        layout?: Record<string, unknown>[] | null
+    }> | null
+    swapData?: {
+        defaultTheme?: Record<string, unknown> | null
+        defaultBlocks?: Record<string, unknown>[] | null
+        templatePages?: Array<{
+            isHomepage?: boolean
+            layout?: Record<string, unknown>[] | null
+        }> | null
     }
 }
 

@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
-import { useApplyTemplate, useTemplateList, useTemplateSearch } from '@/hooks/use-template-queries'
+import { useApplyTemplate, useTemplateList, useTemplateSearch, useTemplateForSwap, type AppliedTemplateState } from '@/hooks/use-template-queries'
 import {
     templateSearchFormSchema,
     type TemplateSearchFormValues,
@@ -39,14 +39,19 @@ export interface TemplateApplyResult {
     templateName: string
     siteId: string | number
     unmatchedBlocks?: string[]
+    appliedState?: AppliedTemplateState
 }
 
 interface EditorTemplateModalProps {
     isOpen: boolean
     onClose: () => void
     siteId: string
+    pageId?: string | null
     onBeforeApply?: () => Promise<void>
-    onApplied: (result: TemplateApplyResult) => void
+    onApplyPending?: () => void
+    onApplyStarted?: (template: Omit<Template, 'defaultTheme'> & { defaultTheme?: Record<string, unknown> | null }) => void
+    onApplyFailed?: () => void
+    onApplied: (result: TemplateApplyResult) => void | Promise<void>
 }
 
 function TemplateGridSkeleton() {
@@ -70,7 +75,7 @@ function TemplateGridSkeleton() {
     )
 }
 
-export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, onApplied }: EditorTemplateModalProps) {
+export function EditorTemplateModal({ isOpen, onClose, siteId, pageId, onBeforeApply, onApplyPending, onApplyStarted, onApplyFailed, onApplied }: EditorTemplateModalProps) {
     const { t, locale } = useI18n()
     const tt = t.editor.template
     const sub = t.common.subscriptionErrors
@@ -79,6 +84,9 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
     const [activeCategory, setActiveCategory] = useState('all')
     const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null)
     const [confirmTemplate, setConfirmTemplate] = useState<Template | null>(null)
+    const detailQuery = useTemplateForSwap(isOpen && confirmTemplate && !confirmTemplate.swapData ? confirmTemplate.id : null)
+    const preparedTemplate = confirmTemplate?.swapData ? confirmTemplate : detailQuery.data
+    const isPreparing = Boolean(confirmTemplate && !preparedTemplate)
     const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null)
     const applyGuardRef = useRef(false)
     const {
@@ -129,6 +137,12 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
         toast.error(tt.loadError)
     }, [activeError, tt.loadError])
 
+    useEffect(() => {
+        const error = detailQuery.error
+        if (!error || ('status' in error && error.status === 401)) return
+        toast.error(tt.loadError)
+    }, [detailQuery.error, tt.loadError])
+
     // Close on Escape
     useEffect(() => {
         if (!isOpen) return
@@ -167,6 +181,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
             const template = (searchResults ?? templates).find((t) => t.id === templateId)
             if (template) {
                 setPreviewTemplate(null)
+                setHoverPreview(null)
                 setConfirmTemplate(template)
             }
         },
@@ -174,36 +189,45 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
     )
 
     const handleConfirmApply = useCallback(async () => {
-        if (!confirmTemplate || applyGuardRef.current) return
-        const templateToApply = confirmTemplate
+        if (!confirmTemplate || !preparedTemplate || applyGuardRef.current) return
+        const templateToApply = preparedTemplate
         applyGuardRef.current = true
         setApplyingTemplateId(templateToApply.id)
 
         try {
+            onApplyPending?.()
             // Save unsaved changes before applying template.
             // onBeforeApply throws with 'PRE_SAVE_FAILED' sentinel if save fails;
             // the caller (handleSave) already toasted the error, so we silently abort.
             if (onBeforeApply) await onBeforeApply()
+            onApplyStarted?.(templateToApply.swapData ? {
+                ...templateToApply,
+                ...templateToApply.swapData,
+                defaultTheme: templateToApply.swapData.defaultTheme ?? null,
+            } : templateToApply)
 
-            const data = await applyTemplate({ templateId: templateToApply.id, siteId })
+            const data = await applyTemplate({ templateId: templateToApply.id, siteId, pageId: pageId || undefined })
             setConfirmTemplate(null)
-            onApplied({
+            await onApplied({
                 templateName: templateToApply.name,
                 siteId: data.siteId ?? siteId,
                 unmatchedBlocks: data.unmatchedBlocks,
+                appliedState: data.appliedState,
             })
         } catch (err) {
+            onApplyFailed?.()
+            if (err instanceof Error && 'status' in err && err.status === 401) return
             const message = err instanceof Error ? err.message : tt.applyFailed
             // PRE_SAVE_FAILED: save already showed an error toast — don't duplicate
             if (message !== 'PRE_SAVE_FAILED') {
                 toast.error(tt.applyFailed, { description: message })
             }
-            setConfirmTemplate(null)
+            // Retain confirmation for Retry after restoring the editor snapshot.
         } finally {
             applyGuardRef.current = false
             setApplyingTemplateId(null)
         }
-    }, [applyTemplate, confirmTemplate, onApplied, onBeforeApply, siteId, tt.applyFailed])
+    }, [applyTemplate, confirmTemplate, preparedTemplate, onApplied, onBeforeApply, onApplyPending, onApplyStarted, onApplyFailed, siteId, pageId, tt.applyFailed])
 
     // Hover preview handlers (desktop)
     const handleCardMouseEnter = useCallback((template: Template, e: React.MouseEvent) => {
@@ -319,7 +343,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
 
                     {/* Grid */}
                     <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-                        {isLoading || isSearching ? (
+                        {confirmTemplate ? null : isLoading || isSearching ? (
                             <TemplateGridSkeleton />
                         ) : activeError ? (
                             <div className="flex min-h-52 flex-col items-center justify-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-5 text-center" data-testid="template-error-state" role="alert">
@@ -401,7 +425,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
             </div>
 
             {/* Hover preview tooltip (desktop only) */}
-            {hoverPreview && (
+            {hoverPreview && !confirmTemplate && (
                 <div
                     className="fixed z-[100] hidden lg:block rounded-xl border border-white/10 bg-[var(--editor-bg)] p-3 shadow-2xl w-[420px]"
                     style={{
@@ -458,6 +482,20 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
                                 </p>
                             </div>
                         </div>
+                        {isPreparing && (detailQuery.isError ? (
+                            <div role="alert" className="mb-4 text-sm text-red-400">
+                                <p>{detailQuery.error.message || tt.loadError}</p>
+                                <button type="button" onClick={() => void detailQuery.refetch()} disabled={detailQuery.isFetching}
+                                    className="mt-2 rounded-lg bg-red-500/15 px-3 py-2 font-semibold disabled:opacity-50">
+                                    {tt.retry}
+                                </button>
+                            </div>
+                        ) : (
+                            <div role="status" aria-label={tt.loading} className="mb-4 space-y-2">
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-2/3" />
+                            </div>
+                        ))}
                         <div className="flex justify-end gap-3">
                             <button
                                 onClick={() => setConfirmTemplate(null)}
@@ -468,7 +506,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
                             </button>
                             <button
                                 onClick={handleConfirmApply}
-                                disabled={!!isApplying}
+                                disabled={!!isApplying || isPreparing}
                                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
                             >
                                 {isApplying ? (

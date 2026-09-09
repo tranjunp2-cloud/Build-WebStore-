@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { FileText, MessageCircle, Zap } from 'lucide-react'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
@@ -9,6 +10,12 @@ import { patchBlockCtaUrls, patchLocaleInitCtaUrls } from '@/lib/ai/patch-block-
 import { hasLocaleContent, resolveBlockContent, interpolateBrand } from '@/lib/ai/add-section-content'
 import { STRUCTURAL_BLOCK_FIELDS, routeBlockChanges } from '@/lib/editor/structural-block-fields'
 import { parseEditorSettingsDeepLink } from '@/lib/editor/settings-deep-link'
+import {
+    isTemplateSwapDraftStable,
+    shouldSaveBeforeTemplateSwap,
+} from '@/lib/editor/template-swap-save'
+import { buildOptimisticTemplateSwap } from '@/lib/editor/optimistic-template-swap'
+import { restoreTemplateRenderMedia } from '@/lib/editor/template-render-media'
 import { resolveInitialActiveLocale } from '@/lib/detect-locale'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
@@ -56,6 +63,7 @@ import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { CompactEditorLayout, type PreviewFrameSharedProps } from '@/components/editor/CompactEditorLayout'
 import type { ToolsSheetPanelProps, ToolsSheetTab } from '@/components/editor/EditorToolsSheet'
 import { useEditorLayoutMode } from '@/hooks/useEditorLayoutMode'
+import { EditorDataRequestError, editorDataQueryOptions } from '@/lib/api/editor-data'
 
 class SerializedSaveSetupError extends Error {
     constructor(readonly originalError: unknown) {
@@ -111,7 +119,31 @@ type LoadedPageData = {
     slug?: string
 }
 
-import type { PageData, BlockData } from '@/store/editorStore'
+type TemplateSwapEditorData = {
+    site?: Omit<SiteData, 'headerBlock' | 'footerBlock'> & {
+        headerBlock?: BlockData | null
+        footerBlock?: BlockData | null
+        globalBlocks?: GlobalBlocksState
+    }
+    page?: {
+        layout?: BlockData[]
+        localeContent?: Record<string, Record<string, Record<string, unknown>>>
+    } | null
+}
+
+type OptimisticTemplateRollback = {
+    blocks: BlockData[]
+    theme: Record<string, unknown>
+    headerBlock: BlockData | null
+    footerBlock: BlockData | null
+    globalBlocks: GlobalBlocksState
+    hasUnsavedChanges: boolean
+    contentRevision: number
+    autoSaveEnabled: boolean
+    site: SiteData | null
+}
+
+import type { PageData, BlockData, GlobalBlocksState } from '@/store/editorStore'
 
 type SaveOptions = {
     showToast?: boolean
@@ -253,6 +285,7 @@ const NON_TRANSLATABLE_FIELDS = [
 export default function EditorPage() {
     const params = useParams()
     const router = useRouter()
+    const queryClient = useQueryClient()
     const searchParams = useSearchParams()
     const siteId = params?.siteId as string
     const selectedPageId = searchParams.get('pageId')
@@ -359,7 +392,11 @@ export default function EditorPage() {
         siteId,
     ])
     const [isTransitioning, setIsTransitioning] = useState(false)
+    const [isTemplateApplyPending, setIsTemplateApplyPending] = useState(false)
+    const templateApplyPendingRef = useRef(false)
     const [templateApplied, setTemplateApplied] = useState(false)
+    const templateSwapRevisionRef = useRef('')
+    const optimisticTemplateRollbackRef = useRef<OptimisticTemplateRollback | null>(null)
     const [showSaveGuard, setShowSaveGuard] = useState(false)
     const reorderSaveTimerRef = useRef<number | null>(null)
     const footerUpdateSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -416,6 +453,8 @@ export default function EditorPage() {
     const redo = useEditorStore(state => state.redo)
     const canUndo = useEditorStore(state => state.canUndo)
     const canRedo = useEditorStore(state => state.canRedo)
+    const undoLabel = useEditorStore(state => state.undoLabel)
+    const redoLabel = useEditorStore(state => state.redoLabel)
     const markSaved = useEditorStore(state => state.markSaved)
     const markDirty = useEditorStore(state => state.markDirty)
     const markPublished = useEditorStore(state => state.markPublished)
@@ -582,7 +621,17 @@ export default function EditorPage() {
                 const normalizedGb = rawGb
                     ? { cartWidget: rawGb.cartWidget ?? null, whatsappButton: rawGb.whatsappButton ?? null, socialWidget: rawGb.socialWidget ?? null }
                     : null
-                init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '', data.site?.headerBlock || null, data.site?.footerBlock || null, normalizedGb)
+                const persistedLocaleContent = data.page?.localeContent as Record<string, Record<SiteLocale, Record<string, unknown>>> | undefined
+                init(
+                    siteId,
+                    data.page?.layout || [],
+                    data.site?.theme || {},
+                    data.site?.name || '',
+                    data.site?.headerBlock || null,
+                    data.site?.footerBlock || null,
+                    normalizedGb,
+                    persistedLocaleContent ?? {},
+                )
 
                 // F-26: siteLocale = EN/MS translation slot (Sites.locale).
                 // generationLocale = actual ISO 639-1 code AI generated in (may be 'vi', 'el', etc.).
@@ -608,9 +657,6 @@ export default function EditorPage() {
                 useEditorStore.getState().setPendingLocale(null)
 
                 // F-26: Hydrate localeOverrides from persisted locale_content (always reset to avoid page-switch bleed)
-                const persistedLocaleContent = data.page?.localeContent as Record<string, Record<SiteLocale, Record<string, unknown>>> | undefined
-                useEditorStore.setState({ localeOverrides: persistedLocaleContent ?? {} })
-
                 if (pagesRes.ok) {
                     const pagesData = await pagesRes.json()
                     const loadedPages = pagesData.pages || []
@@ -810,6 +856,7 @@ export default function EditorPage() {
     }, [markSaved, page, setIsSaving, siteId])
 
     const handleManualSave = useCallback(async (source: 'shell' | 'iframe' | 'footer' = 'shell') => {
+        if (templateApplyPendingRef.current) return false
         if (templateApplied) {
             setShowSaveGuard(true)
             return false
@@ -903,6 +950,14 @@ export default function EditorPage() {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (
+                templateApplyPendingRef.current
+                && (e.metaKey || e.ctrlKey)
+                && ['s', 'z'].includes(e.key.toLowerCase())
+            ) {
+                e.preventDefault()
+                return
+            }
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
                 e.preventDefault()
                 void handleManualSave()
@@ -919,7 +974,10 @@ export default function EditorPage() {
 
                 if (e.shiftKey) {
                     if (canRedo()) {
+                        const isTemplateRedo = redoLabel()?.startsWith('Apply template:') === true
+                        if (isTemplateRedo) setAutoSaveEnabled(false)
                         redo()
+                        if (isTemplateRedo) setTemplateApplied(true)
                         const redoState = useEditorStore.getState()
                         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: redoState.getDisplayBlocks() })
                         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: redoState.globalBlocks })
@@ -930,12 +988,18 @@ export default function EditorPage() {
                 }
 
                 if (canUndo()) {
+                    const isTemplateUndo = undoLabel()?.startsWith('Apply template:') === true
                     undo()
                     const undoState = useEditorStore.getState()
                     previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: undoState.getDisplayBlocks() })
                     previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: undoState.globalBlocks })
                     if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.getDisplayBlock(undoState.headerBlock) })
                     if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.getDisplayBlock(undoState.footerBlock) })
+                    if (templateApplied && isTemplateUndo) {
+                        setTemplateApplied(false)
+                        setAutoSaveEnabled(true)
+                        void handleSave({ showToast: false, refreshPreview: true })
+                    }
                 }
             }
 
@@ -943,7 +1007,7 @@ export default function EditorPage() {
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [canRedo, canUndo, handleManualSave, redo, undo])
+    }, [canRedo, canUndo, handleManualSave, handleSave, redo, redoLabel, setAutoSaveEnabled, templateApplied, undo, undoLabel])
 
     const handleThemeChange = useCallback((key: string, value: string) => {
         updateTheme({ [key]: value })
@@ -2228,28 +2292,42 @@ export default function EditorPage() {
     }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo, triggerImageSeed])
 
     const handleUndo = useCallback(() => {
+        if (templateApplyPendingRef.current) return
         if (!canUndo()) return
+        const isTemplateUndo = undoLabel()?.startsWith('Apply template:') === true
         undo()
-        setTimeout(() => {
-            previewFrameSendRef.current?.sendToIframe({
-                type: 'UPDATE_FULL_LAYOUT',
-                bodyBlocks: useEditorStore.getState().getDisplayBlocks()
-            })
-        }, 0)
+        const undoState = useEditorStore.getState()
+        previewFrameSendRef.current?.sendToIframe({
+            type: 'UPDATE_FULL_LAYOUT',
+            bodyBlocks: undoState.getDisplayBlocks(),
+        })
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: undoState.globalBlocks })
+        if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.getDisplayBlock(undoState.headerBlock) })
+        if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.getDisplayBlock(undoState.footerBlock) })
         // If user undoes the template apply, clear the save guard
-        setTemplateApplied(false)
-    }, [canUndo, undo])
+        if (templateApplied && isTemplateUndo) {
+            setTemplateApplied(false)
+            setAutoSaveEnabled(true)
+            void handleSave({ showToast: false, refreshPreview: false })
+        }
+    }, [canUndo, handleSave, setAutoSaveEnabled, templateApplied, undo, undoLabel])
 
     const handleRedo = useCallback(() => {
+        if (templateApplyPendingRef.current) return
         if (!canRedo()) return
+        const isTemplateRedo = redoLabel()?.startsWith('Apply template:') === true
+        if (isTemplateRedo) setAutoSaveEnabled(false)
         redo()
-        setTimeout(() => {
-            previewFrameSendRef.current?.sendToIframe({
-                type: 'UPDATE_FULL_LAYOUT',
-                bodyBlocks: useEditorStore.getState().getDisplayBlocks()
-            })
-        }, 0)
-    }, [canRedo, redo])
+        if (isTemplateRedo) setTemplateApplied(true)
+        const redoState = useEditorStore.getState()
+        previewFrameSendRef.current?.sendToIframe({
+            type: 'UPDATE_FULL_LAYOUT',
+            bodyBlocks: redoState.getDisplayBlocks(),
+        })
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: redoState.globalBlocks })
+        if (redoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: redoState.getDisplayBlock(redoState.headerBlock) })
+        if (redoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: redoState.getDisplayBlock(redoState.footerBlock) })
+    }, [canRedo, redo, redoLabel, setAutoSaveEnabled])
 
     // Wait for any in-flight save to complete, then save if there are pending changes.
     // Prevents publish from reading a stale draft when the user clicks Publish
@@ -2512,6 +2590,7 @@ export default function EditorPage() {
     }, [flushSavesBeforePublish, isPublishing, markPublished, setPages, siteId])
 
     const handlePageSelected = useCallback(async (pageId: string) => {
+        if (templateApplyPendingRef.current) return
         const store = useEditorStore.getState()
 
         // Cancel any pending auto-save timer to prevent cross-page data save
@@ -2997,27 +3076,27 @@ export default function EditorPage() {
                 currentPageTitle={currentPageTitle}
                 pages={pages}
                 isPublished={Boolean(isPublished)}
-                isSaving={isSaving}
+                isSaving={isSaving || isTemplateApplyPending}
                 saveSuccess={saveSuccess}
                 hasUnsavedChanges={hasUnsavedChanges}
                 lastSavedAt={lastSavedAt}
                 hasUnpublishedChanges={hasUnpublishedChanges}
                 isPublishing={isPublishing}
                 publishSuccess={publishSuccess}
-                canUndo={canUndo()}
-                canRedo={canRedo()}
+                canUndo={!isTemplateApplyPending && canUndo()}
+                canRedo={!isTemplateApplyPending && canRedo()}
                 viewport={viewport}
                 compact={isCompactLayout}
-                aiRunning={aiRunning}
-                onOpenMenu={() => setIsMenuOpen(true)}
-                onOpenTemplates={() => setIsTemplateModalOpen(true)}
+                aiRunning={aiRunning || isTemplateApplyPending}
+                onOpenMenu={() => { if (!templateApplyPendingRef.current) setIsMenuOpen(true) }}
+                onOpenTemplates={() => { if (!templateApplyPendingRef.current) setIsTemplateModalOpen(true) }}
                 onPageSelected={handlePageSelected}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onSave={() => { void handleManualSave() }}
-                onPublish={() => setIsPublishModalOpen(true)}
-                onRepublish={handleRepublish}
-                onUnpublish={() => setIsUnpublishModalOpen(true)}
+                onPublish={() => { if (!templateApplyPendingRef.current) setIsPublishModalOpen(true) }}
+                onRepublish={() => { if (!templateApplyPendingRef.current) void handleRepublish() }}
+                onUnpublish={() => { if (!templateApplyPendingRef.current) setIsUnpublishModalOpen(true) }}
                 pendingLocale={pendingLocale}
                 onViewLive={() => siteUrl && window.open(siteUrl, '_blank')}
                 onCopyLink={handleCopyLink}
@@ -3029,53 +3108,66 @@ export default function EditorPage() {
             <OfflineBanner isOnline={isOnline} isSyncing={isSyncing} />
 
             {isCompactLayout ? (
-                <CompactEditorLayout
-                    previewFrameProps={previewFrameSharedProps}
-                    onBlockSelect={handleMobileBlockSelect}
-                    totalBlocks={blocks.length}
-                    onReorderBlock={handleReorderBlocks}
-                    onDeleteBlockConfirmed={handleDeleteBlock}
-                    isMobileSettingsOpen={isMobileSettingsOpen}
-                    onCloseMobileSettings={handleCloseMobileSettings}
-                    currentBlock={currentBlock}
-                    selectedBlock={selectedBlock}
-                    theme={theme}
-                    site={site}
-                    siteName={siteName}
-                    isContactSavePending={isContactSavePending}
-                    headerBlock={headerBlock}
-                    footerBlock={footerBlock}
-                    pages={pages}
-                    currentPageId={currentPageId}
-                    siteLocale={siteLocale}
-                    isLocalBusinessSaveLocked={isLocalBusinessSaveLocked}
-                    primaryLocale={primaryLocale}
-                    secondaryLocale={secondaryLocale}
-                    pendingLocale={pendingLocale}
-                    settingsRequestedTab={settingsRequestedTab}
-                    onNavLanguageSwitcherChange={handleMultilingualToggle}
-                    onAddLanguage={handleAddLanguage}
-                    onRemoveLanguage={handleRemoveLanguage}
-                    onMakePrimary={handleMakePrimary}
-                    onThemeChange={handleThemeChange}
-                    onBlockFieldChange={handleBlockFieldChange}
-                    onBlockUpdate={handleBlockUpdate}
-                    onHeaderUpdate={handleMobileHeaderUpdate}
-                    onFooterUpdate={handleMobileFooterUpdate}
-                    onSiteSettingsChange={handleSiteSettingsChange}
-                    onPageUpdate={handlePageUpdate}
-                    toolsSheetOpen={toolsSheetOpen}
-                    toolsSheetTab={toolsSheetTab}
-                    onOpenTools={openTools}
-                    onCloseTools={closeTools}
-                    onToolsTabChange={setToolsSheetTab}
-                    toolsPanelProps={toolsPanelProps}
-                    aiRunning={aiRunning}
-                    onStopAI={handleStopAI}
-                    onCopyLink={handleCopyLink}
-                />
+                <div
+                    className={cn(
+                        'flex min-h-0 flex-1 transition-opacity duration-200',
+                        isTransitioning && 'opacity-0',
+                        isTemplateApplyPending && 'pointer-events-none',
+                    )}
+                    data-template-transition="compact"
+                    data-template-apply-pending={isTemplateApplyPending ? 'true' : 'false'}
+                >
+                    <CompactEditorLayout
+                        previewFrameProps={previewFrameSharedProps}
+                        onBlockSelect={handleMobileBlockSelect}
+                        totalBlocks={blocks.length}
+                        onReorderBlock={handleReorderBlocks}
+                        onDeleteBlockConfirmed={handleDeleteBlock}
+                        isMobileSettingsOpen={isMobileSettingsOpen}
+                        onCloseMobileSettings={handleCloseMobileSettings}
+                        currentBlock={currentBlock}
+                        selectedBlock={selectedBlock}
+                        theme={theme}
+                        site={site}
+                        siteName={siteName}
+                        isContactSavePending={isContactSavePending}
+                        headerBlock={headerBlock}
+                        footerBlock={footerBlock}
+                        pages={pages}
+                        currentPageId={currentPageId}
+                        siteLocale={siteLocale}
+                        isLocalBusinessSaveLocked={isLocalBusinessSaveLocked}
+                        primaryLocale={primaryLocale}
+                        secondaryLocale={secondaryLocale}
+                        pendingLocale={pendingLocale}
+                        settingsRequestedTab={settingsRequestedTab}
+                        onNavLanguageSwitcherChange={handleMultilingualToggle}
+                        onAddLanguage={handleAddLanguage}
+                        onRemoveLanguage={handleRemoveLanguage}
+                        onMakePrimary={handleMakePrimary}
+                        onThemeChange={handleThemeChange}
+                        onBlockFieldChange={handleBlockFieldChange}
+                        onBlockUpdate={handleBlockUpdate}
+                        onHeaderUpdate={handleMobileHeaderUpdate}
+                        onFooterUpdate={handleMobileFooterUpdate}
+                        onSiteSettingsChange={handleSiteSettingsChange}
+                        onPageUpdate={handlePageUpdate}
+                        toolsSheetOpen={toolsSheetOpen}
+                        toolsSheetTab={toolsSheetTab}
+                        onOpenTools={openTools}
+                        onCloseTools={closeTools}
+                        onToolsTabChange={setToolsSheetTab}
+                        toolsPanelProps={toolsPanelProps}
+                        aiRunning={aiRunning}
+                        onStopAI={handleStopAI}
+                        onCopyLink={handleCopyLink}
+                    />
+                </div>
             ) : (
-                <div className="flex flex-1 min-h-0 overflow-hidden">
+                <div className={cn(
+                    'flex flex-1 min-h-0 overflow-hidden',
+                    isTemplateApplyPending && 'pointer-events-none',
+                )}>
                     <div
                         className="shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out"
                         style={{
@@ -3092,7 +3184,11 @@ export default function EditorPage() {
                         </EditorSidebar>
                     </div>
 
-                    <div className={cn("flex flex-1 flex-col transition-opacity duration-300", isTransitioning && "opacity-0")}>
+                    <div
+                        className={cn('flex flex-1 flex-col transition-opacity duration-200', isTransitioning && 'opacity-0')}
+                        data-template-transition="desktop"
+                        data-template-apply-pending={isTemplateApplyPending ? 'true' : 'false'}
+                    >
                         <PreviewFrame
                             {...previewFrameSharedProps}
                             onBlockSelect={handleBlockSelectWithContext}
@@ -3196,31 +3292,201 @@ export default function EditorPage() {
                 isOpen={isTemplateModalOpen}
                 onClose={() => setIsTemplateModalOpen(false)}
                 siteId={siteId}
+                pageId={currentPageId}
                 onBeforeApply={async () => {
-                    // ALWAYS force-save before template apply — draft/published version
-                    // mismatch means hasUnsavedChanges can be stale.
-                    // Throw sentinel if save fails so EditorTemplateModal aborts without a duplicate toast.
-                    const ok = await handleSave({ showToast: false, refreshPreview: false })
-                    if (!ok) throw new Error('PRE_SAVE_FAILED')
+                    // editor-data hydrates the authoritative draft. When the store is
+                    // clean and no save is in flight, writing the identical draft again
+                    // only adds a full Payload round trip to every template swap.
+                    // A save can finish successfully while a newer editor revision is
+                    // still dirty. Repeat the barrier until the exact saved revision is
+                    // still current; fail closed if background work keeps changing it.
+                    for (let attempt = 0; attempt < 3; attempt += 1) {
+                        const editorState = useEditorStore.getState()
+                        const saveState = {
+                            hasUnsavedChanges: editorState.hasUnsavedChanges,
+                            saveInFlight: isSavingRef.current,
+                            saveQueued: pendingSaveRef.current !== null,
+                        }
+                        if (!shouldSaveBeforeTemplateSwap(saveState)) return
+
+                        const savedRevision = editorState.contentRevision
+                        const ok = await handleSave({ showToast: false, refreshPreview: false })
+                        if (!ok) throw new Error('PRE_SAVE_FAILED')
+                        const latest = useEditorStore.getState()
+                        if (isTemplateSwapDraftStable(savedRevision, {
+                            contentRevision: latest.contentRevision,
+                            hasUnsavedChanges: latest.hasUnsavedChanges,
+                            saveInFlight: isSavingRef.current,
+                            saveQueued: pendingSaveRef.current !== null,
+                        })) return
+                    }
+                    throw new Error('Editor content kept changing while preparing the template. Please retry.')
                 }}
-                onApplied={async ({ templateName, unmatchedBlocks }: TemplateApplyResult) => {
+                onApplyPending={() => {
+                    templateApplyPendingRef.current = true
+                    templateSwapRevisionRef.current = crypto.randomUUID()
+                    setIsTemplateApplyPending(true)
+                    if (footerUpdateSaveTimerRef.current) {
+                        clearTimeout(footerUpdateSaveTimerRef.current)
+                        footerUpdateSaveTimerRef.current = null
+                    }
+                }}
+                onApplyStarted={(template) => {
+                    const store = useEditorStore.getState()
+                    const isHomepage = pages.find(candidate => String(candidate.id) === String(currentPageId))?.isHomepage
+                        ?? selectedPageId === null
+                    // Map the exact post-save draft, including canonical system blocks.
+                    const optimistic = buildOptimisticTemplateSwap(template, store.blocks, store.theme, {
+                        isHomepage,
+                        headerBlock: store.headerBlock,
+                        footerBlock: store.footerBlock,
+                        globalBlocks: store.globalBlocks,
+                    })
+                    if (!optimistic) return
+
+                    optimisticTemplateRollbackRef.current = {
+                        blocks: structuredClone(store.blocks),
+                        theme: structuredClone(store.theme),
+                        headerBlock: store.headerBlock ? structuredClone(store.headerBlock) : null,
+                        footerBlock: store.footerBlock ? structuredClone(store.footerBlock) : null,
+                        globalBlocks: store.globalBlocks ? structuredClone(store.globalBlocks) : null,
+                        hasUnsavedChanges: store.hasUnsavedChanges,
+                        contentRevision: store.contentRevision,
+                        autoSaveEnabled: store.autoSaveEnabled,
+                        site: site ? structuredClone(site) : null,
+                    }
+
+                    store.setAutoSaveEnabled(false)
+                    if (store.autoSaveTimer) clearTimeout(store.autoSaveTimer)
+                    useEditorStore.setState(current => ({
+                        blocks: optimistic.blocks as BlockData[],
+                        theme: optimistic.theme,
+                        headerBlock: optimistic.headerBlock as BlockData | null,
+                        footerBlock: optimistic.footerBlock as BlockData | null,
+                        globalBlocks: optimistic.globalBlocks as GlobalBlocksState,
+                        autoSaveTimer: null,
+                        hasUnsavedChanges: true,
+                        contentRevision: current.contentRevision + 1,
+                    }))
+                    setSite(current => current ? {
+                        ...current,
+                        theme: optimistic.theme,
+                        headerBlock: optimistic.headerBlock as BlockData | null,
+                        footerBlock: optimistic.footerBlock as BlockData | null,
+                        globalBlocks: optimistic.globalBlocks as GlobalBlocksState,
+                    } : current)
                     setIsTemplateModalOpen(false)
                     setIsTransitioning(true)
+                    const optimisticStore = useEditorStore.getState()
+                    previewFrameSendRef.current?.sendToIframe({
+                        type: 'UPDATE_TEMPLATE_SNAPSHOT',
+                        bodyBlocks: optimisticStore.getDisplayBlocks(),
+                        theme: optimistic.theme,
+                        headerBlock: optimisticStore.headerBlock ? optimisticStore.getDisplayBlock(optimisticStore.headerBlock) : null,
+                        footerBlock: optimisticStore.footerBlock ? optimisticStore.getDisplayBlock(optimisticStore.footerBlock) : null,
+                        globalBlocks: optimisticStore.globalBlocks,
+                        templateSwapRevision: templateSwapRevisionRef.current,
+                    })
+                    requestAnimationFrame(() => requestAnimationFrame(() => setIsTransitioning(false)))
+                }}
+                onApplyFailed={() => {
+                    const rollback = optimisticTemplateRollbackRef.current
+                    optimisticTemplateRollbackRef.current = null
+                    templateApplyPendingRef.current = false
+                    setIsTemplateApplyPending(false)
+                    // The optimistic flow closes the picker while the request is in
+                    // flight. Re-open the retained confirmation state so the error
+                    // surface includes an immediately available Retry action.
+                    setIsTemplateModalOpen(true)
+                    if (!rollback) return
+
+                    setIsTransitioning(true)
+                    useEditorStore.setState({
+                        blocks: rollback.blocks,
+                        theme: rollback.theme,
+                        headerBlock: rollback.headerBlock,
+                        footerBlock: rollback.footerBlock,
+                        globalBlocks: rollback.globalBlocks,
+                        hasUnsavedChanges: rollback.hasUnsavedChanges,
+                        contentRevision: rollback.contentRevision,
+                        autoSaveEnabled: rollback.autoSaveEnabled,
+                    })
+                    setSite(rollback.site)
+                    const restored = useEditorStore.getState()
+                    previewFrameSendRef.current?.sendToIframe({
+                        type: 'UPDATE_TEMPLATE_SNAPSHOT',
+                        bodyBlocks: restored.getDisplayBlocks(),
+                        headerBlock: restored.headerBlock ? restored.getDisplayBlock(restored.headerBlock) : null,
+                        footerBlock: restored.footerBlock ? restored.getDisplayBlock(restored.footerBlock) : null,
+                        globalBlocks: restored.globalBlocks,
+                        theme: rollback.theme,
+                        templateSwapRevision: '',
+                    })
+                    requestAnimationFrame(() => requestAnimationFrame(() => setIsTransitioning(false)))
+                }}
+                onApplied={async ({ templateName, unmatchedBlocks, appliedState }: TemplateApplyResult) => {
+                    setIsTemplateModalOpen(false)
+                    const hadOptimisticState = optimisticTemplateRollbackRef.current !== null
+                    if (!hadOptimisticState) setIsTransitioning(true)
 
                     try {
-                        // Re-fetch fresh data from DB (template already applied by API)
-                        const editorUrl = new URL(`/api/sites/${siteId}/editor-data`, window.location.origin)
-                        if (currentPageId) editorUrl.searchParams.set('pageId', currentPageId)
-                        const res = await fetch(editorUrl.toString(), { credentials: 'include' })
-                        if (!res.ok) throw new Error('Failed to reload editor data')
-                        const data = await res.json()
+                        const store = useEditorStore.getState()
+                        const appliedPage = appliedState?.page
+                        let data: TemplateSwapEditorData
+
+                        if (
+                            appliedState
+                            && appliedPage
+                            && String(appliedPage.id) === String(currentPageId)
+                            && site
+                        ) {
+                            // The apply endpoint returns the exact state it committed. Render it
+                            // immediately instead of blocking the transition on a second remote DB
+                            // read; refresh the TanStack cache in the background as verification.
+                            data = {
+                                site: {
+                                    ...site,
+                                    theme: appliedState.site.theme,
+                                    headerBlock: appliedState.site.headerBlock as BlockData | null,
+                                    footerBlock: appliedState.site.footerBlock as BlockData | null,
+                                    globalBlocks: appliedState.site.globalBlocks as GlobalBlocksState,
+                                },
+                                page: {
+                                    layout: appliedPage.layout as BlockData[],
+                                    localeContent: store.localeOverrides,
+                                },
+                            }
+                            void queryClient.fetchQuery(
+                                editorDataQueryOptions<TemplateSwapEditorData>({ siteId, pageId: currentPageId }),
+                            ).catch(error => {
+                                console.warn('[Template Swap] Background editor-data refresh failed:', error)
+                            })
+                        } else {
+                            // Compatibility fallback for older API responses or a page that was
+                            // not part of the swap snapshot.
+                            data = await queryClient.fetchQuery(
+                                editorDataQueryOptions<TemplateSwapEditorData>({ siteId, pageId: currentPageId }),
+                            )
+                        }
+
+                        // The API returns persistence IDs. Reuse the known populated media
+                        // from the draft so the committed preview keeps the user's images.
+                        data = restoreTemplateRenderMedia(data, [
+                            optimisticTemplateRollbackRef.current,
+                            store.blocks, store.headerBlock, store.footerBlock, store.globalBlocks,
+                        ])
 
                         // Push as single undoable batch (existing history preserved for Ctrl+Z)
-                        const store = useEditorStore.getState()
                         store.pushBatch(
                             data.page?.layout || [],
                             data.site?.theme || {},
-                            `Apply template: ${templateName}`
+                            `Apply template: ${templateName}`,
+                            {
+                                headerBlock: data.site?.headerBlock ?? null,
+                                footerBlock: data.site?.footerBlock ?? null,
+                                globalBlocks: data.site?.globalBlocks ?? null,
+                                localeOverrides: data.page?.localeContent ?? {},
+                            },
                         )
 
                         // Disable auto-save BEFORE mutating store — prevents the 3s debounce
@@ -3232,10 +3498,6 @@ export default function EditorPage() {
                             useEditorStore.setState({ autoSaveTimer: null })
                         }
 
-                        // Update header/footer
-                        if (data.site?.headerBlock) store.updateHeaderBlock(data.site.headerBlock)
-                        if (data.site?.footerBlock) store.updateFooterBlock(data.site.footerBlock)
-
                         // Update local site state
                         if (data.site) setSite(data.site)
 
@@ -3243,27 +3505,44 @@ export default function EditorPage() {
                         setTemplateApplied(true)
 
                         // Update preview in-place — pushBatch already updated blocks/theme in store
-                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: useEditorStore.getState().getDisplayBlocks() })
-                        if (data.site?.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: data.site.headerBlock })
-                        if (data.site?.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: data.site.footerBlock })
-                        if (data.site?.theme) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_SITE_THEME', theme: data.site.theme })
+                        const appliedStore = useEditorStore.getState()
+                        previewFrameSendRef.current?.sendToIframe({
+                            type: 'UPDATE_TEMPLATE_SNAPSHOT',
+                            bodyBlocks: appliedStore.getDisplayBlocks(),
+                            headerBlock: appliedStore.headerBlock ? appliedStore.getDisplayBlock(appliedStore.headerBlock) : null,
+                            footerBlock: appliedStore.footerBlock ? appliedStore.getDisplayBlock(appliedStore.footerBlock) : null,
+                            globalBlocks: appliedStore.globalBlocks,
+                            theme: appliedStore.theme,
+                            templateSwapRevision: templateSwapRevisionRef.current,
+                        })
 
-                        // Show unmatched block notification (Phase 3)
+                        // Unmatched sections remain recoverable through the editor undo/version history,
+                        // but are intentionally not injected into a template that has no matching slot.
                         if (unmatchedBlocks && unmatchedBlocks.length > 0) {
                             const types = unmatchedBlocks.join(', ')
                             toast.info(
-                                `${unmatchedBlocks.length} section(s) (${types}) had no match in the new template and were placed before the footer.`,
+                                t.editor.template.unmatchedBlocks
+                                    .replace('{count}', String(unmatchedBlocks.length))
+                                    .replace('{types}', types),
                                 { duration: 6000 }
                             )
                         }
 
                         toast.success(`Template "${templateName}" applied! Press Ctrl+Z to undo.`)
                     } catch (err) {
+                        if (err instanceof EditorDataRequestError && err.status === 401) {
+                            const returnUrl = `${window.location.pathname}${window.location.search}`
+                            router.replace(`/login?returnUrl=${encodeURIComponent(returnUrl)}`)
+                            return
+                        }
                         const message = err instanceof Error ? err.message : 'Failed to refresh editor'
                         toast.error('Template applied but editor refresh failed', { description: message })
                         window.location.reload()
                     } finally {
-                        setTimeout(() => setIsTransitioning(false), 300)
+                        optimisticTemplateRollbackRef.current = null
+                        templateApplyPendingRef.current = false
+                        setIsTemplateApplyPending(false)
+                        setIsTransitioning(false)
                     }
                 }}
             />

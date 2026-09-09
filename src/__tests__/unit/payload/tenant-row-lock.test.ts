@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { Payload } from 'payload'
-import { lockTenantSiteRows, withTenantRowLock } from '@/lib/payload/tenant-row-lock'
+import {
+    executeTenantTransaction,
+    lockTenantSiteRows,
+    TenantSiteLockError,
+    withTenantRowLock,
+} from '@/lib/payload/tenant-row-lock'
 
 function createPayload() {
     const execute = vi.fn().mockResolvedValue({ rows: [{ id: 'tenant-1' }] })
@@ -34,6 +39,9 @@ describe('withTenantRowLock', () => {
 
     it('locks current tenant site rows inside the same transaction', async () => {
         const { payload, execute } = createPayload()
+        execute
+            .mockResolvedValueOnce({ rows: [{ id: 'tenant-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 1 }, { id: 2 }] })
 
         await withTenantRowLock(payload, 'tenant-1', async (req) => {
             await lockTenantSiteRows(payload, 'tenant-1', [1, 2], req)
@@ -44,6 +52,40 @@ describe('withTenantRowLock', () => {
         const { params } = new PgDialect().sqlToQuery(siteLockQuery as never)
         expect(params).toContain('{1,2}')
         expect(params).not.toContainEqual([1, 2])
+    })
+
+    it('TC-F07.039: rejects when any requested site is outside the locked tenant', async () => {
+        // Arrange
+        const { payload, execute } = createPayload()
+        execute
+            .mockResolvedValueOnce({ rows: [{ id: 'tenant-1' }] })
+            .mockResolvedValueOnce({ rows: [{ id: 1 }] })
+
+        // Act
+        const result = withTenantRowLock(payload, 'tenant-1', async (req) => {
+            await lockTenantSiteRows(payload, 'tenant-1', [1, 2], req)
+        })
+
+        // Assert
+        await expect(result).rejects.toMatchObject<TenantSiteLockError>({
+            code: 'TENANT_SITE_LOCK_FAILED',
+            missingSiteIds: [2],
+        })
+    })
+
+    it('TC-F07.039: executes raw SQL through the active Payload transaction session', async () => {
+        // Arrange
+        const { payload, execute } = createPayload()
+        const query = { purpose: 'page-lock' }
+
+        // Act
+        const result = await withTenantRowLock(payload, 'tenant-1', (req) =>
+            executeTenantTransaction<{ rows: Array<{ id: number }> }>(payload, req, query),
+        )
+
+        // Assert
+        expect(result).toEqual({ rows: [{ id: 'tenant-1' }] })
+        expect(execute).toHaveBeenNthCalledWith(2, query)
     })
 
     it('rejects a site lock without an active transaction', async () => {

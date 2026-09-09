@@ -18,6 +18,7 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
     const [page, setPage] = useState(initialPage)
     const [siteState, setSiteState] = useState(site)
     const [pages, setPages] = useState(initialPages)
+    const [templateSwapRevision, setTemplateSwapRevision] = useState<string>()
 
     // Soft-navigation sync: clicking a nav link inside the preview iframe changes the
     // ?pageId query and re-runs the server component, but this client component stays
@@ -73,6 +74,30 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
     useEffect(() => {
         const onMessage = (e: MessageEvent) => {
             if (e.origin !== window.location.origin) return
+            if (e.data?.type === 'UPDATE_TEMPLATE_SNAPSHOT') {
+                const { bodyBlocks, theme, headerBlock, footerBlock, globalBlocks, templateSwapRevision: revision } = e.data as {
+                    bodyBlocks: unknown
+                    theme: SiteRendererProps['site']['theme']
+                    headerBlock: SiteRendererProps['site']['headerBlock']
+                    footerBlock: SiteRendererProps['site']['footerBlock']
+                    globalBlocks: SiteRendererProps['site']['globalBlocks']
+                    templateSwapRevision?: string
+                }
+                if (!Array.isArray(bodyBlocks) || typeof theme !== 'object' || theme === null) return
+                if (!bodyBlocks.every(block => typeof block === 'object' && block !== null && !Array.isArray(block))) return
+                // React batches this single message: canonical blocks and body must reach
+                // SiteRenderer together, including explicit nulls when restoring a snapshot.
+                setPage(prev => ({
+                    ...prev,
+                    layout: bodyBlocks.map((block: Record<string, unknown>, index: number) => ({
+                        ...block,
+                        __editorBlockIndex: index,
+                    })),
+                }))
+                setSiteState(prev => ({ ...prev, theme, headerBlock, footerBlock, globalBlocks }))
+                setTemplateSwapRevision(typeof revision === 'string' ? revision : undefined)
+                return
+            }
             if (e.data?.type === 'UPDATE_FULL_LAYOUT') {
                 const { bodyBlocks } = e.data as { bodyBlocks: unknown[] }
                 if (Array.isArray(bodyBlocks)) {
@@ -154,6 +179,7 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
     }, [])
 
     return (
+        <div className="contents" data-template-swap-revision={templateSwapRevision}>
         <SiteRenderer
             site={siteState}
             page={page}
@@ -170,5 +196,6 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
             // review-only surfaces. Wire it only for the real editor iframe.
             onBlockFieldChange={isEditorIframe && !isBuilderPreview ? handleBlockFieldChange : undefined}
         />
+        </div>
     )
 }

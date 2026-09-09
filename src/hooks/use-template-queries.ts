@@ -13,11 +13,23 @@ import {
 interface ApplyTemplateInput {
     templateId: string
     siteId: string
+    pageId?: string
+}
+
+export interface AppliedTemplateState {
+    site: {
+        theme: Record<string, unknown>
+        headerBlock: Record<string, unknown> | null
+        footerBlock: Record<string, unknown> | null
+        globalBlocks: Record<string, unknown> | null
+    }
+    page: { id: string | number; layout: Record<string, unknown>[] } | null
 }
 
 interface ApplyTemplateResponse {
-    siteId?: string | number
+    siteId: string | number
     unmatchedBlocks?: string[]
+    appliedState?: AppliedTemplateState
 }
 
 class TemplateRequestError extends Error {
@@ -78,14 +90,17 @@ function templatesFromSearchResponse(body: unknown): Template[] {
 }
 
 function applyResultFromResponse(body: unknown): ApplyTemplateResponse {
-    // Preserve the existing Apply flow: successful responses may omit metadata;
-    // the editor already owns the selected template name and target site ID.
-    if (!isRecord(body)) return {}
+    if (!isRecord(body) || body.success !== true || !isRecord(body.data)
+        || (typeof body.data.siteId !== 'string' && typeof body.data.siteId !== 'number')) {
+        throw new TemplateRequestError('Failed to apply template: invalid server response', 502, body)
+    }
+    const data = body.data
     return {
-        siteId: typeof body.siteId === 'string' || typeof body.siteId === 'number' ? body.siteId : undefined,
-        unmatchedBlocks: Array.isArray(body.unmatchedBlocks)
-            ? body.unmatchedBlocks.filter((block): block is string => typeof block === 'string')
+        siteId: data.siteId as string | number,
+        unmatchedBlocks: Array.isArray(data.unmatchedBlocks)
+            ? data.unmatchedBlocks.filter((block): block is string => typeof block === 'string')
             : undefined,
+        appliedState: data.appliedState as AppliedTemplateState | undefined,
     }
 }
 
@@ -157,16 +172,37 @@ export function useTemplateSearch(request: TemplateSearchRequest | null, isOpen:
     })
 }
 
+export function useTemplateForSwap(templateId: string | null) {
+    const redirectToLogin = useLoginRedirect()
+
+    return useQuery<Template, Error>({
+        queryKey: ['templates', 'swap-detail', templateId],
+        enabled: templateId !== null,
+        retry: false,
+        queryFn: async ({ signal }) => {
+            const response = await fetch(`/api/templates/list?templateId=${encodeURIComponent(templateId!)}`, {
+                credentials: 'include', signal,
+            })
+            const body = await assertResponse(response, redirectToLogin, 'Failed to load template')
+            const template = templatesFromListResponse(body).find(candidate => candidate.id === templateId)
+            if (!template?.swapData) {
+                throw new TemplateRequestError('Failed to load template: missing template layout', 502, body)
+            }
+            return template
+        },
+    })
+}
+
 export function useApplyTemplate(subscriptionErrors: SubscriptionErrorStrings) {
     const redirectToLogin = useLoginRedirect()
 
     return useMutation<ApplyTemplateResponse, Error, ApplyTemplateInput>({
-        mutationFn: async ({ templateId, siteId }) => {
+        mutationFn: async ({ templateId, siteId, pageId }) => {
             const response = await fetch('/api/ai/apply-template', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ templateId, siteId }),
+                body: JSON.stringify({ templateId, siteId, pageId }),
             })
             const body = await readResponseBody(response)
             if (response.status === 401) redirectToLogin()

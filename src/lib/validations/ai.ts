@@ -112,4 +112,8 @@ export const rewriteTextSchema = z.object({
 export const applyTemplateSchema = z.object({
     templateId: z.union([z.string().min(1), z.number()]).transform(String),
     siteId: z.union([z.string(), z.number()]).optional().transform((v) => v != null ? String(v) : undefined),
+    pageId: z.union([z.string().regex(/^\d+$/), z.number().int().positive()])
+        .refine((v) => Number.isSafeInteger(Number(v)) && Number(v) > 0, 'Page ID must be a positive safe integer')
+        .transform((v) => String(Number(v)))
+        .optional(),
 })

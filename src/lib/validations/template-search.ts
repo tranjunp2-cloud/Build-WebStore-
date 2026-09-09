@@ -14,6 +14,15 @@ export const templateSearchRequestSchema = templateSearchFormSchema.extend({
     locale: z.enum(['en', 'vi', 'ms']),
 })
 
+const templateSwapDataSchema = z.object({
+    defaultTheme: z.record(z.unknown()).nullish(),
+    defaultBlocks: z.array(z.record(z.unknown())).nullish(),
+    templatePages: z.array(z.object({
+        isHomepage: z.boolean().optional(),
+        layout: z.array(z.record(z.unknown())).nullish(),
+    }).passthrough()).nullish(),
+})
+
 export const templateCardResponseSchema = z.object({
     id: z.union([z.string(), z.number()]),
     name: z.string().min(1),
@@ -22,6 +31,9 @@ export const templateCardResponseSchema = z.object({
     thumbnail: z.object({ url: z.string().min(1) }).passthrough().nullish(),
     isPremium: z.boolean().nullish(),
     isFeatured: z.boolean().nullish(),
+    defaultBlocks: templateSwapDataSchema.shape.defaultBlocks,
+    templatePages: templateSwapDataSchema.shape.templatePages,
+    swapData: templateSwapDataSchema.optional(),
     defaultTheme: z.object({
         primaryColor: z.string().nullish(),
         secondaryColor: z.string().nullish(),
@@ -35,6 +47,12 @@ export const templateCardResponseSchema = z.object({
     ...(template.thumbnail?.url ? { thumbnail: { url: template.thumbnail.url } } : {}),
     isPremium: Boolean(template.isPremium),
     isFeatured: Boolean(template.isFeatured),
+    ...(template.swapData || template.defaultBlocks !== undefined || template.templatePages !== undefined
+        ? { swapData: template.swapData ?? {
+            defaultTheme: template.defaultTheme ?? null,
+            defaultBlocks: template.defaultBlocks,
+            templatePages: template.templatePages,
+        } } : {}),
     defaultTheme: {
         primaryColor: template.defaultTheme?.primaryColor ?? '#3B82F6',
         ...(template.defaultTheme?.secondaryColor

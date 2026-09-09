@@ -4841,6 +4841,7 @@
       "applyButton": "Apply template",
       "appliedSuccess": "Template \"{name}\" applied",
       "applyFailed": "Couldn't apply the template. Try again.",
+      "unmatchedBlocks": "{count} section(s) ({types}) had no match in the new template and were not transferred. You can restore the previous layout with Undo.",
       "previewTitle": "Preview: {name}",
       "all": "All",
       "restaurant": "Restaurant",

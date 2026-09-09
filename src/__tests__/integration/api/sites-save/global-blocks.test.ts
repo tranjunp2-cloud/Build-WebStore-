@@ -51,6 +51,17 @@ vi.mock('@/lib/block-normalization', () => ({
     normalizeBlocksForPersistence: vi.fn((b: unknown) => b),
 }))
 
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    TenantSiteLockError: class TenantSiteLockError extends Error {},
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: unknown,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'save-transaction' })),
+    lockTenantSiteRows: vi.fn().mockResolvedValue(undefined),
+    executeTenantTransaction: vi.fn().mockResolvedValue({ rows: [] }),
+}))
+
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
         id: 'mock-sub-1',

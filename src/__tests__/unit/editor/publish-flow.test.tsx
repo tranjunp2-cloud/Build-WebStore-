@@ -36,6 +36,14 @@ vi.mock('next/navigation', () => ({
     usePathname: () => '/editor/test-site-id',
 }))
 
+vi.mock('@tanstack/react-query', () => ({
+    queryOptions: (options: unknown) => options,
+    useQueryClient: () => ({
+        fetchQuery: ({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<unknown> }) =>
+            queryFn({ signal: new AbortController().signal }),
+    }),
+}))
+
 vi.mock('@/lib/analytics/track-event', () => ({
     trackEvent: vi.fn(),
 }))
@@ -99,8 +107,21 @@ vi.mock('@/i18n', () => ({
     I18nProvider: ({ children }: any) => children,
 }))
 
+const previewFrameHarness = vi.hoisted(() => ({
+    messages: [] as Array<{ type: string; [key: string]: unknown }>,
+}))
+
 // Mock out heavy child components so we can focus on EditorPage's publish/save flows
-vi.mock('@/components/editor/PreviewFrame', () => ({ PreviewFrame: () => <div data-testid="preview-frame" /> }))
+vi.mock('@/components/editor/PreviewFrame', () => ({
+    PreviewFrame: (props: {
+        onHandleReady?: (handle: { sendToIframe: (message: { type: string; [key: string]: unknown }) => void }) => void
+    }) => {
+        props.onHandleReady?.({
+            sendToIframe: message => previewFrameHarness.messages.push(message),
+        })
+        return <div data-testid="preview-frame" />
+    },
+}))
 vi.mock('@/components/editor/EditorSidebar', () => ({ 
     EditorSidebar: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar">{children}</div> 
 }))
@@ -110,6 +131,7 @@ type EditorToolbarHarnessProps = {
     onSave: () => void
     onPublish: () => void
     onRepublish: () => void
+    onRedo: () => void
     onPageSelected: (pageId: string) => Promise<void>
 }
 
@@ -125,6 +147,7 @@ vi.mock('@/components/editor/EditorToolbar', () => ({
                 <button data-testid="save-btn" onClick={props.onSave} disabled={props.isSaving}>Save</button>
                 <button data-testid="publish-btn" onClick={props.onPublish}>Publish</button>
                 <button data-testid="republish-btn" onClick={props.onRepublish}>Update</button>
+                <button data-testid="redo-btn" onClick={props.onRedo}>Redo</button>
             </div>
         )
     },
@@ -210,6 +233,7 @@ beforeEach(() => {
     settingsPanelHarness.siteId = 'test-site-id'
     settingsPanelHarness.searchParams = ''
     editorToolbarHarness.latestProps = null
+    previewFrameHarness.messages = []
     
     Object.defineProperty(window, 'matchMedia', {
         writable: true,
@@ -269,6 +293,42 @@ beforeEach(() => {
 })
 
 describe('Publish and Save Flows (TC-F05)', () => {
+
+
+    it('keeps a redone template behind the save guard and fully syncs the preview', async () => {
+        const redo = vi.fn(() => {
+            useEditorStore.setState({
+                blocks: [{ id: 'hero-new', blockType: 'hero', headline: 'Redone hero' }],
+                headerBlock: { blockType: 'navigation', logoText: 'Redone header' },
+                footerBlock: { blockType: 'footer', copyrightText: 'Redone footer' },
+                globalBlocks: {
+                    cartWidget: { blockType: 'cartWidget', label: 'Cart' },
+                    whatsappButton: null,
+                    socialWidget: null,
+                },
+            })
+        })
+        useEditorStore.setState({
+            autoSaveEnabled: true,
+            canRedo: () => true,
+            redoLabel: () => 'Apply template: Editorial',
+            redo,
+        })
+
+        render(<EditorPage />)
+        await waitFor(() => expect(screen.getByTestId('redo-btn')).toBeInTheDocument())
+        previewFrameHarness.messages = []
+        fireEvent.click(screen.getByTestId('redo-btn'))
+
+        expect(redo).toHaveBeenCalledOnce()
+        expect(useEditorStore.getState().autoSaveEnabled).toBe(false)
+        expect(previewFrameHarness.messages.map(message => message.type)).toEqual(expect.arrayContaining([
+            'UPDATE_FULL_LAYOUT',
+            'UPDATE_GLOBAL_BLOCKS',
+            'UPDATE_HEADER_BLOCK',
+            'UPDATE_FOOTER_BLOCK',
+        ]))
+    })
 
 
 afterEach(() => {
