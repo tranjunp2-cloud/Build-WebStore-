@@ -50,6 +50,21 @@ export function getFieldDiffRecordsForPage(
   );
 }
 
+/**
+ * An entity can be structurally matched while one or more of its fields still
+ * need attention. Keep this rule shared so the inspector never hides those
+ * field-level discrepancies when the error-only filter is enabled.
+ */
+export function hasEntityDiffIssue(record: Pick<EntityDiffRecord, "matchStatus" | "fields">): boolean {
+  return record.matchStatus !== "match" || record.fields.some((field) => field.status !== "match");
+}
+
+export function getVisualDiffGapLabel(status: "pass" | "warn" | "fail", note?: string): string | null {
+  if (status === "fail") return `P0 lệch dữ liệu${note ? `: ${note}` : ""}`;
+  if (status === "warn") return `P1 cần xem lại${note ? `: ${note}` : ""}`;
+  return null;
+}
+
 export interface StoreFieldDiffAudit {
   storeId: string;
   summary: {

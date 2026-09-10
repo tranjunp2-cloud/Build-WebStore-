@@ -2,12 +2,39 @@ import { describe, it, expect } from "vitest";
 import {
   getFieldDiffAuditForStore,
   getFieldDiffRecordsForPage,
+  hasEntityDiffIssue,
   getStoreDeepDiff,
   type EntityDiffRecord,
   type FieldDiffItem,
 } from "@/lib/admin/qa/migration-diff-engine";
 
 describe("[TC-F40-11] Deep Field-by-Field Database Diff Inspector Suite", () => {
+  it("[TC-F40-11-07] keeps field-level discrepancies visible when error-only filtering is enabled", () => {
+    // Arrange
+    const matchedRecordWithFieldError: EntityDiffRecord = {
+      id: "ent-prod-regression",
+      pageIds: ["page-products"],
+      legacyId: "PROD-REGRESSION",
+      entityGroup: "products",
+      entityName: "Regression product",
+      entityIdentifier: "SKU: REG-001",
+      matchStatus: "match",
+      totalFields: 2,
+      matchedFields: 1,
+      discrepancyCount: 1,
+      fields: [
+        { fieldName: "name", fieldLabel: "Name", legacyKey: "products.name", migratedKey: "products.name", legacyValue: "A", migratedValue: "A", status: "match", classification: "100% Match" },
+        { fieldName: "price", fieldLabel: "Price", legacyKey: "product_skus.price", migratedKey: "products.price", legacyValue: 10, migratedValue: 0, status: "error", classification: "P0 Blocker" },
+      ],
+    };
+
+    // Act
+    const hasIssue = hasEntityDiffIssue(matchedRecordWithFieldError);
+
+    // Assert
+    expect(hasIssue).toBe(true);
+  });
+
   it("[TC-F40-11-01] matches entities 1-to-1 across ALL data groups (products, banners, richtext, navigation, categories, posts, settings, blocks)", () => {
     const audit = getFieldDiffAuditForStore("SITE-0001");
     expect(audit).toBeDefined();

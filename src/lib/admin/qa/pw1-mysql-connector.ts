@@ -18,6 +18,26 @@ export interface Pw1DbConfig {
   ssl?: boolean;
 }
 
+interface Pw1ProductRow extends mysql.RowDataPacket {
+  id: number;
+  name: string;
+  slug?: string | null;
+  status?: number;
+  brand_name?: string | null;
+  category_name?: string | null;
+}
+
+interface Pw1SkuRow extends mysql.RowDataPacket {
+  id: number;
+  product_id: number;
+  sku?: string | null;
+  price?: number | null;
+  stock?: number | null;
+  cost?: number | null;
+  status?: number;
+  prod_name?: string | null;
+}
+
 export const CANONICAL_FALLBACK_CODES = ["FB101", "PA101", "F102", "FN104", "FN103", "C102", "C101", "FN102", "FN101"] as const;
 
 export interface Pw1ConnectionStatus {
@@ -191,6 +211,19 @@ export function getPw1DbConfig(): Pw1DbConfig | null {
   }
 
   return null;
+}
+
+export function selectUniqueProducts<T extends { id: string | number }>(products: T[]): T[] {
+  return [...new Map(products.map((product) => [String(product.id), product])).values()];
+}
+
+export function selectPrimarySkusByProductId<T extends { product_id: string | number }>(skus: T[]): Map<string, T> {
+  const primarySkuByProductId = new Map<string, T>();
+  for (const sku of skus) {
+    const productId = String(sku.product_id);
+    if (!primarySkuByProductId.has(productId)) primarySkuByProductId.set(productId, sku);
+  }
+  return primarySkuByProductId;
 }
 
 /**
@@ -589,10 +622,9 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     rawPages,
     rawMenus,
   ] = await Promise.all([
-    queryPw1ReadOnly<mysql.RowDataPacket[]>(
-      `SELECT p.id, p.name, p.slug, p.status, p.brand_id, p.category_id, k.sku, k.price, k.cost, k.stock, b.name as brand_name, c.name as category_name
+    queryPw1ReadOnly<Pw1ProductRow[]>(
+      `SELECT p.id, p.name, p.slug, p.status, p.brand_id, p.category_id, b.name as brand_name, c.name as category_name
        FROM products p
-       LEFT JOIN product_skus k ON k.product_id = p.id
        LEFT JOIN brands b ON b.id = p.brand_id
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE p.store_id = ?
@@ -611,7 +643,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
       `SELECT id, title, slug, image, status, created_at FROM blog_posts WHERE store_id = ? LIMIT 10;`,
       [numericId],
     ),
-    queryPw1ReadOnly<mysql.RowDataPacket[]>(
+    queryPw1ReadOnly<Pw1SkuRow[]>(
       `SELECT ps.id, ps.product_id, ps.sku, ps.price, ps.stock, ps.cost, ps.status, p.name as prod_name
        FROM product_skus ps
        JOIN products p ON p.id = ps.product_id
@@ -621,7 +653,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
       [numericId],
     ).catch((err) => {
       console.warn(`[pw1-mysql-connector] Could not fetch product_skus for store ${numericId}:`, err);
-      return [] as mysql.RowDataPacket[];
+      return [] as Pw1SkuRow[];
     }),
     queryPw1ReadOnly<mysql.RowDataPacket[]>(
       `SELECT id, name, title, slug, url, type, status FROM pages WHERE store_id = ? AND deleted_at IS NULL ORDER BY id ASC;`,
@@ -635,15 +667,21 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
 
   const records: any[] = [];
 
+  // A product can have many SKUs. The product audit must have one entity per
+  // product, while variants are represented by the separate SKU records below.
+  const primarySkuByProductId = selectPrimarySkusByProductId(rawSkus);
+  const uniqueProducts = selectUniqueProducts(products);
+
   // Map Products & Variants
-  for (const p of products as any[]) {
+  for (const p of uniqueProducts) {
+    const primarySku = primarySkuByProductId.get(String(p.id));
     records.push({
       id: `ent-prod-${p.id}`,
       legacyId: `PROD-${p.id}`,
       migratedId: `pw2_prod_${p.id}`,
       entityGroup: "products",
       entityName: `Sản Phẩm: ${p.name}`,
-      entityIdentifier: p.sku ? `SKU: ${p.sku}` : `ID: ${p.id}`,
+      entityIdentifier: primarySku?.sku ? `SKU: ${primarySku.sku}` : `ID: ${p.id}`,
       matchStatus: "match",
       totalFields: 6,
       matchedFields: 6,
@@ -674,8 +712,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           fieldLabel: "Giá Niêm Yết",
           legacyKey: "product_skus.price",
           migratedKey: "products.price",
-          legacyValue: p.price || 0,
-          migratedValue: p.price || 0,
+          legacyValue: primarySku?.price || 0,
+          migratedValue: primarySku?.price || 0,
           status: "match",
           classification: "100% Match",
         },
