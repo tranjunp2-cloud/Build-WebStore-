@@ -826,6 +826,7 @@ export function MigrationDiffClient() {
   const [previewSource, setPreviewSource] = useState<"template" | "live_domain">("template");
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const pw1DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
+  const reconciliationRequestRef = React.useRef(0);
   const pw2DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
   const pw1MobIframeRef = React.useRef<HTMLIFrameElement>(null);
   const pw2MobIframeRef = React.useRef<HTMLIFrameElement>(null);
@@ -953,7 +954,8 @@ export function MigrationDiffClient() {
     const scope: ReconciliationScope | null = activeViewTab === "commerce_reconciliation" ? "commerce" : activeViewTab === "settings_reconciliation" ? "settings" : null;
     if (!scope || !activeStoreId) return;
     const controller = new AbortController();
-    const load = async () => { setReconciliationLoading(true); setReconciliationError(null); try { const response = await fetch(`/api/qa/migration-reconciliation?scope=${scope}&store_id=${encodeURIComponent(activeStoreId)}${reconciliationDemo ? "&demo=1" : ""}`, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload: { data?: ReconciliationSnapshot } = await response.json(); setReconciliationSnapshot(payload.data ?? null); } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) { setReconciliationSnapshot(null); setReconciliationError(error instanceof Error ? error.message : "Lỗi không xác định"); } } finally { if (!controller.signal.aborted) setReconciliationLoading(false); } };
+    const requestId = ++reconciliationRequestRef.current;
+    const load = async () => { setReconciliationSnapshot(null); setReconciliationLoading(true); setReconciliationError(null); try { const response = await fetch(`/api/qa/migration-reconciliation?scope=${scope}&store_id=${encodeURIComponent(activeStoreId)}${reconciliationDemo ? "&demo=1" : ""}`, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload: { data?: ReconciliationSnapshot } = await response.json(); if (payload.data?.scope !== scope || payload.data.storeId !== activeStoreId) throw new Error("Phản hồi đối soát không khớp store hoặc phạm vi đang chọn"); if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationSnapshot(payload.data); } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationRequestRef.current) { setReconciliationSnapshot(null); setReconciliationError(error instanceof Error ? error.message : "Lỗi không xác định"); } } finally { if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationLoading(false); } };
     void load(); return () => controller.abort();
   }, [activeStoreId, activeViewTab, reconciliationDemo]);
 

@@ -98,5 +98,9 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     await expect(page.getByTestId("migration-reconciliation-shell")).toBeVisible();
     await expect(page.getByText("Áo thun mẫu")).toBeVisible();
     await expect(page.getByText("Đơn hàng #1024")).toHaveCount(0);
+
+    // Switching scopes must not retain the Commerce-only Products filter.
+    await page.getByRole("button", { name: "Đối soát Settings" }).click();
+    await expect(page.getByText("Account profile")).toBeVisible();
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Database, ShieldCheck } from "lucide-react";
 import type {
   ReconciliationRecord,
@@ -84,6 +84,14 @@ export function ReconciliationInspector({
   const [onlyIssues, setOnlyIssues] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<ReconciliationRecord | null>(null);
+  useEffect(() => {
+    setFeature("overview");
+    setStatus("all");
+    setQuery("");
+    setOnlyIssues(false);
+    setPage(1);
+    setSelected(null);
+  }, [scope]);
   const nav =
     scope === "commerce"
       ? [
@@ -110,7 +118,7 @@ export function ReconciliationInspector({
           (feature === "overview" || record.sourceEntity === feature) &&
           (status === "all" || record.status === status) &&
           (!onlyIssues || record.status !== "match") &&
-          `${record.label} ${record.sourceId} ${record.targetId ?? ""}`
+          `${record.label} ${record.sourceId} ${record.targetIds.join(" ")}`
             .toLocaleLowerCase()
             .includes(query.trim().toLocaleLowerCase()),
       ),
@@ -283,7 +291,7 @@ export function ReconciliationInspector({
                       </small>
                     </td>
                     <td className="p-3 font-mono text-slate-300">
-                      {record.targetId ?? "—"}
+                      {record.targetIds.length ? record.targetIds.join(", ") : "—"}
                     </td>
                     <td className="p-3">
                       <span
@@ -325,7 +333,7 @@ export function ReconciliationInspector({
           <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/50 p-3 text-xs">
             <strong className="text-slate-200">Tóm tắt đối soát</strong>
             <p className="mt-2 text-slate-300">
-              PW1 {selected.sourceId} → PW2 {selected.targetId ?? "Chưa có"} ·{" "}
+              PW1 {selected.sourceId} → PW2 {selected.targetIds.length ? selected.targetIds.join(", ") : "Chưa có"} ·{" "}
               {META[selected.status].label}
             </p>
             <p className="mt-1 text-slate-400">

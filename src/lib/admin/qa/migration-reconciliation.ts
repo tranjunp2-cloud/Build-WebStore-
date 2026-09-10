@@ -35,7 +35,8 @@ export type ReconciliationRecord = {
   sourceEntity: ReconciliationEntity;
   sourceId: string;
   targetCollection: string | null;
-  targetId: string | null;
+  /** One or more confirmed PW2 identifiers; never encode multiples in a string. */
+  targetIds: string[];
   label: string;
   status: ReconciliationStatus;
   reason: string;
@@ -84,9 +85,52 @@ export type MigrationEvidenceProvider = {
   }): Promise<ReconciliationSnapshot>;
 };
 
-const SECRET_FIELD_PATTERN = /(password|secret|token|api[_-]?key|key_string|dns_token|credential|authorization)/i;
+const SECRET_FIELD_PATTERN = /(password|secret|token|api[_-]?key|key_string|dns_token|credential|authorization|private[_-]?key|signing[_-]?key)/i;
 const PII_FIELD_PATTERN = /(email|phone|hotline|address|post_code|postal|customer_name|account_name|account_id)/i;
 const MAX_DISPLAY_TEXT_LENGTH = 240;
+const PUBLIC_ID_PATTERN = /^[A-Za-z0-9:_-]{1,128}$/;
+/**
+ * Immutable, Security-reviewed field registry for real adapter output. Add a
+ * key only with the mapping-contract change that documents its classification.
+ */
+export const APPROVED_RECONCILIATION_FIELD_KEYS = [
+  "products.name",
+  "products.slug",
+  "products.status",
+  "products.package_length",
+  "products.package_width",
+  "products.package_height",
+  "products.package_weight",
+  "product_skus.sku",
+  "product_skus.price",
+  "product_skus.cost",
+  "product_skus.status",
+  "promotions.name",
+  "promotions.start_date",
+  "promotions.end_date",
+  "promotions.discount_value",
+  "orders.code",
+  "orders.currency_id",
+  "orders.sub_total",
+  "orders.total_discount",
+  "orders.total_shipping",
+  "orders.total_tax",
+  "orders.status",
+] as const;
+const PUBLIC_FIELD_ALLOWLIST = new Set<string>(APPROVED_RECONCILIATION_FIELD_KEYS);
+const ENTITY_TARGET_COLLECTIONS: Record<ReconciliationEntity, readonly string[]> = {
+  products: ["products"],
+  orders: ["orders"],
+  discounts: ["discounts"],
+  customers: ["customers"],
+  account_profile: ["sites"],
+  team_members: ["users"],
+  email_templates: ["email_templates"],
+  payments: ["payments"],
+  delivery: ["sites"],
+  web_address: ["domains"],
+  app_integrations: ["integrations"],
+};
 
 const SAFE_STATUS_REASONS: Record<ReconciliationStatus, string> = {
   match: "Có đúng một bản ghi PW2 được evidence xác nhận tương ứng với PW1.",
@@ -113,18 +157,60 @@ function maskPii(value: string | null): string | null {
   return "••••";
 }
 
+function isPublicIdentifier(value: unknown): value is string {
+  const identifier = toSafeText(value);
+  return Boolean(identifier && PUBLIC_ID_PATTERN.test(identifier));
+}
+
+function toPublicLabel(value: unknown, isPersonRecord: boolean, isTrustedDemo: boolean): string {
+  const label = toSafeText(value);
+  if (!isTrustedDemo || !label || isPersonRecord || SECRET_FIELD_PATTERN.test(label) || PII_FIELD_PATTERN.test(label)) {
+    return "Bản ghi đã che dữ liệu";
+  }
+  return label;
+}
+
+function normalizedStatus(status: unknown, targetIds: string[]): ReconciliationStatus {
+  if (!isStatus(status)) return "unverified";
+  if (status === "match" && targetIds.length !== 1) return "unverified";
+  if (status === "missing" && targetIds.length !== 0) return "unverified";
+  if (status === "duplicate" && targetIds.length < 2) return "unverified";
+  if (status === "mismatch" && targetIds.length !== 1) return "unverified";
+  return status;
+}
+
+function hasValidMappingIdentity(record: ReconciliationRecord): boolean {
+  if (!isPublicIdentifier(record.sourceId)) return false;
+  const targetIds = Array.isArray(record.targetIds) ? record.targetIds : [];
+  if (!targetIds.every(isPublicIdentifier) || new Set(targetIds).size !== targetIds.length) return false;
+  if (targetIds.length === 0) return record.targetCollection === null;
+  const allowedCollections = ENTITY_TARGET_COLLECTIONS[record.sourceEntity];
+  return record.targetCollection !== null && Boolean(allowedCollections?.includes(record.targetCollection));
+}
+
 /**
  * Converts adapter output into the public, Tester-facing DTO. This boundary is
  * deliberately defensive: values for credentials are removed, PII is masked,
  * and adapter-provided prose is replaced with an approved status explanation.
  */
-export function sanitizeReconciliationSnapshot(snapshot: ReconciliationSnapshot): ReconciliationSnapshot {
+export function sanitizeReconciliationSnapshot(
+  snapshot: ReconciliationSnapshot,
+  options: { allowDemoFixture?: boolean } = {},
+): ReconciliationSnapshot {
+  const isTrustedDemo = options.allowDemoFixture === true && snapshot.evidence?.mode === "demo";
+  const mode = isTrustedDemo ? "demo" : snapshot.evidence?.mode === "verified" ? "verified" : "unavailable";
   const records = Array.isArray(snapshot.records) ? snapshot.records.map((record) => {
-    const status = isStatus(record.status) ? record.status : "unverified";
+    const identityValid = hasValidMappingIdentity(record);
+    const targetIds = identityValid ? record.targetIds : [];
+    const status = identityValid ? normalizedStatus(record.status, targetIds) : "unverified";
+    const displayTargetIds = status === "unverified" ? [] : targetIds;
     const isPersonRecord = record.sourceEntity === "customers" || record.sourceEntity === "team_members";
     const fields = Array.isArray(record.fields) ? record.fields.flatMap((field) => {
       const key = `${field.sourceKey ?? ""} ${field.targetKey ?? ""} ${field.label ?? ""}`;
       if (SECRET_FIELD_PATTERN.test(key)) return [];
+      // Real adapter values remain fail-closed until Security approves explicit
+      // PW1 field keys. Demo data is synthetic and exists solely for UI review.
+      if (!isTrustedDemo && !PUBLIC_FIELD_ALLOWLIST.has(field.sourceKey ?? "")) return [];
 
       const pii = isPersonRecord || PII_FIELD_PATTERN.test(key);
       return [{
@@ -140,10 +226,10 @@ export function sanitizeReconciliationSnapshot(snapshot: ReconciliationSnapshot)
 
     return {
       sourceEntity: record.sourceEntity,
-      sourceId: toSafeText(record.sourceId) ?? "unknown",
+      sourceId: isTrustedDemo && isPublicIdentifier(record.sourceId) ? record.sourceId : "PW1 record",
       targetCollection: toSafeText(record.targetCollection),
-      targetId: toSafeText(record.targetId),
-      label: isPersonRecord ? "Bản ghi cá nhân đã che dữ liệu" : (toSafeText(record.label) ?? "Bản ghi không xác định"),
+      targetIds: isTrustedDemo ? displayTargetIds : displayTargetIds.map((_, index) => `PW2 record #${index + 1}`),
+      label: toPublicLabel(record.label, isPersonRecord, isTrustedDemo),
       status,
       reason: SAFE_STATUS_REASONS[status],
       fields,
@@ -158,12 +244,11 @@ export function sanitizeReconciliationSnapshot(snapshot: ReconciliationSnapshot)
 
   const summary = records.reduce<ReconciliationSummary>((result, record) => {
     result.pw1Total += 1;
-    if (record.targetId) result.pw2Total += 1;
+    result.pw2Total += record.targetIds.length;
     result[record.status] += 1;
     return result;
   }, { ...EMPTY_SUMMARY });
 
-  const mode = snapshot.evidence?.mode === "verified" ? "verified" : snapshot.evidence?.mode === "demo" ? "demo" : "unavailable";
   return {
     scope: snapshot.scope,
     storeId: toSafeText(snapshot.storeId),
@@ -240,20 +325,20 @@ export function createDemoReconciliationSnapshot(input: {
   ) => ({ section, sourceKey, targetKey, label, pw1, pw2, status });
   const records: ReconciliationRecord[] = isCommerce
     ? [
-        { sourceEntity: "products", sourceId: "PW1-PROD-001", targetCollection: "products", targetId: "PW2-PROD-001", label: "Áo thun mẫu", status: "match", reason: "Dữ liệu mẫu: các trường bắt buộc khớp.", relations: [{ label: "SKU / Variants", pw1Total: 100, pw2Total: 100, status: "match" }, { label: "Hình ảnh", pw1Total: 5, pw2Total: 5, status: "match" }], fields: [{ section: "Thông tin chung", label: "Tên", pw1: "Áo thun mẫu", pw2: "Áo thun mẫu", status: "match" }, { section: "Thông tin chung", label: "Slug", pw1: "ao-thun-mau", pw2: "ao-thun-mau", status: "match" }, { section: "Giá & tồn kho", label: "Giá bán", pw1: "RM 49.00", pw2: "RM 49.00", status: "match" }, { section: "Giá & tồn kho", label: "Tồn kho", pw1: "100", pw2: "100", status: "match" }, { section: "SKU / Variants", label: "SKU", pw1: "DEMO-TS-01", pw2: "DEMO-TS-01", status: "match" }, { section: "SEO", label: "Meta title", pw1: "Áo thun mẫu", pw2: "Áo thun mẫu", status: "match" }] },
-        { sourceEntity: "orders", sourceId: "PW1-ORD-1024", targetCollection: null, targetId: null, label: "Đơn hàng #1024", status: "missing", reason: "Dữ liệu mẫu: không tìm thấy target mapping.", relations: [{ label: "Line items", pw1Total: 3, pw2Total: 0, status: "missing" }], fields: [{ section: "Tổng quan", label: "Tổng tiền", pw1: "RM 120.00", pw2: null, status: "missing" }, { section: "Thanh toán", label: "Trạng thái", pw1: "Paid", pw2: null, status: "missing" }, { section: "Giao hàng", label: "Phương thức", pw1: "Standard", pw2: null, status: "missing" }] },
-        { sourceEntity: "discounts", sourceId: "PW1-DIS-NEW10", targetCollection: "discounts", targetId: "PW2-DIS-NEW10", label: "NEW10", status: "mismatch", reason: "Dữ liệu mẫu: giá trị giảm giá khác nhau.", fields: [{ label: "Giá trị", pw1: "10%", pw2: "5%", status: "mismatch" }] },
-        { sourceEntity: "customers", sourceId: "PW1-CUS-081", targetCollection: "customers", targetId: "PW2-CUS-081-A, PW2-CUS-081-B", label: "Khách hàng mẫu", status: "duplicate", reason: "Dữ liệu mẫu: có hơn một target mapping.", fields: [{ label: "Email", pw1: "m***@example.test", pw2: "m***@example.test", status: "duplicate" }] },
-        { sourceEntity: "products", sourceId: "PW1-PROD-099", targetCollection: null, targetId: null, label: "Sản phẩm chờ mapping", status: "unverified", reason: "Dữ liệu mẫu: chưa có mapping định danh.", fields: [{ section: "SKU / Variants", label: "SKU", pw1: "DEMO-PENDING", pw2: null, status: "unverified" }, { section: "Shipping", label: "Kích thước", pw1: "40 × 30 × 5 cm", pw2: null, status: "unsupported" }] },
+        { sourceEntity: "products", sourceId: "PW1-PROD-001", targetCollection: "products", targetIds: ["PW2-PROD-001"], label: "Áo thun mẫu", status: "match", reason: "Dữ liệu mẫu: các trường bắt buộc khớp.", relations: [{ label: "SKU / Variants", pw1Total: 100, pw2Total: 100, status: "match" }, { label: "Hình ảnh", pw1Total: 5, pw2Total: 5, status: "match" }], fields: [{ section: "Thông tin chung", label: "Tên", pw1: "Áo thun mẫu", pw2: "Áo thun mẫu", status: "match" }, { section: "Thông tin chung", label: "Slug", pw1: "ao-thun-mau", pw2: "ao-thun-mau", status: "match" }, { section: "Giá & tồn kho", label: "Giá bán", pw1: "RM 49.00", pw2: "RM 49.00", status: "match" }, { section: "Giá & tồn kho", label: "Tồn kho", pw1: "100", pw2: "100", status: "match" }, { section: "SKU / Variants", label: "SKU", pw1: "DEMO-TS-01", pw2: "DEMO-TS-01", status: "match" }, { section: "SEO", label: "Meta title", pw1: "Áo thun mẫu", pw2: "Áo thun mẫu", status: "match" }] },
+        { sourceEntity: "orders", sourceId: "PW1-ORD-1024", targetCollection: null, targetIds: [], label: "Đơn hàng #1024", status: "missing", reason: "Dữ liệu mẫu: không tìm thấy target mapping.", relations: [{ label: "Line items", pw1Total: 3, pw2Total: 0, status: "missing" }], fields: [{ section: "Tổng quan", label: "Tổng tiền", pw1: "RM 120.00", pw2: null, status: "missing" }, { section: "Thanh toán", label: "Trạng thái", pw1: "Paid", pw2: null, status: "missing" }, { section: "Giao hàng", label: "Phương thức", pw1: "Standard", pw2: null, status: "missing" }] },
+        { sourceEntity: "discounts", sourceId: "PW1-DIS-NEW10", targetCollection: "discounts", targetIds: ["PW2-DIS-NEW10"], label: "NEW10", status: "mismatch", reason: "Dữ liệu mẫu: giá trị giảm giá khác nhau.", fields: [{ label: "Giá trị", pw1: "10%", pw2: "5%", status: "mismatch" }] },
+        { sourceEntity: "customers", sourceId: "PW1-CUS-081", targetCollection: "customers", targetIds: ["PW2-CUS-081-A", "PW2-CUS-081-B"], label: "Khách hàng mẫu", status: "duplicate", reason: "Dữ liệu mẫu: có hơn một target mapping.", fields: [{ label: "Email", pw1: "m***@example.test", pw2: "m***@example.test", status: "duplicate" }] },
+        { sourceEntity: "products", sourceId: "PW1-PROD-099", targetCollection: null, targetIds: [], label: "Sản phẩm chờ mapping", status: "unverified", reason: "Dữ liệu mẫu: chưa có mapping định danh.", fields: [{ section: "SKU / Variants", label: "SKU", pw1: "DEMO-PENDING", pw2: null, status: "unverified" }, { section: "Shipping", label: "Kích thước", pw1: "40 × 30 × 5 cm", pw2: null, status: "unsupported" }] },
       ]
     : [
-        { sourceEntity: "account_profile", sourceId: "PW1-SET-PROFILE", targetCollection: "sites", targetId: "PW2-SITE-001", label: "Account profile", status: "match", reason: "Dữ liệu mẫu: thông tin cho phép đối soát khớp.", fields: [{ label: "Tên cửa hàng", pw1: "Demo Store", pw2: "Demo Store", status: "match" }] },
-        { sourceEntity: "email_templates", sourceId: "PW1-SET-EMAIL", targetCollection: "email_templates", targetId: "PW2-EMAIL-001", label: "Order confirmation", status: "match", reason: "Dữ liệu mẫu: email template đã có mapping.", fields: [{ label: "Subject", pw1: "Xác nhận đơn hàng", pw2: "Xác nhận đơn hàng", status: "match" }] },
-        { sourceEntity: "payments", sourceId: "PW1-SET-PAY", targetCollection: null, targetId: null, label: "Payment methods", status: "missing", reason: "Dữ liệu mẫu: chưa có target mapping.", fields: [{ label: "Phương thức", pw1: "Bank transfer", pw2: null, status: "missing" }] },
-        { sourceEntity: "delivery", sourceId: "PW1-SET-DELIVERY", targetCollection: "sites", targetId: "PW2-SITE-001", label: "Delivery settings", status: "mismatch", reason: "Dữ liệu mẫu: cấu hình giao hàng khác nhau.", fields: [{ label: "Phí giao", pw1: "RM 8", pw2: "RM 10", status: "mismatch" }] },
-        { sourceEntity: "web_address", sourceId: "PW1-SET-DOMAIN", targetCollection: "domains", targetId: "PW2-DOMAIN-001", label: "demo.example.test", status: "match", reason: "Dữ liệu mẫu: domain đã có mapping.", fields: [{ label: "Domain", pw1: "demo.example.test", pw2: "demo.example.test", status: "match" }] },
-        { sourceEntity: "team_members", sourceId: "PW1-SET-TEAM", targetCollection: "users", targetId: "PW2-USER-001, PW2-USER-002", label: "Team members", status: "duplicate", reason: "Dữ liệu mẫu: trùng target mapping.", fields: [{ label: "Email", pw1: "t***@example.test", pw2: "t***@example.test", status: "duplicate" }] },
-        { sourceEntity: "app_integrations", sourceId: "PW1-SET-APP", targetCollection: null, targetId: null, label: "App integrations", status: "unverified", reason: "Dữ liệu mẫu: chờ mapping định danh.", fields: [{ label: "Loại tích hợp", pw1: "Analytics", pw2: null, status: "unverified" }] },
+        { sourceEntity: "account_profile", sourceId: "PW1-SET-PROFILE", targetCollection: "sites", targetIds: ["PW2-SITE-001"], label: "Account profile", status: "match", reason: "Dữ liệu mẫu: thông tin cho phép đối soát khớp.", fields: [{ label: "Tên cửa hàng", pw1: "Demo Store", pw2: "Demo Store", status: "match" }] },
+        { sourceEntity: "email_templates", sourceId: "PW1-SET-EMAIL", targetCollection: "email_templates", targetIds: ["PW2-EMAIL-001"], label: "Order confirmation", status: "match", reason: "Dữ liệu mẫu: email template đã có mapping.", fields: [{ label: "Subject", pw1: "Xác nhận đơn hàng", pw2: "Xác nhận đơn hàng", status: "match" }] },
+        { sourceEntity: "payments", sourceId: "PW1-SET-PAY", targetCollection: null, targetIds: [], label: "Payment methods", status: "missing", reason: "Dữ liệu mẫu: chưa có target mapping.", fields: [{ label: "Phương thức", pw1: "Bank transfer", pw2: null, status: "missing" }] },
+        { sourceEntity: "delivery", sourceId: "PW1-SET-DELIVERY", targetCollection: "sites", targetIds: ["PW2-SITE-001"], label: "Delivery settings", status: "mismatch", reason: "Dữ liệu mẫu: cấu hình giao hàng khác nhau.", fields: [{ label: "Phí giao", pw1: "RM 8", pw2: "RM 10", status: "mismatch" }] },
+        { sourceEntity: "web_address", sourceId: "PW1-SET-DOMAIN", targetCollection: "domains", targetIds: ["PW2-DOMAIN-001"], label: "demo.example.test", status: "match", reason: "Dữ liệu mẫu: domain đã có mapping.", fields: [{ label: "Domain", pw1: "demo.example.test", pw2: "demo.example.test", status: "match" }] },
+        { sourceEntity: "team_members", sourceId: "PW1-SET-TEAM", targetCollection: "users", targetIds: ["PW2-USER-001", "PW2-USER-002"], label: "Team members", status: "duplicate", reason: "Dữ liệu mẫu: trùng target mapping.", fields: [{ label: "Email", pw1: "t***@example.test", pw2: "t***@example.test", status: "duplicate" }] },
+        { sourceEntity: "app_integrations", sourceId: "PW1-SET-APP", targetCollection: null, targetIds: [], label: "App integrations", status: "unverified", reason: "Dữ liệu mẫu: chờ mapping định danh.", fields: [{ label: "Loại tích hợp", pw1: "Analytics", pw2: null, status: "unverified" }] },
       ];
 
   const schemaDetail = new Map<string, ReconciliationRecord["fields"]>([
@@ -364,7 +449,7 @@ export function createDemoReconciliationSnapshot(input: {
 
   const summary = enrichedRecords.reduce<ReconciliationSummary>((result, record) => {
     result.pw1Total += 1;
-    if (record.targetId) result.pw2Total += 1;
+    result.pw2Total += record.targetIds.length;
     result[record.status] += 1;
     return result;
   }, { ...EMPTY_SUMMARY });

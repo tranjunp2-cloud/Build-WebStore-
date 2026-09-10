@@ -77,7 +77,7 @@ describe("[TC-F40-14-01][TC-F40-14-03] Migration reconciliation evidence boundar
       sourceEntity: "customers",
       sourceId: "PW1-CUS-001",
       targetCollection: "customers",
-      targetId: "PW2-CUS-001",
+      targetIds: ["PW2-CUS-001"],
       label: "Mai Example",
       status: "match",
       reason: "Adapter-provided free text must not be returned.",
@@ -88,13 +88,81 @@ describe("[TC-F40-14-01][TC-F40-14-03] Migration reconciliation evidence boundar
     }];
 
     // Act
-    const sanitized = sanitizeReconciliationSnapshot(snapshot);
+    const sanitized = sanitizeReconciliationSnapshot(snapshot, { allowDemoFixture: true });
 
     // Assert
-    expect(sanitized.records[0].label).toBe("Bản ghi cá nhân đã che dữ liệu");
+    expect(sanitized.records[0].label).toBe("Bản ghi đã che dữ liệu");
     expect(sanitized.records[0].reason).not.toContain("Adapter-provided");
     expect(sanitized.records[0].fields).toEqual([
       expect.objectContaining({ label: "Email", pw1: "m***@example.test", pw2: "m***@example.test" }),
     ]);
+  });
+
+  it("TC-F40-14-03: counts every structured PW2 target instead of parsing a display string", () => {
+    // Arrange
+    const snapshot = createDemoReconciliationSnapshot({ scope: "commerce", storeId: "SITE-0205" });
+
+    // Act
+    const sanitized = sanitizeReconciliationSnapshot(snapshot, { allowDemoFixture: true });
+
+    // Assert
+    expect(sanitized.summary.pw2Total).toBe(4);
+    expect(sanitized.records.find((record) => record.sourceEntity === "customers")?.targetIds).toEqual([
+      "PW2-CUS-081-A",
+      "PW2-CUS-081-B",
+    ]);
+  });
+
+  it("TC-F40-14-01: downgrades malformed target evidence instead of certifying a match", () => {
+    // Arrange
+    const snapshot = createDemoReconciliationSnapshot({ scope: "commerce", storeId: "SITE-0205" });
+    snapshot.evidence = { available: true, mode: "verified", contractVersion: "v1", message: "ignored" };
+    snapshot.records = [{
+      sourceEntity: "products",
+      sourceId: "customer@example.test",
+      targetCollection: "products",
+      targetIds: ["PW2-PROD-001", "customer@example.test"],
+      label: "Arbitrary adapter label",
+      status: "match",
+      reason: "ignored",
+      fields: [{ sourceKey: "products.name", label: "Tên", pw1: "Áo", pw2: "Áo", status: "match" }],
+    }];
+
+    // Act
+    const sanitized = sanitizeReconciliationSnapshot(snapshot);
+
+    // Assert
+    expect(sanitized.records[0]).toEqual(expect.objectContaining({
+      sourceId: "PW1 record",
+      targetIds: [],
+      label: "Bản ghi đã che dữ liệu",
+      status: "unverified",
+    }));
+    expect(sanitized.summary.match).toBe(0);
+    expect(sanitized.summary.unverified).toBe(1);
+  });
+
+  it("TC-F40-14-01: never counts an unverified candidate as a mapped PW2 record", () => {
+    // Arrange
+    const snapshot = createDemoReconciliationSnapshot({ scope: "commerce", storeId: "SITE-0205" });
+    snapshot.evidence = { available: true, mode: "verified", contractVersion: "v1", message: "ignored" };
+    snapshot.records = [{
+      sourceEntity: "products",
+      sourceId: "PW1-PROD-001",
+      targetCollection: "products",
+      targetIds: ["PW2-PROD-001"],
+      label: "ignored",
+      status: "unverified",
+      reason: "ignored",
+      fields: [],
+    }];
+
+    // Act
+    const sanitized = sanitizeReconciliationSnapshot(snapshot);
+
+    // Assert
+    expect(sanitized.records[0].targetIds).toEqual([]);
+    expect(sanitized.summary.pw2Total).toBe(0);
+    expect(sanitized.summary.unverified).toBe(1);
   });
 });

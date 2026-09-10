@@ -38,5 +38,7 @@ export const GET = withSuperAdmin(async (request: NextRequest) => {
     demo: query.data.demo === "1",
   });
 
-  return NextResponse.json({ data: sanitizeReconciliationSnapshot(snapshot) });
+  return NextResponse.json({
+    data: sanitizeReconciliationSnapshot(snapshot, { allowDemoFixture: query.data.demo === "1" }),
+  });
 });
