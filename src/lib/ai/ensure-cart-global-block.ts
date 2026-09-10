@@ -27,8 +27,9 @@ export function ensureCartGlobalBlock(
     existingGlobalBlocks: Record<string, unknown> | null | undefined,
     pages: Array<{ layout?: unknown[] }>,
     headerBlock?: unknown,
+    requireCart = false,
 ): { globalBlocks: Record<string, unknown> } | Record<string, never> {
-    if (!detectCommercePresence(pages)) return {}
+    if (!requireCart && !detectCommercePresence(pages)) return {}
     if (hasHeaderCart(headerBlock)) return {}
 
     const existing =
@@ -52,11 +53,12 @@ export function ensureCartGlobalBlockWithPending(
     pendingGlobalBlocks: Record<string, unknown> | null | undefined,
     pages: Array<{ layout?: unknown[] }>,
     headerBlock?: unknown,
+    requireCart = false,
 ): { globalBlocks?: Record<string, unknown>; pendingGlobalBlocks?: Record<string, unknown> } {
-    const livePatch = ensureCartGlobalBlock(existingGlobalBlocks, pages, headerBlock)
+    const livePatch = ensureCartGlobalBlock(existingGlobalBlocks, pages, headerBlock, requireCart)
     if (pendingGlobalBlocks == null) return livePatch
 
-    const pendingPatch = ensureCartGlobalBlock(pendingGlobalBlocks, pages, headerBlock)
+    const pendingPatch = ensureCartGlobalBlock(pendingGlobalBlocks, pages, headerBlock, requireCart)
     return {
         ...livePatch,
         ...('globalBlocks' in pendingPatch ? { pendingGlobalBlocks: pendingPatch.globalBlocks } : {}),

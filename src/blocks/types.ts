@@ -55,6 +55,7 @@ export const ThemeConfigSchema = z.object({
 
 // ── Block Types Enum ─────────────────────────────────────────────────────────
 export const BLOCK_TYPES = [
+    'rich-text', 'content-cards',
     'navigation', 'hero', 'about', 'features', 'testimonials',
     'contact', 'gallery', 'footer', 'faq', 'pricing',
     'cta', 'stats', 'team', 'newsletter',

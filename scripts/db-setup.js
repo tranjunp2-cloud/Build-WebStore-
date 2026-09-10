@@ -63,6 +63,7 @@ async function getTableCount(pool) {
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
+  { name: 'pw1_migration.batch_ledger', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-batch.sql'), 'utf8') },
   // ── Users: Auth tables (Payload Drizzle schema) ──
   // Payload 3.14 uses VARCHAR id (UUID), mixed column naming:
   //   roles: parent_id, order (no underscore)
@@ -842,6 +843,20 @@ const MIGRATIONS = [
     );`,
   },
   // Hero CTA buttons
+  {
+    name: 'pw1_reconstruction.native_blocks',
+    sql: `ALTER TABLE pages_blocks_hero ADD COLUMN IF NOT EXISTS source_layout jsonb;
+ALTER TABLE IF EXISTS _pages_v_blocks_hero ADD COLUMN IF NOT EXISTS source_layout jsonb;
+CREATE TABLE IF NOT EXISTS pages_blocks_rich_text (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, html text, source_component_id varchar, padding_y numeric DEFAULT 64);
+CREATE TABLE IF NOT EXISTS _pages_v_blocks_rich_text (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, html text, source_component_id varchar, padding_y numeric DEFAULT 64);
+CREATE TABLE IF NOT EXISTS pages_blocks_content_cards (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, variant varchar, headline varchar, source_component_id varchar, source_content jsonb);
+CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, variant varchar, headline varchar, source_component_id varchar, source_content jsonb);`,
+  },
+  {
+    name: 'pages_blocks_hero.slides',
+    sql: `ALTER TABLE "pages_blocks_hero" ADD COLUMN IF NOT EXISTS "slides" jsonb;
+      ALTER TABLE IF EXISTS "_pages_v_blocks_hero" ADD COLUMN IF NOT EXISTS "slides" jsonb;`,
+  },
   {
     name: 'pages_blocks_hero_cta_buttons.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_hero_cta_buttons" (

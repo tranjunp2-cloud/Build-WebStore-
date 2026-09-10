@@ -25,6 +25,9 @@ const HeroBlock = {
                 { label: 'Split Video', value: 'split-video' },
             ],
         },
+        // Ordered slide content is JSON, preserving per-slide copy/CTA and resolved image URLs.
+        { name: 'slides', type: 'json' },
+        { name: 'sourceLayout', type: 'json' },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
@@ -830,6 +833,22 @@ const ProductsFeaturedBlock = {
     ],
 }
 
+const RichTextBlock = {
+    slug: 'rich-text', labels: { singular: 'Rich Text', plural: 'Rich Text' },
+    fields: [
+        { name: 'html', type: 'code', admin: { language: 'html' } },
+        { name: 'sourceComponentId', type: 'text' },
+        { name: 'paddingY', type: 'number', defaultValue: 64 },
+    ],
+}
+const ContentCardsBlock = {
+    slug: 'content-cards', labels: { singular: 'Content Cards', plural: 'Content Cards' },
+    fields: [
+        { name: 'variant', type: 'text' }, { name: 'headline', type: 'text' },
+        { name: 'sourceComponentId', type: 'text' }, { name: 'sourceContent', type: 'json' },
+    ],
+}
+
 const CustomHtmlBlock = {
     slug: 'custom-html',
     labels: { singular: 'Custom HTML', plural: 'Custom HTML Blocks' },
@@ -1594,6 +1613,8 @@ export const Pages: CollectionConfig = {
                 ProductsGridBlock,
                 ProductsFeaturedBlock,
                 CustomHtmlBlock,
+                RichTextBlock,
+                ContentCardsBlock,
                 ServiceCardsBlock,
                 CarouselBlock,
                 StepProcessBlock,

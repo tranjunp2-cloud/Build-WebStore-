@@ -1,0 +1,62 @@
+import { ensureCartGlobalBlockWithPending } from '@/lib/ai/ensure-cart-global-block'
+import { describe, expect, it } from 'vitest'
+import { adaptWebsiteInput } from '@/lib/migration/pw2-website-input'
+import { bindNativeDesign } from '@/lib/migration/pw1-native-ai'
+function fixture() {
+    return { format:'pw2-website-input', version:'1.0.0', source:{storeId:'1',websiteUrl:'https://source.example'},website:{name:'Shop',locale:'en',branding:{logoUrl:'https://source.example/logo.png'},navigation:[{label:'Home',pageId:'10'}],footer:{copyright:'Shop',columns:[]}}, pages:[{sourceId:'10',title:'Home',path:'/',components:[
+        {sourceId:'1',type:'product_listing',content:{heading:'Products'},config:{limit:7},binding:{source:'pw2.database',collection:'products',scope:'site',emptyBehavior:'native-empty-state'}},
+        {sourceId:'2',type:'article_listing',content:{heading:'Stories'},config:{limit:4},binding:{source:'pw2.database',collection:'blogs',scope:'tenant',emptyBehavior:'native-empty-state'}},
+        {sourceId:'3',type:'product_filter',content:{heading:'Filter'},config:{criteria:{category:1}},mappingStatus:'pending'},
+        {sourceId:'4',type:'rich_text',enabled:false,content:{html:'<p>Disabled</p>'},config:{}},
+    ]}] }
+}
+describe('[TC-F35.M21] Compact website input adapter',()=>{
+    it('uses only the supplied input, resolves navigation and reports pending/disabled components',()=>{
+        const input=fixture(), original=JSON.stringify(input)
+        const {contract,report}=adaptWebsiteInput(input)
+        expect(contract.site.navigation.links).toEqual([{label:'Home',url:'/'}])
+        expect(contract.pages[0].components.map(c=>c.sourceId)).toEqual(['1','2'])
+        expect(report.pending).toMatchObject([{sourceId:'3',type:'product_filter'}])
+        expect(report.excluded).toEqual(['4'])
+        expect(JSON.stringify(input)).toBe(original)
+        const result=bindNativeDesign(contract,{theme:{primaryColor:'#335533',secondaryColor:'#fafafa',fontHeading:'Inter',fontBody:'Inter'},navigationVariant:'centered',footerVariant:'simple',pages:[{sourceId:'10',sections:[{sourceId:'1',blockType:'products-grid',variant:'grid-4'},{sourceId:'2',blockType:'blog-list',variant:'cards'}]}]})
+        expect(result.pages![0].blocks[1]).toMatchObject({blockType:'products-grid',limit:7})
+        expect(result.pages![0].blocks[2]).toMatchObject({blockType:'blog-list',limit:4})
+    })
+    it('rejects invalid page links and duplicate paths',()=>{
+        const input=fixture();input.website.navigation[0].pageId='99'
+        expect(()=>adaptWebsiteInput(input)).toThrow('navigation target')
+        input.website.navigation[0].pageId='10';input.pages.push({...input.pages[0],sourceId:'11',components:[]})
+        expect(()=>adaptWebsiteInput(input)).toThrow('Duplicate page')
+    })
+    it('rejects unsupported binding rather than embedding source records',()=>{
+        const input=fixture();input.pages[0].components[0].binding!.collection='blogs'
+        expect(()=>adaptWebsiteInput(input)).toThrow('database binding')
+    })
+    it('preserves static HTML and banner slide content',()=>{
+        const input=fixture()
+        const payload={...input,pages:[{...input.pages[0],components:[{sourceId:'5',type:'rich_text',content:{html:'<h2>Exact copy</h2>'},config:{}},{sourceId:'6',type:'banner',content:{slides:[{imageUrl:'https://source.example/a.jpg',heading:'Tea',cta:{label:'Read',url:'/articles'}}]},config:{autoplay:false,intervalMs:3000}}]}]}
+        const {contract}=adaptWebsiteInput(payload)
+        expect(contract.pages[0].components[0].block.html).toBe('<h2>Exact copy</h2>')
+        expect(contract.pages[0].components[1].block.slides).toMatchObject([{headline:'Tea',ctaButtons:[{label:'Read',url:'/articles'}]}])
+    })
+})
+
+
+describe('[TC-F35.M24] Native commerce features from legacy navigation', () => {
+    it('converts same-origin system links to features and preserves external links', () => {
+        const input = fixture()
+        const links = [{label:'Cart',url:'/cart'}, {label:'Tracking',url:'https://source.example/order-tracking'}, {label:'External',url:'https://other.example/cart'}]
+        const {contract} = adaptWebsiteInput({...input,website:{...input.website,navigation:links}})
+        expect(contract.site.features).toEqual({cart:true,orderTracking:true})
+        expect(contract.site.navigation.links).toEqual([links[2]])
+    })
+    it('enables native cart without product blocks, including a stale pending draft', () => {
+        const input = fixture()
+        const {contract} = adaptWebsiteInput({...input,website:{...input.website,features:{cart:true,orderTracking:true},navigation:[]}})
+        const patch = ensureCartGlobalBlockWithPending(null,{cartWidget:null},[],undefined,contract.site.features?.cart)
+        expect(patch.globalBlocks?.cartWidget).toMatchObject({blockType:'cartWidget'})
+        expect(patch.pendingGlobalBlocks?.cartWidget).toMatchObject({blockType:'cartWidget'})
+        expect(ensureCartGlobalBlockWithPending(null,null,[],undefined,false)).toEqual({})
+    })
+})

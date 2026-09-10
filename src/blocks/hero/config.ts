@@ -2,6 +2,14 @@ import { z } from 'zod'
 import { BaseBlockSchema, CTAButtonSchema, ImageRefSchema } from '../types'
 import type { CTAButton, ImageRef } from '../types'
 
+export const HeroSlideSchema = z.object({
+    headline: z.string(),
+    subheadline: z.string().optional(),
+    image: ImageRefSchema.optional(),
+    ctaButtons: z.array(CTAButtonSchema).default([]),
+})
+export type HeroSlide = z.infer<typeof HeroSlideSchema>
+
 // ── Hero Config ──────────────────────────────────────────────────────────────
 export type HeroConfig = {
     blockType: 'hero'
@@ -16,6 +24,8 @@ export type HeroConfig = {
     // New optional fields
     videoUrl?: string
     gradientPreset?: 'aurora' | 'sunset' | 'ocean' | 'forest'
+    sourceLayout?: { size: 'hero' | 'small'; autoplay: boolean; interval: number; sourceComponentId: string }
+    slides?: HeroSlide[]
     images?: ImageRef[]
 }
 
@@ -34,6 +44,8 @@ export const HeroConfigSchema = BaseBlockSchema.extend({
     videoUrl: z.string().optional(),
     gradientPreset: z.enum(['aurora', 'sunset', 'ocean', 'forest']).optional(),
     images: z.array(ImageRefSchema).optional(),
+    slides: z.array(HeroSlideSchema).optional(),
+    sourceLayout: z.object({ size: z.enum(['hero','small']), autoplay: z.boolean(), interval: z.number().min(1000).max(30000), sourceComponentId: z.string() }).optional(),
 })
 
 export const heroMeta = {

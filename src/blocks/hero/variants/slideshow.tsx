@@ -14,18 +14,24 @@ import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
 
 export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
-    const { headline, subheadline, ctaButtons = [], badge, image, images = [] } = block
+    const { badge, image, images = [], slides: contentSlides = [] } = block
     const category = (site?.siteType as string) || 'business'
     const fallbackHeroUrl = getHeroImage(category, 0, site?.imageLibraryS3 as Record<string, string> | undefined)
 
     // Build slides array: use images[] if available, fall back to single image
-    const slides = (images && images.length > 0)
+    const slides = contentSlides.length > 0
+        ? contentSlides.map(slide => slide.image)
+        : (images && images.length > 0)
         ? images
         : image?.url
             ? [image]
-            : [{ url: fallbackHeroUrl, alt: headline }]
+            : [{ url: fallbackHeroUrl, alt: block.headline }]
 
     const [currentIndex, setCurrentIndex] = useState(0)
+    const currentSlide = contentSlides[currentIndex % Math.max(contentSlides.length, 1)]
+    const { headline, subheadline, ctaButtons = [] } = currentSlide ?? block
+
+    const imageOnly = !headline && !subheadline && ctaButtons.length === 0
 
     useEffect(() => {
         if (slides.length <= 1) return
@@ -53,10 +59,10 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
     }, [currentIndex, slides.length])
 
     return (
-        <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
+        <AnimatedSection className={`relative flex items-center overflow-hidden ${imageOnly ? 'min-h-[48vh] md:min-h-[65vh]' : 'min-h-[75vh] md:min-h-[92vh]'}`}>
             {/* Only current + next slide rendered in DOM (preload optimization) */}
             {visibleIndices.map((i) => {
-                const slideField = (images && images.length > 0) ? `images.${i}.url` : 'image.url'
+                const slideField = contentSlides.length ? `slides.${i}.image.url` : (images && images.length > 0) ? `images.${i}.url` : 'image.url'
                 const slideAlt = (slides[i]?.alt as string | undefined) ?? ''
                 return (
                     <HeroMediaOverlay
@@ -68,7 +74,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
                         <div
                             className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
                             style={{
-                                backgroundImage: `url(${slides[i]?.url})`,
+                                backgroundImage: slides[i]?.url ? `url(${slides[i]?.url})` : undefined,
                                 opacity: i === currentIndex ? 1 : 0,
                             }}
                         />
@@ -76,9 +82,9 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
                 )
             })}
             {/* Dark overlay */}
-            <div className="absolute inset-0 bg-black/50" />
+            <div className="absolute inset-0 bg-black" style={{ opacity: block.overlayOpacity ?? 0.5 }} />
 
-            <div className={`${HERO_CONTAINER} relative z-10 text-center max-w-3xl`}>
+            <div className={`${HERO_CONTAINER} z-10 text-center max-w-3xl ${imageOnly ? 'absolute bottom-6 left-1/2 -translate-x-1/2 w-full' : 'relative'}`}>
                 {badge?.show && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}

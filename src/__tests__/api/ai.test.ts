@@ -1,4 +1,6 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
+import { generateSiteService } from '@/lib/ai/generate-site-service'
+import type { GenerateSiteServiceContext } from '@/lib/ai/generate-site-service'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
 import { POST as GenerateSitePOST, buildGeneratedPages, canonicalizePageSlug } from '@/app/api/ai/generate-site/route'
 import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
@@ -282,6 +284,28 @@ describe('AI Streaming APIs', () => {
 
     describe('POST /api/ai/generate-site', () => {
         
+        it('[TC-F35.M11] rejects a migration account that does not own the target before generation or writes', async () => {
+            // Arrange
+            const payload = await getPayload({ config: {} as Parameters<typeof getPayload>[0]['config'] })
+            vi.mocked(payload.findByID).mockResolvedValueOnce({ id: 'target-site', tenant: 'foreign-tenant' })
+            const input = { businessInfo: { businessName: 'Source shop', industry: 'ecommerce', products: 'Catalog', shortDescription: 'Original shop' } }
+            const sourceBlueprint = { nativeContract: { format: 'pw2-reconstruction-contract' as const, version: '1.0.0' as const, source: {storeId:'11',url:'https://source.example',capturedAt:'',dumpHash:''}, site:{name:'Source shop',navigation:{},footer:{}},pages:[],reconciliation:[] }, storeId: '11', siteName: 'Source shop', description: '', storeSettings: {},
+                navigation: { menus: [], menu_items: [], menu_lines: [], settings: [] }, pages: [], warnings: [], excludedPages: 0, excludedComponents: 0 }
+            const user = { id: 'user-xyz', tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }] } as unknown as GenerateSiteServiceContext['user']
+
+            // Act
+            const response = await generateSiteService({ payload, user, input, streaming: false,
+                migration: { targetSiteId: 'target-site', sourceBlueprint } })
+
+            // Assert
+            expect(response.status).toBe(403)
+            expect(generateSiteWithAI).not.toHaveBeenCalled()
+            expect(generateSampleProducts).not.toHaveBeenCalled()
+            expect(payload.create).not.toHaveBeenCalled()
+            expect(payload.update).not.toHaveBeenCalled()
+            expect(payload.delete).not.toHaveBeenCalled()
+        })
+
         it('returns 400 if businessInfo is missing required fields', async () => {
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
                  method: 'POST',
