@@ -80,6 +80,15 @@ import {
   Clock,
   Info,
 } from "lucide-react";
+import {
+  BlockMigrationEvidence,
+  Pw2EvidencePlaceholder,
+} from "./BlockMigrationEvidence";
+import type {
+  BlockRenderEvidence,
+  MigrationRenderEvidenceSnapshot,
+} from "@/lib/admin/qa/migration-render-evidence";
+import { deriveRenderEvidenceOverall } from "@/lib/admin/qa/migration-render-evidence";
 
 type FieldDiffSource = "ui_fixture" | "catalog_fixture" | "pw1_snapshot_unverified";
 type LoadedFieldDiff = { data: StoreDeepDiff; source: FieldDiffSource };
@@ -847,6 +856,12 @@ export function MigrationDiffClient() {
   const [resolvedStoreIds, setResolvedStoreIds] = useState<Set<string>>(new Set());
   const [isReloading, setIsReloading] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [renderEvidence, setRenderEvidence] =
+    useState<MigrationRenderEvidenceSnapshot | null>(null);
+  const [isRenderEvidenceLoading, setIsRenderEvidenceLoading] = useState(false);
+  const [renderEvidenceError, setRenderEvidenceError] = useState<string | null>(null);
+  const [useDemoRenderEvidence, setUseDemoRenderEvidence] = useState(false);
+  const [liveCheckBlockId, setLiveCheckBlockId] = useState<string | null>(null);
 
   // Live Database Modal States
   const [dbModalOpen, setDbModalOpen] = useState(false);
@@ -1013,6 +1028,56 @@ export function MigrationDiffClient() {
 
   const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
 
+  useEffect(() => {
+    if (!activeStoreId || !activePage) {
+      setRenderEvidence(null);
+      setRenderEvidenceError(null);
+      setIsRenderEvidenceLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const loadEvidence = async () => {
+      setRenderEvidence(null);
+      setLiveCheckBlockId(null);
+      setIsRenderEvidenceLoading(true);
+      setRenderEvidenceError(null);
+      try {
+        const params = new URLSearchParams({
+          store_id: activeStoreId,
+          page_id: activePage.id,
+          demo: useDemoRenderEvidence ? "1" : "0",
+        });
+        const response = await fetch(`/api/qa/migration-render-evidence?${params}`, {
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as {
+          data?: MigrationRenderEvidenceSnapshot;
+          error?: string;
+        };
+        if (!response.ok || !payload.data) {
+          throw new Error(payload.error || "Không tải được bằng chứng migration.");
+        }
+        if (!controller.signal.aborted) setRenderEvidence(payload.data);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setRenderEvidence(null);
+        setRenderEvidenceError(
+          error instanceof Error ? error.message : "Không tải được bằng chứng migration.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setIsRenderEvidenceLoading(false);
+      }
+    };
+    void loadEvidence();
+    return () => controller.abort();
+  }, [activeStoreId, activePage?.id, useDemoRenderEvidence]);
+
+  const evidenceByLegacyId = useMemo(
+    () => new Map(renderEvidence?.blocks.map((item) => [item.legacyId, item]) ?? []),
+    [renderEvidence],
+  );
+
   // Dispatch smooth SPA navigation to live storefront iframes when user switches page tabs
   useEffect(() => {
     if (activePage && previewSource === "template") {
@@ -1154,6 +1219,66 @@ export function MigrationDiffClient() {
     setTimeout(() => setToastMsg(null), 3000);
   };
 
+  const requestLiveCheck = async (evidence: BlockRenderEvidence) => {
+    if (!activeStoreId || !activePage) return;
+    setLiveCheckBlockId(evidence.legacyId);
+    try {
+      const response = await fetch("/api/qa/migration-render-evidence/live-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          store_id: activeStoreId,
+          page_id: activePage.id,
+          legacy_id: evidence.legacyId,
+        }),
+      });
+      const payload = (await response.json()) as {
+        data?: {
+          legacyId: string;
+          status: "rendered" | "not_rendered" | "unverified";
+          checkedAt: string | null;
+          evidenceRef: string | null;
+          reasonCode: string;
+          message?: string;
+        };
+        error?: string;
+      };
+      if (!response.ok) throw new Error(payload.error || "Không thể yêu cầu live check.");
+      if (!payload.data || payload.data.legacyId !== evidence.legacyId) {
+        throw new Error("Kết quả live check không khớp với block đang kiểm tra.");
+      }
+      setRenderEvidence((snapshot) => {
+        if (!snapshot || snapshot.storeId !== activeStoreId || snapshot.pageId !== activePage.id) return snapshot;
+        return {
+          ...snapshot,
+          blocks: snapshot.blocks.map((block) => {
+            if (block.legacyId !== evidence.legacyId) return block;
+            const liveRender = {
+              status: payload.data!.status,
+              checkedAt: payload.data!.checkedAt,
+              evidenceRef: payload.data!.evidenceRef,
+              reasonCode: payload.data!.reasonCode,
+            };
+            return {
+              ...block,
+              liveRender,
+              overall: deriveRenderEvidenceOverall({
+                pw2Data: block.pw2Data,
+                component: block.component,
+                liveRender,
+              }),
+            };
+          }),
+        };
+      });
+      showToast(payload.data?.message || "Đã gửi yêu cầu live check.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Không thể yêu cầu live check.");
+    } finally {
+      setLiveCheckBlockId(null);
+    }
+  };
+
   const handleReloadStoreData = async (storeId: string) => {
     setIsReloading(true);
     const requestId = ++fieldDiffRequestRef.current;
@@ -1228,11 +1353,7 @@ export function MigrationDiffClient() {
   };
 
   const handleApprovePass = (storeId: string) => {
-    setCatalog((prev) =>
-      prev.map((s) => (s.id === storeId ? { ...s, status: "passed", score: "99.8%" } : s))
-    );
-    showToast(`✓ Đã đóng dấu QC Pass cho ${storeId}!`);
-    setActiveStoreId(null);
+    showToast(`Không thể duyệt QC Pass cho ${storeId}: cần bằng chứng xác minh toàn bộ website.`);
   };
 
   const scrollToBlock = (blockId: string) => {
@@ -1840,11 +1961,14 @@ export function MigrationDiffClient() {
                   <span>{isReloading ? "Đang Quét Lại..." : "Quét Lại CSDL"}</span>
                 </button>
                 <button
+                  type="button"
+                  disabled
                   onClick={() => handleApprovePass(selectedDiff.id)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl transition shadow-md shadow-emerald-600/20"
+                  title="Chỉ mở khi có evidence xác minh đầy đủ cho toàn bộ website"
+                  className="flex cursor-not-allowed items-center gap-1.5 rounded-xl bg-slate-700 px-4 py-2 text-xs font-semibold text-slate-400 opacity-70"
                 >
                   <CheckCircle2 className="size-4" />
-                  <span>Duyệt QC Pass</span>
+                  <span>QC Pass chờ evidence</span>
                 </button>
                 <button
                   onClick={() => setActiveStoreId(null)}
@@ -1941,7 +2065,7 @@ export function MigrationDiffClient() {
                     onChange={(e) => setShowOnlyErrors(e.target.checked)}
                     className="rounded border-slate-700 text-blue-600 focus:ring-0 size-3.5"
                   />
-                  <span className="font-semibold text-rose-400">Chỉ Lỗi</span>
+                  <span className="font-semibold text-rose-400">Lỗi / cần xem</span>
                 </label>
               </div>
             </div>
@@ -1972,10 +2096,6 @@ export function MigrationDiffClient() {
                         className={`w-full text-left p-2.5 rounded-xl border text-xs transition flex items-center justify-between ${
                           selectedBlockId === block.id
                             ? "bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/25 font-semibold"
-                            : block.status === "fail"
-                            ? "bg-rose-500/10 text-rose-300 border-rose-500/20 hover:bg-rose-500/20"
-                            : block.status === "warn"
-                            ? "bg-amber-500/10 text-amber-300 border-amber-500/20 hover:bg-amber-500/20"
                             : "bg-slate-900/60 text-slate-300 border-slate-800/80 hover:bg-slate-800 hover:text-white"
                         }`}
                       >
@@ -1985,13 +2105,7 @@ export function MigrationDiffClient() {
                           </span>
                           <span className="font-medium truncate">{block.title.replace(/Khối #\d+:\s*/, "")}</span>
                         </div>
-                        {block.status === "fail" ? (
-                          <span className="size-2 rounded-full bg-rose-500 shrink-0" />
-                        ) : block.status === "warn" ? (
-                          <span className="size-2 rounded-full bg-amber-400 shrink-0" />
-                        ) : (
-                          <span className="size-2 rounded-full bg-emerald-400 shrink-0" />
-                        )}
+                        <span className="size-2 rounded-full bg-slate-500 shrink-0" title="Xem bằng chứng migration trong chi tiết khối" />
                       </button>
                     ))}
                   </div>
@@ -2056,6 +2170,25 @@ export function MigrationDiffClient() {
                           />
                         </div>
                       )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs">
+                      <label className="flex cursor-pointer items-center gap-2 text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={useDemoRenderEvidence}
+                          onChange={(event) => setUseDemoRenderEvidence(event.target.checked)}
+                          className="size-3.5 rounded border-slate-700 text-blue-600 focus:ring-0"
+                        />
+                        <span className="font-semibold">Xem dữ liệu mẫu để duyệt UI</span>
+                      </label>
+                      <span className={useDemoRenderEvidence ? "text-amber-300" : "text-slate-400"}>
+                        {isRenderEvidenceLoading
+                          ? "Đang tải bằng chứng…"
+                          : renderEvidenceError
+                            ? renderEvidenceError
+                            : renderEvidence?.message ?? "Chưa tải bằng chứng migration."}
+                      </span>
                     </div>
 
                     <div className={`grid gap-6 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2 gap-4"}`}>
@@ -2148,20 +2281,27 @@ export function MigrationDiffClient() {
                   {/* Sequential Block Stack */}
                   <div className="space-y-4">
                     {activePage.blocks
-                      .filter((b) => !showOnlyErrors || b.status === "fail" || b.status === "warn")
-                      .map((block) => (
+                      .filter(
+                        (block) =>
+                          !showOnlyErrors ||
+                          evidenceByLegacyId.get(block.id)?.overall !== "pass",
+                      )
+                      .map((block) => {
+                        const blockEvidence: BlockRenderEvidence | null =
+                          evidenceByLegacyId.get(block.id) ?? null;
+                        const evidenceSurface =
+                          blockEvidence?.overall === "failed"
+                            ? "bg-rose-950/10 border-rose-500/40 ring-1 ring-rose-500/20 shadow-md"
+                            : blockEvidence?.overall === "pass"
+                              ? "bg-emerald-950/10 border-emerald-500/30"
+                              : selectedBlockId === block.id
+                                ? "bg-slate-900 border-blue-500 ring-2 ring-blue-500/30 shadow-xl"
+                                : "bg-slate-900/40 border-slate-800/80 hover:border-slate-700/80 shadow-sm";
+                        return (
                         <div
                           key={block.id}
                           id={block.id}
-                          className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 space-y-3.5 ${
-                            block.status === "fail"
-                              ? "bg-rose-950/10 border-rose-500/40 ring-1 ring-rose-500/20 shadow-md"
-                              : block.status === "warn"
-                              ? "bg-amber-950/10 border-amber-500/40 ring-1 ring-amber-500/20 shadow-md"
-                              : selectedBlockId === block.id
-                              ? "bg-slate-900 border-blue-500 ring-2 ring-blue-500/30 shadow-xl"
-                              : "bg-slate-900/40 border-slate-800/80 hover:border-slate-700/80 shadow-sm"
-                          }`}
+                          className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 space-y-3.5 ${evidenceSurface}`}
                         >
                           {/* Block Header */}
                           <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
@@ -2172,38 +2312,34 @@ export function MigrationDiffClient() {
                               <div>
                                 <h4 className="font-bold text-white text-sm">{block.title}</h4>
                                 <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                                  PW1: <strong className="text-slate-300">{block.pw1Component}</strong> ➔ PW2: <strong className="text-sky-300">{block.pw2Block}</strong>
+                                  PW1: <strong className="text-slate-300">{block.pw1Component}</strong> ➔ PW2: <strong className="text-sky-300">{blockEvidence?.pw2Data.status === "migrated" ? blockEvidence.pw2Data.blockType ?? "Đã mapping, chưa rõ loại block" : blockEvidence?.pw2Data.status === "mismatch" ? blockEvidence.pw2Data.blockType ?? "Đã mapping, dữ liệu lệch" : blockEvidence?.pw2Data.status === "missing" ? "Thiếu block PW2" : "Chưa xác minh"}</strong>
                                 </div>
                               </div>
                             </div>
 
-                            <div>
-                              {block.status === "fail" ? (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                  🚨 LỖI P0: {block.discrepancyNote || "Lệch dữ liệu"}
-                                </span>
-                              ) : block.status === "warn" ? (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                  ⚠️ CẦN XEM: {block.discrepancyNote || "Cảnh báo"}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                  <CheckCircle2 className="size-3.5" /> KHỚP 100%
-                                </span>
-                              )}
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-300 border border-slate-700">
+                              {blockEvidence
+                                ? "Xem bằng chứng bên dưới"
+                                : isRenderEvidenceLoading
+                                  ? "Đang tải bằng chứng"
+                                  : "Chưa có bằng chứng"}
+                            </span>
                           </div>
 
-                          {/* Dual Column Content Preview - Switches between Desktop, Mobile & Swipe Slider */}
-                          {parityMode === "swipe_slider" ? (
-                            /* Split Swipe Slider Mode (0% to 100%) */
-                            <SwipeSliderBlockRenderer
-                              block={block}
-                              deviceView={deviceView}
-                              sliderPosition={sliderPosition}
-                              highlightDiffGaps={showDiffGaps}
+                          {blockEvidence ? (
+                            <BlockMigrationEvidence
+                              evidence={blockEvidence}
+                              onRequestLiveCheck={requestLiveCheck}
+                              isLiveCheckPending={liveCheckBlockId === blockEvidence.legacyId}
                             />
-                          ) : deviceView === "mobile" ? (
+                          ) : (
+                            <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-xs text-slate-400">
+                              Chưa có mapping PW1 → PW2 đã xác nhận, nên không thể kết luận block này đã migrate hoặc render đúng.
+                            </div>
+                          )}
+
+                          {/* Dual Column Content Preview - Switches between Desktop, Mobile & Swipe Slider */}
+                          {deviceView === "mobile" ? (
                             /* Mobile Phone Mockup View (375px) */
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-2">
                               {/* PW1 Phone Mockup */}
@@ -2226,11 +2362,9 @@ export function MigrationDiffClient() {
 
                               {/* PW2 Phone Mockup */}
                               <div className={`w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 rounded-[2.5rem] p-4 shadow-2xl space-y-3.5 relative ${
-                                block.status === "fail"
+                                blockEvidence?.overall === "failed"
                                   ? "border-rose-500/60 ring-2 ring-rose-500/30"
-                                  : block.status === "warn"
-                                  ? "border-amber-500/60 ring-2 ring-amber-500/30"
-                                  : "border-sky-500/40 ring-1 ring-sky-500/20"
+                                  : "border-slate-700 ring-1 ring-slate-800"
                               }`}>
                                 {/* Speaker / Notch */}
                                 <div className="w-24 h-3.5 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner">
@@ -2242,8 +2376,7 @@ export function MigrationDiffClient() {
                                 </div>
 
                                 {/* Rich Visual Block Render for PW2 */}
-                                <RichVisualBlockRenderer block={block} version="pw2" deviceView="mobile" />
-                                <PW2DiffGapOverlay block={block} enabled={showDiffGaps} />
+                                <Pw2EvidencePlaceholder evidence={blockEvidence} />
 
                                 {/* Home Bar */}
                                 <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
@@ -2265,8 +2398,7 @@ export function MigrationDiffClient() {
                                 <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider px-1">
                                   Giao Diện Bản Mới PW2 (Next.js 15)
                                 </div>
-                                <RichVisualBlockRenderer block={block} version="pw2" deviceView="desktop" />
-                                <PW2DiffGapOverlay block={block} enabled={showDiffGaps} />
+                                <Pw2EvidencePlaceholder evidence={blockEvidence} />
                               </div>
                             </div>
                           )}
@@ -2274,8 +2406,8 @@ export function MigrationDiffClient() {
                           {/* Raw Field Data & Configuration Inspector for this Block */}
                           <div className="mt-2 bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5">
                             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center justify-between">
-                              <span className="text-amber-400">📋 Dữ Liệu MySQL Của Khối #{block.order} ({block.pw1Component})</span>
-                              <span className="text-slate-500 font-normal">Trường dữ liệu người dùng nhập</span>
+                              <span className="text-amber-400">📋 Dữ liệu PW1 của khối #{block.order} ({block.pw1Component})</span>
+                              <span className="text-slate-500 font-normal">Chỉ là nguồn PW1, không chứng minh migration PW2</span>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
                               <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800/80">
@@ -2295,7 +2427,8 @@ export function MigrationDiffClient() {
                             )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
