@@ -596,8 +596,10 @@ export async function fetchLivePw1StoresCatalog(limit = 2000): Promise<any[]> {
  * Fetches Live Deep Field Diff for a specific store from PW1 MySQL database.
  */
 export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): Promise<any> {
-  const numericId = typeof storeIdParam === "string" ? parseInt(storeIdParam.replace(/\D/g, ""), 10) : storeIdParam;
-  if (!numericId || isNaN(numericId)) {
+  const numericId = typeof storeIdParam === "string"
+    ? Number(/^(?:SITE-)?(\d+)$/.exec(storeIdParam)?.[1])
+    : storeIdParam;
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) {
     throw new Error(`Invalid store ID: ${storeIdParam}`);
   }
 
@@ -1786,6 +1788,25 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     },
   );
 
+  // This connector reads PW1 only. Do not manufacture PW2 IDs or values by
+  // copying the legacy side: that would turn an unavailable comparison into a
+  // false green migration result.
+  const unverifiedPw1Records = recordsWithPageIds.map((record) => ({
+    ...record,
+    migratedId: null,
+    matchStatus: "warning" as const,
+    matchedFields: 0,
+    discrepancyCount: record.fields.length,
+    fields: record.fields.map((field: Record<string, unknown>) => ({
+      ...field,
+      migratedValue: null,
+      status: "warning" as const,
+      classification: "P1 Warning" as const,
+      diffExplanation: "PW2 chưa được đọc từ nguồn dữ liệu đã xác minh.",
+      remediationAction: "Cung cấp mapping định danh PW1→PW2 và kết nối nguồn PW2 trước khi đối soát.",
+    })),
+  }));
+
   // Dynamically calculate block and field parity across all entities and pages
   let totalBlocksCount = 0;
   let passedBlocksCount = 0;
@@ -1860,12 +1881,12 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     fieldDiffAudit: {
       storeId: siteId,
       summary: {
-        totalEntitiesV1: records.length,
-        totalEntitiesV2: records.length - failEntities,
-        matchedEntities: matchedEntities,
-        missingInPW2Count: failEntities,
+        totalEntitiesV1: unverifiedPw1Records.length,
+        totalEntitiesV2: 0,
+        matchedEntities: 0,
+        missingInPW2Count: 0,
         orphanInPW2Count: 0,
-        fieldMatchRate,
+        fieldMatchRate: "0.0%",
         groupStats: {
           products: { total: (products as any[]).length, pass: (products as any[]).length, warn: 0, fail: 0 },
           variants: { total: (rawSkus as any[]).length, pass: (rawSkus as any[]).length, warn: 0, fail: 0 },
@@ -1888,7 +1909,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           },
         },
       },
-      records: recordsWithPageIds,
+      records: unverifiedPw1Records,
     },
     reconciliationAudit: {
       totalProductsV1: products.length,

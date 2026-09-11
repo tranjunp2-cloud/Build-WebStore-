@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   getFieldDiffAuditForStore,
   getFieldDiffRecordsForPage,
+  getFieldEvidenceVisualState,
   hasEntityDiffIssue,
   getStoreDeepDiff,
   type EntityDiffRecord,
@@ -9,6 +10,51 @@ import {
 } from "@/lib/admin/qa/migration-diff-engine";
 
 describe("[TC-F40-11] Deep Field-by-Field Database Diff Inspector Suite", () => {
+  it("[TC-F40-11-09] separates a meaningful matched value from two empty source values", () => {
+    const matchedValue: FieldDiffItem = {
+      fieldName: "name", fieldLabel: "Name", legacyKey: "products.name", migratedKey: "products.name",
+      legacyValue: "Áo thun", migratedValue: "Áo thun", status: "match", classification: "100% Match",
+    };
+    const matchedEmpty: FieldDiffItem = {
+      fieldName: "subtitle", fieldLabel: "Subtitle", legacyKey: "products.subtitle", migratedKey: "products.subtitle",
+      legacyValue: "", migratedValue: "", status: "match", classification: "100% Match",
+    };
+    const discrepancy: FieldDiffItem = {
+      fieldName: "price", fieldLabel: "Price", legacyKey: "product_skus.price", migratedKey: "products.price",
+      legacyValue: 10, migratedValue: null, status: "error", classification: "P0 Blocker",
+    };
+    const bothNull: FieldDiffItem = {
+      fieldName: "optional", fieldLabel: "Optional", legacyKey: "products.optional", migratedKey: "products.optional",
+      legacyValue: null, migratedValue: null, status: "match", classification: "100% Match",
+    };
+    const staleMatch: FieldDiffItem = {
+      fieldName: "stale", fieldLabel: "Stale", legacyKey: "products.stale", migratedKey: "products.stale",
+      legacyValue: "PW1", migratedValue: "PW2", status: "match", classification: "100% Match",
+    };
+
+    expect(getFieldEvidenceVisualState(matchedValue)).toBe("matched_value");
+    expect(getFieldEvidenceVisualState(matchedEmpty)).toBe("matched_empty");
+    expect(getFieldEvidenceVisualState(discrepancy)).toBe("attention");
+    expect(getFieldEvidenceVisualState(bothNull)).toBe("attention");
+    expect(getFieldEvidenceVisualState(staleMatch)).toBe("attention");
+  });
+
+  it("[TC-F40-11-10] exposes all UI states through the SITE-0001 mock fixture only", () => {
+    const audit = getFieldDiffAuditForStore("SITE-0001", undefined, true);
+    const demoRecord = audit.records.find((record) => record.id === "ent-demo-ui-product");
+    const orphanRecord = audit.records.find((record) => record.id === "ent-demo-ui-orphan");
+
+    expect(demoRecord?.fields.map(getFieldEvidenceVisualState)).toEqual([
+      "matched_value",
+      "matched_empty",
+      "attention",
+      "attention",
+      "matched_value",
+    ]);
+    expect(orphanRecord?.matchStatus).toBe("orphan_in_pw2");
+    expect(audit.summary.orphanInPW2Count).toBe(1);
+  });
+
   it("[TC-F40-11-07] keeps field-level discrepancies visible when error-only filtering is enabled", () => {
     // Arrange
     const matchedRecordWithFieldError: EntityDiffRecord = {

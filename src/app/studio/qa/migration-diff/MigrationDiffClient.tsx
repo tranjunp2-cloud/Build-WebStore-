@@ -12,6 +12,7 @@ import {
   getDashboardMetrics,
   CANONICAL_TEMPLATES,
   getVisualDiffGapLabel,
+  getFieldEvidenceVisualState,
   hasEntityDiffIssue,
   isStoreDomainSslReady,
   type StoreSummary,
@@ -77,7 +78,15 @@ import {
   Mail,
   Calendar,
   Clock,
+  Info,
 } from "lucide-react";
+
+type FieldDiffSource = "ui_fixture" | "catalog_fixture" | "pw1_snapshot_unverified";
+type LoadedFieldDiff = { data: StoreDeepDiff; source: FieldDiffSource };
+
+function getDisplayEvidenceState(field: FieldDiffItem, source: FieldDiffSource) {
+  return source === "ui_fixture" ? getFieldEvidenceVisualState(field) : "attention" as const;
+}
 
 /**
  * Renders authentic, high-fidelity visual layout components
@@ -831,7 +840,10 @@ export function MigrationDiffClient() {
   const pw1MobIframeRef = React.useRef<HTMLIFrameElement>(null);
   const pw2MobIframeRef = React.useRef<HTMLIFrameElement>(null);
   const [activeEntityGroup, setActiveEntityGroup] = useState<"all" | EntityGroupType>("all");
+  const [fieldStatusFilter, setFieldStatusFilter] = useState<"attention" | "all" | "matched_value" | "matched_empty">("attention");
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
+  const [fieldDiffUiDemo, setFieldDiffUiDemo] = useState(false);
+  const [expandedFieldRecordIds, setExpandedFieldRecordIds] = useState<Set<string>>(new Set());
   const [resolvedStoreIds, setResolvedStoreIds] = useState<Set<string>>(new Set());
   const [isReloading, setIsReloading] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -909,7 +921,8 @@ export function MigrationDiffClient() {
     }
   };
 
-  const [liveStoreDiff, setLiveStoreDiff] = useState<StoreDeepDiff | null>(null);
+  const [loadedFieldDiff, setLoadedFieldDiff] = useState<LoadedFieldDiff | null>(null);
+  const fieldDiffRequestRef = React.useRef(0);
 
   const loadLiveCatalog = async () => {
     try {
@@ -931,24 +944,41 @@ export function MigrationDiffClient() {
 
   useEffect(() => {
     if (!activeStoreId) {
-      setLiveStoreDiff(null);
+      setLoadedFieldDiff(null);
       return;
     }
+    const requestId = ++fieldDiffRequestRef.current;
+    const controller = new AbortController();
+    const expectsUiFixture = fieldDiffUiDemo && activeStoreId === "SITE-0001";
+    setLoadedFieldDiff(null);
     const fetchDiff = async () => {
       try {
-        const res = await fetch(`/api/qa/migration-diff?store_id=${encodeURIComponent(activeStoreId)}&_t=${Date.now()}`, {
+        const uiDemoParam = expectsUiFixture ? "&ui_demo=1" : "";
+        const res = await fetch(`/api/qa/migration-diff?store_id=${encodeURIComponent(activeStoreId)}${uiDemoParam}&_t=${Date.now()}`, {
           cache: "no-store",
+          signal: controller.signal,
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
-        if (json.data) {
-          setLiveStoreDiff(json.data);
+        const source = json.source as FieldDiffSource | undefined;
+        if (
+          !controller.signal.aborted &&
+          requestId === fieldDiffRequestRef.current &&
+          json.data?.id === activeStoreId &&
+          source &&
+          (source === "ui_fixture") === expectsUiFixture
+        ) {
+          setLoadedFieldDiff({ data: json.data, source });
         }
       } catch (err) {
-        console.error("[MigrationDiffClient] Failed to fetch deep diff, falling back:", err);
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          console.error("[MigrationDiffClient] Failed to fetch deep diff, falling back:", err);
+        }
       }
     };
     void fetchDiff();
-  }, [activeStoreId]);
+    return () => controller.abort();
+  }, [activeStoreId, fieldDiffUiDemo]);
 
   useEffect(() => {
     const scope: ReconciliationScope | null = activeViewTab === "commerce_reconciliation" ? "commerce" : activeViewTab === "settings_reconciliation" ? "settings" : null;
@@ -961,7 +991,7 @@ export function MigrationDiffClient() {
 
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
     if (!activeStoreId) return null;
-    if (liveStoreDiff && liveStoreDiff.id === activeStoreId) return liveStoreDiff;
+    if (loadedFieldDiff?.data.id === activeStoreId) return loadedFieldDiff.data;
     const isResolved = resolvedStoreIds.has(activeStoreId);
     const catalogStore = catalog.find((s) => s.id === activeStoreId);
     const diff = getStoreDeepDiff(activeStoreId, isResolved ? "passed" : undefined);
@@ -975,7 +1005,11 @@ export function MigrationDiffClient() {
       };
     }
     return diff;
-  }, [activeStoreId, resolvedStoreIds, liveStoreDiff, catalog]);
+  }, [activeStoreId, resolvedStoreIds, loadedFieldDiff, catalog]);
+
+  const fieldDiffSource: FieldDiffSource = loadedFieldDiff?.data.id === activeStoreId
+    ? loadedFieldDiff.source
+    : "catalog_fixture";
 
   const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
 
@@ -1059,10 +1093,14 @@ export function MigrationDiffClient() {
     return filteredStores.slice(start, start + pageSize);
   }, [filteredStores, currentPage, pageSize]);
 
-  // Filtered Field Diff Records
-  const filteredFieldRecords = useMemo(() => {
+  const scopedFieldRecords = useMemo(() => {
     if (!selectedDiff?.fieldDiffAudit?.records || !activePage) return [];
-    return getFieldDiffRecordsForPage(selectedDiff.fieldDiffAudit, activePage.id).filter((r) => {
+    return getFieldDiffRecordsForPage(selectedDiff.fieldDiffAudit, activePage.id);
+  }, [selectedDiff, activePage?.id]);
+
+  // Apply the non-status filters first so summary counts always describe the current scope.
+  const baseFilteredFieldRecords = useMemo(() => {
+    return scopedFieldRecords.filter((r) => {
       const matchGroup = activeEntityGroup === "all" || r.entityGroup === activeEntityGroup;
       const matchErrors = !showOnlyErrors || hasEntityDiffIssue(r);
       const q = fieldSearchQuery.toLowerCase().trim();
@@ -1082,7 +1120,34 @@ export function MigrationDiffClient() {
 
       return matchGroup && matchErrors && matchSearch;
     });
-  }, [selectedDiff, activePage?.id, activeEntityGroup, showOnlyErrors, fieldSearchQuery]);
+  }, [scopedFieldRecords, activeEntityGroup, showOnlyErrors, fieldSearchQuery]);
+
+  const filteredFieldRecords = useMemo(() => {
+    if (fieldStatusFilter === "all") return baseFilteredFieldRecords;
+    return baseFilteredFieldRecords.filter((record) =>
+      fieldStatusFilter === "attention"
+        ? fieldDiffSource !== "ui_fixture" || hasEntityDiffIssue(record)
+        : record.fields.some((field) => getDisplayEvidenceState(field, fieldDiffSource) === fieldStatusFilter),
+    );
+  }, [baseFilteredFieldRecords, fieldStatusFilter, fieldDiffSource]);
+
+  const fieldEvidenceCounts = useMemo(() => {
+    const fields = baseFilteredFieldRecords.flatMap((record) => record.fields);
+    return {
+      attention: fields.filter((field) => getDisplayEvidenceState(field, fieldDiffSource) === "attention").length,
+      matched_value: fields.filter((field) => getDisplayEvidenceState(field, fieldDiffSource) === "matched_value").length,
+      matched_empty: fields.filter((field) => getDisplayEvidenceState(field, fieldDiffSource) === "matched_empty").length,
+      recordsWithAttention: fieldDiffSource === "ui_fixture"
+        ? baseFilteredFieldRecords.filter(hasEntityDiffIssue).length
+        : baseFilteredFieldRecords.length,
+    };
+  }, [baseFilteredFieldRecords, fieldDiffSource]);
+
+  useEffect(() => {
+    setExpandedFieldRecordIds(
+      new Set(scopedFieldRecords.filter(hasEntityDiffIssue).map((record) => record.id)),
+    );
+  }, [activeStoreId, activePage?.id, scopedFieldRecords]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -1091,15 +1156,26 @@ export function MigrationDiffClient() {
 
   const handleReloadStoreData = async (storeId: string) => {
     setIsReloading(true);
+    const requestId = ++fieldDiffRequestRef.current;
+    const expectsUiFixture = fieldDiffUiDemo && storeId === "SITE-0001";
+    let acceptedSource: FieldDiffSource | null = null;
 
     try {
-      const res = await fetch(`/api/qa/migration-diff?store_id=${encodeURIComponent(storeId)}&_t=${Date.now()}`, {
+      const uiDemoParam = expectsUiFixture ? "&ui_demo=1" : "";
+      const res = await fetch(`/api/qa/migration-diff?store_id=${encodeURIComponent(storeId)}${uiDemoParam}&_t=${Date.now()}`, {
         cache: "no-store",
       });
       if (res.ok) {
         const json = await res.json();
-        if (json.data) {
-          setLiveStoreDiff(json.data);
+        const source = json.source as FieldDiffSource | undefined;
+        if (
+          json.data?.id === storeId &&
+          source &&
+          requestId === fieldDiffRequestRef.current &&
+          (source === "ui_fixture") === expectsUiFixture
+        ) {
+          setLoadedFieldDiff({ data: json.data, source });
+          acceptedSource = source;
           if (json.data.status === "passed") {
             setResolvedStoreIds((prev) => new Set([...prev, storeId]));
           } else {
@@ -1127,13 +1203,27 @@ export function MigrationDiffClient() {
             )
           );
         }
+      } else {
+        throw new Error(`HTTP ${res.status}`);
       }
     } catch (err) {
       console.error("[MigrationDiffClient] Failed to reload store diff:", err);
     } finally {
-      setIframeReloadKey((k) => k + 1);
-      setIsReloading(false);
-      showToast("✓ Đã quét lại CSDL thành công! Dữ liệu PW1 và PW2 đã được đồng bộ mới nhất.");
+      if (requestId === fieldDiffRequestRef.current) {
+        setIsReloading(false);
+        if (acceptedSource) {
+          setIframeReloadKey((k) => k + 1);
+          showToast(
+            acceptedSource === "pw1_snapshot_unverified"
+              ? "✓ Đã đọc lại PW1. PW2 vẫn chưa được kết nối để đối soát."
+              : acceptedSource === "ui_fixture"
+              ? "✓ Đã nạp lại dữ liệu mẫu UI."
+              : "✓ Đã nạp lại catalog đối soát.",
+          );
+        } else {
+          showToast("⚠ Không thể nạp lại dữ liệu đối soát. Vui lòng thử lại.");
+        }
+      }
     }
   };
 
@@ -1482,7 +1572,7 @@ export function MigrationDiffClient() {
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {paginatedStores.map((store) => (
-                <tr key={store.id} className="hover:bg-slate-800/30 transition-colors">
+                <tr key={store.id} data-testid={`migration-store-row-${store.id}`} className="hover:bg-slate-800/30 transition-colors">
                   <td className="py-4 px-4 font-semibold text-white whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-md">
@@ -1565,8 +1655,9 @@ export function MigrationDiffClient() {
                   </td>
                   <td className="py-4 px-4 text-right whitespace-nowrap">
                     <button
+                      data-testid={`migration-store-compare-${store.id}`}
                       onClick={() => {
-                        setLiveStoreDiff(null);
+                        setLoadedFieldDiff(null);
                         setActiveStoreId(store.id);
                         setActivePageIndex(0);
                         setSelectedBlockId(null);
@@ -2533,35 +2624,67 @@ export function MigrationDiffClient() {
               /* ========================================================================= */
               <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/30 min-h-0">
                 {/* Header Summary Card */}
-                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800/80 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800/80 shadow-sm space-y-4">
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
                       <SlidersHorizontal className="size-5 text-blue-400" />
-                      <span>ĐỐI SOÁT TRƯỜNG DỮ LIỆU CSDL 1-TO-1 (DATABASE FIELD RECONCILIATION)</span>
+                      <span>Đối soát trường dữ liệu 1-to-1</span>
                     </h3>
                     <p className="text-xs text-slate-400 mt-1">
-                      Đối chiếu từng trường theo <code>legacy_id</code> giữa MySQL PW1 và Postgres PW2: <strong>Sản Phẩm, Biến Thể, Banners, Link CTA, RichText & Bảng Biểu, Menu Điều Hướng, Danh Mục, Cài Đặt Shop</strong>.
+                      Quét record cần xem trước, rồi mở chi tiết field khi cần đối chiếu. Không dùng tỷ lệ xanh để thay thế mapping PW1→PW2 đã được xác nhận.
                     </p>
                     <p className="text-xs text-indigo-300 mt-2" data-testid="field-diff-page-scope">
                       Phạm vi trang: <strong>{activePage.name}</strong> ({activePage.path})
                     </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
-                      <div className="text-[10px] text-slate-400 uppercase font-mono font-semibold">Độ Khớp Trường</div>
-                      <div className="font-bold text-emerald-400 text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.fieldMatchRate}</div>
-                    </div>
-                    <div className="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
-                      <div className="text-[10px] text-slate-400 uppercase font-mono font-semibold">Tổng Record</div>
-                      <div className="font-bold text-white text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.totalEntitiesV1}</div>
-                    </div>
-                    {selectedDiff.fieldDiffAudit.summary.missingInPW2Count > 0 && (
-                      <div className="bg-rose-950/30 px-3.5 py-2 rounded-xl border border-rose-500/40 text-xs">
-                        <div className="text-[10px] text-rose-400 uppercase font-mono font-semibold">Thiếu Trên PW2</div>
-                        <div className="font-bold text-rose-300 text-sm font-mono">🚨 {selectedDiff.fieldDiffAudit.summary.missingInPW2Count} Record</div>
+                    <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
+                      <strong>Nguồn dữ liệu:</strong>{" "}
+                      {fieldDiffSource === "ui_fixture"
+                        ? "fixture UI phục vụ kiểm thử, không phải migration thực tế."
+                        : fieldDiffSource === "pw1_snapshot_unverified"
+                        ? "mới đọc PW1; PW2 và mapping định danh chưa được đọc. Không có field nào được xem là khớp migration."
+                        : "catalog minh họa; chưa thay thế mapping PW1→PW2 đã được xác nhận."}
+                    </p>
+                    {activeStoreId === "SITE-0001" && (
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          data-testid="field-diff-ui-demo-toggle"
+                          aria-pressed={fieldDiffUiDemo}
+                          onClick={() => setFieldDiffUiDemo((current) => !current)}
+                          className={`rounded-lg border px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
+                            fieldDiffUiDemo
+                              ? "border-amber-400/60 bg-amber-950/50 text-amber-100"
+                              : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"
+                          }`}
+                        >
+                          {fieldDiffUiDemo ? "Tắt dữ liệu mẫu UI" : "Dùng dữ liệu mẫu UI"}
+                        </button>
+                        {fieldDiffUiDemo && (
+                          <span data-testid="field-diff-ui-demo-notice" className="rounded-lg border border-amber-400/40 bg-amber-950/30 px-3 py-2 text-xs font-semibold text-amber-100">
+                            DỮ LIỆU MẪU UI — không phải kết quả migration thực tế.
+                          </span>
+                        )}
                       </div>
                     )}
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-3.5 py-2 text-xs">
+                      <div className="text-[10px] font-semibold uppercase text-amber-300/75">Cần xem</div>
+                      <div className="font-mono text-sm font-bold text-amber-200">{fieldEvidenceCounts.recordsWithAttention} record</div>
+                    </div>
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 px-3.5 py-2 text-xs">
+                      <div className="text-[10px] font-semibold uppercase text-rose-300/75">Field lệch / thiếu</div>
+                      <div className="font-mono text-sm font-bold text-rose-200">{fieldEvidenceCounts.attention}</div>
+                    </div>
+                    <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/20 px-3.5 py-2 text-xs">
+                      <div className="text-[10px] font-semibold uppercase text-emerald-300/75">Khớp có dữ liệu</div>
+                      <div className="font-mono text-sm font-bold text-emerald-200">{fieldEvidenceCounts.matched_value}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 text-xs">
+                      <div className="text-[10px] font-semibold uppercase text-slate-400">Cả hai trống</div>
+                      <div className="font-mono text-sm font-bold text-slate-200">{fieldEvidenceCounts.matched_empty}</div>
+                    </div>
                   </div>
                 </div>
 
@@ -2607,10 +2730,37 @@ export function MigrationDiffClient() {
                     })}
                   </div>
 
+                  <div className="flex w-full flex-wrap gap-1.5 md:w-auto" aria-label="Lọc theo trạng thái đối soát">
+                    {[
+                      { key: "attention", label: "Field cần xem", count: fieldEvidenceCounts.attention },
+                      { key: "matched_value", label: "Khớp có dữ liệu", count: fieldEvidenceCounts.matched_value },
+                      { key: "matched_empty", label: "Cả hai trống", count: fieldEvidenceCounts.matched_empty },
+                      { key: "all", label: "Tất cả", count: baseFilteredFieldRecords.length },
+                    ].map((filter) => (
+                      <button
+                        key={filter.key}
+                        data-testid={`field-status-filter-${filter.key}`}
+                        type="button"
+                        onClick={() => {
+                          setFieldStatusFilter(filter.key as typeof fieldStatusFilter);
+                          if (filter.key !== "attention") setShowOnlyErrors(false);
+                        }}
+                        className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
+                          fieldStatusFilter === filter.key
+                            ? "border-sky-500/60 bg-sky-950/50 text-sky-100"
+                            : "border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                        }`}
+                      >
+                        {filter.label} <span className="font-mono opacity-75">{filter.count} {filter.key === "all" ? "record" : "field"}</span>
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="relative w-full md:w-64">
                     <Search className="size-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
+                      aria-label="Tìm trường, SKU hoặc khóa CSDL"
                       placeholder="Tìm trường, SKU, khóa CSDL..."
                       value={fieldSearchQuery}
                       onChange={(e) => setFieldSearchQuery(e.target.value)}
@@ -2621,12 +2771,25 @@ export function MigrationDiffClient() {
 
                 {/* Entity Cards & Field Breakdown Tables */}
                 <div className="space-y-4">
-                  {filteredFieldRecords.map((record) => (
-                    <div
+                  {filteredFieldRecords.length === 0 ? (
+                    <div data-testid="field-diff-empty-state" className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 px-6 py-12 text-center">
+                      <Search className="mx-auto size-6 text-slate-500" aria-hidden="true" />
+                      <p className="mt-3 text-sm font-bold text-slate-200">Không có record phù hợp bộ lọc</p>
+                      <p className="mt-1 text-xs text-slate-400">Đổi trạng thái, loại dữ liệu hoặc từ khóa để tiếp tục đối soát.</p>
+                      <button
+                        type="button"
+                        onClick={() => { setFieldStatusFilter("all"); setActiveEntityGroup("all"); setFieldSearchQuery(""); setShowOnlyErrors(false); }}
+                        className="mt-4 rounded-lg border border-sky-500/40 px-3 py-2 text-xs font-bold text-sky-200 hover:bg-sky-950/40"
+                      >
+                        Xóa bộ lọc
+                      </button>
+                    </div>
+                  ) : filteredFieldRecords.map((record) => (
+                    <article
                       key={record.id}
                       data-testid={`field-diff-record-${record.id}`}
                       className={`rounded-2xl border overflow-hidden shadow-lg transition ${
-                        record.matchStatus === "missing_in_pw2" || record.matchStatus === "error"
+                        record.matchStatus === "missing_in_pw2" || record.matchStatus === "orphan_in_pw2" || record.matchStatus === "error"
                           ? "bg-rose-950/15 border-rose-500 ring-1 ring-rose-500/40"
                           : record.matchStatus === "warning"
                           ? "bg-amber-950/15 border-amber-500 ring-1 ring-amber-500/40"
@@ -2634,7 +2797,18 @@ export function MigrationDiffClient() {
                       }`}
                     >
                       {/* Entity Header */}
-                      <div className="p-4 bg-slate-950/90 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <button
+                        type="button"
+                        data-testid={`field-diff-toggle-${record.id}`}
+                        aria-controls={`field-diff-details-${record.id}`}
+                        aria-expanded={expandedFieldRecordIds.has(record.id)}
+                        onClick={() => setExpandedFieldRecordIds((current) => {
+                          const next = new Set(current);
+                          if (next.has(record.id)) next.delete(record.id); else next.add(record.id);
+                          return next;
+                        })}
+                        className="w-full p-4 bg-slate-950/90 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-left transition hover:bg-slate-900/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"
+                      >
                         <div className="flex items-center gap-3">
                           <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-lg bg-slate-900 text-indigo-400 border border-slate-800">
                             {record.entityGroup}
@@ -2655,10 +2829,18 @@ export function MigrationDiffClient() {
                           </div>
                         </div>
 
-                        <div>
-                          {record.matchStatus === "missing_in_pw2" ? (
+                        <div className="flex items-center gap-3 self-end md:self-auto">
+                          {fieldDiffSource !== "ui_fixture" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-950 text-amber-300 border border-amber-500/50">
+                              <Info className="size-3.5" /> CHƯA XÁC MINH PW2
+                            </span>
+                          ) : record.matchStatus === "missing_in_pw2" ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500 animate-pulse">
                               <AlertOctagon className="size-3.5" /> 🚨 MẤT BẢN GHI TRÊN PW2
+                            </span>
+                          ) : record.matchStatus === "orphan_in_pw2" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500/50">
+                              <AlertOctagon className="size-3.5" /> ⚠️ BẢN GHI DƯ TRÊN PW2
                             </span>
                           ) : record.matchStatus === "error" ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500/50">
@@ -2673,26 +2855,48 @@ export function MigrationDiffClient() {
                               <CheckCircle2 className="size-3.5" /> ✓ Khớp {record.matchedFields}/{record.totalFields} Trường
                             </span>
                           )}
+                          <ChevronDown className={`size-4 text-slate-400 transition-transform ${expandedFieldRecordIds.has(record.id) ? "rotate-180" : ""}`} aria-hidden="true" />
                         </div>
-                      </div>
+                      </button>
 
                       {/* 1-to-1 Field Matrix Table */}
-                      <div className="overflow-x-auto">
+                      <div
+                        id={`field-diff-details-${record.id}`}
+                        hidden={!expandedFieldRecordIds.has(record.id)}
+                        className="overflow-x-auto"
+                      >
                         <table className="w-full text-left text-xs text-slate-300">
                           <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800">
                             <tr>
-                              <th className="py-3 px-4">Tên Trường (Field)</th>
-                              <th className="py-3 px-4">Khóa MySQL (PW1) ➔ Khóa Postgres (PW2)</th>
-                              <th className="py-3 px-4">Giá Trị Bản Cũ (PW1)</th>
-                              <th className="py-3 px-4">Giá Trị Bản Mới (PW2)</th>
-                              <th className="py-3 px-4">Đánh Giá</th>
-                              <th className="py-3 px-4">Hướng Dẫn Khắc Phục (Fix Action)</th>
+                              <th className="min-w-56 py-3 px-4">Trường & mapping</th>
+                              <th className="min-w-52 py-3 px-4 text-amber-300/80">Giá trị PW1</th>
+                              <th className="min-w-52 py-3 px-4 text-sky-300/80">
+                                {fieldDiffSource === "pw1_snapshot_unverified" ? "PW2 chưa đọc được" : "Giá trị PW2"}
+                              </th>
+                              <th className="min-w-56 py-3 px-4">Kết quả / thao tác</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/50 text-[11px] font-mono">
-                            {record.fields.map((field, fIdx) => (
+                            {record.fields.filter((field) => fieldStatusFilter === "all" || (
+                              fieldStatusFilter === "attention"
+                                ? getDisplayEvidenceState(field, fieldDiffSource) === "attention"
+                                : getDisplayEvidenceState(field, fieldDiffSource) === fieldStatusFilter
+                            )).length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="px-4 py-5 font-sans text-slate-400">
+                                  Bản ghi cần xử lý ở cấp record; chưa có field nào thuộc trạng thái đang lọc để đối chiếu.
+                                </td>
+                              </tr>
+                            ) : record.fields
+                              .filter((field) => fieldStatusFilter === "all" || (
+                                fieldStatusFilter === "attention"
+                                  ? getDisplayEvidenceState(field, fieldDiffSource) === "attention"
+                                  : getDisplayEvidenceState(field, fieldDiffSource) === fieldStatusFilter
+                              ))
+                              .map((field, fIdx) => (
                               <tr
                                 key={fIdx}
+                                data-evidence-state={getDisplayEvidenceState(field, fieldDiffSource)}
                                 className={`hover:bg-slate-900/40 transition ${
                                   field.status === "error"
                                     ? "bg-rose-950/20"
@@ -2704,30 +2908,46 @@ export function MigrationDiffClient() {
                                 <td className="py-3.5 px-4 font-sans font-bold text-white">
                                   {field.fieldLabel}
                                   <div className="text-[10px] text-slate-500 font-mono">{field.fieldName}</div>
+                                  <div className="mt-1.5 break-words text-[10px] font-mono font-normal leading-4 text-slate-500">
+                                    <span className="text-amber-400/90">{field.legacyKey}</span>
+                                    <span className="mx-1 text-slate-600">→</span>
+                                    <span className="text-sky-400/90">{field.migratedKey}</span>
+                                  </div>
                                 </td>
-                                <td className="py-3.5 px-4 text-slate-400">
-                                  <span className="text-amber-400/90">{field.legacyKey}</span>
-                                  <span className="text-slate-600 mx-1.5">➔</span>
-                                  <span className="text-indigo-400/90">{field.migratedKey}</span>
-                                </td>
-                                <td className="py-3.5 px-4 font-sans text-slate-200">
+                                <td className={`max-w-sm py-3.5 px-4 font-sans break-words ${getDisplayEvidenceState(field, fieldDiffSource) === "matched_empty" ? "text-slate-500" : "text-slate-200"}`}>
                                   {field.legacyValue !== null ? (
-                                    String(field.legacyValue)
+                                    String(field.legacyValue) || <span className="italic">trống</span>
                                   ) : (
                                     <span className="text-slate-600 italic">null</span>
                                   )}
                                 </td>
-                                <td className="py-3.5 px-4 font-sans">
-                                  {field.migratedValue !== null ? (
-                                    <span className="text-slate-200">{String(field.migratedValue)}</span>
+                                <td className={`max-w-sm py-3.5 px-4 font-sans break-words ${getDisplayEvidenceState(field, fieldDiffSource) === "matched_empty" ? "text-slate-500" : "text-slate-200"}`}>
+                                  {fieldDiffSource === "pw1_snapshot_unverified" ? (
+                                    <span className="text-amber-300 italic">Chưa đọc nguồn PW2</span>
+                                  ) : field.migratedValue !== null ? (
+                                    <span>{String(field.migratedValue) || <span className="italic">trống</span>}</span>
+                                  ) : field.legacyValue === null ? (
+                                    <span className="text-slate-500 italic">NULL (cần xác minh)</span>
                                   ) : (
                                     <span className="text-rose-400 font-bold italic">🚨 NULL (Bị Mất)</span>
                                   )}
                                 </td>
-                                <td className="py-3.5 px-4 font-sans">
-                                  {field.status === "match" ? (
+                                <td className="py-3.5 px-4 font-sans align-top">
+                                  {fieldDiffSource !== "ui_fixture" ? (
+                                    <span className="text-amber-300 font-bold flex items-center gap-1">
+                                      <Info className="size-3.5" /> Chưa xác minh PW2
+                                    </span>
+                                  ) : getDisplayEvidenceState(field, fieldDiffSource) === "matched_value" ? (
                                     <span className="text-emerald-400 font-bold flex items-center gap-1">
-                                      <Check className="size-3.5" /> Khớp 100%
+                                      <Check className="size-3.5" /> Khớp có dữ liệu
+                                    </span>
+                                  ) : getDisplayEvidenceState(field, fieldDiffSource) === "matched_empty" ? (
+                                    <span className="text-slate-400 font-bold flex items-center gap-1">
+                                      <Info className="size-3.5" /> Cả hai trống
+                                    </span>
+                                  ) : field.status === "match" && field.legacyValue === null && field.migratedValue === null ? (
+                                    <span className="text-amber-300 font-bold flex items-center gap-1">
+                                      <Info className="size-3.5" /> Cả hai NULL — cần xác minh
                                     </span>
                                   ) : field.status === "warning" ? (
                                     <span className="text-amber-400 font-bold flex items-center gap-1">
@@ -2738,22 +2958,20 @@ export function MigrationDiffClient() {
                                       <AlertOctagon className="size-3.5" /> {field.classification}
                                     </span>
                                   )}
-                                </td>
-                                <td className="py-3.5 px-4 font-sans text-slate-300 max-w-xs">
-                                  {field.remediationAction ? (
+                                  {getDisplayEvidenceState(field, fieldDiffSource) === "attention" && (field.remediationAction ? (
                                     <div className="text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-indigo-300">
                                       {field.remediationAction}
                                     </div>
                                   ) : (
-                                    <span className="text-emerald-500/80 text-[11px]">✓ Không cần chỉnh sửa</span>
-                                  )}
+                                    <span className="mt-2 block text-[11px] text-slate-400">Chưa có hướng dẫn khắc phục.</span>
+                                  ))}
                                 </td>
                               </tr>
-                            ))}
+                              ))}
                           </tbody>
                         </table>
                       </div>
-                    </div>
+                    </article>
                   ))}
                 </div>
               </div>

@@ -112,6 +112,9 @@ The stateful test intentionally skips when its fixture variables are absent. Bef
 | --- | --- | --- | --- | --- | --- |
 | TC-F40-11-07 | Unit | High | A record with `matchStatus = match` but an error/warning field remains visible when **Chỉ Lỗi** is enabled. | [x] AUTO | `src/__tests__/unit/qa/f40-field-diff-inspector.test.ts` |
 | TC-F40-11-08 | Unit | High | A Product with multiple SKU rows produces one Product entity candidate while retaining a deterministic primary SKU. | [x] AUTO | `src/__tests__/unit/qa/f40-pw1-mysql-connector.test.ts` |
+| TC-F40-11-09 | Unit | High | The field-inspector status separates a meaningful matching value from two empty values, and never marks stale/different values as a match. | [x] AUTO | `src/__tests__/unit/qa/f40-field-diff-inspector.test.ts` |
+| TC-F40-11-10 | Unit | High | The UI demo fixture exposes all evidence states only for its explicit `SITE-0001` QA fixture; it is not a migration result. | [x] AUTO | `src/__tests__/unit/qa/f40-field-diff-inspector.test.ts` |
+| TC-F40-11-E2E-03 | E2E | High | A super-admin opens the `SITE-0001` UI fixture, sees attention records by default, expands/collapses one record, and filters exact evidence states. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
 
 ## US-F40-12 — Visual Parity Inspector
 

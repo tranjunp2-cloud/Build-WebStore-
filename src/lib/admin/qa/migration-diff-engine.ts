@@ -79,6 +79,21 @@ export interface StoreFieldDiffAudit {
   records: EntityDiffRecord[];
 }
 
+export type FieldEvidenceVisualState =
+  | "attention"
+  | "matched_value"
+  | "matched_empty";
+
+/** UI-only classification. It never upgrades a field into verified evidence. */
+export function getFieldEvidenceVisualState(
+  field: Pick<FieldDiffItem, "status" | "legacyValue" | "migratedValue">,
+): FieldEvidenceVisualState {
+  if (field.status !== "match") return "attention";
+  if (field.legacyValue === null || field.migratedValue === null) return "attention";
+  if (!Object.is(field.legacyValue, field.migratedValue)) return "attention";
+  return field.legacyValue === "" ? "matched_empty" : "matched_value";
+}
+
 export interface StoreSummary {
   id: string;
   name: string;
@@ -630,7 +645,11 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
 /**
  * Generate Complete 1-to-1 Field-Level Database Diff Audit for any store
  */
-export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreFieldDiffAudit {
+export function getFieldDiffAuditForStore(
+  siteId: string,
+  overrideStatus?: "passed" | "warning" | "failed",
+  includeUiDemoFixture = false,
+): StoreFieldDiffAudit {
   const allStores = generateReconciliationCatalog(2000);
   const store = allStores.find((s) => s.id === siteId);
   if (!store) {
@@ -1414,10 +1433,101 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     },
   ];
 
+  // Fixture only for the default QA demo. It deliberately covers every visual
+  // state so Tester can verify the inspector without changing live PW1/PW2 data.
+  if (includeUiDemoFixture && siteId === "SITE-0001") {
+    records.push(
+      {
+        id: "ent-demo-ui-product",
+        pageIds: ["page-home", "page-catalog"],
+        legacyId: "DEMO-UI-PROD-001",
+        migratedId: "pw2_demo_ui_prod_001",
+        entityGroup: "products",
+        entityName: "[DỮ LIỆU MẪU UI] Sản phẩm kiểm thử đối soát",
+        entityIdentifier: "SKU: DEMO-UI-001",
+        matchStatus: "warning",
+        totalFields: 5,
+        matchedFields: 3,
+        discrepancyCount: 2,
+        fields: [
+          {
+            fieldName: "name",
+            fieldLabel: "Tên sản phẩm",
+            legacyKey: "products.title",
+            migratedKey: "products.title",
+            legacyValue: "Áo thun mẫu UI",
+            migratedValue: "Áo thun mẫu UI",
+            status: "match",
+            classification: "100% Match",
+          },
+          {
+            fieldName: "subtitle",
+            fieldLabel: "Tiêu đề phụ",
+            legacyKey: "products.subtitle",
+            migratedKey: "products.subtitle",
+            legacyValue: "",
+            migratedValue: "",
+            status: "match",
+            classification: "100% Match",
+          },
+          {
+            fieldName: "price",
+            fieldLabel: "Giá niêm yết",
+            legacyKey: "products.price",
+            migratedKey: "products.price",
+            legacyValue: 49000,
+            migratedValue: 39000,
+            status: "warning",
+            classification: "P1 Warning",
+            diffExplanation: "Giá PW2 khác PW1 để minh họa trạng thái cần xem.",
+            remediationAction: "Kiểm tra rule làm tròn giá trong bước transform.",
+          },
+          {
+            fieldName: "brand",
+            fieldLabel: "Thương hiệu",
+            legacyKey: "products.brand_id",
+            migratedKey: "products.brand",
+            legacyValue: "Prime Demo Brand",
+            migratedValue: null,
+            status: "error",
+            classification: "P0 Blocker",
+            diffExplanation: "Trường minh họa dữ liệu PW2 bị thiếu.",
+            remediationAction: "Bổ sung mapping relationship cho thương hiệu.",
+          },
+          {
+            fieldName: "sku",
+            fieldLabel: "Mã SKU",
+            legacyKey: "products.sku",
+            migratedKey: "products.sku",
+            legacyValue: "DEMO-UI-001",
+            migratedValue: "DEMO-UI-001",
+            status: "match",
+            classification: "100% Match",
+          },
+        ],
+      },
+      {
+        id: "ent-demo-ui-orphan",
+        pageIds: ["page-home"],
+        legacyId: "—",
+        migratedId: "pw2_demo_orphan_001",
+        entityGroup: "products",
+        entityName: "[DỮ LIỆU MẪU UI] Bản ghi chỉ có ở PW2",
+        entityIdentifier: "PW2 ID: pw2_demo_orphan_001",
+        matchStatus: "orphan_in_pw2",
+        totalFields: 0,
+        matchedFields: 0,
+        discrepancyCount: 1,
+        fields: [],
+      },
+    );
+  }
+
   // Calculate statistics
-  const totalEntitiesV1 = records.length;
+  const totalEntitiesV1 = records.filter((r) => r.matchStatus !== "orphan_in_pw2").length;
   const missingCount = records.filter((r) => r.matchStatus === "missing_in_pw2").length;
-  const totalEntitiesV2 = totalEntitiesV1 - missingCount;
+  const orphanCount = records.filter((r) => r.matchStatus === "orphan_in_pw2").length;
+  const totalEntitiesV2 = records.filter((r) => r.matchStatus !== "missing_in_pw2").length;
   const matchedEntities = records.filter((r) => r.matchStatus === "match").length;
 
   const allFields = records.flatMap((r) => r.fields);
@@ -1425,17 +1535,17 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
   const totalFieldCount = allFields.length;
   const fieldMatchRate = totalFieldCount > 0 ? `${((matchedFieldCount / totalFieldCount) * 100).toFixed(1)}%` : "100.0%";
 
-  const groupStats: Record<EntityGroupType, { total: number; pass: number; warn: number; fail: number }> = {
-    products: { total: 1, pass: isFailed ? 0 : 1, warn: 0, fail: isFailed ? 1 : 0 },
-    variants: { total: 2, pass: isFailed ? 1 : 2, warn: 0, fail: isFailed ? 1 : 0 },
-    banners: { total: 2, pass: 2, warn: 0, fail: 0 },
-    richtext: { total: 1, pass: isFailed ? 0 : 1, warn: 0, fail: isFailed ? 1 : 0 },
-    categories: { total: 1, pass: 1, warn: 0, fail: 0 },
-    navigation: { total: 1, pass: 1, warn: 0, fail: 0 },
-    posts: { total: 1, pass: 1, warn: 0, fail: 0 },
-    settings: { total: 1, pass: isWarn ? 0 : 1, warn: isWarn ? 1 : 0, fail: 0 },
-    blocks: { total: 1, pass: 1, warn: 0, fail: 0 },
-  };
+  const groupStats = Object.fromEntries(
+    (["products", "variants", "banners", "richtext", "navigation", "categories", "posts", "settings", "blocks"] as EntityGroupType[])
+      .map((group) => [group, { total: 0, pass: 0, warn: 0, fail: 0 }]),
+  ) as Record<EntityGroupType, { total: number; pass: number; warn: number; fail: number }>;
+  for (const record of records) {
+    const stats = groupStats[record.entityGroup];
+    stats.total += 1;
+    if (record.matchStatus === "match") stats.pass += 1;
+    else if (record.matchStatus === "warning") stats.warn += 1;
+    else stats.fail += 1;
+  }
 
   return {
     storeId: siteId,
@@ -1444,7 +1554,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
       totalEntitiesV2,
       matchedEntities,
       missingInPW2Count: missingCount,
-      orphanInPW2Count: 0,
+      orphanInPW2Count: orphanCount,
       fieldMatchRate,
       groupStats,
     },
@@ -1455,7 +1565,11 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
 /**
  * Get deep store diff with specialized Media, Text Format & Field-by-Field audits
  */
-export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreDeepDiff | null {
+export function getStoreDeepDiff(
+  siteId: string,
+  overrideStatus?: "passed" | "warning" | "failed",
+  includeUiDemoFixture = false,
+): StoreDeepDiff | null {
   const allStores = generateReconciliationCatalog(2000);
   const store = allStores.find((s) => s.id === siteId);
   if (!store) return null;
@@ -2188,7 +2302,7 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
     totalPagesInPW2: isFailed ? dynamicPages.length - 1 : dynamicPages.length,
     missingPagesCount: isFailed ? 1 : 0,
     pages: dynamicPages,
-    fieldDiffAudit: getFieldDiffAuditForStore(siteId, currentStatus),
+    fieldDiffAudit: getFieldDiffAuditForStore(siteId, currentStatus, includeUiDemoFixture),
     reconciliationAudit: {
       totalProductsV1: 24,
       totalProductsV2: 24,
