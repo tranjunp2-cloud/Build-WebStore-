@@ -53,7 +53,7 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
                 industry: 'ecommerce',
                 products: 'Existing PW1 catalog; preserve source references, do not create sample products.',
             },
-            language: 'en', generationLocale: 'en',
+            language: options.blueprint.nativeContract.site.locale ?? 'en', generationLocale: options.blueprint.nativeContract.site.locale ?? 'en',
             extraInstructions: 'Recreate the supplied PW1 pages and components. Source blueprint is authoritative; no sample catalog or invented page content.',
         })
         console.log(`Applying source store ${options.blueprint.storeId} to PW2 user ${user.id}, tenant ${tenantId}, site ${site.id} on ${databaseUrl.hostname}.`)

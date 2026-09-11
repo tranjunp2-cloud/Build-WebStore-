@@ -11,7 +11,7 @@ export const ContentCardsConfigSchema = BaseBlockSchema.extend({
         capturedAt: z.string(),
         presentation: z.enum(['source', 'pw2']).optional(),
         bindingStatus: z.literal('captured-public-content'),
-        items: z.array(z.object({ sourceId: z.string(), title: z.string(), image: ImageRefSchema.optional(), url: SafeLink,
+        items: z.array(z.object({ sourceId: z.string(), title: z.string(), image: ImageRefSchema.optional(), url: SafeLink.optional(),
             summary: z.string().optional(), date: z.string().optional(), price: z.string().optional(), ctaLabel: z.string().optional() })),
     }),
 })

@@ -35,13 +35,13 @@ async function provision(payload:Payload, entry:BatchEntry):Promise<void> {
                 user=await payload.update({collection:'users',id:user.id,data:{tenants:[...(user.tenants??[]),membership]},req})
             }
             await payload.create({collection:'plan-subscriptions',data:{tenant:tenant.id,name:'main',plan:'FREEMIUM',status:'active',startsAt:new Date().toISOString(),endsAt:new Date(Date.now()+365*86400000).toISOString(),packCode:'FREEMIUM'},req})
-            const site=await payload.create({collection:'sites',data:{tenant:tenant.id,name:entry.website.name,status:'draft',generationStatus:'none',siteType:'ecommerce',locale:'en',generationLocale:'en'},req})
+            const site=await payload.create({collection:'sites',data:{tenant:tenant.id,name:entry.website.name,status:'draft',generationStatus:'none',siteType:'ecommerce',locale:entry.website.locale,generationLocale:entry.website.locale},req})
             await tx.execute(sql`INSERT INTO pw1_migration_accounts(source_user_id,email,user_id) VALUES(${entry.sourceUserId},${entry.owner.email},${user.id}) ON CONFLICT(source_user_id) DO NOTHING`)
             await tx.execute(sql`INSERT INTO pw1_migration_stores(source_store_id,source_user_id,tenant_id,site_id) VALUES(${entry.sourceStoreId},${entry.sourceUserId},${tenant.id},${site.id})`)
         } finally { delete db.sessions[transactionID] }
     })
 }
-export async function runPw1Batch(entries:BatchEntry[],options:{dryRun?:boolean;rerun?:boolean}={}) {
+export async function runPw1Batch(entries:BatchEntry[],options:{dryRun?:boolean;rerun?:boolean;inputReports?:import('./pw1-collection-input').CollectionReport[]}={}) {
     if(options.dryRun) {
         const stores=entries.map(entry=>{const {report}=adaptWebsiteInput(compactInput(entry));return {sourceStoreId:entry.sourceStoreId,owner:entry.owner.email,pages:entry.website.pages.length,components:report.sourceComponents,pending:report.pending.length}})
         console.log(JSON.stringify({status:'dry-run',stores},null,2));return
@@ -90,6 +90,7 @@ export async function runPw1Batch(entries:BatchEntry[],options:{dryRun?:boolean;
             try {
                 const adapted=adaptWebsiteInput(compactInput(entry)), blueprint=createNativeBlueprint(adapted.contract)
                 await save('input-adaptation.json',adapted.report)
+                await save('collection-input-report.json', options.inputReports?.find(r => r.sourceStoreId === entry.sourceStoreId) ?? null)
                 await save('blueprint.json',{sourceHash:hash,...blueprint})
                 console.log(`[${entry.sourceStoreId}] generating → site ${mapping.site_id}`)
                 const result=await applyPw1Website({payload:activePayload,blueprint,account:entry.owner.email,siteId:mapping.site_id,sourceHash:hash,save})

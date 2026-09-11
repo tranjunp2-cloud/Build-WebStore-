@@ -166,7 +166,7 @@ export function VideoControlButton({ isPlaying, onClick, className = '', iconSiz
 }
 
 // ── Shared SlideshowDot — touch-friendly dot indicator ─────────────────────
-// 10px visual dot wrapped in 44px button hit area (WCAG 2.5.5).
+// Compact 24px-wide targets keep dots close, with 44px height for tapping.
 
 type SlideshowDotProps = {
     active: boolean
@@ -187,7 +187,7 @@ export function SlideshowDot({
         <button
             type="button"
             onClick={onClick}
-            className={`${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full transition-all duration-300`}
+            className="h-11 w-6 min-w-6 shrink-0 flex items-center justify-center rounded-full transition-all duration-300"
             aria-label={label}
             aria-current={active}
         >

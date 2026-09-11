@@ -46,7 +46,7 @@ export type SupportedAddSectionType =
     | 'blog-list'
     | 'products-grid'
     | 'logo-cloud'
-    // | 'custom-html' // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    | 'custom-html'
     | 'products-featured'
     // v2.0 industry blocks
     // | 'booking-widget' // hidden: BLOCKS_TEMP_HIDDEN GH-1145
@@ -162,7 +162,7 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'blog-list': 'blog list',
     'products-grid': 'products grid',
     'logo-cloud': 'logo cloud',
-    // 'custom-html': 'custom HTML', // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    'custom-html': 'rich text',
     'products-featured': 'featured products',
     // v2.0 industry blocks
     // 'booking-widget': 'booking widget', // hidden: BLOCKS_TEMP_HIDDEN GH-1145
@@ -716,14 +716,8 @@ export function createAddSectionBlock({
                 ],
             }
 
-        // case 'custom-html': // hidden: BLOCKS_TEMP_HIDDEN GH-1145
-        //     return {
-        //         blockType: 'custom-html',
-        //         html: `<div style="padding: 2rem; text-align: center; background: #f8f8f8; border-radius: 8px;">
-        //   <h3 style="margin-bottom: 0.5rem;">Custom HTML Block</h3>
-        //   <p style="color: #666;">Edit this HTML to add any custom content, embeds, or widgets.</p>
-        // </div>`,
-        //     }
+        case 'custom-html':
+            return { blockType: 'custom-html', html: '<p>Add your text here.</p>' }
 
         case 'products-featured':
             return {

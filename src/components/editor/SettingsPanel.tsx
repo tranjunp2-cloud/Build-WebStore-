@@ -2033,7 +2033,7 @@ function SettingsPanelInner({
                             </div>
                             {activeTab === 'block' && block ? (
                                 <div className="mt-1 pl-7 flex items-center gap-2">
-                                    <p className="text-[11px] text-slate-500">[{block.blockType}]</p>
+                                    <p className="text-[11px] text-slate-500">{block.blockType === 'custom-html' ? 'Rich text' : `[${block.blockType}]`}</p>
                                     {isGlobal && (
                                         <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none" style={{ background: 'hsl(var(--info)/0.12)', color: 'hsl(var(--info))' }}>
                                             <Globe className="h-3 w-3" aria-hidden /> Global
@@ -2137,6 +2137,7 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
+                            {bt === 'custom-html' && <p className="text-sm text-slate-400">Click the Rich text content on the page to edit text, images, links and tables inline.</p>}
                             {/* ─── Common Text Fields ──────────────────────── */}
                             {block.logoText !== undefined && (
                                 <div>

@@ -38,7 +38,7 @@ The preload reads `.env.local` / `.env` from the working directory; existing pro
 - Rerun the same command to retry failed stores. Completed stores with unchanged input are skipped. Changed completed input requires `--rerun`; this also explicitly regenerates unchanged completed stores. Replacement requires a draft site.
 - Progress, mappings and generation/backup artifacts are stored in `pw1_migration_accounts`, `pw1_migration_stores`, `pw1_migration_attempts` and `pw1_migration_batches`. No per-store JSON files are generated. These tables are installed by `db-setup.js` and bootstrapped idempotently by the command.
 
-A database-wide advisory lock prevents overlapping batch commands. Retries reuse the mapped account/tenant/site, but may duplicate uploaded media; generation and page replacement are not one atomic transaction. The current website adapter supports English and single-segment paths. Product/blog blocks read PW2 database records and show their native empty states when no records exist. Product filters and source-specific sorting remain pending. The command does not import products, blogs or orders and does not publish sites.
+A database-wide advisory lock prevents overlapping batch commands. Retries reuse the mapped account/tenant/site, but may duplicate uploaded media; generation and page replacement are not one atomic transaction. The website adapter supports English/Malay and single-segment paths. Product/blog blocks read PW2 database records and show their native empty states when no records exist. Product filters and source-specific sorting remain pending. The command does not import products, blogs or orders and does not publish sites.
 
 Local verification: the Amelina array reused user 1847 and provisioned tenant 1821/site 3659. After one rejected AI design, the same command succeeded using that mapping; a subsequent identical run skipped the completed store. Production execution across 1,300+ users has **not** been load-tested.
 
@@ -69,3 +69,13 @@ The `rich-text`, `content-cards` and Hero `sourceLayout` renderers/schema remain
 - `src/lib/migration/pw1-apply.ts`: ownership checks, snapshots and shared-service invocation.
 
 The component gap report is a separate planning document; unimplemented component/editor improvements are not part of this cleanup.
+
+## BE collection export input
+
+The same command now also accepts an array of collection bundles (`tenants`, `users`, `sites`, `pages`, `media`, etc.). It resolves owner/tenant/store identities and projects raw PW1 nested component data into the native website contract entirely in memory. No intermediate input file is created and commerce/customer/order records are not passed to AI.
+
+The adapter reads `sites.domain`, branding and menus; page `type`, status/deleted_at and position; component definitions/defaults plus model_settings; banners and shortlist_items. Only active undeleted content is considered. Runtime cart/checkout/tracking pages use native commerce features. Empty banner/rich-text/category components are reported and skipped. Deleted menu targets are removed and valid children promoted. Footer text-only content becomes tagline, and empty link columns are omitted (native footer permits four nonempty columns).
+
+The file locale (`en`/`ms`) is propagated into generation. Native block limitations still apply: filter/sort controls and selected product/article semantics are reported as pending. Brand cards keep source image/name but no link; category links still use source URLs until destination mappings are implemented. Header search is reported as pending. Blog bodies/commerce import are handled by BE separately.
+
+Reports print during validation and are saved as `collection-input-report.json` inside each database attempt's artifacts. No raw collection dump is saved there. A store with no active source pages fails validation rather than generating invented content. Existing local source-store ledger mappings are reused; this adapter does not automatically adopt arbitrary sites created by a separate BE import without destination mapping integration.

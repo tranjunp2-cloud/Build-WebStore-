@@ -851,7 +851,7 @@ const ContentCardsBlock = {
 
 const CustomHtmlBlock = {
     slug: 'custom-html',
-    labels: { singular: 'Custom HTML', plural: 'Custom HTML Blocks' },
+    labels: { singular: 'Rich text', plural: 'Rich text Blocks' },
     fields: [
         { name: 'html', type: 'code', required: true, admin: { language: 'html' } },
     ],

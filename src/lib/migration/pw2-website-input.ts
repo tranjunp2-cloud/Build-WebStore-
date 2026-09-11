@@ -2,12 +2,14 @@ import { z } from 'zod'
 import { ContractSchema } from './pw1-contract'
 const Id = z.string().regex(/^\d+$/)
 const Url = z.string().refine(v => /^https?:\/\/[^\s]+$/i.test(v), 'Expected HTTP(S) URL')
-const Link = z.object({ label: z.string(), pageId: Id.optional(), url: z.string().optional() }).strict().refine(v => Boolean(v.pageId) !== Boolean(v.url), 'Use pageId or url')
+type ResolvedLink = { label: string; url: string; children?: ResolvedLink[] }
+type InputLink = { label: string; pageId?: string; url?: string; children?: InputLink[] }
+const Link: z.ZodType<InputLink> = z.lazy(() => z.object({ label: z.string(), pageId: Id.optional(), url: z.string().optional(), children: z.array(Link).optional() }).strict().refine(v => Boolean(v.pageId) !== Boolean(v.url), 'Use pageId or url'))
 const Config = z.object({ size: z.enum(['hero','small']).optional(), autoplay: z.boolean().optional(), intervalMs: z.number().min(1000).max(30000).optional(), paddingY: z.number().min(0).max(240).optional(), limit: z.number().int().min(1).max(20).optional(), showCategoryFilter: z.boolean().optional(), criteria: z.record(z.union([z.number(),z.boolean()])).optional(), sourceSettings: z.record(z.unknown()).optional() }).strict()
 const Component = z.object({ sourceId: Id, type: z.enum(['banner','rich_text','category_listing','product_listing','article_listing','product_filter','product_sort','article_filter','article_sort']), enabled: z.boolean().default(true), content: z.record(z.unknown()), config: Config.default({}), binding: z.object({ source: z.literal('pw2.database'), collection: z.enum(['products','blogs']), scope: z.enum(['site','tenant']), emptyBehavior: z.literal('native-empty-state') }).strict().optional(), mappingStatus: z.literal('pending').optional() }).strict()
-export const WebsiteInputSchema = z.object({ format: z.literal('pw2-website-input'), version: z.literal('1.0.0'), source: z.object({ storeId: Id, websiteUrl: Url, capturedAt: z.string().optional() }).strict(), website: z.object({ name: z.string().min(1), locale: z.literal('en'), branding: z.object({ logoUrl: Url }).strict(), features: z.object({ cart: z.boolean(), orderTracking: z.boolean() }).strict().optional(), navigation: z.array(Link), footer: z.object({ copyright: z.string(), tagline: z.string().optional(), columns: z.array(z.object({ title: z.string(), links: z.array(Link) }).strict()) }).strict() }).strict(), pages: z.array(z.object({ sourceId: Id, title: z.string().min(1), path: z.string().regex(/^\/(?:[a-z0-9-]+)?$/), components: z.array(Component) }).strict()).min(1) }).strict()
+export const WebsiteInputSchema = z.object({ format: z.literal('pw2-website-input'), version: z.literal('1.0.0'), source: z.object({ storeId: Id, websiteUrl: Url, capturedAt: z.string().optional() }).strict(), website: z.object({ name: z.string().min(1), locale: z.enum(['en', 'ms']), branding: z.object({ logoUrl: Url }).strict(), features: z.object({ cart: z.boolean(), orderTracking: z.boolean() }).strict().optional(), navigation: z.array(Link), footer: z.object({ copyright: z.string(), tagline: z.string().optional(), columns: z.array(z.object({ title: z.string(), links: z.array(Link) }).strict()) }).strict() }).strict(), pages: z.array(z.object({ sourceId: Id, title: z.string().min(1), path: z.string().regex(/^\/(?:[a-z0-9-]+)?$/), components: z.array(Component) }).strict()).min(1) }).strict()
 const Slide = z.object({ imageUrl: Url, alt: z.string().default(''), heading: z.string().default(''), description: z.string().default(''), cta: z.object({ label: z.string(), url: z.string() }).nullable().optional() }).strict()
-const Categories = z.object({ heading: z.string(), items: z.array(z.object({ sourceId: Id, title: z.string(), imageUrl: Url, alt: z.string().optional(), url: Url, ctaLabel: z.string().optional() }).strict()) }).strict()
+const Categories = z.object({ heading: z.string(), items: z.array(z.object({ sourceId: Id, title: z.string(), imageUrl: Url, alt: z.string().optional(), url: Url.optional(), ctaLabel: z.string().optional() }).strict()) }).strict()
 /** Adapt the compact public contract only; never read a previous export or live DB. */
 export function adaptWebsiteInput(input: unknown) {
     const data = WebsiteInputSchema.parse(input)
@@ -21,10 +23,10 @@ export function adaptWebsiteInput(input: unknown) {
         }
     }
     if (!paths.has('/')) throw new Error('Homepage is required')
-    const link = (value: z.infer<typeof Link>) => {
+    const link = (value: InputLink): ResolvedLink => {
         const url = value.pageId ? data.pages.find(p => p.sourceId === value.pageId)?.path : value.url
         if (!url || !/^(https?:\/\/|\/(?!\/)|#)/.test(url)) throw new Error('Invalid navigation target')
-        return { label: value.label, url }
+        return { label: value.label, url, ...(value.children?.length ? { children: value.children.map(link) } : {}) }
     }
     // Recognize only same-origin legacy system routes; external links stay ordinary links.
     const systemFeature = (value: z.infer<typeof Link>) => {
@@ -70,6 +72,6 @@ export function adaptWebsiteInput(input: unknown) {
         }
         return [{ sourceId: component.sourceId, position: index, kind: component.type, block }]
     }) }))
-    const contract = ContractSchema.parse({ format: 'pw2-reconstruction-contract', version: '1.0.0', source: { storeId: data.source.storeId, url: data.source.websiteUrl, capturedAt: data.source.capturedAt ?? '', dumpHash: '' }, site: { name: data.website.name, features, navigation: { blockType: 'navigation', logoText: data.website.name, logo: { url: data.website.branding.logoUrl, alt: data.website.name }, links: navigation }, footer: { blockType: 'footer', logoText: data.website.name, copyrightText: data.website.footer.copyright, tagline: data.website.footer.tagline, columns: data.website.footer.columns.map(c => ({ title: c.title, links: c.links.map(link) })) } }, pages, reconciliation: [...warnings, ...pending.map(p => `${p.sourceId}: ${p.reason}`), ...excluded.map(id => `${id}: disabled component excluded`)] })
+    const contract = ContractSchema.parse({ format: 'pw2-reconstruction-contract', version: '1.0.0', source: { storeId: data.source.storeId, url: data.source.websiteUrl, capturedAt: data.source.capturedAt ?? '', dumpHash: '' }, site: { name: data.website.name, locale: data.website.locale, features, navigation: { blockType: 'navigation', logoText: data.website.name, logo: { url: data.website.branding.logoUrl, alt: data.website.name }, links: navigation }, footer: { blockType: 'footer', logoText: data.website.name, copyrightText: data.website.footer.copyright, tagline: data.website.footer.tagline, columns: data.website.footer.columns.map(c => ({ title: c.title, links: c.links.map(link) })) } }, pages, reconciliation: [...warnings, ...pending.map(p => `${p.sourceId}: ${p.reason}`), ...excluded.map(id => `${id}: disabled component excluded`)] })
     return { contract, report: { inputFormat: data.format, locale: data.website.locale, sourceComponents: data.pages.reduce((sum,p) => sum+p.components.length,0), mappedComponents: pages.reduce((sum,p) => sum+p.components.length,0), pending, excluded, warnings, sourceConfigs: data.pages.flatMap(p=>p.components.map(c=>({ pageId:p.sourceId, sourceId:c.sourceId, config:c.config }))) } }
 }

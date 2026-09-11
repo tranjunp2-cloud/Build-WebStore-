@@ -66,13 +66,13 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
     )
 
     const Dots = () => (
-        <div className="flex justify-center gap-2 mt-6">
+        <div className="flex justify-center mt-6">
             {items.map((_, i) => (
                 <button
                     key={i}
                     type="button"
                     onClick={() => goTo(i)}
-                    className={`${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full transition-all duration-300`}
+                    className="h-11 w-6 min-w-6 shrink-0 flex items-center justify-center rounded-full transition-all duration-300"
                     aria-label={`Go to slide ${i + 1}`}
                     aria-current={i === currentIndex}
                 >

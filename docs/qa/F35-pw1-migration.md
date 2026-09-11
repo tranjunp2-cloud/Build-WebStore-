@@ -32,3 +32,12 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 
 ### TC-F35.M26 — Native blueprint
 - [x] AUTO — Keep source contract and page identity without generating legacy blocks; reject duplicate page/component IDs and invalid homepage/order.
+
+### TC-F35.M27 — BE collection adapter
+- [x] AUTO — Project website-only data; keep locale and content; exclude disabled/deleted/empty records; promote valid menu children; reject ambiguous owners and cross-store settings.
+
+### Rich text editor HTML compatibility
+- [x] AUTO TC-F35-RT-01: Tiptap retains PW1 container styles, headings, lists, image metadata and tables during an HTML edit round trip.
+- [x] AUTO TC-F35-RT-02: Editing text color replaces the prior color without removing unrelated span styles.
+- [x] AUTO TC-F35-RT-03: Image inline/left-wrap/right-wrap/standalone layouts and spacing survive HTML reload; legacy floats can be reset to inline.
+- [x] AUTO TC-F35-RT-04: Source percent-width images, formatted captions, trusted media and HSL/RGB colors survive normalization; unsafe embedded HTML is removed.

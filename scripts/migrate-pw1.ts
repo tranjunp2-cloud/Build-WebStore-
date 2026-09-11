@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { readFile, stat, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { parseBatchInput } from '../src/lib/migration/pw1-batch-input'
+import { parseMigrationInput } from '../src/lib/migration/pw1-collection-input'
 
 async function main() {
     const { values, positionals } = parseArgs({ options: {
@@ -12,7 +12,7 @@ async function main() {
 Usage: npm run migrate:pw1 -- ./pw1-websites.json
        npm run migrate:pw1 -- ./pw1-websites.json --dry-run
        npm run migrate:pw1 -- ./pw1-websites.json --rerun
-One input array, one store per entry. Default: apply; dry-run has no AI/DB writes.
+One input array: compact website entries or BE collection bundles. Default: apply; dry-run has no AI/DB writes.
 Environment: existing process variables or project .env.local/.env (loaded by preload).
 Maps accounts/stores and saves backups/progress in the destination database; no per-store JSON files.
 Completed unchanged stores are skipped. --rerun explicitly regenerates mapped draft sites.
@@ -25,9 +25,10 @@ One active batch per database; failures are reported and remaining stores contin
     const path = await realpath(resolve(positionals[0]))
     const file = await stat(path)
     if (!file.isFile() || file.size > 100 * 1024 * 1024) throw new Error('Input must be a JSON file no larger than 100 MiB')
-    const entries = parseBatchInput(JSON.parse(await readFile(path, 'utf8')))
+    const { entries, reports } = parseMigrationInput(JSON.parse(await readFile(path, 'utf8')))
+    if (reports.length) console.log(JSON.stringify({ collectionInputReports: reports }, null, 2))
     const { runPw1Batch } = await import('../src/lib/migration/pw1-batch')
-    await runPw1Batch(entries, { dryRun: values['dry-run'], rerun: values.rerun })
+    await runPw1Batch(entries, { dryRun: values['dry-run'], rerun: values.rerun, inputReports: reports })
 }
 main().then(() => process.exit(0)).catch(error => {
     console.error(error instanceof Error ? error.message : 'Migration failed')

@@ -285,6 +285,9 @@ function PreviewFrameInner({
     // GH-1367 Bug 3: keeps the iframe frozen while the inline-edit save flushes in the
     // background, even though the text toolbar (gated by textEditingData) is already hidden.
     const [isFlushingEdit, setIsFlushingEdit] = useState(false)
+    const [richTextInlineIndex, setRichTextInlineIndex] = useState<number | null>(null)
+    const richTextInlineActive = richTextInlineIndex !== null
+    const visibleSelectedBlock = richTextInlineIndex ?? selectedBlock
     const [iframeScrollY, setIframeScrollY] = useState(0)
     const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string; imageIndex?: number; totalImagesInBlock?: number } | null>(null)
     // Scroll position to restore after iframe reload
@@ -517,6 +520,28 @@ function PreviewFrameInner({
         const handleMessage = (e: MessageEvent) => {
             // Security: only accept messages from own origin or sandboxed iframe ('null')
             if (e.origin !== window.location.origin && e.origin !== 'null') return
+
+            if (['RICH_TEXT_INLINE_START', 'RICH_TEXT_INLINE_END', 'RICH_TEXT_INLINE_CANCEL'].includes(e.data?.type)) {
+                if (e.source !== frameElementRef.current?.contentWindow || e.origin !== window.location.origin) return
+                const index = e.data.blockIndex
+                if (e.data.type !== 'RICH_TEXT_INLINE_CANCEL' && (!Number.isInteger(index) || blocksRef.current[index]?.blockType !== 'custom-html')) return
+                const active = e.data.type === 'RICH_TEXT_INLINE_START'
+                setRichTextInlineIndex(active ? index : null)
+                if (active && selectedBlock !== index) onBlockSelect?.(index)
+                setIsInlineEditing(active)
+                setTextEditingData(null)
+                setHoverData(null)
+                setImageClickData(null)
+                if (e.data.type === 'RICH_TEXT_INLINE_END' && typeof e.data.html === 'string') {
+                    updateBlock(index, { html: e.data.html })
+                    const store = useEditorStore.getState()
+                    frameElementRef.current?.contentWindow?.postMessage({
+                        type: 'UPDATE_BLOCK_DATA', blockIndex: index,
+                        blockData: store.getDisplayBlock(store.blocks[index]),
+                    }, window.location.origin)
+                }
+                return
+            }
 
             if (e.data?.type === 'BLOCK_HOVERED') {
                 if (isEditingRef.current || dragStateRef.current) return
@@ -776,7 +801,7 @@ function PreviewFrameInner({
             window.removeEventListener('message', handleMessage)
         }
         // Stable deps only — blocks/dragState/isEditing accessed via refs to prevent listener churn
-    }, [applyInlineEditPayload, cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, onLocaleSwitch, setIsEditing, updateBlock])
+    }, [applyInlineEditPayload, cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, onLocaleSwitch, setIsEditing, updateBlock, selectedBlock])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -1400,14 +1425,14 @@ function PreviewFrameInner({
                     </div>
                 </div>
 
-                {((blockHover && !dragState) || (selectedBlock !== null && overlayOffset)) ? (
+                {((blockHover && !dragState) || (visibleSelectedBlock !== null && overlayOffset)) ? (
                     <>
                         {/* Hover overlay — dashed border + block name label */}
                         {(() => {
-                            if (!blockHover || dragState || !overlayOffset) return null
-                            if (blockHover.blockIndex === selectedBlock) return null
+                            if (richTextInlineActive || !blockHover || dragState || !overlayOffset) return null
+                            if (blockHover.blockIndex === visibleSelectedBlock) return null
                             if (blockHover.blockType === 'breadcrumb' || blockHover.blockType === 'navigation' || blockHover.blockType === 'footer') return null
-                            const label = blockHover.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+                            const label = blockHover.blockType === 'custom-html' ? 'Rich text' : blockHover.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
                             return (
                                 <div
                                     className="pointer-events-none absolute border-2 border-dashed border-blue-400 transition-all duration-100"
@@ -1427,13 +1452,13 @@ function PreviewFrameInner({
                         })()}
                         {/* Selected border injected via CSS into iframe; label rendered here */}
                         {(() => {
-                            if (selectedBlock === null || !overlayOffset || dragState) return null
-                            const layout = editableLayouts.find(l => l.blockIndex === selectedBlock) ?? null
+                            if (visibleSelectedBlock === null || !overlayOffset || dragState) return null
+                            const layout = editableLayouts.find(l => l.blockIndex === visibleSelectedBlock) ?? null
                             if (!layout) return null
-                            const label = layout.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+                            const label = layout.blockType === 'custom-html' ? 'Rich text' : layout.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
                             return (
                                 <div
-                                    className="pointer-events-none absolute transition-all duration-100"
+                                    className={`pointer-events-none absolute transition-all duration-100 ${richTextInlineActive ? 'border-2 border-blue-500' : ''}`}
                                     style={{
                                         top: overlayOffset.top + layout.top,
                                         left: overlayOffset.left + layout.left,
@@ -1450,8 +1475,8 @@ function PreviewFrameInner({
                         })()}
                         {/* Block Action Bar — shows on selected block */}
                         {(() => {
-                            const selectedLayout = selectedBlock !== null
-                                ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
+                            const selectedLayout = visibleSelectedBlock !== null
+                                ? editableLayouts.find(layout => layout.blockIndex === visibleSelectedBlock) || null
                                 : null
                             if (!selectedLayout || !overlayOffset || dragState || textEditingData || hideBlockActionBar) return null
 
@@ -1508,7 +1533,7 @@ function PreviewFrameInner({
                                             syncDragPosition(event.clientY, selectedLayout.blockIndex)
                                         }}
                                         position={{
-                                            top: overlayOffset.top + selectedLayout.top,
+                                            top: overlayOffset.top + selectedLayout.top - (richTextInlineActive ? 28 : 0),
                                             left: overlayOffset.left + selectedLayout.left,
                                             width: selectedLayout.width,
                                         }}

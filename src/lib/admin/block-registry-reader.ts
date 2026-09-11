@@ -52,7 +52,7 @@ const VI_NAME_MAP: Record<string, string> = {
     'blog-list': 'Danh sách bài viết',
     'products-grid': 'Lưới sản phẩm',
     'products-featured': 'Sản phẩm nổi bật',
-    'custom-html': 'HTML tuỳ chỉnh',
+    'custom-html': 'Văn bản định dạng',
     socialWidget: 'Mạng xã hội',
     cartWidget: 'Giỏ hàng',
     'pricing-table': 'Bảng giá chi tiết',
