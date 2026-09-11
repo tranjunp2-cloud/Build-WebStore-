@@ -118,3 +118,11 @@ The stateful test intentionally skips when its fixture variables are absent. Bef
 | TC-ID | Type | Priority | Scenario | Status | Automated by |
 | --- | --- | --- | --- | --- | --- |
 | TC-F40-12-11 | Unit | High | **Highlight Diff Gaps** identifies P0/P1 PW2 visual gaps with an explanatory label and ignores matched blocks. | [x] AUTO | `src/__tests__/unit/qa/f40-visual-parity-inspector.test.ts` |
+
+## US-F40-14 — Commerce và Settings Migration Reconciliation
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-14-01 | Unit | Critical | Khi chưa có mapping evidence, snapshot chỉ là `Chưa xác minh`; không được suy đoán bản ghi khớp từ SKU/email/order number. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts` |
+| TC-F40-14-02 | E2E | Critical | Super Admin mở Đối soát Commerce, bật dữ liệu mẫu và lọc theo Products. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+| TC-F40-14-03 | Unit | High | Adapter evidence versioned có thể được đăng ký mà không thay đổi contract UI. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts` |

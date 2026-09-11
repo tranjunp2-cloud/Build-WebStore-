@@ -79,4 +79,28 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     await expect(page.getByTestId("field-diff-record-ent-cat-12")).toHaveCount(0);
     await expect(page.getByTestId("field-diff-record-ent-post-88")).toBeVisible();
   });
+
+  test("[TC-F40-14-02] Super Admin can open the Commerce reconciliation workspace and filter by feature", async ({ page }) => {
+    test.skip(
+      !process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE,
+      "Requires the super-admin E2E account configured by the f40-migration-diff project.",
+    );
+
+    // Arrange
+    await page.goto("/studio/qa/migration-diff");
+
+    // Act
+    await page.getByRole("button", { name: "Đối soát Commerce" }).click();
+    await page.getByRole("checkbox", { name: "Xem dữ liệu mẫu" }).check();
+    await page.getByRole("button", { name: "Products" }).click();
+
+    // Assert
+    await expect(page.getByTestId("migration-reconciliation-shell")).toBeVisible();
+    await expect(page.getByText("Áo thun mẫu")).toBeVisible();
+    await expect(page.getByText("Đơn hàng #1024")).toHaveCount(0);
+
+    // Switching scopes must not retain the Commerce-only Products filter.
+    await page.getByRole("button", { name: "Đối soát Settings" }).click();
+    await expect(page.getByText("Account profile")).toBeVisible();
+  });
 });
