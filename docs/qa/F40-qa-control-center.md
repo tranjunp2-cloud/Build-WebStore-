@@ -131,3 +131,11 @@ The stateful test intentionally skips when its fixture variables are absent. Bef
 | TC-F40-13-05 | E2E | Critical | The inferred PW2 preview is replaced when data/component evidence is incomplete. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
 | TC-F40-13-07 | Manual | Critical | Approved PW1→PW2 mapping identifies the actual PW2 layout block. | [ ] MANUAL | Team migration mapping handoff |
 | TC-F40-13-08 | Manual | High | On-demand live check confirms or rejects the real PW2 block without exposing customer data. | [ ] MANUAL | Team live-check runner handoff |
+
+## US-F40-14 — Commerce và Settings Migration Reconciliation
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-14-01 | Unit | Critical | Khi chưa có mapping evidence, snapshot chỉ là `Chưa xác minh`; không được suy đoán bản ghi khớp từ SKU/email/order number. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts` |
+| TC-F40-14-02 | E2E | Critical | Super Admin mở Đối soát Commerce, bật dữ liệu mẫu và lọc theo Products. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+| TC-F40-14-03 | Unit | High | Adapter evidence versioned có thể được đăng ký mà không thay đổi contract UI. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts` |

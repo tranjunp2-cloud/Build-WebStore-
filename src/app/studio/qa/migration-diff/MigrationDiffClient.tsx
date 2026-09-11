@@ -3,6 +3,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
+import { ReconciliationInspector } from "./ReconciliationInspector";
+import { type ReconciliationScope, type ReconciliationSnapshot } from "@/lib/admin/qa/migration-reconciliation";
 import {
   generateReconciliationCatalog,
   getFieldDiffRecordsForPage,
@@ -825,10 +827,15 @@ export function MigrationDiffClient() {
   const [parityMode, setParityMode] = useState<"dual_window" | "swipe_slider">("dual_window");
   const [showDiffGaps, setShowDiffGaps] = useState(false);
   const [sliderPosition, setSliderPosition] = useState<number>(50);
-  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit">("live_webview");
+  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit" | "commerce_reconciliation" | "settings_reconciliation">("live_webview");
+  const [reconciliationSnapshot, setReconciliationSnapshot] = useState<ReconciliationSnapshot | null>(null);
+  const [reconciliationLoading, setReconciliationLoading] = useState(false);
+  const [reconciliationError, setReconciliationError] = useState<string | null>(null);
+  const [reconciliationDemo, setReconciliationDemo] = useState(false);
   const [previewSource, setPreviewSource] = useState<"template" | "live_domain">("template");
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const pw1DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
+  const reconciliationRequestRef = React.useRef(0);
   const pw2DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
   const pw1MobIframeRef = React.useRef<HTMLIFrameElement>(null);
   const pw2MobIframeRef = React.useRef<HTMLIFrameElement>(null);
@@ -957,6 +964,15 @@ export function MigrationDiffClient() {
     };
     void fetchDiff();
   }, [activeStoreId]);
+
+  useEffect(() => {
+    const scope: ReconciliationScope | null = activeViewTab === "commerce_reconciliation" ? "commerce" : activeViewTab === "settings_reconciliation" ? "settings" : null;
+    if (!scope || !activeStoreId) return;
+    const controller = new AbortController();
+    const requestId = ++reconciliationRequestRef.current;
+    const load = async () => { setReconciliationSnapshot(null); setReconciliationLoading(true); setReconciliationError(null); try { const response = await fetch(`/api/qa/migration-reconciliation?scope=${scope}&store_id=${encodeURIComponent(activeStoreId)}${reconciliationDemo ? "&demo=1" : ""}`, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload: { data?: ReconciliationSnapshot } = await response.json(); if (payload.data?.scope !== scope || payload.data.storeId !== activeStoreId) throw new Error("Phản hồi đối soát không khớp store hoặc phạm vi đang chọn"); if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationSnapshot(payload.data); } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationRequestRef.current) { setReconciliationSnapshot(null); setReconciliationError(error instanceof Error ? error.message : "Lỗi không xác định"); } } finally { if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationLoading(false); } };
+    void load(); return () => controller.abort();
+  }, [activeStoreId, activeViewTab, reconciliationDemo]);
 
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
     if (!activeStoreId) return null;
@@ -1946,24 +1962,8 @@ export function MigrationDiffClient() {
                     <SlidersHorizontal className="size-3.5" />
                     <span>Soi CSDL 1-to-1</span>
                   </button>
-                  <button
-                    onClick={() => setActiveViewTab("media_audit")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "media_audit" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <ImageIcon className="size-3.5" />
-                    <span>Soi Ảnh & Link</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveViewTab("text_audit")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "text_audit" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <TypeIcon className="size-3.5" />
-                    <span>Soi Chữ & Bảng</span>
-                  </button>
+                  <button onClick={() => setActiveViewTab("commerce_reconciliation")} className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${activeViewTab === "commerce_reconciliation" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"}`}><ShoppingCart className="size-3.5" /><span>Đối soát Commerce</span></button>
+                  <button onClick={() => setActiveViewTab("settings_reconciliation")} className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${activeViewTab === "settings_reconciliation" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"}`}><Settings className="size-3.5" /><span>Đối soát Settings</span></button>
                 </div>
 
                 {/* Filter toggle */}
@@ -1980,7 +1980,9 @@ export function MigrationDiffClient() {
             </div>
 
             {/* Modal Body Area */}
-            {activeViewTab === "visual_stream" ? (
+            {activeViewTab === "commerce_reconciliation" || activeViewTab === "settings_reconciliation" ? (
+              <ReconciliationInspector scope={activeViewTab === "commerce_reconciliation" ? "commerce" : "settings"} snapshot={reconciliationSnapshot} loading={reconciliationLoading} error={reconciliationError} isDemo={reconciliationDemo} onToggleDemo={setReconciliationDemo} />
+            ) : activeViewTab === "visual_stream" ? (
               /* ========================================================================= */
               /* 1. THE CLASSIC DUAL BROWSER PARITY STREAM VIEW (PW1 VS PW2) */
               /* ========================================================================= */
