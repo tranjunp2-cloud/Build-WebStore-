@@ -46,6 +46,24 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     expect([401, 403]).toContain(res.status());
   });
 
+  test("[TC-F40-13-API-01] GET /api/qa/migration-render-evidence rejects unauthenticated access with 401/403", async ({
+    request,
+  }) => {
+    const res = await request.get(
+      "/api/qa/migration-render-evidence?store_id=SITE-0001&page_id=page-home&demo=0",
+    );
+    expect([401, 403]).toContain(res.status());
+  });
+
+  test("[TC-F40-13-API-02] POST live-check rejects unauthenticated access with 401/403", async ({
+    request,
+  }) => {
+    const res = await request.post("/api/qa/migration-render-evidence/live-check", {
+      data: { store_id: "SITE-0001", page_id: "page-home", legacy_id: "block-1" },
+    });
+    expect([401, 403]).toContain(res.status());
+  });
+
   test("[TC-F40-11-E2E-01] unauthenticated navigation to /studio/migration redirects to login", async ({
     page,
   }) => {
@@ -78,5 +96,20 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     await expect(page.getByTestId("field-diff-page-scope")).toContainText("Tin Tức & Cẩm Nang");
     await expect(page.getByTestId("field-diff-record-ent-cat-12")).toHaveCount(0);
     await expect(page.getByTestId("field-diff-record-ent-post-88")).toBeVisible();
+  });
+
+  test("[TC-F40-13-E2E-02] mock evidence never treats inferred PW2 UI as verified", async ({ page }) => {
+    test.skip(
+      !process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE,
+      "Requires the super-admin E2E account configured by the f40-migration-diff project.",
+    );
+
+    await page.goto("/studio/qa/migration-diff");
+    await page.getByRole("button", { name: "So Sánh Khối" }).click();
+    await page.getByLabel("Xem dữ liệu mẫu để duyệt UI").check();
+
+    await expect(page.getByText("Dữ liệu mẫu để duyệt UI; không phải bằng chứng migration thực tế.")).toBeVisible();
+    await expect(page.getByText("Dữ liệu PW2").first()).toBeVisible();
+    await expect(page.getByTestId("pw2-evidence-placeholder").first()).toBeVisible();
   });
 });
