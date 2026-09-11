@@ -119,6 +119,19 @@ The stateful test intentionally skips when its fixture variables are absent. Bef
 | --- | --- | --- | --- | --- | --- |
 | TC-F40-12-11 | Unit | High | **Highlight Diff Gaps** identifies P0/P1 PW2 visual gaps with an explanatory label and ignores matched blocks. | [x] AUTO | `src/__tests__/unit/qa/f40-visual-parity-inspector.test.ts` |
 
+## US-F40-13 — PW2 Render Evidence
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-13-01 | Unit | Critical | No approved mapping returns `unverified`; never infer PW2 data from preview. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-render-evidence.test.ts` |
+| TC-F40-13-02 | Unit | Critical | Overall pass requires migrated data, supported component and verified live render. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-render-evidence.test.ts` |
+| TC-F40-13-06 | Unit | Critical | Sensitive evidence field is removed before response serialization. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-render-evidence.test.ts` |
+| TC-F40-13-03 | API | Critical | Evidence and explicit live-check endpoints require Super Admin authentication. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+| TC-F40-13-04 | E2E | High | Demo mode is visibly labelled as non-production evidence. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+| TC-F40-13-05 | E2E | Critical | The inferred PW2 preview is replaced when data/component evidence is incomplete. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+| TC-F40-13-07 | Manual | Critical | Approved PW1→PW2 mapping identifies the actual PW2 layout block. | [ ] MANUAL | Team migration mapping handoff |
+| TC-F40-13-08 | Manual | High | On-demand live check confirms or rejects the real PW2 block without exposing customer data. | [ ] MANUAL | Team live-check runner handoff |
+
 ## US-F40-14 — Commerce và Settings Migration Reconciliation
 
 | TC-ID | Type | Priority | Scenario | Status | Automated by |
