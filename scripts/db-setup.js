@@ -3859,6 +3859,33 @@ const MIGRATIONS = [
       ADD COLUMN IF NOT EXISTS fields_filled integer,
       ADD COLUMN IF NOT EXISTS fields_edited integer DEFAULT 0;`,
   },
+  // ── F41: durable website generation outcome (additive/idempotent) ────────
+  { name: 'ai_generation_records.f41_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records
+    ADD COLUMN IF NOT EXISTS trace_id varchar, ADD COLUMN IF NOT EXISTS input_snapshot jsonb,
+    ADD COLUMN IF NOT EXISTS input_schema_version varchar, ADD COLUMN IF NOT EXISTS input_hash varchar,
+    ADD COLUMN IF NOT EXISTS lifecycle varchar, ADD COLUMN IF NOT EXISTS outcome varchar,
+    ADD COLUMN IF NOT EXISTS recovery_status varchar, ADD COLUMN IF NOT EXISTS page_summary_expected integer,
+    ADD COLUMN IF NOT EXISTS page_summary_persisted integer, ADD COLUMN IF NOT EXISTS page_summary_failed integer,
+    ADD COLUMN IF NOT EXISTS user_safe_message varchar, ADD COLUMN IF NOT EXISTS started_at timestamp,
+    ADD COLUMN IF NOT EXISTS terminal_at timestamp, ADD COLUMN IF NOT EXISTS last_heartbeat_at timestamp;` },
+  { name: 'ai_generation_records.f41_indexes', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_trace_id_idx ON ai_generation_records (trace_id);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_lifecycle_idx ON ai_generation_records (lifecycle);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_outcome_idx ON ai_generation_records (outcome);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_recovery_status_idx ON ai_generation_records (recovery_status);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_terminal_at_idx ON ai_generation_records (terminal_at);` },
+  { name: 'ai_generation_records_page_outcomes.create_table', sql: `CREATE TABLE IF NOT EXISTS ai_generation_records_page_outcomes (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0,
+    _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
+    _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, page_key varchar, title varchar, slug varchar,
+    page_id varchar, status varchar, block_count integer, error_code varchar, error_summary text);` },
+  { name: 'ai_generation_records_page_outcomes.parent_idx', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_page_outcomes_parent_idx ON ai_generation_records_page_outcomes (_parent_id);` },
+  { name: 'ai_generation_records_generation_errors.create_table', sql: `CREATE TABLE IF NOT EXISTS ai_generation_records_generation_errors (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0,
+    _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
+    _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, phase varchar, location_type varchar, location_key varchar,
+    code varchar, category varchar, retryability_reason varchar, operator_message text, user_safe_message text,
+    sanitized_technical_message text, signature varchar);` },
+  { name: 'ai_generation_records_generation_errors.parent_idx', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_generation_errors_parent_idx ON ai_generation_records_generation_errors (_parent_id);` },
 
   // ── Pages: Data cleanup for F05 Footer variants ──
   // Migrate legacy variant values to the new supported values cleanly in the database

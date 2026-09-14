@@ -15,6 +15,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withSuperAdmin, checkRateLimit } from '@/lib/admin/api-utils'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
+import { finishCapture, startCapture } from '@/lib/ai/capture-generation'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -75,8 +76,21 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
         }
 
         try {
-            // generateSiteWithAI creates its own capture record via the wrapped function
+            // F41 assigns website persistence capture to generate-site. This legacy
+            // admin action only re-composes content, so keep its separate monitor row.
+            const capture = await startCapture({
+                endpoint: 'site-generator-rerun-composition',
+                prompt: promptText,
+                category: businessInfo.industry || undefined,
+                userId: adminCtx.user.id,
+                payload,
+            })
             const { result } = await generateSiteWithAI(businessInfo)
+            await finishCapture(capture, {
+                status: 'success',
+                selectedBlocks: result.blocks.map((block) => String((block as { blockType?: unknown }).blockType ?? '')),
+                outputSnapshot: { path: 'admin-rerun-composition', siteName: result.siteName },
+            })
 
             return NextResponse.json({
                 data: {
