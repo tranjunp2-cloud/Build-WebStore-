@@ -7,6 +7,8 @@ branch: feat/F41-studio-generation-recovery-operations
 
 # F41 Implementation Plan
 
+> **Engineering source of truth:** [F41 Generation Recovery contract](../../docs/architecture/f41-generation-recovery-contract.md). Phase implementation must follow its state machine, retry isolation, API, event, RBAC and privacy rules.
+
 ## Phase 1 — Data contract and migration
 
 - Extend generation run summary and add durable outcome/event/retry lineage model.
@@ -21,8 +23,8 @@ branch: feat/F41-studio-generation-recovery-operations
 
 ## Phase 3 — Website retry recovery
 
-- Replace lossy prompt-parsing re-run with a short-lived job/request model using stored input snapshot.
-- Create child generation and draft/site result without overwriting parent.
+- Replace lossy prompt-parsing re-run with an approved async queue/job using stored input snapshot; API only returns accepted job ID within Vercel limits.
+- Create child generation and isolated draft recovery site without overwriting parent. Do not reuse the legacy in-place re-run path because it can delete existing pages.
 - Enforce retry policy, idempotency and Vercel duration limits.
 
 ## Phase 4 — Studio UX

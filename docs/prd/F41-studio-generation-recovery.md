@@ -7,6 +7,8 @@ created: 2026-09-14
 
 # PRD — F41 Studio Generation Recovery & Operations
 
+> **Engineering handoff:** [F41 Generation Recovery contract](../architecture/f41-generation-recovery-contract.md). Dev phải theo contract này cho state, persistence, API, event, RBAC và privacy; không tự suy luận policy từ UI/error text.
+
 ## 1. Vấn đề
 
 Studio User Generations hiện là log viewer. Người trực phải tự lọc record lỗi, không biết website/user nào bị ảnh hưởng, lỗi nằm ở page/component nào, và không có flow recovery hoặc escalation có evidence đầy đủ.
@@ -30,7 +32,7 @@ End user không thấy lỗi kỹ thuật. Họ chỉ thấy: đang hoàn thiệ
 ### Trong phạm vi
 
 - `Needs Attention` và `All Generations` trong `/studio/generations`.
-- Final run status chính xác sau site/page persistence: `completed`, `partial_success`, `failed`, `retrying`, `needs_attention`, `cannot_recover`, `ticket_created`.
+- Final run status chính xác sau site/page persistence. Status tách thành lifecycle, outcome, recovery và ticket state theo Engineering Contract, không dùng một enum trộn tất cả.
 - Structured input snapshot, generation trace ID, site/user identity, site preview/live link, page outcomes và normalized error/retryability.
 - Tracker có thể tạo **một retry website mới** từ input snapshot gốc; run/site lỗi không bị ghi đè.
 - Detail full-page có website/user, input summary/full form, result, page tree, timeline, recovery history, technical evidence và issue handoff.
@@ -46,12 +48,12 @@ End user không thấy lỗi kỹ thuật. Họ chỉ thấy: đang hoàn thiệ
 
 ## 5. Quy tắc nghiệp vụ
 
-1. Mỗi retry website là generation mới, có `parentGeneration`/retry lineage và không overwrite run cũ.
+1. Mỗi retry website là child generation mới, có `parentGeneration`/retry lineage, idempotency key và draft recovery site riêng. Không overwrite parent run/site/pages/evidence, không auto-publish hoặc swap site trong MVP.
 2. Chỉ lỗi có policy `retryable` mới được retry. Validation/schema/permission/database migration không retry mù quáng.
-3. Auto-retry tối đa một lần với lỗi transient đã allowlist; sau đó đưa vào Needs Attention hoặc Issue.
+3. Auto-retry chỉ có khi policy explicit allowlist và tối đa một lần. Manual retry cũng tối đa một lần; retry job đang chạy phải khóa CTA ở list/detail.
 4. Needs Attention mặc định khi có exception; thứ tự: cannot recover → retryable → retry failed → retrying → running quá lâu.
-5. Ticket chỉ được tạo sau retry không hợp lệ/thất bại, có dedupe signature và chứa safe evidence.
-6. Super Admin là role duy nhất được xem full input, retry hoặc tạo ticket.
+5. Ticket tạo ngay với lỗi non-retryable, hoặc sau khi retry fail/hết quota; dedupe theo signature server-computed và chỉ chứa safe evidence.
+6. Super Admin là role duy nhất được xem full input, retry, tạo ticket hoặc export. End user chỉ thấy own-generation safe status, không tự retry trong MVP.
 7. UI phải nói rõ page/component lỗi khi data có; nếu không có evidence, hiển thị `Không xác định` thay vì suy đoán.
 
 ## 6. Chỉ số thành công MVP
@@ -79,3 +81,7 @@ End user không thấy lỗi kỹ thuật. Họ chỉ thấy: đang hoàn thiệ
 - Detail cung cấp website link, user identity, input summary/full form, page outcomes, timeline và error evidence.
 - Không retry được hoặc retry thất bại tạo/mở Issue & Feedback có safe context và không duplicate.
 - End user chỉ nhận trạng thái thân thiện, không nhận lỗi kỹ thuật.
+- API retry trả nhanh `202` với child/job ID; AI/recovery chạy async và mọi API route `maxDuration <= 60`.
+- Retry đồng thời hoặc lặp cùng idempotency key không được tạo nhiều child generation/site/job.
+- Server finalise mọi run, kể cả exception/stale-job; `succeeded` chỉ sau persistence terminal.
+- Không dùng endpoint re-run cũ để recovery vì có thể thay đổi/xóa pages của site hiện hữu; recovery worker phải tạo isolated draft site.

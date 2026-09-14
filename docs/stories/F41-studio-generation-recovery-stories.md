@@ -42,6 +42,7 @@ WHEN tôi chọn Gen lại website và xác nhận
 THEN system tạo generation mới từ structured input snapshot
 AND liên kết generation mới với generation gốc
 AND không overwrite website/run lỗi
+AND child generation tạo isolated draft recovery site, không sửa hoặc xóa page của parent site
 AND row hiển thị Đang gen lại cho đến terminal outcome
 ```
 
