@@ -3,6 +3,7 @@
 > **Feature:** F41 — Studio Generation Recovery & Operations
 > **Priority:** P1
 > **Ref PRD:** [F41-studio-generation-recovery.md](../prd/F41-studio-generation-recovery.md)
+> **Engineering contract:** [F41-generation-recovery-contract.md](../architecture/f41-generation-recovery-contract.md). Contract này là nguồn sự thật cho state, API, data, event, RBAC và privacy.
 
 ## US-F41-01: Capture end-to-end generation outcome
 
@@ -13,8 +14,10 @@
 ```gherkin
 GIVEN user submit form tạo website
 WHEN generation kết thúc
-THEN system lưu run status, trace ID, user/site relation, input snapshot và outcome của từng page
-AND status là completed, partial_success hoặc failed theo kết quả persistence thực tế
+THEN system lưu lifecycle, trace ID, user/site relation, frozen input snapshot và outcome của từng page
+AND lifecycle chỉ terminal sau persistence site/page thực tế
+AND outcome là succeeded, partial_failed hoặc failed
+AND recoveryStatus được lưu độc lập với outcome để UI không suy luận action từ error text
 ```
 
 ## US-F41-02: Prioritize generation cần xử lý
@@ -86,6 +89,7 @@ THEN user thấy trạng thái Đang hoàn thiện website của bạn
 
 GIVEN recovery không thành công
 WHEN generation đạt terminal failure
-THEN user thấy thông báo thân thiện và lựa chọn thử lại
+THEN user thấy thông báo thân thiện: thông tin đã được lưu, hãy thử lại sau hoặc liên hệ hỗ trợ
+AND user không có CTA retry trực tiếp trong MVP; chỉ Super Admin được retry theo recovery policy
 AND không thấy raw error, component name hoặc ticket nội bộ
 ```
