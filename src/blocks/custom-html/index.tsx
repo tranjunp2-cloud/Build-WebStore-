@@ -1,8 +1,7 @@
 'use client'
 
 import './rich-text-content.css'
-import { useState, useEffect, useRef } from 'react'
-import dynamic from 'next/dynamic'
+import { lazy, Suspense, useState, useEffect, useRef } from 'react'
 import type { BlockProps } from '../types'
 import type { CustomHtmlConfig } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
@@ -12,7 +11,10 @@ import { proseThemeVars } from '@/lib/theme/prose-theme'
 
 void _CSS_VARS
 
-const InlineRichTextEditor = dynamic(() => import('@/components/editor/RichTextBlockEditor'), { ssr: false })
+// Mounted only after an editor interaction, so no server render is needed.
+// React.lazy avoids Next dynamic-import manifest generation in API routes
+// that also import the block registry.
+const InlineRichTextEditor = lazy(() => import('@/components/editor/RichTextBlockEditor'))
 
 export function CustomHtmlBlock({ block }: BlockProps<CustomHtmlConfig>) {
     const { html = '' } = block
@@ -59,8 +61,8 @@ export function CustomHtmlBlock({ block }: BlockProps<CustomHtmlConfig>) {
             <div ref={rootRef} className="relative" data-editor-control={editorMode ? 'rich-text' : undefined}>
                 {editing && <div style={editorReady ? undefined : { position: 'absolute', inset: 0, visibility: 'hidden', pointerEvents: 'none' }}
                     aria-hidden={!editorReady}>
-                    <InlineRichTextEditor html={sanitizedHtml} onReady={() => setEditorReady(true)}
-                        onApply={finish} onCancel={() => finish()} />
+                    <Suspense fallback={null}><InlineRichTextEditor html={sanitizedHtml} onReady={() => setEditorReady(true)}
+                        onApply={finish} onCancel={() => finish()} /></Suspense>
                 </div>}
                 {(!editing || !editorReady) && (
                     <div onClick={editorMode ? event => {
