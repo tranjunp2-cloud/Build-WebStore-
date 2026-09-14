@@ -1,3 +1,4 @@
+import { preparePw1SiteSettings } from './pw1-site-settings'
 import type { WebsiteBlueprint } from './pw1-contract'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import type { Payload } from 'payload'
@@ -45,6 +46,8 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
         const pagesBefore = await payload.find({ collection: 'pages', where: { site: { equals: options.siteId } }, depth: 0, pagination: false })
         // Durable, exclusive backup before the shared service can replace page rows.
         await options.save('site-before.json', { sourceHash: options.sourceHash, site, pages: pagesBefore.docs })
+        const sourceSettings = options.blueprint.nativeContract.site.settings
+        const siteSettings = sourceSettings ? await preparePw1SiteSettings(sourceSettings, tenantId, payload) : undefined
         const productsBefore = await payload.count({ collection: 'products', where: { site: { equals: options.siteId } } })
         const input = generateSiteSchema.parse({
             businessInfo: {
@@ -67,7 +70,16 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
         const outcome = await response.json() as Record<string, unknown>
         await options.save('service-response.json', { httpStatus: response.status, ...outcome })
         if (!response.ok || outcome.success !== true) throw new Error(`Shared generation service failed (status ${response.status}); inspect saved service-response.json and site-before.json artifacts`)
+        if (siteSettings) await payload.update({ collection: 'sites', id: site.id, data: siteSettings })
         const persistedSite = await payload.findByID({ collection: 'sites', id: options.siteId, depth: 0 })
+        if (siteSettings) {
+            for (const group of ['branding', 'contactInfo', 'socialLinks', 'seo'] as const) {
+                for (const [key, value] of Object.entries(siteSettings[group])) {
+                    const actual = (persistedSite[group] as Record<string, unknown> | null)?.[key]
+                    if (actual !== value) throw new Error(`Site settings verification failed: ${group}.${key}`)
+                }
+            }
+        }
         const persistedPages = await payload.find({ collection: 'pages', where: { site: { equals: options.siteId } }, depth: 0, pagination: false })
         const productsAfter = await payload.count({ collection: 'products', where: { site: { equals: options.siteId } } })
         const actualSlugs = new Set(persistedPages.docs.map(page => String(page.slug).replace(/^\//, '')))

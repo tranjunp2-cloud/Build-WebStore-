@@ -153,8 +153,28 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             })).filter(Boolean).join('\n')
             const columns = footerItems.map(i => ({ title: localized(i), links: menuLinks(i) })).filter(c => c.links.length > 0)
             if (columns.length > 4) throw new Error(`Store ${storeId}: native footer supports at most 4 nonempty link columns`)
+            const pickStrings = (value: unknown, keys: string[]) => {
+                const data = object(value)
+                return Object.fromEntries(keys.filter(key => data[key] != null).map(key => [key, str(data[key])]))
+            }
+            const assetUrl = (value: unknown): string | undefined => {
+                if (!value) return undefined
+                if (!str(value).startsWith('@')) return str(value)
+                const matches = rows(bundle.media).filter(m => m._ref === value)
+                if (matches.length !== 1) throw new Error(`Store ${storeId}: unresolved site media ${str(value)}`)
+                const url = str(matches[0].sourceUrl || matches[0].url)
+                if (!url) throw new Error(`Store ${storeId}: site media has no URL`)
+                return url
+            }
+            const branding = object(site.branding), seo = object(site.seo)
+            const siteSettings = {
+                branding: { logo: assetUrl(branding.logo), favicon: assetUrl(branding.favicon) },
+                contactInfo: pickStrings(site.contactInfo, ['phone', 'email', 'address']),
+                socialLinks: pickStrings(site.socialLinks, ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok']),
+                seo: { ...pickStrings(site.seo, ['metaTitle', 'metaDescription']), ogImage: assetUrl(seo.ogImage) },
+            }
             entries.push({ sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin }, website: {
-                name: str(site.name), locale, branding: { logoUrl: str(object(site.branding).logo) },
+                settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: str(object(site.branding).logo) },
                 features: { cart: Number(headerConfig.cart_status) === 1, orderTracking: Number(headerConfig.cart_status) === 1 && validPages.some(p => str(p.type) === '6') },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(menuLinks),
                 footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns }, pages,

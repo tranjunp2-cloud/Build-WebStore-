@@ -1,3 +1,5 @@
+import { compactInput } from '@/lib/migration/pw1-batch-input'
+import { adaptWebsiteInput } from '@/lib/migration/pw2-website-input'
 import { describe, expect, it } from 'vitest'
 import { parseMigrationInput } from '@/lib/migration/pw1-collection-input'
 function fixture() {
@@ -37,4 +39,24 @@ describe('[TC-F35.M27] BE collection input', () => {
         input[0].pages[0].components[0].model_settings[0].store_id='999'
         expect(()=>parseMigrationInput(input)).toThrow('another store')
     })
+})
+
+it('preserves branding, resolved SEO media and contact settings through the native contract', () => {
+    const input = fixture()
+    const site = input[0].sites[0]
+    const enhanced = [{ ...input[0], sites: [{ ...site,
+        branding: { ...site.branding, favicon: 'https://shop.example/favicon.png' },
+        contactInfo: { phone: '123', email: 'shop@example.com', address: '' },
+        socialLinks: { facebook: 'https://facebook.com/shop' },
+        seo: { metaTitle: 'Source title', metaDescription: 'Source description', ogImage: '@media:stores:205:logo' },
+    }], media: [{ _ref: '@media:stores:205:logo', sourceUrl: site.branding.logo }] }]
+    const entry = parseMigrationInput(enhanced).entries[0]
+    const { contract } = adaptWebsiteInput(compactInput(entry))
+    expect(contract.site.settings).toEqual({
+        branding: { logo: site.branding.logo, favicon: 'https://shop.example/favicon.png' },
+        contactInfo: { phone: '123', email: 'shop@example.com', address: '' },
+        socialLinks: { facebook: 'https://facebook.com/shop' },
+        seo: { metaTitle: 'Source title', metaDescription: 'Source description', ogImage: site.branding.logo },
+    })
+    expect(() => parseMigrationInput([{ ...enhanced[0], media: [] }])).toThrow('unresolved site media')
 })
