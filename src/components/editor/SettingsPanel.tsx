@@ -17,6 +17,8 @@ import { BlockImageEditor } from './BlockImageEditor'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
+import HeroSlidesSettings from './HeroSlidesSettings'
+import type { HeroConfig } from '@/blocks/hero/config'
 import FaqSettings from './FaqSettings'
 import TeamSettings from './TeamSettings'
 import LogoCloudSettings from './LogoCloudSettings'
@@ -2149,7 +2151,7 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {block.headline !== undefined && (
+                            {block.headline !== undefined && !(bt === 'hero' && block.variant === 'slideshow') && (
                                 <div>
                                     <label className={labelCls}>{s.headline}</label>
                                     <Input defaultValue={stripHtmlForDisplay(block.headline)} key={`hl-${bk}`}
@@ -2159,7 +2161,7 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {block.subheadline !== undefined && (
+                            {block.subheadline !== undefined && !(bt === 'hero' && block.variant === 'slideshow') && (
                                 <div>
                                     <label className={labelCls}>{s.subheadline}</label>
                                     <Textarea defaultValue={stripHtmlForDisplay(block.subheadline)} rows={2} key={`sub-${bk}`}
@@ -2540,7 +2542,8 @@ function SettingsPanelInner({
                             )}
 
                             {/* ─── Hero CTA Buttons ───────────────────────── */}
-                            {bt === 'hero' && (
+                            {bt === 'hero' && block.variant === 'slideshow' && <HeroSlidesSettings key={currentBlockIndex} block={block as unknown as HeroConfig} blockIndex={currentBlockIndex} onBlockUpdate={onBlockUpdate} />}
+                            {bt === 'hero' && block.variant !== 'slideshow' && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">{s.ctaButtons}</label>
                                     {((block.ctaButtons || []) as CtaButton[]).length === 0 && (
@@ -3146,7 +3149,7 @@ function SettingsPanelInner({
                             )}
 
                             {/* Image Editor — for blocks with image/backgroundImage fields */}
-                            {block && (block.image || block.backgroundImage || block.heroImage) && (
+                            {block && !(bt === 'hero' && block.variant === 'slideshow') && (block.image || block.backgroundImage || block.heroImage) && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">Image</label>
                                     <div className="mt-2">

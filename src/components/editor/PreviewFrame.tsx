@@ -693,7 +693,7 @@ function PreviewFrameInner({
                 }, 100)
             } else if (e.data?.type === 'IMAGE_EDITING_STARTED') {
                 // logo-cloud uses LogoImageOverlay for image replacement — suppress generic ImageToolbar
-                if (['navigation', 'footer', 'breadcrumb', 'logo-cloud'].includes(e.data.blockType)) return
+                if (['navigation', 'footer', 'breadcrumb', 'logo-cloud', 'custom-html', 'rich-text'].includes(e.data.blockType)) return
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType, imageIndex: e.data.imageIndex, totalImagesInBlock: e.data.totalImagesInBlock })
                 setTextEditingData(null)
             } else if (e.data?.type === 'SELECTION_STATE') {
@@ -850,6 +850,15 @@ function PreviewFrameInner({
         setImageClickData(null)
         setSelectedGlobalBlockLayout(null)
     }, [cancelPendingHoverClear, iframeKey, pageId, viewport])
+
+    // Keep slideshow playback suspended for the whole inline-edit session,
+    // including focus moving from the canvas text to the formatting toolbar.
+    const inlineEditingBlockIndex = textEditingData?.blockIndex ?? null
+    useEffect(() => {
+        frameElement?.contentWindow?.postMessage({
+            type: 'HERO_INLINE_EDIT', blockIndex: inlineEditingBlockIndex,
+        }, window.location.origin)
+    }, [frameElement, inlineEditingBlockIndex])
 
     const handleExecCommand = useCallback(async (command: string, value?: string) => {
         if (!frameElement) return

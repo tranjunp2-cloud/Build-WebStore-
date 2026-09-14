@@ -2,13 +2,21 @@ import { z } from 'zod'
 import { BaseBlockSchema, CTAButtonSchema, ImageRefSchema } from '../types'
 import type { CTAButton, ImageRef } from '../types'
 
+export const HERO_TRANSITIONS = ['none', 'fade', 'slide-horizontal', 'slide-vertical'] as const
+export type HeroTransition = typeof HERO_TRANSITIONS[number]
+
 export const HeroSlideSchema = z.object({
     headline: z.string(),
     subheadline: z.string().optional(),
     image: ImageRefSchema.optional(),
     ctaButtons: z.array(CTAButtonSchema).default([]),
 })
-export type HeroSlide = z.infer<typeof HeroSlideSchema>
+export type HeroSlide = {
+    headline: string
+    subheadline?: string
+    image?: ImageRef
+    ctaButtons: CTAButton[]
+}
 
 // ── Hero Config ──────────────────────────────────────────────────────────────
 export type HeroConfig = {
@@ -24,7 +32,7 @@ export type HeroConfig = {
     // New optional fields
     videoUrl?: string
     gradientPreset?: 'aurora' | 'sunset' | 'ocean' | 'forest'
-    sourceLayout?: { size: 'hero' | 'small'; autoplay: boolean; interval: number; sourceComponentId: string }
+    sourceLayout?: { size: 'hero' | 'small'; autoplay: boolean; interval: number; sourceComponentId: string; animation?: HeroTransition; showArrows?: boolean; showDots?: boolean }
     slides?: HeroSlide[]
     images?: ImageRef[]
 }
@@ -45,7 +53,7 @@ export const HeroConfigSchema = BaseBlockSchema.extend({
     gradientPreset: z.enum(['aurora', 'sunset', 'ocean', 'forest']).optional(),
     images: z.array(ImageRefSchema).optional(),
     slides: z.array(HeroSlideSchema).optional(),
-    sourceLayout: z.object({ size: z.enum(['hero','small']), autoplay: z.boolean(), interval: z.number().min(1000).max(30000), sourceComponentId: z.string() }).optional(),
+    sourceLayout: z.object({ size: z.enum(['hero','small']), autoplay: z.boolean(), interval: z.number().min(1000).max(30000), sourceComponentId: z.string(), animation: z.enum(HERO_TRANSITIONS).optional(), showArrows: z.boolean().optional(), showDots: z.boolean().optional() }).optional(),
 })
 
 export const heroMeta = {

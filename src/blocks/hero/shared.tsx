@@ -168,39 +168,7 @@ export function VideoControlButton({ isPlaying, onClick, className = '', iconSiz
 // ── Shared SlideshowDot — touch-friendly dot indicator ─────────────────────
 // Compact 24px-wide targets keep dots close, with 44px height for tapping.
 
-type SlideshowDotProps = {
-    active: boolean
-    onClick: () => void
-    label: string
-    activeColor?: string
-    inactiveColor?: string
-}
-
-export function SlideshowDot({
-    active,
-    onClick,
-    label,
-    activeColor = '#fff',
-    inactiveColor = 'rgba(255,255,255,0.4)',
-}: SlideshowDotProps) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="h-11 w-6 min-w-6 shrink-0 flex items-center justify-center rounded-full transition-all duration-300"
-            aria-label={label}
-            aria-current={active}
-        >
-            <span
-                className="w-2.5 h-2.5 rounded-full transition-all duration-300"
-                style={{
-                    background: active ? activeColor : inactiveColor,
-                    transform: active ? 'scale(1.3)' : 'scale(1)',
-                }}
-            />
-        </button>
-    )
-}
+export { SlideshowDot } from '../shared/slideshow-controls'
 
 // Re-export ReactNode so variants don't need separate imports
 export type { ReactNode }

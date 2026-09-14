@@ -8,9 +8,9 @@ type PendingSave = {
 }
 
 export function useConnectivity() {
-    const [isOnline, setIsOnline] = useState(
-        typeof navigator !== 'undefined' ? navigator.onLine : true
-    )
+    // SSR and the first client render must agree. Node also exposes navigator,
+    // but its onLine value is not a browser connectivity signal.
+    const [isOnline, setIsOnline] = useState(true)
     const [isSyncing, setIsSyncing] = useState(false)
     const pendingSavesRef = useRef<PendingSave[]>([])
 
@@ -20,6 +20,7 @@ export function useConnectivity() {
 
         window.addEventListener('online', handleOnline)
         window.addEventListener('offline', handleOffline)
+        setIsOnline(navigator.onLine)
 
         return () => {
             window.removeEventListener('online', handleOnline)

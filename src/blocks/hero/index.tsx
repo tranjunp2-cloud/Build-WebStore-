@@ -31,7 +31,9 @@ const VARIANT_MAP: Record<string, React.ComponentType<BlockProps<HeroConfig>>> =
 }
 
 export function HeroBlock(props: BlockProps<HeroConfig>) {
-    if (props.block.sourceLayout) return <SourceLayoutHero {...props} />
+    // Explicit PW2 variants take precedence: sourceLayout also stores slideshow
+    // playback settings and must not switch the block to the legacy renderer.
+    if (props.block.sourceLayout && !props.block.variant) return <SourceLayoutHero {...props} />
     const variant = props.block.variant || 'centered'
     const Component = VARIANT_MAP[variant] || VARIANT_MAP['centered']
     return <Component {...props} />

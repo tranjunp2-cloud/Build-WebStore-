@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { motion } from 'framer-motion'
-import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { useState, useEffect, useRef } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { SlideshowArrow } from '../../shared/slideshow-controls'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
@@ -28,11 +28,45 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
             ? [image]
             : [{ url: fallbackHeroUrl, alt: block.headline }]
 
-    const [currentIndex, setCurrentIndex] = useState(0)
+    const reduceMotion = useReducedMotion()
+    const transition = reduceMotion ? 'none' : (block.sourceLayout?.animation ?? 'fade')
+    const [direction, setDirection] = useState(1)
+    const rootRef = useRef<HTMLDivElement>(null)
+    const [editingSlide, setEditingSlide] = useState<number | null>(null)
+    const [inlineEditing, setInlineEditing] = useState(false)
+    const [storedIndex, setCurrentIndex] = useState(0)
+    const currentIndex = Math.min(editingSlide ?? storedIndex, slides.length - 1)
+    useEffect(() => {
+        const receive = (event: MessageEvent) => {
+            if (window.parent === window || event.source !== window.parent || event.origin !== window.location.origin) return
+            const index = Number(rootRef.current?.closest('[data-block-index]')?.getAttribute('data-block-index'))
+            if (event.data?.type === 'HERO_INLINE_EDIT') {
+                setInlineEditing(event.data.blockIndex === index)
+                return
+            }
+            if (event.data?.type !== 'HERO_SLIDE_PREVIEW') return
+            if (event.data.blockIndex !== index) return
+            const selected = event.data.slideIndex
+            if (selected !== null && (!Number.isInteger(selected) || selected < 0)) return
+            setEditingSlide(selected)
+            if (selected !== null) setCurrentIndex(Math.min(selected, slides.length - 1))
+        }
+        window.addEventListener('message', receive)
+        if (window.parent !== window) {
+            const blockIndex = Number(rootRef.current?.closest('[data-block-index]')?.getAttribute('data-block-index'))
+            window.parent.postMessage({ type: 'HERO_SLIDE_READY', blockIndex }, window.location.origin)
+        }
+        return () => window.removeEventListener('message', receive)
+    }, [slides.length])
     const [autoplayReset, setAutoplayReset] = useState(0)
 
-    const selectSlide = (index: number) => {
+    const selectSlide = (index: number, travel = index >= currentIndex ? 1 : -1) => {
+        setDirection(travel)
         setCurrentIndex(index)
+        if (editingSlide !== null) {
+            const blockIndex = Number(rootRef.current?.closest('[data-block-index]')?.getAttribute('data-block-index'))
+            window.parent.postMessage({ type: 'HERO_SLIDE_SELECTED', blockIndex, slideIndex: index }, window.location.origin)
+        }
         // Restart even when the user selects the currently active dot.
         setAutoplayReset(value => value + 1)
     }
@@ -40,12 +74,13 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [] } = currentSlide ?? block
 
     useEffect(() => {
-        if (slides.length <= 1) return
+        if (slides.length <= 1 || inlineEditing || editingSlide !== null || block.sourceLayout?.autoplay === false) return
         const timer = setTimeout(() => {
+            setDirection(1)
             setCurrentIndex((prev) => (prev + 1) % slides.length)
-        }, 5000)
+        }, Math.max(1000, Math.min(30000, block.sourceLayout?.interval ?? 5000)))
         return () => clearTimeout(timer)
-    }, [currentIndex, slides.length, autoplayReset])
+    }, [currentIndex, slides.length, autoplayReset, editingSlide, inlineEditing, block.sourceLayout?.autoplay, block.sourceLayout?.interval])
 
     // Preload next slide image
     useEffect(() => {
@@ -57,110 +92,72 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
         }
     }, [currentIndex, slides])
 
-    // Only render current + next slide in DOM
-    const visibleIndices = useMemo(() => {
-        if (slides.length <= 1) return [0]
-        const next = (currentIndex + 1) % slides.length
-        return Array.from(new Set([currentIndex, next]))
-    }, [currentIndex, slides.length])
+    const slideField = contentSlides.length ? `slides.${currentIndex}.image.url` : images.length ? `images.${currentIndex}.url` : 'image.url'
+    const offset = (travel: number) => transition === 'slide-horizontal'
+        ? { x: `${travel * 100}%`, y: '0%', opacity: 1 }
+        : transition === 'slide-vertical'
+            ? { x: '0%', y: `${travel * 100}%`, opacity: 1 }
+            : { x: '0%', y: '0%', opacity: transition === 'none' ? 1 : 0 }
 
     return (
-        <AnimatedSection className="relative aspect-[16/9] w-full overflow-hidden">
-            {/* Only current + next slide rendered in DOM (preload optimization) */}
-            {visibleIndices.map((i) => {
-                const slideField = contentSlides.length ? `slides.${i}.image.url` : (images && images.length > 0) ? `images.${i}.url` : 'image.url'
-                const slideAlt = (slides[i]?.alt as string | undefined) ?? ''
-                return (
-                    <HeroMediaOverlay
-                        key={i}
-                        field={slideField}
-                        altText={slideAlt}
-                        positionClass="absolute inset-0"
-                    >
-                        <div
-                            className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
-                            style={{
-                                backgroundImage: slides[i]?.url ? `url(${slides[i]?.url})` : undefined,
-                                opacity: i === currentIndex ? 1 : 0,
-                            }}
-                        />
+        <div ref={rootRef}><AnimatedSection className="relative aspect-[16/9] w-full overflow-hidden">
+            <AnimatePresence initial={false} custom={direction}>
+                <motion.div key={currentIndex} className="absolute inset-0" custom={direction}
+                    variants={{ enter: (travel: number) => offset(travel), exit: (travel: number) => offset(-travel) }}
+                    initial="enter" animate={{ x: '0%', y: '0%', opacity: 1 }} exit="exit"
+                    transition={{ duration: transition === 'none' ? 0 : 0.6, ease: 'easeInOut' }}>
+                    <HeroMediaOverlay field={slideField} altText={slides[currentIndex]?.alt ?? ''} positionClass="absolute inset-0">
+                        <div className="absolute inset-0 bg-cover bg-center"
+                            style={{ backgroundImage: slides[currentIndex]?.url ? `url(${slides[currentIndex]?.url})` : undefined }} />
                     </HeroMediaOverlay>
-                )
-            })}
-            {/* Dark overlay */}
-            <div className="absolute inset-0 bg-black" style={{ opacity: block.overlayOpacity ?? 0.5 }} />
+                    <div className="absolute inset-0 bg-black" style={{ opacity: block.overlayOpacity ?? 0.5 }} />
+                    <div className={`${HERO_CONTAINER} z-10 text-center max-w-3xl absolute inset-0 flex flex-col justify-center overflow-y-auto px-14 pt-3 pb-12 md:px-16 md:pt-8 md:pb-16`}>
+                        {badge?.show && (
+                            <div>
+                                <HeroBadge text={badge.text} />
+                            </div>
+                        )}
+                        <h1
+                            className="text-xl sm:text-3xl md:text-5xl lg:text-7xl font-bold font-heading leading-[1.05] mb-2 md:mb-6 text-white"
+                        >
+                            <RichText text={headline} as="span" />
+                        </h1>
+                        {subheadline && (
+                            <p
+                                className="text-sm md:text-xl text-white/70 mb-3 md:mb-10 max-w-2xl mx-auto leading-relaxed"
+                            >
+                                <RichText text={subheadline} as="span" />
+                            </p>
+                        )}
+                        <div
+                            className="flex flex-wrap gap-4 justify-center"
+                        >
+                            <CTAButtons buttons={ctaButtons} variant="glass" siteId={site?.id ? String(site.id) : undefined} />
+                        </div>
 
-            {slides.length > 1 && (
+                    </div>
+
+                </motion.div>
+            </AnimatePresence>
+
+            {slides.length > 1 && block.sourceLayout?.showArrows !== false && (
                 <>
                     {(['left', 'right'] as const).map(direction => (
-                        <button
+                        <SlideshowArrow
                             key={direction}
-                            type="button"
-                            aria-label={direction === 'left' ? 'Previous slide' : 'Next slide'}
-                            onClick={() => selectSlide((currentIndex + (direction === 'left' ? -1 : 1) + slides.length) % slides.length)}
-                            className={`absolute top-1/2 -translate-y-1/2 ${TOUCH_TARGET.min} min-w-[44px] md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 z-20 backdrop-blur-sm`}
-                            style={{
-                                [direction === 'left' ? 'left' : 'right']: '12px',
-                                background: 'rgba(var(--brand-primary-rgb), 0.188)',
-                                color: '#fff',
-                            }}
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" d={direction === 'left' ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'} />
-                            </svg>
-                        </button>
+                            direction={direction}
+                            onClick={() => selectSlide((currentIndex + (direction === 'left' ? -1 : 1) + slides.length) % slides.length, direction === 'left' ? -1 : 1)}
+                        />
                     ))}
                 </>
             )}
 
-            <div className={`${HERO_CONTAINER} z-10 text-center max-w-3xl absolute inset-0 flex flex-col justify-center overflow-y-auto px-14 pt-3 pb-12 md:px-16 md:pt-8 md:pb-16`}>
-                {badge?.show && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.4 }}
-                    >
-                        <HeroBadge text={badge.text} />
-                    </motion.div>
-                )}
-                <motion.h1
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                    className="text-xl sm:text-3xl md:text-5xl lg:text-7xl font-bold font-heading leading-[1.05] mb-2 md:mb-6 text-white"
-                >
-                    <RichText text={headline} as="span" />
-                </motion.h1>
-                {subheadline && (
-                    <motion.p
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.6, delay: 0.15 }}
-                        className="text-sm md:text-xl text-white/70 mb-3 md:mb-10 max-w-2xl mx-auto leading-relaxed"
-                    >
-                        <RichText text={subheadline} as="span" />
-                    </motion.p>
-                )}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: 0.25 }}
-                    className="flex flex-wrap gap-4 justify-center"
-                >
-                    <CTAButtons buttons={ctaButtons} variant="glass" siteId={site?.id ? String(site.id) : undefined} />
-                </motion.div>
-
-            </div>
-
             {/* Dot indicators — compact spacing with tall tap targets */}
-            {slides.length > 1 && (
+            {slides.length > 1 && block.sourceLayout?.showDots !== false && (
                 <div className="absolute bottom-0 md:bottom-3 inset-x-0 z-20 flex justify-center">
                     {slides.map((_, i) => (
                         <SlideshowDot
+                            onImage
                             key={i}
                             active={i === currentIndex}
                             onClick={() => selectSlide(i)}
@@ -169,6 +166,6 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
                     ))}
                 </div>
             )}
-        </AnimatedSection>
+        </AnimatedSection></div>
     )
 }
