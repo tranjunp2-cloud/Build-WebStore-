@@ -109,7 +109,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
         const ownerDraft = site.status !== 'published'
         const pagesResult = await payload.find({
             collection: 'pages',
-            where: { and: [{ site: { equals: site.id } }, { slug: { equals: pageSlug } }, ...deletedFilter] },
+            where: { and: [{ site: { equals: site.id } }, { slug: { in: [pageSlug, pageSlug.replace(/^\//, '')] } }, ...deletedFilter] },
             limit: 1,
             depth: 3,
             draft: ownerDraft,

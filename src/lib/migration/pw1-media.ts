@@ -1,12 +1,13 @@
+import { SUPPORTED_IMAGE_MIMES } from '@/lib/media/image-signature'
+import { recordCreatedPw1Media } from './pw1-media-tracking'
+import { sql } from 'drizzle-orm'
 import { createHash } from 'node:crypto'
 import type { Payload } from 'payload'
 import { uploadImageBuffer } from '@/lib/ai/upload-media'
 
-const LEGACY_HOSTS = new Set(['tm-prime-web-dev.sgp1.digitaloceanspaces.com', 'tm-prime-web.sgp1.digitaloceanspaces.com'])
-
 export function validatePw1MediaUrl(value: string): URL {
     const url = new URL(value)
-    if (url.protocol !== 'https:' || !LEGACY_HOSTS.has(url.hostname) || url.port || url.username || url.password) throw new Error('Source media host is not approved for this PW1 migration')
+    if (url.protocol !== 'https:' || url.port || url.username || url.password) throw new Error('Source media URL must use HTTPS without credentials or a custom port')
     return url
 }
 
@@ -15,7 +16,7 @@ async function downloadSourceImage(value: string) {
     const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000) })
     if (!response.ok || !response.body) throw new Error(`Source media download failed (HTTP ${response.status})`)
     const mimetype = (response.headers.get('content-type') || '').split(';')[0]
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'].includes(mimetype)) throw new Error('Source media is not a supported raster image')
+    if (!SUPPORTED_IMAGE_MIMES.has(mimetype) && !['image/gif', 'image/avif'].includes(mimetype)) throw new Error('Source media is not a supported raster image')
     const limit = 10 * 1024 * 1024
     if (Number(response.headers.get('content-length')) > limit) { await response.body.cancel(); throw new Error('Source image exceeds 10 MiB') }
     const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0
@@ -48,12 +49,27 @@ export async function importPw1BlockMedia(buckets: Record<string, unknown>[][], 
                 if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error('Source upload field has no HTTP(S) asset URL')
                 let mediaId = cache.get(url)
                 if (!mediaId) {
-                    const filename = `pw1-${tenantId}-${createHash('sha256').update(url).digest('hex').slice(0, 20)}.jpg`
+                    validatePw1MediaUrl(url)
+                    const sourceHash = createHash('sha256').update(url).digest('hex')
+                    const filename = `pw1-${tenantId}-${sourceHash.slice(0, 20)}.jpg`
+                    const db = payload.db as unknown as { drizzle: { execute(query: unknown): Promise<{ rows: Array<{ media_id: number }> }> } }
+                    const cached = await db.drizzle.execute(sql`SELECT c.media_id FROM pw1_migration_media c JOIN media m ON m.id=c.media_id WHERE c.tenant_id=${tenantId} AND c.source_hash=${sourceHash} AND m.filename LIKE ${`pw1-${tenantId}-${sourceHash.slice(0, 20)}%`}`)
+                    mediaId = cached.rows[0]?.media_id
+                    if (!mediaId) {
+                        // Recover an upload whose process died between media creation and cache registration.
+                        const existing = await payload.find({ collection: 'media', where: { filename: { in: ['jpg','jpeg','png','webp','gif','avif'].map(ext => filename.replace(/\.jpg$/, `.${ext}`)) } }, limit: 1, depth: 0 })
+                        mediaId = existing.docs[0] ? Number(existing.docs[0].id) : undefined
+                    }
                     const sourceAlt = typeof child === 'object' && 'alt' in child && typeof child.alt === 'string' ? child.alt.trim() : ''
                     const alt = sourceAlt || (typeof record.headline === 'string' && record.headline.trim() ? record.headline : new URL(url).pathname.split('/').pop() || 'PW1 image')
-                    const { buffer, mimetype } = await downloadSourceImage(url)
-                    mediaId = await uploadImageBuffer(buffer, mimetype, filename, alt, tenantId, payload, false)
+                    if (!mediaId) {
+                        const { buffer, mimetype } = await downloadSourceImage(url)
+                        const uploadFilename = ['image/x-icon', 'image/vnd.microsoft.icon'].includes(mimetype) ? filename.replace(/\.jpg$/, '.ico') : filename
+                        mediaId = await uploadImageBuffer(buffer, mimetype, uploadFilename, alt, tenantId, payload, false)
+                        if (mediaId) recordCreatedPw1Media(mediaId)
+                    }
                     if (!mediaId) throw new Error('Source media upload returned no media ID')
+                    await db.drizzle.execute(sql`INSERT INTO pw1_migration_media(tenant_id,source_hash,media_id) VALUES(${tenantId},${sourceHash},${mediaId}) ON CONFLICT(tenant_id,source_hash) DO UPDATE SET media_id=EXCLUDED.media_id,last_used_at=now()`)
                     cache.set(url, mediaId)
                     succeeded++
                 }

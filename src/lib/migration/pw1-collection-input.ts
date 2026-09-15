@@ -51,7 +51,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             })
             if (!validPages.length) throw new Error(`Store ${storeId}: no active pages to migrate`)
             const pageById = new Map(pageRows.map(p => [str(p.id), p]))
-            const pagePath = (p: Row) => str(p.type) === '1' ? '/' : '/' + str(p.slug).replace(/^\/+/, '')
+            const pagePath = (p: Row) => str(p.type) === '1' ? '/' : (str(p.url).trim() || '/' + str(p.slug).replace(/^\/+/, ''))
             const resolveTarget = (model: unknown, id: unknown, url: unknown, context: string): Omit<Link, 'label'> | undefined => {
                 if (model) {
                     const kind = str(model).split('\\').filter(Boolean).at(-1)
@@ -122,8 +122,9 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                         return true
                     }).map(b => {
                         const h = object(b.header), sub = object(b.subheader), button = object(b.button)
-                        const dest = resolveTarget(undefined, undefined, b.url, `banner:${str(b.id)}`)
-                        const label = str(object(object(button.mode).default).text)
+                        const buttonEnabled = str(button.status) === '1'
+                        const dest = buttonEnabled ? resolveTarget(undefined, undefined, b.url, `banner:${str(b.id)}`) : undefined
+                        const label = buttonEnabled ? str(object(object(button.mode).default).text) : ''
                         return { imageUrl: str(b.image), alt: str(b.name), heading: str(h.status) === '1' ? str(h.text) : '', description: str(sub.status) === '1' ? str(sub.text) : '', cta: str(button.status) === '1' && label && dest?.url ? { label, url: dest.url } : null }
                     })
                     if (!slides.length) { exclude(c.id, 'component', 'empty-banner'); return [] }

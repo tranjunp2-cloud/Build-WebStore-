@@ -30,3 +30,12 @@ export function withMediaCreateLock<T>(fn: () => Promise<T>): Promise<T> {
     chain = run.catch(() => undefined)
     return run
 }
+
+/** Migration website persistence uses the same adapter gate as uploads. */
+export async function acquireMediaCreateLock(): Promise<() => void> {
+    const previous = chain
+    let release!: () => void
+    chain = new Promise<void>(resolve => { release = resolve })
+    await previous
+    return release
+}

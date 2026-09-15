@@ -25,11 +25,11 @@ export interface WebsiteBlueprint {
 
 export function createNativeBlueprint(input: unknown): WebsiteBlueprint {
     const contract = ContractSchema.parse(input)
-    if (contract.pages.filter(page => page.isHomepage).length !== 1) throw new Error('Exactly one homepage is required')
-    const slugs = new Set<string>(), pageIds = new Set<string>(), componentIds = new Set<string>()
+    if (!contract.pages.some(page => page.isHomepage)) throw new Error('At least one homepage is required')
+    const pageIds = new Set<string>(), componentIds = new Set<string>()
     for (const page of contract.pages) {
-        if (slugs.has(page.slug) || pageIds.has(page.sourceId)) throw new Error('Duplicate source page')
-        slugs.add(page.slug); pageIds.add(page.sourceId)
+        if (pageIds.has(page.sourceId)) throw new Error('Duplicate source page')
+        pageIds.add(page.sourceId)
         let previous = -1
         for (const component of page.components) {
             if (componentIds.has(component.sourceId) || component.position <= previous) throw new Error('Duplicate component or invalid source order')

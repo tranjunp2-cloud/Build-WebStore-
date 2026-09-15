@@ -1,3 +1,46 @@
+# Context mới nhất — 2026-09-15
+
+Phần này thay thế trạng thái cũ bên dưới. Branch vẫn là `levietducprime/research-f35-spike-f35-11-nghi-n-c-u-t-i-t-o-web`. User yêu cầu lưu context và commit/push; chưa yêu cầu merge hoặc triển khai production.
+
+## Việc tiếp theo: footer AI (đã điều tra, CHƯA sửa)
+
+- User thấy footer các site gần như giống nhau dù migrate qua AI. DB của 30 site: 28 `simple`, 1 `centered-stack`, 1 `dark-gradient`.
+- Footer global dùng chung giữa các page của cùng site là chủ ý. Vấn đề là lựa chọn giữa các site thiếu đa dạng/phù hợp nội dung.
+- `src/lib/migration/pw1-native-ai.ts`: schema/prompt chỉ mở simple/centered-stack/dark-gradient, bỏ sót minimal có trong footerMeta. User prompt chỉ có site name và page components, KHÔNG gửi source.site.footer/navigation cho AI chọn layout.
+- Hướng đã giải thích: truyền đủ nội dung footer, dùng danh sách variant native hiện có; để AI chọn phù hợp nội dung, không random chỉ để khác nhau. User đồng ý rồi yêu cầu bàn giao trước. Chưa implement hướng này.
+
+## Trạng thái migrate hiện tại
+
+- 30/30 store completed kèm warnings sau nhiều lượt retry, không phải một lượt full đều thành công.
+- Tất cả 30 site đã publish trên LOCAL theo yêu cầu test; kiểm tra anonymous homepage HTTP 200 đủ 30. Không publish production.
+- Link: `http://localhost:3000/sites/pw1-{storeId}`. `/preview/{siteId}` không phải link anonymous.
+- Store IDs: 205,1047,1127,1111,1044,1042,1041,1036,1033,1004,1023,986,963,959,957,949,627,602,645,253,655,416,185,567,18,743,939,495,257,546.
+- Input riêng ngoài Git: `~/Downloads/stores-205-285-pw2-current-schema-collection-only(1).json`, 30 bundles. Full PW1 source archives và reports: `~/Work/pw1-exports/reconstruction/`. Các file này/DB/storage không đi theo git push; máy khác cần bản copy riêng hoặc export lại.
+- DB local localhost:5433/primeweb, Docker primeweb-db; PW1 snapshot chỉ đọc. Backup trước reset gần nhất `/tmp/pw1-before-full-30-rerun-20260915.dump`.
+- Lượt full gần nhất d1c65e1a-252c-45a8-a5f5-203dbe1cbfb8: 22 success / 8 fail / 0 skip, 58.209s chưa tính reset. Retry các fix sau đó đạt 30. Không dùng số này làm cam kết throughput 1350 store.
+
+## Những thay đổi trong lần commit này
+
+- P0/P1 batch reliability: DB ledger/report JSON/CSV, retry classification, limits/readiness, receipt/recovery, rollback website write, cleanup media lỗi sau khi drain batch. Xem `docs/migration/pw1-website-cli.md` và `plans/260914-pw1-batch-reliability/plan.md`.
+- Một lệnh npx/CLI, Promise pool trong process, mặc định 2 tối đa 5. AI/media chuẩn bị song song; ghi website tuần tự, cùng source account tuần tự. Không external worker.
+- Fix transaction PG: pin connection vì nhiều bản pg làm Drizzle nhận nhầm Pool. Regression integration scripts trong scripts/tests; không chạy trên shared/production DB.
+- User yêu cầu bỏ host allowlist: đã bỏ, giữ HTTPS/no credentials/custom port, redirect:error, timeout30s/10MiB. ICO dùng MIME set và uploader chung PW2, filename .ico. Store185 đã pass và favicon HTTP200.
+- Banner store18: nút status=0 thì bỏ qua mode/default và URL CTA; không đọc object từ mảng rỗng khi disabled. Giữ ảnh/banner. Đã retry pass.
+- URL page: ưu tiên trường url nguồn thay vì slug cũ. Store257 trước đó 3 URL khác nhau nhưng slug đều new-page-1; đã pass.
+- Cùng store trùng URL: DB CÓ unique index pages_site_slug_uniq (site_id,slug) WHERE deleted_at IS NULL. Không bỏ index. Giữ đủ page ID; trang đầu giữ route, trang trùng gán suffix -pw1-PAGE_ID tránh collision. Chỉ một homepage. Page-ID links được remap, URL links nguyên gốc không đoán page. routeChanges/warnings ghi lại URL gốc và mới. User sẽ tự xóa trang dư. 1036/986 giữ 8 page nguồn mỗi store +404, đã pass.
+- Storefront 404 subpages: migration lưu bare slug nhưng route tìm leading slash. Owner và cached visitor lookup nhận cả hai; cache key v2 để tránh cache miss cũ. Store253 E2E thật click cả3 menu rồi reload anonymous HTTP200. Test ở tests/pw1-migrated-page-routes.spec.ts cần fixture local published253; đã chạy Chrome installed bằng config tạm (đã bỏ).
+
+## Validation và giới hạn
+
+- Lượt tổng unit gần đây 149 tests pass trước fix disabled CTA; sau đó thêm CTA regression, suite collection5 tests pass. TypeScript pass sau các thay đổi. Real migration và read-back đã dùng để xác nhận ICO, duplicate pages, CTA.
+- Chạy lại toàn bộ tests migration + tsc trước commit bàn giao để ghi số mới nhất trong phản hồi.
+- Known warnings còn nguyên: BE products/blog import riêng, source mapping chưa xác minh, một số CTA/filter/search chưa hỗ trợ. Completed không có nghĩa đã đạt toàn bộ parity PW1.
+- Không đưa secret, token, account password, full dump hoặc input khách hàng vào Git.
+
+---
+
+## Lịch sử bàn giao trước (có thông tin đã cũ)
+
 # Context bàn giao — PW1 migration & Rich text PW2
 
 Cập nhật: 2026-09-11. Đây là bản tóm tắt context để tiếp tục trên máy khác, không phải transcript nguyên văn. Đọc file này trước khi sửa code tiếp.

@@ -153,6 +153,8 @@ export interface GenerateSiteServiceContext {
         targetSiteId: number | string
         sourceBlueprint: NonNullable<GenerateSiteOptions['sourceBlueprint']>
         onGenerated?: (result: GenerationResult) => Promise<unknown>
+        beforeWrite?: () => Promise<void>
+        onFailure?: (error: unknown) => void
     }
 }
 
@@ -1272,13 +1274,12 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             if (!Array.isArray(pages) || pages.length === 0 || !pages.some(page => page.isHomepage === true)) {
                 throw new Error('Migration output must contain complete pages with a homepage')
             }
-            const slugs = new Set<string>()
             for (const page of pages) {
-                if (!page.slug || slugs.has(page.slug) || !Array.isArray(page.blocks) || page.blocks.length === 0) throw new Error('Invalid migration page output')
-                slugs.add(page.slug)
+                if (!page.slug || !Array.isArray(page.blocks) || page.blocks.length === 0) throw new Error('Invalid migration page output')
                 if (page.blocks.some(block => !block.blockType || !blockRegistry.has(block.blockType))) throw new Error('Unknown migration block type')
             }
         }
+        if (migration?.beforeWrite) await migration.beforeWrite()
         if (existingSites.docs.length > 0) {
             const previousSite = existingSites.docs[0] as Record<string, unknown>
             _site = previousSite
@@ -1582,6 +1583,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                         },
                     ) as Record<string, unknown>
                 } catch (firstErr) {
+                    if (migration) throw firstErr
                     // Plan 260415 fix-500 — fallback: when the first create fails
                     // with a "pages_blocks_*_images" / upload foreign-key error,
                     // strip ALL image refs from the page and retry once without
@@ -2373,8 +2375,9 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         })
 
     } catch (error: unknown) {
+        migration?.onFailure?.(error)
         const _siteForCatch = _site as Record<string, unknown> | null
-        if (_siteForCatch?.id && _payload) {
+        if (!migration && _siteForCatch?.id && _payload) {
             const status = _createdPagesCount > 0 ? 'completed' : 'failed'
             await _payload.update({
                 collection: 'sites',

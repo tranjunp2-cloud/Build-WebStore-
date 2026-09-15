@@ -6,7 +6,7 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — The shared generation service rejects a foreign tenant target before generation/writes (`src/__tests__/api/ai.test.ts`).
 
 ### TC-F35.M12 — Source media boundary
-- [x] AUTO — Exact approved HTTPS bucket checks reject host tricks, credentials, ports and local URLs (`pw1-media.test.ts`).
+- [x] AUTO — HTTPS source URLs accept arbitrary hosts without an allowlist; malformed URLs, non-HTTPS protocols, credentials and custom ports are rejected (`pw1-media.test.ts`).
 
 ### TC-F35.M18 — AI design using existing PW2 blocks
 - [x] AUTO — AI is called before binding; preserve slide/card/document/video content and order; reject new block types and reordered IDs; no silent fallback when AI fails.
@@ -41,3 +41,30 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO TC-F35-RT-02: Editing text color replaces the prior color without removing unrelated span styles.
 - [x] AUTO TC-F35-RT-03: Image inline/left-wrap/right-wrap/standalone layouts and spacing survive HTML reload; legacy floats can be reset to inline.
 - [x] AUTO TC-F35-RT-04: Source percent-width images, formatted captions, trusted media and HSL/RGB colors survive normalization; unsafe embedded HTML is removed.
+
+### TC-F35.M28 — Batch validation isolation
+- [x] AUTO — Invalid entries do not block valid stores; duplicate identities quarantine all conflicting entries; multi-site bundles split safely.
+### TC-F35.M29 — Retry policy
+- [x] AUTO — Retry timeout/rate limit/network/server failures only; cap attempts and backoff; stop permanent validation errors.
+### TC-F35.M30 — Atomic local DB writes and recovery
+- [x] AUTO — Local integration: rollback exceptions and worker termination preserve old site/pages; commit receipts recover interrupted ledger state; scoped media cache reuses existing uploads.
+### TC-F35.M31 — Operator commands
+- [x] AUTO — Local integration: status/logs expose failed attempts and batch input errors; retry policy skips completed stores; dry-run makes no writes.
+
+### TC-F35.M32 — Batch operational budgets
+- [x] AUTO — Validate positive limits; generation attempt/token budgets stop new attempts; time limits checked at safe boundaries; spacing respects deadline. Local CLI verifies deferred stores can resume via retry without regenerating completed stores.
+### TC-F35.M33 — Batch reports
+- [x] AUTO — JSON/CSV include validation failures, deferred/skipped stores and attempt durations; missing usage stays null; CSV quotes multiline content and neutralizes formulas. Local DB report export does not mutate ledger.
+### TC-F35.M34 — BE availability preflight
+- [x] AUTO — Distinguish missing data, no dependency and available-but-unverified mapping. Strict mode refuses unmapped data-dependent stores before provisioning/AI; never certifies source ID parity from counts alone.
+
+### TC-F35.M35 — Migration orphan-media cleanup
+- [x] AUTO — Cleanup validates store, retention and batch bounds; only strict migration filename/cache provenance qualifies. Real local CLI dry-run preserves media; apply deletes old unreferenced migration media/cache, retains ID/HTML references and recent media; concurrent migration lock rejects cleanup.
+
+### TC-F35.M36 — Automatic cleanup after terminal store failure
+- [x] AUTO — Real CLI batch fails after logo upload, automatically deletes only the newly imported orphan and continues the next store. Tracking scope isolates concurrent contexts and does not record cache hits; cleanup refuses committed/unresolved attempts and preserves live/version/backup references.
+
+### TC-F35.M37 — Bounded preparation and serialized writes
+- [x] AUTO — Pool limits active stores, serializes same-account jobs, drains on fatal errors. Real DB preparation opens no transaction; two preparations overlap but gated persistence never overlaps. Rollback/session fencing and crash recovery remain valid. Real CLI runs concurrent stores and cleanup after pool drain.
+
+- [x] AUTO TC-F35.M38: CLI transactions retain one backend PID/transaction ID despite concurrent pool reads; real DB regression in `scripts/tests/pw1-reliability.ts`.

@@ -60,3 +60,26 @@ it('preserves branding, resolved SEO media and contact settings through the nati
     })
     expect(() => parseMigrationInput([{ ...enhanced[0], media: [] }])).toThrow('unresolved site media')
 })
+
+it('[TC-F35.M27] preserves different source URLs even when legacy slugs match', () => {
+    const input = fixture()
+    input[0].pages.push(...['about-us','recruitment','contact'].map((path, index) => ({
+        id: String(953 + index), store_id:'205', name:path, type:'7', slug:'new-page-1', url:`/${path}`, status:'1', components:[],
+    })))
+    const {entries} = parseMigrationInput(input)
+    expect(entries[0].website.pages.slice(1).map(p => p.path)).toEqual(['/about-us','/recruitment','/contact'])
+})
+
+it('[TC-F35.M27] ignores disabled legacy CTA configuration while retaining its banner', () => {
+    const input = fixture()
+    const banner = {
+        id:'118',page_id:'10',status:'1',position:'0',
+        frontend_component:{name:'banner',default_config_values:{}},
+        banners:[{id:'51',page_component_id:'118',store_id:'205',status:'1',image:'https://source.example/banner.png',
+            button:{status:'0',mode:{default:[],hover:[]}},url:'javascript:unused',header:{status:'1',text:'Keep banner'},subheader:{status:'0'}}],
+    }
+    const data = [{...input[0],pages:[{...input[0].pages[0],components:[banner]}]}]
+    const {entries} = parseMigrationInput(data)
+    const {contract} = adaptWebsiteInput(compactInput(entries[0]))
+    expect(contract.pages[0].components[0].block.slides).toMatchObject([{headline:'Keep banner',image:{url:'https://source.example/banner.png'},ctaButtons:[]}])
+})

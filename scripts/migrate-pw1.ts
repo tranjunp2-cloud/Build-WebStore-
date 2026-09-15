@@ -1,34 +1,85 @@
 import { parseArgs } from 'node:util'
 import { readFile, stat, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { parseMigrationInput } from '../src/lib/migration/pw1-collection-input'
+import { validateBatchLimits } from '../src/lib/migration/pw1-batch-controls'
+import { validateMigrationBatch } from '../src/lib/migration/pw1-batch-validation'
 
 async function main() {
     const { values, positionals } = parseArgs({ options: {
-        rerun: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, help: { type: 'boolean' },
+        concurrency: { type: 'string' }, rerun: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, help: { type: 'boolean' },
+        store: { type: 'string' }, 'max-attempts': { type: 'string' },
+        'max-generation-attempts': { type: 'string' }, 'max-batch-seconds': { type: 'string' },
+        'max-store-seconds': { type: 'string' }, 'min-generation-interval-seconds': { type: 'string' },
+        'max-design-tokens': { type: 'string' }, 'require-be-data': { type: 'boolean' },
+        apply: { type: 'boolean' }, 'older-than-hours': { type: 'string' }, limit: { type: 'string' }, 'after-id': { type: 'string' },
+        batch: { type: 'string' }, format: { type: 'string' },
     }, strict: true, allowPositionals: true })
     if (values.help) {
-        console.log(`PW1 batch website migration
-Usage: npm run migrate:pw1 -- ./pw1-websites.json
-       npm run migrate:pw1 -- ./pw1-websites.json --dry-run
-       npm run migrate:pw1 -- ./pw1-websites.json --rerun
-One input array: compact website entries or BE collection bundles. Default: apply; dry-run has no AI/DB writes.
-Environment: existing process variables or project .env.local/.env (loaded by preload).
-Maps accounts/stores and saves backups/progress in the destination database; no per-store JSON files.
-Completed unchanged stores are skipped. --rerun explicitly regenerates mapped draft sites.
-Unmapped stores receive a new tenant/site; existing user credentials are preserved.
-One active batch per database; failures are reported and remaining stores continue.`)
+        console.log(`PW1 migration (bounded preparation; serialized writes; one batch/database)
+  npm run migrate:pw1 -- FILE [--dry-run] [--store ID] [--max-attempts 3] [--concurrency 2]
+  npm run migrate:pw1 -- FILE --rerun
+  npm run migrate:pw1 -- retry FILE [--store ID]
+  npm run migrate:pw1 -- status [--store ID]
+  npm run migrate:pw1 -- logs [--store ID]
+  npm run migrate:pw1 -- report --batch UUID [--format json|csv]
+  npm run migrate:pw1 -- cleanup-media --store ID [--older-than-hours 168] [--limit 20] [--after-id ID] [--apply]
+Cleanup defaults to dry-run; --apply deletes only unreferenced migration media in a maintenance window.
+Run limits: --max-generation-attempts N --max-batch-seconds N --max-store-seconds N
+  --min-generation-interval-seconds N --max-design-tokens N --require-be-data
+Time limits stop at safe boundaries. Generation spacing is not a provider request rate limit.
+Design token limit is observed after responses; excludes other AI calls and may overshoot by one generation.
+BE data checks verify availability only, not source ID mapping or complete import.
+Default skips unchanged completed stores. Retry selects mapped failed/pending stores.
+--rerun explicitly regenerates completed draft sites. Invalid stores are reported without blocking valid stores.
+SIGINT/SIGTERM stops at safe boundaries; interrupted writes roll back. Rerun input to recover.
+Status/logs are read-only and need only database configuration.`)
         return
     }
-    if (positionals.length !== 1) throw new Error('Usage: npm run migrate:pw1 -- FILE [--dry-run | --rerun]')
-    if (values['dry-run'] && values.rerun) throw new Error('Choose --dry-run or --rerun')
+    if (values.store && !/^\d+$/.test(values.store)) throw new Error('store must be a numeric PW1 store ID')
+    const command = ['status','logs','retry','report','cleanup-media'].includes(positionals[0]) ? positionals.shift() : 'run'
+    const numeric = (key: keyof typeof values) => values[key] === undefined ? undefined : Number(values[key])
+    const limits = validateBatchLimits({ maxGenerationAttempts: numeric('max-generation-attempts'), maxBatchSeconds: numeric('max-batch-seconds'),
+        maxStoreSeconds: numeric('max-store-seconds'), minGenerationIntervalSeconds: numeric('min-generation-interval-seconds'), maxDesignTokens: numeric('max-design-tokens') })
+    const hasRunOptions = values.concurrency || values.rerun || values['dry-run'] || values['max-attempts'] || values['require-be-data'] || Object.values(limits).some(v => v !== undefined)
+    if (command === 'cleanup-media') {
+        if (positionals.length || hasRunOptions || values.batch || values.format) throw new Error('cleanup-media accepts --store, --older-than-hours, --limit, --after-id and --apply only')
+        const { cleanupPw1Media } = await import('../src/lib/migration/pw1-media-cleanup')
+        await cleanupPw1Media({ store: values.store ?? '', apply: values.apply, olderThanHours: numeric('older-than-hours'), limit: numeric('limit'), afterId: numeric('after-id') })
+        return
+    }
+    if (values.apply !== undefined || values['older-than-hours'] !== undefined || values.limit !== undefined || values['after-id'] !== undefined) throw new Error('Cleanup options are only available for cleanup-media')
+    if (command === 'report') {
+        if (positionals.length || hasRunOptions || values.store) throw new Error('report accepts only --batch and --format')
+        if (!values.batch || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(values.batch)) throw new Error('report requires a valid --batch UUID')
+        if (values.format && !['json','csv'].includes(values.format)) throw new Error('format must be json or csv')
+        const { exportMigrationReport } = await import('../src/lib/migration/pw1-operations')
+        process.stdout.write(await exportMigrationReport(values.batch, values.format === 'csv' ? 'csv' : 'json'))
+        return
+    }
+    if (values.batch || values.format) throw new Error('--batch and --format are only available for report')
+    if (command === 'status' || command === 'logs') {
+        if (positionals.length || hasRunOptions) throw new Error('status/logs only accept --store')
+        const { inspectMigration } = await import('../src/lib/migration/pw1-operations')
+        console.log(JSON.stringify(await inspectMigration(command, values.store), null, 2)); return
+    }
+    if (positionals.length !== 1) throw new Error('Expected one input file; use --help')
+    if (values.rerun && (values['dry-run'] || command === 'retry')) throw new Error('--rerun cannot be combined with dry-run or retry')
+    const maxAttempts = Number(values['max-attempts'] ?? 3)
+    if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 5) throw new Error('max-attempts must be 1–5')
     const path = await realpath(resolve(positionals[0]))
     const file = await stat(path)
     if (!file.isFile() || file.size > 100 * 1024 * 1024) throw new Error('Input must be a JSON file no larger than 100 MiB')
-    const { entries, reports } = parseMigrationInput(JSON.parse(await readFile(path, 'utf8')))
-    if (reports.length) console.log(JSON.stringify({ collectionInputReports: reports }, null, 2))
-    const { runPw1Batch } = await import('../src/lib/migration/pw1-batch')
-    await runPw1Batch(entries, { dryRun: values['dry-run'], rerun: values.rerun, inputReports: reports })
+    const parsed = validateMigrationBatch(JSON.parse(await readFile(path, 'utf8')))
+    const entries = values.store ? parsed.entries.filter(e => e.sourceStoreId === values.store) : parsed.entries
+    const errors = values.store ? parsed.errors.filter(e => e.sourceStoreId === values.store) : parsed.errors
+    if (!entries.length && !errors.length) throw new Error('No matching source store in input')
+    const controller = new AbortController()
+    const stop = () => { console.error('Stopping at next safe boundary…'); controller.abort() }
+    process.once('SIGINT', stop); process.once('SIGTERM', stop)
+    try {
+        const { runPw1Batch } = await import('../src/lib/migration/pw1-batch')
+        await runPw1Batch(entries, { concurrency: numeric('concurrency'), limits, requireBeData: values['require-be-data'], dryRun: values['dry-run'], rerun: values.rerun, retryOnly: command === 'retry', maxAttempts, signal: controller.signal, inputReports: parsed.reports, invalidStores: errors })
+    } finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop) }
 }
 main().then(() => process.exit(0)).catch(error => {
     console.error(error instanceof Error ? error.message : 'Migration failed')

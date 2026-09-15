@@ -27,20 +27,34 @@ The positional file is **one JSON array**, with one object per PW1 store. The co
 ]
 ```
 
-This is a structural illustration; supply the actual validated page/component configuration in `website.pages`. The updated external Amelina input retains 3 source pages and 18 components, with one filter component explicitly pending. Multiple stores belonging to one user repeat the same owner identity and use distinct source store IDs. Input is limited to 100 MiB; every entry is validated before database work.
+This is a structural illustration; supply the actual validated page/component configuration in `website.pages`. The updated external Amelina input retains 3 source pages and 18 components, with one filter component explicitly pending. Multiple stores belonging to one user repeat the same owner identity and use distinct source store IDs. Input is limited to 100 MiB; each store is validated before processing; malformed stores are recorded without blocking unrelated valid stores.
 
 The preload reads `.env.local` / `.env` from the working directory; existing process environment takes precedence. Configure the destination database, Payload secret, OpenAI and media storage there once. No `--env-file`, account, site ID, output directory or `--apply` argument is required for the batch command.
 
 - Add `--dry-run` to validate and summarize without DB or AI calls.
 - Existing accounts are matched by email; new accounts receive a random password and need the normal password-reset flow to sign in. Existing passwords remain unchanged. No welcome email is sent by this provisioning path.
 - Each previously unmapped source store gets a new tenant, draft site and default FREEMIUM subscription. Paid plans and commerce records are not imported. Account, membership, site and source-ID mappings commit together.
-- Store processing is sequential. A store failure is recorded and processing continues; the command exits nonzero when any store fails.
+- By default, up to two stores prepare concurrently; website writes are serialized. Stores belonging to the same account run sequentially. A store failure is recorded and processing continues; the command exits nonzero when any store fails.
 - Rerun the same command to retry failed stores. Completed stores with unchanged input are skipped. Changed completed input requires `--rerun`; this also explicitly regenerates unchanged completed stores. Replacement requires a draft site.
 - Progress, mappings and generation/backup artifacts are stored in `pw1_migration_accounts`, `pw1_migration_stores`, `pw1_migration_attempts` and `pw1_migration_batches`. No per-store JSON files are generated. These tables are installed by `db-setup.js` and bootstrapped idempotently by the command.
 
-A database-wide advisory lock prevents overlapping batch commands. Retries reuse the mapped account/tenant/site, but may duplicate uploaded media; generation and page replacement are not one atomic transaction. The website adapter supports English/Malay and single-segment paths. Product/blog blocks read PW2 database records and show their native empty states when no records exist. Product filters and source-specific sorting remain pending. The command does not import products, blogs or orders and does not publish sites.
+A database-wide advisory lock prevents overlapping batch commands. Retries reuse the mapped account/tenant/site and tenant-keyed source media cache. Site/page replacement and its commit receipt are atomic; media preparation remains outside the transaction for reuse. The website adapter supports English/Malay and single-segment paths. Product/blog blocks read PW2 database records and show their native empty states when no records exist. Product filters and source-specific sorting remain pending. The command does not import products, blogs or orders and does not publish sites.
 
 Local verification: the Amelina array reused user 1847 and provisioned tenant 1821/site 3659. After one rejected AI design, the same command succeeded using that mapping; a subsequent identical run skipped the completed store. Production execution across 1,300+ users has **not** been load-tested.
+
+### In-process concurrency
+
+```sh
+npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts input.json
+# Optional: raise the bounded pool after a representative pilot.
+npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts input.json --concurrency 5
+```
+
+`--concurrency` defaults to **2**, accepts **1–5**, and counts complete active store jobs, including jobs waiting to persist. Use `1` for the original sequential behavior. A free slot takes another store immediately; it does not wait for a fixed group to finish. Stores sharing a source account never overlap. Completion/report order may differ from input order; identify results by `sourceStoreId`.
+
+AI and image downloads can overlap. Provisioning, actual media creation and website persistence share the existing in-process Payload adapter gate. The CLI pins each transaction to one PostgreSQL connection, including Payload upload transactions, to avoid driver Pool-class mismatches. A website transaction opens only after preparation finishes and the write gate is acquired; no database transaction is held while waiting for AI. Snapshot checks, verification and the commit receipt remain inside that transaction. The bounded pool also bounds prepared results waiting in memory. Existing per-account generation rate limits still apply.
+
+The same command drains active jobs before shutting down Payload. Automatic orphan cleanup runs after the pool drains because its reference checks lock tables. No worker service or additional terminal is needed. The concurrency limit is recorded with batch limits. Local tests verify overlap and isolation; this does not establish throughput for 1,350 production stores.
 
 ## Active flow
 
@@ -81,3 +95,92 @@ The file locale (`en`/`ms`) is propagated into generation. Native block limitati
 Reports print during validation and are saved as `collection-input-report.json` inside each database attempt's artifacts. No raw collection dump is saved there. A store with no active source pages fails validation rather than generating invented content. Existing local source-store ledger mappings are reused; this adapter does not automatically adopt arbitrary sites created by a separate BE import without destination mapping integration.
 
 Site settings from collection inputs now pass through the native contract independently of AI design: branding logo/favicon, contact phone/email/address, supported social links, and SEO title/description/OG image. Symbolic SEO media references must resolve within the bundle. Assets use the trusted PW1 media importer; branding stores the imported public URLs and OG image stores its media relationship. Explicit empty source settings clear stale values. These settings are verified after persistence; a mismatch fails the migration attempt. Compact inputs without the optional settings object retain their previous behavior.
+
+
+## Reliable batch operations
+
+```sh
+npm run migrate:pw1 -- input.json --dry-run
+npm run migrate:pw1 -- input.json --max-attempts 3
+npm run migrate:pw1 -- status
+npm run migrate:pw1 -- status --store 205
+npm run migrate:pw1 -- logs --store 205
+npm run migrate:pw1 -- retry input.json
+npm run migrate:pw1 -- retry input.json --store 205
+npm run migrate:pw1 -- input.json --store 205 --rerun
+```
+
+- File JSON/array failures remain fatal. Per-store errors are saved in batch results, including failures before a destination account exists. Duplicate store identities and conflicting valid owner identities quarantine all conflicting entries.
+- Default maximum is three attempts (allowed 1–5). Retryable timeouts, rate limits, selected connection/DB errors and upstream 5xx use capped exponential delay with jitter (at most 30.5 seconds). Permanent validation/identity/permission errors stop the store. The next store still runs.
+- `retry` selects mapped failed/pending stores, plus unmapped stores with an earlier batch failure. Normal execution also processes new stores. Completed unchanged stores are skipped; changed completed input requires `--rerun`.
+- Attempts record batch ID, stage, error code/message, retryability, attempt ordinal and a 15-second heartbeat. `logs` shows recent attempts and failing batch results (including invalid input); artifacts remain in the DB. `status` shows recent batches and store outcomes. Outputs are JSON and can be redirected to a private file.
+- Store status remains `completed` internally for compatibility; `warning_count` and operator output distinguish `completed_with_warnings`. Missing supported settings/page/block output fails verification. Unsupported controls/category mapping and BE-dependent catalog/blog bindings produce warnings, not a claim that commerce data was imported.
+- AI and media preparation run before taking write locks. The existing site/page timestamps are checked under lock to detect concurrent CMS edits. Site/pages/settings are written in one PostgreSQL transaction. Missing pages, changed block count/order or failed settings verification roll back. Migration never falls back to removing failed images.
+- Media is keyed by tenant and source URL hash in `pw1_migration_media`; a deterministic filename also recovers the upload-before-cache crash window. The current media collection is global (no tenant column), so cache keys and tenant-prefixed filenames enforce migration reuse boundaries. Media assets may remain after failed attempts and are reused, rather than deleted while another reference might need them.
+- A durable `pw1_migration_commits` receipt commits with site/page writes. If the worker dies before ledger completion, the next batch acquires the exclusive lock and reconciles stale attempts: receipt present → completed; no receipt → failed/retryable. Old interrupted batch records remain marked failed for audit.
+- SIGINT/SIGTERM requests a stop at safe phase boundaries. Ongoing upstream calls retain their existing network timeouts; cancellation does not abandon a background promise that could write later. Losing the batch-lock connection requests the same stop. SIGKILL relies on PostgreSQL connection cleanup to roll back.
+
+### Verification and limitations
+
+Run deterministic tests with `npx vitest run src/__tests__/unit/migration`. Run real PostgreSQL rollback/worker-kill/recovery/media-cache tests with `npx tsx --require ./scripts/seed-preload.cjs scripts/tests/pw1-reliability.ts`; this refuses remote DB hosts and creates/cleans synthetic fixtures. It also uploads/deletes one test pixel using configured local storage. Do not run against a shared active migration database.
+
+Preparation uses a bounded in-process Promise pool; website persistence remains serialized. There is no external worker queue, monetary cost budget, full-AI checkpoint resume, production load certification or automatic BE commerce coordination. Retrying generation may spend AI tokens again. The cache does not re-download external assets whose content changes behind an unchanged URL. Provision-stage failures are available in batch results; attempt rows start after provisioning. Operators must retain the input file and its mapping. Raw dumps and credentials should stay outside Git.
+
+### P1: operational controls and reports
+
+```sh
+npm run migrate:pw1 -- input.json --max-generation-attempts 20 --max-batch-seconds 3600 --max-store-seconds 300 --min-generation-interval-seconds 5 --max-design-tokens 100000
+npm run migrate:pw1 -- input.json --require-be-data
+npm run --silent migrate:pw1 -- report --batch BATCH_UUID --format json > batch.json
+npm run --silent migrate:pw1 -- report --batch BATCH_UUID --format csv > batch.csv
+```
+
+Limits are optional, positive integers (seconds ≤ 86400). `--max-generation-attempts` counts generation attempts across all stores/retries, not individual provider requests. `--min-generation-interval-seconds` spaces generation starts across the whole pool; shared-service requests within one generation may be more frequent. Start reservations and attempt budgets are serialized. Limit configuration is retained on the batch. Re-running a command starts a new budget.
+
+Batch/store time limits are checked before new work and at media/generation/write/verify/commit boundaries. They do not forcibly abandon an in-flight network call or DB transaction. Calls retain their existing timeouts. A store time limit fails that store; global time/attempt/token limits defer remaining work. Deferred results carry a reason and nonzero batch exit status; `retry input.json` resumes pending/failed stores and unmapped deferred entries, skipping completed stores. A completed store that was explicitly selected for regeneration still requires `--rerun` again if regeneration did not start.
+
+`--max-design-tokens` is a **soft, observed native-design budget**: already-started generations (up to the configured concurrency) may cross it and finish; once the observed limit is reached, another generation will not start. Native-design response usage is captured before validation, so invalid designs with a response still count. This excludes translation, credit probes and provider retries without a response; it is not a hard total-AI or monetary cap. JSON reports use `costUsd: null` and explicit usage scope, rather than inventing cost. Missing token measurements remain null. Configure provider-side spending limits separately when required.
+
+Reports are read-only and need only DB configuration. They include result/error/warnings, attempts, elapsed time and observed design tokens, including deferred and validation-failed stores. CSV quotes cells and neutralizes spreadsheet formulas. Keep exported files private: errors and warnings can contain source content. Use `npm run --silent` to avoid npm banners in machine-readable output.
+
+BE preflight counts active undeleted products scoped to destination site and published blogs scoped to tenant, only for enabled source listings. It records `not-required`, `missing-data` or `data-present-mapping-unverified`. Default execution permits native empty states with warnings. `--require-be-data` blocks missing required data before generation; unmapped data-dependent stores are blocked before provisioning. Existing completed stores are still skipped unless `--rerun` is supplied. Counts never certify source-to-destination IDs or complete BE import; automated adoption/mapping requires the BE contract and remains follow-up work.
+
+Run local real-CLI P1 verification with `npx tsx --require ./scripts/seed-preload.cjs scripts/tests/pw1-batch-operations.ts`. It calls configured AI for three synthetic stores, checks budget/deferred retry/report/BE gate/dry-run and cleans its fixtures. Run on an idle local migration DB. Larger staging pilot still needs a staging destination and representative input; local tests do not certify production throughput.
+
+### Cleanup unused migration media
+
+Apply the SQL migrations with the normal `scripts/db-setup.js --migrate-only` deployment step before using cleanup. The media reuse ledger now records `last_used_at`; existing cache entries receive a fresh retention period on schema upgrade.
+
+```sh
+# List candidates only (default retention: 7 days since import/last reuse).
+npm run migrate:pw1 -- cleanup-media --store 205
+# Delete eligible orphan files through Payload's configured storage hooks.
+npm run migrate:pw1 -- cleanup-media --store 205 --apply
+# Bounded scan; use nextAfterId from the report to continue past retained items.
+npm run migrate:pw1 -- cleanup-media --store 205 --limit 20 --after-id 12345
+```
+
+The standalone command is for older leftover assets. The runner now also cleans newly created orphan media automatically after a terminal store failure, as described below. Recently reused existing assets are never selected by that automatic path. `--older-than-hours` is 1–87600 (default 168); `--limit` is 1–100 (default 20). `nextAfterId` lets an operator advance the scan without repeatedly scanning the same referenced records. Dry-run is advisory; apply rechecks each candidate.
+
+Only assets registered in `pw1_migration_media` for the selected store's tenant, with the exact tenant/hash filename produced by the importer, qualify. Unregistered upload-before-cache crashes and manually named files are retained rather than guessing ownership. All database tables are conservatively checked for references by media ID or filename stem, including other sites/tenants, draft/version rows, HTML/JSON URLs and migration backup artifacts. Primary keys and known non-media parent/foreign keys are not media references. Uncertain matches retain the file. Backups can intentionally keep an otherwise-unused asset indefinitely; this command does not prune backups.
+
+Run apply in an idle maintenance window. It shares the migration advisory lock, rejects unresolved running attempts and briefly locks application tables against writes during each final reference check/delete; ordinary reads can continue. Lock contention or row-level security fails closed and is reported, never bypassed. This guards database writes, not external consumers or future stale editor submissions; do not run alongside schema changes or active editors.
+
+Payload deletion handles the original and configured derivative/storage files and cascades the migration cache row. Storage and PostgreSQL cannot form one atomic transaction: a storage/commit error may leave a partially removed *unreferenced* asset; the error is reported and cleanup can be retried. No referenced website data is intentionally removed. Results report `eligible`, `retained`, `deleted` or `error`, with media IDs and reasons.
+
+Local integration: `npx tsx --require ./scripts/seed-preload.cjs scripts/tests/pw1-media-cleanup.ts` creates only synthetic media, tests dry-run/apply/reference/retention/lock behavior, then removes its fixtures.
+
+
+### Automatic cleanup in the single migration command
+
+`npm run migrate:pw1 -- input.json` now handles: failed attempt → rollback → retry when allowed → terminal store failure → queue cleanup → finish/drain all store work → clean queued orphan media → final report. No second command or seven-day wait is required for this path.
+
+An async store scope tracks IDs returned by actual new imports across all attempts. Cache hits and existing uploaded files recovered by filename are not included. Cleanup runs after all preparation and website writes have drained, uses the runner's existing batch lock, and refuses committed or unresolved attempts. It reuses the reference/storage deletion checks; website, versions, other tenants and `site-before.json` backups remain protected. Temporary generated artifacts from this store's failed attempts are diagnostic, not live references, and do not keep new orphan uploads alive.
+
+The batch result includes `mediaCleanup` (also in JSON/CSV and failed-batch logs). Cleanup errors do not replace the original migration error or stop the next store. Lock contention/unproven provenance retains media and reports why. Budget-deferred/interrupted work keeps assets for resume; process death or a fatal batch infrastructure error cannot guarantee queued cleanup and relies on the separate maintenance command after recovery. Uploads that failed before registration/returning an ID cannot be safely attributed and are not guessed.
+
+### Duplicate source page URLs
+
+Page identity is scoped to the source store and page ID. Distinct pages sharing a URL are retained. The first page keeps its route; later duplicates receive a collision-safe `-pw1-PAGE_ID` suffix to satisfy PW2's unique site/slug index. Only the first homepage remains the homepage. Page-ID links follow the assigned route; raw URL links retain their original destination. Reports preserve source/destination paths in `routeChanges` and warnings for user cleanup. Duplicate source IDs still fail. The collection adapter prefers source `url`, falling back to `slug` only when absent. Post-write reconciliation consumes one distinct persisted page per expected layout.
+
+Source image imports do not use a host allowlist. The operator-provided input determines the source host. URLs must use HTTPS without credentials or custom ports; redirects are rejected. The importer retains its 30-second download timeout, 10 MiB size limit and supported image MIME checks.

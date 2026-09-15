@@ -108,7 +108,7 @@ export function bindNativeDesign(input: unknown, designInput: unknown): Generati
         return { sourceId: page.sourceId, title: page.title, slug: page.slug, isHomepage: page.isHomepage, blocks, seo: { title: page.title, description: '' } }
     })
     const home = pages.find(page => page.isHomepage)
-    if (!home || pages.filter(page => page.isHomepage).length !== 1) throw new Error('Expected one homepage')
+    if (!home) throw new Error('Expected a homepage')
     return { siteName: source.site.name, siteType: 'ecommerce', theme: { ...design.theme, colorMode: 'light' }, pages, blocks: home.blocks, seo: home.seo,
         sourceMigration: { componentMappingVersion: 2, method: 'ai-native-block-design', allowedBlocks: NATIVE_BLOCKS, pageMappings: mappings, design,
             catalogBindings: 'Product listings query the destination site database, with native empty state and no source snapshot fallback. Source product IDs/filters are not mapped yet. Blog listings query published posts from the destination tenant DB, with native empty state. Source blog selections remain unmapped. Category listings retain public snapshots. No commerce records imported.', warnings: source.reconciliation } } as GenerationResult
@@ -124,6 +124,7 @@ export async function generateNativePw1WithAI(openai: OpenAI, input: unknown, on
             { role: 'user', content: JSON.stringify({ name: source.site.name, pages: source.pages.map(page => ({ sourceId: page.sourceId, title: page.title, components: page.components.map(c => ({ sourceId: c.sourceId, kind: c.kind, allowedOutput: c.kind === 'banner' ? nativeBannerChoices(c.block) : c.kind === 'rich_text' ? ['custom-html:default'] : c.kind === 'product_listing' ? ['products-grid:grid-3', 'products-grid:grid-4', 'products-grid:list'] : c.kind === 'article_listing' ? ['blog-list:cards', 'blog-list:list'] : ['carousel:cards'], content: ['product_listing', 'article_listing'].includes(c.kind) ? { headline: c.block.headline, dataSource: c.kind === 'product_listing' ? 'destination-site-products-db' : 'destination-tenant-published-blog-db', emptyBehavior: 'native-empty-state' } : c.block })) })) }) }],
     }, { timeout: 180_000 })
     logAiUsage({ endpoint: 'site-generation', model: response.model, tokensIn: response.usage?.prompt_tokens ?? 0, tokensOut: response.usage?.completion_tokens ?? 0, durationMs: Date.now() - start, success: response.choices[0]?.finish_reason === 'stop' })
+    emit({ event: 'step', data: { step: 'ai-native-design-usage', model: response.model, tokens: response.usage } })
     if (response.choices[0]?.finish_reason !== 'stop') throw new Error('Native AI design did not complete')
     const result = bindNativeDesign(source, JSON.parse(response.choices[0].message.content || 'null'))
     emit({ event: 'step', data: { step: 'ai-native-design-validated', pages: result.pages?.length, model: response.model, tokens: response.usage } })

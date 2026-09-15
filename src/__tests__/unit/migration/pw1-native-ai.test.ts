@@ -102,3 +102,13 @@ describe('[TC-F35.M18] AI chooses only existing PW2 blocks', () => {
         await expect(generateNativePw1WithAI(client, source)).rejects.toThrow('AI unavailable')
     })
 })
+
+it('[TC-F35.M18] binds distinct homepage records without dropping a duplicate URL', () => {
+    const {source, design} = fixture()
+    source.pages.push({...source.pages[0], sourceId:'20', components:[]})
+    design.pages.push({sourceId:'20', sections:[]})
+    const result = bindNativeDesign(source, design)
+    expect(result.pages).toHaveLength(2)
+    expect(result.pages!.map(p => p.slug)).toEqual(['home','home'])
+    expect(result.pages!.every(p => p.isHomepage)).toBe(true)
+})

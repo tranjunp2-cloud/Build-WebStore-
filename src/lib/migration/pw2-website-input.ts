@@ -16,7 +16,7 @@ export function adaptWebsiteInput(input: unknown) {
     const data = WebsiteInputSchema.parse(input)
     const ids = new Set<string>(), paths = new Set<string>(), componentIds = new Set<string>()
     for (const page of data.pages) {
-        if (ids.has(page.sourceId) || paths.has(page.path)) throw new Error('Duplicate page identity/path')
+        if (ids.has(page.sourceId)) throw new Error('Duplicate page identity')
         ids.add(page.sourceId); paths.add(page.path)
         for (const component of page.components) {
             if (componentIds.has(component.sourceId)) throw new Error('Duplicate component identity')
@@ -24,8 +24,30 @@ export function adaptWebsiteInput(input: unknown) {
         }
     }
     if (!paths.has('/')) throw new Error('Homepage is required')
+    // Preserve every source identity while satisfying PW2's per-site slug index.
+    const reserved = new Set([...data.pages.map(p => p.path === '/' ? 'home' : p.path.slice(1)), '404'])
+    const used = new Set<string>(['404'])
+    const homepageId = data.pages.find(p => p.path === '/')!.sourceId
+    const pageRoutes = new Map<string, { slug: string; path: string; isHomepage: boolean }>()
+    const routeChanges: Array<{ sourceId: string; sourcePath: string; destinationPath: string }> = []
+    // Reserve homepage's internal slug even if a /home page precedes it.
+    used.add('home')
+    for (const page of data.pages) {
+        const isHomepage = page.sourceId === homepageId
+        const base = page.path === '/' ? 'home' : page.path.slice(1)
+        let slug = base
+        if (!isHomepage && used.has(slug)) {
+            slug = `${base}-pw1-${page.sourceId}`
+            let suffix = 2
+            while (used.has(slug) || reserved.has(slug)) slug = `${base}-pw1-${page.sourceId}-${suffix++}`
+        }
+        used.add(slug)
+        const path = isHomepage ? '/' : `/${slug}`
+        pageRoutes.set(page.sourceId, {slug, path, isHomepage})
+        if (path !== page.path) routeChanges.push({sourceId:page.sourceId, sourcePath:page.path, destinationPath:path})
+    }
     const link = (value: InputLink): ResolvedLink => {
-        const url = value.pageId ? data.pages.find(p => p.sourceId === value.pageId)?.path : value.url
+        const url = value.pageId ? pageRoutes.get(value.pageId)?.path : value.url
         if (!url || !/^(https?:\/\/|\/(?!\/)|#)/.test(url)) throw new Error('Invalid navigation target')
         return { label: value.label, url, ...(value.children?.length ? { children: value.children.map(link) } : {}) }
     }
@@ -48,8 +70,12 @@ export function adaptWebsiteInput(input: unknown) {
     const navigation = data.website.navigation.filter(value => !systemFeature(value)).map(link)
     const pending: Array<{ pageId: string; sourceId: string; type: string; config: unknown; reason: string }> = []
     const excluded: string[] = []
-    const warnings: string[] = []
-    const pages = data.pages.map(page => ({ sourceId: page.sourceId, title: page.title, slug: page.path === '/' ? 'home' : page.path.slice(1), isHomepage: page.path === '/', components: page.components.flatMap((component, index) => {
+    const warnings: string[] = routeChanges.map(p => `Store ${data.source.storeId}: page ${p.sourceId} retained at temporary URL ${p.destinationPath} (source URL ${p.sourcePath}); review duplicate page after migration`)
+    for (const path of paths) {
+        const matches = data.pages.filter(page => page.path === path)
+        if (matches.length > 1) warnings.push(`Store ${data.source.storeId}: URL ${path} is shared by source pages ${matches.map(page => page.sourceId).join(', ')}; all pages retained`)
+    }
+    const pages = data.pages.map(page => ({ sourceId: page.sourceId, title: page.title, slug: pageRoutes.get(page.sourceId)!.slug, isHomepage: pageRoutes.get(page.sourceId)!.isHomepage, components: page.components.flatMap((component, index) => {
         if (!component.enabled) { excluded.push(component.sourceId); return [] }
         if (component.type.endsWith('_filter') || component.type.endsWith('_sort')) {
             pending.push({ pageId: page.sourceId, sourceId: component.sourceId, type: component.type, config: component.config, reason: 'Separate filter/sort control mapping is pending; no synthetic control emitted.' }); return []
@@ -74,5 +100,5 @@ export function adaptWebsiteInput(input: unknown) {
         return [{ sourceId: component.sourceId, position: index, kind: component.type, block }]
     }) }))
     const contract = ContractSchema.parse({ format: 'pw2-reconstruction-contract', version: '1.0.0', source: { storeId: data.source.storeId, url: data.source.websiteUrl, capturedAt: data.source.capturedAt ?? '', dumpHash: '' }, site: { settings: data.website.settings, name: data.website.name, locale: data.website.locale, features, navigation: { blockType: 'navigation', logoText: data.website.name, logo: { url: data.website.branding.logoUrl, alt: data.website.name }, links: navigation }, footer: { blockType: 'footer', logoText: data.website.name, copyrightText: data.website.footer.copyright, tagline: data.website.footer.tagline, columns: data.website.footer.columns.map(c => ({ title: c.title, links: c.links.map(link) })) } }, pages, reconciliation: [...warnings, ...pending.map(p => `${p.sourceId}: ${p.reason}`), ...excluded.map(id => `${id}: disabled component excluded`)] })
-    return { contract, report: { inputFormat: data.format, locale: data.website.locale, sourceComponents: data.pages.reduce((sum,p) => sum+p.components.length,0), mappedComponents: pages.reduce((sum,p) => sum+p.components.length,0), pending, excluded, warnings, sourceConfigs: data.pages.flatMap(p=>p.components.map(c=>({ pageId:p.sourceId, sourceId:c.sourceId, config:c.config }))) } }
+    return { contract, report: { inputFormat: data.format, locale: data.website.locale, sourceComponents: data.pages.reduce((sum,p) => sum+p.components.length,0), mappedComponents: pages.reduce((sum,p) => sum+p.components.length,0), pending, excluded, warnings, routeChanges, sourceConfigs: data.pages.flatMap(p=>p.components.map(c=>({ pageId:p.sourceId, sourceId:c.sourceId, config:c.config }))) } }
 }

@@ -23,10 +23,10 @@ describe('[TC-F35.M21] Compact website input adapter',()=>{
         expect(result.pages![0].blocks[1]).toMatchObject({blockType:'products-grid',limit:7})
         expect(result.pages![0].blocks[2]).toMatchObject({blockType:'blog-list',limit:4})
     })
-    it('rejects invalid page links and duplicate paths',()=>{
+    it('rejects invalid page links and duplicate identities',()=>{
         const input=fixture();input.website.navigation[0].pageId='99'
         expect(()=>adaptWebsiteInput(input)).toThrow('navigation target')
-        input.website.navigation[0].pageId='10';input.pages.push({...input.pages[0],sourceId:'11',components:[]})
+        input.website.navigation[0].pageId='10';input.pages.push({...input.pages[0],sourceId:'10',components:[]})
         expect(()=>adaptWebsiteInput(input)).toThrow('Duplicate page')
     })
     it('rejects unsupported binding rather than embedding source records',()=>{
@@ -59,4 +59,28 @@ describe('[TC-F35.M24] Native commerce features from legacy navigation', () => {
         expect(patch.pendingGlobalBlocks?.cartWidget).toMatchObject({blockType:'cartWidget'})
         expect(ensureCartGlobalBlockWithPending(null,null,[],undefined,false)).toEqual({})
     })
+})
+
+ it('[TC-F35.M27] retains distinct page identities sharing a homepage URL', () => {
+    const input = fixture()
+    input.pages.push({...input.pages[0], sourceId:'11', components:[]})
+    const {contract, report} = adaptWebsiteInput(input)
+    expect(contract.pages.map(p => p.sourceId)).toEqual(['10','11'])
+    expect(contract.pages.map(p => p.isHomepage)).toEqual([true,false])
+    expect(contract.pages.map(p => p.slug)).toEqual(['home','home-pw1-11'])
+    expect(report.routeChanges).toEqual([{sourceId:'11',sourcePath:'/',destinationPath:'/home-pw1-11'}])
+    expect(report.warnings.join(' ')).toContain('10, 11')
+ })
+
+it('[TC-F35.M27] temporary duplicate routes avoid reserved source URLs and update page-ID links', () => {
+    const input = fixture()
+    input.pages.push(
+        {...input.pages[0],sourceId:'11',path:'/about',components:[]},
+        {...input.pages[0],sourceId:'12',path:'/about',components:[]},
+        {...input.pages[0],sourceId:'13',path:'/about-pw1-12',components:[]},
+    )
+    input.website.navigation[0].pageId = '12'
+    const {contract} = adaptWebsiteInput(input)
+    expect(contract.pages.map(p => p.slug)).toEqual(['home','about','about-pw1-12-2','about-pw1-12'])
+    expect(contract.site.navigation.links[0].url).toBe('/about-pw1-12-2')
 })
