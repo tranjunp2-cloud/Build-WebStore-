@@ -23,6 +23,12 @@
  */
 
 import { createHash } from 'crypto'
+import {
+    finalizeGenerationOutcome,
+    type FailedPage,
+    type PersistedPage,
+    type TerminalErrorPhase,
+} from './generation-outcome'
 // Phase 04 — snapshot field counting extracted to keep this file under 200 lines
 export { countSnapshotFields } from './snapshot-field-counter'
 
@@ -40,12 +46,19 @@ export type StartCaptureInput = {
     mode?: CaptureMode
     /** Pre-resolved Payload instance (avoids cold-start overhead) */
     payload?: import('payload').Payload
+    /** F41: immutable route-level context captured after validation and authorization. */
+    traceId?: string
+    inputSnapshot?: Record<string, unknown>
+    inputSchemaVersion?: string
+    /** Website generation requires a durable record; callers may opt out only for legacy monitoring. */
+    required?: boolean
 }
 
 export type CaptureHandle = {
     recordId: number | null   // null if DB write failed (monitoring best-effort)
     startTime: number
     payload?: import('payload').Payload
+    finalized?: boolean
 }
 
 export type FinishCaptureInput = {
@@ -57,6 +70,19 @@ export type FinishCaptureInput = {
     /** Phase 04 — override-rate: total editable fields across all generated blocks */
     fieldsTotal?: number
     /** Phase 04 — override-rate: fields where AI wrote a non-empty value */
+    fieldsFilled?: number
+}
+
+export type FinishWebsiteCaptureInput = {
+    expectedPages: number
+    persistedPages: PersistedPage[]
+    failedPages: FailedPage[]
+    terminalError?: unknown
+    terminalErrorPhase?: TerminalErrorPhase
+    siteId?: number | string | null
+    selectedBlocks?: string[]
+    outputSnapshot?: Record<string, unknown>
+    fieldsTotal?: number
     fieldsFilled?: number
 }
 
@@ -78,6 +104,7 @@ function sanitizeErrorLog(raw: string): string {
 // ── Snapshot size guard ──────────────────────────────────────────────────────
 
 const MAX_KB = parseInt(process.env.ADMIN_GEN_SNAPSHOT_MAX_KB ?? '50', 10)
+const MAX_INPUT_SNAPSHOT_KB = 20
 
 function guardSnapshot(snapshot: Record<string, unknown>): Record<string, unknown> {
     try {
@@ -90,6 +117,47 @@ function guardSnapshot(snapshot: Record<string, unknown>): Record<string, unknow
         return snapshot
     } catch {
         return { _truncated: true, warning: 'Snapshot not serializable' }
+    }
+}
+
+function guardInputSnapshot(snapshot: Record<string, unknown>): Record<string, unknown> {
+    try {
+        const sanitizeValue = (value: unknown, depth = 0): unknown => {
+            if (depth > 4) return '<truncated-depth>'
+            if (typeof value === 'string') return value
+                .replace(/(api[_-]?key|authorization|token|password|cookie|client[_-]?secret|secret)\s*[:=]\s*(?:bearer\s+)?[^\r\n,;]+/gi, '$1=<redacted>')
+                .replace(/(["'](?:api[_-]?key|authorization|token|password|cookie|client[_-]?secret|secret)["']\s*:\s*["'])(?:bearer\s+)?[^"']*(["'])/gi, '$1<redacted>$2')
+                .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '<redacted-api-key>')
+                .slice(0, 1000)
+            if (Array.isArray(value)) return value.slice(0, 30).map((item) => sanitizeValue(item, depth + 1))
+            if (value && typeof value === 'object') {
+                return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+                    .slice(0, 30)
+                    .map(([key, item]) => [
+                        key,
+                        /password|token|authorization|cookie|api[_-]?key/i.test(key)
+                            ? '<redacted>'
+                            : sanitizeValue(item, depth + 1),
+                    ]))
+            }
+            return value
+        }
+        const sanitized = sanitizeValue(snapshot) as Record<string, unknown>
+        const json = JSON.stringify(sanitized)
+        const kb = json.length / 1024
+        if (kb > MAX_INPUT_SNAPSHOT_KB) {
+            // Preserve the known form fields while replacing only the optional,
+            // arbitrarily nested brief that caused the cap to be exceeded.
+            const { contentBrief: _contentBrief, ...formFields } = sanitized
+            return {
+                ...formFields,
+                contentBrief: { _truncated: true, _sizeKb: Math.round(kb) },
+                warning: 'Input snapshot exceeded size limit',
+            }
+        }
+        return sanitized
+    } catch {
+        return { _truncated: true, warning: 'Input snapshot not serializable' }
     }
 }
 
@@ -125,7 +193,8 @@ async function resolvePayload(provided?: import('payload').Payload): Promise<imp
 /**
  * Creates a `ai-generation-records` row with status=running.
  * Returns a CaptureHandle — pass to finishCapture when gen completes.
- * Never throws; recordId=null means the DB write failed (safe to ignore).
+ * Legacy monitoring calls never throw; required website tracking throws when
+ * the record cannot be created, preventing an untracked success response.
  */
 export async function startCapture(input: StartCaptureInput): Promise<CaptureHandle> {
     const startTime = Date.now()
@@ -137,6 +206,8 @@ export async function startCapture(input: StartCaptureInput): Promise<CaptureHan
     try {
         const payload = await resolvePayload(input.payload)
         const { promptText, promptHash } = buildPromptFields(input.prompt, mode)
+        const inputSnapshot = input.inputSnapshot ? guardInputSnapshot(input.inputSnapshot) : undefined
+        const inputHash = inputSnapshot ? sha256(JSON.stringify(inputSnapshot)) : undefined
 
         const record = await payload.create({
             collection: 'ai-generation-records',
@@ -149,14 +220,23 @@ export async function startCapture(input: StartCaptureInput): Promise<CaptureHan
                 promptText,
                 promptHash,
                 status: 'running',
+                lifecycle: 'running',
+                recoveryStatus: 'none',
+                traceId: input.traceId,
+                inputSnapshot,
+                inputSchemaVersion: input.inputSchemaVersion,
+                inputHash,
+                startedAt: new Date(startTime).toISOString(),
+                lastHeartbeatAt: new Date(startTime).toISOString(),
             },
         })
 
-        return { recordId: record.id as number, startTime, payload }
+        return { recordId: record.id as number, startTime, payload, finalized: false }
     } catch (err) {
         // Monitoring must never block the AI gen path
         console.warn('[capture-generation] startCapture failed:', err instanceof Error ? err.message : String(err))
-        return { recordId: null, startTime }
+        if (input.required) throw new Error('Generation tracking is temporarily unavailable')
+        return { recordId: null, startTime, finalized: false }
     }
 }
 
@@ -199,5 +279,104 @@ export async function finishCapture(
         })
     } catch (err) {
         console.warn('[capture-generation] finishCapture failed:', err instanceof Error ? err.message : String(err))
+    }
+}
+
+/**
+ * Finalizes a website capture only after site/page writes are known. This keeps
+ * observability truthful when composition succeeds but persistence is partial.
+ */
+export async function finishWebsiteCapture(
+    handle: CaptureHandle,
+    input: FinishWebsiteCaptureInput,
+): Promise<boolean> {
+    if (handle.recordId === null) return false
+    if (handle.finalized) return true
+    const terminal = finalizeGenerationOutcome(input)
+    const now = new Date().toISOString()
+    const legacyStatus = terminal.outcome === 'succeeded' ? 'success' : 'failed'
+    const recoveryStatus = terminal.outcome === 'succeeded' ? 'none' : 'eligible'
+
+    let lastError: unknown
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const payload = await resolvePayload(handle.payload)
+            const existing = await payload.findByID({ collection: 'ai-generation-records', id: handle.recordId })
+            if (existing?.lifecycle === 'terminal') {
+                handle.finalized = true
+                return true
+            }
+            await payload.update({
+            collection: 'ai-generation-records',
+            id: handle.recordId,
+            data: {
+                status: legacyStatus,
+                lifecycle: 'terminal',
+                outcome: terminal.outcome,
+                recoveryStatus,
+                site: input.siteId ?? undefined,
+                pageSummary: terminal.pageSummary,
+                pageOutcomes: terminal.pageOutcomes,
+                generationErrors: terminal.errors,
+                userSafeMessage: terminal.userSafeMessage,
+                errorLog: terminal.errors[0]?.sanitizedTechnicalMessage,
+                durationMs: Date.now() - handle.startTime,
+                completedAt: now,
+                terminalAt: now,
+                lastHeartbeatAt: now,
+                ...(input.selectedBlocks ? { selectedBlocks: input.selectedBlocks.map((value) => ({ value })) } : {}),
+                ...(input.outputSnapshot ? { outputSnapshot: guardSnapshot(input.outputSnapshot) } : {}),
+                ...(input.fieldsTotal !== undefined ? { fieldsTotal: input.fieldsTotal } : {}),
+                ...(input.fieldsFilled !== undefined ? { fieldsFilled: input.fieldsFilled } : {}),
+            },
+            })
+            // The route has both stream and outer error boundaries. Only lock the
+            // handle after persistence succeeds so a transient capture failure can retry.
+            handle.finalized = true
+            return true
+        } catch (err) {
+            lastError = err
+        }
+    }
+    console.error('[capture-generation] terminal website capture failed after retry:', lastError instanceof Error ? lastError.message : String(lastError))
+    return false
+}
+
+/** Best-effort heartbeat used while a long site/page persistence phase is active. */
+export async function heartbeatWebsiteCapture(handle: CaptureHandle): Promise<void> {
+    if (handle.recordId === null || handle.finalized) return
+    try {
+        const payload = await resolvePayload(handle.payload)
+        await payload.update({
+            collection: 'ai-generation-records',
+            id: handle.recordId,
+            data: { lastHeartbeatAt: new Date().toISOString() },
+        })
+    } catch (err) {
+        console.warn('[capture-generation] heartbeatWebsiteCapture failed:', err instanceof Error ? err.message : String(err))
+    }
+}
+
+/** Persists non-terminal page evidence so an interrupted run remains debuggable. */
+export async function persistWebsiteCaptureProgress(
+    handle: CaptureHandle,
+    input: Pick<FinishWebsiteCaptureInput, 'expectedPages' | 'persistedPages' | 'failedPages'>,
+): Promise<void> {
+    if (handle.recordId === null || handle.finalized) return
+    const progress = finalizeGenerationOutcome(input)
+    try {
+        const payload = await resolvePayload(handle.payload)
+        await payload.update({
+            collection: 'ai-generation-records',
+            id: handle.recordId,
+            data: {
+                pageSummary: progress.pageSummary,
+                pageOutcomes: progress.pageOutcomes,
+                generationErrors: progress.errors,
+                lastHeartbeatAt: new Date().toISOString(),
+            },
+        })
+    } catch (err) {
+        console.warn('[capture-generation] persistWebsiteCaptureProgress failed:', err instanceof Error ? err.message : String(err))
     }
 }

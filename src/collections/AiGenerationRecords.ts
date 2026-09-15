@@ -102,6 +102,49 @@ export const AiGenerationRecords: CollectionConfig = {
                 { label: 'Failed', value: 'failed' },
             ],
         },
+        { name: 'traceId', type: 'text', index: true, admin: { description: 'Route request trace ID for this generation run' } },
+        { name: 'inputSnapshot', type: 'json', admin: { description: 'Frozen, normalized input used for this run' } },
+        { name: 'inputSchemaVersion', type: 'text', admin: { description: 'Schema version of frozen input' } },
+        { name: 'inputHash', type: 'text', index: true, admin: { description: 'SHA256 of frozen normalized input' } },
+        {
+            name: 'lifecycle', type: 'select', index: true,
+            options: ['queued', 'running', 'terminal'],
+            admin: { description: 'F41 lifecycle; terminal is written only after site/page persistence' },
+        },
+        {
+            name: 'outcome', type: 'select', index: true,
+            options: ['succeeded', 'partial_failed', 'failed', 'cancelled'],
+            admin: { description: 'Terminal persistence outcome, independent from legacy status' },
+        },
+        {
+            name: 'recoveryStatus', type: 'select', index: true,
+            options: ['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'stale_running'],
+            admin: { description: 'Operations recovery state; do not infer from error text in UI' },
+        },
+        {
+            name: 'pageSummary', type: 'group', fields: [
+                { name: 'expected', type: 'number' },
+                { name: 'persisted', type: 'number' },
+                { name: 'failed', type: 'number' },
+            ],
+        },
+        {
+            name: 'pageOutcomes', type: 'array', fields: [
+                { name: 'pageKey', type: 'text' }, { name: 'title', type: 'text' }, { name: 'slug', type: 'text' },
+                { name: 'pageId', type: 'text' }, { name: 'status', type: 'select', options: ['persisted', 'failed'] },
+                { name: 'blockCount', type: 'number' }, { name: 'errorCode', type: 'text' }, { name: 'errorSummary', type: 'textarea' },
+            ],
+        },
+        {
+            name: 'generationErrors', type: 'array', fields: [
+                { name: 'phase', type: 'text' }, { name: 'locationType', type: 'text' }, { name: 'locationKey', type: 'text' },
+                { name: 'code', type: 'text' }, { name: 'category', type: 'text' }, { name: 'retryabilityReason', type: 'text' },
+                { name: 'operatorMessage', type: 'textarea' }, { name: 'userSafeMessage', type: 'textarea' },
+                { name: 'sanitizedTechnicalMessage', type: 'textarea' }, { name: 'signature', type: 'text' },
+            ],
+        },
+        { name: 'userSafeMessage', type: 'text', admin: { description: 'Never contains provider/raw error details' } },
+        { name: 'startedAt', type: 'date' }, { name: 'terminalAt', type: 'date', index: true }, { name: 'lastHeartbeatAt', type: 'date' },
         {
             name: 'errorLog',
             type: 'textarea',

@@ -15,6 +15,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withSuperAdmin, checkRateLimit } from '@/lib/admin/api-utils'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
+import { finishCapture, startCapture } from '@/lib/ai/capture-generation'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -74,9 +75,20 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             products: parts[3] ?? '',
         }
 
+        const capture = await startCapture({
+            endpoint: 'site-generator-rerun-composition',
+            prompt: promptText,
+            category: businessInfo.industry || undefined,
+            userId: adminCtx.user.id,
+            payload,
+        })
         try {
-            // generateSiteWithAI creates its own capture record via the wrapped function
             const { result } = await generateSiteWithAI(businessInfo)
+            await finishCapture(capture, {
+                status: 'success',
+                selectedBlocks: result.blocks.map((block) => String((block as { blockType?: unknown }).blockType ?? '')),
+                outputSnapshot: { path: 'admin-rerun-composition', siteName: result.siteName },
+            })
 
             return NextResponse.json({
                 data: {
@@ -87,7 +99,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             })
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err)
-            return NextResponse.json({ error: `Rerun failed: ${message}` }, { status: 500 })
+            await finishCapture(capture, { status: 'failed', error: message })
+            return NextResponse.json({ error: 'Rerun failed. Please try again later.' }, { status: 500 })
         }
     })(req)
 }

@@ -74,6 +74,8 @@ import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
 import { patchBlockCtaUrlsFromLinks } from '@/lib/ai/patch-block-cta-urls'
 import { GenerationTimings, normalizeGenerationRequestId } from '@/lib/ai/generation-timings'
+import { countSnapshotFields, finishWebsiteCapture, heartbeatWebsiteCapture, persistWebsiteCaptureProgress, startCapture, type CaptureHandle } from '@/lib/ai/capture-generation'
+import type { FailedPage, PersistedPage, TerminalErrorPhase } from '@/lib/ai/generation-outcome'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
 import { PRODUCTS_GRID_LIMIT } from '@/blocks/products-grid/config'
 
@@ -142,6 +144,30 @@ function collectGenerationBlockBuckets(result: GenerationResult): Record<string,
     return buckets
 }
 
+function buildWebsiteCaptureOutput(result: GenerationResult): {
+    selectedBlocks: string[]
+    outputSnapshot: Record<string, unknown>
+    fieldsTotal: number
+    fieldsFilled: number
+} {
+    const blocks = collectGenerationBlockBuckets(result).flat()
+    const fieldCounts = countSnapshotFields({ blocks })
+    return {
+        selectedBlocks: blocks.map((block) => String(block.blockType ?? '')),
+        outputSnapshot: { siteName: result.siteName, totalBlocks: blocks.length },
+        ...fieldCounts,
+    }
+}
+
+function resolveTerminalCapturePhase(timings: GenerationTimings): TerminalErrorPhase {
+    const failedPhases = Object.entries(timings.snapshot())
+        .filter(([, timing]) => timing.outcome === 'error')
+        .map(([phase]) => phase)
+    return failedPhases.includes('site_write') || failedPhases.includes('pages_write') || failedPhases.includes('site_complete')
+        ? 'site_persist'
+        : 'composition'
+}
+
 /**
  * POST /api/ai/generate-site
  * Generate a website from a text prompt using AI.
@@ -158,6 +184,23 @@ export async function POST(req: NextRequest) {
     let _site: Record<string, unknown> | null = null
     let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
     let _createdPagesCount = 0
+    let _expectedPagesCount = 0
+    let _siteCapture: CaptureHandle | null = null
+    const _persistedPageOutcomes: PersistedPage[] = []
+    const _failedPageOutcomes: FailedPage[] = []
+    let _expectedPageOutcomes: Array<Omit<FailedPage, 'error'>> = []
+    const terminalFailedPages = (error: unknown): FailedPage[] => {
+        const knownKeys = new Set([
+            ..._persistedPageOutcomes.map((page) => page.key),
+            ..._failedPageOutcomes.map((page) => page.key),
+        ])
+        return [
+            ..._failedPageOutcomes,
+            ..._expectedPageOutcomes
+                .filter((page) => !knownKeys.has(page.key))
+                .map((page) => ({ ...page, error })),
+        ]
+    }
 
     try {
         // Parse request body early so validation errors return before auth/db side effects.
@@ -339,6 +382,25 @@ export async function POST(req: NextRequest) {
         // after auth, rate limiting, safety, and subscription checks. Translation
         // may also use AI, so start it only after the request-local mode is known.
         const modeDecision: SiteGenerationModeDecision = await resolveSiteGenerationMode()
+        _siteCapture = await startCapture({
+            endpoint: 'site-generator',
+            prompt: [businessInfo.businessName, businessInfo.industry, businessInfo.shortDescription, businessInfo.products].join(' | '),
+            category: businessInfo.industry ?? undefined,
+            userId: user.id,
+            payload,
+            traceId: generationRequestId,
+            inputSchemaVersion: 'f41.v1',
+            required: true,
+            inputSnapshot: {
+                businessInfo,
+                extraInstructions: extraInstructions ?? null,
+                language,
+                generationLocale: effectiveGenerationLocale,
+                // Capture helper bounds/redacts nested values while retaining the
+                // submitted form shape needed by future detail/retry workflows.
+                contentBrief: rawContentBrief ?? null,
+            },
+        })
         const translatedBusinessInfoPromise = translateUserInputsIfNeeded({
             businessName: normalizedBusinessInfo.businessName,
             shortDescription: normalizedBusinessInfo.shortDescription,
@@ -571,6 +633,7 @@ export async function POST(req: NextRequest) {
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
             blockImageStats: { succeeded: number; failed: number }
             normalizedPageLinks: Array<{ label: string; url: string }>
+            expectedPages: number
         }> => {
             await trackPhase('translation', () => translatedBusinessInfoPromise)
             // GH-1185: keywords are sent to Pixabay RAW (user input language, no
@@ -1456,12 +1519,20 @@ export async function POST(req: NextRequest) {
             businessInfo.businessName,
             result.localeStructuralStrings,
         )
+        _expectedPagesCount = pageDefinitions.length
+        _expectedPageOutcomes = pageDefinitions.map((page) => ({
+            key: page.slug,
+            slug: page.slug,
+            title: page.title,
+        }))
 
         const createdPages: Record<string, unknown>[] = []
         const pageFailures: Array<{ slug: string; title: string; error: string }> = []
 
         const dbPhaseStart = Date.now()
+        if (_siteCapture) await heartbeatWebsiteCapture(_siteCapture)
         for (const pageDefinition of pageDefinitions) {
+            if (_siteCapture) await heartbeatWebsiteCapture(_siteCapture)
             // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
             // Plan 260415 — also run sanitizeBlocksForPayload on EVERY page's
             // layout (not just homepage), so sub-page team/testimonials/faq
@@ -1603,12 +1674,36 @@ export async function POST(req: NextRequest) {
                 }
                 createdPages.push(createdPage)
                 _createdPagesCount++
+                _persistedPageOutcomes.push({
+                    id: typeof createdPage.id === 'string' || typeof createdPage.id === 'number' ? createdPage.id : undefined,
+                    key: pageDefinition.slug,
+                    slug: pageDefinition.slug,
+                    title: pageDefinition.title,
+                    blockCount: Array.isArray(normalizedLayout) ? normalizedLayout.length : undefined,
+                })
+                if (_siteCapture) await persistWebsiteCaptureProgress(_siteCapture, {
+                    expectedPages: _expectedPagesCount,
+                    persistedPages: _persistedPageOutcomes,
+                    failedPages: _failedPageOutcomes,
+                })
             } catch (pageErr) {
                 const errMsg = pageErr instanceof Error ? pageErr.message : String(pageErr)
                 pageFailures.push({
                     slug: pageDefinition.slug,
                     title: pageDefinition.title,
                     error: errMsg,
+                })
+                _failedPageOutcomes.push({
+                    key: pageDefinition.slug,
+                    slug: pageDefinition.slug,
+                    title: pageDefinition.title,
+                    blockCount: Array.isArray(sanitizedLayout) ? sanitizedLayout.length : undefined,
+                    error: pageErr,
+                })
+                if (_siteCapture) await persistWebsiteCaptureProgress(_siteCapture, {
+                    expectedPages: _expectedPagesCount,
+                    persistedPages: _persistedPageOutcomes,
+                    failedPages: _failedPageOutcomes,
                 })
                 console.error('[generate-site] Page create failed', JSON.stringify({
                     slug: pageDefinition.slug,
@@ -2088,6 +2183,7 @@ export async function POST(req: NextRequest) {
                 productImageStats,
                 blockImageStats,
                 normalizedPageLinks,
+                expectedPages: pageDefinitions.length,
             }
         } // end runGenPipeline
 
@@ -2130,6 +2226,22 @@ export async function POST(req: NextRequest) {
                             pixabaySearchBudget,
                             () => runGenPipeline(onEvent),
                         )
+                        if (_siteCapture) {
+                            const captureOutput = buildWebsiteCaptureOutput(result)
+                            const finalized = await finishWebsiteCapture(_siteCapture, {
+                                expectedPages: _expectedPagesCount,
+                                persistedPages: _persistedPageOutcomes,
+                                failedPages: _failedPageOutcomes,
+                                siteId: _pipeSite.id as string | number,
+                                ...captureOutput,
+                            })
+                            if (!finalized) {
+                                console.error('[generate-site] TRACKING_FINALIZATION_FAILED', {
+                                    requestId: generationRequestId,
+                                    siteId: _pipeSite.id,
+                                })
+                            }
+                        }
                         // The site is already committed. Slug sync is optional
                         // post-response work and must not turn success into an SSE error.
                         const _slugSyncStream = () => trackPhase('slug_sync', syncTenantSlug)
@@ -2192,6 +2304,16 @@ export async function POST(req: NextRequest) {
                             .map(([name]) => name)
                         const failedPhase = failedPhases.at(-1) ?? 'unknown'
                         const siteId = _site?.id ?? null
+                        if (_siteCapture) {
+                            await finishWebsiteCapture(_siteCapture, {
+                                expectedPages: _expectedPagesCount,
+                                persistedPages: _persistedPageOutcomes,
+                                failedPages: terminalFailedPages(streamErr),
+                                terminalError: streamErr,
+                                terminalErrorPhase: resolveTerminalCapturePhase(generationTimings),
+                                siteId: siteId as string | number | null,
+                            })
+                        }
 
                         console.error('[generate-site] SSE_ERROR', JSON.stringify({
                             requestId: generationRequestId,
@@ -2213,7 +2335,7 @@ export async function POST(req: NextRequest) {
                             controller.enqueue(
                                 _encoder.encode(
                                     `event: error\ndata: ${JSON.stringify({
-                                        message: errMsg,
+                                        message: 'Chúng tôi chưa thể hoàn thiện website của bạn. Thông tin của bạn đã được lưu.',
                                         code: 'GENERATION_FAILED',
                                         debugId,
                                         phase: failedPhase,
@@ -2282,6 +2404,22 @@ export async function POST(req: NextRequest) {
             pixabaySearchBudget,
             () => runGenPipeline(),
         )
+        if (_siteCapture) {
+            const captureOutput = buildWebsiteCaptureOutput(result)
+            const finalized = await finishWebsiteCapture(_siteCapture, {
+                expectedPages: _expectedPagesCount,
+                persistedPages: _persistedPageOutcomes,
+                failedPages: _failedPageOutcomes,
+                siteId: site.id as string | number,
+                ...captureOutput,
+            })
+            if (!finalized) {
+                console.error('[generate-site] TRACKING_FINALIZATION_FAILED', {
+                    requestId: generationRequestId,
+                    siteId: site.id,
+                })
+            }
+        }
         // JSON callers share the same terminal contract: once committed, only
         // non-fatal post-response work remains.
         const _slugSync = () => trackPhase('slug_sync', syncTenantSlug)
@@ -2340,6 +2478,16 @@ export async function POST(req: NextRequest) {
         }
 
         const errMsg = error instanceof Error ? error.message : String(error)
+        if (_siteCapture) {
+            await finishWebsiteCapture(_siteCapture, {
+                expectedPages: _expectedPagesCount,
+                persistedPages: _persistedPageOutcomes,
+                failedPages: terminalFailedPages(error),
+                terminalError: error,
+                terminalErrorPhase: resolveTerminalCapturePhase(generationTimings),
+                siteId: _siteForCatch?.id as string | number | null,
+            })
+        }
         const errStack = error instanceof Error ? error.stack : ''
 
         // Drizzle wraps the real Postgres error (e.g. `column "variant" does not
