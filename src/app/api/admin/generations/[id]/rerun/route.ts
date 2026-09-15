@@ -75,16 +75,14 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             products: parts[3] ?? '',
         }
 
+        const capture = await startCapture({
+            endpoint: 'site-generator-rerun-composition',
+            prompt: promptText,
+            category: businessInfo.industry || undefined,
+            userId: adminCtx.user.id,
+            payload,
+        })
         try {
-            // F41 assigns website persistence capture to generate-site. This legacy
-            // admin action only re-composes content, so keep its separate monitor row.
-            const capture = await startCapture({
-                endpoint: 'site-generator-rerun-composition',
-                prompt: promptText,
-                category: businessInfo.industry || undefined,
-                userId: adminCtx.user.id,
-                payload,
-            })
             const { result } = await generateSiteWithAI(businessInfo)
             await finishCapture(capture, {
                 status: 'success',
@@ -101,7 +99,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             })
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err)
-            return NextResponse.json({ error: `Rerun failed: ${message}` }, { status: 500 })
+            await finishCapture(capture, { status: 'failed', error: message })
+            return NextResponse.json({ error: 'Rerun failed. Please try again later.' }, { status: 500 })
         }
     })(req)
 }

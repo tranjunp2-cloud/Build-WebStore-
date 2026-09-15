@@ -74,7 +74,7 @@ import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
 import { patchBlockCtaUrlsFromLinks } from '@/lib/ai/patch-block-cta-urls'
 import { GenerationTimings, normalizeGenerationRequestId } from '@/lib/ai/generation-timings'
-import { countSnapshotFields, finishWebsiteCapture, heartbeatWebsiteCapture, startCapture, type CaptureHandle } from '@/lib/ai/capture-generation'
+import { countSnapshotFields, finishWebsiteCapture, heartbeatWebsiteCapture, persistWebsiteCaptureProgress, startCapture, type CaptureHandle } from '@/lib/ai/capture-generation'
 import type { FailedPage, PersistedPage, TerminalErrorPhase } from '@/lib/ai/generation-outcome'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
 import { PRODUCTS_GRID_LIMIT } from '@/blocks/products-grid/config'
@@ -163,9 +163,9 @@ function resolveTerminalCapturePhase(timings: GenerationTimings): TerminalErrorP
     const failedPhases = Object.entries(timings.snapshot())
         .filter(([, timing]) => timing.outcome === 'error')
         .map(([phase]) => phase)
-    return failedPhases.includes('pages_write') || failedPhases.includes('site_complete')
+    return failedPhases.includes('site_write') || failedPhases.includes('pages_write') || failedPhases.includes('site_complete')
         ? 'site_persist'
-        : 'unknown'
+        : 'composition'
 }
 
 /**
@@ -1532,6 +1532,7 @@ export async function POST(req: NextRequest) {
         const dbPhaseStart = Date.now()
         if (_siteCapture) await heartbeatWebsiteCapture(_siteCapture)
         for (const pageDefinition of pageDefinitions) {
+            if (_siteCapture) await heartbeatWebsiteCapture(_siteCapture)
             // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
             // Plan 260415 — also run sanitizeBlocksForPayload on EVERY page's
             // layout (not just homepage), so sub-page team/testimonials/faq
@@ -1680,6 +1681,11 @@ export async function POST(req: NextRequest) {
                     title: pageDefinition.title,
                     blockCount: Array.isArray(normalizedLayout) ? normalizedLayout.length : undefined,
                 })
+                if (_siteCapture) await persistWebsiteCaptureProgress(_siteCapture, {
+                    expectedPages: _expectedPagesCount,
+                    persistedPages: _persistedPageOutcomes,
+                    failedPages: _failedPageOutcomes,
+                })
             } catch (pageErr) {
                 const errMsg = pageErr instanceof Error ? pageErr.message : String(pageErr)
                 pageFailures.push({
@@ -1693,6 +1699,11 @@ export async function POST(req: NextRequest) {
                     title: pageDefinition.title,
                     blockCount: Array.isArray(sanitizedLayout) ? sanitizedLayout.length : undefined,
                     error: pageErr,
+                })
+                if (_siteCapture) await persistWebsiteCaptureProgress(_siteCapture, {
+                    expectedPages: _expectedPagesCount,
+                    persistedPages: _persistedPageOutcomes,
+                    failedPages: _failedPageOutcomes,
                 })
                 console.error('[generate-site] Page create failed', JSON.stringify({
                     slug: pageDefinition.slug,

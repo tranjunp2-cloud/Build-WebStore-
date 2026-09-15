@@ -25,11 +25,11 @@ export type FailedPage = {
 }
 
 export type NormalizedGenerationError = {
-    phase: 'site_persist' | 'page_persist' | 'unknown'
+    phase: 'site_persist' | 'page_persist' | 'composition' | 'unknown'
     locationType: 'site' | 'page' | 'unknown'
     locationKey?: string
     code: string
-    category: 'persistence'
+    category: 'persistence' | 'composition'
     retryabilityReason: string
     operatorMessage: string
     userSafeMessage: string
@@ -72,13 +72,14 @@ function boundedMessage(value: unknown): string {
 function normalizeError(error: unknown, page?: FailedPage, terminalPhase: TerminalErrorPhase = 'unknown'): NormalizedGenerationError {
     const message = boundedMessage(error)
     const timeout = /timeout|timed out|etimedout/i.test(message)
+    const isComposition = !page && terminalPhase === 'composition'
 
     return {
-        phase: page ? 'page_persist' : terminalPhase === 'site_persist' ? 'site_persist' : 'unknown',
+        phase: page ? 'page_persist' : isComposition ? 'composition' : terminalPhase === 'site_persist' ? 'site_persist' : 'unknown',
         locationType: page ? 'page' : terminalPhase === 'site_persist' ? 'site' : 'unknown',
         ...(page ? { locationKey: page.key } : {}),
-        code: timeout ? 'PERSISTENCE_TIMEOUT' : page ? 'PAGE_PERSISTENCE_FAILED' : terminalPhase === 'site_persist' ? 'SITE_PERSISTENCE_FAILED' : 'GENERATION_FAILED',
-        category: 'persistence',
+        code: timeout ? isComposition ? 'GENERATION_TIMEOUT' : 'PERSISTENCE_TIMEOUT' : page ? 'PAGE_PERSISTENCE_FAILED' : terminalPhase === 'site_persist' ? 'SITE_PERSISTENCE_FAILED' : 'GENERATION_FAILED',
+        category: isComposition ? 'composition' : 'persistence',
         retryabilityReason: timeout ? 'transient_timeout' : 'requires_operator_review',
         operatorMessage: message || 'Persistence failed without a diagnostic message.',
         userSafeMessage: 'Chúng tôi chưa thể hoàn thiện website của bạn. Thông tin của bạn đã được lưu.',
@@ -100,7 +101,7 @@ export function finalizeGenerationOutcome(input: {
     const failed = input.failedPages.length
     const hasTerminalError = input.terminalError !== undefined && input.terminalError !== null
 
-    const outcome: GenerationOutcome = !hasTerminalError && persisted === expected && failed === 0
+    const outcome: GenerationOutcome = expected > 0 && !hasTerminalError && persisted === expected && failed === 0
         ? 'succeeded'
         : persisted > 0
             ? 'partial_failed'

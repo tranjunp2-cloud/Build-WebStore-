@@ -302,7 +302,7 @@ export async function finishWebsiteCapture(
         try {
             const payload = await resolvePayload(handle.payload)
             const existing = await payload.findByID({ collection: 'ai-generation-records', id: handle.recordId })
-            if (existing.lifecycle === 'terminal') {
+            if (existing?.lifecycle === 'terminal') {
                 handle.finalized = true
                 return true
             }
@@ -354,5 +354,29 @@ export async function heartbeatWebsiteCapture(handle: CaptureHandle): Promise<vo
         })
     } catch (err) {
         console.warn('[capture-generation] heartbeatWebsiteCapture failed:', err instanceof Error ? err.message : String(err))
+    }
+}
+
+/** Persists non-terminal page evidence so an interrupted run remains debuggable. */
+export async function persistWebsiteCaptureProgress(
+    handle: CaptureHandle,
+    input: Pick<FinishWebsiteCaptureInput, 'expectedPages' | 'persistedPages' | 'failedPages'>,
+): Promise<void> {
+    if (handle.recordId === null || handle.finalized) return
+    const progress = finalizeGenerationOutcome(input)
+    try {
+        const payload = await resolvePayload(handle.payload)
+        await payload.update({
+            collection: 'ai-generation-records',
+            id: handle.recordId,
+            data: {
+                pageSummary: progress.pageSummary,
+                pageOutcomes: progress.pageOutcomes,
+                generationErrors: progress.errors,
+                lastHeartbeatAt: new Date().toISOString(),
+            },
+        })
+    } catch (err) {
+        console.warn('[capture-generation] persistWebsiteCaptureProgress failed:', err instanceof Error ? err.message : String(err))
     }
 }

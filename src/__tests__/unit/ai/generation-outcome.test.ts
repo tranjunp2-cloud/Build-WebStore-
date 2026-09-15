@@ -24,6 +24,37 @@ describe('finalizeGenerationOutcome', () => {
         expect(result.errors[0]?.operatorMessage).not.toContain('/vercel/path0')
     })
 
+    it('TC-F41-02: classifies a composition timeout without inventing a persistence failure', () => {
+        // Arrange
+        const input = {
+            expectedPages: 0,
+            persistedPages: [],
+            failedPages: [],
+            terminalError: new Error('OpenAI request timed out'),
+            terminalErrorPhase: 'composition' as const,
+        }
+
+        // Act
+        const result = finalizeGenerationOutcome(input)
+
+        // Assert
+        expect(result).toMatchObject({ outcome: 'failed' })
+        expect(result.errors[0]).toMatchObject({
+            phase: 'composition', category: 'composition', code: 'GENERATION_TIMEOUT',
+        })
+    })
+
+    it('TC-F41-02: never reports a zero-page run as succeeded', () => {
+        // Arrange
+        const input = { expectedPages: 0, persistedPages: [], failedPages: [] }
+
+        // Act
+        const result = finalizeGenerationOutcome(input)
+
+        // Assert
+        expect(result.outcome).toBe('failed')
+    })
+
     it('TC-F41-03: records a partial result with four persisted pages and one failed page', () => {
         // Arrange
         const input = {
