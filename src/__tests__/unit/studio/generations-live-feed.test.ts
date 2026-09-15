@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendUniqueGenerationRecords } from '@/app/studio/generations/_components/generations-live-feed'
+import { appendUniqueGenerationRecords, getExportScope, mergePolledGenerationRecords, toDateTimeLocalValue } from '@/app/studio/generations/_components/generations-live-feed'
 import type { GenerationRecord } from '@/app/studio/generations/_components/generation-types'
 
 function record(id: string): GenerationRecord {
@@ -14,6 +14,7 @@ function record(id: string): GenerationRecord {
         priority: 'retryable',
         recoveryPolicy: { action: 'retry_website', retryable: true, reasonCode: 'RETRYABLE' },
         pageSummary: { expected: 1, persisted: 0, failed: 1 },
+        incidentSummary: null,
         affectedError: null,
     }
 }
@@ -29,5 +30,53 @@ describe('appendUniqueGenerationRecords', () => {
 
         // Assert
         expect(result.map((item) => item.id)).toEqual(['generation-3', 'generation-2', 'generation-1'])
+    })
+
+    it('TC-F41-19: does not let a stale eligible poll undo an accepted retry monitor state', () => {
+        const locallyAccepted = {
+            ...record('generation-1'),
+            recoveryStatus: 'retrying',
+            priority: 'retrying',
+            recoveryPolicy: { action: 'monitor' as const, retryable: false, reasonCode: 'RETRY_IN_PROGRESS' },
+        }
+
+        const result = mergePolledGenerationRecords([record('generation-1')], [locallyAccepted])
+
+        expect(result).toEqual([locallyAccepted])
+    })
+
+    it('TC-F41-19: accepts a later server retry-failed update instead of keeping monitor state forever', () => {
+        const locallyAccepted = {
+            ...record('generation-1'),
+            recoveryStatus: 'retrying',
+            priority: 'retrying',
+            recoveryPolicy: { action: 'monitor' as const, retryable: false, reasonCode: 'RETRY_IN_PROGRESS' },
+        }
+        const serverUpdate = {
+            ...record('generation-1'),
+            recoveryStatus: 'retry_failed',
+            priority: 'retry_failed',
+            recoveryPolicy: { action: 'create_ticket' as const, retryable: false, reasonCode: 'RETRY_FAILED' },
+        }
+
+        const result = mergePolledGenerationRecords([serverUpdate], [locallyAccepted])
+
+        expect(result).toEqual([serverUpdate])
+    })
+})
+
+describe('generation listing presentation guards', () => {
+    it('TC-F41-18: converts ISO timestamps to browser-local datetime-local values', () => {
+        // Date constructor uses local fields; this assertion is timezone-safe.
+        const source = '2026-09-15T09:08:07.000Z'
+        const local = new Date(source)
+        const expected = `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, '0')}-${String(local.getDate()).padStart(2, '0')}T${String(local.getHours()).padStart(2, '0')}:${String(local.getMinutes()).padStart(2, '0')}`
+        expect(toDateTimeLocalValue(source)).toBe(expected)
+        expect(toDateTimeLocalValue('not-a-date')).toBe('')
+    })
+
+    it('TC-F41-18: prevents Export CSV from silently dropping unsupported queue filters', () => {
+        expect(getExportScope({ view: 'needs_attention', status: 'all', recoveryStatus: 'all', search: '', userId: '', siteId: '', dateFrom: '', dateTo: '', cursor: '', limit: 50 })).toMatch(/chỉ hỗ trợ toàn bộ generation/i)
+        expect(getExportScope({ view: 'all', status: 'failed', recoveryStatus: 'all', search: '', userId: '1', siteId: '', dateFrom: '', dateTo: '', cursor: '', limit: 50 })).toMatch(/trạng thái, User ID và khoảng thời gian/i)
     })
 })

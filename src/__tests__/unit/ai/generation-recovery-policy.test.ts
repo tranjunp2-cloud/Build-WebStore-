@@ -4,6 +4,7 @@ import {
     resolveGenerationPriority,
     resolveGenerationRecoveryPolicy,
     serializeAdminGeneration,
+    summarizeGenerationIncident,
     type GenerationListSource,
 } from '@/lib/ai/generation-recovery-policy'
 
@@ -84,11 +85,27 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
             site: { id: null, label: 'Unknown', missing: true },
             pageSummary: { expected: 5, persisted: 4, failed: 1 },
             affectedError: { code: 'PAGE_PERSISTENCE_FAILED', locationKey: 'about', summary: 'Safe normalized summary' },
+            incidentSummary: { kind: 'persistence', label: 'Không thể lưu website', scope: 'about', totalErrors: 1 },
         })
         expect(serialized).not.toHaveProperty('promptText')
         expect(serialized).not.toHaveProperty('inputSnapshot')
         expect(serialized).not.toHaveProperty('outputSnapshot')
         expect(serialized).not.toHaveProperty('errorLog')
         expect(JSON.stringify(serialized)).not.toContain('raw provider stack / secret')
+    })
+
+    it('TC-F41-08: selects the most blocking incident across all captured errors', () => {
+        // Arrange: the first error is component-scoped, but quota blocks the entire website.
+        const errors: NonNullable<GenerationListSource['generationErrors']> = [
+            { code: 'INVALID_COMPONENT_CONTRACT', locationType: 'component', locationKey: 'Sản phẩm / Gallery' },
+            { code: 'AI_QUOTA_EXCEEDED', locationType: 'website' },
+            { code: 'PAGE_GENERATION_FAILED', locationType: 'page', locationKey: 'Liên hệ' },
+        ]
+
+        // Act
+        const incident = summarizeGenerationIncident(errors)
+
+        // Assert
+        expect(incident).toEqual({ kind: 'quota', label: 'Hết quota AI', scope: 'Áp dụng toàn website', totalErrors: 3 })
     })
 })

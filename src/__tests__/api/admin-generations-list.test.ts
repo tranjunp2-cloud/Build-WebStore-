@@ -199,8 +199,12 @@ describe('GET /api/admin/generations', () => {
 
         // Assert
         expect(response.status).toBe(200)
-        expect(findSpy).toHaveBeenCalledTimes(5)
-        for (const [args] of findSpy.mock.calls) {
+        // Search now resolves user/site display names in two bounded relation
+        // queries before it queries the five recovery-priority buckets.
+        expect(findSpy).toHaveBeenCalledTimes(7)
+        expect(findSpy.mock.calls[0]?.[0]).toMatchObject({ collection: 'users', limit: 51, pagination: false, depth: 0 })
+        expect(findSpy.mock.calls[1]?.[0]).toMatchObject({ collection: 'sites', limit: 51, pagination: false, depth: 0 })
+        for (const [args] of findSpy.mock.calls.slice(2)) {
             // `combineWhere` nests its clauses, so assert the full set is
             // present without coupling this contract test to that shape.
             const where = JSON.stringify(args.where)
@@ -212,6 +216,50 @@ describe('GET /api/admin/generations', () => {
             expect(where).toContain('"less_than_equal":"2026-09-16T00:00:00.000Z"')
             expect(where).toContain('"traceId":{"like":"trace-41"}')
         }
+    })
+
+    it('TC-F41-09: searches user and website labels through bounded relation IDs', async () => {
+        // Arrange — relationship fields are ID-backed; label matching must be
+        // resolved first instead of relying on adapter-specific dot paths.
+        findSpy
+            .mockResolvedValueOnce({ docs: [{ id: 'user-linh' }] })
+            .mockResolvedValueOnce({ docs: [{ id: 'site-linh' }] })
+            .mockResolvedValue({ docs: [fixture('matched', 'eligible', '2026-09-15T10:00:00.000Z')] })
+
+        // Act
+        const response = await GET(request('?search=Linh'))
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(findSpy.mock.calls[0]?.[0]).toMatchObject({
+            collection: 'users', where: { or: expect.arrayContaining([{ firstName: { like: 'Linh' } }]) },
+        })
+        expect(findSpy.mock.calls[1]?.[0]).toMatchObject({ collection: 'sites', where: { name: { like: 'Linh' } } })
+        for (const [args] of findSpy.mock.calls.slice(2)) {
+            const where = JSON.stringify(args.where)
+            expect(where).toContain('"user":{"in":["user-linh"]}')
+            expect(where).toContain('"site":{"in":["site-linh"]}')
+        }
+    })
+
+    it('TC-F41-09: rejects a broad relation-label search instead of silently truncating matching generations', async () => {
+        // Arrange — the 51st relation match proves the 50-ID bounded query is
+        // incomplete. The API must require a narrower term before it queries
+        // generation records.
+        const tooManyUsers = Array.from({ length: 51 }, (_, index) => ({ id: `user-${index}` }))
+        findSpy.mockImplementation(({ collection }: { collection: string }) => {
+            if (collection === 'users') return Promise.resolve({ docs: tooManyUsers })
+            if (collection === 'sites') return Promise.resolve({ docs: [] })
+            return Promise.reject(new Error('generation query must not run for broad relation search'))
+        })
+
+        // Act
+        const response = await GET(request('?search=an'))
+
+        // Assert
+        expect(response.status).toBe(400)
+        await expect(response.json()).resolves.toMatchObject({ error: { code: 'SEARCH_TOO_BROAD' } })
+        expect(findSpy.mock.calls.every(([args]) => args.collection !== 'ai-generation-records')).toBe(true)
     })
 
     it('TC-F41-10: serializes absent user and site relations as Unknown without throwing', async () => {

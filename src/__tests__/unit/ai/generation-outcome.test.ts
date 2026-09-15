@@ -198,6 +198,27 @@ describe('finalizeGenerationOutcome', () => {
         })
     })
 
+    it.each(['AI_QUOTA_EXCEEDED', 'FORM_INVALID', 'INVALID_TEMPLATE_CONTRACT', 'INVALID_COMPONENT_CONTRACT', 'SITE_PERSISTENCE_FAILED'])('TC-F41-03: routes %s terminal evidence to ticket flow, never retry', async (message) => {
+        // Arrange
+        const update = vi.fn().mockResolvedValue({ id: 42 })
+        const findByID = vi.fn().mockResolvedValue({ id: 42, lifecycle: 'running' })
+        const handle = { recordId: 42, startTime: Date.now() - 30, payload: { update, findByID }, finalized: false }
+
+        // Act
+        await finishWebsiteCapture(handle, {
+            expectedPages: 1,
+            persistedPages: [],
+            failedPages: [],
+            terminalError: new Error(message),
+            terminalErrorPhase: 'composition',
+        })
+
+        // Assert
+        expect(update.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+            data: expect.objectContaining({ recoveryStatus: 'ticket_required' }),
+        }))
+    })
+
     it('TC-F41-05: keeps F41 array migrations idempotent and non-destructive', () => {
         // Arrange
         const migration = readFileSync(resolve(process.cwd(), 'scripts/db-setup.js'), 'utf8')
@@ -217,5 +238,28 @@ describe('finalizeGenerationOutcome', () => {
         expect(f41Block).toContain('_parent_id integer NOT NULL REFERENCES ai_generation_records(id)')
         expect(f41Block).toContain('_uuid varchar NOT NULL DEFAULT gen_random_uuid()::text')
         expect(f41Block).not.toMatch(/DROP\s+TABLE/i)
+    })
+
+    it('TC-F41-05: adds isolated retry lineage and durable job guards idempotently', () => {
+        // Arrange
+        const migration = readFileSync(resolve(process.cwd(), 'scripts/db-setup.js'), 'utf8')
+        const f41RetryBlock = migration.slice(
+            migration.indexOf('// ── F41-03: durable, isolated website recovery queue ────────────────────'),
+            migration.indexOf('// ── Pages: Data cleanup for F05 Footer variants ──'),
+        )
+
+        // Act
+        const hasActiveChildGuard = f41RetryBlock.includes('ai_generation_records_one_active_retry_child_idx')
+        const hasActiveJobGuard = f41RetryBlock.includes('generation_recovery_jobs_one_active_source_idx')
+
+        // Assert
+        expect(f41RetryBlock).toContain('ADD COLUMN IF NOT EXISTS parent_generation_id integer')
+        expect(f41RetryBlock).toContain('ADD COLUMN IF NOT EXISTS tenant_id integer')
+        expect(f41RetryBlock).toContain('ADD COLUMN IF NOT EXISTS retry_root_generation_id integer')
+        expect(f41RetryBlock).toContain('CREATE TABLE IF NOT EXISTS generation_recovery_jobs')
+        expect(f41RetryBlock).toContain('generation_recovery_jobs_source_retry_idempotency_uniq')
+        expect(hasActiveChildGuard).toBe(true)
+        expect(hasActiveJobGuard).toBe(true)
+        expect(f41RetryBlock).not.toMatch(/DROP\s+TABLE/i)
     })
 })

@@ -11,6 +11,7 @@ export type GenerationRecord = {
     priority: string
     recoveryPolicy: { action: RecoveryAction; retryable: boolean; reasonCode: string }
     pageSummary: { expected: number | null; persisted: number; failed: number }
+    incidentSummary: { kind: 'quota' | 'system' | 'persistence' | 'page' | 'component' | 'input' | 'unknown'; label: string; scope: string; totalErrors: number } | null
     affectedError: { code: string; phase: string; locationType: string; locationKey: string | null; summary: string } | null
     // Legacy detail components are replaced in F41-04. These optional fields
     // keep their compile contract without being returned by the F41-02 list API.

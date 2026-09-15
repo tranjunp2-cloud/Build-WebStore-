@@ -32,6 +32,7 @@ import { TemplateQualityScores } from './collections/TemplateQualityScores'
 import { BlockCatalogEntries } from './collections/BlockCatalogEntries'
 import { BlockVariants } from './collections/BlockVariants'
 import { AiGenerationRecords } from './collections/AiGenerationRecords'
+import { GenerationRecoveryJobs } from './collections/GenerationRecoveryJobs'
 import { TemplateIssues } from './collections/TemplateIssues'
 import { ContentPacks } from './collections/ContentPacks'
 import { TemplateVersions } from './collections/TemplateVersions'
@@ -154,6 +155,7 @@ export default buildConfig({
     BlockCatalogEntries,
     BlockVariants,
     AiGenerationRecords,
+    GenerationRecoveryJobs,
     TemplateIssues,
     ContentPacks,
     TemplateVersions,
