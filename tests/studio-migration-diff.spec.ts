@@ -79,7 +79,12 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
 
     // Arrange
     await page.goto("/studio/qa/migration-diff");
-    await page.getByRole("button", { name: "So Sánh" }).first().click();
+    await page.getByPlaceholder("Tìm theo Email khách hàng, Domain, Mã Site...").fill("SITE-0001");
+    await page.getByTestId("migration-store-compare-SITE-0001").click();
+    await page.getByRole("button", { name: "Soi CSDL 1-to-1" }).click();
+    await page.getByTestId("field-diff-ui-demo-toggle").click();
+    await expect(page.getByTestId("field-diff-ui-demo-notice")).toBeVisible();
+    await page.getByTestId("field-status-filter-all").click();
     await expect(page.getByTestId("field-diff-page-scope")).toContainText("Trang Chủ");
 
     // Act / Assert — Home-only banner is visible on Home.
@@ -96,6 +101,37 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     await expect(page.getByTestId("field-diff-page-scope")).toContainText("Tin Tức & Cẩm Nang");
     await expect(page.getByTestId("field-diff-record-ent-cat-12")).toHaveCount(0);
     await expect(page.getByTestId("field-diff-record-ent-post-88")).toBeVisible();
+  });
+
+  test("[TC-F40-11-E2E-03] field inspector prioritizes attention and expands a record on demand", async ({ page }) => {
+    test.skip(
+      !process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE,
+      "Requires the super-admin E2E account configured by the f40-migration-diff project.",
+    );
+
+    await page.goto("/studio/qa/migration-diff");
+    await page.getByPlaceholder("Tìm theo Email khách hàng, Domain, Mã Site...").fill("SITE-0001");
+    await page.getByTestId("migration-store-compare-SITE-0001").click();
+    await page.getByRole("button", { name: "Soi CSDL 1-to-1" }).click();
+    await page.getByTestId("field-diff-ui-demo-toggle").click();
+
+    await expect(page.getByTestId("field-status-filter-attention")).toHaveClass(/bg-sky-950/);
+    await expect(page.getByTestId("field-diff-record-ent-demo-ui-product")).toBeVisible();
+    const demoRecordToggle = page.getByTestId("field-diff-toggle-ent-demo-ui-product");
+    await expect(demoRecordToggle).toHaveAttribute("aria-expanded", "true");
+    const demoRecordDetails = page.locator("#field-diff-details-ent-demo-ui-product");
+    await expect(demoRecordDetails).toBeVisible();
+    await demoRecordToggle.click();
+    await expect(demoRecordToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(demoRecordDetails).toBeHidden();
+    await demoRecordToggle.click();
+    await expect(demoRecordToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(demoRecordDetails).toBeVisible();
+
+    await page.getByTestId("field-status-filter-matched_value").click();
+    await expect(page.locator('[data-evidence-state="attention"]')).toHaveCount(0);
+    await page.getByTestId("field-status-filter-matched_empty").click();
+    await expect(page.locator('[data-evidence-state="matched_empty"]')).toHaveCount(1);
   });
 
   test("[TC-F40-13-E2E-02] mock evidence never treats inferred PW2 UI as verified", async ({ page }) => {

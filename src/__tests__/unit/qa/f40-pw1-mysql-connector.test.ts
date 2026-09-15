@@ -184,5 +184,6 @@ describe("[US-F40-PW1-Connector] Read-Only Security Guardrails", () => {
   it("handles invalid store ID gracefully", async () => {
     const { fetchLivePw1StoreDeepDiff } = await import("@/lib/admin/qa/pw1-mysql-connector");
     await expect(fetchLivePw1StoreDeepDiff("INVALID")).rejects.toThrow(/Invalid store ID/);
+    await expect(fetchLivePw1StoreDeepDiff("SITE-0001junk")).rejects.toThrow(/Invalid store ID/);
   });
 });
