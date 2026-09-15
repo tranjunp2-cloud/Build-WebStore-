@@ -250,6 +250,19 @@ export default defineConfig({
             testMatch: /f40-targeted-smoke-api\.spec\.ts/,
             use: { ...devices['Desktop Chrome'], storageState: undefined },
         },
+        // US-F41-02 uses the persisted Super Admin session for the real Studio
+        // boundary, while its list response is browser-mocked for deterministic
+        // recovery fixtures without an AI/provider dependency.
+        {
+            name: 'f41-generation-attention',
+            testDir: './tests',
+            testMatch: /f41-generation-attention\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: hasE2EAccount ? './e2e/.auth/user.json' : undefined,
+            },
+            dependencies: hasE2EAccount ? ['setup'] : [],
+        },
         // GH-1684: desktop keeps its native PDF viewer while real mobile browser
         // profiles exercise the canvas path (including WebKit soft-mask images).
         {

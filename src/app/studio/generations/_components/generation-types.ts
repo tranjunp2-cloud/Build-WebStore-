@@ -1,52 +1,21 @@
-/**
- * Shared TypeScript types for the Generations monitoring UI.
- * Mirrors the ai-generation-records Payload collection shape.
- */
-
-export type GenerationStatus = 'running' | 'success' | 'failed'
-
+/** Admin-safe list contract from GET /api/admin/generations. */
+export type RecoveryAction = 'view_detail' | 'monitor' | 'retry_website' | 'create_ticket' | 'open_ticket'
 export type GenerationRecord = {
-    id: number
-    endpoint: string
-    category?: string | null
-    promptMode: 'full' | 'truncated' | 'hashed'
-    promptText?: string | null
-    promptHash?: string | null
-    selectedBlocks?: Array<{ id: string; value?: string | null }> | null
-    outputSnapshot?: Record<string, unknown> | null
-    status: GenerationStatus
-    errorLog?: string | null
-    durationMs?: number | null
-    costUsd?: number | null
-    completedAt?: string | null
-    createdAt: string
-    updatedAt: string
-    // depth=1 hydrated
-    user?: { id: number; email: string; firstName?: string; lastName?: string } | number | null
-    site?: { id: number; name?: string } | number | null
+    id: string
+    submittedAt: string
+    user: { id: string | null; label: string; missing: boolean; email?: string | null }
+    site: { id: string | null; label: string; missing: boolean }
+    lifecycle: 'queued' | 'running' | 'terminal'
+    outcome: 'succeeded' | 'partial_failed' | 'failed' | 'cancelled' | null
+    recoveryStatus: string
+    priority: string
+    recoveryPolicy: { action: RecoveryAction; retryable: boolean; reasonCode: string }
+    pageSummary: { expected: number | null; persisted: number; failed: number }
+    affectedError: { code: string; phase: string; locationType: string; locationKey: string | null; summary: string } | null
+    // Legacy detail components are replaced in F41-04. These optional fields
+    // keep their compile contract without being returned by the F41-02 list API.
+    status?: 'running' | 'success' | 'failed'; endpoint?: string; category?: string | null; durationMs?: number | null; costUsd?: number | null; createdAt?: string; completedAt?: string | null; promptMode?: string; promptHash?: string | null; errorLog?: string | null; outputSnapshot?: Record<string, unknown> | null; selectedBlocks?: Array<{ id: string; value?: string | null }> | null
 }
-
-export type GenerationsListMeta = {
-    totalDocs: number
-    totalPages: number
-    page: number
-    limit: number
-    hasNextPage: boolean
-    hasPrevPage: boolean
-}
-
-export type GenerationsListResponse = {
-    data: GenerationRecord[]
-    meta: GenerationsListMeta
-}
-
-export type GenerationsFilters = {
-    status: string
-    endpoint: string
-    category: string
-    dateFrom: string
-    dateTo: string
-    search: string
-    page: number
-    limit: number
-}
+export type GenerationsListMeta = { totalDocs: number; totalPages?: number; page?: number; limit: number; hasNextPage: boolean; hasPrevPage: boolean }
+export type GenerationsListResponse = { items: GenerationRecord[]; nextCursor?: string | null; meta: GenerationsListMeta }
+export type GenerationsFilters = { view: 'needs_attention' | 'all'; status: string; recoveryStatus: string; search: string; userId: string; siteId: string; dateFrom: string; dateTo: string; cursor: string; limit: number }
