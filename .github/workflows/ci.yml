@@ -125,6 +125,20 @@ jobs:
     needs: quality-check
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: primeweb
+          POSTGRES_PASSWORD: primeweb
+          POSTGRES_DB: primeweb
+        options: >-
+          --health-cmd "pg_isready -U primeweb -d primeweb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     permissions:
       contents: read
     steps:
@@ -139,6 +153,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --include=optional
+
+      - name: Verify F41 migrations are idempotent on an isolated schema
+        env:
+          DATABASE_URI: postgresql://primeweb:primeweb@localhost:5432/primeweb?sslmode=disable
+        run: npm run test:f41-migrations
 
       - name: Test
         id: test

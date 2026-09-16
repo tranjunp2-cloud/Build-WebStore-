@@ -24,6 +24,9 @@ type QueryInput = z.infer<typeof Query>
 // after `"10"`, which can silently skip records sharing a createdAt value.
 type Cursor = { v: 1; filter: string; asOf: string; bucket: number; createdAt: string; id: number }
 type Bucket = { priority: GenerationPriority; where: Where }
+const MAX_RELATION_SEARCH_IDS = 50
+
+class SearchTooBroadError extends Error {}
 
 const ATTENTION_BUCKETS: Bucket[] = [
     {
@@ -71,7 +74,19 @@ function createCursor(cursor: Omit<Cursor, 'v'>) {
     return Buffer.from(JSON.stringify({ v: 1, ...cursor })).toString('base64url')
 }
 
-function baseWhere(q: QueryInput, asOf: string): Where {
+async function findRelationIds(payload: Awaited<ReturnType<typeof getPayload>>, collection: 'users' | 'sites', where: Where) {
+    // Resolve relationship labels in two bounded, indexed queries. Generation
+    // records only store relationship IDs, so filtering `user.email`/`site.name`
+    // directly is adapter-dependent and can silently return no rows on Postgres.
+    // Fetch one extra record to prove that every returned ID is represented.
+    // A broad relation match must be rejected explicitly rather than silently
+    // truncating records and making valid generation runs disappear from search.
+    const result = await payload.find({ collection, where, depth: 0, limit: MAX_RELATION_SEARCH_IDS + 1, pagination: false, overrideAccess: true })
+    if (result.docs.length > MAX_RELATION_SEARCH_IDS) throw new SearchTooBroadError()
+    return result.docs.map((doc) => String(doc.id))
+}
+
+async function baseWhere(q: QueryInput, asOf: string, payload: Awaited<ReturnType<typeof getPayload>>): Promise<Where> {
     const clauses: Where[] = [{ createdAt: { less_than_equal: asOf } }]
     if (q.status !== 'all') clauses.push({ status: { equals: q.status } })
     if (q.recoveryStatus !== 'all') clauses.push({ recoveryStatus: { equals: q.recoveryStatus } })
@@ -81,6 +96,12 @@ function baseWhere(q: QueryInput, asOf: string): Where {
     if (q.search) {
         const numericId = Number(q.search)
         const searchClauses: Where[] = [{ traceId: { like: q.search } }, { endpoint: { like: q.search } }, { category: { like: q.search } }]
+        const [userIds, siteIds] = await Promise.all([
+            findRelationIds(payload, 'users', { or: [{ email: { like: q.search } }, { firstName: { like: q.search } }, { lastName: { like: q.search } }] }),
+            findRelationIds(payload, 'sites', { name: { like: q.search } }),
+        ])
+        if (userIds.length) searchClauses.push({ user: { in: userIds } })
+        if (siteIds.length) searchClauses.push({ site: { in: siteIds } })
         if (Number.isSafeInteger(numericId) && numericId > 0 && String(numericId) === q.search) searchClauses.unshift({ id: { equals: numericId } })
         clauses.push({ or: searchClauses })
     }
@@ -122,8 +143,16 @@ export const GET = withSuperAdmin(async (req: NextRequest) => {
     const cursor = parseCursor(q.cursor, fingerprint)
     if (q.cursor && !cursor) return NextResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'Cursor không hợp lệ.' } }, { status: 400 })
     const asOf = cursor?.asOf ?? new Date().toISOString()
-    const filters = baseWhere(q, asOf)
     const payload = await getPayload({ config })
+    let filters: Where
+    try {
+        filters = await baseWhere(q, asOf, payload)
+    } catch (error) {
+        if (error instanceof SearchTooBroadError) {
+            return NextResponse.json({ error: { code: 'SEARCH_TOO_BROAD', message: 'Có quá nhiều user hoặc website khớp. Hãy nhập từ khóa cụ thể hơn.' } }, { status: 400 })
+        }
+        throw error
+    }
 
     if (q.view === 'all') {
         const result = await payload.find({

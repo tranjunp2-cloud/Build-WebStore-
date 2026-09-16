@@ -23,6 +23,7 @@
  */
 
 import { createHash } from 'crypto'
+import { hashGenerationSnapshot } from './generation-snapshot-hash'
 import {
     finalizeGenerationOutcome,
     type FailedPage,
@@ -42,6 +43,8 @@ export type StartCaptureInput = {
     category?: string
     userId?: number | string | null
     siteId?: number | string | null
+    /** F41-03: freeze tenant ownership so recovery never guesses a tenant. */
+    tenantId?: number | string | null
     /** Defaults to ADMIN_GEN_CAPTURE_MODE env var, then 'full' */
     mode?: CaptureMode
     /** Pre-resolved Payload instance (avoids cold-start overhead) */
@@ -207,7 +210,7 @@ export async function startCapture(input: StartCaptureInput): Promise<CaptureHan
         const payload = await resolvePayload(input.payload)
         const { promptText, promptHash } = buildPromptFields(input.prompt, mode)
         const inputSnapshot = input.inputSnapshot ? guardInputSnapshot(input.inputSnapshot) : undefined
-        const inputHash = inputSnapshot ? sha256(JSON.stringify(inputSnapshot)) : undefined
+        const inputHash = inputSnapshot ? hashGenerationSnapshot(inputSnapshot) : undefined
 
         const record = await payload.create({
             collection: 'ai-generation-records',
@@ -216,6 +219,7 @@ export async function startCapture(input: StartCaptureInput): Promise<CaptureHan
                 category: input.category ?? undefined,
                 user: input.userId ?? undefined,
                 site: input.siteId ?? undefined,
+                tenant: input.tenantId ?? undefined,
                 promptMode: mode,
                 promptText,
                 promptHash,
@@ -295,7 +299,14 @@ export async function finishWebsiteCapture(
     const terminal = finalizeGenerationOutcome(input)
     const now = new Date().toISOString()
     const legacyStatus = terminal.outcome === 'succeeded' ? 'success' : 'failed'
-    const recoveryStatus = terminal.outcome === 'succeeded' ? 'none' : 'eligible'
+    // Retry is deliberately an allowlist. A new/unknown provider or template
+    // error must reach an operator ticket, never spend quota on a blind retry.
+    // `finalizeGenerationOutcome` marks only timeout evidence as transient.
+    const isRetryableFailure = terminal.errors.length > 0
+        && terminal.errors.every((error) => error.retryabilityReason === 'transient_timeout')
+    const recoveryStatus = terminal.outcome === 'succeeded'
+        ? 'none'
+        : isRetryableFailure ? 'eligible' : 'ticket_required'
 
     let lastError: unknown
     for (let attempt = 0; attempt < 2; attempt++) {

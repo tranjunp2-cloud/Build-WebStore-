@@ -11,13 +11,15 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { GenerationRecord } from './generation-types'
+import { GenerationRetryAction } from './generation-retry-action'
 
 type Props = {
     record: GenerationRecord | null
     onClose: () => void
+    onRetryAccepted: (id: string) => void
 }
 
-export function GenerationDetailDrawer({ record, onClose }: Props) {
+export function GenerationDetailDrawer({ record, onClose, onRetryAccepted }: Props) {
     return (
         <Dialog open={!!record} onOpenChange={(open) => { if (!open) onClose() }}>
             <DialogContent
@@ -39,6 +41,7 @@ export function GenerationDetailDrawer({ record, onClose }: Props) {
                     <span style={{ color: 'var(--text-2)' }}>Recovery</span><b>{record.recoveryPolicy.reasonCode}</b>
                     {record.affectedError && <><span style={{ color: 'var(--text-2)' }}>Affected error</span><span><b>{record.affectedError.code}</b>: {record.affectedError.summary}</span></>}
                 </div>}
+                {record && <GenerationRetryAction record={record} onAccepted={onRetryAccepted} />}
 
             </DialogContent>
         </Dialog>

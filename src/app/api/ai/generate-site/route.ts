@@ -387,6 +387,7 @@ export async function POST(req: NextRequest) {
             prompt: [businessInfo.businessName, businessInfo.industry, businessInfo.shortDescription, businessInfo.products].join(' | '),
             category: businessInfo.industry ?? undefined,
             userId: user.id,
+            tenantId: resolvedTenantId,
             payload,
             traceId: generationRequestId,
             inputSchemaVersion: 'f41.v1',

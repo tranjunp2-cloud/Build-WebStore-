@@ -399,7 +399,7 @@ describe('AI Streaming APIs', () => {
              // Assert
              expect(res.status).toBe(500)
              expect(mockGenerationRecordDB[0]).toMatchObject({
-                 lifecycle: 'terminal', outcome: 'failed', status: 'failed', recoveryStatus: 'eligible',
+                lifecycle: 'terminal', outcome: 'failed', status: 'failed', recoveryStatus: 'ticket_required',
                  pageSummary: { expected: 0, persisted: 0, failed: 0 },
              })
              expect(mockGenerationRecordDB[0]?.generationErrors).toEqual(expect.arrayContaining([
@@ -428,7 +428,7 @@ describe('AI Streaming APIs', () => {
              expect(stream).toContain('"code":"GENERATION_FAILED"')
              expect(stream).not.toContain('site persistence unavailable')
              expect(mockGenerationRecordDB[0]).toMatchObject({
-                 lifecycle: 'terminal', outcome: 'failed', status: 'failed', recoveryStatus: 'eligible',
+                lifecycle: 'terminal', outcome: 'failed', status: 'failed', recoveryStatus: 'ticket_required',
              })
         })
 

@@ -16,6 +16,14 @@ export type RecoveryPolicy = {
     reasonCode: string
 }
 
+export type GenerationIncidentKind = 'quota' | 'system' | 'persistence' | 'page' | 'component' | 'input' | 'unknown'
+export type GenerationIncidentSummary = {
+    kind: GenerationIncidentKind
+    label: string
+    scope: string
+    totalErrors: number
+}
+
 export type GenerationListSource = {
     id: string | number
     createdAt: string
@@ -25,6 +33,7 @@ export type GenerationListSource = {
     pageSummary?: { expected?: number | null; persisted?: number | null; failed?: number | null } | null
     generationErrors?: Array<{
         code?: string | null
+        category?: string | null
         phase?: string | null
         locationType?: string | null
         locationKey?: string | null
@@ -33,6 +42,54 @@ export type GenerationListSource = {
     }> | null
     user?: { id: string | number; email?: string | null; firstName?: string | null; lastName?: string | null } | string | number | null
     site?: { id: string | number; name?: string | null; slug?: string | null } | string | number | null
+}
+
+type GenerationError = NonNullable<GenerationListSource['generationErrors']>[number]
+
+const incidentRank: Record<GenerationIncidentKind, number> = {
+    quota: 0, system: 1, persistence: 2, page: 3, component: 4, input: 5, unknown: 6,
+}
+
+function incidentKindFor(error: GenerationError): GenerationIncidentKind {
+    const code = (error.code ?? '').toUpperCase()
+    const phase = (error.phase ?? '').toLowerCase()
+    const category = (error.category ?? '').toLowerCase()
+    const locationType = (error.locationType ?? '').toLowerCase()
+    if (/QUOTA|RATE_LIMIT|INSUFFICIENT_CREDIT|BILLING/.test(code) || category === 'quota') return 'quota'
+    if (/VALIDATION|INVALID_INPUT|FORM_INVALID/.test(code) || phase.includes('validate') || locationType === 'input') return 'input'
+    if (/UPSTREAM|PROVIDER|SYSTEM|INTERNAL|TIMEOUT|UNAVAILABLE/.test(code) || category === 'transient' || category === 'system') return 'system'
+    if (/PERSIST|DATABASE|STORAGE|SAVE/.test(code) || phase.includes('persist') || locationType === 'website') return 'persistence'
+    if (locationType === 'page') return 'page'
+    if (locationType === 'component') return 'component'
+    return 'unknown'
+}
+
+/**
+ * Produces the single operational answer required by the listing. It chooses
+ * the most blocking category across every captured error, never array order.
+ * Detailed page/component evidence stays out of the list contract.
+ */
+export function summarizeGenerationIncident(errors: GenerationListSource['generationErrors']): GenerationIncidentSummary | null {
+    const captured = errors?.filter(Boolean) ?? []
+    if (captured.length === 0) return null
+    const primary = captured
+        .map((error, index) => ({ error, index, kind: incidentKindFor(error) }))
+        .sort((a, b) => incidentRank[a.kind] - incidentRank[b.kind] || a.index - b.index)[0]
+    if (!primary) return null
+    const labels: Record<GenerationIncidentKind, string> = {
+        quota: 'Hết quota AI', system: 'Lỗi hệ thống khi tạo web', persistence: 'Không thể lưu website',
+        page: 'Lỗi tạo trang', component: 'Lỗi tạo component', input: 'Dữ liệu đầu vào không hợp lệ', unknown: 'Lỗi tạo website',
+    }
+    const defaultScope: Record<GenerationIncidentKind, string> = {
+        quota: 'Áp dụng toàn website', system: 'Trong lúc tạo website', persistence: 'Sau khi AI tạo nội dung',
+        page: 'Một hoặc nhiều trang', component: 'Một hoặc nhiều component', input: 'Cần kiểm tra form nhập', unknown: 'Cần xem chi tiết',
+    }
+    return {
+        kind: primary.kind,
+        label: labels[primary.kind],
+        scope: primary.error.locationKey || defaultScope[primary.kind],
+        totalErrors: captured.length,
+    }
 }
 
 export function resolveGenerationRecoveryPolicy(record: Pick<GenerationListSource, 'lifecycle' | 'outcome' | 'recoveryStatus'>): RecoveryPolicy {
@@ -80,6 +137,7 @@ export function serializeAdminGeneration(record: GenerationListSource) {
         recoveryStatus: record.recoveryStatus ?? 'none', priority: resolveGenerationPriority(record),
         recoveryPolicy: resolveGenerationRecoveryPolicy(record),
         pageSummary: { expected: record.pageSummary?.expected ?? null, persisted: record.pageSummary?.persisted ?? 0, failed: record.pageSummary?.failed ?? 0 },
+        incidentSummary: summarizeGenerationIncident(record.generationErrors),
         // Historic operatorMessage values predate F41 sanitizer; list UI only
         // receives the explicitly user-safe message.
         affectedError: error ? { code: error.code ?? 'UNKNOWN', phase: error.phase ?? 'unknown', locationType: error.locationType ?? 'unknown', locationKey: error.locationKey ?? null, summary: error.userSafeMessage ?? 'Unknown' } : null,

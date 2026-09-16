@@ -35,6 +35,13 @@ export const AiGenerationRecords: CollectionConfig = {
             admin: { description: 'Site being generated (optional — not set for template gens)' },
         },
         {
+            name: 'tenant',
+            type: 'relationship',
+            relationTo: 'tenants',
+            index: true,
+            admin: { description: 'Frozen tenant ownership for this generation and any isolated recovery child.' },
+        },
+        {
             name: 'user',
             type: 'relationship',
             relationTo: 'users',
@@ -120,6 +127,25 @@ export const AiGenerationRecords: CollectionConfig = {
             name: 'recoveryStatus', type: 'select', index: true,
             options: ['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'stale_running'],
             admin: { description: 'Operations recovery state; do not infer from error text in UI' },
+        },
+        {
+            name: 'source', type: 'select', index: true,
+            defaultValue: 'user_submit',
+            options: ['user_submit', 'ops_retry'],
+            admin: { description: 'How this run was initiated. Retry runs must be isolated child records.' },
+        },
+        {
+            name: 'parentGeneration', type: 'relationship', relationTo: 'ai-generation-records', index: true,
+            admin: { description: 'Immutable source run for an operations retry.' },
+        },
+        {
+            name: 'retryRootGeneration', type: 'relationship', relationTo: 'ai-generation-records', index: true,
+            admin: { description: 'First run in a retry lineage.' },
+        },
+        { name: 'retryAttempt', type: 'number', min: 0, admin: { description: 'Zero for original runs; increments only for a child retry.' } },
+        {
+            name: 'recoveredSite', type: 'relationship', relationTo: 'sites', index: true,
+            admin: { description: 'Isolated draft site created by an operations retry; never replaces the parent site.' },
         },
         {
             name: 'pageSummary', type: 'group', fields: [
