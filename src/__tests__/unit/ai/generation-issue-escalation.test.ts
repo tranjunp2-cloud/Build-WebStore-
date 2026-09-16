@@ -46,6 +46,7 @@ describe('[TC-F41-21/22/29] generation issue escalation draft', () => {
         // Assert
         expect(typeof firstDraft === 'string' || typeof sameDraft === 'string' ? null : firstDraft.dedupeKey).toBe(typeof sameDraft === 'string' ? null : sameDraft.dedupeKey)
         expect(typeof firstDraft === 'string' || typeof differentDraft === 'string' ? null : firstDraft.dedupeKey).not.toBe(typeof differentDraft === 'string' ? null : differentDraft.dedupeKey)
+        expect(typeof firstDraft === 'string' ? null : firstDraft.relatedId).toBe('7')
     })
 
     it('TC-F41-29: excludes raw form values and prompt from the issue description and key', () => {
@@ -60,6 +61,32 @@ describe('[TC-F41-21/22/29] generation issue escalation draft', () => {
         expect(serialized).not.toContain('private@example.test')
         expect(serialized).not.toContain('Không được lộ')
         expect(serialized).not.toContain('prompt must never reach issue')
+    })
+
+    it('TC-F41-29: excludes a page title containing PII while keeping the safe location category', () => {
+        // Arrange
+        const generation = detail({ pageOutcomes: [{ pageKey: 'contact', title: 'Liên hệ jane@example.test', status: 'failed' }] })
+
+        // Act
+        const draft = buildGenerationIssueDraft(generation, buildGenerationTicketIncidentSnapshot(generation))
+        const description = typeof draft === 'string' ? '' : draft.description
+
+        // Assert
+        expect(description).toContain('Vị trí: Trang bị ảnh hưởng')
+        expect(description).not.toContain('jane@example.test')
+    })
+
+    it('TC-F41-29: does not persist free-form technical evidence in the ticket', () => {
+        // Arrange
+        const generation = detail({ generationErrors: [{ phase: 'page_persist', locationType: 'page', locationKey: 'contact', locationLabel: 'Trang lỗi', code: 'PAGE_GENERATION_FAILED', category: 'system', userSafeMessage: 'Không thể lưu trang', sanitizedTechnicalMessage: 'Normalized diagnostic: PAGE_GENERATION_FAILED (provider timeout).' }] })
+
+        // Act
+        const draft = buildGenerationIssueDraft(generation, buildGenerationTicketIncidentSnapshot(generation))
+        const description = typeof draft === 'string' ? '' : draft.description
+
+        // Assert
+        expect(description).toContain('Technical evidence: Có')
+        expect(description).not.toContain('Normalized diagnostic: PAGE_GENERATION_FAILED (provider timeout).')
     })
 
     it('TC-F41-23: rejects a generation whose recovery policy does not allow Dev escalation', () => {

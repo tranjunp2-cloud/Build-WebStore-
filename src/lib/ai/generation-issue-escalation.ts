@@ -21,7 +21,7 @@ function canonicalSignature(detail: GenerationDetail) {
     return JSON.stringify({
         version: 'f41-generation-issue-v1',
         rootId,
-        phase: incident.developerEvidence?.phase ?? null,
+        phase: incident.cause.phase,
         kind: incident.kind,
         locationType: incident.location.type,
         locationKey: incident.location.key,
@@ -34,6 +34,13 @@ function canonicalSignature(detail: GenerationDetail) {
 
 function line(label: string, value: string | null | undefined) {
     return value ? `${label}: ${value}` : `${label}: Chưa ghi nhận`
+}
+
+function ticketLocationLabel(type: string) {
+    const labels: Record<string, string> = {
+        input: 'Form tạo website', page: 'Trang bị ảnh hưởng', component: 'Component bị ảnh hưởng', site: 'Toàn bộ website', unknown: 'Chưa xác định',
+    }
+    return labels[type] ?? 'Chưa xác định'
 }
 
 /**
@@ -62,14 +69,21 @@ export function buildGenerationIssueDraft(
         line('Trace ID', snapshot.traceId),
         '',
         line('Loại sự cố', incident.label),
-        line('Vị trí', incident.location.known ? incident.location.label : 'Unknown — generation cũ chưa capture vị trí'),
+        // `location.label` may be a generated page title. A ticket is durable
+        // and must never persist that potentially user-controlled value.
+        line('Vị trí', ticketLocationLabel(incident.location.type)),
+        line('Giai đoạn lỗi', incident.cause.phase),
         line('Mã chuẩn hóa', incident.cause.code),
         line('Nguyên nhân', incident.cause.label),
         line('Ảnh hưởng', incident.impact.summary),
         line('Recovery', incident.recovery.reasonCode),
         line('Lần gen lại', String(snapshot.lineage.retryAttempt)),
         ...(incident.cause.validationRule ? [line('Quy tắc validation', incident.cause.validationRule), line('Trạng thái quan sát', incident.cause.observedState)] : []),
-        ...(incident.developerEvidence ? [line('Giai đoạn lỗi', incident.developerEvidence.phase), line('Technical evidence đã sanitize', incident.developerEvidence.technicalMessage)] : []),
+        // Free-form diagnostic text is intentionally not copied into a durable
+        // issue. Old provider evidence may contain PII even after structural
+        // sanitization. The canonical code/phase and generation link above let
+        // an authorized developer inspect the bounded detail when necessary.
+        ...(incident.developerEvidence ? ['Technical evidence: Có — xem generation detail với quyền Super Admin.'] : []),
     ].join('\n').slice(0, 10_000)
 
     return {
@@ -77,6 +91,9 @@ export function buildGenerationIssueDraft(
         title: `[Generation #${snapshot.generationId}] ${incident.label}`.slice(0, 300),
         description,
         severity: incident.kind === 'system' || incident.kind === 'quota' ? 'high' : 'medium',
-        relatedId: snapshot.generationId,
+        // A ticket belongs to the retry lineage, not a particular attempt.
+        // This makes the same ticket discoverable from the root and every
+        // retry after the UI reloads.
+        relatedId: retryRoot,
     }
 }

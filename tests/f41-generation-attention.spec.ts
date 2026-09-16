@@ -41,6 +41,8 @@ const attentionRow = {
   },
 };
 
+const realTicketGenerationId = process.env.E2E_F41_TICKET_GENERATION_ID;
+
 const successRow = {
   id: "e2e-success-run",
   submittedAt: "2026-09-15T07:00:00.000Z",
@@ -122,7 +124,7 @@ function detailResponse(row: typeof attentionRow | typeof retryableRow) {
         kind: row.incidentSummary?.kind ?? "unknown",
         label: row.incidentSummary?.label ?? "Lỗi tạo website",
         location: { type: "page", key: null, label: "Trang bị ảnh hưởng", known: true },
-        cause: { label: "Không thể tạo trang", code: "PAGE_GENERATION_FAILED", validationRule: null, observedState: null },
+        cause: { label: "Không thể tạo trang", code: "PAGE_GENERATION_FAILED", phase: "page_persist", validationRule: null, observedState: null },
         impact: { expected: 5, persisted: 4, failed: 1, summary: "1/5 trang chưa tạo, 4 trang đã lưu." },
         recovery: { retryable: isRetryable, scope: isRetryable ? "website" : "none", reasonCode: row.recoveryPolicy.reasonCode },
         owner: { kind: isRetryable ? "operator" : "dev", label: isRetryable ? "Người trực tracking" : "Team Dev" },
@@ -199,6 +201,55 @@ test.describe("US-F41-02 Needs Attention", () => {
       "Xem generation e2e-attention-run",
       "Xem generation e2e-success-run",
     ]);
+  });
+
+  test("[TC-F41-23] Super Admin creates one Dev ticket from a non-recoverable generation", async ({ page }) => {
+    test.skip(
+      !process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE,
+      "Requires the dedicated Super Admin E2E account configured by auth.setup.ts.",
+    );
+
+    // Arrange
+    await page.route("**/api/admin/generations**", async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(response([attentionRow])) });
+    });
+    await page.route("**/api/admin/generations/e2e-attention-run/issue", async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { id: "e2e-issue", created: true, href: "/studio/issues?relatedType=generation&relatedId=e2e-attention-run" } }),
+      });
+    });
+
+    // Act
+    await page.goto("/studio/generations");
+    await page.getByRole("button", { name: "Tạo ticket Dev cho generation #e2e-attention-run" }).click();
+    await expect(page.getByText("Không gửi nội dung form, prompt hoặc dữ liệu nhạy cảm.")).toBeVisible();
+    await page.getByRole("button", { name: "Tạo ticket Dev", exact: true }).click();
+
+    // Assert
+    await expect(page.getByRole("link", { name: "Mở ticket" })).toHaveAttribute("href", "/studio/issues?relatedType=generation&relatedId=e2e-attention-run");
+    await expect(page.getByRole("status")).toHaveText("Đã tạo ticket Dev.");
+  });
+
+  test("[TC-F41-23] Super Admin creates or opens a Dev ticket against the real protected endpoint", async ({ page }) => {
+    test.skip(
+      !process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE || !realTicketGenerationId,
+      "Requires Super Admin credentials and an e2e-f41 ticket-eligible generation fixture.",
+    );
+
+    // Arrange / Act — no API route is mocked. The configured fixture belongs
+    // only to the E2E tenant and is safe to dedupe across reruns.
+    await page.goto(`/studio/generations/${realTicketGenerationId}`);
+    const create = page.getByRole("button", { name: `Tạo ticket Dev cho generation #${realTicketGenerationId}` });
+    if (await create.isVisible()) {
+      await create.click();
+      await page.getByRole("button", { name: "Tạo ticket Dev", exact: true }).click();
+    }
+
+    // Assert
+    await expect(page.getByRole("link", { name: "Mở ticket" })).toBeVisible();
   });
 
   test("[TC-F41-13] Super Admin sees a queued retry only after the retry API returns 202", async ({ page }) => {

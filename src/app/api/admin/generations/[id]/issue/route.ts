@@ -72,8 +72,22 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
                     if (!issue) throw error
                 }
             }
-            await payload.update({ collection: 'ai-generation-records', id: generationId, overrideAccess: true, data: { recoveryStatus: 'ticket_created' } })
-            return NextResponse.json({ data: { id: String(issue.id), created, href: `/studio/issues?relatedType=generation&relatedId=${encodeURIComponent(draft.relatedId)}` } }, { status: created ? 201 : 200 })
+            // The dedupe signature is lineage-scoped. Mark every failed,
+            // ticket-eligible attempt in that lineage so a sibling does not
+            // misleadingly offer another "Tạo ticket Dev" after reload.
+            await payload.update({
+                collection: 'ai-generation-records',
+                where: {
+                    and: [
+                        { or: [{ id: { equals: retryRootId } }, { retryRootGeneration: { equals: retryRootId } }] },
+                        { or: [{ recoveryStatus: { equals: 'ticket_required' } }, { recoveryStatus: { equals: 'exhausted' } }] },
+                    ],
+                },
+                overrideAccess: true,
+                data: { recoveryStatus: 'ticket_created' },
+            })
+            const issueRelatedId = typeof issue.relatedId === 'string' ? issue.relatedId : draft.relatedId
+            return NextResponse.json({ data: { id: String(issue.id), created, href: `/studio/issues?relatedType=generation&relatedId=${encodeURIComponent(issueRelatedId)}` } }, { status: created ? 201 : 200 })
         } catch (error) {
             console.error('[generation-issue] failed to create issue', { generationId, error: error instanceof Error ? error.name : 'unknown' })
             return NextResponse.json({ error: { code: 'CREATE_FAILED', message: 'Chưa thể tạo ticket Dev. Vui lòng thử lại.' } }, { status: 500 })

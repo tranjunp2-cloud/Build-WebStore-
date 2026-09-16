@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
     find: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    guard: vi.fn(),
 }))
 
 vi.mock('payload', () => ({
@@ -20,7 +21,8 @@ vi.mock('payload', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 
 vi.mock('@/lib/admin/api-utils', () => ({
-    withSuperAdmin: (handler: (request: NextRequest) => Promise<Response>) => handler,
+    withSuperAdmin: (handler: (request: NextRequest) => Promise<Response>) =>
+        async (request: NextRequest) => mocks.guard(handler, request),
 }))
 
 import { POST } from '@/app/api/admin/generations/[id]/issue/route'
@@ -53,6 +55,7 @@ beforeEach(() => {
     mocks.find.mockResolvedValue({ docs: [] })
     mocks.create.mockResolvedValue({ id: 91 })
     mocks.update.mockResolvedValue({ id: 41 })
+    mocks.guard.mockImplementation((handler: (request: NextRequest) => Promise<Response>, guardedRequest: NextRequest) => handler(guardedRequest))
 })
 
 describe('[TC-F41-21/22/29] POST /api/admin/generations/:id/issue', () => {
@@ -79,14 +82,20 @@ describe('[TC-F41-21/22/29] POST /api/admin/generations/:id/issue', () => {
         expect(created.data.description).not.toContain('Private florist name')
         expect(created.data.description).not.toContain('prompt must never reach an issue')
         expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
-            collection: 'ai-generation-records', id: 41, data: { recoveryStatus: 'ticket_created' },
+            collection: 'ai-generation-records',
+            where: expect.objectContaining({
+                and: expect.arrayContaining([
+                    { or: [{ id: { equals: '41' } }, { retryRootGeneration: { equals: '41' } }] },
+                ]),
+            }),
+            data: { recoveryStatus: 'ticket_created' },
         }))
     })
 
     it('TC-F41-22: returns the existing ticket without inserting a duplicate', async () => {
         // Arrange
         mocks.find.mockImplementation(async ({ collection }: { collection: string }) => (
-            collection === 'template-issues' ? { docs: [{ id: 92 }] } : { docs: [] }
+            collection === 'template-issues' ? { docs: [{ id: 92, relatedId: '7' }] } : { docs: [] }
         ))
 
         // Act
@@ -95,7 +104,7 @@ describe('[TC-F41-21/22/29] POST /api/admin/generations/:id/issue', () => {
 
         // Assert
         expect(response.status).toBe(200)
-        expect(body.data).toMatchObject({ id: '92', created: false })
+        expect(body.data).toMatchObject({ id: '92', created: false, href: '/studio/issues?relatedType=generation&relatedId=7' })
         expect(mocks.create).not.toHaveBeenCalled()
     })
 
@@ -119,6 +128,35 @@ describe('[TC-F41-21/22/29] POST /api/admin/generations/:id/issue', () => {
         expect(mocks.create).toHaveBeenCalledTimes(1)
     })
 
+    it('TC-F41-22: marks the retry root and all ticket-eligible siblings as escalated', async () => {
+        // Arrange
+        mocks.findByID.mockResolvedValue(ticketEligibleGeneration({
+            id: 43,
+            retryRootGeneration: { id: 41 },
+            recoveryStatus: 'exhausted',
+        }))
+
+        // Act
+        const response = await POST(request, context)
+        const body = await response.json() as { data: { href: string } }
+
+        // Assert
+        expect(response.status).toBe(201)
+        expect(body.data.href).toBe('/studio/issues?relatedType=generation&relatedId=41')
+        expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ relatedId: '41' }),
+        }))
+        expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+            where: {
+                and: [
+                    { or: [{ id: { equals: '41' } }, { retryRootGeneration: { equals: '41' } }] },
+                    { or: [{ recoveryStatus: { equals: 'ticket_required' } }, { recoveryStatus: { equals: 'exhausted' } }] },
+                ],
+            },
+            data: { recoveryStatus: 'ticket_created' },
+        }))
+    })
+
     it('TC-F41-29: rejects a non-ticket-eligible generation without creating an issue', async () => {
         // Arrange
         mocks.findByID.mockResolvedValue(ticketEligibleGeneration({ recoveryStatus: 'eligible' }))
@@ -132,5 +170,17 @@ describe('[TC-F41-21/22/29] POST /api/admin/generations/:id/issue', () => {
         expect(body.error.code).toBe('NOT_TICKET_ELIGIBLE')
         expect(mocks.create).not.toHaveBeenCalled()
         expect(mocks.update).not.toHaveBeenCalled()
+    })
+
+    it('TC-F41-01: denies a non-Super-Admin before loading generation existence', async () => {
+        // Arrange
+        mocks.guard.mockResolvedValue(new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 }))
+
+        // Act
+        const response = await POST(request, context)
+
+        // Assert
+        expect(response.status).toBe(403)
+        expect(mocks.findByID).not.toHaveBeenCalled()
     })
 })

@@ -31,6 +31,7 @@ export type GenerationListSource = {
     lifecycle?: GenerationLifecycle
     outcome?: GenerationOutcome
     recoveryStatus?: GenerationRecoveryStatus
+    retryRootGeneration?: { id: string | number } | string | number | null
     pageSummary?: { expected?: number | null; persisted?: number | null; failed?: number | null } | null
     generationErrors?: Array<{
         code?: string | null
@@ -141,6 +142,10 @@ export function serializeAdminGeneration(record: GenerationListSource) {
         user: relationLabel(record.user, 'user'), site: relationLabel(record.site, 'site'),
         lifecycle: record.lifecycle ?? 'running', outcome: record.outcome ?? null,
         recoveryStatus: record.recoveryStatus ?? 'none', priority: resolveGenerationPriority(record),
+        // Every retry in a lineage escalates to one ticket. This stable root
+        // identifier lets a reloaded list open that ticket without exposing
+        // any raw generation evidence.
+        ticketRelatedGenerationId: relationId(record.retryRootGeneration) ?? String(record.id),
         recoveryPolicy: resolveGenerationRecoveryPolicy(record),
         pageSummary: { expected: record.pageSummary?.expected ?? null, persisted: record.pageSummary?.persisted ?? 0, failed: record.pageSummary?.failed ?? 0 },
         incidentSummary: summarizeGenerationIncident(record.generationErrors),
@@ -397,7 +402,7 @@ export function serializeAdminGenerationDetail(
             type: primary?.locationType ?? 'unknown', key: primary?.locationKey ?? null,
             label: primary?.locationLabel ?? 'Chưa xác định', known: primary?.locationKnown ?? false,
         },
-        cause: { ...incidentCause(incidentSummary.kind, primary?.code ?? 'UNKNOWN'), validationRule: primary?.validationRule ?? null, observedState: primary?.observedState ?? null },
+        cause: { ...incidentCause(incidentSummary.kind, primary?.code ?? 'UNKNOWN'), phase: primary?.phase ?? 'unknown', validationRule: primary?.validationRule ?? null, observedState: primary?.observedState ?? null },
         impact: { expected: summary.pageSummary.expected, persisted: summary.pageSummary.persisted, failed: summary.pageSummary.failed, summary: summary.pageSummary.expected === null ? 'Chưa ghi nhận tổng số trang.' : `${summary.pageSummary.failed}/${summary.pageSummary.expected} trang chưa tạo, ${summary.pageSummary.persisted} trang đã lưu.` },
         recovery: { retryable: summary.recoveryPolicy.retryable, scope: summary.recoveryPolicy.retryable ? 'website' : 'none', reasonCode: summary.recoveryPolicy.reasonCode },
         owner: inputIncident ? { kind: 'user', label: 'Người dùng cần điều chỉnh form' } : summary.recoveryPolicy.action === 'create_ticket' || summary.recoveryPolicy.action === 'open_ticket' ? { kind: 'dev', label: 'Team Dev' } : { kind: 'operator', label: 'Người trực tracking' },
@@ -405,7 +410,7 @@ export function serializeAdminGenerationDetail(
         developerEvidence: primary?.technicalMessage ? { phase: primary.phase, technicalMessage: primary.technicalMessage } : null,
         legacy: false, relatedErrorCount: errors.length,
     }
-    const legacyIncident = isLegacy ? { kind: 'unknown' as const, label: 'Chưa xác định lỗi', location: { type: 'unknown', key: null, label: 'Chưa xác định', known: false }, cause: { ...incidentCause('unknown', 'UNKNOWN'), validationRule: null, observedState: null }, impact: { expected: summary.pageSummary.expected, persisted: summary.pageSummary.persisted, failed: summary.pageSummary.failed, summary: summary.pageSummary.expected === null ? 'Chưa ghi nhận tổng số trang.' : `${summary.pageSummary.failed}/${summary.pageSummary.expected} trang chưa tạo, ${summary.pageSummary.persisted} trang đã lưu.` }, recovery: { retryable: summary.recoveryPolicy.retryable, scope: summary.recoveryPolicy.retryable ? 'website' : 'none', reasonCode: summary.recoveryPolicy.reasonCode }, owner: { kind: 'operator', label: 'Người trực tracking' }, nextAction: { kind: 'monitor', label: 'Kiểm tra timeline hoặc lần gen lại để tiếp tục điều tra.' }, developerEvidence: null, legacy: true, relatedErrorCount: 0 } : null
+    const legacyIncident = isLegacy ? { kind: 'unknown' as const, label: 'Chưa xác định lỗi', location: { type: 'unknown', key: null, label: 'Chưa xác định', known: false }, cause: { ...incidentCause('unknown', 'UNKNOWN'), phase: 'unknown', validationRule: null, observedState: null }, impact: { expected: summary.pageSummary.expected, persisted: summary.pageSummary.persisted, failed: summary.pageSummary.failed, summary: summary.pageSummary.expected === null ? 'Chưa ghi nhận tổng số trang.' : `${summary.pageSummary.failed}/${summary.pageSummary.expected} trang chưa tạo, ${summary.pageSummary.persisted} trang đã lưu.` }, recovery: { retryable: summary.recoveryPolicy.retryable, scope: summary.recoveryPolicy.retryable ? 'website' : 'none', reasonCode: summary.recoveryPolicy.reasonCode }, owner: { kind: 'operator', label: 'Người trực tracking' }, nextAction: { kind: 'monitor', label: 'Kiểm tra timeline hoặc lần gen lại để tiếp tục điều tra.' }, developerEvidence: null, legacy: true, relatedErrorCount: 0 } : null
     return {
         ...summary,
         endpoint: record.endpoint ?? 'site-generator', category: record.category ?? null,

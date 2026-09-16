@@ -15,7 +15,7 @@ export function GenerationIssueAction({ record, onCreated }: { record: Generatio
     const [message, setMessage] = useState<string | null>(null)
     const ticketEligible = record.recoveryPolicy.action === 'create_ticket'
     const openedTicket = record.recoveryPolicy.action === 'open_ticket' || record.recoveryStatus === 'ticket_created'
-    const href = result?.href ?? `/studio/issues?relatedType=generation&relatedId=${encodeURIComponent(record.id)}`
+    const href = result?.href ?? `/studio/issues?relatedType=generation&relatedId=${encodeURIComponent(record.ticketRelatedGenerationId)}`
     if (!ticketEligible && !openedTicket) return null
     if (openedTicket || result) return <div className="f41-issue-action"><Link className="btn btn-sm f41-issue-trigger" href={href}>Mở ticket</Link>{result && <span role="status" className="f41-issue-feedback">{result.created ? 'Đã tạo ticket Dev.' : 'Đã dùng ticket Dev đang mở.'}</span>}</div>
     const open = () => { setMessage(null); setConfirming(true) }
