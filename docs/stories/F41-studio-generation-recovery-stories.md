@@ -93,3 +93,35 @@ THEN user thấy thông báo thân thiện: thông tin đã được lưu, hãy 
 AND user không có CTA retry trực tiếp trong MVP; chỉ Super Admin được retry theo recovery policy
 AND không thấy raw error, component name hoặc ticket nội bộ
 ```
+
+## US-F41-07: Chẩn đoán sự cố generation có cấu trúc
+
+**Là Tracker, QA hoặc Developer**, tôi muốn cùng đọc một bản chẩn đoán sự cố
+nhất quán để biết lỗi gì, ở đâu, ảnh hưởng thế nào và bước xử lý nào là hợp lệ
+mà không phải suy đoán từ mã lỗi hay lỗi thô.
+
+### Acceptance Criteria
+
+```gherkin
+GIVEN generation kết thúc failed hoặc partial_failed
+WHEN hệ thống ghi nhận lỗi
+THEN mỗi lỗi lưu phase, loại/vị trí lỗi, mã chuẩn hoá, category, retryability,
+     safe operator message và sanitized technical evidence
+AND lỗi input có fieldKey, nhãn field tiếng Việt, validation rule và observed state
+    đã allowlist, không lưu giá trị form nhạy cảm
+AND lỗi page/component có page/component key hoặc ghi Unknown rõ ràng khi chưa capture
+
+GIVEN Tracker mở generation detail có lỗi
+WHEN detail được tải
+THEN chỉ có một khối “Sự cố cần xử lý” làm nguồn sự thật cho lỗi, tác động,
+     khả năng recovery, owner và next action
+AND status/action được lấy từ server policy, không parse error text ở client
+AND technical evidence chỉ hiện khi có evidence hữu ích và chỉ Super Admin xem được
+AND dữ liệu legacy thiếu page/component được báo minh bạch, không bịa vị trí lỗi
+
+GIVEN lỗi không thể recovery được được chuyển thành Issue & Feedback
+WHEN ticket được tạo ở US-F41-05
+THEN ticket nhận đúng incident snapshot đã sanitize, gồm affected scope,
+     validation/page/component context, trace, retry lineage và evidence
+AND không chứa input raw, prompt, token, header, stack trace hoặc PII ngoài allowlist
+```

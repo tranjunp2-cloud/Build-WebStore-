@@ -5,6 +5,7 @@ import {
     resolveGenerationRecoveryPolicy,
     serializeAdminGeneration,
     serializeAdminGenerationDetail,
+    buildGenerationTicketIncidentSnapshot,
     summarizeGenerationIncident,
     type GenerationDetailSource,
     type GenerationListSource,
@@ -86,8 +87,8 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
             user: { id: null, label: 'Unknown', missing: true },
             site: { id: null, label: 'Unknown', missing: true },
             pageSummary: { expected: 5, persisted: 4, failed: 1 },
-            affectedError: { code: 'PAGE_PERSISTENCE_FAILED', locationKey: 'about', summary: 'Safe normalized summary' },
-            incidentSummary: { kind: 'persistence', label: 'Không thể lưu website', scope: 'about', totalErrors: 1 },
+            affectedError: { code: 'PAGE_PERSISTENCE_FAILED', locationKey: null, summary: 'Đã ghi nhận lỗi. Xem chi tiết để xử lý.' },
+            incidentSummary: { kind: 'page', label: 'Lỗi tạo trang', scope: 'Một hoặc nhiều trang', totalErrors: 1 },
         })
         expect(serialized).not.toHaveProperty('promptText')
         expect(serialized).not.toHaveProperty('inputSnapshot')
@@ -109,6 +110,17 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
 
         // Assert
         expect(incident).toEqual({ kind: 'quota', label: 'Hết quota AI', scope: 'Áp dụng toàn website', totalErrors: 3 })
+    })
+
+    it('TC-F41-08: keeps a page or component target distinct from a generic persistence failure', () => {
+        // Arrange
+        const component = [{ code: 'INVALID_COMPONENT_CONTRACT', phase: 'component_persist', locationType: 'component' }]
+
+        // Act
+        const incident = summarizeGenerationIncident(component)
+
+        // Assert
+        expect(incident).toMatchObject({ kind: 'component', label: 'Lỗi tạo component', scope: 'Một hoặc nhiều component' })
     })
 
     it('TC-F41-04/14: returns bounded debug context without raw prompt, output or secret-like values', () => {
@@ -169,5 +181,119 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
         expect(serialized).not.toContain('db-password')
         expect(serialized).not.toContain('ops-password')
         expect(serialized).not.toContain('secret-token')
+    })
+
+    it('TC-F41-29: hands the exact safe incident detail to the future ticket workflow', () => {
+        // Arrange
+        const source = record({
+            user: { id: 'user-9', email: 'private@example.test' },
+            site: { id: 'site-9', name: 'private@example.test' },
+            traceId: 'f41-ui-fixture-incident-9',
+            pageSummary: { expected: 5, persisted: 4, failed: 1 },
+            pageOutcomes: [{ pageKey: 'contact', title: 'Liên hệ', slug: 'contact', status: 'failed' }],
+            promptText: 'never copy this prompt',
+            generationErrors: [{
+                phase: 'page_persist', locationType: 'page', locationKey: 'contact', locationLabel: 'Liên hệ',
+                code: 'PAGE_PERSISTENCE_FAILED', category: 'persistence', userSafeMessage: 'safe',
+                sanitizedTechnicalMessage: 'Normalized diagnostic: PAGE_PERSISTENCE_FAILED (timeout).',
+            }],
+        } as GenerationDetailSource)
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+        const snapshot = buildGenerationTicketIncidentSnapshot(detail)
+
+        // Assert
+        expect(snapshot).toMatchObject({
+            generationId: 'gen-1', traceId: 'f41-ui-fixture-incident-9', website: { id: 'site-9' }, user: { id: 'user-9' },
+            incident: { location: { key: 'contact', label: 'Liên hệ', known: true }, cause: { code: 'PAGE_PERSISTENCE_FAILED' } },
+        })
+        expect(snapshot?.incident).toEqual(detail.incident)
+        expect(JSON.stringify(snapshot)).not.toContain('never copy this prompt')
+        expect(JSON.stringify(snapshot)).not.toContain('private@example.test')
+    })
+
+    it('TC-F41-28: resolves a component from captured stable page and component keys only', () => {
+        // Arrange
+        const source = record({
+            pageOutcomes: [{ pageKey: 'products', title: 'Sản phẩm', slug: 'products', status: 'failed' }],
+            generationErrors: [{ phase: 'component_persist', locationType: 'component', locationKey: 'products-gallery', code: 'INVALID_COMPONENT_CONTRACT', category: 'composition' }],
+        } as GenerationDetailSource)
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.incident?.location).toEqual({ type: 'component', key: 'products-gallery', label: 'Sản phẩm / Gallery', known: true })
+    })
+
+    it('TC-F41-27: never hands untrusted legacy incident text to the operator or future ticket', () => {
+        // Arrange
+        const privateValue = 'alice.0901234567'
+        const source = record({
+            generationErrors: [{
+                phase: privateValue, locationType: 'input', locationKey: privateValue, locationLabel: privateValue,
+                validationRule: privateValue, observedState: privateValue, code: 'CUSTOMER_ALICE_PHONE',
+                category: privateValue, retryabilityReason: privateValue, userSafeMessage: privateValue,
+                sanitizedTechnicalMessage: 'Normalized diagnostic: CUSTOMER_ALICE_PHONE.',
+            }],
+        } as GenerationDetailSource)
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+        const snapshot = buildGenerationTicketIncidentSnapshot(detail)
+
+        // Assert
+        expect(detail.incident?.location).toMatchObject({ key: null, label: 'Chưa xác định', known: false })
+        expect(detail.incident?.cause.code).toBe('UNKNOWN')
+        expect(JSON.stringify(detail)).not.toContain(privateValue)
+        expect(JSON.stringify(snapshot)).not.toContain(privateValue)
+    })
+
+    it('TC-F41-29: chooses the incident from the same bounded error set exposed to detail', () => {
+        // Arrange: a quota record after the first 20 must not alter the detail's primary incident.
+        const source = record({
+            generationErrors: [
+                ...Array.from({ length: 20 }, (_, index) => ({ code: 'PAGE_GENERATION_FAILED', locationType: 'page', locationKey: `page-${index}` })),
+                { code: 'AI_QUOTA_EXCEEDED', locationType: 'website' },
+            ],
+        } as GenerationDetailSource)
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.errors).toHaveLength(20)
+        expect(detail.incident).toMatchObject({ kind: 'page', relatedErrorCount: 20 })
+    })
+
+    it('TC-F41-29: keeps an existing ticket actionable instead of downgrading it to monitoring', () => {
+        // Arrange
+        const source = record({
+            recoveryStatus: 'ticket_created',
+            generationErrors: [{ code: 'SITE_PERSISTENCE_FAILED', locationType: 'site' }],
+        } as GenerationDetailSource)
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.incident?.nextAction).toEqual({ kind: 'open_issues', label: 'Mở ticket hiện có trong Issues & feedback.' })
+    })
+
+    it('TC-F41-27: preserves only catalogued F41 quota, template and component codes', () => {
+        // Arrange
+        const sources = [
+            { code: 'AI_QUOTA_EXCEEDED', locationType: 'site' },
+            { code: 'INVALID_TEMPLATE_CONTRACT', locationType: 'site' },
+            { code: 'INVALID_COMPONENT_CONTRACT', locationType: 'component' },
+        ]
+
+        // Act
+        const details = sources.map((generationError) => serializeAdminGenerationDetail(record({ generationErrors: [generationError] }) as GenerationDetailSource))
+
+        // Assert
+        expect(details.map((detail) => detail.incident?.cause.code)).toEqual(['AI_QUOTA_EXCEEDED', 'INVALID_TEMPLATE_CONTRACT', 'INVALID_COMPONENT_CONTRACT'])
+        expect(details.map((detail) => detail.incident?.developerEvidence)).toEqual([null, null, null])
     })
 })

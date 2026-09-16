@@ -9,7 +9,7 @@ const record: GenerationRecord = {
     site: { id: 'site-1', label: 'Website', missing: false },
     lifecycle: 'terminal', outcome: 'partial_failed', recoveryStatus: 'eligible', priority: 'retryable',
     recoveryPolicy: { action: 'retry_website', retryable: true, reasonCode: 'RETRYABLE' },
-    pageSummary: { expected: 5, persisted: 4, failed: 1 }, incidentSummary: null, affectedError: null,
+    pageSummary: { expected: 5, persisted: 4, failed: 1 }, incidentSummary: { kind: 'component', label: 'Lỗi tạo component', scope: 'Sản phẩm / Gallery', totalErrors: 1 }, affectedError: null,
 }
 
 afterEach(() => vi.unstubAllGlobals())
@@ -27,7 +27,7 @@ describe('GenerationRetryAction', () => {
 
         // Assert
         expect(fetchMock).not.toHaveBeenCalled()
-        expect(screen.queryByText('Gen lại website?')).not.toBeInTheDocument()
+        expect(screen.queryByText('Gen lại toàn bộ website?')).not.toBeInTheDocument()
     })
 
     it('TC-F41-13: confirms exactly once and disables the confirm CTA while queued', async () => {
@@ -40,7 +40,7 @@ describe('GenerationRetryAction', () => {
 
         // Act
         fireEvent.click(screen.getByRole('button', { name: 'Gen lại website 41' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Xác nhận gen lại' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Tạo lần gen lại' }))
         fireEvent.click(screen.getByRole('button', { name: 'Đang xếp hàng…' }))
 
         // Assert
@@ -64,7 +64,7 @@ describe('GenerationRetryAction', () => {
 
         // Act
         fireEvent.click(screen.getByRole('button', { name: 'Gen lại website 41' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Xác nhận gen lại' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Tạo lần gen lại' }))
 
         // Assert
         await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Retry đã hết lượt.'))
@@ -81,11 +81,43 @@ describe('GenerationRetryAction', () => {
 
         // Act
         fireEvent.click(screen.getByRole('button', { name: 'Gen lại website 41' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Xác nhận gen lại' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Tạo lần gen lại' }))
 
         // Assert
         await waitFor(() => expect(onAccepted).toHaveBeenCalledWith('41'))
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Gen lại website 41' })).toBeDisabled()
+    })
+
+    it('TC-F41-13: clears a prior retry rejection before a new confirmation attempt', async () => {
+        // Arrange
+        vi.stubGlobal('crypto', { randomUUID: () => '6ca7f9b7-c398-4c26-9925-1e9c6cd7d572' })
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: 'RETRY_NOT_ALLOWED', message: 'Retry đã hết lượt.' } }), { status: 409 })))
+        render(<GenerationRetryAction record={record} onAccepted={vi.fn()} />)
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: 'Gen lại website 41' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Tạo lần gen lại' }))
+        await screen.findByRole('alert')
+        fireEvent.click(screen.getByRole('button', { name: 'Hủy' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Gen lại website 41' }))
+
+        // Assert
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('TC-F41-13: explains the affected incident and retry impact before confirmation', () => {
+        // Arrange
+        render(<GenerationRetryAction record={record} onAccepted={vi.fn()} />)
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: 'Gen lại website 41' }))
+
+        // Assert
+        expect(screen.getByRole('heading', { name: 'Gen lại toàn bộ website?' })).toBeInTheDocument()
+        expect(screen.getByText('Lỗi tạo component')).toBeInTheDocument()
+        expect(screen.getByText('Sản phẩm / Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Gen lại toàn bộ website, không chỉ riêng component lỗi.')).toBeInTheDocument()
+        expect(screen.getByText(/generation #41, website hiện tại và thông tin lỗi đã ghi nhận/i)).toBeInTheDocument()
     })
 })

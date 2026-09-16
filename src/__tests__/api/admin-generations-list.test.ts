@@ -102,7 +102,9 @@ describe('GET /api/admin/generations', () => {
         expect(serialized).not.toHaveProperty('inputSnapshot')
         expect(serialized).not.toHaveProperty('outputSnapshot')
         expect(serialized).not.toHaveProperty('errorLog')
-        expect((serialized.affectedError as { summary: string }).summary).toBe('Chúng tôi chưa thể hoàn thiện một trang của website.')
+        // The list deliberately uses a generic, product-owned copy instead of
+        // persisted error text, which may be historical or contain request data.
+        expect((serialized.affectedError as { summary: string }).summary).toBe('Đã ghi nhận lỗi. Xem chi tiết để xử lý.')
         expect(JSON.stringify(serialized)).not.toContain('private-operator-token')
     })
 

@@ -70,7 +70,12 @@ PageOutcome {
 GenerationError {
   id, generationId, phase: 'validate' | 'compose' | 'site_persist' |
   'page_persist' | 'component_persist' | 'publish' | 'job',
-  locationType: 'site' | 'page' | 'component' | 'unknown', locationRef?: Json,
+  locationType: 'input' | 'site' | 'page' | 'component' | 'unknown',
+  locationKey?: string, locationLabel?: string,
+  validationRule?: 'required' | 'format' | 'min_length' | 'max_length' |
+    'unsupported_value' | 'contract_mismatch',
+  observedState?: 'missing' | 'invalid_format' | 'too_short' | 'too_long' |
+    'unsupported' | 'unknown',
   normalizedCode: string, category: string, retryabilityReason: string,
   operatorMessage: string, userSafeMessage: string,
   sanitizedTechnicalMessage?: string, signature: string
@@ -84,6 +89,11 @@ RecoveryJob {
 
 IssueLink { generationId, issueId, signature, status: 'open' | 'resolved', createdBy, createdAt }
 ```
+
+`locationLabel`, `validationRule` và `observedState` là dữ liệu vận hành
+allowlist do server tạo, không lấy text tự do từ provider. Không lưu giá trị
+field lỗi, prompt, token hoặc stack trace. Khi pipeline cũ không capture đủ
+vị trí, serializer trả `Unknown` rõ ràng thay vì suy đoán page/component/field.
 
 **Migration rule:** mọi field/table mới phải có migration idempotent trong `scripts/db-setup.js`; array table dùng UUID `id varchar`, `_order`, `_parent_id`, `_uuid`; không `DROP TABLE`.
 
