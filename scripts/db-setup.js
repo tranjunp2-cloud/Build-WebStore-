@@ -3392,6 +3392,14 @@ const MIGRATIONS = [
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS related_id varchar;`,
   },
   {
+    name: 'template_issues.alter_dedupe_key',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS dedupe_key varchar;`,
+  },
+  {
+    name: 'template_issues.create_dedupe_key_uniq',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS template_issues_dedupe_key_uniq ON template_issues (dedupe_key) WHERE dedupe_key IS NOT NULL;`,
+  },
+  {
     name: 'template_issues.alter_reported_by_id',
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS reported_by_id integer REFERENCES users(id) ON DELETE SET NULL;`,
   },

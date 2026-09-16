@@ -139,6 +139,13 @@ export const TemplateIssues: CollectionConfig = {
             admin: { description: 'Template id / Generation id / Block slug / Runtime provider key (polymorphic soft FK).' },
         },
         {
+            name: 'dedupeKey',
+            type: 'text',
+            unique: true,
+            index: true,
+            admin: { readOnly: true, description: 'Server-owned idempotency key for internally promoted incidents. Null for manually-created issues.' },
+        },
+        {
             name: 'reportedBy',
             type: 'relationship',
             relationTo: 'users',

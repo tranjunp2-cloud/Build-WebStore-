@@ -2063,6 +2063,10 @@
 .studio-shell .f41-generation-page .f41-retry-trigger { color: #fff; background: var(--f41-blue); border-color: var(--f41-blue); box-shadow: 0 1px 2px #1d4ed833; }
 .studio-shell .f41-generation-page .f41-retry-trigger:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
 .studio-shell .f41-generation-page .f41-retry-trigger:disabled { border-color: #cbd7e5; background: #eef3fa; color: #71819a; box-shadow: none; }
+.studio-shell .f41-generation-page .f41-issue-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 126px; color: #fff; background: var(--f41-blue); border-color: var(--f41-blue); box-shadow: 0 1px 2px #1d4ed833; }
+.studio-shell .f41-generation-page .f41-issue-trigger:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
+.studio-shell .f41-issue-action { display: inline-flex; align-items: center; gap: 6px; }.studio-shell .f41-issue-feedback { color: #16724f; font-size: 11px; font-weight: 700; }
+.studio-shell .f41-issue-error { color: var(--destructive); font-size: 13px; font-weight: 600; }
 
 /* F41-04 full-page debug context. The detail reuses the queue's compact
    operational palette, but deliberately gives errors and captured evidence
@@ -2108,6 +2112,7 @@
 .f41-retry-confirm { border-color: #2563eb !important; background: #2563eb !important; color: #fff !important; }
 .f41-retry-confirm:hover:not(:disabled) { border-color: #1d4ed8 !important; background: #1d4ed8 !important; }
 .f41-retry-confirm:focus-visible, .f41-retry-cancel:focus-visible, .studio-shell .f41-generation-page .f41-retry-trigger:focus-visible { outline: 3px solid #8ab4ff; outline-offset: 2px; }
+.f41-issue-trigger:focus-visible { outline: 3px solid #8ab4ff; outline-offset: 2px; }
 
 @media (max-width: 768px) {
     .studio-shell .f41-generation-page { margin: calc(var(--pad) * -1); padding: 17px 13px 32px; }
