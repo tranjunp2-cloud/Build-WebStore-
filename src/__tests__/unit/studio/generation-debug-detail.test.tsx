@@ -85,6 +85,7 @@ describe('[TC-F41-15/16] GenerationDebugDetail', () => {
         expect(screen.getByText('Normalized diagnostic: PAGE_FAILED (timeout).')).toBeVisible()
         expect(screen.getByText('Trace ID')).toBeVisible()
         expect(technicalSummary.closest('details')).toHaveAttribute('open')
+        expect(technicalSummary.closest('.f41-incident-panel')).toBeInTheDocument()
         expect(screen.queryByText('Input hash')).not.toBeInTheDocument()
     })
 
