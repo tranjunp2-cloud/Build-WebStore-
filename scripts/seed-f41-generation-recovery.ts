@@ -62,6 +62,11 @@ async function main() {
     let created = 0
     for (const fixture of fixtures) {
         const traceId = `f41-ui-fixture-${fixture.key}-v1`
+        const pageOutcomes = fixture.key === 'page'
+            ? [{ pageKey: 'contact', title: 'Liên hệ', slug: 'contact', status: 'failed', blockCount: 2, errorCode: fixture.code, errorSummary: 'Không thể tạo trang Liên hệ.' }]
+            : fixture.key === 'component'
+                ? [{ pageKey: 'products', title: 'Sản phẩm', slug: 'products', status: 'failed', blockCount: 4, errorCode: fixture.code, errorSummary: 'Component Gallery không thể tạo.' }]
+                : []
         const existing = await payload.find({ collection: 'ai-generation-records', where: { traceId: { equals: traceId } }, limit: 1, depth: 0, overrideAccess: true })
         if (existing.docs[0]) {
             // Fixtures created before canonical hashing used insertion-order
@@ -70,6 +75,7 @@ async function main() {
             await payload.update({ collection: 'ai-generation-records', id: existing.docs[0].id, overrideAccess: true, data: {
                 inputSnapshot: snapshot, inputHash, inputSchemaVersion: 'f41.v1',
                 recoveryStatus: fixture.recoveryStatus,
+                pageOutcomes,
                 generationErrors: [{ phase: fixture.phase, locationType: fixture.locationType, ...(fixture.locationKey ? { locationKey: fixture.locationKey } : {}), ...(fixture.validationRule ? { validationRule: fixture.validationRule, observedState: fixture.observedState } : {}), code: fixture.code, category: fixture.category, retryabilityReason: fixture.retryable ? 'transient_timeout' : 'requires_operator_review', operatorMessage: fixture.message, userSafeMessage: 'Đã ghi nhận lỗi. Xem detail để xử lý.', sanitizedTechnicalMessage: `Normalized diagnostic: ${fixture.code}.` }],
             } })
             continue
@@ -85,6 +91,7 @@ async function main() {
                 promptMode: 'hashed', promptHash: inputHash, status: 'failed', lifecycle: 'terminal', outcome: fixture.outcome, recoveryStatus: fixture.recoveryStatus,
                 traceId, inputSnapshot: snapshot, inputSchemaVersion: 'f41.v1', inputHash,
                 pageSummary: { expected: 5, persisted: fixture.outcome === 'partial_failed' ? 4 : 0, failed: fixture.outcome === 'partial_failed' ? 1 : 5 },
+                pageOutcomes,
                 generationErrors: [{ phase: fixture.phase, locationType: fixture.locationType, ...(fixture.locationKey ? { locationKey: fixture.locationKey } : {}), ...(fixture.validationRule ? { validationRule: fixture.validationRule, observedState: fixture.observedState } : {}), code: fixture.code, category: fixture.category, retryabilityReason: fixture.retryable ? 'transient_timeout' : 'requires_operator_review', operatorMessage: fixture.message, userSafeMessage: 'Đã ghi nhận lỗi. Xem detail để xử lý.', sanitizedTechnicalMessage: `Normalized diagnostic: ${fixture.code}.` }],
                 userSafeMessage: fixture.retryable ? 'Chúng tôi đang hoàn thiện website của bạn.' : 'Thông tin của bạn đã được lưu.', startedAt: new Date(Date.now() - 120_000).toISOString(), terminalAt: new Date(Date.now() - 10_000).toISOString(), lastHeartbeatAt: new Date(Date.now() - 10_000).toISOString(),
             },

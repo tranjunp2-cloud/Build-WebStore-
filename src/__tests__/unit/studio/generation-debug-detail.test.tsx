@@ -11,7 +11,7 @@ const detail = {
     id: '41', submittedAt: '2026-09-15T08:00:00.000Z', lifecycle: 'terminal', outcome: 'partial_failed', recoveryStatus: 'eligible', priority: 'retryable',
     recoveryPolicy: { action: 'retry_website', retryable: true, reasonCode: 'RETRY_ELIGIBLE' }, pageSummary: { expected: 2, persisted: 1, failed: 1 }, incidentSummary: null, affectedError: null,
     endpoint: 'site-generator', category: 'retail', website: { id: 'site-1', name: 'Flower Store', domain: 'flower.example.test', status: 'draft', urls: { preview: '/preview/site-1', live: 'flower.example.test' } },
-    recoveredWebsite: null, user: { id: 'user-1', name: 'Mai Lan', email: 'mai@example.test' }, inputSchemaVersion: 'f41.v1', inputHash: 'hash',
+    recoveredWebsite: null, user: { id: 'user-1', name: 'Mai Lan', email: 'mai@example.test' }, inputSchemaVersion: 'f41.v1', inputHash: 'hash', traceId: 'f41-ui-fixture-detail-41',
     input: { available: true, summary: [['Tên doanh nghiệp', 'Flower Store'], ['Ngành hàng', 'Retail'], ['Mô tả', 'Hoa tươi'], ['Sản phẩm / dịch vụ', 'Hoa hồng'], ['Ngôn ngữ', 'vi']], full: { businessName: 'Flower Store', extraInstructions: 'Full safe instructions' } },
     pages: [{ pageKey: 'contact', title: 'Liên hệ', slug: 'contact', pageId: 'page-1', status: 'failed', blockCount: 2, errorCode: 'PAGE_FAILED', errorSummary: 'Không thể lưu trang' }],
     errors: [], timeline: [{ event: 'submitted', at: '2026-09-15T08:00:00.000Z' }], durationMs: null,
@@ -60,7 +60,7 @@ describe('[TC-F41-15/16] GenerationDebugDetail', () => {
 
     it('TC-F41-16: explicitly reports unknown page/component capture instead of inventing a tree', async () => {
         // Arrange
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { ...detail, pages: [] } }), { status: 200 })))
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { ...detail, pages: [], traceId: null } }), { status: 200 })))
 
         // Act
         render(<GenerationDebugDetail generationId="41" />)
@@ -80,8 +80,11 @@ describe('[TC-F41-15/16] GenerationDebugDetail', () => {
 
         // Assert
         expect(await screen.findByText('Thông tin kỹ thuật phục vụ Dev debug')).toBeVisible()
-        fireEvent.click(screen.getByText('Thông tin Dev'))
+        const technicalSummary = screen.getByText('Thông tin kỹ thuật phục vụ Dev debug')
+        fireEvent.click(technicalSummary)
         expect(screen.getByText('Normalized diagnostic: PAGE_FAILED (timeout).')).toBeVisible()
+        expect(screen.getByText('Trace ID')).toBeVisible()
+        expect(technicalSummary.closest('details')).toHaveAttribute('open')
         expect(screen.queryByText('Input hash')).not.toBeInTheDocument()
     })
 

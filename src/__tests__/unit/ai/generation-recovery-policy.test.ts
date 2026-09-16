@@ -88,7 +88,7 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
             site: { id: null, label: 'Unknown', missing: true },
             pageSummary: { expected: 5, persisted: 4, failed: 1 },
             affectedError: { code: 'PAGE_PERSISTENCE_FAILED', locationKey: null, summary: 'Đã ghi nhận lỗi. Xem chi tiết để xử lý.' },
-            incidentSummary: { kind: 'persistence', label: 'Không thể lưu website', scope: 'Sau khi AI tạo nội dung', totalErrors: 1 },
+            incidentSummary: { kind: 'page', label: 'Lỗi tạo trang', scope: 'Một hoặc nhiều trang', totalErrors: 1 },
         })
         expect(serialized).not.toHaveProperty('promptText')
         expect(serialized).not.toHaveProperty('inputSnapshot')
@@ -110,6 +110,17 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
 
         // Assert
         expect(incident).toEqual({ kind: 'quota', label: 'Hết quota AI', scope: 'Áp dụng toàn website', totalErrors: 3 })
+    })
+
+    it('TC-F41-08: keeps a page or component target distinct from a generic persistence failure', () => {
+        // Arrange
+        const component = [{ code: 'INVALID_COMPONENT_CONTRACT', phase: 'component_persist', locationType: 'component' }]
+
+        // Act
+        const incident = summarizeGenerationIncident(component)
+
+        // Assert
+        expect(incident).toMatchObject({ kind: 'component', label: 'Lỗi tạo component', scope: 'Một hoặc nhiều component' })
     })
 
     it('TC-F41-04/14: returns bounded debug context without raw prompt, output or secret-like values', () => {

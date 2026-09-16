@@ -62,9 +62,9 @@ function incidentKindFor(error: GenerationError): GenerationIncidentKind {
     if (/QUOTA|RATE_LIMIT|INSUFFICIENT_CREDIT|BILLING/.test(code) || category === 'quota') return 'quota'
     if (/VALIDATION|INVALID_INPUT|FORM_INVALID/.test(code) || phase.includes('validate') || locationType === 'input') return 'input'
     if (/UPSTREAM|PROVIDER|SYSTEM|INTERNAL|TIMEOUT|UNAVAILABLE/.test(code) || category === 'transient' || category === 'system') return 'system'
-    if (/PERSIST|DATABASE|STORAGE|SAVE/.test(code) || phase.includes('persist') || locationType === 'website') return 'persistence'
     if (locationType === 'page') return 'page'
     if (locationType === 'component') return 'component'
+    if (/PERSIST|DATABASE|STORAGE|SAVE/.test(code) || phase.includes('persist') || locationType === 'website') return 'persistence'
     return 'unknown'
 }
 
