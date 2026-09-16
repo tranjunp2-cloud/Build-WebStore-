@@ -5,6 +5,7 @@ import { sanitizeBlocksForPayload } from './pages-schema'
 import { resolveSiteType } from './site-type'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { contentBriefToReferencePrompt, type ContentBrief } from './content-brief'
+import { normalizeGenerationIncident } from './generation-outcome'
 
 type Id = string | number
 type Relation = Id | { id: Id } | null | undefined
@@ -241,8 +242,18 @@ export async function runGenerationRecoveryJob(payload: PayloadLike, input: { jo
         }
         const code = safeErrorCode(error)
         const terminalAt = new Date().toISOString()
+        const recoveryIncident = normalizeGenerationIncident(undefined, {
+            phase: 'recovery',
+            locationType: 'site',
+            locationLabel: 'Website recovery',
+            code,
+            category: code === 'RECOVERY_TIMEOUT' ? 'system' : 'composition',
+            retryabilityReason: 'requires_operator_review',
+            operatorMessage: safeErrorMessage(code),
+            userSafeMessage: safeErrorMessage(code),
+        })
         await Promise.all([
-            payload.update({ collection: 'ai-generation-records', id: childId, overrideAccess: true, data: { lifecycle: 'terminal', outcome: 'failed', status: 'failed', recoveryStatus: 'ticket_required', terminalAt, lastHeartbeatAt: terminalAt, userSafeMessage: safeErrorMessage(code), generationErrors: [{ phase: 'recovery', locationType: 'website', code, userSafeMessage: safeErrorMessage(code) }] } }),
+            payload.update({ collection: 'ai-generation-records', id: childId, overrideAccess: true, data: { lifecycle: 'terminal', outcome: 'failed', status: 'failed', recoveryStatus: 'ticket_required', terminalAt, lastHeartbeatAt: terminalAt, userSafeMessage: safeErrorMessage(code), generationErrors: [recoveryIncident] } }),
             payload.update({ collection: 'generation_recovery_jobs', id: input.jobId, overrideAccess: true, data: { status: 'failed', failureCode: code, userSafeMessage: safeErrorMessage(code), finishedAt: terminalAt, lastHeartbeatAt: terminalAt } }),
             payload.update({ collection: 'ai-generation-records', id: parentId, overrideAccess: true, data: { recoveryStatus: 'ticket_required' } }),
         ])

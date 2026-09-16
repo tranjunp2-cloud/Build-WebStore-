@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>F41 — Structured generation incident</title>
+  <style>
+    :root { --ink:#142742; --muted:#69809f; --line:#d9e3f0; --canvas:#f4f7fb; --danger:#c43a32; --warn:#9b6500; --blue:#2468e8; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--canvas); color:var(--ink); font:14px/1.45 Inter,Arial,sans-serif; }
+    main { max-width:1120px; margin:40px auto; padding:0 20px; } h1 { margin:0 0 5px; font-size:28px; } h2 { margin:0; font-size:18px; } p { margin:0; } .sub { color:var(--muted); }
+    .tabs { display:flex; gap:8px; margin:26px 0 16px; } button { border:1px solid var(--line); border-radius:7px; padding:9px 12px; background:white; color:#28415f; font:inherit; font-weight:700; cursor:pointer; } button.active { border-color:var(--blue); background:#edf4ff; color:var(--blue); }
+    .incident { border:1px solid #f0b8b3; border-radius:10px; background:white; overflow:hidden; box-shadow:0 1px 2px #1834510d; } .incident-head { display:flex; justify-content:space-between; gap:16px; align-items:center; padding:17px 20px; border-bottom:1px solid var(--line); background:#fff8f7; } .pill { display:inline-block; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:800; white-space:nowrap; } .danger { background:#fde9e7; color:var(--danger); } .warn { background:#fff2d5; color:var(--warn); } .body { padding:20px; } dl { display:grid; grid-template-columns:180px minmax(0,1fr); gap:13px 18px; margin:0; } dt { color:var(--muted); font-weight:700; } dd { margin:0; font-weight:600; } .callout { margin-top:20px; padding:14px; border-radius:7px; background:#fffaf0; border-left:3px solid #d49a2a; color:#73530b; } .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; } .primary { border-color:var(--danger); background:var(--danger); color:white; } details { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; } summary { cursor:pointer; color:#304d70; font-weight:800; } .evidence { display:grid; gap:6px; margin:12px 0 0; color:#4d617a; font:12px ui-monospace,SFMono-Regular,monospace; } [data-case] { display:none; } [data-case].active { display:block; }
+    @media (max-width:600px) { main { margin:24px auto; } .incident-head { align-items:flex-start; flex-direction:column; } dl { grid-template-columns:1fr; gap:4px; } dd { margin-bottom:10px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Sự cố cần xử lý</h1>
+    <p class="sub">Wireframe F41-07 — một nguồn sự thật cho Tracker, QA, Dev và Issue &amp; Feedback. Không hiển thị raw input hoặc stack trace.</p>
+    <div class="tabs" role="tablist" aria-label="Incident examples">
+      <button class="active" data-tab="input" role="tab" aria-selected="true">Lỗi input</button>
+      <button data-tab="component" role="tab" aria-selected="false">Lỗi component</button>
+      <button data-tab="legacy" role="tab" aria-selected="false">Dữ liệu cũ</button>
+    </div>
+    <section class="incident active" data-case="input" aria-label="Sự cố lỗi input">
+      <header class="incident-head"><h2>Sự cố cần xử lý</h2><span class="pill danger">Cần Dev xử lý</span></header>
+      <div class="body"><dl><dt>Lỗi gì?</dt><dd>Dữ liệu đầu vào không hợp lệ</dd><dt>Vị trí lỗi</dt><dd>Form tạo website → Thông tin doanh nghiệp</dd><dt>Nguyên nhân</dt><dd>Trường này chưa có dữ liệu hợp lệ để tạo nội dung website.</dd><dt>Ảnh hưởng</dt><dd>Không tạo được 5/5 trang · chưa có website preview.</dd><dt>Khả năng khôi phục</dt><dd>Không thể gen lại: form gốc sẽ lặp lại lỗi này.</dd><dt>Owner / bước tiếp theo</dt><dd>Dev điều tra và cập nhật validation hoặc luồng capture.</dd></dl><div class="actions"><button class="primary">Tạo ticket Dev</button><button>Xem input đã allowlist</button></div><details><summary>Thông tin Dev</summary><div class="evidence"><span>phase: validate</span><span>code: FORM_INVALID</span><span>field: businessName</span><span>rule: required · observed: missing</span></div></details></div>
+    </section>
+    <section class="incident" data-case="component" aria-label="Sự cố lỗi component">
+      <header class="incident-head"><h2>Sự cố cần xử lý</h2><span class="pill warn">Có thể gen lại</span></header>
+      <div class="body"><dl><dt>Lỗi gì?</dt><dd>Lỗi tạo component</dd><dt>Vị trí lỗi</dt><dd>Trang Sản phẩm → Gallery</dd><dt>Nguyên nhân</dt><dd>Dịch vụ tạo media không phản hồi trong thời gian cho phép.</dd><dt>Ảnh hưởng</dt><dd>1/5 trang chưa tạo; 4 trang đã được lưu.</dd><dt>Khả năng khôi phục</dt><dd>Có thể gen lại toàn bộ website một lần.</dd><dt>Owner / bước tiếp theo</dt><dd>Tracker xác nhận Gen lại website.</dd></dl><div class="actions"><button class="primary">Gen lại website</button><button>Mở trang Sản phẩm</button></div><details><summary>Thông tin Dev</summary><div class="evidence"><span>phase: component_persist</span><span>code: IMAGE_GENERATION_TIMEOUT</span><span>component: gallery · retryability: transient_timeout</span></div></details></div>
+    </section>
+    <section class="incident" data-case="legacy" aria-label="Sự cố dữ liệu cũ">
+      <header class="incident-head"><h2>Sự cố cần xử lý</h2><span class="pill danger">Cần Dev xử lý</span></header>
+      <div class="body"><dl><dt>Lỗi gì?</dt><dd>Không thể lưu website</dd><dt>Vị trí lỗi</dt><dd>Unknown — generation cũ chưa capture vị trí lỗi</dd><dt>Ảnh hưởng</dt><dd>Không tạo được 5/5 trang; website chưa khả dụng.</dd><dt>Khả năng khôi phục</dt><dd>Không thể xác minh an toàn từ evidence hiện có.</dd><dt>Owner / bước tiếp theo</dt><dd>Dev điều tra hoặc xem generation recovery mới nhất.</dd></dl><p class="callout">Dữ liệu trang/component không được lưu cho generation cũ. Hệ thống không suy đoán field, trang hoặc component lỗi.</p><div class="actions"><button class="primary">Tạo ticket Dev</button><button>Xem lần gen lại #12</button></div></div>
+    </section>
+  </main>
+  <script>
+    const buttons = document.querySelectorAll('[data-tab]');
+    const cases = document.querySelectorAll('[data-case]');
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      buttons.forEach((item) => { const selected = item === button; item.classList.toggle('active', selected); item.setAttribute('aria-selected', String(selected)); });
+      cases.forEach((item) => item.classList.toggle('active', item.dataset.case === button.dataset.tab));
+    }));
+  </script>
+</body>
+</html>

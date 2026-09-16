@@ -74,7 +74,7 @@ import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
 import { patchBlockCtaUrlsFromLinks } from '@/lib/ai/patch-block-cta-urls'
 import { GenerationTimings, normalizeGenerationRequestId } from '@/lib/ai/generation-timings'
-import { countSnapshotFields, finishWebsiteCapture, heartbeatWebsiteCapture, persistWebsiteCaptureProgress, startCapture, type CaptureHandle } from '@/lib/ai/capture-generation'
+import { captureRejectedWebsiteGeneration, countSnapshotFields, finishWebsiteCapture, heartbeatWebsiteCapture, persistWebsiteCaptureProgress, startCapture, type CaptureHandle } from '@/lib/ai/capture-generation'
 import type { FailedPage, PersistedPage, TerminalErrorPhase } from '@/lib/ai/generation-outcome'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
 import { PRODUCTS_GRID_LIMIT } from '@/blocks/products-grid/config'
@@ -203,9 +203,37 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        // Parse request body early so validation errors return before auth/db side effects.
-        const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
-        if (errorResponse) return errorResponse
+        // Parsing a clone preserves the request for auth and lets an authenticated
+        // rejected form be tracked without ever persisting its raw payload.
+        const { data, errorResponse, validationIssues } = await parseRequest(req.clone(), generateSiteSchema)
+        if (errorResponse) {
+            const rejectedUser = await getCurrentUser(req)
+            if (rejectedUser && validationIssues?.length) {
+                // Invalid forms used to be side-effect free. Keep this new
+                // observability path bounded per user so it cannot become a DB
+                // write amplification vector; it never changes the 400 reply.
+                try {
+                    const trackingRate = await checkTwoTierRateLimit(`generation-invalid:${String(rejectedUser.id)}`, 5, 20)
+                    if (trackingRate.allowed) {
+                        const rejectedTenant = (rejectedUser as { tenants?: Array<{ tenant?: unknown }> }).tenants?.[0]?.tenant
+                        const tenantId = typeof rejectedTenant === 'object' && rejectedTenant
+                            ? (rejectedTenant as { id?: number | string }).id
+                            : typeof rejectedTenant === 'number' || typeof rejectedTenant === 'string' ? rejectedTenant : undefined
+                        await captureRejectedWebsiteGeneration({
+                            userId: rejectedUser.id,
+                            tenantId,
+                            traceId: generationRequestId,
+                            issues: validationIssues,
+                        })
+                    }
+                } catch {
+                    // The validation response remains authoritative when the
+                    // best-effort tracking dependency is unavailable.
+                    console.warn('[generate-site] rejected generation tracking unavailable')
+                }
+            }
+            return errorResponse
+        }
 
         const { businessInfo: rawBusinessInfo, extraInstructions: rawExtraInstructions, language = 'en', generationLocale: requestedGenerationLocale, contentBrief: rawContentBrief } = data!
 

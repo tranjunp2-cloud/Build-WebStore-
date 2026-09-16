@@ -39,6 +39,7 @@ Mỗi fixture có tenant, Super Admin, non-admin và end-user riêng. Dọn fixt
 | US-F41-04 | Detail có user/site/input/result/timeline/evidence rõ ràng | 14–16, 20 |
 | US-F41-05 | Ticket có context, dedupe | 21–23 |
 | US-F41-06 | End user chỉ thấy thông điệp thân thiện | 24–25 |
+| US-F41-07 | Chẩn đoán incident có cấu trúc, nhất quán UI/ticket | 26–29 |
 
 ## 4. Automated test cases
 
@@ -69,6 +70,10 @@ Mỗi fixture có tenant, Super Admin, non-admin và end-user riêng. Dọn fixt
 | TC-F41-23 | [x] AUTO | E2E | High | **A:** nonretryable. **A:** listing/detail → create ticket. **A:** không retry; CTA thành `Mở ticket` và link đúng. |
 | TC-F41-24 | [x] AUTO | API + E2E | Critical | **A:** prompt chứa email/secret-like string + raw stack trace. **A:** end-user status + CSV. **A:** chỉ friendly copy; không prompt, raw error, trace, admin link. |
 | TC-F41-25 | [x] AUTO | Regression | High | **A:** generic `site-generator` re-run. **A:** access F41. **A:** không bypass policy/flatten prompt; chỉ F41 retry endpoint. |
+| TC-F41-26 | [x] AUTO | Service + Migration | Critical | **A:** lỗi input/page/component/system fixtures. **A:** persist error hai lần migration. **A:** incident fields/location/validation allowlist đúng, migration idempotent và không raw value. |
+| TC-F41-27 | [x] AUTO | API | Critical | **A:** Super Admin, Admin, end user và error chứa raw input/stack. **A:** GET detail. **A:** chỉ Super Admin thấy safe incident snapshot; raw/PII không xuất hiện và role khác không leak record. |
+| TC-F41-28 | [x] AUTO | Component + E2E | High | **A:** input error, page/component error, quota/system, legacy error. **A:** mở detail. **A:** một khối Sự cố cần xử lý nêu lỗi/vị trí/ảnh hưởng/recovery/owner; legacy Unknown minh bạch; keyboard disclosure hoạt động. |
+| TC-F41-29 | [x] AUTO | API + E2E | Critical | **A:** create ticket từ mỗi incident fixture. **A:** create/open ticket. **A:** ticket snapshot khớp safe incident detail, dedupe signature đúng, không leak raw input/evidence cấm. |
 
 ## 5. Manual staging gates
 

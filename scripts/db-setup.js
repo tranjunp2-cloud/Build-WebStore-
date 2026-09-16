@@ -3883,9 +3883,15 @@ const MIGRATIONS = [
     id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0,
     _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
     _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, phase varchar, location_type varchar, location_key varchar,
+    location_label varchar, validation_rule varchar, observed_state varchar,
     code varchar, category varchar, retryability_reason varchar, operator_message text, user_safe_message text,
     sanitized_technical_message text, signature varchar);` },
   { name: 'ai_generation_records_generation_errors.parent_idx', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_generation_errors_parent_idx ON ai_generation_records_generation_errors (_parent_id);` },
+  // F41-07: CREATE TABLE does not update an existing Payload array table.
+  { name: 'ai_generation_records_generation_errors.structured_incident_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records_generation_errors
+    ADD COLUMN IF NOT EXISTS location_label varchar,
+    ADD COLUMN IF NOT EXISTS validation_rule varchar,
+    ADD COLUMN IF NOT EXISTS observed_state varchar;` },
 
   // ── F41-03: durable, isolated website recovery queue ────────────────────
   { name: 'ai_generation_records.f41_retry_lineage_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records
