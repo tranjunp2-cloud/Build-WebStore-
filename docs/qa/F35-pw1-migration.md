@@ -9,6 +9,8 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — HTTPS source URLs accept arbitrary hosts without an allowlist; malformed URLs, non-HTTPS protocols, credentials and custom ports are rejected (`pw1-media.test.ts`).
 
 ### TC-F35.M18 — AI design using existing PW2 blocks
+- [x] AUTO — Stable per-store design briefs cover six directions; all native navigation variants preserve source links; AI receives the selected brief.
+- [x] AUTO — AI request includes source footer/navigation and the complete native footer variant enum; binder preserves footer content for each supported variant.
 - [x] AUTO — AI is called before binding; preserve slide/card/document/video content and order; reject new block types and reordered IDs; no silent fallback when AI fails.
 
 ### TC-F35.M19 — Product listings use the destination database
@@ -28,7 +30,7 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 
 - [x] AUTO TC-F35.M24: Map legacy cart/order tracking routes to native features, preserve external routes, and activate cart without product blocks including pending drafts.
 
-- [x] AUTO TC-F35.M25: Category listing maps only to Carousel cards, retains items and rejects Portfolio Grid.
+- [x] AUTO TC-F35.M25: Category listing supports Carousel cards and Portfolio Grid grid/masonry/showcase when every item has a source image; preserves item order, copy and links.
 
 ### TC-F35.M26 — Native blueprint
 - [x] AUTO — Keep source contract and page identity without generating legacy blocks; reject duplicate page/component IDs and invalid homepage/order.
@@ -68,3 +70,31 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — Pool limits active stores, serializes same-account jobs, drains on fatal errors. Real DB preparation opens no transaction; two preparations overlap but gated persistence never overlaps. Rollback/session fencing and crash recovery remain valid. Real CLI runs concurrent stores and cleanup after pool drain.
 
 - [x] AUTO TC-F35.M38: CLI transactions retain one backend PID/transaction ID despite concurrent pool reads; real DB regression in `scripts/tests/pw1-reliability.ts`.
+
+### TC-F35.M39 — Legacy brand evidence
+- [x] AUTO — Rank CTA/navigation colors, retain neutral samples for visual analysis, exclude transparent samples; reject private network destinations; nonfatal fallback and cancellation. Native AI prompt includes color evidence but excludes screenshot bytes.
+
+### TC-F35.M40 — Source tenant slug
+- [x] AUTO — Preserve PW1 hostname label; custom www domains use next label. Reserved/invalid/occupied names use store-ID suffix; collision checks never attach to an existing tenant.
+
+- [x] AUTO TC-F35.M39: Isolated visual palette accepts neutral/logo-only identity, rejects parked-site evidence, reports model/tokens and falls back on AI errors; cancellation propagates.
+
+### TC-F35.M41 — Source carousel layout
+- [x] AUTO — Adapter preserves explicit source frame ratio, fit and slides per view. Responsive navigation, stable frame height and no horizontal overflow are checked in the browser.
+- Migration does not infer layout from image dimensions. Unverified Small banner layouts use PW2 defaults with a report warning; per-theme PW1 extraction remains pending.
+
+### TC-F35.M42 — Source link mapping
+- [x] AUTO — Map same-store page URLs in menus, CTA and HTML, preserve query/hash and external/media URLs; never reinterpret legacy category IDs, warn on unresolved links.
+
+### TC-F35.M43 — Portfolio category controls
+- [x] AUTO — Migrated portfolio without category groups renders its cards without an All-only or empty category filter.
+
+### TC-F35.M44 — Explicit BE destination/category mapping
+- [x] AUTO — Validate positive IDs, unique category source identity, active ownership, draft site, tenant/site category scope and deletion; translate category/category_id only with verified mapping into native categoryId and an enabled product listing page. Unmapped/external/ambiguous URLs stay unchanged.
+
+### TC-F35.M45 — Public post-migration quality audit
+- [x] AUTO — Classify legacy entity links separately from unmapped source page links; ignore external links, preserve evidence URLs and never fetch PW1 targets during link verification.
+
+- [x] AUTO TC-F35.M41: Browser measures rendered Swiper frame rather than intrinsic image ratio; exact source URL matching rejects conflicting observations.
+- [x] AUTO TC-F35.M42: Reviewed per-store corrections use an existing source page ID; image-only map links receive an accessible label, preserving existing names.
+- [x] AUTO TC-F35.M35: Grouped reset reference queries execute against isolated local fixtures; reference and transaction protections remain enabled.

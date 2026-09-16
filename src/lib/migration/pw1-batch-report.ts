@@ -1,8 +1,10 @@
+import { groupMigrationWarnings } from './pw1-warning-groups'
 import type { Client } from 'pg'
 
 type Result = Record<string, unknown>
 export type ReportAttempt = {
     source_store_id: string; status: string; stage: string; error_code: string | null
+    brand_evidence?: unknown; brand_selection?: unknown
     duration_seconds: number | null; design_tokens: number | null; model: string | null
 }
 export function buildBatchReport(batch: { id: string; status: string; results: Result[]; started_at: string | Date; finished_at: string | Date | null; limits?: unknown }, attempts: ReportAttempt[]) {
@@ -18,7 +20,7 @@ export function buildBatchReport(batch: { id: string; status: string; results: R
         const related = attempts.filter(a => a.source_store_id === result.sourceStoreId)
         const timed = related.filter(a => a.duration_seconds !== null)
         const measured = related.filter(a => a.design_tokens !== null)
-        return { ...result, status: result.status ?? (result.error ? 'failed' : 'unknown'), attempts: related.length,
+        return { ...result, warningGroups: groupMigrationWarnings(result.warnings), status: result.status ?? (result.error ? 'failed' : 'unknown'), attempts: related.length,
             attemptSeconds: timed.length ? timed.reduce((sum, a) => sum + Number(a.duration_seconds), 0) : null,
             observedDesignTokens: measured.length ? measured.reduce((sum, a) => sum + Number(a.design_tokens), 0) : null,
             models: [...new Set(related.map(a => a.model).filter(Boolean))],
@@ -32,7 +34,7 @@ export function buildBatchReport(batch: { id: string; status: string; results: R
             running: stores.filter(s => s.status === 'running').length, deferred: stores.filter(s => s.status === 'deferred').length, attempts: attempts.length,
             observedDesignTokens: attempts.some(a => a.design_tokens !== null) ? attempts.reduce((sum, a) => sum + Number(a.design_tokens ?? 0), 0) : null },
         costUsd: null,
-        usageScope: 'Observed native-design responses only. Excludes credit probes, translation, provider retries without a response and other AI calls; null means not measured. Not a billing report.',
+        usageScope: 'Observed native-design responses only. Visual brand-analysis model/tokens are recorded separately in each attempt brand_evidence.analysisModel/analysisTokens (reused evidence across retries is not a new call). Excludes credit probes, translation, provider retries without a response and other AI calls; null means not measured. Not a billing report.',
     }
 }
 
@@ -43,7 +45,7 @@ export function csvCell(value: unknown) {
     return `"${text.replaceAll('"', '""')}"`
 }
 export function batchReportCsv(report: ReturnType<typeof buildBatchReport>) {
-    const keys = ['sourceStoreId','inputIndex','status','siteId','attempts','attemptSeconds','observedDesignTokens','models','code','error','warnings','readiness','mediaCleanup']
+    const keys = ['sourceStoreId','inputIndex','status','siteId','attempts','attemptSeconds','observedDesignTokens','models','code','error','warnings','warningGroups','readiness','beMapping','mediaCleanup']
     return [keys.map(csvCell).join(','), ...report.stores.map(store => keys.map(key => csvCell((store as Result)[key])).join(','))].join('\r\n') + '\r\n'
 }
 export async function readBatchReport(client: Client, id: string) {
@@ -52,7 +54,9 @@ export async function readBatchReport(client: Client, id: string) {
     const attempts = await client.query<ReportAttempt>(`SELECT source_store_id,status,stage,error_code,
         EXTRACT(EPOCH FROM (finished_at-started_at))::float8 AS duration_seconds,
         (artifacts->'usage.json'->>'totalTokens')::float8 AS design_tokens,
-        artifacts->'usage.json'->>'model' AS model
+        artifacts->'usage.json'->>'model' AS model,
+        (artifacts->'brand-evidence.json') - 'screenshot' - 'logoScreenshot' AS brand_evidence,
+        artifacts->'brand-selection.json' AS brand_selection
         FROM pw1_migration_attempts WHERE batch_id=$1 ORDER BY started_at`, [id])
     return buildBatchReport(rows[0], attempts.rows)
 }

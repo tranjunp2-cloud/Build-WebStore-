@@ -62,7 +62,7 @@ The same command drains active jobs before shutting down Payload. Automatic orph
 
 Only the positional batch CLI remains. The old raw-dump/single-store arguments, artifact-only generation, source-layout generation and file-based resume have been removed. Retry uses the same array and database ledger; each retry of a failed store calls AI again. Extraction/conversion from SQL stays outside this flow.
 
-Native outputs: Hero, Carousel, Products Grid, Blog List, Custom HTML, Video, Navigation and Footer. Category listings always use Carousel `cards`; Portfolio Grid is rejected. Category items still use input content and legacy links until category mapping is implemented.
+Native outputs: Hero, Carousel, Products Grid, Blog List, Custom HTML, Video, Navigation and Footer. Image-backed category listings use Carousel `cards` or Portfolio Grid variants. Category items retain source content; verified destination category mappings can replace legacy links (see below).
 
 `website.features: { "cart": true, "orderTracking": true }` activates the native cart system. PW2 order lookup is coupled to cart. The adapter also recognizes same-origin legacy cart/tracking navigation routes and removes those old links.
 
@@ -184,3 +184,82 @@ The batch result includes `mediaCleanup` (also in JSON/CSV and failed-batch logs
 Page identity is scoped to the source store and page ID. Distinct pages sharing a URL are retained. The first page keeps its route; later duplicates receive a collision-safe `-pw1-PAGE_ID` suffix to satisfy PW2's unique site/slug index. Only the first homepage remains the homepage. Page-ID links follow the assigned route; raw URL links retain their original destination. Reports preserve source/destination paths in `routeChanges` and warnings for user cleanup. Duplicate source IDs still fail. The collection adapter prefers source `url`, falling back to `slug` only when absent. Post-write reconciliation consumes one distinct persisted page per expected layout.
 
 Source image imports do not use a host allowlist. The operator-provided input determines the source host. URLs must use HTTPS without credentials or custom ports; redirects are rejected. The importer retains its 30-second download timeout, 10 MiB size limit and supported image MIME checks.
+
+### Content layout variety
+
+Native design uses stable per-store art directions and per-component preferences drawn from compatible layouts. Single-image heroes additionally support magazine, cards-overlay and parallax; multi-slide heroes retain slideshow. Image-backed category listings can use carousel cards or portfolio grid/masonry/showcase, preserving ordered source items. Product/blog listings remain database-backed. Rich-text HTML is retained inside reading, wide or panel wrappers according to site direction. AI preferences are guidance, not quotas; report measured layout counts separately from visual acceptance.
+
+### Source brand colors (CLI)
+
+The migrate command scans each source domain before layout generation. One isolated Chromium browser runs at a time; bounded process-local URL+logo cache and per-store analyzed evidence avoid repeat scans/AI on retries. Navigation tries normal HTTPS, relaxed-certificate HTTPS, then HTTP; transport is recorded. The browser is read-only, uses no login cookies, rejects private-network requests and credentials/custom ports, and has a60s browser-work deadline plus10s launch timeout.
+
+Computed CTA/navigation/link colors include neutral black/white/gray. A JPEG captures the page up to6000px tall; a separate source-logo image is captured when available, including when the domain fails. A separate visual AI call (45s timeout, no provider retry) proposes only primary/secondary colors, reason and confidence, rejects error/parked/blank pages without useful logo, and never generates blocks. Layout AI receives only CSS colors and the analyzed palette; screenshot bytes never enter layout generation. Visual-analysis failure falls back to CSS evidence, or contextual colors when none exists. Brand-analysis tokens count toward the batch AI token budget and are separately recorded in evidence.
+
+Runner setup requires development dependencies plus `npx playwright install --with-deps chromium`. The migrate invocation is unchanged. Browser absence produces a nonfatal warning. No new environment variables or migrations are needed.
+
+`report --batch <id> --format json` exposes attempt `brand_evidence`: URL, transport, timestamp, CSS colors, analyzed palette/reason/confidence, warning and visual model/tokens. `brand_selection` contains the final generated theme. Website and logo JPEG bytes stay in attempt artifacts and are excluded from reports. Evidence reused on retry is not another AI charge. Native-design usage totals remain separate from visual-analysis usage. Existing completed/published sites are not recolored automatically.
+
+Native AI output still passes strict source identity/order/variant validation. On invalid output the generator permits one corrective AI call with the validation error and expected identities; if it remains invalid the store fails without bypassing validation. Each response is recorded in usage controls.
+
+New tenants use the source website hostname label as slug (www custom domains use the next label), not `pw1-ID` or the exported tenant display slug. Reserved/invalid/occupied labels receive a store-ID suffix; further collisions receive a numeric suffix. Existing tenant slugs and previous-slug aliases are checked; no existing tenant is claimed. Existing mapped stores keep their current tenant unless explicitly renamed.
+
+### Carousel source layout
+
+Carousel aspectRatio/imageFit/slidesPerView are passed through from explicit source component config. Image dimensions do not determine layout; the importer no longer synthesizes these values. The renderer has no migration-wide480px/55vh cap. Optional maxImageWidth remains supported as an explicit block setting. Missing Small-banner ratio/slide count is reported as unverified PW1 layout and uses normal PW2 defaults, not a claim of equivalent source presentation. Per-theme extraction/verified mappings are still pending; current collection export lacks that geometry. Do not reintroduce image-size heuristics as source-layout evidence.
+
+### Internal source links
+The compact adapter resolves same-host HTTP/HTTPS page URLs against this store's migrated page routes, including navigation, footer, banner CTA, category cards and HTML anchors. Query strings and fragments survive. Page-ID targets retain identity even when duplicate source paths receive temporary destination slugs; URL-only duplicate targets resolve to the first source page. Rich-text rendering prefixes local `/sites/{slug}` links without writing that prefix back to editor content.
+
+Unmatched source routes and legacy entity-filter URLs (for example `?category=42`) remain unchanged with an `Unresolved source link retained` report warning. These require verified BE entity mappings; replacing the host alone is unsafe. External destinations and media URLs are preserved. This is not a claim that every source link has been migrated.
+
+### Explicit BE destination and category mapping
+
+An optional `destination` on each batch entry (or collection bundle) attaches migration to an **existing draft** BE site instead of creating a fresh tenant/site. Example (IDs are placeholders):
+
+```json
+{
+  "destination": {
+    "tenantId": 100,
+    "siteId": 200,
+    "productCategories": [
+      { "sourceId": "32589", "destinationId": 300, "listingPageId": "12251", "sourcePath": "/products" }
+    ]
+  }
+}
+```
+
+The importing operator supplies the source-to-destination identities. Runtime checks require an existing account matching the input email, active owner membership, the declared site belonging to that tenant and still in draft, and every destination category undeleted in that exact tenant/site. Existing migration mappings cannot be redirected. Two stores cannot claim the same destination. Attaching does not create/change accounts, memberships, subscriptions or commerce records; website content is regenerated using the existing atomic replacement and backup mechanism. Do not point this at a published site.
+
+`listingPageId` is the **source page ID**, and must contain an enabled product listing. Its migrated route receives `?categoryId=DESTINATION_ID`; native category filtering is enabled for that page's product blocks. Only verified `category`/`category_id` links matching `sourcePath` are translated; unrelated query/hash data survive. No matching by category name. Validation happens before generation and is repeated inside the website write transaction. `be-mapping.json` records verified declared mappings, and store results expose `beMapping` separately from the broader catalog-readiness assessment.
+
+This implements product-category link mapping only. It does not certify completeness of BE product/blog imports, map brands/blog categories/product detail URLs, or apply legacy listing selections/sorting. Those remain pending. Input without `destination` behaves as before. `--dry-run` validates the declaration's structure and source-page reference only; it does not access the destination DB.
+
+### Public quality audit (no BE dependency)
+
+```sh
+npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts audit input.json --audit-base-url http://localhost:3000 --audit-output /tmp/pw1-quality.json
+```
+
+Reads mapped sites/pages from DB and visits published `/sites/{tenantSlug}` routes anonymously at 1440px and 390px, using two browser contexts. Never publishes sites, submits forms, clicks controls or follows PW1/external links. Checks HTTP/runtime errors, loaded broken images, horizontal overflow, unnamed controls and internal links. PW1 entity-filter links are grouped as `waiting-be`; other PW1 page links need review. This classification is based on URL shape, not a verification of BE mapping. Not a visual parity or commerce correctness certification.
+
+Outputs JSON + `.md` plus incremental `.jsonl` page results. Each finding has store/page/URL, block index when available and viewport. Per-store status distinguishes `needs-fix`, `needs-review`, `waiting-be`, `checked`, `not-checked`. Exit 2 means detected errors, skipped/unpublished stores or invalid input entries; warnings/BE waits remain visible without making the command fail. Browser/DB setup failures exit 1. An HTTP 200 cannot prove absence of a rendered soft-404, and the scan does not exercise hover menus, carousel navigation or purchase flows.
+
+To retain a single migrate invocation, add both `--audit-base-url ORIGIN --audit-output REPORT.json` to the normal run/retry command. Audit runs after successful batch completion; draft sites are reported as not checked (migration still does not auto-publish). A failed batch keeps its existing error flow; run `audit` separately to inspect its published results. GitHub runner needs Chromium installed as described above, and a reachable running PW2 application. Each page is bounded to 160 scroll steps, 30-second navigation and 15-second link checks; incomplete scan is reported. Only up to 2,000 unique same-store links are requested, redirects are reported rather than followed, and external link health is not checked.
+
+### GitHub Actions (deferred)
+
+User deferred this integration. A local workflow draft has not been committed or dispatched; the supported entry point remains the CLI command above.
+
+### Reviewed URL corrections and source carousel evidence
+
+A batch entry (or collection bundle) can include `linkCorrections`. Each correction is scoped to that store and requires an exact `from`, an existing source `pageId`, and a review `reason`:
+
+```json
+{"linkCorrections":[{"from":"/products-services","pageId":"5135","reason":"Reviewed source page uses /product-service"}]}
+```
+
+Corrections participate in the input hash. They are not fuzzy path matching; external URLs remain unchanged unless explicitly listed. The adapter also maps the legacy same-store `/checkout` URL to PW2's existing checkout route. This does not migrate payments or assert that BE product import is complete. Empty unstyled editor anchors are removed; image-only or decorative external links without a name receive a destination label.
+
+The existing read-only PW1 homepage scan now captures rendered Swiper image frame ratio, image fit and visible slide count. Exact source image URLs bind this evidence to Small banner components, with conflicting observations rejected. Explicit input layout values win. `carousel-evidence.json` records applied/unverified components. This is rendered homepage evidence, not coverage of every legacy theme: inaccessible pages, CSS background images, non-Swiper carousels and inner-page-only banners may still need explicit source configuration. No intrinsic image-size or fixed-height heuristic is used.
+
+Audit scrolling now allows up to 160 steps (previously 20); pages exceeding that bound still produce `SCAN_LIMIT`. Cleanup adds a conservative pages/sites preflight, and local reset reference queries are grouped in batches of 20 tables. Deletion still requires the full locked reference check. Run cleanup during an idle period; concurrent CMS writes can safely reject the lock rather than bypass checks.

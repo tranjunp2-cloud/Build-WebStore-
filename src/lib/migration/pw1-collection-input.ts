@@ -138,7 +138,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 if (type === 'category_listing') {
                     const items = ordered(c.shortlist_items).filter(active).map(i => {
                         const dest = resolveTarget(i.model_type, i.model_id, '', `component:${str(c.id)}/item:${str(i.id)}`)
-                        return { sourceId: str(i.id), title: str(i.name), imageUrl: str(i.image), alt: str(i.name), ...(dest?.url ? { url: dest.url, ctaLabel: str(i.cta_button_text) } : {}) }
+                        return { sourceId: str(i.id), title: str(i.name), imageUrl: str(i.image), alt: str(i.name), ...(dest ? { ...dest, ctaLabel: str(i.cta_button_text) } : {}) }
                     })
                     if (!items.length) { exclude(c.id, 'component', 'empty-category-list'); return [] }
                     return [{ ...common, content: { heading: str(config.header), items }, config: { autoplay: config.animation === 'auto', intervalMs: Number(config.timing_animation ?? 5) * 1000, sourceSettings } }]
@@ -174,7 +174,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 socialLinks: pickStrings(site.socialLinks, ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok']),
                 seo: { ...pickStrings(site.seo, ['metaTitle', 'metaDescription']), ogImage: assetUrl(seo.ogImage) },
             }
-            entries.push({ sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin }, website: {
+            entries.push({ ...(bundle.linkCorrections ? { linkCorrections: bundle.linkCorrections } : {}), ...(bundle.destination ? { destination: bundle.destination } : {}), sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin }, website: {
                 settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: str(object(site.branding).logo) },
                 features: { cart: Number(headerConfig.cart_status) === 1, orderTracking: Number(headerConfig.cart_status) === 1 && validPages.some(p => str(p.type) === '6') },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(menuLinks),

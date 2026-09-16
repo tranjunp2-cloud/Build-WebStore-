@@ -20,7 +20,7 @@ export function validateCleanupOptions(options: CleanupOptions) {
 }
 export function migrationMediaStem(candidate: Candidate): string | null {
     const stem = `pw1-${candidate.tenant_id}-${candidate.source_hash.slice(0, 20)}`
-    return /^[a-f0-9]{64}$/.test(candidate.source_hash) && ['jpg','jpeg','png','webp','gif','avif'].some(ext => candidate.filename === `${stem}.${ext}`) ? stem : null
+    return /^[a-f0-9]{64}$/.test(candidate.source_hash) && ['jpg','jpeg','png','webp','gif','avif','ico'].some(ext => candidate.filename === `${stem}.${ext}`) ? stem : null
 }
 const quote = (identifier: string) => `"${identifier.replaceAll('"', '""')}"`
 const qualified = (table: Table) => `${quote(table.schema)}.${quote(table.name)}`
@@ -78,7 +78,25 @@ async function cleanCandidates(payload: Payload, candidates: Candidate[], option
     configureMigrationTransactions(payload)
     const activePayload = payload, db = payload.db as unknown as Database
     const results: Array<{ mediaId: number; status: string; reason?: string }> = []
+    // A read-only preflight can only retain candidates. Every deletion still runs the
+    // authoritative locked check below, so concurrent CMS edits cannot create a stale delete.
+    const preflightReferences = new Set<number>()
+    if (candidates.length > 1) {
+        const refs = await db.drizzle.transaction(async tx => {
+            await tx.execute(sql`SET LOCAL statement_timeout = '30s'`)
+            const result = await tx.execute(sql`WITH documents AS MATERIALIZED (
+                SELECT to_jsonb(p)::text AS document FROM pages p
+                UNION ALL SELECT to_jsonb(s)::text FROM sites s
+            ) SELECT c.id FROM jsonb_to_recordset(${JSON.stringify(candidates)}::jsonb)
+                AS c(id int,filename text,source_hash text,tenant_id int)
+                WHERE EXISTS (SELECT 1 FROM documents d WHERE
+                    strpos(d.document,'pw1-'||c.tenant_id::text||'-'||left(c.source_hash,20))>0)`) as {rows: Array<{id:number}>}
+            return result.rows
+        })
+        for (const row of refs) preflightReferences.add(row.id)
+    }
     for (const candidate of candidates) {
+        if (preflightReferences.has(candidate.id)) { results.push({mediaId:candidate.id,status:'retained',reason:'Possible reference in pages/sites preflight'}); continue }
         const stem = migrationMediaStem(candidate)
         if (!stem) { results.push({ mediaId: candidate.id, status: 'retained', reason: 'Migration provenance/filename mismatch' }); continue }
         try {
@@ -179,18 +197,22 @@ export async function cleanupResetMigrationMedia(payload: Payload, client: Clien
         }
         // Serialize each existing document once per table, then check all reset candidates.
         // Hold write locks until deletion finishes so the shared snapshot cannot become stale.
-        for (const table of tables) {
-            if (table.schema === 'public' && table.name === 'pw1_migration_media') continue
+        const searchable = tables.filter(table => !(table.schema === 'public' && table.name === 'pw1_migration_media'))
+        for (let offset = 0; offset < searchable.length; offset += 20) {
             const pending = candidates.filter(c => !retained.has(c.id))
             if (!pending.length) break
-            const own = table.schema === 'public' && table.name === 'media' ? sql`t.id` : sql`NULL::int`
-            const result = await tx.execute(sql`WITH documents AS MATERIALIZED (
-                SELECT (to_jsonb(t) - ${table.excluded}::text[])::text AS document, ${own} AS own_id FROM ${sql.raw(qualified(table))} t
-            ) SELECT c.id FROM jsonb_to_recordset(${JSON.stringify(pending)}::jsonb) AS c(id int,filename text,source_hash text,tenant_id int)
-            WHERE EXISTS (SELECT 1 FROM documents d WHERE d.own_id IS DISTINCT FROM c.id AND (
-                d.document ~ ('(^|[^a-zA-Z0-9])'||c.id::text||'([^a-zA-Z0-9]|$)')
-                OR strpos(d.document,'pw1-'||c.tenant_id::text||'-'||left(c.source_hash,20))>0))`) as { rows: Array<{ id: number }> }
-            for (const row of result.rows) retained.set(row.id, `Possible reference in ${table.schema}.${table.name}`)
+            const probes = searchable.slice(offset, offset + 20).map(table => {
+                const own = table.schema === 'public' && table.name === 'media' ? sql`t.id` : sql`NULL::int`
+                return sql`(WITH documents AS MATERIALIZED (
+                    SELECT (to_jsonb(t) - ${table.excluded}::text[])::text AS document, ${own} AS own_id FROM ${sql.raw(qualified(table))} t
+                ) SELECT c.id, ${`${table.schema}.${table.name}`}::text AS source
+                FROM jsonb_to_recordset(${JSON.stringify(pending)}::jsonb) AS c(id int,filename text,source_hash text,tenant_id int)
+                WHERE EXISTS (SELECT 1 FROM documents d WHERE d.own_id IS DISTINCT FROM c.id AND (
+                    d.document ~ ('(^|[^a-zA-Z0-9])'||c.id::text||'([^a-zA-Z0-9]|$)')
+                    OR strpos(d.document,'pw1-'||c.tenant_id::text||'-'||left(c.source_hash,20))>0)))`
+            })
+            const result = await tx.execute(sql`${sql.join(probes, sql` UNION ALL `)}`) as {rows: Array<{id:number;source:string}>}
+            for (const row of result.rows) if (!retained.has(row.id)) retained.set(row.id, `Possible reference in ${row.source}`)
         }
         const results: Array<{ mediaId: number; status: string; reason?: string }> = []
         const transactionID = randomUUID()

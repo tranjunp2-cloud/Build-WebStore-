@@ -1,9 +1,12 @@
+import { DestinationSchema } from './pw1-destination'
 import { z } from 'zod'
 import { createHash } from 'node:crypto'
 import { WebsiteInputSchema, adaptWebsiteInput } from './pw2-website-input'
 const Identity = z.string().regex(/^\d+$/)
 const BatchEntrySchema = z.object({
     sourceUserId: Identity, sourceStoreId: Identity,
+    destination: DestinationSchema.optional(),
+    linkCorrections: WebsiteInputSchema.shape.linkCorrections,
     owner: z.object({ email: z.string().email().transform(v=>v.trim().toLowerCase()), firstName: z.string().min(1), lastName: z.string().optional() }).strict(),
     source: z.object({ websiteUrl: z.string().url(), capturedAt: z.string().optional() }).strict(),
     website: WebsiteInputSchema.shape.website.extend({ pages: WebsiteInputSchema.shape.pages }).strict(),
@@ -11,7 +14,7 @@ const BatchEntrySchema = z.object({
 export type BatchEntry = z.infer<typeof BatchEntrySchema>
 export function compactInput(entry: BatchEntry) {
     const { pages, ...website } = entry.website
-    return { format:'pw2-website-input', version:'1.0.0', source:{...entry.source,storeId:entry.sourceStoreId}, website, pages }
+    return { linkCorrections: entry.linkCorrections, format:'pw2-website-input', version:'1.0.0', source:{...entry.source,storeId:entry.sourceStoreId}, website, pages }
 }
 /** Validate the complete array before any connection, provisioning or generation. */
 export function parseBatchInput(input: unknown): BatchEntry[] {
@@ -24,6 +27,10 @@ export function parseBatchInput(input: unknown): BatchEntry[] {
         if (users.has(entry.sourceUserId) && users.get(entry.sourceUserId)!==identity) throw new Error(`Conflicting owner for source user ${entry.sourceUserId}`)
         if (emails.has(entry.owner.email) && emails.get(entry.owner.email)!==entry.sourceUserId) throw new Error('Different source users cannot share one destination email')
         users.set(entry.sourceUserId,identity); emails.set(entry.owner.email,entry.sourceUserId)
+        for (const mapping of entry.destination?.productCategories ?? []) {
+            const page = entry.website.pages.find(p => p.sourceId === mapping.listingPageId)
+            if (!page?.components.some(c => c.enabled !== false && c.type === 'product_listing')) throw new Error(`Category mapping requires a product listing page: ${mapping.listingPageId}`)
+        }
         adaptWebsiteInput(compactInput(entry))
     }
     return entries

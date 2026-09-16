@@ -1,3 +1,95 @@
+# Corrected carousel policy — 2026-09-16
+
+User rejected generic caps and image-derived geometry. Removed480px/55vh renderer cap and median/max image sizing import policy. Removed helper/tests asserting that incorrect policy. Explicit source config aspectRatio/imageFit/slidesPerView now passes through adapter→binder→carousel; absentSmallbanner geometry produces percomponent warning. CurrentPW1export has no verifiedthemegeometry; full mapping still pending, not paritycomplete. Cleared49pilotcarousel heuristic settings plus98version records, republished30local sites; backup `/tmp/carousel-before-remove-inference.json`. Existing olddefaults return; this is removal of incorrect guesses, not a claim of blur fixed or PW1 layout replicated. Prior sizingdocs superseded. No reset.
+
+# Carousel oversized frame correction — 2026-09-16
+
+User reported small portrait centered in huge blank frame. Root: largest source width plus median aspect could produce multi-thousand-pixel frames; scale-down only fixed image scaling. Renderer now bounds migrated scale-down frames to480px/55svh and clamps aspect0.75–2.4, constrains viewport width accordingly. Legacy cover unchanged. Existing49carousels benefit immediately, no reset/DB mutation. Future migration uses median source width capped960 and ratio*480 instead oflargest; unknown metadata uses16:9/800px. Stable frame across slides.
+
+Validation: TypeScript+3puretests+5realbrowser tests pass (desktop/mobile253; worstdimensions546our-services,1127,1047). Verified PC_DEMO_14 screenshot /tmp/carousel-bounded.png. No republish/regeneration needed; code uncommitted.
+
+# Fresh30 carousel pilot — 2026-09-16
+
+User requested full reset+migrate. Backup `/tmp/pw1-before-carousel-30.dump`; scoped reset30 keeps loginaccounts and outside sites. Batch `12dd0e43-fc24-4f79-9c15-3816503d504b`:30completed_with_warnings,0failed/skip,143.388s excluding reset/publish, no manualretry. Readback157pages including404, allsettingsmatch. Published30 localsites.49/49carousel persisted scale-down+aspectRatio+maxImageWidth AFTERpublish. Anonymous127/127 HTTP200.29brandobserved/1fallback. Existing BE mapping warnings remain.
+
+Latest evidence+published-links.md `~/Work/pw1-exports/reconstruction/pilot-carousel-30-20260916/`. Source-domain slugs unchanged; newsite IDs. Reset script moved out of repo. No code changes or commit/push thisrun. This pilot proves carousel fields survive ordinary migrate+publish without postmigrationpatch.
+
+# Carousel image layout improvement — 2026-09-16
+
+User requested general migration fix after PW1 carousel research. Added optional carousel aspectRatio/imageFit/maxImageWidth/slidesPerView to config/renderer, Pages fields, additive DB migration for current+version tables, and AI field allowlist. Media importer derives median ratio/max source width from actual media dimensions, uses scale-down; honors explicit sourceLayout geometry when supplied. No automatic per-theme scraping implemented; unknown layout keeps1slide. Legacyblocks preservedefaults. Cards withouttext no longer renderemptycontentpadding.
+
+Applied layout to49carousel blocks across30localpilot sites (and their version records so publish retainsvalues), republished30. Temporary script and before-data backup moved outsideGit. Store253 persistedafterpublish ratio1.8,maxwidth900,imageFit scale-down. Initial publish encountered devHMR Drizzle schema error; server restarted clean via nextdev, successful republish afterward. Serverlog /tmp/pw1-carousel-next.log. Browser E2E tests tests/pw1-carousel-layout.spec.ts use local253fixture and desktop/mobile navigation. No reset/regeneration thisturn; no commit/push. Source domain links unchanged.
+
+# Full30 brand-v2 pilot — 2026-09-16
+
+User requested reset30 and migrate again. Backup `/tmp/pw1-before-brand-v2-30-20260916.dump`. Reset30sites/tenants/mappings; login accounts preserved, outside sites unchanged;131media deleted/200retained. Source-domain tenant slugs now provisioned directly.
+
+Initial batch `17b27c71-8df9-4eb6-9793-ca4b7ff0ca4a`:29completed/1failed (1047 category variant validation),172.983seconds excluding reset/publish. Retry `a7c75656-a5af-4f77-ad9a-1c60d1ba0058` completed1047,29skipped. Final30completed_with_warnings,0failed remaining. Brand evidence28observed/2fallback (1041 webpage timeout+logo generic photo rejected;939page screenshot5s timeout). Do not claim all30 recovered brand identity. Readback157pages including404; branding/contact/social/SEO matches input30/30. Publish30/30 via localAPI; anonymous127/127 HTTP200. No visual acceptance claim.
+
+Private evidence `~/Work/pw1-exports/reconstruction/pilot-brand-v2-30-20260916/`: original reports for bothbatches, combined report.json, verification, results, anonymous-checks, published-links.md with actual domain slugs and palette. Temporaryreset moved here. No code changes needed thisrun; no commit/push. Latest link list supersedes previouspilot. Local sites remain published.
+
+# Brand scan v2 — 2026-09-16
+
+User requested broader PW1 visual reference. Scanner now tries HTTPS→relaxed cert→HTTP, records transport, retains neutral colors, captures up to6000px page JPEG and source-logo image in guarded browser. Can analyze logo even if domain unavailable. Separate analyzePw1Brand visual AI returns only palette/reason/confidence/usable; layout AI never sees screenshot bytes. Error/parked pages rejected; visual-AI failure uses CSS/contextual fallback. Batch budgets include visual tokens, artifacts/report expose them separately. Browser cache raw byURL+logo; analyzed evidence reused perstore onretry.
+
+Real scan+AI smoke (no DB mutation): store205 Amelina recovered via https-relaxed, brown#241305/olive#748a53 confidence medium; store253 CSS-empty recovered fromlogo blue#28489f/orange#f58220 confidencehigh. Evidence `/tmp/pw1-brand-v2-smoke.log`. 30 publishedsites NOT regenerated/recolored this turn. Previous source-slug mapping remains current. No new env/schema/dependency. Changes uncommitted.
+
+# PW1 source slug — 2026-09-16
+
+User confirmed public tenant slug must follow PW1 domain, not pw1-storeID. Provision now uses selectPw1TenantSlug: first hostname label, strip www; validate existing tenant constraints; suffix source ID for reserved/invalid/collision, then counter. Checks existing tenant current and previous slug aliases, never claims another tenant. No schema/env changes.
+
+Explicitly updated30 local pilot tenant slugs using Payload, preserved old slugs in previousSlugs with30day expiry. Pages/site IDs and content unchanged. Store546 now `/sites/test-dev-pw10` (source domain), not exported tenant slug ary-... . Mapping audit outsideGit in pilot-brand-30-20260916/slug-changes.json; published-links.md updated. Existing mapped stores are not renamed automatically on CLI retry. Earlier /sites/pw1-ID handoff URLs superseded.
+
+# Reset + migrate30 với màu PW1 — 2026-09-16
+
+User yêu cầu reset30 và migrate lại. Backup `/tmp/pw1-before-brand-30-20260916.dump`. Reset30sites/tenants/mappings, giữ login accounts, outside sites unchanged; cleanup138 deleted/193 retained. Evidence riêng `~/Work/pw1-exports/reconstruction/pilot-brand-30-20260916/`; reset.ts chuyển khỏi repo.
+
+Batch đầu `ec70e843-ca31-45e1-b15e-8fcf77371af2`:24 completed/6failed,149.139s. Lỗi native AI page/section identity hoặc category variant. Bỏ JPEG khỏi AI layout prompt (vẫn lưu audit), chỉ truyền bảng màu; retry `fa7c0014-6283-4454-9f1a-adef6c1422fb` sửa3. Thêm một lượt correction có validation error+expected identities/allowedOutput, binder vẫn strict; retry `0db4c027-0796-42fd-bdc1-b727ee406225` sửa3 còn lại. Tổng30 completed_with_warnings,0failed remaining. Không được mô tả đây là một batch thành công ngay lần đầu. Usage accumulation sửa để đếm mọi native-design call khi correction; lần retry2 chạy trước sửa accumulation nên report usage correction có thể thiếu.
+
+16store brand observed,14fallback (10SSL/4no chromatic UI color). Readback157pages including404, allSettingsMatch=true. Publish30/30 local API. Anonymous127/127 pages returned200, chưa nghiệm thu visual. Link giữ `/sites/pw1-ID`; published-links.md ngoàiGit có palette và evidence status. Report riêng từngbatch giữ nguyên; report.json là tổng hợp thành công qua3batch (aggregateTotals là kết quả gộp).
+
+171tests/16files+tsc+diff check pass. Generator hiện không gửi screenshot cho AI nữa vì screenshot ảnh hưởng cấu trúc; screenshot vẫn ở artifact. Một lượt correction có test thành công và hết lượt vẫn fail. Chưa commit/push. Các mục dưới là lịch sử trước lượt này.
+
+# CLI source brand scan — 2026-09-16
+
+Added automatic scan of input source.websiteUrl in batch CLI before AI generation. CLI-only Playwright, one browser at a time, bounded100 URL process cache, per-store evidence reused on retry. Captures ranked chromatic CTA/nav/link computed colors and viewport JPEG; passes evidence + image to native AI with instruction to retain brand anchors and adjust readability. Artifact brand-evidence.json plus brand-selection.json; JSON batch report exposes evidence without JPEG and generated theme. Fallback warning for launch/network/SSL/no-color failures; cancellation still aborts. No new env vars/schema/dependencies (existing Playwright). CI runner setup needs `npx playwright install --with-deps chromium`; migrate command unchanged. Existing published30 sites NOT recolored in this turn.
+
+Validation: TypeScript,170 tests/16 files, diff check pass. Real browser PC_DEMO_14 returned observed #337ab7(nav/link), #ee9051(nav/CTA/link), JPEG45844base64 chars. This smoke test did not call AI or mutate DB. Browser Chromium installed locally for verification. Pending full migration with brand scan and visual evaluation of generated palettes. Latest reset/publish remains previous block-variety batch below. Code uncommitted.
+
+# Reset + migrate lại 30 store với block variety — 2026-09-16
+
+Theo yêu cầu user, reset đúng30 stores rồi chạy lại full flow với code variant mới. Backup trước reset: `/tmp/pw1-before-block-variety-30-20260916.dump`. Đã xóa30site/tenant/mapping; giữ login accounts và xác nhận site ngoài scope không đổi. Cleanup xóa136 media, giữ195 có thể còn tham chiếu.
+
+Batch `6a703988-5024-4057-8d4e-2d18fbfdc5da`, concurrency5, writes serialized:30 completed_with_warnings,0failed/skip,59.270s (không gồm reset/publish). Readback157pages gồm404; branding/contact/social/SEO khớp cả30. Publish API local30/30 thành công. Anonymous HTTP127/127 trang không phải404 trả200; đây là kiểm tra routing, chưa phải nghiệm thu visual/mobile. URL giữ `/sites/pw1-{storeId}`; site IDs đã đổi.
+
+Actual output across pages: hero slideshow37/fullscreen4/split-right3/centered9/parallax3/split-left2/cards-overlay4; products grid3=12/grid4=17/list8; portfolio grid9/showcase8/masonry8; blog list24/cards17; carousel images21/cards27. Footer dark-gradient53/simple26/centered-stack48. Đây là số block trên tất cả page, không phải số store. Các cảnh báo BE product/blog import, source identity mapping và filter/search/category mapping vẫn tồn tại; không tuyên bố full PW1 parity.
+
+Evidence riêng ngoàiGit: `~/Work/pw1-exports/reconstruction/pilot-block-variety-30-20260916/` gồm reset-summary, run.log, timing, report, verification, results, anonymous-checks, block-counts và published-links.md. Script reset tạm đã chuyển ra khỏi repo. Thay đổi code variant chưa commit/push; các mục bên dưới là lịch sử trước lần chạy này.
+
+# Đa dạng block nội dung — 2026-09-16
+
+User yêu cầu đa dạng cả block bên trong. Đã mở hero một ảnh thêm magazine/cards-overlay/parallax (không mở minimal/gradient vì renderer không hiển thị ảnh, không mở video khi nguồn không có video). Multi-slide giữ slideshow để không mất slide. Category listing nay cho phép carousel cards hoặc portfolio-grid grid/masonry/showcase khi mọi item có ảnh nguồn; giữ thứ tự/title/image/description/link. Products/blog vẫn query DB thật. Thêm preferredOutput ổn định theo store+component ID từ allowedOutput, AI có quyền chọn khác nếu không phù hợp. Rich text giữ nguyên HTML, wrapper reading/wide/panel theo art direction thay vì luôn960px. Không tạo block type mới.
+
+167 tests + TypeScript pass. AI generate+bind thử30/30 hợp lệ, chưa ghi DB/publish. So với lần đo trước: products-grid list0→7; category portfolio25block (showcase9/grid8/masonry8); blog cards29/list12→cards18/list23; hero thêm cards-overlay4/parallax4 (magazine được mở nhưng lần này AI không chọn). Hero tổng62block, slideshow36 vẫn nhiều vì nguồn multi-slide. Evidence `~/Work/pw1-exports/reconstruction/block-variety-30-20260916/` có designs và block-counts; số đếm là block trên toàn bộ page, không phải số store. Cần regenerate/publish và visual QA trước khi kết luận UI đạt yêu cầu; các30 site đang publish vẫn là bản pilot-footer trước đó.
+
+# Tăng đa dạng thiết kế — 2026-09-16
+
+User nhận xét 30 site giống nhau gần80%. Đã bổ sung `pw1-design-direction.ts`:6 định hướng editorial/catalog/immersive/boutique/studio/classic, chọn ổn định từ storeId hash, làm gợi ý cho AI chứ không ép layout hoặc random theo lần chạy. Mở đủ6 navigation variants từ schema native. AI nhận mood và preferred header/footer/single-image hero/products/blog layouts; vẫn giữ các ràng buộc bảo toàn nội dung (multi-slide hero luôn slideshow, rich text giữ HTML).
+
+Đã gọi AI thật trên30 input, chỉ generate+bind trong bộ nhớ, KHÔNG ghi đè30 site published. 30/30 output hợp lệ. Header: transparent7/default7/mega5/floating6/sidebar2/centered3. Footer: dark-gradient12/simple7/centered-stack11 (trước đó simple26/30). Đây là số variant, chưa phải đánh giá visual/mobile hay khẳng định % web khác nhau. Evidence riêng `~/Work/pw1-exports/reconstruction/variety-30-20260916/`. 161 tests và TypeScript pass. Muốn nhìn phiên bản này trên website cần migrate/regenerate tiếp; không tự reset dữ liệu trong lượt đo AI này.
+
+# Pilot footer 30 store — 2026-09-16
+
+Đã reset đúng30 stores, backup `/tmp/pw1-before-footer-30-20260916.dump`, giữ login accounts. Batch `b729f25d-75f9-4fd6-b51f-27554061d0aa` chạy concurrency5 từ đầu: 30 completed_with_warnings, 0failed/skip, wall55.914s (không gồm reset). Read-back157pages gồm404, branding/contact/social/SEO khớp cả30. Đã publish lại30 trên local qua API. Footer actual:26simple,2minimal(store959/1041),2centered-stack(store602/1044),0dark-gradient. Prompt mới chưa tạo khác biệt lớn về phân bố; chưa được xem là nghiệm thu visual.
+
+Reset phát hiện cleanup filename validator thiếu ico; đã thêm ico kèm regression assertion. 154 migration tests và TypeScript pass. Evidence riêng ngoàiGit: `~/Work/pw1-exports/reconstruction/pilot-footer-30-20260916/`. Các siteIDs đã đổi; dùng `/sites/pw1-{storeId}`. Server local được khởi động Next dev không turbopack, log `/tmp/pw1-footer-next.log`.
+
+# Cập nhật 2026-09-16 — Footer AI
+
+Đã sửa prompt native migration để gửi đầy đủ `source.site.footer` và `source.site.navigation`. Footer output enum và danh sách cho AI lấy trực tiếp từ FooterConfigSchema (simple/minimal/centered-stack/dark-gradient), không hardcode tập con. Hướng dẫn AI chọn theo nội dung/phong cách, không random để tạo khác biệt; cảnh báo hạn chế hiển thị của minimal khi có tagline/socials/nhiều nhóm link. Footer vẫn global trong mỗi site, binder giữ nguyên nội dung nguồn.
+
+15 tests native AI và TypeScript pass. Chưa gọi AI thật để đo phân bố variant mới; chưa regenerate 30 site đang published. Các site cũ chưa thay đổi. Mục “footer CHƯA sửa” bên dưới là trạng thái lịch sử đã được thay thế bởi cập nhật này. Các mapping BE và staging pilot vẫn pending.
+
 # Context mới nhất — 2026-09-15
 
 Phần này thay thế trạng thái cũ bên dưới. Branch vẫn là `levietducprime/research-f35-spike-f35-11-nghi-n-c-u-t-i-t-o-web`. User yêu cầu lưu context và commit/push; chưa yêu cầu merge hoặc triển khai production.
@@ -207,3 +299,43 @@ Các báo cáo:
 > Đọc `docs/migration/SESSION-HANDOFF.md` trên branch hiện tại, kiểm tra trạng thái repo/môi trường rồi tiếp tục phần PW1 migration và Rich text Tiptap từ commit dd3c66dc0. Đừng migrate lại hay sửa dữ liệu trước khi xác định DB đích.
 
 Lưu ý phối hợp: người dùng thích làm trực tiếp, sửa nhỏ rồi quan sát UI, không hỏi lại quyền cho thay đổi đã được yêu cầu. Đọc screenshot cẩn thận; “full toolbar” nghĩa hiển thị đủ công cụ, không chỉ kéo rộng thanh vẫn có More tools. Không tự merge/publish/gửi thông báo hoặc mang mật khẩu vào tài liệu bàn giao.
+
+## Internal links repair — 2026-09-16
+- Added `pw1-links.ts`, used by compact adapter for known same-store page URLs in navigation/footer/banner/category CTA and Rich text anchors. Preserve query/hash and external/media URLs. Preserve Page-ID category CTA previously omitted.
+- Unmapped entity filters and unknown pages remain source links with report warnings; 30-store input audit has 96 distinct-per-store unresolved URLs (`/tmp/pw1-link-audit.json`). Do not report all PW1 links removed.
+- Patched 57 fields in 9 local pilot stores (current/version blocks), backed up exact changes to `/tmp/pw1-link-repair-backup.json`, then republished all30. No content generation/reset performed.
+- Custom HTML/Rich text local runtime prefixes internal anchors with `/sites/{slug}`; editor data remains portable.
+
+## BE destination/category mapping — 2026-09-16
+- Optional per-entry/bundle `destination` declares existing draft tenant/site and product category ID pairs + source listing page ID. No guessing from names.
+- Provisioner can attach to existing BE site only after active owner/site/category scope verification; existing store mappings cannot be redirected. Categories checked again inside atomic website write. No new schema/env vars.
+- Verified category/category_id links become native categoryId links on mapped product listing; its native filters are enabled. Other entity types/listing selection semantics remain pending.
+- `be-mapping.json` artifact and JSON/CSV `beMapping` summarize verified declarations. Broader BE readiness remains explicitly unverified, not overridden by category mappings.
+- 185 migration unit tests, TypeScript and real local DB/browser E2E pass. E2E creates isolated fixtures, verifies site reuse/no extra tenant, rejects invalid scope, clicks CTA and proves only matching category product returned; cleans fixtures.
+- Current 30-store input has no destination mapping. No reset/regeneration or guessed BE IDs applied to those sites this turn. Need actual BE ID pairs to activate category mapping there. Product/blog/brand mapping and filter/sort fidelity are still next stages.
+
+## Non-BE quality audit / CI — 2026-09-16
+- CLI adds `audit FILE --audit-base-url ORIGIN --audit-output REPORT.json`, or optional audit flags after successful run/retry. Published-only anonymous QA; draft sites explicitly not checked, never auto-published. JSON/Markdown + incremental JSONL, per-store severity and page/block/viewport evidence.
+- 30-store audit completed:127 pages,0 scanner failures,1 internal link404,77 warnings,167 per-page BE-link findings. Unique source entity URLs64; source page URLs17. Ten stores exceed bounded scroll scan; lower sections remain unchecked. Report at private pilot root `quality-report.json`, user summary `quality-summary.md`.
+- Real findings:963 Home has stale source HTML `/products-services` but page is `/product-service`;205 Home embeds absolute localhost root links in source HTML. Do not blindly rewrite similar names or unrelated external URLs.
+- An initial tsx DOM serialization failure was fixed using a local __name shim (not injected into site globals); its invalid report was replaced by the full successful rerun.
+- Migration report adds warningGroups (BE/presentation/functionality/links/other). Manual GitHub workflow added for dry-run/run/retry + private input/env secrets and report artifacts; YAML/bash validated, not dispatched.
+- 188 unit tests, browser audit fixture and TypeScript passed. No data reset, migration generation, publishing or commit/push this turn. Carousel theme extraction and media-cleanup performance tuning are still pending.
+
+## 2026-09-16 follow-up: QA fixes, source carousel evidence, cleanup
+
+User deferred GitHub Actions. Workflow draft remains local/uncommitted. Remaining migration work and context are being committed on the current branch.
+
+- Added per-store `linkCorrections` (exact from + source pageId + review reason), validated before any migration and included in input hash. Pilot input has reviewed corrections for 205 localhost root -> source home 646, and 963 /products-services -> source page 5135. Original input backed up at /tmp/pw1-input-before-reviewed-links.json.
+- Native checkout route is now included in source link resolution; no payment settings/import inferred. Remaining source about-us links (645,1033,1042) have no confirmed destination and remain warnings.
+- Removes empty unstyled editor links and names external image-only links when alt/title/aria name absent; Google Maps gets a purpose-specific label.
+- Applied scoped local HTML repairs (4 rows incl latest versions) and checkout navigation/footer repairs (106 rows incl latest versions). Backups /tmp/pw1-reviewed-repair-sql-backup.json and /tmp/pw1-checkout-repair-backup.json. No reset/AI regeneration. Generic Payload full-page update encountered id uniqueness validation and was rolled back; used narrow transactional SQL patches instead, preserving older versions.
+- Added CLI-only pw1-carousel-evidence module. Reads rendered Swiper image frames, exact media matching and conflict rejection; explicit source config wins. Existing brand scan supplies evidence and batch writes carousel-evidence.json. Unavailable/non-Swiper/inner-page-only source layouts still report unverified; not a complete legacy-theme catalog. Real source store253 scan returned no frames, so it was NOT changed to a guessed ratio.
+- Cleanup uses conservative pages/sites preflight (retention only), preserving locked authoritative checks before delete; reset scans union 20 table probes per round trip. No unlocked deletion or cleanup during generation introduced.
+- Audit scroll bound raised 20 ->160 steps; still reports SCAN_LIMIT when exceeded. Follow-up audit artifacts /tmp/pw1-quality-followup.json*.
+- Checkout global navigation required updating sites.global_blocks as well (14 fields backed up at /tmp/pw1-checkout-global-backup.json). Republished the 17 affected local pilot sites to invalidate public caches; results /tmp/pw1-reviewed-publish-results.json.
+- Audit scrolling also bypasses CSS smooth scrolling and waits for a stable bottom after initial hydration. Intermediate audit artifacts contain stale findings from before republish; use the final completed audit only.
+- Deferred workflow draft moved outside the checkout to the pilot `reviewed-fixes/pw1-migration.workflow-draft.yml` artifact; no Actions workflow is included in this commit.
+- Follow-up browser checks: 6 passed; 194 migration unit tests (22 files), TypeScript and real DB/storage cleanup fixtures passed. Source carousel measured-frame test also rejects fractional visible counts that PW2 cannot represent faithfully.
+- Final reconciled QA: 30 stores / 127 pages desktop+mobile; 0 errors, 0 skipped/failed, 3 warnings (unmapped About Us on stores 645,1033,1042), 167 BE link findings. No remaining scan-limit/unnamed-control findings after targeted rechecks of 655 and 743. Intermediate concurrent local checks hit request timeouts; sequential rechecks succeeded. Final report `pilot-carousel-30-20260916/quality-reviewed-final.json` preserves source-run provenance; Markdown companion available.
+- Store655 contained an empty styled citation anchor from pasted source HTML; migration now names these external decorative links as well as image links. Patched current/latest local HTML, backed up `/tmp/pw1-final-controls-backup.json`, republished store655, confirmed rendered aria-label.

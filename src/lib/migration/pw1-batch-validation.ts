@@ -42,6 +42,14 @@ export function validateMigrationBatch(input: unknown) {
     }
     for (const group of users.values()) if (new Set(group.map(c => JSON.stringify(c.entry.owner))).size > 1) for (const c of group) rejected.set(c.inputIndex, 'Conflicting source owner identity')
     for (const group of emails.values()) if (new Set(group.map(c => c.entry.sourceUserId)).size > 1) for (const c of group) rejected.set(c.inputIndex, 'Different source users share destination email')
+    for (const field of ['tenantId','siteId'] as const) {
+        const destinations = new Map<number, typeof candidates>()
+        for (const candidate of candidates) {
+            const id = candidate.entry.destination?.[field]
+            if (id) destinations.set(id, [...(destinations.get(id) ?? []), candidate])
+        }
+        for (const group of destinations.values()) if (group.length > 1) for (const c of group) rejected.set(c.inputIndex, `Different source stores share destination ${field}`)
+    }
     const accepted = candidates.filter(c => {
         const error = rejected.get(c.inputIndex)
         if (!error) return true

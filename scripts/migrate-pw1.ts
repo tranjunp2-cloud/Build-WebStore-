@@ -6,6 +6,7 @@ import { validateMigrationBatch } from '../src/lib/migration/pw1-batch-validatio
 
 async function main() {
     const { values, positionals } = parseArgs({ options: {
+        'audit-base-url': { type: 'string' }, 'audit-output': { type: 'string' },
         concurrency: { type: 'string' }, rerun: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, help: { type: 'boolean' },
         store: { type: 'string' }, 'max-attempts': { type: 'string' },
         'max-generation-attempts': { type: 'string' }, 'max-batch-seconds': { type: 'string' },
@@ -21,6 +22,8 @@ async function main() {
   npm run migrate:pw1 -- retry FILE [--store ID]
   npm run migrate:pw1 -- status [--store ID]
   npm run migrate:pw1 -- logs [--store ID]
+  npm run migrate:pw1 -- audit FILE --audit-base-url http://localhost:3000 --audit-output /tmp/pw1-quality.json
+  npm run migrate:pw1 -- FILE --audit-base-url ORIGIN --audit-output REPORT.json
   npm run migrate:pw1 -- report --batch UUID [--format json|csv]
   npm run migrate:pw1 -- cleanup-media --store ID [--older-than-hours 168] [--limit 20] [--after-id ID] [--apply]
 Cleanup defaults to dry-run; --apply deletes only unreferenced migration media in a maintenance window.
@@ -36,7 +39,13 @@ Status/logs are read-only and need only database configuration.`)
         return
     }
     if (values.store && !/^\d+$/.test(values.store)) throw new Error('store must be a numeric PW1 store ID')
-    const command = ['status','logs','retry','report','cleanup-media'].includes(positionals[0]) ? positionals.shift() : 'run'
+    const command = ['status','logs','retry','report','cleanup-media','audit'].includes(positionals[0]) ? positionals.shift() : 'run'
+    const auditRequested = command === 'audit' || values['audit-base-url'] !== undefined || values['audit-output'] !== undefined
+    if (auditRequested && (!['run','retry','audit'].includes(command) || !values['audit-base-url'] || !values['audit-output'] || values['dry-run'])) throw new Error('Audit requires input, --audit-base-url and --audit-output; not compatible with dry-run/status/report/cleanup')
+    if (auditRequested) {
+        const base = new URL(values['audit-base-url']!)
+        if (!['http:','https:'].includes(base.protocol) || base.username || base.password || base.pathname !== '/' || base.search || base.hash) throw new Error('Audit base URL must be an HTTP(S) origin')
+    }
     const numeric = (key: keyof typeof values) => values[key] === undefined ? undefined : Number(values[key])
     const limits = validateBatchLimits({ maxGenerationAttempts: numeric('max-generation-attempts'), maxBatchSeconds: numeric('max-batch-seconds'),
         maxStoreSeconds: numeric('max-store-seconds'), minGenerationIntervalSeconds: numeric('min-generation-interval-seconds'), maxDesignTokens: numeric('max-design-tokens') })
@@ -69,19 +78,32 @@ Status/logs are read-only and need only database configuration.`)
     const path = await realpath(resolve(positionals[0]))
     const file = await stat(path)
     if (!file.isFile() || file.size > 100 * 1024 * 1024) throw new Error('Input must be a JSON file no larger than 100 MiB')
+    if (auditRequested) for (const suffix of ['', '.md', '.jsonl']) {
+        const outputPath = resolve(values['audit-output']! + suffix)
+        if (await realpath(outputPath).catch(() => outputPath) === path) throw new Error('Audit output cannot overwrite input')
+    }
     const parsed = validateMigrationBatch(JSON.parse(await readFile(path, 'utf8')))
     const entries = values.store ? parsed.entries.filter(e => e.sourceStoreId === values.store) : parsed.entries
     const errors = values.store ? parsed.errors.filter(e => e.sourceStoreId === values.store) : parsed.errors
     if (!entries.length && !errors.length) throw new Error('No matching source store in input')
+    if (command === 'audit' && hasRunOptions) throw new Error('audit does not accept migration run options')
+    const runAudit = async () => {
+        const { auditPw1Websites } = await import('../src/lib/migration/pw1-quality-audit')
+        const summary = await auditPw1Websites(entries, values['audit-base-url']!, resolve(values['audit-output']!))
+        console.log(JSON.stringify({qualityAudit:summary,inputErrors:errors,report:resolve(values['audit-output']!)}))
+        if (summary.errors || summary.skipped || errors.length) process.exitCode = 2
+    }
+    if (command === 'audit') { await runAudit(); return }
     const controller = new AbortController()
     const stop = () => { console.error('Stopping at next safe boundary…'); controller.abort() }
     process.once('SIGINT', stop); process.once('SIGTERM', stop)
     try {
         const { runPw1Batch } = await import('../src/lib/migration/pw1-batch')
         await runPw1Batch(entries, { concurrency: numeric('concurrency'), limits, requireBeData: values['require-be-data'], dryRun: values['dry-run'], rerun: values.rerun, retryOnly: command === 'retry', maxAttempts, signal: controller.signal, inputReports: parsed.reports, invalidStores: errors })
+        if (auditRequested) await runAudit()
     } finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop) }
 }
-main().then(() => process.exit(0)).catch(error => {
+main().then(() => process.exit(process.exitCode ?? 0)).catch(error => {
     console.error(error instanceof Error ? error.message : 'Migration failed')
     process.exit(1)
 })

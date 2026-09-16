@@ -127,7 +127,7 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     'products-grid': ['variant', 'headline', 'subheadline', 'limit', 'category'],
     'products-featured': ['variant', 'headline', 'subheadline'],
     'service-cards': ['variant', 'headline', 'subheadline', 'services'],
-    carousel: ['variant', 'headline', 'autoplay', 'interval', 'items'],
+    carousel: ['variant', 'headline', 'autoplay', 'interval', 'items', 'aspectRatio', 'imageFit', 'maxImageWidth', 'slidesPerView'],
     'step-process': ['variant', 'headline', 'subheadline', 'steps'],
     divider: ['variant', 'height', 'color'],
     'announcement-bar': ['variant', 'message', 'linkText', 'linkUrl', 'dismissible', 'backgroundColor'],

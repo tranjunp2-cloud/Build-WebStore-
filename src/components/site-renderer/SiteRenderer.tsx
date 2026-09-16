@@ -592,7 +592,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             // footer, breadcrumb) normally return unwrapped; breadcrumb gets
             // wrapped when a fixed-nav offset applies.
             rendered = (
-                <div key={`${block.blockType}-${index}`} style={spacingStyle}>
+                <div key={`${block.blockType}-${index}`} data-block-index={index} data-block-type={block.blockType} style={spacingStyle}>
                     {blockContent}
                 </div>
             )

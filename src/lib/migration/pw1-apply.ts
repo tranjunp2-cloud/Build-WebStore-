@@ -1,3 +1,4 @@
+import { verifyMigrationDestination, type MigrationDestination } from './pw1-destination'
 import { configureMigrationTransactions } from './pw1-transactions'
 import { sql } from 'drizzle-orm'
 import { withAtomicSiteWrite } from './pw1-atomic-write'
@@ -8,6 +9,7 @@ import { generateSiteSchema } from '@/lib/validations/ai'
 import type { Payload } from 'payload'
 
 export interface ApplyWebsiteOptions {
+    destination?: MigrationDestination
     onDesignUsage?: (usage: { model: string; totalTokens: number | null }) => void
     acquireWrite?: () => Promise<() => void>
     attemptId?: string
@@ -87,11 +89,13 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
                     onGenerated: async result => {
                         expectedLayouts = (result.pages ?? []).map(page => ({ slug: String(page.slug), types: (page.blocks ?? []).map(block => String(block.blockType)) }))
                         await options.save('ai-generated-before-media.json', result)
+                        await options.save('brand-selection.json', { evidenceStatus: options.blueprint.nativeContract.site.brandEvidence?.status ?? 'not-scanned', theme: result.theme })
                     },
                     beforeWrite: async () => {
                         options.signal?.throwIfAborted()
                         await options.onStage?.('waiting-write')
                         await beginWrite()
+                        if (options.destination) await verifyMigrationDestination(scoped, options.destination, options.account)
                         await options.onStage?.('write')
                     },
                     onFailure: error => { generationError = error },
@@ -101,8 +105,9 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
                         console.log(`[generation] ${JSON.stringify(event.data)}`)
                         if (event.data.step === 'ai-native-design-usage') {
                             const data = event.data as { model?: string; tokens?: { total_tokens?: number } }
-                            designUsage = { model: String(data.model ?? 'unknown'), totalTokens: data.tokens?.total_tokens ?? null }
-                            options.onDesignUsage?.(designUsage)
+                            const usage = { model: String(data.model ?? 'unknown'), totalTokens: data.tokens?.total_tokens ?? null }
+                            designUsage = { ...usage, totalTokens: usage.totalTokens === null && !designUsage ? null : (designUsage?.totalTokens ?? 0) + (usage.totalTokens ?? 0) }
+                            options.onDesignUsage?.(usage)
                         }
                     }
                 },

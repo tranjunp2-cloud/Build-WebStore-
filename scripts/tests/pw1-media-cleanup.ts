@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises'
 import { Client } from 'pg'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { cleanupFailedStoreMedia } from '../../src/lib/migration/pw1-media-cleanup'
+import { cleanupFailedStoreMedia, cleanupResetMigrationMedia } from '../../src/lib/migration/pw1-media-cleanup'
 const exec = promisify(execFile)
 async function main() {
     const connectionString = process.env.DATABASE_URI || process.env.DATABASE_URL
@@ -72,6 +72,15 @@ async function main() {
         assert.equal(auto.results.find(r => r.mediaId === mediaIds[1])?.status, 'retained')
         assert.equal(auto.results.find(r => r.mediaId === mediaIds[2])?.status, 'retained')
         console.log('PASS: auto cleanup retains committed/unresolved work and references, ignores only failed runtime artifacts, removes fresh orphan')
+        await client.query('DELETE FROM pw1_migration_attempts WHERE id=$1', [attemptId])
+        await client.query('DELETE FROM pw1_migration_stores WHERE source_store_id=$1', [source])
+        await payload.delete({collection:'pages',where:{site:{equals:siteId}}})
+        await payload.delete({collection:'sites',id:siteId!}); siteId=undefined
+        const reset = await cleanupResetMigrationMedia(payload,client,[tenantId!])
+        assert.equal(reset.length,2)
+        assert.ok(reset.every(result=>['deleted','retained'].includes(result.status)))
+        console.log('PASS: batched reset reference scan completed under lock for isolated fixture')
+
 
     } finally {
         await client.query('DELETE FROM pw1_migration_commits WHERE attempt_id=$1', [attemptId])

@@ -2269,6 +2269,12 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
     );`,
   },
   {
+    name: 'carousel.source_image_layout',
+    sql: `ALTER TABLE IF EXISTS pages_blocks_carousel ADD COLUMN IF NOT EXISTS aspect_ratio numeric, ADD COLUMN IF NOT EXISTS image_fit varchar, ADD COLUMN IF NOT EXISTS max_image_width numeric, ADD COLUMN IF NOT EXISTS slides_per_view numeric;
+    ALTER TABLE IF EXISTS _pages_v_blocks_carousel ADD COLUMN IF NOT EXISTS aspect_ratio numeric, ADD COLUMN IF NOT EXISTS image_fit varchar, ADD COLUMN IF NOT EXISTS max_image_width numeric, ADD COLUMN IF NOT EXISTS slides_per_view numeric;`,
+  },
+
+  {
     name: '_pages_v_blocks_carousel_items.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_carousel_items" (
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,

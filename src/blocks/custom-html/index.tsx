@@ -1,7 +1,8 @@
 'use client'
 
 import './rich-text-content.css'
-import { lazy, Suspense, useState, useEffect, useRef } from 'react'
+import { lazy, Suspense, useState, useEffect, useRef, useMemo } from 'react'
+import { usePathname } from 'next/navigation'
 import type { BlockProps } from '../types'
 import type { CustomHtmlConfig } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
@@ -38,6 +39,18 @@ export function CustomHtmlBlock({ block }: BlockProps<CustomHtmlConfig>) {
         if (editing) window.parent.postMessage({ type: 'RICH_TEXT_INLINE_CANCEL' }, window.location.origin)
     }, [editing])
     const [sanitizedHtml, setSanitizedHtml] = useState('')
+    const pathname = usePathname()
+    // Rewrite only the rendered document; the editor continues to save portable URLs.
+    const displayHtml = useMemo(() => {
+        const base = pathname?.match(/^\/sites\/[^/]+/)?.[0]
+        if (!base || !sanitizedHtml) return sanitizedHtml
+        const document = new DOMParser().parseFromString(sanitizedHtml, 'text/html')
+        document.querySelectorAll('a[href]').forEach(anchor => {
+            const href = anchor.getAttribute('href')!
+            if (/^\/(?!\/)/.test(href) && !/^\/(sites|preview)\//.test(href)) anchor.setAttribute('href', href === '/' ? base : `${base}${href}`)
+        })
+        return document.body.innerHTML
+    }, [sanitizedHtml, pathname])
 
     useEffect(() => {
         let isMounted = true
@@ -73,7 +86,7 @@ export function CustomHtmlBlock({ block }: BlockProps<CustomHtmlConfig>) {
                         setEditing(true)
                         send('RICH_TEXT_INLINE_START')
                     } : undefined}>
-                        <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
+                        <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
                     </div>
                 )}
             </div>

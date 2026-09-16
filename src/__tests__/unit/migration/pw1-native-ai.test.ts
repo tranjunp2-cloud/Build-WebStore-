@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type OpenAI from 'openai'
+import { pw1DesignDirection } from '@/lib/migration/pw1-design-direction'
+import { NavigationConfigSchema } from '@/blocks/navigation/config'
+import { FooterConfigSchema } from '@/blocks/footer/config'
 import { bindNativeDesign, generateNativePw1WithAI, NATIVE_BLOCKS } from '@/lib/migration/pw1-native-ai'
 vi.mock('@/lib/ai/log-usage', () => ({ logAiUsage: vi.fn() }))
 function fixture() {
@@ -71,7 +74,7 @@ describe('[TC-F35.M18] AI chooses only existing PW2 blocks', () => {
         design.pages[0].sections[0] = { sourceId:'11', blockType:'hero', variant:'fullscreen' }
         expect(bindNativeDesign(source, design).pages![0].blocks[1]).toMatchObject({blockType:'hero',variant:'fullscreen',headline:'One',image:{url:'https://source.example/1.jpg'},ctaButtons:[{label:'Buy',url:'/products'}]})
     })
-    it('[TC-F35.M25] binds categories only to Carousel cards and preserves ordered items', () => {
+    it('[TC-F35.M25] binds categories to native cards and portfolio layouts with ordered items', () => {
         const { source, design } = fixture()
         source.pages[0].components[1].kind = 'category_listing'
         source.pages[0].components[1].block.variant = 'categories'
@@ -81,7 +84,7 @@ describe('[TC-F35.M18] AI chooses only existing PW2 blocks', () => {
             items: [{ title: 'Green tea', linkUrl: 'https://source.example/8' }],
         })
         design.pages[0].sections[1] = { sourceId: '12', blockType: 'portfolio-grid', variant: 'grid' }
-        expect(() => bindNativeDesign(source, design)).toThrow('Category listings require Carousel cards')
+        expect(bindNativeDesign(source, design).pages![0].blocks[2]).toMatchObject({blockType:'portfolio-grid',variant:'grid',projects:[{title:'Green tea',linkUrl:'https://source.example/8',image:{url:'https://source.example/tea.jpg'},description:'Original copy\nRM 8'}]})
     })
     it('rejects invented or reordered component identities', () => {
         const { source, design } = fixture(); design.pages[0].sections.reverse()
@@ -95,8 +98,18 @@ describe('[TC-F35.M18] AI chooses only existing PW2 blocks', () => {
         const { source, design } = fixture()
         const create = vi.fn().mockResolvedValue({ model: 'test', choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(design) } }] })
         const client = { chat: { completions: { create } } } as unknown as OpenAI
-        const output = await generateNativePw1WithAI(client, source)
+        const brandEvidence = { status: 'observed', url: source.source.url, capturedAt: '2026-09-16', colors: [{ color: '#335533', score: 5, roles: ['cta'] }], screenshot: 'test-jpeg' }
+        const output = await generateNativePw1WithAI(client, { ...source, site: { ...source.site, brandEvidence } })
         expect(create).toHaveBeenCalledOnce()
+        const request = create.mock.calls[0][0]
+        const context = JSON.parse(request.messages[1].content)
+        expect(context.brandEvidence.colors).toEqual(brandEvidence.colors)
+        expect(context.brandEvidence.screenshot).toBeUndefined()
+        expect(request.messages).toHaveLength(2)
+        expect(context.designDirection).toEqual(pw1DesignDirection(source.source.storeId))
+        expect(context.footer).toEqual(source.site.footer)
+        expect(context.navigation).toEqual(source.site.navigation)
+        expect(context.allowedFooterVariants).toEqual(FooterConfigSchema.shape.variant.removeDefault().options)
         expect(output.effectiveGenMode).toBe('ai-first')
         create.mockRejectedValueOnce(new Error('AI unavailable'))
         await expect(generateNativePw1WithAI(client, source)).rejects.toThrow('AI unavailable')
@@ -111,4 +124,58 @@ it('[TC-F35.M18] binds distinct homepage records without dropping a duplicate UR
     expect(result.pages).toHaveLength(2)
     expect(result.pages!.map(p => p.slug)).toEqual(['home','home'])
     expect(result.pages!.every(p => p.isHomepage)).toBe(true)
+})
+
+it.each(FooterConfigSchema.shape.variant.removeDefault().options)('[TC-F35.M18] binds native footer variant %s and preserves source content on every page', variant => {
+    const {source, design} = fixture()
+    const footer = {...source.site.footer, tagline:'Source tagline', copyrightText:'Source copyright', columns:[{title:'Links',links:[{label:'Contact',url:'/contact'}]}]}
+    const result = bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant})
+    for (const page of result.pages!) expect(page.blocks.at(-1)).toMatchObject({...footer,variant})
+})
+
+it.each(NavigationConfigSchema.shape.variant.removeDefault().options)('[TC-F35.M18] preserves navigation content with native %s variant', variant => {
+    const {source, design} = fixture()
+    const result = bindNativeDesign(source, {...design,navigationVariant:variant})
+    expect(result.pages![0].blocks[0]).toMatchObject({...source.site.navigation,variant})
+})
+it('[TC-F35.M18] uses stable, varied store directions with native preferences', () => {
+    const directions = Array.from({length:100}, (_, i) => pw1DesignDirection(String(i)))
+    expect(new Set(directions.map(d => d.name)).size).toBe(6)
+    expect(pw1DesignDirection('253')).toEqual(pw1DesignDirection('253'))
+    for (const d of directions) {
+        expect(d.allowedNavigationVariants).toContain(d.navigation)
+        expect(d.allowedFooterVariants).toContain(d.footer)
+    }
+})
+
+it.each(['magazine','cards-overlay','parallax'])('[TC-F35.M22] preserves single banner content using %s', variant => {
+    const {source,design}=fixture()
+    source.pages[0].components[0].block.sourceLayout!.size='hero'
+    source.pages[0].components[0].block.slides!.pop()
+    design.pages[0].sections[0]={sourceId:'11',blockType:'hero',variant}
+    expect(bindNativeDesign(source,design).pages![0].blocks[1]).toMatchObject({variant,headline:'One',image:{url:'https://source.example/1.jpg'},ctaButtons:[{label:'Buy',url:'/products'}]})
+})
+it.each(['grid','masonry','showcase'])('[TC-F35.M25] category %s retains every source item', variant => {
+    const {source,design}=fixture()
+    source.pages[0].components[1].kind='category_listing'
+    const items=source.pages[0].components[1].block.sourceContent!.items
+    items.push({...items[0],sourceId:'9',title:'Second'})
+    design.pages[0].sections[1]={sourceId:'12',blockType:'portfolio-grid',variant}
+    const block=bindNativeDesign(source,design).pages![0].blocks[2]
+    expect(block).toMatchObject({variant,projects:[{title:'Green tea'},{title:'Second'}]})
+})
+
+it('[TC-F35.M39] corrects one invalid AI layout without weakening binder validation', async () => {
+    const { source, design } = fixture()
+    const invalid = { ...design, pages: [] }
+    const response = (value: unknown) => ({ model: 'test', choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(value) } }] })
+    const create = vi.fn().mockResolvedValueOnce(response(invalid)).mockResolvedValueOnce(response(design))
+    const client = { chat: { completions: { create } } } as unknown as OpenAI
+    const output = await generateNativePw1WithAI(client, source)
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(create.mock.calls[1][0].messages[1].content).validationCorrection).toContain('AI page count mismatch')
+    expect(output.result.pages).toHaveLength(1)
+    create.mockReset().mockResolvedValue(response(invalid))
+    await expect(generateNativePw1WithAI(client, source)).rejects.toThrow('AI page count mismatch')
+    expect(create).toHaveBeenCalledTimes(2)
 })

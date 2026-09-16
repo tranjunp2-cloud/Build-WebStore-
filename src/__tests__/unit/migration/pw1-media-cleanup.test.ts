@@ -12,6 +12,7 @@ describe('[TC-F35.M35] Cleanup ownership and retention', () => {
         const source_hash = 'a'.repeat(64)
         const candidate = { id: 10, tenant_id: 1, source_hash, filename: `pw1-1-${source_hash.slice(0,20)}.png` }
         expect(migrationMediaStem(candidate)).toBe(`pw1-1-${source_hash.slice(0,20)}`)
+        expect(migrationMediaStem({...candidate,filename:`pw1-1-${source_hash.slice(0,20)}.ico`})).toBe(`pw1-1-${source_hash.slice(0,20)}`)
         expect(migrationMediaStem({ ...candidate, tenant_id: 2 })).toBeNull()
         expect(migrationMediaStem({ ...candidate, filename: 'manual-upload.png' })).toBeNull()
         expect(migrationMediaStem({ ...candidate, source_hash: 'invalid' })).toBeNull()

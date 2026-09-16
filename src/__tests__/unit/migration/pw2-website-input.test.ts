@@ -35,9 +35,10 @@ describe('[TC-F35.M21] Compact website input adapter',()=>{
     })
     it('preserves static HTML and banner slide content',()=>{
         const input=fixture()
-        const payload={...input,pages:[{...input.pages[0],components:[{sourceId:'5',type:'rich_text',content:{html:'<h2>Exact copy</h2>'},config:{}},{sourceId:'6',type:'banner',content:{slides:[{imageUrl:'https://source.example/a.jpg',heading:'Tea',cta:{label:'Read',url:'/articles'}}]},config:{autoplay:false,intervalMs:3000}}]}]}
+        const payload={...input,pages:[{...input.pages[0],components:[{sourceId:'5',type:'rich_text',content:{html:'<h2>Exact copy</h2>'},config:{}},{sourceId:'6',type:'banner',content:{slides:[{imageUrl:'https://source.example/a.jpg',heading:'Tea',cta:{label:'Read',url:'/articles'}}]},config:{autoplay:false,intervalMs:3000,aspectRatio:2,imageFit:'contain',slidesPerView:2}}]}]}
         const {contract}=adaptWebsiteInput(payload)
         expect(contract.pages[0].components[0].block.html).toBe('<h2>Exact copy</h2>')
+        expect(contract.pages[0].components[1].block.sourceLayout).toMatchObject({aspectRatio:2,imageFit:'contain',slidesPerView:2})
         expect(contract.pages[0].components[1].block.slides).toMatchObject([{headline:'Tea',ctaButtons:[{label:'Read',url:'/articles'}]}])
     })
 })
@@ -83,4 +84,35 @@ it('[TC-F35.M27] temporary duplicate routes avoid reserved source URLs and updat
     const {contract} = adaptWebsiteInput(input)
     expect(contract.pages.map(p => p.slug)).toEqual(['home','about','about-pw1-12-2','about-pw1-12'])
     expect(contract.site.navigation.links[0].url).toBe('/about-pw1-12-2')
+})
+
+describe('[TC-F35.M42] page links across all source blocks', () => {
+    it('maps explicit URLs and Page IDs without crossing store scope', () => {
+        const input = fixture()
+        const {contract} = adaptWebsiteInput({...input,
+            website: {...input.website,
+                navigation: [{label:'About',url:'http://source.example/about#team'}],
+                footer: {copyright:'Shop',columns:[{title:'Pages',links:[{label:'About',url:'https://source.example/about'}]}]},
+            },
+            pages: [{sourceId:'10',title:'Home',path:'/',components:[
+                {sourceId:'11',type:'banner',content:{slides:[{imageUrl:'https://source.example/a.jpg',cta:{label:'Go',url:'https://source.example/about'}}]},config:{}},
+                {sourceId:'12',type:'rich_text',content:{html:'<a href="https://source.example/about">About</a>'},config:{}},
+                {sourceId:'13',type:'category_listing',content:{heading:'Pages',items:[{sourceId:'1',title:'About',imageUrl:'https://source.example/a.jpg',pageId:'20'}]},config:{}},
+            ]},{sourceId:'20',title:'About',path:'/about',components:[]}],
+        })
+        expect(contract.site.navigation.links).toMatchObject([{url:'/about#team'}])
+        expect(contract.site.footer.columns).toMatchObject([{links:[{url:'/about'}]}])
+        expect(contract.pages[0].components[0].block.slides).toMatchObject([{ctaButtons:[{url:'/about'}]}])
+        expect(contract.pages[0].components[1].block.html).toBe('<a href="/about">About</a>')
+        expect(contract.pages[0].components[2].block.sourceContent).toMatchObject({items:[{url:'/about'}]})
+    })
+})
+
+describe('[TC-F35.M42] reviewed adapter routes',()=>{
+    it('maps native checkout and validates reviewed destination page identity',()=>{
+        const input=fixture()
+        const website={...input.website,navigation:[{label:'Checkout',url:'https://source.example/checkout'}]}
+        expect(adaptWebsiteInput({...input,website}).contract.site.navigation.links).toEqual([{label:'Checkout',url:'/checkout'}])
+        expect(()=>adaptWebsiteInput({...input,linkCorrections:[{from:'/old',pageId:'999',reason:'reviewed'}]})).toThrow('missing page')
+    })
 })

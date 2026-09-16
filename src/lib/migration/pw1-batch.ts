@@ -1,3 +1,8 @@
+import { applyCarouselEvidence } from './pw1-carousel-evidence'
+import { verifyMigrationDestination } from './pw1-destination'
+import { analyzePw1Brand } from './pw1-brand-analysis'
+import { selectPw1TenantSlug } from './pw1-tenant-slug'
+import { scanPw1Brand } from './pw1-brand-scan'
 import { configureMigrationTransactions } from './pw1-transactions'
 import { MigrationMutex, runStorePool } from './pw1-concurrency'
 import { acquireMediaCreateLock } from '@/lib/ai/media-create-lock'
@@ -23,7 +28,7 @@ import { batchAction, batchEntryHash, compactInput, type BatchEntry } from './pw
 type Mapping = { source_store_id:string;source_user_id:string;tenant_id:number;site_id:number;input_hash:string|null;status:string }
 type Tx = { execute(query:unknown):Promise<unknown> }
 type TransactionDb = { drizzle:{transaction<T>(fn:(tx:Tx)=>Promise<T>):Promise<T>};sessions:Record<string,{db:Tx}> }
-async function provision(payload:Payload, entry:BatchEntry):Promise<void> {
+export async function provisionMigrationStore(payload:Payload, entry:BatchEntry):Promise<void> {
     const db=payload.db as unknown as TransactionDb
     await db.drizzle.transaction(async tx=>{
         const transactionID=randomUUID();db.sessions[transactionID]={db:tx}
@@ -35,9 +40,16 @@ async function provision(payload:Payload, entry:BatchEntry):Promise<void> {
             let user=users.docs[0]
             const accountRows=await tx.execute(sql`SELECT source_user_id,email,user_id FROM pw1_migration_accounts WHERE source_user_id=${entry.sourceUserId} OR email=${entry.owner.email}`) as {rows:Array<{source_user_id:string;email:string;user_id:number}>}
             if(accountRows.rows.some(a=>a.source_user_id!==entry.sourceUserId||a.email!==entry.owner.email||a.user_id!==user?.id))throw new Error('Source account mapping conflict')
-            const slug=`pw1-${entry.sourceStoreId}`
-            const tenants=await payload.find({collection:'tenants',where:{slug:{equals:slug}},limit:1,req})
-            if(tenants.totalDocs)throw new Error('Unmapped destination tenant slug already exists; resolve mapping before retry')
+            if (entry.destination) {
+                user = await verifyMigrationDestination(payload, entry.destination, entry.owner.email, req)
+                await tx.execute(sql`INSERT INTO pw1_migration_accounts(source_user_id,email,user_id) VALUES(${entry.sourceUserId},${entry.owner.email},${user.id}) ON CONFLICT(source_user_id) DO NOTHING`)
+                await tx.execute(sql`INSERT INTO pw1_migration_stores(source_store_id,source_user_id,tenant_id,site_id) VALUES(${entry.sourceStoreId},${entry.sourceUserId},${entry.destination.tenantId},${entry.destination.siteId})`)
+                return
+            }
+            const slug = await selectPw1TenantSlug(entry.source.websiteUrl, entry.sourceStoreId, async candidate => {
+                const tenants = await payload.find({ collection: 'tenants', where: { or: [{ slug: { equals: candidate } }, { 'previousSlugs.slug': { equals: candidate } }] }, limit: 1, req })
+                return tenants.totalDocs > 0
+            })
             const tenant=await payload.create({collection:'tenants',data:{name:entry.website.name,slug,plan:'free'},req})
             const membership={tenant:tenant.id,role:'owner' as const,status:'active' as const}
             if(!user) {
@@ -132,12 +144,12 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                         if (site.status !== 'draft') throw new MigrationError('PUBLISHED_SITE', 'Mapped site is not a draft; automatic replacement refused')
                     } else {
                         controls.checkGenerationBudget()
-                        if (options.requireBeData && entry.website.pages.some(p => p.components.some(c => c.enabled !== false && c.binding))) {
+                        if (options.requireBeData && !entry.destination && entry.website.pages.some(p => p.components.some(c => c.enabled !== false && c.binding))) {
                             throw new MigrationError('BE_DATA_MISSING', 'Unmapped store has no verified destination for BE data; establish destination mapping before strict migration')
                         }
                         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                             controller.signal.throwIfAborted()
-                            try { const release = await acquireMediaCreateLock(); try { await provision(activePayload, entry) } finally { release() }; break }
+                            try { const release = await acquireMediaCreateLock(); try { await provisionMigrationStore(activePayload, entry) } finally { release() }; break }
                             catch (error) {
                                 const failure = classifyMigrationError(error)
                                 if (!shouldRetry(failure, attempt, maxAttempts)) throw error
@@ -153,11 +165,15 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                     }
                     controls.checkGenerationBudget()
                     controls.checkTime(storeStartedAt)
+                    if (entry.destination) {
+                        if (entry.destination.siteId !== mapping.site_id || entry.destination.tenantId !== mapping.tenant_id) throw new MigrationError('BE_MAPPING_INVALID', 'Declared destination conflicts with existing store mapping')
+                        await verifyMigrationDestination(activePayload, entry.destination, entry.owner.email)
+                    }
                     const readiness = await checkBeReadiness(activePayload, entry, mapping)
                     if (options.requireBeData && readiness.status === 'missing-data') throw new MigrationError('BE_DATA_MISSING', readiness.warnings.join('; '))
-                    const adapted = adaptWebsiteInput(compactInput(entry)), blueprint = createNativeBlueprint(adapted.contract)
+                    const adapted = adaptWebsiteInput(compactInput(entry), entry.destination?.productCategories), blueprint = createNativeBlueprint(adapted.contract)
                     const inputReport = options.inputReports?.find(r => r.sourceStoreId === entry.sourceStoreId)
-                    const warnings = [...new Set([...readiness.warnings, ...(inputReport?.warnings ?? []), ...adapted.report.warnings, ...adapted.report.pending.map(p => `${p.sourceId}: ${p.reason}`)])]
+                    const warnings = [...new Set([...readiness.warnings, ...(inputReport?.warnings ?? []).filter(w => !w.includes('category CTA retains source URL')), ...adapted.report.warnings, ...adapted.report.pending.map(p => `${p.sourceId}: ${p.reason}`)])]
                     if (entry.website.pages.some(p => p.components.some(c => c.binding))) warnings.push('Product/blog data is provided by the separate BE import; database bindings were not imported by this batch')
                     await client.query('UPDATE pw1_migration_stores SET warning_count=$2 WHERE source_store_id=$1', [entry.sourceStoreId, warnings.length])
                     let completed: Record<string, unknown> | undefined
@@ -180,16 +196,37 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                         const onStage = async (stage: string) => { controller.signal.throwIfAborted(); controls.checkTime(storeStartedAt); await client.query('UPDATE pw1_migration_attempts SET stage=$2,heartbeat_at=now() WHERE id=$1', [attemptId, stage]) }
                         let retry = false
                         try {
+                            await onStage('brand-scan')
+                            let brand = blueprint.nativeContract.site.brandEvidence
+                            if (!brand) {
+                                const scanned = await scanPw1Brand(entry.source.websiteUrl, controller.signal, blueprint.nativeContract.site.settings?.branding.logo)
+                                await onStage('brand-analysis')
+                                brand = await analyzePw1Brand(scanned, controller.signal)
+                                blueprint.nativeContract.site.brandEvidence = brand
+                                await save('brand-evidence.json', brand)
+                                controls.recordDesignTokens(brand.analysisTokens ?? 0)
+                            }
+                            blueprint.nativeContract.site.brandEvidence = brand
+                            const carouselEvidence = applyCarouselEvidence(blueprint, brand.carouselFrames ?? [])
+                            await save('carousel-evidence.json', carouselEvidence)
+                            for (const record of carouselEvidence) {
+                                const warning = `${record.sourceId}: PW1 carousel layout not verified; PW2 default presentation used. Image dimensions are not used to infer layout.`
+                                if (record.status === 'unverified' && !warnings.includes(warning)) warnings.push(warning)
+                            }
+                            if (brand.warning && !warnings.includes(brand.warning)) warnings.push(brand.warning)
+                            await save('brand-evidence.json', brand)
+                            await client.query('UPDATE pw1_migration_stores SET warning_count=$2 WHERE source_store_id=$1', [entry.sourceStoreId, warnings.length])
                             await save('be-readiness.json', readiness)
+                            if (entry.destination) await save('be-mapping.json', { status: 'verified-declared-mappings', ...entry.destination, verifiedAt: new Date().toISOString() })
                             await save('input-adaptation.json', adapted.report)
                             await save('collection-input-report.json', inputReport ?? null)
                             await save('warnings.json', warnings)
                             await save('blueprint.json', { sourceHash: hash, ...blueprint })
                             console.log(`[${entry.sourceStoreId}] attempt ${attempt}/${maxAttempts} → site ${mapping.site_id}`)
-                            const applied = await withPw1MediaTracking(createdMedia, () => applyPw1Website({ payload: activePayload, blueprint, account: entry.owner.email, siteId: mapping.site_id, sourceHash: hash, save, attemptId, onStage, acquireWrite: acquireMediaCreateLock, signal: controller.signal, onDesignUsage: usage => { controls.recordDesignTokens(usage.totalTokens ?? 0) } }))
+                            const applied = await withPw1MediaTracking(createdMedia, () => applyPw1Website({ destination: entry.destination, payload: activePayload, blueprint, account: entry.owner.email, siteId: mapping.site_id, sourceHash: hash, save, attemptId, onStage, acquireWrite: acquireMediaCreateLock, signal: controller.signal, onDesignUsage: usage => { controls.recordDesignTokens(usage.totalTokens ?? 0) } }))
                             await client.query("UPDATE pw1_migration_attempts SET status='completed',stage='completed',finished_at=now() WHERE id=$1", [attemptId])
                             await client.query("UPDATE pw1_migration_stores SET status='completed',updated_at=now() WHERE source_store_id=$1", [entry.sourceStoreId])
-                            completed = { sourceStoreId: entry.sourceStoreId, status: warnings.length ? 'completed_with_warnings' : 'completed', siteId: mapping.site_id, previewUrl: applied.previewUrl, warnings, readiness, attemptId }
+                            completed = { sourceStoreId: entry.sourceStoreId, status: warnings.length ? 'completed_with_warnings' : 'completed', siteId: mapping.site_id, previewUrl: applied.previewUrl, warnings, readiness, beMapping: entry.destination ? { status: 'verified-declared-mappings', productCategories: entry.destination.productCategories.length, tenantId: entry.destination.tenantId, siteId: entry.destination.siteId } : undefined, attemptId, brand: { status: blueprint.nativeContract.site.brandEvidence?.status, colors: blueprint.nativeContract.site.brandEvidence?.colors } }
                         } catch (error) {
                             // If commit succeeded but ledger update failed, leave running for receipt-based recovery.
                             const committed = await client.query('SELECT 1 FROM pw1_migration_commits WHERE attempt_id=$1', [attemptId])
