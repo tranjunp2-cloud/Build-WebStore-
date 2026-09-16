@@ -47,7 +47,7 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 ### TC-F35.M28 — Batch validation isolation
 - [x] AUTO — Invalid entries do not block valid stores; duplicate identities quarantine all conflicting entries; multi-site bundles split safely.
 ### TC-F35.M29 — Retry policy
-- [x] AUTO — Retry timeout/rate limit/network/server failures only; cap attempts and backoff; stop permanent validation errors.
+- [x] AUTO — Retry uncommitted store execution failures, including AI layout validation and unknown errors, up to the configured attempt limit (default 3 total attempts) with backoff; record failed and continue other stores after exhaustion. Stop on cancellation, operational budgets, identity/destination conflicts, published sites and concurrent edits. Provisioning retains transport-only retries.
 ### TC-F35.M30 — Atomic local DB writes and recovery
 - [x] AUTO — Local integration: rollback exceptions and worker termination preserve old site/pages; commit receipts recover interrupted ledger state; scoped media cache reuses existing uploads.
 ### TC-F35.M31 — Operator commands

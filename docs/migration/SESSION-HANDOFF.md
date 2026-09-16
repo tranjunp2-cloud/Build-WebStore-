@@ -1,3 +1,44 @@
+# Current handoff — 2026-09-16: retry policy corrected; pilot unfinished
+
+This section supersedes older pilot completion claims below for the current reset.
+
+## User requirement and implementation
+
+User requires one migration command: automatically retry a failed store within the same run, then record failed and continue other stores after exhausting the limit. Do not manually launch retry commands and present their aggregate success as one successful batch.
+
+This retry-policy change adds `classifyStoreAttemptError` to the generation/apply attempt catch in `pw1-batch.ts`. All uncommitted execution failures, including AI layout validation and unknown errors, are eligible for bounded retry. Default is **3 total attempts (initial + 2 retries)**, configurable with existing `--max-attempts` (1–5), using existing exponential backoff/jitter. Logs show attempt/limit and automatic retry vs final failure. Exhausted stores remain failed, cleanup is queued, and the pool continues. Batch exits nonzero after draining if failures remain.
+
+Safety/operational stops do not retry: interruption, time/token/generation budgets, owner/destination conflicts, missing required BE data, published sites, concurrent edits. Commit receipts still prevent blindly retrying an already committed write. Provisioning retains its existing transport-only retry policy; preflight/input errors occur outside the execution attempt loop. Do not claim every possible preflight failure is retried three times.
+
+Transport classification now recognizes UND_ERR_SOCKET, UND_ERR_HEADERS_TIMEOUT and UND_ERR_BODY_TIMEOUT. Actual store 18 log was TypeError `terminated`, cause `other side closed`, code UND_ERR_SOCKET: a closed HTTP connection, not the entire process terminating.
+
+Validation: 26 tests in `pw1-reliability.test.ts` passed; TypeScript noEmit passed; diff whitespace check passed. QA TC-F35.M29 updated. **New policy has not yet been exercised in a real migration batch. Code, tests, QA notes and this handoff are included together in the retry-policy commit.**
+
+## Actual current 30-store run
+
+Last pushed implementation before this run: `0e7230eaa` (migration fidelity and verification). Local-only scoped reset completed: 30 mappings/sites/tenants removed, login accounts preserved, outside sites unchanged; media 139 deleted/192 retained. Backup `/tmp/pw1-before-reviewed-rerun-30.dump`.
+
+Initial batch `fc1fe38b-1be2-4e71-870b-88c99e687692`, concurrency 5, 271.43 seconds: **28 succeeded, 2 failed (546 and 18)**. It ran before this retry policy correction.
+
+Manual retries were subsequently launched by the assistant, contrary to the intended operational flow:
+- Store 546 retry batch `74147b35-c912-440b-9fef-7bef0aeb1cea`: still failed with `Category listings require native cards or portfolio layout`.
+- Store 18 retry succeeded (see retry-18.log).
+
+Current result: **29 successful stores, store 546 unresolved. Current regenerated set has not been published or verified end-to-end.** Do not claim 30/30 completed or use old published links/checks as proof for this run. Do not reset the 29 successes merely to retry 546. The user has not requested a further full reset since the retry discussion.
+
+Input (local/private, not in Git): `/Users/levietducprime/Downloads/stores-205-285-pw2-current-schema-collection-only(1).json`.
+Artifact root: `/Users/levietducprime/Work/pw1-exports/reconstruction/pilot-carousel-30-20260916`.
+Current evidence: `run.log`, `timing.json`, `run-metadata.json`, `report-initial.json`, `retry-546.log`, `retry-18.log`, `reset-summary.json`. Previous evidence archived in `archive-reviewed-20260916-174738`. Other existing top-level report/verification/public-links files can still be stale. Preserve individual batch histories when generating any aggregate report.
+
+## Next steps / home machine
+
+1. Pull the current research branch to get the retry-policy commit (code, tests, QA notes and context). Private input, local DB, /tmp backups and external artifacts do not transfer with Git.
+2. Verify the automatic bounded retry in a real run, including exhausted-store continuation. Investigate 546's repeat layout validation failure without weakening source fidelity checks. Do not substitute silent manual retries for proof of the new policy.
+3. After successful migration, read back settings and page counts, publish the 30 authorized pilot sites, verify anonymous public routes, regenerate the current public-link list. Prior expected counts were 157 pages including 404 / 127 public non-404 pages; verify rather than assume.
+4. BE product/category mapping remains pending real BE imports. GitHub Actions remains explicitly deferred by user.
+
+---
+
 # Corrected carousel policy — 2026-09-16
 
 User rejected generic caps and image-derived geometry. Removed480px/55vh renderer cap and median/max image sizing import policy. Removed helper/tests asserting that incorrect policy. Explicit source config aspectRatio/imageFit/slidesPerView now passes through adapter→binder→carousel; absentSmallbanner geometry produces percomponent warning. CurrentPW1export has no verifiedthemegeometry; full mapping still pending, not paritycomplete. Cleared49pilotcarousel heuristic settings plus98version records, republished30local sites; backup `/tmp/carousel-before-remove-inference.json`. Existing olddefaults return; this is removal of incorrect guesses, not a claim of blur fixed or PW1 layout replicated. Prior sizingdocs superseded. No reset.

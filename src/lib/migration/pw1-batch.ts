@@ -11,7 +11,7 @@ import { withPw1MediaTracking } from './pw1-media-tracking'
 import { BatchControls, type BatchLimits } from './pw1-batch-controls'
 import { checkBeReadiness } from './pw1-readiness'
 import { readBatchReport } from './pw1-batch-report'
-import { classifyMigrationError, MigrationError, retryDelayMs, shouldRetry } from './pw1-errors'
+import { classifyStoreAttemptError, classifyMigrationError, MigrationError, retryDelayMs, shouldRetry } from './pw1-errors'
 import { recoverInterruptedBatches } from './pw1-operations'
 import type { InvalidStore } from './pw1-batch-validation'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -231,12 +231,12 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             // If commit succeeded but ledger update failed, leave running for receipt-based recovery.
                             const committed = await client.query('SELECT 1 FROM pw1_migration_commits WHERE attempt_id=$1', [attemptId])
                             if (committed.rowCount) throw error
-                            const failure = classifyMigrationError(error)
+                            const failure = classifyStoreAttemptError(error)
                             await client.query("UPDATE pw1_migration_attempts SET status='failed',error=$2,error_code=$3,retryable=$4,finished_at=now() WHERE id=$1", [attemptId, failure.message, failure.code, failure.retryable])
                             await client.query("UPDATE pw1_migration_stores SET status='failed',updated_at=now() WHERE source_store_id=$1", [entry.sourceStoreId])
                             retry = !controller.signal.aborted && shouldRetry(failure, attempt, maxAttempts)
-                            console.error(`[${entry.sourceStoreId}] ${failure.code}: ${failure.message}; retry=${retry}`)
-                            if (!retry) throw error
+                            console.error(`[${entry.sourceStoreId}] attempt ${attempt}/${maxAttempts}: ${failure.code}: ${failure.message}; ${retry ? 'retrying automatically' : 'failed; continuing with other stores'}`)
+                            if (!retry) throw new MigrationError(failure.code, failure.message, failure.retryable)
                         } finally { clearInterval(heartbeat) }
                         if (completed) break
                         if (retry) await delay(retryDelayMs(attempt), undefined, { signal: controller.signal })
