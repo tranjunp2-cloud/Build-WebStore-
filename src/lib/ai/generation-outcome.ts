@@ -56,7 +56,12 @@ export type GenerationOutcomeResult = {
 
 const MAX_MESSAGE_LENGTH = 500
 
-function boundedMessage(value: unknown): string {
+/**
+ * Converts persisted diagnostic text to a bounded operator-safe form. This is
+ * exported because read models must defensively sanitize legacy rows too; the
+ * field name `sanitizedTechnicalMessage` alone is not a trust boundary.
+ */
+export function sanitizeGenerationEvidence(value: unknown, maxLength = MAX_MESSAGE_LENGTH): string {
     const raw = value instanceof Error ? value.message : String(value ?? '')
     return raw
         .replace(/\/[\w./-]+\.(?:ts|tsx|js|jsx|mjs|cjs)/g, '<path>')
@@ -66,11 +71,11 @@ function boundedMessage(value: unknown): string {
         .replace(/\b(?:https?|postgres(?:ql)?):\/\/[^\s/@]+:[^\s/@]+@/gi, '<redacted-url-credentials>@')
         .replace(/\s+/g, ' ')
         .trim()
-        .slice(0, MAX_MESSAGE_LENGTH)
+        .slice(0, maxLength)
 }
 
 function normalizeError(error: unknown, page?: FailedPage, terminalPhase: TerminalErrorPhase = 'unknown'): NormalizedGenerationError {
-    const message = boundedMessage(error)
+    const message = sanitizeGenerationEvidence(error)
     const timeout = /timeout|timed out|etimedout/i.test(message)
     const isComposition = !page && terminalPhase === 'composition'
 

@@ -103,6 +103,27 @@ function response(items: Array<Record<string, unknown>>): GenerationListResponse
   };
 }
 
+function detailResponse(row: typeof attentionRow | typeof retryableRow) {
+  return {
+    data: {
+      ...row,
+      endpoint: "site-generator",
+      category: "retail",
+      website: { id: row.site.id, name: row.site.label, domain: "e2e.example.test", status: "draft", urls: { preview: null, live: "e2e.example.test" } },
+      user: { id: row.user.id, name: row.user.label, email: "tracker@example.test" },
+      input: { available: true, summary: [["Tên doanh nghiệp", "E2E recovery site"], ["Ngành hàng", "Retail"], ["Mô tả", "Test store"], ["Sản phẩm / dịch vụ", "Flowers"], ["Ngôn ngữ", "vi"]], full: { businessName: "E2E recovery site", extraInstructions: "Keep this content concise" } },
+      inputSchemaVersion: "f41.v1",
+      inputHash: "fixture-hash",
+      pages: [{ pageKey: "contact", title: "Liên hệ", slug: "contact", pageId: "page-1", status: "failed", blockCount: 2, errorCode: "PAGE_FAILED", errorSummary: "Không thể lưu trang" }],
+      errors: [{ phase: "page_persist", locationType: "page", locationKey: "contact", code: "PAGE_FAILED", category: "persistence", retryabilityReason: null, message: "Không thể lưu trang", technicalMessage: "safe evidence" }],
+      timeline: [{ event: "submitted", at: row.submittedAt }, { event: "terminal", at: row.submittedAt }],
+      durationMs: 1200,
+      lineage: { source: "user_submit", parentGenerationId: null, retryRootGenerationId: null, retryAttempt: 0 },
+      retryHistory: [],
+    },
+  };
+}
+
 test.describe("US-F41-02 Needs Attention", () => {
   test("[TC-F41-17] Super Admin sees an actionable failure before success history", async ({ page }) => {
     test.skip(
@@ -114,6 +135,10 @@ test.describe("US-F41-02 Needs Attention", () => {
     // Super Admin boundary remain real; no AI/provider service is required.
     await page.route("**/api/admin/generations**", async (route) => {
       if (route.request().method() !== "GET") return route.fallback();
+      if (new URL(route.request().url()).pathname !== "/api/admin/generations") {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify(detailResponse(attentionRow)) });
+        return;
+      }
       const view = new URL(route.request().url()).searchParams.get("view");
       await route.fulfill({
         contentType: "application/json",
@@ -138,19 +163,14 @@ test.describe("US-F41-02 Needs Attention", () => {
     await expect(actionableRow).toContainText("4/5");
     await expect(actionableRow).toContainText("Không thể lưu website");
     await expect(actionableRow).toContainText("Sau khi AI tạo nội dung");
-    await expect(actionableRow).toContainText("Không recovery");
+    await expect(actionableRow).toContainText("Cần Dev xử lý");
     await expect(page.getByRole("button", { name: "Xem generation e2e-success-run" })).toHaveCount(0);
 
-    // A row remains actionable through the safe detail navigation. F41-02
-    // intentionally does not expose a retry/ticket mutation button yet.
+    // A row remains actionable through the shareable safe detail page.
     await actionableRow.click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.getByText("Generation #e2e-attention-run")).toBeVisible();
-
-    // The detail drawer is modal, so close it before interacting with the
-    // underlying view tab (the production UI correctly makes it inert).
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/studio\/generations\/e2e-attention-run$/);
+    await expect(page.getByRole("heading", { name: "E2E recovery site" })).toBeVisible();
+    await page.goBack();
 
     // Act: request history explicitly.
     await page.getByRole("button", { name: "All Generations", exact: true }).click();
@@ -229,7 +249,7 @@ test.describe("US-F41-02 Needs Attention", () => {
     await expect(page.getByRole("button", { name: "Đang gen lại website e2e-retryable-run" })).toHaveCount(0);
   });
 
-  test("[TC-F41-19] Retry accepted from detail drawer updates the shared recovery CTA", async ({ page }) => {
+  test("[TC-F41-19] Retry accepted from the detail page updates its recovery CTA", async ({ page }) => {
     test.skip(
       !process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE,
       "Requires the dedicated Super Admin E2E account configured by auth.setup.ts.",
@@ -238,29 +258,49 @@ test.describe("US-F41-02 Needs Attention", () => {
     // Arrange
     await page.route("**/api/admin/generations**", async (route) => {
       if (route.request().method() !== "GET") return route.fallback();
+      if (new URL(route.request().url()).pathname !== "/api/admin/generations") {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify(detailResponse(retryableRow)) });
+        return;
+      }
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(response([retryableRow])) });
     });
     await page.route("**/api/admin/generations/e2e-retryable-run/retry", async (route) => {
       await route.fulfill({
         status: 202,
         contentType: "application/json",
-        body: JSON.stringify({ jobId: "mock-drawer-job", childGenerationId: "mock-drawer-child", recoveryStatus: "retrying" }),
+        body: JSON.stringify({ jobId: "mock-detail-job", childGenerationId: "mock-detail-child", recoveryStatus: "retrying" }),
       });
     });
 
     // Act — use the detail CTA, not the listing CTA.
     await page.goto("/studio/generations");
     await page.getByRole("button", { name: "Xem generation e2e-retryable-run" }).click();
-    const drawer = page.getByRole("dialog", { name: "Generation #e2e-retryable-run" });
-    await drawer.getByRole("button", { name: "Gen lại website e2e-retryable-run" }).click();
+    await page.getByRole("button", { name: "Gen lại website e2e-retryable-run" }).click();
     await page.getByRole("button", { name: "Xác nhận gen lại" }).click();
 
-    // Assert — drawer reflects monitor state, then close the modal to verify
-    // the underlying list shares it too (the modal intentionally hides the
-    // background from accessibility queries while it is open).
-    await expect(drawer.getByRole("button", { name: "Đang gen lại website e2e-retryable-run" })).toBeDisabled();
-    await drawer.getByRole("button", { name: "Close", exact: true }).click();
-    await expect(drawer).toHaveCount(0);
+    // Assert — the detail page reloads its server-owned state after acceptance.
     await expect(page.getByRole("button", { name: "Đang gen lại website e2e-retryable-run" })).toBeDisabled();
+  });
+
+  test("[TC-F41-20] Super Admin can open and inspect the full shareable detail page", async ({ page }) => {
+    test.skip(!process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE, "Requires the dedicated Super Admin E2E account configured by auth.setup.ts.");
+
+    // Arrange
+    await page.route("**/api/admin/generations/e2e-attention-run", async (route) => {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(detailResponse(attentionRow)) });
+    });
+
+    // Act
+    await page.goto("/studio/generations/e2e-attention-run");
+
+    // Assert
+    await expect(page.getByText("Preview URL")).toBeVisible();
+    await expect(page.getByText("Live URL")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Xem form đầy đủ" })).toBeVisible();
+    await page.getByRole("button", { name: "Xem form đầy đủ" }).click();
+    await expect(page.getByText("Keep this content concise")).toBeVisible();
+    await expect(page.getByText("Trang và component")).toBeVisible();
+    await page.getByText("Thông tin kỹ thuật phục vụ Dev debug").click();
+    await expect(page.getByText("safe evidence")).toBeVisible();
   });
 });
