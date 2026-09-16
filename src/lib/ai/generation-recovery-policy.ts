@@ -238,6 +238,9 @@ const VALIDATION_RULES = new Set(['required', 'format', 'min_length', 'max_lengt
 const OBSERVED_STATES = new Set(['missing', 'invalid_format', 'too_short', 'too_long', 'unsupported', 'unknown'])
 function safeIncidentEnum(value: unknown, allowed: Set<string>, fallback = 'unknown') { return typeof value === 'string' && allowed.has(value) ? value : fallback }
 function safeIncidentCode(value: unknown) { return typeof value === 'string' && SERVER_INCIDENT_CODES.has(value) ? value : 'UNKNOWN' }
+function safeIncidentLocationKey(value: unknown) {
+    return typeof value === 'string' && /^[a-zA-Z0-9._/-]{1,120}$/.test(value) ? value : null
+}
 function safeTraceId(value: unknown) {
     if (typeof value !== 'string') return null
     const id = value.trim()
@@ -307,6 +310,33 @@ function userDetail(value: GenerationDetailSource['user']) {
     return { id: String(value.id), name: name || value.email || `#${value.id}`, email: value.email ?? null }
 }
 
+type DetailPageLocation = { pageKey: string | null; title: string; slug: string | null }
+
+/**
+ * Page/component error rows contain only a stable key. Resolve the human label
+ * from separately captured page metadata, never from the durable error itself.
+ */
+function resolveIncidentLocation(type: string, key: string | null, pages: DetailPageLocation[]) {
+    if (type === 'input') return { key, label: key ? INPUT_INCIDENT_LABELS[key] ?? 'Chưa xác định' : 'Chưa xác định', known: Boolean(key && INPUT_INCIDENT_LABELS[key]) }
+    if (type === 'site') return { key: null, label: 'Toàn bộ website', known: true }
+    if (type === 'page' && key) {
+        const page = pages.find((item) => item.pageKey === key || item.slug === key)
+        return page ? { key, label: page.title, known: true } : { key: null, label: 'Chưa xác định từ generation cũ', known: false }
+    }
+    if (type === 'component' && key) {
+        const page = pages
+            .filter((item) => item.pageKey && key.startsWith(`${item.pageKey}-`))
+            .sort((a, b) => (b.pageKey?.length ?? 0) - (a.pageKey?.length ?? 0))[0]
+        const componentKey = page?.pageKey ? key.slice(page.pageKey.length + 1) : ''
+        if (page && /^[a-zA-Z0-9._/-]{1,80}$/.test(componentKey)) {
+            const componentLabel = componentKey.split(/[-_/]+/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
+            return { key, label: componentLabel ? `${page.title} / ${componentLabel}` : page.title, known: true }
+        }
+        return { key: null, label: 'Chưa xác định từ generation cũ', known: false }
+    }
+    return { key: null, label: 'Chưa xác định', known: false }
+}
+
 /** Safe, bounded debugger detail. Never add raw prompt/output/request/stack data. */
 export function serializeAdminGenerationDetail(
     record: GenerationDetailSource,
@@ -321,28 +351,28 @@ export function serializeAdminGenerationDetail(
     // website in that transitional state.
     const site = capturedSite.id ? capturedSite : recoveredSite
     const boundedRawErrors = recordItems(record.generationErrors).slice(0, 20)
-    const errors = boundedRawErrors.map((error) => {
-        const locationType = safeIncidentEnum(error.locationType, INCIDENT_LOCATION_TYPES)
-        const candidateKey = typeof error.locationKey === 'string' ? error.locationKey : null
-        // The only durable field keys are the server-owned input schema keys.
-        // Page/component labels can originate in prompts or old AI output and
-        // are therefore shown only through their separately sanitized tree.
-        const locationKey = locationType === 'input' && INPUT_INCIDENT_LABELS[candidateKey ?? ''] ? candidateKey : null
-        const locationLabel = locationType === 'input'
-            ? INPUT_INCIDENT_LABELS[locationKey ?? ''] ?? null
-            : INCIDENT_LOCATION_LABELS[locationType] ?? 'Chưa xác định'
-        return {
-        phase: safeIncidentEnum(error.phase, INCIDENT_PHASES), locationType, locationKey,
-        locationLabel,
-        validationRule: safeIncidentEnum(error.validationRule, VALIDATION_RULES, '') || null, observedState: safeIncidentEnum(error.observedState, OBSERVED_STATES, '') || null,
-        code: safeIncidentCode(error.code), category: safeIncidentEnum(error.category, INCIDENT_CATEGORIES), retryabilityReason: null,
-        message: 'Đã ghi nhận lỗi an toàn. Xem nguyên nhân và hành động được đề xuất bên dưới.', technicalMessage: safeTechnicalEvidence(error.sanitizedTechnicalMessage),
-    }})
     const pages = recordItems(record.pageOutcomes).slice(0, 100).map((page) => ({
         pageKey: safeDiagnostic(page.pageKey, 160), title: safeDiagnostic(page.title, 240) ?? safeDiagnostic(page.slug, 160) ?? 'Trang chưa đặt tên', slug: safeDiagnostic(page.slug, 160),
         pageId: safeDiagnostic(page.pageId, 120), status: page.status === 'persisted' ? 'persisted' : page.status === 'failed' ? 'failed' : 'unknown', blockCount: typeof page.blockCount === 'number' && Number.isFinite(page.blockCount) ? page.blockCount : null,
         errorCode: safeDiagnostic(page.errorCode, 120), errorSummary: safeDiagnostic(page.errorSummary),
     }))
+    const errors = boundedRawErrors.map((error) => {
+        const locationType = safeIncidentEnum(error.locationType, INCIDENT_LOCATION_TYPES)
+        const candidateKey = safeIncidentLocationKey(error.locationKey)
+        // The only durable field keys are the server-owned input schema keys.
+        // Page/component labels can originate in prompts or old AI output and
+        // are therefore shown only through their separately sanitized tree.
+        const locationKey = locationType === 'input'
+            ? INPUT_INCIDENT_LABELS[candidateKey ?? ''] ? candidateKey : null
+            : candidateKey
+        const location = resolveIncidentLocation(locationType, locationKey, pages)
+        return {
+        phase: safeIncidentEnum(error.phase, INCIDENT_PHASES), locationType, locationKey,
+        locationLabel: location.label, locationKnown: location.known,
+        validationRule: safeIncidentEnum(error.validationRule, VALIDATION_RULES, '') || null, observedState: safeIncidentEnum(error.observedState, OBSERVED_STATES, '') || null,
+        code: safeIncidentCode(error.code), category: safeIncidentEnum(error.category, INCIDENT_CATEGORIES), retryabilityReason: null,
+        message: 'Đã ghi nhận lỗi an toàn. Xem nguyên nhân và hành động được đề xuất bên dưới.', technicalMessage: safeTechnicalEvidence(error.sanitizedTechnicalMessage),
+    }})
     const timestamps = [
         ['submitted', record.createdAt], ['started', record.startedAt], ['last_heartbeat', record.lastHeartbeatAt],
         ['terminal', record.terminalAt ?? record.completedAt],
@@ -365,7 +395,7 @@ export function serializeAdminGenerationDetail(
         label: incidentSummary.label,
         location: {
             type: primary?.locationType ?? 'unknown', key: primary?.locationKey ?? null,
-            label: primary?.locationLabel ?? 'Chưa xác định', known: Boolean(primary?.locationLabel),
+            label: primary?.locationLabel ?? 'Chưa xác định', known: primary?.locationKnown ?? false,
         },
         cause: { ...incidentCause(incidentSummary.kind, primary?.code ?? 'UNKNOWN'), validationRule: primary?.validationRule ?? null, observedState: primary?.observedState ?? null },
         impact: { expected: summary.pageSummary.expected, persisted: summary.pageSummary.persisted, failed: summary.pageSummary.failed, summary: summary.pageSummary.expected === null ? 'Chưa ghi nhận tổng số trang.' : `${summary.pageSummary.failed}/${summary.pageSummary.expected} trang chưa tạo, ${summary.pageSummary.persisted} trang đã lưu.` },

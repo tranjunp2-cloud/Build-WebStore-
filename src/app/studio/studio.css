@@ -2060,8 +2060,9 @@
 .studio-shell .f41-generation-page .gen-pill-warn { color: var(--f41-amber); background: var(--f41-amber-bg); }.studio-shell .f41-generation-page .gen-pill-danger { color: var(--f41-red); background: var(--f41-red-bg); }.studio-shell .f41-generation-page .gen-pill-accent { color: var(--f41-blue); background: var(--f41-blue-bg); }.studio-shell .f41-generation-page .gen-pill-success { color: var(--f41-green); background: var(--f41-green-bg); }
 .studio-shell .f41-generation-page .gen-row-action { padding: 9px 13px; }
 .studio-shell .f41-list-note { margin: 4px 0 0; color: var(--f41-muted); font-size: 12px; }
-.studio-shell .f41-generation-page .f41-retry-trigger { color: #845000; background: #fffaf0; border-color: #f0c36b; }
-.studio-shell .f41-generation-page .f41-retry-trigger:hover:not(:disabled) { background: #fff3d9; border-color: #dca941; }
+.studio-shell .f41-generation-page .f41-retry-trigger { color: #fff; background: var(--f41-blue); border-color: var(--f41-blue); box-shadow: 0 1px 2px #1d4ed833; }
+.studio-shell .f41-generation-page .f41-retry-trigger:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
+.studio-shell .f41-generation-page .f41-retry-trigger:disabled { border-color: #cbd7e5; background: #eef3fa; color: #71819a; box-shadow: none; }
 
 /* F41-04 full-page debug context. The detail reuses the queue's compact
    operational palette, but deliberately gives errors and captured evidence
@@ -2090,8 +2091,19 @@
 /* Dialog uses a Radix portal outside .f41-generation-page, so it needs its
    own token bridge rather than inheriting the page-scoped rules above. */
 .f41-retry-dialog { border-color: #dce5ef !important; border-radius: 12px !important; background: #fff !important; color: #15233a !important; box-shadow: 0 18px 56px #13233a55 !important; }
-.f41-retry-dialog > p { color: #62758e; }
-.f41-retry-note { margin: 0; padding: 10px; border-radius: 7px; background: #fff4db; color: #684c16 !important; font-size: 12px; }
+.f41-retry-dialog .f41-retry-description { display: flex; align-items: center; gap: 7px; color: #62758e; }
+.f41-retry-dialog .f41-retry-description strong { color: #30445e; font-weight: 700; }
+.f41-retry-dialog .f41-retry-description span { padding-left: 8px; border-left: 1px solid #cbd7e5; }
+.f41-retry-incident { display: grid; gap: 3px; padding: 11px 12px; border: 1px solid #f3d4d0; border-radius: 8px; background: #fffafa; }
+.f41-retry-incident > span { color: #b94036; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.f41-retry-incident strong { color: #3a2730; font-size: 14px; }
+.f41-retry-incident small { color: #62758e; font-size: 12px; }
+.f41-retry-impact { padding: 0 1px; color: #50617a; font-size: 13px; line-height: 1.45; }
+.f41-retry-impact > strong { display: block; color: #30445e; font-size: 13px; }
+.f41-retry-impact ul { display: grid; gap: 4px; margin: 7px 0 0; padding-left: 18px; }
+.f41-retry-impact li::marker { color: #2563eb; }
+.f41-retry-note { margin: 0; padding: 10px 12px; border: 1px solid #dce5ef; border-radius: 7px; background: #f8fbff; color: #50617a !important; font-size: 12px; line-height: 1.45; }
+.f41-retry-note strong { color: #30445e; }
 .f41-retry-cancel { border-color: #dce5ef; background: #fff; color: #30445e; }
 .f41-retry-confirm { border-color: #2563eb !important; background: #2563eb !important; color: #fff !important; }
 .f41-retry-confirm:hover:not(:disabled) { border-color: #1d4ed8 !important; background: #1d4ed8 !important; }

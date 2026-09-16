@@ -190,6 +190,7 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
             site: { id: 'site-9', name: 'private@example.test' },
             traceId: 'f41-ui-fixture-incident-9',
             pageSummary: { expected: 5, persisted: 4, failed: 1 },
+            pageOutcomes: [{ pageKey: 'contact', title: 'Liên hệ', slug: 'contact', status: 'failed' }],
             promptText: 'never copy this prompt',
             generationErrors: [{
                 phase: 'page_persist', locationType: 'page', locationKey: 'contact', locationLabel: 'Liên hệ',
@@ -205,11 +206,25 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
         // Assert
         expect(snapshot).toMatchObject({
             generationId: 'gen-1', traceId: 'f41-ui-fixture-incident-9', website: { id: 'site-9' }, user: { id: 'user-9' },
-            incident: { location: { label: 'Trang bị ảnh hưởng' }, cause: { code: 'PAGE_PERSISTENCE_FAILED' } },
+            incident: { location: { key: 'contact', label: 'Liên hệ', known: true }, cause: { code: 'PAGE_PERSISTENCE_FAILED' } },
         })
         expect(snapshot?.incident).toEqual(detail.incident)
         expect(JSON.stringify(snapshot)).not.toContain('never copy this prompt')
         expect(JSON.stringify(snapshot)).not.toContain('private@example.test')
+    })
+
+    it('TC-F41-28: resolves a component from captured stable page and component keys only', () => {
+        // Arrange
+        const source = record({
+            pageOutcomes: [{ pageKey: 'products', title: 'Sản phẩm', slug: 'products', status: 'failed' }],
+            generationErrors: [{ phase: 'component_persist', locationType: 'component', locationKey: 'products-gallery', code: 'INVALID_COMPONENT_CONTRACT', category: 'composition' }],
+        } as GenerationDetailSource)
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.incident?.location).toEqual({ type: 'component', key: 'products-gallery', label: 'Sản phẩm / Gallery', known: true })
     })
 
     it('TC-F41-27: never hands untrusted legacy incident text to the operator or future ticket', () => {

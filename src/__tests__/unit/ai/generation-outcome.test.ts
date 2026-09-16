@@ -150,6 +150,24 @@ describe('finalizeGenerationOutcome', () => {
         expect(result.errors[0]).toMatchObject({ code: 'PERSISTENCE_TIMEOUT', locationKey: 'blog' })
     })
 
+    it('TC-F41-26: never persists a generated page title inside the incident record', () => {
+        // Arrange
+        const privateTitle = 'Liên hệ private-business@example.com token=private-token'
+
+        // Act
+        const result = finalizeGenerationOutcome({
+            expectedPages: 1,
+            persistedPages: [],
+            failedPages: [{ key: 'contact', slug: 'contact', title: privateTitle, error: new Error('page write failed') }],
+        })
+
+        // Assert
+        expect(result.errors[0]).toMatchObject({ locationType: 'page', locationKey: 'contact' })
+        expect(result.errors[0]).toHaveProperty('locationLabel', 'Trang bị ảnh hưởng')
+        expect(JSON.stringify(result.errors[0])).not.toContain(privateTitle)
+        expect(JSON.stringify(result.errors[0])).not.toContain('private-token')
+    })
+
     it('TC-F41-04: preserves only bounded, sanitized operator evidence', () => {
         // Arrange
         const input = {

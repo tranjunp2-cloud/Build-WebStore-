@@ -224,7 +224,7 @@ test.describe("US-F41-02 Needs Attention", () => {
     // Act
     await page.goto("/studio/generations");
     await page.getByRole("button", { name: "Gen lại website e2e-retryable-run" }).click();
-    await page.getByRole("button", { name: "Xác nhận gen lại" }).click();
+    await page.getByRole("button", { name: "Tạo lần gen lại" }).click();
 
     // Assert — only a positive accepted response changes the row into monitor state.
     await expect(page.getByRole("button", { name: "Đang gen lại website e2e-retryable-run" })).toBeDisabled();
@@ -253,7 +253,7 @@ test.describe("US-F41-02 Needs Attention", () => {
     // Act
     await page.goto("/studio/generations");
     await page.getByRole("button", { name: "Gen lại website e2e-retryable-run" }).click();
-    await page.getByRole("button", { name: "Xác nhận gen lại" }).click();
+    await page.getByRole("button", { name: "Tạo lần gen lại" }).click();
 
     // Assert — a generic conflict must never be represented as a queued retry.
     await expect(page.getByRole("alert")).toHaveText("Retry đã hết lượt.");
@@ -291,7 +291,7 @@ test.describe("US-F41-02 Needs Attention", () => {
     await page.goto("/studio/generations");
     await page.getByRole("button", { name: "Xem generation e2e-retryable-run" }).click();
     await page.getByRole("button", { name: "Gen lại website e2e-retryable-run" }).click();
-    await page.getByRole("button", { name: "Xác nhận gen lại" }).click();
+    await page.getByRole("button", { name: "Tạo lần gen lại" }).click();
 
     // Assert — the detail page reloads its server-owned state after acceptance.
     await expect(page.getByRole("button", { name: "Đang gen lại website e2e-retryable-run" })).toBeDisabled();

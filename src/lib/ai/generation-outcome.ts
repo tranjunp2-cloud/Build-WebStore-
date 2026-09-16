@@ -92,6 +92,9 @@ const INPUT_LOCATION_LABELS: Record<string, string> = {
     language: 'Ngôn ngữ',
     template: 'Template',
 }
+const NON_INPUT_LOCATION_LABELS: Partial<Record<GenerationIncidentLocationType, string>> = {
+    site: 'Toàn bộ website', page: 'Trang bị ảnh hưởng', component: 'Component bị ảnh hưởng', unknown: 'Chưa xác định',
+}
 const INCIDENT_PHASES = new Set<GenerationIncidentPhase>(['validate', 'site_persist', 'page_persist', 'component_persist', 'composition', 'recovery', 'unknown'])
 const INCIDENT_LOCATION_TYPES = new Set<GenerationIncidentLocationType>(['input', 'site', 'page', 'component', 'unknown'])
 const INCIDENT_CATEGORIES = new Set<GenerationIncidentCategory>(['input_validation', 'persistence', 'composition', 'quota', 'system'])
@@ -109,12 +112,6 @@ export const SERVER_INCIDENT_CODES = new Set([
 function safeIncidentKey(value: string | undefined): string | undefined {
     if (!value || !/^[a-zA-Z0-9._/-]{1,120}$/.test(value)) return undefined
     return value
-}
-
-function safeIncidentLabel(value: string | undefined): string | undefined {
-    if (!value) return undefined
-    const trimmed = value.replace(/\s+/g, ' ').trim()
-    return trimmed ? trimmed.slice(0, 120) : undefined
 }
 
 function safeEnum<T extends string>(value: unknown, allowed: Set<T>): T | undefined {
@@ -180,9 +177,13 @@ export function normalizeGenerationIncident(error: unknown, hint: GenerationInci
     const validationRule = safeEnum(hint.validationRule, VALIDATION_RULES)
     const observedState = safeEnum(hint.observedState, OBSERVED_STATES)
     const rawLocationKey = safeIncidentKey(hint.locationKey)
+    // Labels are selected exclusively from a server-owned catalog. Page and
+    // component names may be provider- or user-influenced, so the durable
+    // incident keeps only its stable key; the read model resolves a display
+    // name from separately captured page metadata when it exists.
     const locationLabel = locationType === 'input'
         ? INPUT_LOCATION_LABELS[rawLocationKey ?? '']
-        : safeIncidentLabel(hint.locationLabel)
+        : NON_INPUT_LOCATION_LABELS[locationType]
     const locationKey = locationType === 'input' && !locationLabel ? undefined : rawLocationKey
     const category = safeEnum(hint.category, INCIDENT_CATEGORIES) ?? (phase === 'composition' ? 'composition' : 'persistence')
     const code = safeIncidentCode(hint.code) ?? (timeout ? phase === 'composition' ? 'GENERATION_TIMEOUT' : 'PERSISTENCE_TIMEOUT' : 'GENERATION_FAILED')
@@ -218,7 +219,7 @@ function normalizeError(error: unknown, page?: FailedPage, terminalPhase: Termin
     return normalizeGenerationIncident(error, {
         phase,
         locationType,
-        ...(page ? { locationKey: page.key, locationLabel: page.title } : {}),
+        ...(page ? { locationKey: page.key } : {}),
         code: timeout ? isComposition ? 'GENERATION_TIMEOUT' : 'PERSISTENCE_TIMEOUT' : page ? 'PAGE_PERSISTENCE_FAILED' : terminalPhase === 'site_persist' ? 'SITE_PERSISTENCE_FAILED' : 'GENERATION_FAILED',
         category: isComposition ? 'composition' : 'persistence',
         retryabilityReason: timeout ? 'transient_timeout' : 'requires_operator_review',
