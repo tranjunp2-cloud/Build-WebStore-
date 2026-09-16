@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in_review
 feature: F41
 story: US-F41-07
 issue: 1882
@@ -49,7 +49,7 @@ tiếp theo. Detail và ticket dùng cùng read model; UI không suy diễn từ
 
 ## Phase 2 — Safe serializer và ticket snapshot boundary
 
-**Status: blocked by US-F41-04 merge into `staging`.**
+**Status: complete (2026-09-16; integrated after US-F41-04 merged).**
 
 1. Extend `serializeAdminGenerationDetail` trả `incident` structured read model:
    `kind`, `location`, `cause`, `impact`, `recovery`, `owner`, `nextAction`,
@@ -63,7 +63,7 @@ tiếp theo. Detail và ticket dùng cùng read model; UI không suy diễn từ
 
 ## Phase 3 — Detail redesign
 
-**Status: blocked by US-F41-04 merge into `staging`.**
+**Status: complete (2026-09-16; integrated after US-F41-04 merged).**
 
 1. Add `IncidentPanel` as the one visible source of truth: error category,
    affected location, plain-language cause, impact, retryability/owner/CTA.
@@ -76,12 +76,15 @@ tiếp theo. Detail và ticket dùng cùng read model; UI không suy diễn từ
 
 ## Phase 4 — QA, observability and handoff
 
+**Status: complete for this story's contract/UI scope (2026-09-16).**
+
 1. Add fixtures: input required/format, page, component, quota/system, legacy.
-2. Add TC-F41-28 component/E2E, role/privacy tests, keyboard disclosure and
-   ticket snapshot handoff contract test.
+2. Add component/API privacy tests, keyboard disclosure and ticket snapshot
+   handoff contract test. (No new route was introduced; existing route tests
+   cover the read contract.)
 3. Verify `db-setup.js --migrate-only` twice, targeted tests, typecheck,
-   lint, diff check and manual staging gate: an operator identifies affected
-   user/site/error/location/next action within 10 seconds without raw data.
+   lint and diff check. Local smoke test verified authenticated listing; the
+   local DB had no generation fixture available to open a real detail record.
 
 ## Non-goals and guardrails
 

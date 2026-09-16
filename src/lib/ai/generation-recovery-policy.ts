@@ -1,5 +1,5 @@
 /** Server-owned recovery policy and safe list serialization for F41 Operations. */
-import { sanitizeGenerationEvidence } from './generation-outcome'
+import { sanitizeGenerationEvidence, SERVER_INCIDENT_CODES } from './generation-outcome'
 
 export type GenerationRecoveryStatus =
     | 'none' | 'eligible' | 'retrying' | 'exhausted'
@@ -38,6 +38,9 @@ export type GenerationListSource = {
         phase?: string | null
         locationType?: string | null
         locationKey?: string | null
+        locationLabel?: string | null
+        validationRule?: string | null
+        observedState?: string | null
         operatorMessage?: string | null
         userSafeMessage?: string | null
     }> | null
@@ -88,7 +91,9 @@ export function summarizeGenerationIncident(errors: GenerationListSource['genera
     return {
         kind: primary.kind,
         label: labels[primary.kind],
-        scope: primary.error.locationKey || defaultScope[primary.kind],
+        // The list intentionally stays at an operational level. Historical
+        // location keys are not trustworthy enough to expose outside detail.
+        scope: defaultScope[primary.kind],
         totalErrors: captured.length,
     }
 }
@@ -139,9 +144,10 @@ export function serializeAdminGeneration(record: GenerationListSource) {
         recoveryPolicy: resolveGenerationRecoveryPolicy(record),
         pageSummary: { expected: record.pageSummary?.expected ?? null, persisted: record.pageSummary?.persisted ?? 0, failed: record.pageSummary?.failed ?? 0 },
         incidentSummary: summarizeGenerationIncident(record.generationErrors),
-        // Historic operatorMessage values predate F41 sanitizer; list UI only
-        // receives the explicitly user-safe message.
-        affectedError: error ? { code: error.code ?? 'UNKNOWN', phase: error.phase ?? 'unknown', locationType: error.locationType ?? 'unknown', locationKey: error.locationKey ?? null, summary: error.userSafeMessage ?? 'Unknown' } : null,
+        // Historic error text and location values may contain request data.
+        // The list uses the structured incident summary above; retain this
+        // legacy field only as a bounded, non-sensitive compatibility shape.
+        affectedError: error ? { code: safeIncidentCode(error.code), phase: safeIncidentEnum(error.phase, INCIDENT_PHASES), locationType: safeIncidentEnum(error.locationType, INCIDENT_LOCATION_TYPES), locationKey: null, summary: 'Đã ghi nhận lỗi. Xem chi tiết để xử lý.' } : null,
     }
 }
 
@@ -153,6 +159,7 @@ export function serializeAdminGeneration(record: GenerationListSource) {
  * operator/privacy purpose has been reviewed.
  */
 export type GenerationDetailSource = GenerationListSource & {
+    traceId?: string | null
     endpoint?: string | null
     category?: string | null
     inputSchemaVersion?: string | null
@@ -171,7 +178,7 @@ export type GenerationDetailSource = GenerationListSource & {
     site?: { id: string | number; name?: string | null; slug?: string | null; domain?: string | null; status?: string | null } | string | number | null
     user?: { id: string | number; email?: string | null; firstName?: string | null; lastName?: string | null } | string | number | null
     pageOutcomes?: Array<{ pageKey?: string | null; title?: string | null; slug?: string | null; pageId?: string | null; status?: string | null; blockCount?: number | null; errorCode?: string | null; errorSummary?: string | null }> | null
-    generationErrors?: Array<{ phase?: string | null; locationType?: string | null; locationKey?: string | null; code?: string | null; category?: string | null; retryabilityReason?: string | null; userSafeMessage?: string | null; sanitizedTechnicalMessage?: string | null }> | null
+    generationErrors?: Array<{ phase?: string | null; locationType?: string | null; locationKey?: string | null; locationLabel?: string | null; validationRule?: string | null; observedState?: string | null; code?: string | null; category?: string | null; retryabilityReason?: string | null; userSafeMessage?: string | null; sanitizedTechnicalMessage?: string | null }> | null
 }
 
 export type GenerationRecoveryJobDetailSource = {
@@ -215,6 +222,38 @@ function recordItems(value: unknown): Array<Record<string, unknown>> {
 
 function safeDiagnostic(value: unknown, maxLength = 500) {
     return sanitizeGenerationEvidence(value, maxLength) || null
+}
+
+function safeTechnicalEvidence(value: unknown) {
+    if (typeof value !== 'string') return null
+    const match = /^Normalized diagnostic: ([A-Z][A-Z0-9_]{1,79})(?: \([a-z_ -]{1,80}\))?\.$/.exec(value.trim())
+    return match && SERVER_INCIDENT_CODES.has(match[1]) ? match[0] : null
+}
+const INPUT_INCIDENT_LABELS: Record<string, string> = { 'businessInfo.businessName': 'Tên doanh nghiệp', 'businessInfo.industry': 'Ngành hàng', 'businessInfo.shortDescription': 'Mô tả', 'businessInfo.products': 'Sản phẩm / dịch vụ', language: 'Ngôn ngữ', template: 'Template' }
+const INCIDENT_LOCATION_LABELS: Record<string, string> = { site: 'Toàn bộ website', page: 'Trang bị ảnh hưởng', component: 'Component bị ảnh hưởng', unknown: 'Chưa xác định' }
+const INCIDENT_LOCATION_TYPES = new Set(['input', 'site', 'page', 'component', 'unknown'])
+const INCIDENT_PHASES = new Set(['validate', 'site_persist', 'page_persist', 'component_persist', 'composition', 'recovery', 'unknown'])
+const INCIDENT_CATEGORIES = new Set(['input_validation', 'persistence', 'composition', 'quota', 'system'])
+const VALIDATION_RULES = new Set(['required', 'format', 'min_length', 'max_length', 'unsupported_value', 'contract_mismatch'])
+const OBSERVED_STATES = new Set(['missing', 'invalid_format', 'too_short', 'too_long', 'unsupported', 'unknown'])
+function safeIncidentEnum(value: unknown, allowed: Set<string>, fallback = 'unknown') { return typeof value === 'string' && allowed.has(value) ? value : fallback }
+function safeIncidentCode(value: unknown) { return typeof value === 'string' && SERVER_INCIDENT_CODES.has(value) ? value : 'UNKNOWN' }
+function safeTraceId(value: unknown) {
+    if (typeof value !== 'string') return null
+    const id = value.trim()
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+        || /^f41-ui-fixture-[a-z0-9-]{1,40}$/i.test(id)
+        || /^tr_[a-zA-Z0-9_-]{8,60}$/.test(id)
+        ? id
+        : null
+}
+
+function incidentCause(kind: GenerationIncidentKind, code: string) {
+    const labels: Record<GenerationIncidentKind, string> = {
+        input: 'Thông tin form chưa hợp lệ', quota: 'Không đủ quota AI để tiếp tục', system: 'Dịch vụ tạo website gặp sự cố',
+        persistence: 'Không thể lưu website', page: 'Không thể tạo trang', component: 'Không thể tạo component', unknown: 'Chưa có đủ dữ liệu để xác định nguyên nhân',
+    }
+    return { label: labels[kind], code }
 }
 
 function relationId(value: { id: string | number } | string | number | null | undefined) {
@@ -281,11 +320,24 @@ export function serializeAdminGenerationDetail(
     // linked to it. Prefer the original relation, but do not hide the recovery
     // website in that transitional state.
     const site = capturedSite.id ? capturedSite : recoveredSite
-    const errors = recordItems(record.generationErrors).slice(0, 20).map((error) => ({
-        phase: safeDiagnostic(error.phase, 100) ?? 'unknown', locationType: safeDiagnostic(error.locationType, 100) ?? 'unknown', locationKey: safeDiagnostic(error.locationKey, 160),
-        code: safeDiagnostic(error.code, 120) ?? 'UNKNOWN', category: safeDiagnostic(error.category, 100) ?? 'unknown', retryabilityReason: safeDiagnostic(error.retryabilityReason, 160),
-        message: safeDiagnostic(error.userSafeMessage) ?? 'Không có mô tả lỗi an toàn.', technicalMessage: safeDiagnostic(error.sanitizedTechnicalMessage),
-    }))
+    const boundedRawErrors = recordItems(record.generationErrors).slice(0, 20)
+    const errors = boundedRawErrors.map((error) => {
+        const locationType = safeIncidentEnum(error.locationType, INCIDENT_LOCATION_TYPES)
+        const candidateKey = typeof error.locationKey === 'string' ? error.locationKey : null
+        // The only durable field keys are the server-owned input schema keys.
+        // Page/component labels can originate in prompts or old AI output and
+        // are therefore shown only through their separately sanitized tree.
+        const locationKey = locationType === 'input' && INPUT_INCIDENT_LABELS[candidateKey ?? ''] ? candidateKey : null
+        const locationLabel = locationType === 'input'
+            ? INPUT_INCIDENT_LABELS[locationKey ?? ''] ?? null
+            : INCIDENT_LOCATION_LABELS[locationType] ?? 'Chưa xác định'
+        return {
+        phase: safeIncidentEnum(error.phase, INCIDENT_PHASES), locationType, locationKey,
+        locationLabel,
+        validationRule: safeIncidentEnum(error.validationRule, VALIDATION_RULES, '') || null, observedState: safeIncidentEnum(error.observedState, OBSERVED_STATES, '') || null,
+        code: safeIncidentCode(error.code), category: safeIncidentEnum(error.category, INCIDENT_CATEGORIES), retryabilityReason: null,
+        message: 'Đã ghi nhận lỗi an toàn. Xem nguyên nhân và hành động được đề xuất bên dưới.', technicalMessage: safeTechnicalEvidence(error.sanitizedTechnicalMessage),
+    }})
     const pages = recordItems(record.pageOutcomes).slice(0, 100).map((page) => ({
         pageKey: safeDiagnostic(page.pageKey, 160), title: safeDiagnostic(page.title, 240) ?? safeDiagnostic(page.slug, 160) ?? 'Trang chưa đặt tên', slug: safeDiagnostic(page.slug, 160),
         pageId: safeDiagnostic(page.pageId, 120), status: page.status === 'persisted' ? 'persisted' : page.status === 'failed' ? 'failed' : 'unknown', blockCount: typeof page.blockCount === 'number' && Number.isFinite(page.blockCount) ? page.blockCount : null,
@@ -304,16 +356,43 @@ export function serializeAdminGenerationDetail(
         jobStatus: job.status ?? 'unknown',
         childGenerationId: relationId(job.childGeneration),
     })))
+    const incidentSummary = summarizeGenerationIncident(boundedRawErrors)
+    const primary = errors.find((error) => incidentSummary && incidentKindFor(error) === incidentSummary.kind) ?? errors[0]
+    const inputIncident = incidentSummary?.kind === 'input'
+    const isLegacy = Boolean((record.outcome === 'failed' || record.outcome === 'partial_failed') && errors.length === 0)
+    const incident = !incidentSummary ? null : {
+        kind: incidentSummary.kind,
+        label: incidentSummary.label,
+        location: {
+            type: primary?.locationType ?? 'unknown', key: primary?.locationKey ?? null,
+            label: primary?.locationLabel ?? 'Chưa xác định', known: Boolean(primary?.locationLabel),
+        },
+        cause: { ...incidentCause(incidentSummary.kind, primary?.code ?? 'UNKNOWN'), validationRule: primary?.validationRule ?? null, observedState: primary?.observedState ?? null },
+        impact: { expected: summary.pageSummary.expected, persisted: summary.pageSummary.persisted, failed: summary.pageSummary.failed, summary: summary.pageSummary.expected === null ? 'Chưa ghi nhận tổng số trang.' : `${summary.pageSummary.failed}/${summary.pageSummary.expected} trang chưa tạo, ${summary.pageSummary.persisted} trang đã lưu.` },
+        recovery: { retryable: summary.recoveryPolicy.retryable, scope: summary.recoveryPolicy.retryable ? 'website' : 'none', reasonCode: summary.recoveryPolicy.reasonCode },
+        owner: inputIncident ? { kind: 'user', label: 'Người dùng cần điều chỉnh form' } : summary.recoveryPolicy.action === 'create_ticket' || summary.recoveryPolicy.action === 'open_ticket' ? { kind: 'dev', label: 'Team Dev' } : { kind: 'operator', label: 'Người trực tracking' },
+        nextAction: inputIncident ? { kind: 'none', label: 'Chờ người dùng điều chỉnh form và gửi lại.' } : summary.recoveryPolicy.action === 'retry_website' ? { kind: 'retry_website', label: 'Gen lại toàn bộ website.' } : summary.recoveryPolicy.action === 'create_ticket' || summary.recoveryPolicy.action === 'open_ticket' ? { kind: 'open_issues', label: summary.recoveryPolicy.action === 'open_ticket' ? 'Mở ticket hiện có trong Issues & feedback.' : 'Tạo ticket để team Dev điều tra.' } : { kind: 'monitor', label: 'Theo dõi generation và timeline.' },
+        developerEvidence: primary?.technicalMessage ? { phase: primary.phase, technicalMessage: primary.technicalMessage } : null,
+        legacy: false, relatedErrorCount: errors.length,
+    }
+    const legacyIncident = isLegacy ? { kind: 'unknown' as const, label: 'Chưa xác định lỗi', location: { type: 'unknown', key: null, label: 'Chưa xác định', known: false }, cause: { ...incidentCause('unknown', 'UNKNOWN'), validationRule: null, observedState: null }, impact: { expected: summary.pageSummary.expected, persisted: summary.pageSummary.persisted, failed: summary.pageSummary.failed, summary: summary.pageSummary.expected === null ? 'Chưa ghi nhận tổng số trang.' : `${summary.pageSummary.failed}/${summary.pageSummary.expected} trang chưa tạo, ${summary.pageSummary.persisted} trang đã lưu.` }, recovery: { retryable: summary.recoveryPolicy.retryable, scope: summary.recoveryPolicy.retryable ? 'website' : 'none', reasonCode: summary.recoveryPolicy.reasonCode }, owner: { kind: 'operator', label: 'Người trực tracking' }, nextAction: { kind: 'monitor', label: 'Kiểm tra timeline hoặc lần gen lại để tiếp tục điều tra.' }, developerEvidence: null, legacy: true, relatedErrorCount: 0 } : null
     return {
         ...summary,
         endpoint: record.endpoint ?? 'site-generator', category: record.category ?? null,
         website: { ...site, urls: siteUrls(site) },
         recoveredWebsite: record.recoveredSite && recoveredSite.id !== site.id ? { ...recoveredSite, urls: siteUrls(recoveredSite) } : null,
         user: userDetail(record.user),
+        traceId: safeTraceId(record.traceId),
         input: safeInput(record.inputSnapshot), inputSchemaVersion: record.inputSchemaVersion ?? null,
         inputHash: record.inputHash ? record.inputHash.slice(0, 16) : null,
-        pages, errors, timeline: [...timestamps, ...recoveryTimeline].sort((a, b) => a.at.localeCompare(b.at)), durationMs: record.durationMs ?? null,
+        pages, errors, incident: incident ?? legacyIncident, timeline: [...timestamps, ...recoveryTimeline].sort((a, b) => a.at.localeCompare(b.at)), durationMs: record.durationMs ?? null,
         lineage: { source: record.source ?? 'user_submit', parentGenerationId: relationId(record.parentGeneration), retryRootGenerationId: relationId(record.retryRootGeneration), retryAttempt: record.retryAttempt ?? 0 },
         retryHistory: retryHistory.filter((item) => String(item.id) !== String(record.id)).slice(0, 10).map((item) => ({ id: String(item.id), submittedAt: item.createdAt, outcome: item.outcome ?? null, recoveryStatus: item.recoveryStatus ?? 'none', retryAttempt: item.retryAttempt ?? 0 })),
     }
+}
+
+/** Pure, sanitized handoff for US-F41-05. It deliberately performs no mutation. */
+export function buildGenerationTicketIncidentSnapshot(detail: ReturnType<typeof serializeAdminGenerationDetail>) {
+    if (!detail.incident) return null
+    return { generationId: detail.id, traceId: safeTraceId(detail.traceId), incident: detail.incident, website: { id: detail.website.id }, user: { id: detail.user.id }, lineage: detail.lineage }
 }

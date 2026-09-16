@@ -97,6 +97,14 @@ const INCIDENT_LOCATION_TYPES = new Set<GenerationIncidentLocationType>(['input'
 const INCIDENT_CATEGORIES = new Set<GenerationIncidentCategory>(['input_validation', 'persistence', 'composition', 'quota', 'system'])
 const VALIDATION_RULES = new Set<GenerationValidationRule>(['required', 'format', 'min_length', 'max_length', 'unsupported_value', 'contract_mismatch'])
 const OBSERVED_STATES = new Set<GenerationObservedState>(['missing', 'invalid_format', 'too_short', 'too_long', 'unsupported', 'unknown'])
+/** Canonical server-owned F41 incident codes. Read models must use this too. */
+export const SERVER_INCIDENT_CODES = new Set([
+    'FORM_INVALID', 'INVALID_INPUT', 'INVALID_TEMPLATE_CONTRACT', 'INVALID_COMPONENT_CONTRACT',
+    'PAGE_PERSISTENCE_FAILED', 'PAGE_PERSIST_FAILED', 'PAGE_GENERATION_FAILED', 'SITE_PERSISTENCE_FAILED',
+    'GENERATION_FAILED', 'GENERATION_TIMEOUT', 'IMAGE_GENERATION_TIMEOUT', 'PERSISTENCE_TIMEOUT',
+    'AI_QUOTA_EXCEEDED', 'UPSTREAM_TIMEOUT', 'RECOVERY_TIMEOUT', 'RECOVERY_INVALID_OUTPUT',
+    'RECOVERY_GENERATION_FAILED', 'RECOVERY_PREVIOUSLY_TERMINAL',
+])
 
 function safeIncidentKey(value: string | undefined): string | undefined {
     if (!value || !/^[a-zA-Z0-9._/-]{1,120}$/.test(value)) return undefined
@@ -114,7 +122,7 @@ function safeEnum<T extends string>(value: unknown, allowed: Set<T>): T | undefi
 }
 
 function safeIncidentCode(value: unknown): string | undefined {
-    return typeof value === 'string' && /^[A-Z][A-Z0-9_]{1,79}$/.test(value) ? value : undefined
+    return typeof value === 'string' && SERVER_INCIDENT_CODES.has(value) ? value : undefined
 }
 
 function inputOperatorMessage(label: string | undefined, rule: GenerationValidationRule | undefined, state: GenerationObservedState | undefined): string {
@@ -165,7 +173,7 @@ export function sanitizeGenerationEvidence(value: unknown, maxLength = MAX_MESSA
  * category and input metadata are never inferred from it.
  */
 export function normalizeGenerationIncident(error: unknown, hint: GenerationIncidentHint = {}): NormalizedGenerationError {
-    const message = boundedMessage(error)
+    const message = sanitizeGenerationEvidence(error)
     const timeout = /timeout|timed out|etimedout/i.test(message)
     const phase = safeEnum(hint.phase, INCIDENT_PHASES) ?? 'unknown'
     const locationType = safeEnum(hint.locationType, INCIDENT_LOCATION_TYPES) ?? 'unknown'
