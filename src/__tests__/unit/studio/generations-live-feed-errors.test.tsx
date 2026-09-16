@@ -1,5 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), back: vi.fn() }) }))
+
 import { GenerationsLiveFeed } from '@/app/studio/generations/_components/generations-live-feed'
 import type { GenerationsListResponse } from '@/app/studio/generations/_components/generation-types'
 
@@ -18,6 +21,22 @@ const staleData: GenerationsListResponse = {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('GenerationsLiveFeed error state', () => {
+    it('TC-F41-21: changes to All Generations before querying a global status', async () => {
+        // Arrange
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(staleData), { status: 200 }))
+        vi.stubGlobal('fetch', fetchMock)
+        render(<GenerationsLiveFeed initialData={staleData} />)
+        await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+
+        // Act
+        fireEvent.change(screen.getByRole('combobox', { name: 'Lọc theo trạng thái' }), { target: { value: 'success:all' } })
+
+        // Assert
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+        expect(String(fetchMock.mock.calls[1]?.[0])).toContain('view=all')
+        expect(String(fetchMock.mock.calls[1]?.[0])).toContain('status=success')
+    })
+
     it('TC-F41-18: clears stale actionable rows and shows the server-safe filter error', async () => {
         // Arrange — a prior query has a retryable row, but the active request
         // rejects an over-broad user/site name search.

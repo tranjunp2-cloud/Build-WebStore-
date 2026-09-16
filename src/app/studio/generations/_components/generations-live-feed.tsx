@@ -1,17 +1,35 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Download, Info, RefreshCw, Search } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTapToggleTooltip } from '@/hooks/use-tap-toggle-tooltip'
 import type { GenerationRecord, GenerationsFilters, GenerationsListResponse } from './generation-types'
-import { GenerationDetailDrawer } from './generation-detail-drawer'
 import { GenerationRetryAction } from './generation-retry-action'
 
 const POLL_INTERVAL_MS = 10_000
-const labels: Record<string, string> = { cannot_recover: 'Không recovery', retryable: 'Cần xử lý', retry_failed: 'Retry thất bại', retrying: 'Đang gen lại', stale_running: 'Đang treo', history: 'Hoàn tất' }
-const statusTone: Record<string, string> = { cannot_recover: 'danger', retry_failed: 'danger', retryable: 'warn', retrying: 'accent', stale_running: 'accent', history: 'success' }
+const DETAIL_RETURN_MARKER = 'f41-generation-detail-return'
 const priorityLabel: Record<string, string> = { cannot_recover: 'P0', retry_failed: 'P0', retryable: 'P1', retrying: 'P2', stale_running: 'P2', history: '—' }
+
+type OperatorStatus = { label: string; tone: 'danger' | 'warn' | 'accent' | 'success' | 'muted'; description: string }
+
+/** Queue priority orders rows; this status tells the operator what to do next. */
+export function getOperatorStatus(record: Pick<GenerationRecord, 'recoveryStatus' | 'lifecycle' | 'outcome'>): OperatorStatus {
+    switch (record.recoveryStatus) {
+        case 'eligible': return { label: 'Có thể gen lại', tone: 'warn', description: 'Lỗi có thể khôi phục. Chọn Gen lại để tạo bản nháp mới từ form gốc.' }
+        case 'retrying': return { label: 'Đang gen lại', tone: 'accent', description: 'Yêu cầu đã được xếp hàng hoặc đang chạy. Chưa cần thao tác thêm.' }
+        case 'stale_running': return { label: 'Có dấu hiệu bị kẹt', tone: 'warn', description: 'Generation không có cập nhật tiến trình trong thời gian dự kiến. Mở chi tiết để kiểm tra.' }
+        case 'ticket_required': return { label: 'Cần Dev xử lý', tone: 'danger', description: 'Không thể gen lại an toàn. Chuyển issue cho team Dev điều tra.' }
+        case 'exhausted': return { label: 'Cần Dev xử lý', tone: 'danger', description: 'Hệ thống không thể tự khôi phục thêm. Chuyển issue cho team Dev điều tra.' }
+        case 'ticket_created': return { label: 'Đã chuyển Dev', tone: 'muted', description: 'Issue đã được tạo. Theo dõi tiến độ tại Issues & feedback.' }
+    }
+    if (record.lifecycle === 'queued') return { label: 'Đang chờ tạo website', tone: 'accent', description: 'Generation đã được ghi nhận và đang chờ hệ thống bắt đầu tạo website.' }
+    if (record.lifecycle === 'running') return { label: 'Đang tạo website', tone: 'accent', description: 'Hệ thống đang tạo website.' }
+    if (record.outcome === 'succeeded') return { label: 'Đã hoàn tất', tone: 'success', description: 'Website đã được tạo thành công, không cần thao tác thêm.' }
+    if (record.outcome === 'failed' || record.outcome === 'partial_failed' || record.outcome === 'cancelled') return { label: 'Cần kiểm tra', tone: 'warn', description: 'Generation đã kết thúc nhưng chưa có hướng khôi phục đáng tin cậy. Mở chi tiết để kiểm tra.' }
+    return { label: 'Đã ghi nhận generation', tone: 'muted', description: 'Chưa có đủ dữ liệu để xác định hướng xử lý. Mở chi tiết để kiểm tra.' }
+}
 function relativeTime(value: string) { const d = Date.now() - new Date(value).getTime(); return d < 60_000 ? 'vừa xong' : d < 3_600_000 ? `${Math.floor(d / 60_000)} phút` : `${Math.floor(d / 3_600_000)} giờ` }
 function buildUrl(f: GenerationsFilters) { const p = new URLSearchParams({ view: f.view, status: f.status, recoveryStatus: f.recoveryStatus, limit: String(f.limit) }); for (const [key, value] of Object.entries({ search: f.search, userId: f.userId, siteId: f.siteId, dateFrom: f.dateFrom, dateTo: f.dateTo, cursor: f.cursor })) if (value) p.set(key, value); return `/api/admin/generations?${p}` }
 
@@ -27,6 +45,11 @@ export function toDateTimeLocalValue(value: string) {
 export function GenerationTimeHelp() {
     const { open, onOpenChange, onPointerDown, onTouchStart, onFocus, onClick, ref } = useTapToggleTooltip<HTMLButtonElement>()
     return <TooltipProvider><Tooltip open={open} onOpenChange={onOpenChange}><TooltipTrigger asChild><button ref={ref} type="button" className="f41-column-help" aria-label="Giải thích thời gian generation" aria-expanded={open} onPointerDown={onPointerDown} onTouchStart={onTouchStart} onFocus={onFocus} onClick={onClick}><Info size={12} aria-hidden /></button></TooltipTrigger><TooltipContent side="top">Thời gian tính từ lúc user gửi form và hệ thống tạo generation; không phải thời lượng AI gen website.</TooltipContent></Tooltip></TooltipProvider>
+}
+
+export function GenerationStatusHelp() {
+    const { open, onOpenChange, onPointerDown, onTouchStart, onFocus, onClick, ref } = useTapToggleTooltip<HTMLButtonElement>()
+    return <TooltipProvider><Tooltip open={open} onOpenChange={onOpenChange}><TooltipTrigger asChild><button ref={ref} type="button" className="f41-column-help" aria-label="Giải thích hướng xử lý" aria-expanded={open} onPointerDown={onPointerDown} onTouchStart={onTouchStart} onFocus={onFocus} onClick={onClick}><Info size={12} aria-hidden /></button></TooltipTrigger><TooltipContent side="top">Cho biết người trực cần gen lại, theo dõi hoặc chuyển Dev; không phải riêng kết quả tạo website.</TooltipContent></Tooltip></TooltipProvider>
 }
 
 export function getExportScope(filters: GenerationsFilters) {
@@ -72,8 +95,14 @@ function sameFilters(a: GenerationsFilters, b: GenerationsFilters) {
 }
 
 export function GenerationsLiveFeed({ initialData }: { initialData: GenerationsListResponse }) {
-    const [data, setData] = useState(initialData), [filters, setFilters] = useState<GenerationsFilters>({ view: 'needs_attention', status: 'all', recoveryStatus: 'all', search: '', userId: '', siteId: '', dateFrom: '', dateTo: '', cursor: '', limit: 50 }), [loading, setLoading] = useState(false), [selected, setSelected] = useState<GenerationRecord | null>(null), [advancedOpen, setAdvancedOpen] = useState(false), [timeRange, setTimeRange] = useState('all'), [loadError, setLoadError] = useState<string | null>(null)
+    const router = useRouter()
+    const [data, setData] = useState(initialData), [filters, setFilters] = useState<GenerationsFilters>({ view: 'needs_attention', status: 'all', recoveryStatus: 'all', search: '', userId: '', siteId: '', dateFrom: '', dateTo: '', cursor: '', limit: 50 }), [loading, setLoading] = useState(false), [advancedOpen, setAdvancedOpen] = useState(false), [timeRange, setTimeRange] = useState('all'), [loadError, setLoadError] = useState<string | null>(null)
     const ref = useRef(filters); ref.current = filters
+    useEffect(() => {
+        // A browser Back action returns here too, so a stale marker can never
+        // make a later shared detail URL navigate away from Studio.
+        window.sessionStorage.removeItem(DETAIL_RETURN_MARKER)
+    }, [])
     const load = useCallback(async (f: GenerationsFilters, mode: 'replace' | 'append' | 'poll' = 'replace', manual = false) => {
         if (manual) setLoading(true)
         try {
@@ -86,7 +115,6 @@ export function GenerationsLiveFeed({ initialData }: { initialData: GenerationsL
                 // applied to a generation that is no longer in scope.
                 if (mode === 'replace') {
                     setData((current) => ({ ...current, items: [], nextCursor: null, meta: { ...current.meta, totalDocs: 0, hasNextPage: false, hasPrevPage: false } }))
-                    setSelected(null)
                 }
                 setLoadError(body?.error?.message ?? 'Chưa thể tải generations. Vui lòng thử lại.')
                 return
@@ -110,7 +138,6 @@ export function GenerationsLiveFeed({ initialData }: { initialData: GenerationsL
             if (sameFilters(f, ref.current)) {
                 if (mode === 'replace') {
                     setData((current) => ({ ...current, items: [], nextCursor: null, meta: { ...current.meta, totalDocs: 0, hasNextPage: false, hasPrevPage: false } }))
-                    setSelected(null)
                 }
                 setLoadError('Chưa thể tải generations. Vui lòng kiểm tra kết nối và thử lại.')
             }
@@ -123,7 +150,6 @@ export function GenerationsLiveFeed({ initialData }: { initialData: GenerationsL
         // before its request starts, so a stale row can never be retried in the
         // short interval between the input event and the API response.
         setData((current) => ({ ...current, items: [], nextCursor: null, meta: { ...current.meta, totalDocs: 0, hasNextPage: false, hasPrevPage: false } }))
-        setSelected(null)
         setLoadError(null)
     }
     const update = <K extends keyof GenerationsFilters>(key: K, value: GenerationsFilters[K]) => {
@@ -133,7 +159,8 @@ export function GenerationsLiveFeed({ initialData }: { initialData: GenerationsL
     const updateStatusFilter = (value: string) => {
         const [status, recoveryStatus] = value.split(':')
         clearActiveScope()
-        setFilters((old) => ({ ...old, status: status as GenerationsFilters['status'], recoveryStatus: recoveryStatus as GenerationsFilters['recoveryStatus'], cursor: '' }))
+        const requiresAllGenerations = status === 'running' || status === 'success' || recoveryStatus === 'ticket_created'
+        setFilters((old) => ({ ...old, view: requiresAllGenerations ? 'all' : old.view, status: status as GenerationsFilters['status'], recoveryStatus: recoveryStatus as GenerationsFilters['recoveryStatus'], cursor: '' }))
     }
     const updateTimeRange = (value: string) => {
         setTimeRange(value)
@@ -162,18 +189,22 @@ export function GenerationsLiveFeed({ initialData }: { initialData: GenerationsL
     const retryAccepted = (id: string) => {
         const apply = (record: GenerationRecord) => record.id === id ? { ...record, recoveryStatus: 'retrying', priority: 'retrying', recoveryPolicy: { action: 'monitor' as const, retryable: false, reasonCode: 'RETRY_IN_PROGRESS' } } : record
         setData((current) => ({ ...current, items: current.items.map(apply) }))
-        setSelected((current) => current ? apply(current) : current)
+    }
+    const openDetail = (id: string) => {
+        window.sessionStorage.setItem(DETAIL_RETURN_MARKER, '1')
+        router.push(`/studio/generations/${encodeURIComponent(id)}`)
     }
     const visible = data.items
     const metric = (priority: string) => visible.filter((item) => item.priority === priority).length
     return <div className="gen-page f41-generation-page">
         <p className="f41-caption">Needs Attention là queue mặc định. Success chỉ nằm trong history để người trực thấy lỗi cần xử lý trước.</p>
         <div className="page-head f41-page-head"><div><h1 className="page-title">User Generations</h1><p className="page-sub">Theo dõi website AI gen, khôi phục lỗi và chuyển Dev khi không thể recovery.</p></div><div className="f41-head-actions"><button className="btn btn-sm" onClick={() => void load(filters, 'replace', true)} disabled={loading}><RefreshCw size={13} /> Làm mới</button><button className="btn btn-sm" onClick={exportCsv} disabled={!canExport} title={exportScope} aria-label={exportScope}><Download size={13} /> Export CSV</button></div></div>
-        <div className="f41-kpis" aria-label="Tổng quan generation đang hiển thị"><div><small>Cần xử lý</small><b className="amber">{metric('retryable')}</b></div><div><small>Đang gen lại</small><b className="blue">{metric('retrying')}</b></div><div><small>Không recovery</small><b className="red">{metric('cannot_recover') + metric('retry_failed')}</b></div><div><small>Hoàn tất hôm nay</small><b className="green">{metric('history')}</b></div><div><small>Đang gen</small><b className="blue">{visible.filter((item) => item.lifecycle === 'running').length}</b></div></div>
+        <div className="f41-kpis" aria-label="Tổng quan generation đang hiển thị"><div><small>Có thể gen lại</small><b className="amber">{metric('retryable')}</b></div><div><small>Đang gen lại</small><b className="blue">{metric('retrying')}</b></div><div><small>Cần Dev xử lý</small><b className="red">{metric('cannot_recover') + metric('retry_failed')}</b></div><div><small>Đã hoàn tất</small><b className="green">{visible.filter((item) => item.outcome === 'succeeded').length}</b></div><div><small>Đang tạo website</small><b className="blue">{visible.filter((item) => item.lifecycle === 'running').length}</b></div></div>
         <div className="f41-tabs" aria-label="Generation views">{(['needs_attention', 'all'] as const).map((view) => <button key={view} type="button" aria-pressed={filters.view === view} className={filters.view === view ? 'active' : ''} onClick={() => update('view', view)}>{view === 'needs_attention' ? `Needs Attention · ${data.meta.totalDocs}` : 'All Generations'}</button>)}</div>
-        <div className="f41-toolbar"><select className="f41-toolbar-control" aria-label="Lỗi hoặc trạng thái" value={`${filters.status}:${filters.recoveryStatus}`} onChange={(e) => updateStatusFilter(e.target.value)}><option value="all:all">Lỗi / trạng thái</option><option value="failed:all">Lỗi</option><option value="all:eligible">Cần xử lý</option><option value="all:retrying">Đang gen lại</option><option value="running:all">Đang gen</option><option value="success:all">Hoàn tất</option></select><select className="f41-toolbar-control" aria-label="Thời gian" value={timeRange} onChange={(e) => updateTimeRange(e.target.value)}><option value="all">Thời gian</option><option value="24h">24 giờ gần đây</option><option value="7d">7 ngày gần đây</option><option value="30d">30 ngày gần đây</option></select><button type="button" className="btn btn-sm f41-toolbar-control" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((open) => !open)}>Bộ lọc khác</button><div className="f41-search"><Search size={14} /><input aria-label="Tìm generation" value={filters.search} onChange={(e) => update('search', e.target.value)} placeholder="Tìm user, website, generation ID…" /></div></div>
+        <p className="f41-status-legend" aria-label="Giải thích hướng xử lý"><b>Hướng xử lý:</b> Có thể gen lại — bấm Gen lại; Đang gen lại — chờ hệ thống; Có dấu hiệu bị kẹt — mở chi tiết; Cần Dev xử lý — chuyển issue cho Dev; Đã chuyển Dev — theo dõi issue.</p>
+        <div className="f41-toolbar"><select className="f41-toolbar-control" aria-label="Lọc theo trạng thái" value={`${filters.status}:${filters.recoveryStatus}`} onChange={(e) => updateStatusFilter(e.target.value)}><option value="all:all">Lọc theo trạng thái</option><option value="failed:all">Có lỗi khi tạo website</option><option value="all:eligible">Có thể gen lại</option><option value="all:retrying">Đang gen lại</option><option value="all:stale_running">Có dấu hiệu bị kẹt</option><option value="all:ticket_required">Cần Dev xử lý — chưa gen lại</option><option value="all:exhausted">Cần Dev xử lý — đã thử gen lại</option><option value="all:ticket_created">Đã chuyển Dev</option><option value="running:all">Đang tạo website</option><option value="success:all">Đã hoàn tất</option></select><select className="f41-toolbar-control" aria-label="Thời gian" value={timeRange} onChange={(e) => updateTimeRange(e.target.value)}><option value="all">Thời gian</option><option value="24h">24 giờ gần đây</option><option value="7d">7 ngày gần đây</option><option value="30d">30 ngày gần đây</option></select><button type="button" className="btn btn-sm f41-toolbar-control" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((open) => !open)}>Bộ lọc khác</button><div className="f41-search"><Search size={14} /><input aria-label="Tìm generation" value={filters.search} onChange={(e) => update('search', e.target.value)} placeholder="Tìm user, website, generation ID…" /></div></div>
         {loadError && <p role="alert" className="f41-load-error">{loadError}</p>}
         {advancedOpen && <div className="f41-advanced" aria-label="Bộ lọc nâng cao"><input aria-label="User ID" value={filters.userId} onChange={(e) => update('userId', e.target.value)} placeholder="User ID" /><input aria-label="Website ID" value={filters.siteId} onChange={(e) => update('siteId', e.target.value)} placeholder="Website ID" /><label>Từ <input aria-label="Từ ngày" type="datetime-local" value={toDateTimeLocalValue(filters.dateFrom)} onChange={(e) => update('dateFrom', e.target.value ? new Date(e.target.value).toISOString() : '')} /></label><label>Đến <input aria-label="Đến ngày" type="datetime-local" value={toDateTimeLocalValue(filters.dateTo)} onChange={(e) => update('dateTo', e.target.value ? new Date(e.target.value).toISOString() : '')} /></label></div>}
-        <div className="gen-list"><div className="gen-list-head"><div className="col col-time"><span>Ưu tiên / thời gian</span><GenerationTimeHelp /></div><div className="col col-user">User &amp; website</div><div className="col col-metrics">Trang</div><div className="col col-prompt">Loại sự cố</div><div className="col col-status">Trạng thái</div><div className="col col-action"><span className="sr-only">Hành động</span></div></div><div className="gen-list-body scroll-thin">{data.items.length === 0 ? <div className="empty-state">Không có generation cần xử lý</div> : data.items.map((r: GenerationRecord) => <div className="gen-row-wrap" key={r.id}><button type="button" onClick={() => setSelected(r)} className="gen-row" aria-label={`Xem generation ${r.id}`}><div className="gen-row-time"><span className="t">{priorityLabel[r.priority] ?? '—'} · {relativeTime(r.submittedAt)}</span><span className="id">#{r.id}</span></div><div className="gen-row-user-site"><div className="n">{r.user.label}</div><div className="e">{r.site.label}</div></div><div className="gen-row-metrics" aria-label={`${r.pageSummary.persisted} of ${r.pageSummary.expected ?? 'unknown'} pages persisted; ${r.pageSummary.failed} failed`}><b>{r.pageSummary.persisted}/{r.pageSummary.expected ?? '?'}</b><small>pages</small></div><div className="gen-row-prompt">{r.incidentSummary ? <><b>{r.incidentSummary.label}</b><div className="prompt-text" title={r.incidentSummary.scope}>{r.incidentSummary.scope}{r.incidentSummary.totalErrors > 1 ? ` · +${r.incidentSummary.totalErrors - 1} lỗi khác` : ''}</div></> : <><b>—</b><div className="prompt-text">Không có lỗi ảnh hưởng</div></>}</div><div className="gen-row-status"><span className={`gen-pill gen-pill-${statusTone[r.priority] ?? 'muted'}`}>{labels[r.priority] ?? r.priority}</span></div></button><div className="gen-row-action"><GenerationRetryAction record={r} onAccepted={retryAccepted} /><button type="button" className="btn btn-sm" onClick={() => setSelected(r)}>Xem</button></div></div>)}{data.nextCursor && <button className="btn btn-sm" onClick={loadMore} disabled={loading}>Tải thêm</button>}</div></div><p className="f41-list-note">`Gen lại website` tạo child generation bằng form gốc; parent và evidence lỗi luôn được giữ.</p><GenerationDetailDrawer record={selected} onClose={() => setSelected(null)} onRetryAccepted={retryAccepted} />
+        <div className="gen-list"><div className="gen-list-head"><div className="col col-time"><span>Ưu tiên / thời gian</span><GenerationTimeHelp /></div><div className="col col-user">User &amp; website</div><div className="col col-metrics">Trang</div><div className="col col-prompt">Loại sự cố</div><div className="col col-status"><span>Hướng xử lý</span><GenerationStatusHelp /></div><div className="col col-action"><span className="sr-only">Hành động</span></div></div><div className="gen-list-body scroll-thin">{data.items.length === 0 ? <div className="empty-state">Không có generation cần xử lý</div> : data.items.map((r: GenerationRecord) => { const operatorStatus = getOperatorStatus(r); return <div className="gen-row-wrap" key={r.id}><button type="button" onClick={() => openDetail(r.id)} className="gen-row" aria-label={`Xem generation ${r.id}`}><div className="gen-row-time"><span className="t">{priorityLabel[r.priority] ?? '—'} · {relativeTime(r.submittedAt)}</span><span className="id">#{r.id}</span></div><div className="gen-row-user-site"><div className="n">{r.user.label}</div><div className="e">{r.site.label}</div></div><div className="gen-row-metrics" aria-label={`${r.pageSummary.persisted} of ${r.pageSummary.expected ?? 'unknown'} pages persisted; ${r.pageSummary.failed} failed`}><b>{r.pageSummary.persisted}/{r.pageSummary.expected ?? '?'}</b><small>pages</small></div><div className="gen-row-prompt">{r.incidentSummary ? <><b>{r.incidentSummary.label}</b><div className="prompt-text" title={r.incidentSummary.scope}>{r.incidentSummary.scope}{r.incidentSummary.totalErrors > 1 ? ` · +${r.incidentSummary.totalErrors - 1} lỗi khác` : ''}</div></> : <><b>—</b><div className="prompt-text">Không có lỗi ảnh hưởng</div></>}</div><div className="gen-row-status"><span className={`gen-pill gen-pill-${operatorStatus.tone}`} title={operatorStatus.description}>{operatorStatus.label}</span></div></button><div className="gen-row-action"><GenerationRetryAction record={r} onAccepted={retryAccepted} /><button type="button" className="btn btn-sm" onClick={() => openDetail(r.id)}>Xem</button></div></div> })}{data.nextCursor && <button className="btn btn-sm" onClick={loadMore} disabled={loading}>Tải thêm</button>}</div></div><p className="f41-list-note">`Gen lại website` tạo child generation bằng form gốc; parent và evidence lỗi luôn được giữ.</p>
     </div>
 }

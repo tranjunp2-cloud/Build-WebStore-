@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendUniqueGenerationRecords, getExportScope, mergePolledGenerationRecords, toDateTimeLocalValue } from '@/app/studio/generations/_components/generations-live-feed'
+import { appendUniqueGenerationRecords, getExportScope, getOperatorStatus, mergePolledGenerationRecords, toDateTimeLocalValue } from '@/app/studio/generations/_components/generations-live-feed'
 import type { GenerationRecord } from '@/app/studio/generations/_components/generation-types'
 
 function record(id: string): GenerationRecord {
@@ -66,6 +66,18 @@ describe('appendUniqueGenerationRecords', () => {
 })
 
 describe('generation listing presentation guards', () => {
+    it('TC-F41-21: derives an operator-facing status from recovery state and outcome, not queue priority', () => {
+        expect(getOperatorStatus({ recoveryStatus: 'ticket_required', lifecycle: 'terminal', outcome: 'failed' }).label).toBe('Cần Dev xử lý')
+        expect(getOperatorStatus({ recoveryStatus: 'exhausted', lifecycle: 'terminal', outcome: 'partial_failed' }).label).toBe('Cần Dev xử lý')
+        expect(getOperatorStatus({ recoveryStatus: 'ticket_created', lifecycle: 'terminal', outcome: 'failed' }).label).toBe('Đã chuyển Dev')
+        expect(getOperatorStatus({ recoveryStatus: 'none', lifecycle: 'queued', outcome: null }).label).toBe('Đang chờ tạo website')
+        expect(getOperatorStatus({ recoveryStatus: 'none', lifecycle: 'terminal', outcome: 'succeeded' }).label).toBe('Đã hoàn tất')
+        expect(getOperatorStatus({ recoveryStatus: 'eligible', lifecycle: 'terminal', outcome: 'partial_failed' }).label).toBe('Có thể gen lại')
+        expect(getOperatorStatus({ recoveryStatus: 'retrying', lifecycle: 'terminal', outcome: 'partial_failed' }).label).toBe('Đang gen lại')
+        expect(getOperatorStatus({ recoveryStatus: 'stale_running', lifecycle: 'running', outcome: null }).label).toBe('Có dấu hiệu bị kẹt')
+        expect(getOperatorStatus({ recoveryStatus: 'none', lifecycle: 'terminal', outcome: 'cancelled' }).label).toBe('Cần kiểm tra')
+    })
+
     it('TC-F41-18: converts ISO timestamps to browser-local datetime-local values', () => {
         // Date constructor uses local fields; this assertion is timezone-safe.
         const source = '2026-09-15T09:08:07.000Z'
