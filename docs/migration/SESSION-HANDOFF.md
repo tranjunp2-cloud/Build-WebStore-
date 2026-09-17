@@ -1,3 +1,12 @@
+# Latest handoff — 2026-09-17: blog empty state and commit validation
+
+- Blog List now shows a theme-aware empty panel with a decorative FileText icon for both cards/list variants. Keeps section heading/subheadline; blank or whitespace emptyStateLabel falls back to existing storefront blog translation.
+- Verified on the real PC_DEMO_14 public site at desktop/mobile sizes: visible message, no horizontal overflow. TypeScript and diff whitespace checks passed.
+- Pre-commit migration suite: 244 tests across 25 files passed. Migration changes committed as a405737; this section accompanies the separate blog fix commit. Earlier “commit/push pending” entries below are historical.
+- No migration reset or data modification was performed for the blog fix. Larger staging pilot and BE-dependent validation remain follow-up work; GitHub Actions remains deferred.
+
+---
+
 # Current handoff — 2026-09-17: latest full 30-store reset and migration complete
 
 User requested another full reset/migration of30 after the link fix. New private evidence root: /Users/levietducprime/Work/pw1-exports/reconstruction/pilot-full-links-30-20260917. Backup before-reset.dump, original input snapshot preserved. Reset removed30 mappings/sites/tenants, preserved accounts/outside sites, deleted133 migration media and retained198 referenced/uncertain files.

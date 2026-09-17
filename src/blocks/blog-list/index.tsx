@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { FileText } from 'lucide-react'
+import { useI18n } from '@/i18n'
 import type { BlockProps } from '../types'
 import { SmartLink } from '@/blocks/_shared/smart-link'
 import type { BlogListConfig } from './config'
@@ -56,8 +58,10 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         variant = 'cards',
         readArticleLabel = 'Read Article',
         uncategorizedLabel = 'Uncategorized',
-        emptyStateLabel = 'No published posts yet. Check back soon!',
+        emptyStateLabel,
     } = block
+    const { t } = useI18n()
+    const emptyMessage = emptyStateLabel?.trim() || t.storefront.blog.noPosts
     const headline = block.headline || block.sectionLabel || ''
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
@@ -140,10 +144,28 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         return (
             <AnimatedSection className="relative overflow-hidden">
                 <SectionWrapper as="div" padding="default" container="default" background="transparent">
-                    <div className="text-center">
-                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                        <p className="opacity-60 text-lg">{emptyStateLabel}</p>
+                    {(block.sectionLabel || headline || subheadline) && (
+                        <div className="text-center max-w-2xl mx-auto mb-10">
+                            {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+                            {headline && (
+                                <Heading level={2} className="mb-4">
+                                    <RichText text={headline} as="span" />
+                                </Heading>
+                            )}
+                            {subheadline && (
+                                <Body size="lg" className="opacity-60">
+                                    <RichText text={subheadline} as="span" />
+                                </Body>
+                            )}
+                        </div>
+                    )}
+                    <div
+                        role="status"
+                        data-testid="blog-list-empty"
+                        className="rounded-2xl border border-[var(--divider)] bg-[var(--surface-secondary)] px-6 py-14 text-center"
+                    >
+                        <FileText aria-hidden="true" className="mx-auto mb-4 h-10 w-10 opacity-40" />
+                        <Body size="lg" className="opacity-75">{emptyMessage}</Body>
                     </div>
                 </SectionWrapper>
             </AnimatedSection>
