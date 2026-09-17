@@ -18,7 +18,7 @@ async function main() {
     }, strict: true, allowPositionals: true })
     if (values.help) {
         console.log(`PW1 migration (bounded preparation; serialized writes; one batch/database)
-  npm run migrate:pw1 -- FILE [--dry-run] [--store ID] [--max-attempts 3] [--concurrency 2]
+  npm run migrate:pw1 -- FILE [--dry-run] [--store ID] [--max-attempts 3] [--concurrency 5]
   npm run migrate:pw1 -- FILE --rerun
   npm run migrate:pw1 -- retry FILE [--store ID]
   npm run migrate:pw1 -- status [--store ID]
@@ -27,6 +27,9 @@ async function main() {
   npm run migrate:pw1 -- FILE --audit-base-url ORIGIN --audit-output REPORT.json
   npm run migrate:pw1 -- report --batch UUID [--format json|csv]
   npm run migrate:pw1 -- cleanup-media --store ID [--older-than-hours 168] [--limit 20] [--after-id ID] [--apply]
+Default: 5 active stores, 3 total attempts/store, automatic cleanup, publication and public audit.
+Run FILE again to resume; no separate retry command is required.
+Audit defaults to NEXT_PUBLIC_SERVER_URL and FILE.migration-audit.json (+ .md/.jsonl).
 Completed matching stores are automatically published through the existing app API.
 Publish origin: NEXT_PUBLIC_SERVER_URL (running app with the same destination database).
 Publish failures are retried separately without regenerating successful migrations.
@@ -44,6 +47,14 @@ Status/logs are read-only and need only database configuration.`)
     }
     if (values.store && !/^\d+$/.test(values.store)) throw new Error('store must be a numeric PW1 store ID')
     const command = ['status','logs','retry','report','cleanup-media','audit'].includes(positionals[0]) ? positionals.shift() : 'run'
+    // A normal invocation owns the whole flow; operators only supply the input file.
+    if (['run', 'retry'].includes(command) && !values['dry-run']
+        && values['audit-base-url'] === undefined && values['audit-output'] === undefined) {
+        if (!process.env.NEXT_PUBLIC_SERVER_URL) throw new Error('NEXT_PUBLIC_SERVER_URL is required for automatic publication and audit')
+        if (positionals.length !== 1) throw new Error('Expected one input file; use --help')
+        values['audit-base-url'] = process.env.NEXT_PUBLIC_SERVER_URL
+        values['audit-output'] = resolve(`${positionals[0]}.migration-audit.json`)
+    }
     const auditRequested = command === 'audit' || values['audit-base-url'] !== undefined || values['audit-output'] !== undefined
     if (auditRequested && (!['run','retry','audit'].includes(command) || !values['audit-base-url'] || !values['audit-output'] || values['dry-run'])) throw new Error('Audit requires input, --audit-base-url and --audit-output; not compatible with dry-run/status/report/cleanup')
     if (auditRequested) {

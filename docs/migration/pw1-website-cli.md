@@ -3,8 +3,12 @@
 ## Current batch command
 
 ```sh
-npm run migrate:pw1 -- /external/pw1-websites.json
+npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts /external/pw1-websites.json
 ```
+
+This is the complete normal flow: validate → migrate (up to 5 active stores, up to 3 total attempts per store with automatic retry) → orphan-media cleanup → automatic publish → public audit. Failed stores exhaust their retry budget and are recorded without blocking other stores. No concurrency/attempt/retry/audit flags are required. Operational flags below are advanced overrides, not additional required steps.
+
+Audit uses the existing `NEXT_PUBLIC_SERVER_URL` and writes `INPUT.json.migration-audit.json`, with `.md` and `.jsonl` companions beside the input. Install Chromium and configure the running destination app before execution. Re-running the same command resumes from the database ledger, skips unchanged completed generation and retries publication when needed; no reset or separate `retry` command is required. A stopped/killed process cannot restart itself.
 
 The positional file is **one JSON array**, with one object per PW1 store. The command applies by default and calls the real shared website-generation service with PW2 native blocks. SQL dump extraction and conversion remain a separate external step.
 
@@ -50,7 +54,7 @@ npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts input.json
 npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts input.json --concurrency 5
 ```
 
-`--concurrency` defaults to **2**, accepts **1–5**, and counts complete active store jobs, including jobs waiting to persist. Use `1` for the original sequential behavior. A free slot takes another store immediately; it does not wait for a fixed group to finish. Stores sharing a source account never overlap. Completion/report order may differ from input order; identify results by `sourceStoreId`.
+`--concurrency` defaults to **5**, accepts **1–5**, and counts complete active store jobs, including jobs waiting to persist. Use `1` for the original sequential behavior. A free slot takes another store immediately; it does not wait for a fixed group to finish. Stores sharing a source account never overlap. Completion/report order may differ from input order; identify results by `sourceStoreId`.
 
 AI and image downloads can overlap. Provisioning, actual media creation and website persistence share the existing in-process Payload adapter gate. The CLI pins each transaction to one PostgreSQL connection, including Payload upload transactions, to avoid driver Pool-class mismatches. A website transaction opens only after preparation finishes and the write gate is acquired; no database transaction is held while waiting for AI. Snapshot checks, verification and the commit receipt remain inside that transaction. The bounded pool also bounds prepared results waiting in memory. Existing per-account generation rate limits still apply.
 
@@ -244,7 +248,7 @@ Reads mapped sites/pages from DB and visits published `/sites/{tenantSlug}` rout
 
 Outputs JSON + `.md` plus incremental `.jsonl` page results. Each finding has store/page/URL, block index when available and viewport. Per-store status distinguishes `needs-fix`, `needs-review`, `waiting-be`, `checked`, `not-checked`. Exit 2 means detected errors, skipped/unpublished stores or invalid input entries; warnings/BE waits remain visible without making the command fail. Browser/DB setup failures exit 1. An HTTP 200 cannot prove absence of a rendered soft-404, and the scan does not exercise hover menus, carousel navigation or purchase flows.
 
-To retain a single migrate invocation, add both `--audit-base-url ORIGIN --audit-output REPORT.json` to the normal run/retry command. Audit runs after the batch drains, including when individual stores failed; fatal setup failures and cancellation do not start an audit. Migration failure still produces a nonzero exit even if audit succeeds; draft sites are reported as not checked (failed migrations/publications remain unpublished). The combined command audits available published results even after partial migration failure; failed/draft stores remain visible as not checked. GitHub runner needs Chromium installed as described above, and a reachable running PW2 application. Each page is bounded to 160 scroll steps, 30-second navigation and 15-second link checks; incomplete scan is reported. Only up to 2,000 unique same-store links are requested, redirects are reported rather than followed, and external link health is not checked.
+Normal run/retry automatically audits using NEXT_PUBLIC_SERVER_URL and an output path beside the input. Supply both `--audit-base-url ORIGIN --audit-output REPORT.json` only to override those defaults. Audit runs after the batch drains, including when individual stores failed; fatal setup failures and cancellation do not start an audit. Migration failure still produces a nonzero exit even if audit succeeds; draft sites are reported as not checked (failed migrations/publications remain unpublished). The combined command audits available published results even after partial migration failure; failed/draft stores remain visible as not checked. GitHub runner needs Chromium installed as described above, and a reachable running PW2 application. Each page is bounded to 160 scroll steps, 30-second navigation and 15-second link checks; incomplete scan is reported. Only up to 2,000 unique same-store links are requested, redirects are reported rather than followed, and external link health is not checked.
 
 ### GitHub Actions (deferred)
 

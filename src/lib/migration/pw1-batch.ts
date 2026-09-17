@@ -75,7 +75,7 @@ export type BatchOptions = {
     inputReports?: import('./pw1-collection-input').CollectionReport[]; invalidStores?: InvalidStore[]
 }
 export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions = {}) {
-    const concurrency = options.concurrency ?? 2
+    const concurrency = options.concurrency ?? 5
     if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) throw new Error('concurrency must be 1–5')
     const starts = new MigrationMutex()
     const cleanupQueue: Array<{ result: Record<string, unknown>; mediaIds: number[]; attemptIds: string[] }> = []
