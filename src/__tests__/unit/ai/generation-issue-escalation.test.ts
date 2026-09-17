@@ -29,7 +29,8 @@ describe('[TC-F41-21/22/29] generation issue escalation draft', () => {
         // Assert
         expect(draft).toMatchObject({ relatedId: '41', severity: 'high' })
         expect(typeof draft === 'string' ? null : draft.dedupeKey).toMatch(/^f41i_[a-f0-9]{64}$/)
-        expect(typeof draft === 'string' ? '' : draft.description).toContain('Trace ID: tr_generation_issue_41')
+        expect(typeof draft === 'string' ? '' : draft.description).toContain('# Bug Report: Lỗi hệ thống khi tạo web')
+        expect(typeof draft === 'string' ? '' : draft.description).toContain('**Bug ID:** BUG-F41-G41')
     })
 
     it('TC-F41-22: keeps one dedupe key for the same retry-root incident and changes it for a distinct code', () => {
@@ -63,6 +64,35 @@ describe('[TC-F41-21/22/29] generation issue escalation draft', () => {
         expect(serialized).not.toContain('prompt must never reach issue')
     })
 
+    it('TC-F41-21: gives Dev a safe affected-user context and inspection path', () => {
+        // Arrange
+        const generation = detail({
+            site: { id: 501, name: 'Demo Flower Studio', status: 'draft' },
+            user: { id: 77, firstName: 'Mai', lastName: 'Nguyễn', email: 'mai@example.test' },
+            endpoint: 'site-generator',
+            inputSchemaVersion: 'f41.v1',
+            inputHash: 'safe-hash-1234567890',
+        })
+
+        // Act
+        const draft = buildGenerationIssueDraft(generation, buildGenerationTicketIncidentSnapshot(generation))
+        const description = typeof draft === 'string' ? '' : draft.description
+
+        // Assert
+        expect(description).toContain('### Preconditions')
+        expect(description).toContain('Demo Flower Studio')
+        expect(description).toContain('Mai Nguyễn')
+        expect(description).toContain('mai@example.test')
+        expect(description).toContain('[#41](/studio/generations/41)')
+        expect(description).toContain('### Steps to Reproduce')
+        expect(description).toContain('### Actual Result')
+        expect(description).toContain('### Expected Result')
+        expect(description).toContain('### Evidence')
+        expect(description).toContain('### Impact')
+        expect(description).toContain('endpoint `site-generator`')
+        expect(description).toContain('input hash `safe-hash-123456`')
+    })
+
     it('TC-F41-29: excludes a page title containing PII while keeping the safe location category', () => {
         // Arrange
         const generation = detail({ pageOutcomes: [{ pageKey: 'contact', title: 'Liên hệ jane@example.test', status: 'failed' }] })
@@ -76,7 +106,7 @@ describe('[TC-F41-21/22/29] generation issue escalation draft', () => {
         expect(description).not.toContain('jane@example.test')
     })
 
-    it('TC-F41-29: does not persist free-form technical evidence in the ticket', () => {
+    it('TC-F41-29: persists only strictly normalized technical evidence in the ticket', () => {
         // Arrange
         const generation = detail({ generationErrors: [{ phase: 'page_persist', locationType: 'page', locationKey: 'contact', locationLabel: 'Trang lỗi', code: 'PAGE_GENERATION_FAILED', category: 'system', userSafeMessage: 'Không thể lưu trang', sanitizedTechnicalMessage: 'Normalized diagnostic: PAGE_GENERATION_FAILED (provider timeout).' }] })
 
@@ -85,8 +115,8 @@ describe('[TC-F41-21/22/29] generation issue escalation draft', () => {
         const description = typeof draft === 'string' ? '' : draft.description
 
         // Assert
-        expect(description).toContain('Technical evidence: Có')
-        expect(description).not.toContain('Normalized diagnostic: PAGE_GENERATION_FAILED (provider timeout).')
+        expect(description).toContain('Diagnostic chuẩn hoá: `Normalized diagnostic: PAGE_GENERATION_FAILED (provider timeout).`')
+        expect(description).not.toContain('prompt must never reach issue')
     })
 
     it('TC-F41-23: rejects a generation whose recovery policy does not allow Dev escalation', () => {

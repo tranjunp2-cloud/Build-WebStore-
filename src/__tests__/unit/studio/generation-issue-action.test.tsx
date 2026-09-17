@@ -6,7 +6,7 @@ import type { GenerationRecord } from '@/app/studio/generations/_components/gene
 const record: GenerationRecord = {
     id: '41', submittedAt: '2026-09-15T00:00:00.000Z',
     user: { id: 'user-1', label: 'Operator', missing: false }, site: { id: 'site-1', label: 'Website', missing: false },
-    lifecycle: 'terminal', outcome: 'failed', recoveryStatus: 'ticket_required', priority: 'cannot_recover',
+    lifecycle: 'terminal', outcome: 'failed', recoveryStatus: 'ticket_required', ticketRelatedGenerationId: '41', priority: 'cannot_recover',
     recoveryPolicy: { action: 'create_ticket', retryable: false, reasonCode: 'TICKET_REQUIRED' },
     pageSummary: { expected: 5, persisted: 4, failed: 1 }, incidentSummary: { kind: 'page', label: 'Lỗi tạo trang', scope: 'Liên hệ', totalErrors: 1 }, affectedError: null,
 }
@@ -38,7 +38,9 @@ describe('[TC-F41-23/29] GenerationIssueAction', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Tạo ticket Dev cho generation #41' }))
 
         // Assert
-        expect(screen.getByText('Không gửi nội dung form, prompt hoặc dữ liệu nhạy cảm.')).toBeInTheDocument()
+        expect(screen.getByText('Dữ liệu gửi cho Dev:')).toBeInTheDocument()
+        expect(screen.getByText('Không gửi:')).toBeInTheDocument()
+        expect(screen.getByText('Dev cần làm')).toBeInTheDocument()
     })
 
     it('TC-F41-23: restores the action after a safe server rejection', async () => {

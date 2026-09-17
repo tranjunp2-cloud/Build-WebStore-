@@ -225,7 +225,9 @@ test.describe("US-F41-02 Needs Attention", () => {
     // Act
     await page.goto("/studio/generations");
     await page.getByRole("button", { name: "Tạo ticket Dev cho generation #e2e-attention-run" }).click();
-    await expect(page.getByText("Không gửi nội dung form, prompt hoặc dữ liệu nhạy cảm.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Chuyển lỗi này cho team Dev?" })).toBeVisible();
+    await expect(page.getByText("Dev cần làm")).toBeVisible();
+    await expect(page.getByText("Không gửi:")).toBeVisible();
     await page.getByRole("button", { name: "Tạo ticket Dev", exact: true }).click();
 
     // Assert

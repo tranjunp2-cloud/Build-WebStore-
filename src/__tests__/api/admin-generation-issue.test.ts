@@ -72,12 +72,19 @@ describe('[TC-F41-21/22/29] POST /api/admin/generations/:id/issue', () => {
         expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'template-issues', overrideAccess: true,
             data: expect.objectContaining({
-                category: 'ai-quality', status: 'open', relatedType: 'generation', relatedId: '41',
+                category: 'ai-quality', status: 'backlog', relatedType: 'generation', relatedId: '41',
                 dedupeKey: expect.stringMatching(/^f41i_[a-f0-9]{64}$/),
             }),
         }))
         const created = mocks.create.mock.calls[0]?.[0] as { data: { description: string } }
-        expect(created.data.description).toContain('Trace ID: tr_generation_issue_41')
+        expect(created.data.description).toContain('# Bug Report: Lỗi hệ thống khi tạo web')
+        expect(created.data.description).toContain('**Bug ID:** BUG-F41-G41')
+        expect(created.data.description).toContain('### Steps to Reproduce')
+        expect(created.data.description).toContain('### Actual Result')
+        expect(created.data.description).toContain('### Expected Result')
+        expect(created.data.description).toContain('### Evidence')
+        expect(created.data.description).toContain('### Impact')
+        expect(created.data.description).toContain('[#41](/studio/generations/41)')
         expect(created.data.description).not.toContain('private@example.test')
         expect(created.data.description).not.toContain('Private florist name')
         expect(created.data.description).not.toContain('prompt must never reach an issue')

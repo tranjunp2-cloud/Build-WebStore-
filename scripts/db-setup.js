@@ -3411,6 +3411,76 @@ const MIGRATIONS = [
     name: 'template_issues.alter_resolved_at',
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS resolved_at timestamp;`,
   },
+  {
+    name: 'enum_template_issues_status.add_f41_workflow_values',
+    sql: `DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_template_issues_status') THEN
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'in_progress';
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'dev_fixed';
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'testing';
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'done';
+            END IF;
+          END $$;`,
+  },
+  {
+    name: 'template_issues.normalize_f41_workflow_statuses',
+    sql: `UPDATE template_issues
+          SET status = CASE status
+            WHEN 'in-review' THEN 'in_progress'
+            WHEN 'fixed' THEN 'done'
+            WHEN 'wont-fix' THEN 'done'
+            ELSE status
+          END
+          WHERE status IN ('in-review', 'fixed', 'wont-fix');`,
+  },
+  {
+    name: 'enum_template_issues_status.add_f41_board_values',
+    sql: `DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_template_issues_status') THEN
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'backlog';
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'review';
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'reopen';
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'code_review';
+        END IF;
+      END $$;`,
+  },
+  {
+    name: 'template_issues.normalize_f41_board_statuses',
+    sql: `UPDATE template_issues
+          SET status = CASE status
+            WHEN 'open' THEN 'backlog'
+            WHEN 'dev_fixed' THEN 'code_review'
+            ELSE status
+          END
+          WHERE status IN ('open', 'dev_fixed');`,
+  },
+  {
+    name: 'template_issues.default_f41_board_status',
+    sql: `ALTER TABLE IF EXISTS template_issues ALTER COLUMN status SET DEFAULT 'backlog';`,
+  },
+  {
+    name: 'template_issues.remove_f41_review_code_review_statuses',
+    sql: `UPDATE template_issues
+          SET status = CASE status
+            WHEN 'review' THEN 'backlog'
+            WHEN 'code_review' THEN 'dev_fixed'
+            ELSE status
+          END
+          WHERE status IN ('review', 'code_review');`,
+  },
+  {
+    name: 'enum_template_issues_related_type.add_manual',
+    sql: `DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_template_issues_related_type') THEN
+              ALTER TYPE enum_template_issues_related_type ADD VALUE IF NOT EXISTS 'manual';
+            END IF;
+          END $$;`,
+  },
+  {
+    name: 'template_issues.assignment_target',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS assignment_target varchar NOT NULL DEFAULT 'unassigned';`,
+  },
 
   // ── F40: QA run / result / immutable deploy-impact snapshot ──────────────
   {

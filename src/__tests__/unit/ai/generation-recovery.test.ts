@@ -65,7 +65,7 @@ describe('queueGenerationRecovery', () => {
 
     it('TC-F41-09: returns the canonical child for the same idempotency key without writing again', async () => {
         // Arrange
-        const payload = createPayload({ find: vi.fn().mockResolvedValueOnce({ docs: [{ id: 99, childGeneration: 42, idempotencyKey: 'same' }] }) })
+        const payload = createPayload({ find: vi.fn().mockResolvedValueOnce({ docs: [{ id: 99, childGeneration: 42, status: 'queued', idempotencyKey: 'same' }] }) })
 
         // Act
         const result = await queueGenerationRecovery(payload, { parentGenerationId: 41, requestedBy: 2, idempotencyKey: 'same' })
@@ -73,6 +73,20 @@ describe('queueGenerationRecovery', () => {
         // Assert
         expect(result).toEqual({ kind: 'accepted', jobId: '99', parentGenerationId: '41', childGenerationId: '42', idempotent: true })
         expect(payload.create).not.toHaveBeenCalled()
+    })
+
+    it('TC-F41-09: never reverts a completed retry parent to retrying on an old idempotency replay', async () => {
+        // Arrange — a delayed HTTP replay may find the durable, terminal job.
+        const payload = createPayload({
+            find: vi.fn().mockResolvedValueOnce({ docs: [{ id: 99, childGeneration: 42, status: 'succeeded', idempotencyKey: 'same' }] }),
+        })
+
+        // Act
+        const result = await queueGenerationRecovery(payload, { parentGenerationId: 41, requestedBy: 2, idempotencyKey: 'same' })
+
+        // Assert
+        expect(result).toMatchObject({ kind: 'error', code: 'NOT_RETRYABLE' })
+        expect(payload.update).not.toHaveBeenCalled()
     })
 
     it('TC-F41-10: rejects a parent that is not retry-eligible without creating child, site, or job', async () => {
@@ -101,6 +115,11 @@ describe('queueGenerationRecovery', () => {
         // Assert
         expect(result).toEqual({ kind: 'conflict', childGenerationId: '42' })
         expect(payload.create).not.toHaveBeenCalled()
+        expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'ai-generation-records',
+            id: 41,
+            data: { recoveryStatus: 'retrying' },
+        }))
     })
 })
 

@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             let created = false
             if (!issue) {
                 try {
-                    issue = await payload.create({ collection: 'template-issues', overrideAccess: true, data: { ...draft, category: 'ai-quality', status: 'open', relatedType: 'generation' } })
+                    issue = await payload.create({ collection: 'template-issues', overrideAccess: true, data: { ...draft, category: 'ai-quality', status: 'backlog', relatedType: 'generation' } })
                     created = true
                 } catch (error) {
                     if (!isUniqueViolation(error)) throw error

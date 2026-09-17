@@ -3,7 +3,7 @@ import { sanitizeGenerationEvidence, SERVER_INCIDENT_CODES } from './generation-
 
 export type GenerationRecoveryStatus =
     | 'none' | 'eligible' | 'retrying' | 'exhausted'
-    | 'ticket_required' | 'ticket_created' | 'stale_running' | null | undefined
+    | 'ticket_required' | 'ticket_created' | 'ticket_verification_required' | 'stale_running' | null | undefined
 
 export type GenerationLifecycle = 'queued' | 'running' | 'terminal' | null | undefined
 export type GenerationOutcome = 'succeeded' | 'partial_failed' | 'failed' | 'cancelled' | null | undefined
@@ -102,6 +102,7 @@ export function summarizeGenerationIncident(errors: GenerationListSource['genera
 export function resolveGenerationRecoveryPolicy(record: Pick<GenerationListSource, 'lifecycle' | 'outcome' | 'recoveryStatus'>): RecoveryPolicy {
     switch (record.recoveryStatus) {
         case 'ticket_created': return { action: 'open_ticket', retryable: false, reasonCode: 'TICKET_CREATED' }
+        case 'ticket_verification_required': return { action: 'open_ticket', retryable: false, reasonCode: 'TICKET_VERIFICATION_REQUIRED' }
         case 'ticket_required':
         case 'exhausted': return { action: 'create_ticket', retryable: false, reasonCode: 'TICKET_REQUIRED' }
         case 'retrying': return { action: 'monitor', retryable: false, reasonCode: 'RETRY_IN_PROGRESS' }
@@ -113,6 +114,7 @@ export function resolveGenerationRecoveryPolicy(record: Pick<GenerationListSourc
 
 export function resolveGenerationPriority(record: Pick<GenerationListSource, 'lifecycle' | 'outcome' | 'recoveryStatus'>): GenerationPriority {
     if (record.recoveryStatus === 'ticket_required') return 'cannot_recover'
+    if (record.recoveryStatus === 'ticket_verification_required') return 'cannot_recover'
     if (record.recoveryStatus === 'exhausted') return record.outcome === 'failed' || record.outcome === 'partial_failed' ? 'retry_failed' : 'cannot_recover'
     if (record.recoveryStatus === 'eligible') return 'retryable'
     if (record.recoveryStatus === 'retrying') return 'retrying'
@@ -129,7 +131,12 @@ function relationLabel(value: GenerationListSource['user'] | GenerationListSourc
     if (typeof value === 'string' || typeof value === 'number') return { id: String(value), label: `#${value}`, missing: false }
     if (kind === 'user' && 'email' in value) {
         const name = [value.firstName, value.lastName].filter(Boolean).join(' ')
-        return { id: String(value.id), label: name || value.email || `#${value.id}`, missing: false }
+        return {
+            id: String(value.id),
+            label: name || value.email || `#${value.id}`,
+            email: typeof value.email === 'string' ? value.email : null,
+            missing: false,
+        }
     }
     if ('name' in value) return { id: String(value.id), label: value.name || value.slug || `#${value.id}`, missing: false }
     return { id: String(value.id), label: `#${value.id}`, missing: false }
@@ -429,5 +436,33 @@ export function serializeAdminGenerationDetail(
 /** Pure, sanitized handoff for US-F41-05. It deliberately performs no mutation. */
 export function buildGenerationTicketIncidentSnapshot(detail: ReturnType<typeof serializeAdminGenerationDetail>) {
     if (!detail.incident) return null
-    return { generationId: detail.id, traceId: safeTraceId(detail.traceId), incident: detail.incident, website: { id: detail.website.id }, user: { id: detail.user.id }, lineage: detail.lineage }
+    // The issue is an internal, Super Admin-only handoff. Keep enough
+    // relationship and execution context for Dev to find the affected user,
+    // then reproduce by inspection; do not copy form values, prompts or raw
+    // provider output into a durable ticket.
+    return {
+        generationId: detail.id,
+        generationDetailHref: `/studio/generations/${encodeURIComponent(detail.id)}`,
+        traceId: safeTraceId(detail.traceId),
+        incident: detail.incident,
+        website: {
+            id: detail.website.id,
+            name: detail.website.name,
+            previewHref: detail.website.urls.preview,
+        },
+        user: {
+            id: detail.user.id,
+            name: detail.user.name,
+            email: detail.user.email,
+        },
+        execution: {
+            endpoint: detail.endpoint,
+            source: detail.lineage.source,
+            inputSchemaVersion: detail.inputSchemaVersion,
+            inputHash: detail.inputHash,
+            submittedAt: detail.submittedAt,
+            terminalAt: detail.timeline.find((item) => item.event === 'terminal')?.at ?? null,
+        },
+        lineage: detail.lineage,
+    }
 }
