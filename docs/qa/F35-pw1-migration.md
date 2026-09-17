@@ -1,6 +1,6 @@
 # F35 — Native PW1 batch migration QA
 
-Current automated coverage uses synthetic data. Browser/live generation checks are reported separately. Cases M01–M10 and M13–M17 belonged to the retired raw-export/source-reconstruction flows and are retired with their tests.
+Current automated coverage uses synthetic data. Browser/live generation checks are reported separately. Pilot-specific E2E files with hardcoded local stores are excluded; manual destination checks below require a prepared migrated site. Cases M01–M10 and M13–M17 belonged to the retired raw-export/source-reconstruction flows and are retired with their tests.
 
 ### TC-F35.M11 — Target isolation
 - [x] AUTO — The shared generation service rejects a foreign tenant target before generation/writes (`src/__tests__/api/ai.test.ts`).
@@ -80,14 +80,15 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO TC-F35.M39: Isolated visual palette accepts neutral/logo-only identity, rejects parked-site evidence, reports model/tokens and falls back on AI errors; cancellation propagates.
 
 ### TC-F35.M41 — Source carousel layout
-- [x] AUTO — Adapter preserves explicit source frame ratio, fit and slides per view. Responsive navigation, stable frame height and no horizontal overflow are checked in the browser.
+- [x] AUTO — Adapter preserves explicit source frame ratio, fit and slides per view. Browser fixtures verify source geometry; responsive destination navigation, stable frame height and overflow require manual checks on a migrated site.
 - Migration does not infer layout from image dimensions. Unverified Small banner layouts use PW2 defaults with a report warning; per-theme PW1 extraction remains pending.
 
 ### TC-F35.M42 — Source link mapping
+- [ ] MANUAL — Navigate migrated menu/CTA/rich-text links and reload subpages anonymously; verify destination routes and checkout on the selected test site.
 - [x] AUTO — Map same-store page URLs in menus, CTA and HTML, preserve query/hash and external/media URLs; never reinterpret legacy category IDs, warn on unresolved links.
 
 ### TC-F35.M43 — Portfolio category controls
-- [x] AUTO — Migrated portfolio without category groups renders its cards without an All-only or empty category filter.
+- [ ] MANUAL — On a migrated site, portfolio without category groups renders its cards without an All-only or empty category filter.
 
 ### TC-F35.M44 — Explicit BE destination/category mapping
 - [x] AUTO — Validate positive IDs, unique category source identity, active ownership, draft site, tenant/site category scope and deletion; translate category/category_id only with verified mapping into native categoryId and an enabled product listing page. Unmapped/external/ambiguous URLs stay unchanged.
