@@ -58,6 +58,17 @@ vi.mock('@/lib/block-normalization', () => ({
     normalizeBlocksForPersistence: vi.fn((blocks: unknown[]) => blocks),
 }))
 
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    TenantSiteLockError: class TenantSiteLockError extends Error {},
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: unknown,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'save-transaction' })),
+    lockTenantSiteRows: vi.fn().mockResolvedValue(undefined),
+    executeTenantTransaction: vi.fn().mockResolvedValue({ rows: [] }),
+}))
+
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
         id: 'mock-sub-1',
@@ -78,13 +89,13 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 }))
 
 const makeReq = (body: Record<string, unknown>) =>
-    new NextRequest('http://localhost:3000/api/sites/site-1/save', {
+    new NextRequest('http://localhost:3000/api/sites/1/save', {
         method: 'PATCH',
         body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json' },
     })
 
-const makeParams = () => ({ params: Promise.resolve({ siteId: 'site-1' }) })
+const makeParams = () => ({ params: Promise.resolve({ siteId: '1' }) })
 
 /** Extract the sanitized theme from the sites collection update call */
 function getSanitizedTheme(): Record<string, unknown> | undefined {

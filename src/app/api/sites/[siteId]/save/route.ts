@@ -16,6 +16,13 @@ import { buildEnumSets } from '@/lib/theme/enums'
 import { mergeGlobalBlocks } from '@/lib/sites/merge-global-blocks'
 import { sanitizeLegacyOpeningHours } from '@/components/editor/local-business/opening-hours-utils'
 import type { OpeningHourRow } from '@/components/editor/local-business/types'
+import {
+    executeTenantTransaction,
+    lockTenantSiteRows,
+    TenantSiteLockError,
+    withTenantRowLock,
+    type TenantTransactionRequest,
+} from '@/lib/payload/tenant-row-lock'
 
 
 /** Only persist theme fields defined in the Sites collection schema.
@@ -33,6 +40,18 @@ const ALLOWED_THEME_KEYS = new Set([
  *  Sourced from `@/lib/theme/enums` so save + AI prompt stay in sync. */
 const SELECT_FIELD_VALUES: Record<string, Set<string>> = buildEnumSets()
 
+class SavePageNotFoundError extends Error {
+    readonly pageId: string
+
+    constructor(pageId: string) {
+        super('Page not found')
+        this.name = 'SavePageNotFoundError'
+        this.pageId = pageId
+    }
+}
+
+
+
 function sanitizeTheme(raw: Record<string, unknown>): Record<string, unknown> {
     const clean: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(raw)) {
@@ -45,6 +64,8 @@ function sanitizeTheme(raw: Record<string, unknown>): Record<string, unknown> {
     }
     return clean
 }
+
+
 
 /**
  * PATCH /api/sites/[siteId]/save
@@ -112,6 +133,7 @@ export async function PATCH(
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
         const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, localBusiness, socialLinks, branding, seo, isDraft, localeContent, pendingLocaleConfirm } = data!
+
         let validatedLocalBusiness: unknown
         if (localBusiness !== undefined) {
             const previousLocalBusiness = existingSite.localBusiness
@@ -153,35 +175,15 @@ export async function PATCH(
         }
         const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
 
-        // Validate an explicitly selected page before writing any site fields.
-        // Otherwise a mixed request could persist LocalBusiness and only then
-        // return 400/404 for a malformed or cross-site pageId.
         const numericSiteId = Number(siteId)
-        type PageDoc = NonNullable<Awaited<ReturnType<typeof payload.findByID>>>
-        let resolvedBlockPage: PageDoc | null = null
-        if (normalizedBlocks && pageId) {
-            if (!/^\d+$/.test(pageId)) {
-                return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
-            }
-            try {
-                resolvedBlockPage = await payload.findByID({
-                    collection: 'pages',
-                    id: pageId,
-                    draft: true,
-                }) as PageDoc
-            } catch {
-                resolvedBlockPage = null
-            }
-            const requestedPageSiteId = typeof resolvedBlockPage?.site === 'object'
-                ? resolvedBlockPage.site?.id
-                : resolvedBlockPage?.site
-            if (!resolvedBlockPage || Number(requestedPageSiteId) !== numericSiteId) {
-                // pageId was specified but page not found or belongs to a
-                // different site — refuse rather than partially persisting.
-                return NextResponse.json({ error: 'Page not found', pageId }, { status: 404 })
-            }
+        if (!Number.isSafeInteger(numericSiteId) || numericSiteId < 1) {
+            return NextResponse.json({ error: 'Invalid siteId' }, { status: 400 })
+        }
+        if (normalizedBlocks && pageId && !/^\d+$/.test(pageId)) {
+            return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
         }
 
+        type PageDoc = NonNullable<Awaited<ReturnType<typeof payload.findByID>>>
         type SiteUpdateData = Partial<{
             theme: unknown;
             themeCustomized: boolean;
@@ -198,228 +200,205 @@ export async function PATCH(
             seo: unknown;
             pendingLocaleConfirm: boolean;
         }>;
-        const siteUpdateData: SiteUpdateData = {}
-        if (theme) siteUpdateData.theme = sanitizeTheme(theme as Record<string, unknown>)
-        if (theme) siteUpdateData.themeCustomized = true
-        if (siteName) siteUpdateData.name = siteName as string
-        if (locale) siteUpdateData.locale = locale
-        // F26-01: Clear pendingLocaleConfirm when user confirms/dismisses the dialog
-        if (pendingLocaleConfirm !== undefined) siteUpdateData.pendingLocaleConfirm = pendingLocaleConfirm
-        if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
-        // Draft saves write to pending fields — only promoted to live on publish.
-        // Prevents in-progress header/footer edits from immediately affecting the live storefront.
-        if (headerBlock !== undefined) siteUpdateData.pendingHeaderBlock = headerBlock
-        if (footerBlock !== undefined) siteUpdateData.pendingFooterBlock = footerBlock
-        if (globalBlocks !== undefined) {
-            // Draft saves write to pendingGlobalBlocks — only promoted to globalBlocks on publish.
-            // This prevents in-progress edits from immediately affecting the live storefront.
-            const existingPending = existingSite.pendingGlobalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks
-            const existingLive = existingSite.globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks
-            siteUpdateData.pendingGlobalBlocks = mergeGlobalBlocks(
-                existingPending ?? existingLive,
-                globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks,
-            )
-        }
-        if (contactInfo) siteUpdateData.contactInfo = contactInfo
-        if (validatedLocalBusiness !== undefined) siteUpdateData.localBusiness = validatedLocalBusiness
-        if (socialLinks) siteUpdateData.socialLinks = socialLinks
-        if (branding) siteUpdateData.branding = branding
-        if (seo) siteUpdateData.seo = seo
-
-        if (Object.keys(siteUpdateData).length > 0) {
-            await payload.update({
-                collection: 'sites',
-                id: siteId,
-                data: siteUpdateData,
-            })
-        }
-
-        // Update blocks on the selected page if provided
+        // Media preflight is read-only and runs before taking the tenant mutex so
+        // the transaction only covers the consistency-critical site/page writes.
         if (normalizedBlocks) {
-            let page = resolvedBlockPage
+            try {
+                const { stripped, checked } = await stripOrphanMediaRefs(
+                    normalizedBlocks,
+                    payload as unknown as Parameters<typeof stripOrphanMediaRefs>[1],
+                )
+                if (stripped > 0) console.warn(`[Save] Stripped ${stripped}/${checked} orphan media refs`)
+            } catch (stripErr) {
+                console.warn('[Save] stripOrphanMediaRefs failed (non-fatal):', stripErr instanceof Error ? stripErr.message : stripErr)
+            }
+        }
 
-            if (!page) {
-                let pagesResult = await payload.find({
+        const resolvePage = async (transactionReq: TenantTransactionRequest): Promise<PageDoc | null> => {
+            if (!normalizedBlocks && !localeContent) return null
+
+            if (pageId && /^\d+$/.test(pageId)) {
+                let requestedPage: PageDoc | null = null
+                try {
+                    requestedPage = await payload.findByID({
+                        collection: 'pages',
+                        id: pageId,
+                        draft: true,
+                        depth: 0,
+                        req: transactionReq,
+                    }) as PageDoc
+                } catch {
+                    requestedPage = null
+                }
+                const requestedPageSiteId = typeof requestedPage?.site === 'object'
+                    ? requestedPage.site?.id
+                    : requestedPage?.site
+                if (
+                    !requestedPage
+                    || Number(requestedPageSiteId) !== numericSiteId
+                ) {
+                    throw new SavePageNotFoundError(pageId)
+                }
+                return requestedPage
+            }
+
+            let pagesResult = await payload.find({
+                collection: 'pages',
+                where: {
+                    site: { equals: numericSiteId },
+                    isHomepage: { equals: true },
+                },
+                limit: 1,
+                draft: true,
+                depth: 0,
+                req: transactionReq,
+            })
+            if (pagesResult.docs.length === 0) {
+                pagesResult = await payload.find({
                     collection: 'pages',
                     where: {
                         site: { equals: numericSiteId },
-                        isHomepage: { equals: true },
                     },
                     limit: 1,
                     draft: true,
+                    depth: 0,
+                    req: transactionReq,
                 })
-
-                if (pagesResult.docs.length === 0) {
-                    pagesResult = await payload.find({
-                        collection: 'pages',
-                        where: { site: { equals: numericSiteId } },
-                        limit: 1,
-                        draft: true,
-                    })
-                }
-
-                page = pagesResult.docs[0]
             }
-
-            if (page) {
-                // Plan 260415 fix-500 — orphan media preflight. Client may send
-                // layout with avatar_id/image_id refs to media rows that had
-                // "Failed to persist upload data: g: Not Found" during upload
-                // (half-written rows). Editor autosave saw ~14 hits/2h on
-                // pages_blocks_testimonials_testimonials avatar_id inserts
-                // failing. Strip orphan refs before update attempts.
-                try {
-                    const { stripped, checked } = await stripOrphanMediaRefs(
-                        normalizedBlocks as Record<string, unknown>[],
-                        payload as unknown as Parameters<typeof stripOrphanMediaRefs>[1],
-                    )
-                    if (stripped > 0) {
-                        console.warn(`[Save] Stripped ${stripped}/${checked} orphan media refs`)
-                    }
-                } catch (stripErr) {
-                    console.warn('[Save] stripOrphanMediaRefs failed (non-fatal):', stripErr instanceof Error ? stripErr.message : stripErr)
-                }
-
-                // Plan 260415 fix-500: wrap in retry — Payload drafts/versions
-                // system races cause deadlocks + FK violations on _pages_v_blocks_*
-                // under concurrent autosave. Transient — retry with backoff.
-                try {
-                    await withPayloadRetry(
-                        () => payload.update({
-                            collection: 'pages',
-                            id: page!.id,
-                            data: { layout: normalizedBlocks },
-                            draft: isDraft ?? false,
-                        }),
-                        {
-                            onRetry: (attempt, kind, err) => {
-                                const msg = err instanceof Error ? err.message : String(err)
-                                console.warn(`[Save Retry] attempt=${attempt} kind=${kind} pageId=${page!.id} msg=${msg.slice(0, 200)}`)
-                            },
-                        },
-                    )
-                } catch (updateErr) {
-                    // Plan 260415 fix-500 — fallback for pages_blocks_*_images /
-                    // _testimonials / avatar_id FK errors that slipped past the
-                    // preflight. Strip ALL image refs + retry once.
-                    const errMsg = updateErr instanceof Error ? updateErr.message : String(updateErr)
-                    const isImageFkError = /pages_blocks_[a-z_]+(_images|_testimonials|_members|_projects|_logos)?|image_id|avatar_id|upload/i.test(errMsg)
-                    if (!isImageFkError) throw updateErr
-
-                    console.warn(`[Save] Retry without image refs after: ${errMsg.slice(0, 160)}`)
-                    cleanupNonNumericImageFields(normalizedBlocks as Record<string, unknown>[])
-                    // Only strip logo-cloud logos[] image refs when the FK error is logo-related.
-                    // Stripping valid logo Media IDs due to an unrelated block FK error silently
-                    // destroys all logo images (200 response, data gone).
-                    const isLogoFkError = /pages_blocks_logo_cloud|pages_v_blocks_logo_cloud/i.test(errMsg)
-                    // GH-1381: same guard for gallery images[] — an unrelated block's FK error must not
-                    // wipe valid gallery Media IDs (silent data loss: success response, image gone on reload).
-                    const isGalleryFkError = /pages_blocks_gallery|pages_v_blocks_gallery/i.test(errMsg)
-                    for (const block of normalizedBlocks as Record<string, unknown>[]) {
-                        for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
-                            if (typeof block[field] === 'number') delete block[field]
-                        }
-                        for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos', 'properties', 'doctors', 'events', 'posts', 'caseStudies']) {
-                            const arr = block[arrayField]
-                            if (!Array.isArray(arr)) continue
-                            for (const item of arr as Record<string, unknown>[]) {
-                                if (item && typeof item === 'object') {
-                                    for (const f of ['image', 'logo', 'avatar']) {
-                                        // Don't wipe valid logo Media IDs unless the FK error is logos-related
-                                        if (arrayField === 'logos' && f === 'logo' && !isLogoFkError) continue
-                                        // Don't wipe valid gallery image Media IDs unless the FK error is gallery-related
-                                        if (arrayField === 'images' && f === 'image' && !isGalleryFkError) continue
-                                        if (typeof item[f] === 'number') delete item[f]
-                                    }
-                                }
-                            }
-                        }
-                        // menu-food: clean nested categories[].items[].image numeric Payload IDs
-                        if (block.blockType === 'menu-food' && Array.isArray(block.categories)) {
-                            for (const cat of block.categories as Record<string, unknown>[]) {
-                                if (cat && Array.isArray(cat.items)) {
-                                    for (const item of cat.items as Record<string, unknown>[]) {
-                                        if (item && typeof item.image === 'number') delete item.image
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    await payload.update({
-                        collection: 'pages',
-                        id: page!.id,
-                        data: { layout: normalizedBlocks },
-                        draft: isDraft ?? false,
-                    })
-                }
-
-                // F-26: Persist locale_content alongside blocks (raw SQL — not a Payload field)
-                if (localeContent) {
-                    try {
-                        const db = payload.db.drizzle as { execute: (q: unknown) => Promise<unknown> }
-                        await db.execute(sql`
-                            UPDATE pages
-                            SET locale_content = ${JSON.stringify(localeContent)}::jsonb
-                            WHERE id = ${page.id}
-                        `)
-                    } catch (lcErr) {
-                        console.warn('[Save] locale_content update failed (non-fatal):', lcErr instanceof Error ? lcErr.message : lcErr)
-                    }
-                }
-            }
+            return (pagesResult.docs[0] as PageDoc | undefined) ?? null
         }
 
-        // F-26: Persist locale_content when provided without blocks (locale-only save)
-        if (localeContent && !normalizedBlocks) {
-            const numericSiteId = Number(siteId)
+        const persistSave = () => withTenantRowLock(payload, siteTenantId, async (transactionReq) => {
+            await lockTenantSiteRows(payload, siteTenantId, [numericSiteId], transactionReq)
 
-            // C1: Verify page-ownership before writing locale_content (mirrors with-blocks guard)
-            if (pageId && /^\d+$/.test(pageId)) {
-                let requestedPage = null
-                try {
-                    requestedPage = await payload.findByID({ collection: 'pages', id: pageId, draft: true })
-                } catch { /* not found */ }
-                const pageSiteId = typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
-                if (!requestedPage || Number(pageSiteId) !== numericSiteId) {
-                    return NextResponse.json({ error: 'Page not found', pageId }, { status: 404 })
-                }
+            // Re-read after the lock. The initial lookup gives fast auth feedback;
+            // this authoritative lookup closes the ownership/state TOCTOU window.
+            const lockedSite = await payload.findByID({
+                collection: 'sites',
+                id: numericSiteId,
+                depth: 0,
+                disableErrors: true,
+                req: transactionReq,
+            })
+            const lockedTenantId = resolveTenantId(lockedSite?.tenant as TenantRef)
+            if (!lockedSite || lockedTenantId !== siteTenantId) {
+                throw new TenantSiteLockError([numericSiteId])
             }
 
-            try {
-                let lcPageId: string | number | null = null
+            // Resolve and validate an explicitly selected page before any site
+            // fields are written, while holding the same lock as template swap.
+            const page = await resolvePage(transactionReq)
 
-                if (pageId && /^\d+$/.test(pageId)) {
-                    lcPageId = pageId
-                } else {
-                    // Find homepage or first page for this site
-                    let pagesResult = await payload.find({
-                        collection: 'pages',
-                        where: { site: { equals: numericSiteId }, isHomepage: { equals: true } },
-                        limit: 1,
-                        draft: true,
-                    })
-                    if (pagesResult.docs.length === 0) {
-                        pagesResult = await payload.find({
-                            collection: 'pages',
-                            where: { site: { equals: numericSiteId } },
-                            limit: 1,
-                            draft: true,
-                        })
-                    }
-                    lcPageId = pagesResult.docs[0]?.id ?? null
-                }
 
-                if (lcPageId) {
-                    const db = payload.db.drizzle as { execute: (q: unknown) => Promise<unknown> }
-                    await db.execute(sql`
+
+            const siteUpdateData: SiteUpdateData = {}
+            if (theme) siteUpdateData.theme = sanitizeTheme(theme as Record<string, unknown>)
+            if (theme) siteUpdateData.themeCustomized = true
+            if (siteName) siteUpdateData.name = siteName as string
+            if (locale) siteUpdateData.locale = locale
+            if (pendingLocaleConfirm !== undefined) siteUpdateData.pendingLocaleConfirm = pendingLocaleConfirm
+            if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
+            if (headerBlock !== undefined) siteUpdateData.pendingHeaderBlock = headerBlock
+            if (footerBlock !== undefined) siteUpdateData.pendingFooterBlock = footerBlock
+            if (globalBlocks !== undefined) {
+                const existingPending = lockedSite.pendingGlobalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks
+                const existingLive = lockedSite.globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks
+                siteUpdateData.pendingGlobalBlocks = mergeGlobalBlocks(
+                    existingPending ?? existingLive,
+                    globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks,
+                )
+            }
+            if (contactInfo) siteUpdateData.contactInfo = contactInfo
+            if (validatedLocalBusiness !== undefined) siteUpdateData.localBusiness = validatedLocalBusiness
+            if (socialLinks) siteUpdateData.socialLinks = socialLinks
+            if (branding) siteUpdateData.branding = branding
+            if (seo) siteUpdateData.seo = seo
+
+            if (Object.keys(siteUpdateData).length > 0) {
+                await payload.update({
+                    collection: 'sites',
+                    id: numericSiteId,
+                    data: siteUpdateData,
+                    req: transactionReq,
+                })
+            }
+
+            if (normalizedBlocks && page) {
+                await payload.update({
+                    collection: 'pages',
+                    id: page.id,
+                    data: { layout: normalizedBlocks },
+                    draft: isDraft ?? false,
+                    req: transactionReq,
+                })
+            }
+
+            if (localeContent && page) {
+                await executeTenantTransaction(
+                    payload,
+                    transactionReq,
+                    sql`
                         UPDATE pages
                         SET locale_content = ${JSON.stringify(localeContent)}::jsonb
-                        WHERE id = ${lcPageId}
-                    `)
-                }
-            } catch (lcErr) {
-                console.warn('[Save] locale_content-only update failed (non-fatal):', lcErr instanceof Error ? lcErr.message : lcErr)
+                        WHERE id = ${page.id}
+                          AND site_id = ${numericSiteId}
+                    `,
+                )
             }
+        })
+
+        try {
+            await withPayloadRetry(persistSave, {
+                onRetry: (attempt, kind, err) => {
+                    const message = err instanceof Error ? err.message : String(err)
+                    console.warn(`[Save Retry] attempt=${attempt} kind=${kind} pageId=${pageId ?? 'homepage'} msg=${message.slice(0, 200)}`)
+                },
+            })
+        } catch (updateErr) {
+            const errorMessage = updateErr instanceof Error ? updateErr.message : String(updateErr)
+            const isImageFkError = /pages_blocks_[a-z_]+(_images|_testimonials|_members|_projects|_logos)?|image_id|avatar_id|upload/i.test(errorMessage)
+            if (!normalizedBlocks || !isImageFkError) throw updateErr
+
+            console.warn(`[Save] Retry without image refs after: ${errorMessage.slice(0, 160)}`)
+            cleanupNonNumericImageFields(normalizedBlocks as Record<string, unknown>[])
+            // Only strip logo-cloud logos[] image refs when the FK error is logo-related.
+            // Stripping valid logo Media IDs due to an unrelated block FK error silently
+            // destroys all logo images (200 response, data gone).
+            const isLogoFkError = /pages_blocks_logo_cloud|pages_v_blocks_logo_cloud/i.test(errorMessage)
+            // GH-1381: same guard for gallery images[] — an unrelated block's FK error must not
+            // wipe valid gallery Media IDs (silent data loss: success response, image gone on reload).
+            const isGalleryFkError = /pages_blocks_gallery|pages_v_blocks_gallery/i.test(errorMessage)
+            for (const block of normalizedBlocks as Record<string, unknown>[]) {
+                for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
+                    if (typeof block[field] === 'number') delete block[field]
+                }
+                for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos', 'properties', 'doctors', 'events', 'posts', 'caseStudies']) {
+                    const arr = block[arrayField]
+                    if (!Array.isArray(arr)) continue
+                    for (const item of arr as Record<string, unknown>[]) {
+                        if (item && typeof item === 'object') {
+                            for (const f of ['image', 'logo', 'avatar']) {
+                                // Don't wipe valid logo Media IDs unless the FK error is logos-related
+                                if (arrayField === 'logos' && f === 'logo' && !isLogoFkError) continue
+                                // Don't wipe valid gallery image Media IDs unless the FK error is gallery-related
+                                if (arrayField === 'images' && f === 'image' && !isGalleryFkError) continue
+                                if (typeof item[f] === 'number') delete item[f]
+                            }
+                        }
+                    }
+                }
+                // menu-food: clean nested categories[].items[].image numeric Payload IDs
+                if (block.blockType === 'menu-food' && Array.isArray(block.categories)) {
+                    for (const cat of block.categories as Record<string, unknown>[]) {
+                        if (cat && Array.isArray(cat.items)) {
+                            for (const item of cat.items as Record<string, unknown>[]) {
+                                if (item && typeof item.image === 'number') delete item.image
+                            }
+                        }
+                    }
+                }
+            }
+            await withPayloadRetry(persistSave)
         }
 
         return NextResponse.json({
@@ -428,6 +407,14 @@ export async function PATCH(
         })
 
     } catch (error: unknown) {
+
+        if (error instanceof SavePageNotFoundError) {
+            return NextResponse.json({ error: error.message, pageId: error.pageId }, { status: 404 })
+        }
+        if (error instanceof TenantSiteLockError) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
         const errMsg = error instanceof Error ? error.message : String(error)
         const errName = error instanceof Error ? error.name : 'Unknown'
         const transientKind = classifyTransientError(error)

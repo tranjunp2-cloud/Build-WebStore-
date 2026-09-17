@@ -3,11 +3,18 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
+import { ReconciliationInspector } from "./ReconciliationInspector";
+import { type ReconciliationScope, type ReconciliationSnapshot } from "@/lib/admin/qa/migration-reconciliation";
 import {
   generateReconciliationCatalog,
+  getFieldDiffRecordsForPage,
   getStoreDeepDiff,
   getDashboardMetrics,
   CANONICAL_TEMPLATES,
+  getVisualDiffGapLabel,
+  getFieldEvidenceVisualState,
+  hasEntityDiffIssue,
+  isStoreDomainSslReady,
   type StoreSummary,
   type StoreDeepDiff,
   type DynamicStorePage,
@@ -71,7 +78,24 @@ import {
   Mail,
   Calendar,
   Clock,
+  Info,
 } from "lucide-react";
+import {
+  BlockMigrationEvidence,
+  Pw2EvidencePlaceholder,
+} from "./BlockMigrationEvidence";
+import type {
+  BlockRenderEvidence,
+  MigrationRenderEvidenceSnapshot,
+} from "@/lib/admin/qa/migration-render-evidence";
+import { deriveRenderEvidenceOverall } from "@/lib/admin/qa/migration-render-evidence";
+
+type FieldDiffSource = "ui_fixture" | "catalog_fixture" | "pw1_snapshot_unverified";
+type LoadedFieldDiff = { data: StoreDeepDiff; source: FieldDiffSource };
+
+function getDisplayEvidenceState(field: FieldDiffItem, source: FieldDiffSource) {
+  return source === "ui_fixture" ? getFieldEvidenceVisualState(field) : "attention" as const;
+}
 
 /**
  * Renders authentic, high-fidelity visual layout components
@@ -664,6 +688,28 @@ function RichVisualBlockRenderer({
   );
 }
 
+function PW2DiffGapOverlay({
+  block,
+  enabled,
+}: {
+  block: PageBlockItem;
+  enabled: boolean;
+}) {
+  const label = enabled ? getVisualDiffGapLabel(block.status, block.discrepancyNote) : null;
+  if (!label) return null;
+
+  return (
+    <div
+      aria-label={`Highlight Diff Gaps: ${label}`}
+      className="pointer-events-none absolute inset-0 z-10 rounded-2xl border-2 border-rose-400 bg-rose-500/10 ring-2 ring-rose-400/30 animate-pulse"
+    >
+      <span className="absolute right-2 top-2 rounded-full border border-rose-300/70 bg-rose-600 px-2 py-1 text-[10px] font-bold text-white shadow-lg">
+        Highlight Diff Gaps · {label}
+      </span>
+    </div>
+  );
+}
+
 /**
  * Split Swipe Slider comparison with smooth CSS clip-path overlay
  */
@@ -671,10 +717,12 @@ function SwipeSliderBlockRenderer({
   block,
   deviceView,
   sliderPosition,
+  highlightDiffGaps,
 }: {
   block: PageBlockItem;
   deviceView: "desktop" | "mobile";
   sliderPosition: number;
+  highlightDiffGaps: boolean;
 }) {
   const isMobile = deviceView === "mobile";
   const [localPos, setLocalPos] = useState(sliderPosition);
@@ -722,6 +770,7 @@ function SwipeSliderBlockRenderer({
           }}
         >
           <RichVisualBlockRenderer block={block} version="pw2" deviceView={deviceView} />
+          <PW2DiffGapOverlay block={block} enabled={highlightDiffGaps} />
         </div>
 
         {/* Draggable Vertical Splitter Line */}
@@ -785,14 +834,34 @@ export function MigrationDiffClient() {
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [parityMode, setParityMode] = useState<"dual_window" | "swipe_slider">("dual_window");
+  const [showDiffGaps, setShowDiffGaps] = useState(false);
   const [sliderPosition, setSliderPosition] = useState<number>(50);
-  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit">("visual_stream");
+  const [activeViewTab, setActiveViewTab] = useState<"visual_stream" | "live_webview" | "field_diff" | "media_audit" | "text_audit" | "commerce_reconciliation" | "settings_reconciliation">("live_webview");
+  const [reconciliationSnapshot, setReconciliationSnapshot] = useState<ReconciliationSnapshot | null>(null);
+  const [reconciliationLoading, setReconciliationLoading] = useState(false);
+  const [reconciliationError, setReconciliationError] = useState<string | null>(null);
+  const [reconciliationDemo, setReconciliationDemo] = useState(false);
+  const [previewSource, setPreviewSource] = useState<"template" | "live_domain">("template");
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
+  const pw1DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
+  const reconciliationRequestRef = React.useRef(0);
+  const pw2DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
+  const pw1MobIframeRef = React.useRef<HTMLIFrameElement>(null);
+  const pw2MobIframeRef = React.useRef<HTMLIFrameElement>(null);
   const [activeEntityGroup, setActiveEntityGroup] = useState<"all" | EntityGroupType>("all");
+  const [fieldStatusFilter, setFieldStatusFilter] = useState<"attention" | "all" | "matched_value" | "matched_empty">("attention");
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
+  const [fieldDiffUiDemo, setFieldDiffUiDemo] = useState(false);
+  const [expandedFieldRecordIds, setExpandedFieldRecordIds] = useState<Set<string>>(new Set());
   const [resolvedStoreIds, setResolvedStoreIds] = useState<Set<string>>(new Set());
   const [isReloading, setIsReloading] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [renderEvidence, setRenderEvidence] =
+    useState<MigrationRenderEvidenceSnapshot | null>(null);
+  const [isRenderEvidenceLoading, setIsRenderEvidenceLoading] = useState(false);
+  const [renderEvidenceError, setRenderEvidenceError] = useState<string | null>(null);
+  const [useDemoRenderEvidence, setUseDemoRenderEvidence] = useState(false);
+  const [liveCheckBlockId, setLiveCheckBlockId] = useState<string | null>(null);
 
   // Live Database Modal States
   const [dbModalOpen, setDbModalOpen] = useState(false);
@@ -867,11 +936,14 @@ export function MigrationDiffClient() {
     }
   };
 
-  const [liveStoreDiff, setLiveStoreDiff] = useState<StoreDeepDiff | null>(null);
+  const [loadedFieldDiff, setLoadedFieldDiff] = useState<LoadedFieldDiff | null>(null);
+  const fieldDiffRequestRef = React.useRef(0);
 
   const loadLiveCatalog = async () => {
     try {
-      const res = await fetch("/api/qa/migration-diff?limit=2000");
+      const res = await fetch(`/api/qa/migration-diff?limit=2000&_t=${Date.now()}`, {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (json.stores && json.stores.length > 0) {
         setCatalog(json.stores);
@@ -887,31 +959,155 @@ export function MigrationDiffClient() {
 
   useEffect(() => {
     if (!activeStoreId) {
-      setLiveStoreDiff(null);
+      setLoadedFieldDiff(null);
       return;
     }
+    const requestId = ++fieldDiffRequestRef.current;
+    const controller = new AbortController();
+    const expectsUiFixture = fieldDiffUiDemo && activeStoreId === "SITE-0001";
+    setLoadedFieldDiff(null);
     const fetchDiff = async () => {
       try {
-        const res = await fetch(`/api/qa/migration-diff?store_id=${activeStoreId}`);
+        const uiDemoParam = expectsUiFixture ? "&ui_demo=1" : "";
+        const res = await fetch(`/api/qa/migration-diff?store_id=${encodeURIComponent(activeStoreId)}${uiDemoParam}&_t=${Date.now()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
-        if (json.data) {
-          setLiveStoreDiff(json.data);
+        const source = json.source as FieldDiffSource | undefined;
+        if (
+          !controller.signal.aborted &&
+          requestId === fieldDiffRequestRef.current &&
+          json.data?.id === activeStoreId &&
+          source &&
+          (source === "ui_fixture") === expectsUiFixture
+        ) {
+          setLoadedFieldDiff({ data: json.data, source });
         }
       } catch (err) {
-        console.error("[MigrationDiffClient] Failed to fetch deep diff, falling back:", err);
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          console.error("[MigrationDiffClient] Failed to fetch deep diff, falling back:", err);
+        }
       }
     };
     void fetchDiff();
-  }, [activeStoreId]);
+    return () => controller.abort();
+  }, [activeStoreId, fieldDiffUiDemo]);
+
+  useEffect(() => {
+    const scope: ReconciliationScope | null = activeViewTab === "commerce_reconciliation" ? "commerce" : activeViewTab === "settings_reconciliation" ? "settings" : null;
+    if (!scope || !activeStoreId) return;
+    const controller = new AbortController();
+    const requestId = ++reconciliationRequestRef.current;
+    const load = async () => { setReconciliationSnapshot(null); setReconciliationLoading(true); setReconciliationError(null); try { const response = await fetch(`/api/qa/migration-reconciliation?scope=${scope}&store_id=${encodeURIComponent(activeStoreId)}${reconciliationDemo ? "&demo=1" : ""}`, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload: { data?: ReconciliationSnapshot } = await response.json(); if (payload.data?.scope !== scope || payload.data.storeId !== activeStoreId) throw new Error("Phản hồi đối soát không khớp store hoặc phạm vi đang chọn"); if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationSnapshot(payload.data); } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationRequestRef.current) { setReconciliationSnapshot(null); setReconciliationError(error instanceof Error ? error.message : "Lỗi không xác định"); } } finally { if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationLoading(false); } };
+    void load(); return () => controller.abort();
+  }, [activeStoreId, activeViewTab, reconciliationDemo]);
 
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
     if (!activeStoreId) return null;
-    if (liveStoreDiff) return liveStoreDiff;
+    if (loadedFieldDiff?.data.id === activeStoreId) return loadedFieldDiff.data;
     const isResolved = resolvedStoreIds.has(activeStoreId);
-    return getStoreDeepDiff(activeStoreId, isResolved ? "passed" : undefined);
-  }, [activeStoreId, resolvedStoreIds, liveStoreDiff]);
+    const catalogStore = catalog.find((s) => s.id === activeStoreId);
+    const diff = getStoreDeepDiff(activeStoreId, isResolved ? "passed" : undefined);
+    if (diff && catalogStore) {
+      return {
+        ...diff,
+        name: catalogStore.name || diff.name,
+        templateCode: catalogStore.templateCode || diff.templateCode,
+        templateName: catalogStore.templateName || diff.templateName,
+        domain: catalogStore.domain || diff.domain,
+      };
+    }
+    return diff;
+  }, [activeStoreId, resolvedStoreIds, loadedFieldDiff, catalog]);
+
+  const fieldDiffSource: FieldDiffSource = loadedFieldDiff?.data.id === activeStoreId
+    ? loadedFieldDiff.source
+    : "catalog_fixture";
 
   const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
+
+  useEffect(() => {
+    if (!activeStoreId || !activePage) {
+      setRenderEvidence(null);
+      setRenderEvidenceError(null);
+      setIsRenderEvidenceLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const loadEvidence = async () => {
+      setRenderEvidence(null);
+      setLiveCheckBlockId(null);
+      setIsRenderEvidenceLoading(true);
+      setRenderEvidenceError(null);
+      try {
+        const params = new URLSearchParams({
+          store_id: activeStoreId,
+          page_id: activePage.id,
+          demo: useDemoRenderEvidence ? "1" : "0",
+        });
+        const response = await fetch(`/api/qa/migration-render-evidence?${params}`, {
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as {
+          data?: MigrationRenderEvidenceSnapshot;
+          error?: string;
+        };
+        if (!response.ok || !payload.data) {
+          throw new Error(payload.error || "Không tải được bằng chứng migration.");
+        }
+        if (!controller.signal.aborted) setRenderEvidence(payload.data);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setRenderEvidence(null);
+        setRenderEvidenceError(
+          error instanceof Error ? error.message : "Không tải được bằng chứng migration.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setIsRenderEvidenceLoading(false);
+      }
+    };
+    void loadEvidence();
+    return () => controller.abort();
+  }, [activeStoreId, activePage?.id, useDemoRenderEvidence]);
+
+  const evidenceByLegacyId = useMemo(
+    () => new Map(renderEvidence?.blocks.map((item) => [item.legacyId, item]) ?? []),
+    [renderEvidence],
+  );
+
+  // Dispatch smooth SPA navigation to live storefront iframes when user switches page tabs
+  useEffect(() => {
+    if (activePage && previewSource === "template") {
+      const navMsg = {
+        type: "spa-navigate",
+        path: activePage.path,
+        title: activePage.name,
+        storeId: selectedDiff?.id,
+      };
+      try {
+        pw1DeskIframeRef.current?.contentWindow?.postMessage(navMsg, "*");
+        pw2DeskIframeRef.current?.contentWindow?.postMessage(navMsg, "*");
+        pw1MobIframeRef.current?.contentWindow?.postMessage(navMsg, "*");
+        pw2MobIframeRef.current?.contentWindow?.postMessage(navMsg, "*");
+      } catch (e) {
+        console.warn("[MigrationDiffClient] postMessage failed:", e);
+      }
+    }
+  }, [activePageIndex, activePage, previewSource, selectedDiff?.id]);
+
+  // Default preview source to 'live_domain' if SSL is verified and ready, otherwise use 'template' (authentic MySQL prototype).
+  useEffect(() => {
+    if (selectedDiff?.id) {
+      if (isStoreDomainSslReady(selectedDiff)) {
+        setPreviewSource("live_domain");
+      } else {
+        setPreviewSource("template");
+      }
+    }
+  }, [selectedDiff?.id, selectedDiff?.domain, selectedDiff?.sslReady]);
 
   // Lock background body scroll and listen for Escape key when inspection modal is active
   useEffect(() => {
@@ -962,12 +1158,16 @@ export function MigrationDiffClient() {
     return filteredStores.slice(start, start + pageSize);
   }, [filteredStores, currentPage, pageSize]);
 
-  // Filtered Field Diff Records
-  const filteredFieldRecords = useMemo(() => {
-    if (!selectedDiff?.fieldDiffAudit?.records) return [];
-    return selectedDiff.fieldDiffAudit.records.filter((r) => {
+  const scopedFieldRecords = useMemo(() => {
+    if (!selectedDiff?.fieldDiffAudit?.records || !activePage) return [];
+    return getFieldDiffRecordsForPage(selectedDiff.fieldDiffAudit, activePage.id);
+  }, [selectedDiff, activePage?.id]);
+
+  // Apply the non-status filters first so summary counts always describe the current scope.
+  const baseFilteredFieldRecords = useMemo(() => {
+    return scopedFieldRecords.filter((r) => {
       const matchGroup = activeEntityGroup === "all" || r.entityGroup === activeEntityGroup;
-      const matchErrors = !showOnlyErrors || r.matchStatus !== "match";
+      const matchErrors = !showOnlyErrors || hasEntityDiffIssue(r);
       const q = fieldSearchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -985,45 +1185,175 @@ export function MigrationDiffClient() {
 
       return matchGroup && matchErrors && matchSearch;
     });
-  }, [selectedDiff, activeEntityGroup, showOnlyErrors, fieldSearchQuery]);
+  }, [scopedFieldRecords, activeEntityGroup, showOnlyErrors, fieldSearchQuery]);
+
+  const filteredFieldRecords = useMemo(() => {
+    if (fieldStatusFilter === "all") return baseFilteredFieldRecords;
+    return baseFilteredFieldRecords.filter((record) =>
+      fieldStatusFilter === "attention"
+        ? fieldDiffSource !== "ui_fixture" || hasEntityDiffIssue(record)
+        : record.fields.some((field) => getDisplayEvidenceState(field, fieldDiffSource) === fieldStatusFilter),
+    );
+  }, [baseFilteredFieldRecords, fieldStatusFilter, fieldDiffSource]);
+
+  const fieldEvidenceCounts = useMemo(() => {
+    const fields = baseFilteredFieldRecords.flatMap((record) => record.fields);
+    return {
+      attention: fields.filter((field) => getDisplayEvidenceState(field, fieldDiffSource) === "attention").length,
+      matched_value: fields.filter((field) => getDisplayEvidenceState(field, fieldDiffSource) === "matched_value").length,
+      matched_empty: fields.filter((field) => getDisplayEvidenceState(field, fieldDiffSource) === "matched_empty").length,
+      recordsWithAttention: fieldDiffSource === "ui_fixture"
+        ? baseFilteredFieldRecords.filter(hasEntityDiffIssue).length
+        : baseFilteredFieldRecords.length,
+    };
+  }, [baseFilteredFieldRecords, fieldDiffSource]);
+
+  useEffect(() => {
+    setExpandedFieldRecordIds(
+      new Set(scopedFieldRecords.filter(hasEntityDiffIssue).map((record) => record.id)),
+    );
+  }, [activeStoreId, activePage?.id, scopedFieldRecords]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  const handleReloadStoreData = (storeId: string) => {
-    setIsReloading(true);
-    setResolvedStoreIds((prev) => new Set([...prev, storeId]));
+  const requestLiveCheck = async (evidence: BlockRenderEvidence) => {
+    if (!activeStoreId || !activePage) return;
+    setLiveCheckBlockId(evidence.legacyId);
+    try {
+      const response = await fetch("/api/qa/migration-render-evidence/live-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          store_id: activeStoreId,
+          page_id: activePage.id,
+          legacy_id: evidence.legacyId,
+        }),
+      });
+      const payload = (await response.json()) as {
+        data?: {
+          legacyId: string;
+          status: "rendered" | "not_rendered" | "unverified";
+          checkedAt: string | null;
+          evidenceRef: string | null;
+          reasonCode: string;
+          message?: string;
+        };
+        error?: string;
+      };
+      if (!response.ok) throw new Error(payload.error || "Không thể yêu cầu live check.");
+      if (!payload.data || payload.data.legacyId !== evidence.legacyId) {
+        throw new Error("Kết quả live check không khớp với block đang kiểm tra.");
+      }
+      setRenderEvidence((snapshot) => {
+        if (!snapshot || snapshot.storeId !== activeStoreId || snapshot.pageId !== activePage.id) return snapshot;
+        return {
+          ...snapshot,
+          blocks: snapshot.blocks.map((block) => {
+            if (block.legacyId !== evidence.legacyId) return block;
+            const liveRender = {
+              status: payload.data!.status,
+              checkedAt: payload.data!.checkedAt,
+              evidenceRef: payload.data!.evidenceRef,
+              reasonCode: payload.data!.reasonCode,
+            };
+            return {
+              ...block,
+              liveRender,
+              overall: deriveRenderEvidenceOverall({
+                pw2Data: block.pw2Data,
+                component: block.component,
+                liveRender,
+              }),
+            };
+          }),
+        };
+      });
+      showToast(payload.data?.message || "Đã gửi yêu cầu live check.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Không thể yêu cầu live check.");
+    } finally {
+      setLiveCheckBlockId(null);
+    }
+  };
 
-    setTimeout(() => {
-      setCatalog((prev) =>
-        prev.map((s) =>
-          s.id === storeId
-            ? {
-                ...s,
-                status: "passed",
-                score: "99.8%",
-                failedBlocks: [],
-                textScore: "100%",
-                mediaScore: "100%",
-                blockScore: "100%",
-                commerceScore: "100%",
-              }
-            : s
-        )
-      );
-      setIsReloading(false);
-      showToast(`✓ Đã làm mới dữ liệu đối soát! Phát hiện các lỗi đã được Dev sửa xong. Độ khớp: 99.8% (Pass)`);
-    }, 500);
+  const handleReloadStoreData = async (storeId: string) => {
+    setIsReloading(true);
+    const requestId = ++fieldDiffRequestRef.current;
+    const expectsUiFixture = fieldDiffUiDemo && storeId === "SITE-0001";
+    let acceptedSource: FieldDiffSource | null = null;
+
+    try {
+      const uiDemoParam = expectsUiFixture ? "&ui_demo=1" : "";
+      const res = await fetch(`/api/qa/migration-diff?store_id=${encodeURIComponent(storeId)}${uiDemoParam}&_t=${Date.now()}`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const source = json.source as FieldDiffSource | undefined;
+        if (
+          json.data?.id === storeId &&
+          source &&
+          requestId === fieldDiffRequestRef.current &&
+          (source === "ui_fixture") === expectsUiFixture
+        ) {
+          setLoadedFieldDiff({ data: json.data, source });
+          acceptedSource = source;
+          if (json.data.status === "passed") {
+            setResolvedStoreIds((prev) => new Set([...prev, storeId]));
+          } else {
+            setResolvedStoreIds((prev) => {
+              const next = new Set(prev);
+              next.delete(storeId);
+              return next;
+            });
+          }
+          setCatalog((prev) =>
+            prev.map((s) =>
+              s.id === storeId
+                ? {
+                    ...s,
+                    name: json.data.name || s.name,
+                    score: json.data.score || s.score,
+                    status: json.data.status || s.status,
+                    failedBlocks: json.data.failedBlocks || [],
+                    textScore: json.data.textScore || s.textScore,
+                    mediaScore: json.data.mediaScore || s.mediaScore,
+                    blockScore: json.data.blockScore || s.blockScore,
+                    commerceScore: json.data.commerceScore || s.commerceScore,
+                  }
+                : s
+            )
+          );
+        }
+      } else {
+        throw new Error(`HTTP ${res.status}`);
+      }
+    } catch (err) {
+      console.error("[MigrationDiffClient] Failed to reload store diff:", err);
+    } finally {
+      if (requestId === fieldDiffRequestRef.current) {
+        setIsReloading(false);
+        if (acceptedSource) {
+          setIframeReloadKey((k) => k + 1);
+          showToast(
+            acceptedSource === "pw1_snapshot_unverified"
+              ? "✓ Đã đọc lại PW1. PW2 vẫn chưa được kết nối để đối soát."
+              : acceptedSource === "ui_fixture"
+              ? "✓ Đã nạp lại dữ liệu mẫu UI."
+              : "✓ Đã nạp lại catalog đối soát.",
+          );
+        } else {
+          showToast("⚠ Không thể nạp lại dữ liệu đối soát. Vui lòng thử lại.");
+        }
+      }
+    }
   };
 
   const handleApprovePass = (storeId: string) => {
-    setCatalog((prev) =>
-      prev.map((s) => (s.id === storeId ? { ...s, status: "passed", score: "99.8%" } : s))
-    );
-    showToast(`✓ Đã đóng dấu QC Pass cho ${storeId}!`);
-    setActiveStoreId(null);
+    showToast(`Không thể duyệt QC Pass cho ${storeId}: cần bằng chứng xác minh toàn bộ website.`);
   };
 
   const scrollToBlock = (blockId: string) => {
@@ -1137,7 +1467,8 @@ export function MigrationDiffClient() {
             type="button"
             onClick={() => {
               void checkLiveDbStatus();
-              showToast("Đã làm mới dữ liệu đối soát cho toàn bộ 2.000 website!");
+              void loadLiveCatalog();
+              showToast("Đã làm mới dữ liệu đối soát cho toàn bộ website!");
             }}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700/80 transition shadow-sm"
           >
@@ -1362,7 +1693,7 @@ export function MigrationDiffClient() {
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {paginatedStores.map((store) => (
-                <tr key={store.id} className="hover:bg-slate-800/30 transition-colors">
+                <tr key={store.id} data-testid={`migration-store-row-${store.id}`} className="hover:bg-slate-800/30 transition-colors">
                   <td className="py-4 px-4 font-semibold text-white whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-md">
@@ -1445,11 +1776,14 @@ export function MigrationDiffClient() {
                   </td>
                   <td className="py-4 px-4 text-right whitespace-nowrap">
                     <button
+                      data-testid={`migration-store-compare-${store.id}`}
                       onClick={() => {
+                        setLoadedFieldDiff(null);
                         setActiveStoreId(store.id);
                         setActivePageIndex(0);
                         setSelectedBlockId(null);
-                        setActiveViewTab("field_diff");
+                        setActiveViewTab("live_webview");
+                        setPreviewSource(isStoreDomainSslReady(store) ? "live_domain" : "template");
                       }}
                       className="px-3.5 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-600 rounded-xl font-semibold text-xs transition-all shadow-sm flex items-center gap-1 ml-auto whitespace-nowrap"
                     >
@@ -1627,11 +1961,14 @@ export function MigrationDiffClient() {
                   <span>{isReloading ? "Đang Quét Lại..." : "Quét Lại CSDL"}</span>
                 </button>
                 <button
+                  type="button"
+                  disabled
                   onClick={() => handleApprovePass(selectedDiff.id)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl transition shadow-md shadow-emerald-600/20"
+                  title="Chỉ mở khi có evidence xác minh đầy đủ cho toàn bộ website"
+                  className="flex cursor-not-allowed items-center gap-1.5 rounded-xl bg-slate-700 px-4 py-2 text-xs font-semibold text-slate-400 opacity-70"
                 >
                   <CheckCircle2 className="size-4" />
-                  <span>Duyệt QC Pass</span>
+                  <span>QC Pass chờ evidence</span>
                 </button>
                 <button
                   onClick={() => setActiveStoreId(null)}
@@ -1656,6 +1993,7 @@ export function MigrationDiffClient() {
                   return (
                     <button
                       key={p.id}
+                      data-testid={`migration-page-tab-${p.id}`}
                       onClick={() => {
                         setActivePageIndex(idx);
                         setSelectedBlockId(null);
@@ -1689,15 +2027,6 @@ export function MigrationDiffClient() {
               <div className="flex items-center gap-2 shrink-0">
                 <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
                   <button
-                    onClick={() => setActiveViewTab("visual_stream")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "visual_stream" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <Layers className="size-3.5" />
-                    <span>So Sánh Khối</span>
-                  </button>
-                  <button
                     onClick={() => setActiveViewTab("live_webview")}
                     className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
                       activeViewTab === "live_webview" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
@@ -1705,6 +2034,15 @@ export function MigrationDiffClient() {
                   >
                     <Globe className="size-3.5" />
                     <span>Xem Web Thật (Live Iframe)</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveViewTab("visual_stream")}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                      activeViewTab === "visual_stream" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Layers className="size-3.5" />
+                    <span>So Sánh Khối</span>
                   </button>
                   <button
                     onClick={() => setActiveViewTab("field_diff")}
@@ -1715,24 +2053,8 @@ export function MigrationDiffClient() {
                     <SlidersHorizontal className="size-3.5" />
                     <span>Soi CSDL 1-to-1</span>
                   </button>
-                  <button
-                    onClick={() => setActiveViewTab("media_audit")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "media_audit" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <ImageIcon className="size-3.5" />
-                    <span>Soi Ảnh & Link</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveViewTab("text_audit")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
-                      activeViewTab === "text_audit" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    <TypeIcon className="size-3.5" />
-                    <span>Soi Chữ & Bảng</span>
-                  </button>
+                  <button onClick={() => setActiveViewTab("commerce_reconciliation")} className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${activeViewTab === "commerce_reconciliation" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"}`}><ShoppingCart className="size-3.5" /><span>Đối soát Commerce</span></button>
+                  <button onClick={() => setActiveViewTab("settings_reconciliation")} className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${activeViewTab === "settings_reconciliation" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"}`}><Settings className="size-3.5" /><span>Đối soát Settings</span></button>
                 </div>
 
                 {/* Filter toggle */}
@@ -1743,13 +2065,15 @@ export function MigrationDiffClient() {
                     onChange={(e) => setShowOnlyErrors(e.target.checked)}
                     className="rounded border-slate-700 text-blue-600 focus:ring-0 size-3.5"
                   />
-                  <span className="font-semibold text-rose-400">Chỉ Lỗi</span>
+                  <span className="font-semibold text-rose-400">Lỗi / cần xem</span>
                 </label>
               </div>
             </div>
 
             {/* Modal Body Area */}
-            {activeViewTab === "visual_stream" ? (
+            {activeViewTab === "commerce_reconciliation" || activeViewTab === "settings_reconciliation" ? (
+              <ReconciliationInspector scope={activeViewTab === "commerce_reconciliation" ? "commerce" : "settings"} snapshot={reconciliationSnapshot} loading={reconciliationLoading} error={reconciliationError} isDemo={reconciliationDemo} onToggleDemo={setReconciliationDemo} />
+            ) : activeViewTab === "visual_stream" ? (
               /* ========================================================================= */
               /* 1. THE CLASSIC DUAL BROWSER PARITY STREAM VIEW (PW1 VS PW2) */
               /* ========================================================================= */
@@ -1772,10 +2096,6 @@ export function MigrationDiffClient() {
                         className={`w-full text-left p-2.5 rounded-xl border text-xs transition flex items-center justify-between ${
                           selectedBlockId === block.id
                             ? "bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/25 font-semibold"
-                            : block.status === "fail"
-                            ? "bg-rose-500/10 text-rose-300 border-rose-500/20 hover:bg-rose-500/20"
-                            : block.status === "warn"
-                            ? "bg-amber-500/10 text-amber-300 border-amber-500/20 hover:bg-amber-500/20"
                             : "bg-slate-900/60 text-slate-300 border-slate-800/80 hover:bg-slate-800 hover:text-white"
                         }`}
                       >
@@ -1785,13 +2105,7 @@ export function MigrationDiffClient() {
                           </span>
                           <span className="font-medium truncate">{block.title.replace(/Khối #\d+:\s*/, "")}</span>
                         </div>
-                        {block.status === "fail" ? (
-                          <span className="size-2 rounded-full bg-rose-500 shrink-0" />
-                        ) : block.status === "warn" ? (
-                          <span className="size-2 rounded-full bg-amber-400 shrink-0" />
-                        ) : (
-                          <span className="size-2 rounded-full bg-emerald-400 shrink-0" />
-                        )}
+                        <span className="size-2 rounded-full bg-slate-500 shrink-0" title="Xem bằng chứng migration trong chi tiết khối" />
                       </button>
                     ))}
                   </div>
@@ -1829,6 +2143,19 @@ export function MigrationDiffClient() {
                         </button>
                       </div>
 
+                      <button
+                        type="button"
+                        aria-pressed={showDiffGaps}
+                        onClick={() => setShowDiffGaps((current) => !current)}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition ${
+                          showDiffGaps
+                            ? "bg-rose-500/20 text-rose-200 border-rose-400/70 shadow-md shadow-rose-500/20"
+                            : "bg-slate-900 text-slate-300 border-slate-800 hover:border-rose-500/50 hover:text-rose-200"
+                        }`}
+                      >
+                        {showDiffGaps ? "✓ Highlight Diff Gaps" : "Highlight Diff Gaps"}
+                      </button>
+
                       {parityMode === "swipe_slider" && (
                         <div className="flex items-center gap-2 text-xs font-mono bg-slate-900/80 px-3 py-1 rounded-xl border border-slate-800 text-slate-300">
                           <span>Vị trí trượt:</span>
@@ -1845,6 +2172,25 @@ export function MigrationDiffClient() {
                       )}
                     </div>
 
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs">
+                      <label className="flex cursor-pointer items-center gap-2 text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={useDemoRenderEvidence}
+                          onChange={(event) => setUseDemoRenderEvidence(event.target.checked)}
+                          className="size-3.5 rounded border-slate-700 text-blue-600 focus:ring-0"
+                        />
+                        <span className="font-semibold">Xem dữ liệu mẫu để duyệt UI</span>
+                      </label>
+                      <span className={useDemoRenderEvidence ? "text-amber-300" : "text-slate-400"}>
+                        {isRenderEvidenceLoading
+                          ? "Đang tải bằng chứng…"
+                          : renderEvidenceError
+                            ? renderEvidenceError
+                            : renderEvidence?.message ?? "Chưa tải bằng chứng migration."}
+                      </span>
+                    </div>
+
                     <div className={`grid gap-6 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2 gap-4"}`}>
                       {/* Left Browser Bar */}
                       <div className={`bg-slate-900/90 px-4 py-2.5 rounded-xl border border-amber-500/30 flex items-center justify-between shadow-sm ${deviceView === "mobile" ? "max-w-[375px] mx-auto w-full" : ""}`}>
@@ -1858,9 +2204,17 @@ export function MigrationDiffClient() {
                             {deviceView === "mobile" ? "📱 BẢN CŨ PW1 (MOBILE 375px)" : "👈 BẢN CŨ PW1 (LARAVEL)"}
                           </span>
                         </div>
-                        <a href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-medium">
-                          <span>Live V1</span> <ExternalLink className="size-3" />
-                        </a>
+                        {(() => {
+                          const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+                          const pw1HeaderLiveUrl = cleanDomain
+                            ? `https://${cleanDomain}${activePage.path === "/" ? "/" : activePage.path.startsWith("/") ? activePage.path : `/${activePage.path}`}`
+                            : `${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`;
+                          return (
+                            <a href={pw1HeaderLiveUrl} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-medium">
+                              <span>Live V1</span> <ExternalLink className="size-3" />
+                            </a>
+                          );
+                        })()}
                       </div>
 
                       {/* Right Browser Bar */}
@@ -1927,20 +2281,27 @@ export function MigrationDiffClient() {
                   {/* Sequential Block Stack */}
                   <div className="space-y-4">
                     {activePage.blocks
-                      .filter((b) => !showOnlyErrors || b.status === "fail" || b.status === "warn")
-                      .map((block) => (
+                      .filter(
+                        (block) =>
+                          !showOnlyErrors ||
+                          evidenceByLegacyId.get(block.id)?.overall !== "pass",
+                      )
+                      .map((block) => {
+                        const blockEvidence: BlockRenderEvidence | null =
+                          evidenceByLegacyId.get(block.id) ?? null;
+                        const evidenceSurface =
+                          blockEvidence?.overall === "failed"
+                            ? "bg-rose-950/10 border-rose-500/40 ring-1 ring-rose-500/20 shadow-md"
+                            : blockEvidence?.overall === "pass"
+                              ? "bg-emerald-950/10 border-emerald-500/30"
+                              : selectedBlockId === block.id
+                                ? "bg-slate-900 border-blue-500 ring-2 ring-blue-500/30 shadow-xl"
+                                : "bg-slate-900/40 border-slate-800/80 hover:border-slate-700/80 shadow-sm";
+                        return (
                         <div
                           key={block.id}
                           id={block.id}
-                          className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 space-y-3.5 ${
-                            block.status === "fail"
-                              ? "bg-rose-950/10 border-rose-500/40 ring-1 ring-rose-500/20 shadow-md"
-                              : block.status === "warn"
-                              ? "bg-amber-950/10 border-amber-500/40 ring-1 ring-amber-500/20 shadow-md"
-                              : selectedBlockId === block.id
-                              ? "bg-slate-900 border-blue-500 ring-2 ring-blue-500/30 shadow-xl"
-                              : "bg-slate-900/40 border-slate-800/80 hover:border-slate-700/80 shadow-sm"
-                          }`}
+                          className={`rounded-2xl border transition-all duration-200 p-4 sm:p-5 space-y-3.5 ${evidenceSurface}`}
                         >
                           {/* Block Header */}
                           <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
@@ -1951,37 +2312,34 @@ export function MigrationDiffClient() {
                               <div>
                                 <h4 className="font-bold text-white text-sm">{block.title}</h4>
                                 <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                                  PW1: <strong className="text-slate-300">{block.pw1Component}</strong> ➔ PW2: <strong className="text-sky-300">{block.pw2Block}</strong>
+                                  PW1: <strong className="text-slate-300">{block.pw1Component}</strong> ➔ PW2: <strong className="text-sky-300">{blockEvidence?.pw2Data.status === "migrated" ? blockEvidence.pw2Data.blockType ?? "Đã mapping, chưa rõ loại block" : blockEvidence?.pw2Data.status === "mismatch" ? blockEvidence.pw2Data.blockType ?? "Đã mapping, dữ liệu lệch" : blockEvidence?.pw2Data.status === "missing" ? "Thiếu block PW2" : "Chưa xác minh"}</strong>
                                 </div>
                               </div>
                             </div>
 
-                            <div>
-                              {block.status === "fail" ? (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                  🚨 LỖI P0: {block.discrepancyNote || "Lệch dữ liệu"}
-                                </span>
-                              ) : block.status === "warn" ? (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                  ⚠️ CẦN XEM: {block.discrepancyNote || "Cảnh báo"}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                  <CheckCircle2 className="size-3.5" /> KHỚP 100%
-                                </span>
-                              )}
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-300 border border-slate-700">
+                              {blockEvidence
+                                ? "Xem bằng chứng bên dưới"
+                                : isRenderEvidenceLoading
+                                  ? "Đang tải bằng chứng"
+                                  : "Chưa có bằng chứng"}
+                            </span>
                           </div>
 
-                          {/* Dual Column Content Preview - Switches between Desktop, Mobile & Swipe Slider */}
-                          {parityMode === "swipe_slider" ? (
-                            /* Split Swipe Slider Mode (0% to 100%) */
-                            <SwipeSliderBlockRenderer
-                              block={block}
-                              deviceView={deviceView}
-                              sliderPosition={sliderPosition}
+                          {blockEvidence ? (
+                            <BlockMigrationEvidence
+                              evidence={blockEvidence}
+                              onRequestLiveCheck={requestLiveCheck}
+                              isLiveCheckPending={liveCheckBlockId === blockEvidence.legacyId}
                             />
-                          ) : deviceView === "mobile" ? (
+                          ) : (
+                            <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-xs text-slate-400">
+                              Chưa có mapping PW1 → PW2 đã xác nhận, nên không thể kết luận block này đã migrate hoặc render đúng.
+                            </div>
+                          )}
+
+                          {/* Dual Column Content Preview - Switches between Desktop, Mobile & Swipe Slider */}
+                          {deviceView === "mobile" ? (
                             /* Mobile Phone Mockup View (375px) */
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-start py-2">
                               {/* PW1 Phone Mockup */}
@@ -2004,11 +2362,9 @@ export function MigrationDiffClient() {
 
                               {/* PW2 Phone Mockup */}
                               <div className={`w-full max-w-[375px] mx-auto bg-slate-950/95 border-2 rounded-[2.5rem] p-4 shadow-2xl space-y-3.5 relative ${
-                                block.status === "fail"
+                                blockEvidence?.overall === "failed"
                                   ? "border-rose-500/60 ring-2 ring-rose-500/30"
-                                  : block.status === "warn"
-                                  ? "border-amber-500/60 ring-2 ring-amber-500/30"
-                                  : "border-sky-500/40 ring-1 ring-sky-500/20"
+                                  : "border-slate-700 ring-1 ring-slate-800"
                               }`}>
                                 {/* Speaker / Notch */}
                                 <div className="w-24 h-3.5 bg-slate-900 border border-slate-800 rounded-full mx-auto flex items-center justify-center gap-1.5 shadow-inner">
@@ -2020,7 +2376,7 @@ export function MigrationDiffClient() {
                                 </div>
 
                                 {/* Rich Visual Block Render for PW2 */}
-                                <RichVisualBlockRenderer block={block} version="pw2" deviceView="mobile" />
+                                <Pw2EvidencePlaceholder evidence={blockEvidence} />
 
                                 {/* Home Bar */}
                                 <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
@@ -2038,11 +2394,11 @@ export function MigrationDiffClient() {
                               </div>
 
                               {/* PW2 Preview Box */}
-                              <div className="space-y-1.5">
+                              <div className="relative space-y-1.5">
                                 <div className="text-[10px] uppercase font-bold text-sky-400 font-mono tracking-wider px-1">
                                   Giao Diện Bản Mới PW2 (Next.js 15)
                                 </div>
-                                <RichVisualBlockRenderer block={block} version="pw2" deviceView="desktop" />
+                                <Pw2EvidencePlaceholder evidence={blockEvidence} />
                               </div>
                             </div>
                           )}
@@ -2050,8 +2406,8 @@ export function MigrationDiffClient() {
                           {/* Raw Field Data & Configuration Inspector for this Block */}
                           <div className="mt-2 bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5">
                             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center justify-between">
-                              <span className="text-amber-400">📋 Dữ Liệu MySQL Của Khối #{block.order} ({block.pw1Component})</span>
-                              <span className="text-slate-500 font-normal">Trường dữ liệu người dùng nhập</span>
+                              <span className="text-amber-400">📋 Dữ liệu PW1 của khối #{block.order} ({block.pw1Component})</span>
+                              <span className="text-slate-500 font-normal">Chỉ là nguồn PW1, không chứng minh migration PW2</span>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
                               <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800/80">
@@ -2071,7 +2427,8 @@ export function MigrationDiffClient() {
                             )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -2081,8 +2438,71 @@ export function MigrationDiffClient() {
               /* 1.5. LIVE STOREFRONT WEBVIEW (100% REAL COMPILED HTML/CSS/JS IFRAME) */
               /* ========================================================================= */
               <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
-                {/* Dual Browser URL Bar */}
-                <div className="px-4 py-2.5 sm:px-6 sm:py-2.5 border-b border-slate-800/80 bg-slate-900/80 shrink-0 shadow-sm">
+                {/* Preview Source Selector & Status Header */}
+                <div className="px-4 py-2 sm:px-6 sm:py-2.5 border-b border-slate-800/80 bg-slate-900/90 shrink-0 shadow-sm space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                        Nguồn Preview:
+                      </span>
+                      {(() => {
+                        const isDomainSslReady = isStoreDomainSslReady(selectedDiff);
+                        return (
+                          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewSource("template")}
+                              className={`px-3 py-1 font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                                previewSource === "template" || !isDomainSslReady
+                                  ? "bg-blue-600 text-white shadow-sm"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                              title="Hiển thị giao diện trực quan 100% từ CSDL MySQL gốc không phụ thuộc mạng máy chủ cũ"
+                            >
+                              <Sparkles className="size-3" />
+                              <span>Giao Diện Mẫu (100% CSDL)</span>
+                            </button>
+                            {isDomainSslReady ? (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewSource("live_domain")}
+                                className={`px-3 py-1 font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                                  previewSource === "live_domain"
+                                    ? "bg-blue-600 text-white shadow-sm"
+                                    : "text-slate-400 hover:text-slate-200"
+                                }`}
+                                title="Tải trực tiếp qua tên miền khách hàng có bảo mật SSL"
+                              >
+                                <Globe className="size-3" />
+                                <span>Tên Miền Trực Tiếp (Live Domain)</span>
+                              </button>
+                            ) : (
+                              <a
+                                href={`https://${(selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "")}${activePage.path === "/" ? "" : activePage.path}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2.5 py-1 font-semibold rounded-lg transition flex items-center gap-1 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40"
+                                title="Tên miền này chưa có SSL hợp lệ trên máy chủ PW1 cũ nên trình duyệt chặn nhúng iframe. Bấm để mở tab mới ngoài trình duyệt."
+                              >
+                                <Globe className="size-3" />
+                                <span>Mở Live Tab Ngoài (SSL Cũ)</span>
+                                <ExternalLink className="size-2.5 ml-0.5 opacity-70" />
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="size-3" />
+                        <span>Trang: <strong>{activePage.name}</strong> ({activePage.path})</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dual Browser URL Bar */}
                   <div className={`grid gap-4 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2"}`}>
                     {/* Left Browser URL Bar (PW1 Laravel) */}
                     <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-amber-500/30 flex items-center justify-between gap-2 shadow-inner">
@@ -2093,7 +2513,15 @@ export function MigrationDiffClient() {
                           <span className="size-2 rounded-full bg-emerald-500/80" />
                         </div>
                         <span className="text-[11px] font-mono text-amber-300 truncate">
-                          {selectedDiff.legacyDomain}{activePage.path.replace("/", "")}
+                          {(() => {
+                            const isSslReady = isStoreDomainSslReady(selectedDiff);
+                            const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+                            return previewSource === "template" || !isSslReady
+                              ? `👈 PW1 Legacy • Theme ${selectedDiff.templateCode} • ${activePage.path}`
+                              : cleanDomain
+                                ? `https://${cleanDomain}${activePage.path === "/" ? "/" : activePage.path.startsWith("/") ? activePage.path : `/${activePage.path}`}`
+                                : `${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`;
+                          })()}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -2106,7 +2534,15 @@ export function MigrationDiffClient() {
                           <RefreshCw className="size-3" />
                         </button>
                         <a
-                          href={`${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`}
+                          href={(() => {
+                            const isSslReady = isStoreDomainSslReady(selectedDiff);
+                            const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+                            return previewSource === "template" || !isSslReady
+                              ? `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw1&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodeURIComponent(activePage.path)}&title=${encodeURIComponent(activePage.name)}#${activePage.path}`
+                              : cleanDomain
+                                ? `https://${cleanDomain}${activePage.path === "/" ? "/" : activePage.path.startsWith("/") ? activePage.path : `/${activePage.path}`}`
+                                : `${selectedDiff.legacyDomain}${activePage.path.replace("/", "")}`;
+                          })()}
                           target="_blank"
                           rel="noreferrer"
                           className="p-1 rounded-lg hover:bg-slate-800 text-amber-400 transition flex items-center gap-0.5 text-[11px] font-semibold"
@@ -2126,7 +2562,9 @@ export function MigrationDiffClient() {
                           <span className="size-2 rounded-full bg-emerald-500/80" />
                         </div>
                         <span className="text-[11px] font-mono text-sky-300 truncate">
-                          {selectedDiff.migratedDomain}{activePage.path.replace("/", "")}
+                          {previewSource === "template"
+                            ? `👉 PW2 Next.js 15 • Theme ${selectedDiff.templateCode} • ${activePage.path}`
+                            : `👉 PW2 Next.js 15 • ${selectedDiff.name} • ${activePage.path}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -2138,9 +2576,13 @@ export function MigrationDiffClient() {
                         >
                           <RefreshCw className="size-3" />
                         </button>
-                        {activePage.existsInPW2 ? (
+                        {activePage.existsInPW2 || previewSource === "template" ? (
                           <a
-                            href={`${selectedDiff.migratedDomain}${activePage.path.replace("/", "")}`}
+                            href={
+                              previewSource === "template"
+                                ? `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodeURIComponent(activePage.path)}&title=${encodeURIComponent(activePage.name)}#${activePage.path}`
+                                : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodeURIComponent(activePage.path)}&title=${encodeURIComponent(activePage.name)}#${activePage.path}`
+                            }
                             target="_blank"
                             rel="noreferrer"
                             className="p-1 rounded-lg hover:bg-slate-800 text-sky-400 transition flex items-center gap-0.5 text-[11px] font-semibold"
@@ -2159,12 +2601,25 @@ export function MigrationDiffClient() {
                 {/* Iframe Viewport Stream Area */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0 bg-slate-900/40">
                   {(() => {
-                    const pw1Url = selectedDiff.domain
-                      ? `https://${selectedDiff.domain}${activePage.path === "/" ? "" : activePage.path}`
-                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw1`;
-                    const pw2Url = selectedDiff.migratedDomain
-                      ? `${selectedDiff.migratedDomain}${activePage.path === "/" ? "" : activePage.path}`
-                      : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2`;
+                    const activePath = activePage?.path || "/";
+                    const encodedPath = encodeURIComponent(activePath);
+                    const pageTitle = encodeURIComponent(activePage?.name || "Trang");
+                    const tplCode = (selectedDiff.templateCode || "fb101").toLowerCase();
+
+                    const pw1TemplateUrl = `/api/qa/template-preview/${tplCode}?version=pw1&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodedPath}&title=${pageTitle}&_t=${iframeReloadKey}#${activePath}`;
+                    const pw2TemplateUrl = `/api/qa/template-preview/${tplCode}?version=pw2&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodedPath}&title=${pageTitle}&_t=${iframeReloadKey}#${activePath}`;
+
+                    const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+                    const liveDomainPath = activePath === "/" ? "" : activePath.startsWith("/") ? activePath : `/${activePath}`;
+                    const pw1LiveDomainUrl = cleanDomain
+                      ? `https://${cleanDomain}${liveDomainPath || "/"}${cleanDomain.includes("?") ? `&_t=${iframeReloadKey}` : `?_t=${iframeReloadKey}`}`
+                      : pw1TemplateUrl;
+                    const pw2LiveDomainUrl = pw2TemplateUrl;
+
+                    const isDomainSslReady = isStoreDomainSslReady(selectedDiff);
+                    const pw1Url = (previewSource === "live_domain" && isDomainSslReady) ? pw1LiveDomainUrl : pw1TemplateUrl;
+                    const pw2Url = previewSource === "template" ? pw2TemplateUrl : pw2LiveDomainUrl;
+                    const iframeSandbox = "allow-scripts allow-same-origin allow-forms allow-popups";
 
                     return deviceView === "mobile" ? (
                       /* Mobile 375px Dual Phone Mockups with Real Iframes */
@@ -2179,11 +2634,22 @@ export function MigrationDiffClient() {
                           {/* Iframe Container */}
                           <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
                             <iframe
-                              key={`pw1-mob-${iframeReloadKey}`}
+                              ref={pw1MobIframeRef}
+                              key={`pw1-mob-${iframeReloadKey}-${previewSource}-${activePath}`}
                               src={pw1Url}
                               title="PW1 Mobile Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-scripts allow-forms allow-popups"
+                              sandbox={iframeSandbox}
+                              onLoad={() => {
+                                if (previewSource === "template" || !isDomainSslReady) {
+                                  pw1MobIframeRef.current?.contentWindow?.postMessage({
+                                    type: "spa-navigate",
+                                    path: activePath,
+                                    title: activePage?.name,
+                                    storeId: selectedDiff?.id,
+                                  }, "*");
+                                }
+                              }}
                             />
                           </div>
                           {/* Home Bar */}
@@ -2200,11 +2666,22 @@ export function MigrationDiffClient() {
                           {/* Iframe Container */}
                           <div className="w-full h-[620px] rounded-[2rem] overflow-hidden bg-white shadow-inner relative border border-slate-800">
                             <iframe
-                              key={`pw2-mob-${iframeReloadKey}`}
+                              ref={pw2MobIframeRef}
+                              key={`pw2-mob-${iframeReloadKey}-${previewSource}-${activePath}`}
                               src={pw2Url}
                               title="PW2 Next.js Mobile Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-scripts allow-forms allow-popups"
+                              sandbox={iframeSandbox}
+                              onLoad={() => {
+                                if (previewSource === "template") {
+                                  pw2MobIframeRef.current?.contentWindow?.postMessage({
+                                    type: "spa-navigate",
+                                    path: activePath,
+                                    title: activePage?.name,
+                                    storeId: selectedDiff?.id,
+                                  }, "*");
+                                }
+                              }}
                             />
                           </div>
                           {/* Home Bar */}
@@ -2222,11 +2699,22 @@ export function MigrationDiffClient() {
                           </div>
                           <div className="flex-1 bg-white relative">
                             <iframe
-                              key={`pw1-desk-${iframeReloadKey}`}
+                              ref={pw1DeskIframeRef}
+                              key={`pw1-desk-${iframeReloadKey}-${previewSource}-${activePath}`}
                               src={pw1Url}
                               title="PW1 Desktop Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-scripts allow-forms allow-popups"
+                              sandbox={iframeSandbox}
+                              onLoad={() => {
+                                if (previewSource === "template" || !isDomainSslReady) {
+                                  pw1DeskIframeRef.current?.contentWindow?.postMessage({
+                                    type: "spa-navigate",
+                                    path: activePath,
+                                    title: activePage?.name,
+                                    storeId: selectedDiff?.id,
+                                  }, "*");
+                                }
+                              }}
                             />
                           </div>
                         </div>
@@ -2239,11 +2727,22 @@ export function MigrationDiffClient() {
                           </div>
                           <div className="flex-1 bg-white relative">
                             <iframe
-                              key={`pw2-desk-${iframeReloadKey}`}
+                              ref={pw2DeskIframeRef}
+                              key={`pw2-desk-${iframeReloadKey}-${previewSource}-${activePath}`}
                               src={pw2Url}
                               title="PW2 Next.js Desktop Storefront"
                               className="w-full h-full border-0"
-                              sandbox="allow-scripts allow-forms allow-popups"
+                              sandbox={iframeSandbox}
+                              onLoad={() => {
+                                if (previewSource === "template") {
+                                  pw2DeskIframeRef.current?.contentWindow?.postMessage({
+                                    type: "spa-navigate",
+                                    path: activePath,
+                                    title: activePage?.name,
+                                    storeId: selectedDiff?.id,
+                                  }, "*");
+                                }
+                              }}
                             />
                           </div>
                         </div>
@@ -2258,32 +2757,67 @@ export function MigrationDiffClient() {
               /* ========================================================================= */
               <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/30 min-h-0">
                 {/* Header Summary Card */}
-                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800/80 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800/80 shadow-sm space-y-4">
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
                       <SlidersHorizontal className="size-5 text-blue-400" />
-                      <span>ĐỐI SOÁT TRƯỜNG DỮ LIỆU CSDL 1-TO-1 (DATABASE FIELD RECONCILIATION)</span>
+                      <span>Đối soát trường dữ liệu 1-to-1</span>
                     </h3>
                     <p className="text-xs text-slate-400 mt-1">
-                      Đối chiếu từng trường theo <code>legacy_id</code> giữa MySQL PW1 và Postgres PW2: <strong>Sản Phẩm, Biến Thể, Banners, Link CTA, RichText & Bảng Biểu, Menu Điều Hướng, Danh Mục, Cài Đặt Shop</strong>.
+                      Quét record cần xem trước, rồi mở chi tiết field khi cần đối chiếu. Không dùng tỷ lệ xanh để thay thế mapping PW1→PW2 đã được xác nhận.
                     </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
-                      <div className="text-[10px] text-slate-400 uppercase font-mono font-semibold">Độ Khớp Trường</div>
-                      <div className="font-bold text-emerald-400 text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.fieldMatchRate}</div>
-                    </div>
-                    <div className="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 text-xs">
-                      <div className="text-[10px] text-slate-400 uppercase font-mono font-semibold">Tổng Record</div>
-                      <div className="font-bold text-white text-sm font-mono">{selectedDiff.fieldDiffAudit.summary.totalEntitiesV1}</div>
-                    </div>
-                    {selectedDiff.fieldDiffAudit.summary.missingInPW2Count > 0 && (
-                      <div className="bg-rose-950/30 px-3.5 py-2 rounded-xl border border-rose-500/40 text-xs">
-                        <div className="text-[10px] text-rose-400 uppercase font-mono font-semibold">Thiếu Trên PW2</div>
-                        <div className="font-bold text-rose-300 text-sm font-mono">🚨 {selectedDiff.fieldDiffAudit.summary.missingInPW2Count} Record</div>
+                    <p className="text-xs text-indigo-300 mt-2" data-testid="field-diff-page-scope">
+                      Phạm vi trang: <strong>{activePage.name}</strong> ({activePage.path})
+                    </p>
+                    <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
+                      <strong>Nguồn dữ liệu:</strong>{" "}
+                      {fieldDiffSource === "ui_fixture"
+                        ? "fixture UI phục vụ kiểm thử, không phải migration thực tế."
+                        : fieldDiffSource === "pw1_snapshot_unverified"
+                        ? "mới đọc PW1; PW2 và mapping định danh chưa được đọc. Không có field nào được xem là khớp migration."
+                        : "catalog minh họa; chưa thay thế mapping PW1→PW2 đã được xác nhận."}
+                    </p>
+                    {activeStoreId === "SITE-0001" && (
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          data-testid="field-diff-ui-demo-toggle"
+                          aria-pressed={fieldDiffUiDemo}
+                          onClick={() => setFieldDiffUiDemo((current) => !current)}
+                          className={`rounded-lg border px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
+                            fieldDiffUiDemo
+                              ? "border-amber-400/60 bg-amber-950/50 text-amber-100"
+                              : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"
+                          }`}
+                        >
+                          {fieldDiffUiDemo ? "Tắt dữ liệu mẫu UI" : "Dùng dữ liệu mẫu UI"}
+                        </button>
+                        {fieldDiffUiDemo && (
+                          <span data-testid="field-diff-ui-demo-notice" className="rounded-lg border border-amber-400/40 bg-amber-950/30 px-3 py-2 text-xs font-semibold text-amber-100">
+                            DỮ LIỆU MẪU UI — không phải kết quả migration thực tế.
+                          </span>
+                        )}
                       </div>
                     )}
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-3.5 py-2 text-xs">
+                      <div className="text-[10px] font-semibold uppercase text-amber-300/75">Cần xem</div>
+                      <div className="font-mono text-sm font-bold text-amber-200">{fieldEvidenceCounts.recordsWithAttention} record</div>
+                    </div>
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 px-3.5 py-2 text-xs">
+                      <div className="text-[10px] font-semibold uppercase text-rose-300/75">Field lệch / thiếu</div>
+                      <div className="font-mono text-sm font-bold text-rose-200">{fieldEvidenceCounts.attention}</div>
+                    </div>
+                    <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/20 px-3.5 py-2 text-xs">
+                      <div className="text-[10px] font-semibold uppercase text-emerald-300/75">Khớp có dữ liệu</div>
+                      <div className="font-mono text-sm font-bold text-emerald-200">{fieldEvidenceCounts.matched_value}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 text-xs">
+                      <div className="text-[10px] font-semibold uppercase text-slate-400">Cả hai trống</div>
+                      <div className="font-mono text-sm font-bold text-slate-200">{fieldEvidenceCounts.matched_empty}</div>
+                    </div>
                   </div>
                 </div>
 
@@ -2306,8 +2840,8 @@ export function MigrationDiffClient() {
                     ).map((grp) => {
                       const Icon = grp.icon;
                       const count = grp.key === "all"
-                        ? selectedDiff.fieldDiffAudit.records.length
-                        : selectedDiff.fieldDiffAudit.records.filter((r) => r.entityGroup === grp.key).length;
+                        ? getFieldDiffRecordsForPage(selectedDiff.fieldDiffAudit, activePage.id).length
+                        : getFieldDiffRecordsForPage(selectedDiff.fieldDiffAudit, activePage.id).filter((r) => r.entityGroup === grp.key).length;
 
                       return (
                         <button
@@ -2329,10 +2863,37 @@ export function MigrationDiffClient() {
                     })}
                   </div>
 
+                  <div className="flex w-full flex-wrap gap-1.5 md:w-auto" aria-label="Lọc theo trạng thái đối soát">
+                    {[
+                      { key: "attention", label: "Field cần xem", count: fieldEvidenceCounts.attention },
+                      { key: "matched_value", label: "Khớp có dữ liệu", count: fieldEvidenceCounts.matched_value },
+                      { key: "matched_empty", label: "Cả hai trống", count: fieldEvidenceCounts.matched_empty },
+                      { key: "all", label: "Tất cả", count: baseFilteredFieldRecords.length },
+                    ].map((filter) => (
+                      <button
+                        key={filter.key}
+                        data-testid={`field-status-filter-${filter.key}`}
+                        type="button"
+                        onClick={() => {
+                          setFieldStatusFilter(filter.key as typeof fieldStatusFilter);
+                          if (filter.key !== "attention") setShowOnlyErrors(false);
+                        }}
+                        className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
+                          fieldStatusFilter === filter.key
+                            ? "border-sky-500/60 bg-sky-950/50 text-sky-100"
+                            : "border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                        }`}
+                      >
+                        {filter.label} <span className="font-mono opacity-75">{filter.count} {filter.key === "all" ? "record" : "field"}</span>
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="relative w-full md:w-64">
                     <Search className="size-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
+                      aria-label="Tìm trường, SKU hoặc khóa CSDL"
                       placeholder="Tìm trường, SKU, khóa CSDL..."
                       value={fieldSearchQuery}
                       onChange={(e) => setFieldSearchQuery(e.target.value)}
@@ -2343,11 +2904,25 @@ export function MigrationDiffClient() {
 
                 {/* Entity Cards & Field Breakdown Tables */}
                 <div className="space-y-4">
-                  {filteredFieldRecords.map((record) => (
-                    <div
+                  {filteredFieldRecords.length === 0 ? (
+                    <div data-testid="field-diff-empty-state" className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 px-6 py-12 text-center">
+                      <Search className="mx-auto size-6 text-slate-500" aria-hidden="true" />
+                      <p className="mt-3 text-sm font-bold text-slate-200">Không có record phù hợp bộ lọc</p>
+                      <p className="mt-1 text-xs text-slate-400">Đổi trạng thái, loại dữ liệu hoặc từ khóa để tiếp tục đối soát.</p>
+                      <button
+                        type="button"
+                        onClick={() => { setFieldStatusFilter("all"); setActiveEntityGroup("all"); setFieldSearchQuery(""); setShowOnlyErrors(false); }}
+                        className="mt-4 rounded-lg border border-sky-500/40 px-3 py-2 text-xs font-bold text-sky-200 hover:bg-sky-950/40"
+                      >
+                        Xóa bộ lọc
+                      </button>
+                    </div>
+                  ) : filteredFieldRecords.map((record) => (
+                    <article
                       key={record.id}
+                      data-testid={`field-diff-record-${record.id}`}
                       className={`rounded-2xl border overflow-hidden shadow-lg transition ${
-                        record.matchStatus === "missing_in_pw2" || record.matchStatus === "error"
+                        record.matchStatus === "missing_in_pw2" || record.matchStatus === "orphan_in_pw2" || record.matchStatus === "error"
                           ? "bg-rose-950/15 border-rose-500 ring-1 ring-rose-500/40"
                           : record.matchStatus === "warning"
                           ? "bg-amber-950/15 border-amber-500 ring-1 ring-amber-500/40"
@@ -2355,7 +2930,18 @@ export function MigrationDiffClient() {
                       }`}
                     >
                       {/* Entity Header */}
-                      <div className="p-4 bg-slate-950/90 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <button
+                        type="button"
+                        data-testid={`field-diff-toggle-${record.id}`}
+                        aria-controls={`field-diff-details-${record.id}`}
+                        aria-expanded={expandedFieldRecordIds.has(record.id)}
+                        onClick={() => setExpandedFieldRecordIds((current) => {
+                          const next = new Set(current);
+                          if (next.has(record.id)) next.delete(record.id); else next.add(record.id);
+                          return next;
+                        })}
+                        className="w-full p-4 bg-slate-950/90 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-left transition hover:bg-slate-900/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"
+                      >
                         <div className="flex items-center gap-3">
                           <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-lg bg-slate-900 text-indigo-400 border border-slate-800">
                             {record.entityGroup}
@@ -2376,10 +2962,18 @@ export function MigrationDiffClient() {
                           </div>
                         </div>
 
-                        <div>
-                          {record.matchStatus === "missing_in_pw2" ? (
+                        <div className="flex items-center gap-3 self-end md:self-auto">
+                          {fieldDiffSource !== "ui_fixture" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-950 text-amber-300 border border-amber-500/50">
+                              <Info className="size-3.5" /> CHƯA XÁC MINH PW2
+                            </span>
+                          ) : record.matchStatus === "missing_in_pw2" ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500 animate-pulse">
                               <AlertOctagon className="size-3.5" /> 🚨 MẤT BẢN GHI TRÊN PW2
+                            </span>
+                          ) : record.matchStatus === "orphan_in_pw2" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500/50">
+                              <AlertOctagon className="size-3.5" /> ⚠️ BẢN GHI DƯ TRÊN PW2
                             </span>
                           ) : record.matchStatus === "error" ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-500/50">
@@ -2394,26 +2988,48 @@ export function MigrationDiffClient() {
                               <CheckCircle2 className="size-3.5" /> ✓ Khớp {record.matchedFields}/{record.totalFields} Trường
                             </span>
                           )}
+                          <ChevronDown className={`size-4 text-slate-400 transition-transform ${expandedFieldRecordIds.has(record.id) ? "rotate-180" : ""}`} aria-hidden="true" />
                         </div>
-                      </div>
+                      </button>
 
                       {/* 1-to-1 Field Matrix Table */}
-                      <div className="overflow-x-auto">
+                      <div
+                        id={`field-diff-details-${record.id}`}
+                        hidden={!expandedFieldRecordIds.has(record.id)}
+                        className="overflow-x-auto"
+                      >
                         <table className="w-full text-left text-xs text-slate-300">
                           <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800">
                             <tr>
-                              <th className="py-3 px-4">Tên Trường (Field)</th>
-                              <th className="py-3 px-4">Khóa MySQL (PW1) ➔ Khóa Postgres (PW2)</th>
-                              <th className="py-3 px-4">Giá Trị Bản Cũ (PW1)</th>
-                              <th className="py-3 px-4">Giá Trị Bản Mới (PW2)</th>
-                              <th className="py-3 px-4">Đánh Giá</th>
-                              <th className="py-3 px-4">Hướng Dẫn Khắc Phục (Fix Action)</th>
+                              <th className="min-w-56 py-3 px-4">Trường & mapping</th>
+                              <th className="min-w-52 py-3 px-4 text-amber-300/80">Giá trị PW1</th>
+                              <th className="min-w-52 py-3 px-4 text-sky-300/80">
+                                {fieldDiffSource === "pw1_snapshot_unverified" ? "PW2 chưa đọc được" : "Giá trị PW2"}
+                              </th>
+                              <th className="min-w-56 py-3 px-4">Kết quả / thao tác</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/50 text-[11px] font-mono">
-                            {record.fields.map((field, fIdx) => (
+                            {record.fields.filter((field) => fieldStatusFilter === "all" || (
+                              fieldStatusFilter === "attention"
+                                ? getDisplayEvidenceState(field, fieldDiffSource) === "attention"
+                                : getDisplayEvidenceState(field, fieldDiffSource) === fieldStatusFilter
+                            )).length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="px-4 py-5 font-sans text-slate-400">
+                                  Bản ghi cần xử lý ở cấp record; chưa có field nào thuộc trạng thái đang lọc để đối chiếu.
+                                </td>
+                              </tr>
+                            ) : record.fields
+                              .filter((field) => fieldStatusFilter === "all" || (
+                                fieldStatusFilter === "attention"
+                                  ? getDisplayEvidenceState(field, fieldDiffSource) === "attention"
+                                  : getDisplayEvidenceState(field, fieldDiffSource) === fieldStatusFilter
+                              ))
+                              .map((field, fIdx) => (
                               <tr
                                 key={fIdx}
+                                data-evidence-state={getDisplayEvidenceState(field, fieldDiffSource)}
                                 className={`hover:bg-slate-900/40 transition ${
                                   field.status === "error"
                                     ? "bg-rose-950/20"
@@ -2425,30 +3041,46 @@ export function MigrationDiffClient() {
                                 <td className="py-3.5 px-4 font-sans font-bold text-white">
                                   {field.fieldLabel}
                                   <div className="text-[10px] text-slate-500 font-mono">{field.fieldName}</div>
+                                  <div className="mt-1.5 break-words text-[10px] font-mono font-normal leading-4 text-slate-500">
+                                    <span className="text-amber-400/90">{field.legacyKey}</span>
+                                    <span className="mx-1 text-slate-600">→</span>
+                                    <span className="text-sky-400/90">{field.migratedKey}</span>
+                                  </div>
                                 </td>
-                                <td className="py-3.5 px-4 text-slate-400">
-                                  <span className="text-amber-400/90">{field.legacyKey}</span>
-                                  <span className="text-slate-600 mx-1.5">➔</span>
-                                  <span className="text-indigo-400/90">{field.migratedKey}</span>
-                                </td>
-                                <td className="py-3.5 px-4 font-sans text-slate-200">
+                                <td className={`max-w-sm py-3.5 px-4 font-sans break-words ${getDisplayEvidenceState(field, fieldDiffSource) === "matched_empty" ? "text-slate-500" : "text-slate-200"}`}>
                                   {field.legacyValue !== null ? (
-                                    String(field.legacyValue)
+                                    String(field.legacyValue) || <span className="italic">trống</span>
                                   ) : (
                                     <span className="text-slate-600 italic">null</span>
                                   )}
                                 </td>
-                                <td className="py-3.5 px-4 font-sans">
-                                  {field.migratedValue !== null ? (
-                                    <span className="text-slate-200">{String(field.migratedValue)}</span>
+                                <td className={`max-w-sm py-3.5 px-4 font-sans break-words ${getDisplayEvidenceState(field, fieldDiffSource) === "matched_empty" ? "text-slate-500" : "text-slate-200"}`}>
+                                  {fieldDiffSource === "pw1_snapshot_unverified" ? (
+                                    <span className="text-amber-300 italic">Chưa đọc nguồn PW2</span>
+                                  ) : field.migratedValue !== null ? (
+                                    <span>{String(field.migratedValue) || <span className="italic">trống</span>}</span>
+                                  ) : field.legacyValue === null ? (
+                                    <span className="text-slate-500 italic">NULL (cần xác minh)</span>
                                   ) : (
                                     <span className="text-rose-400 font-bold italic">🚨 NULL (Bị Mất)</span>
                                   )}
                                 </td>
-                                <td className="py-3.5 px-4 font-sans">
-                                  {field.status === "match" ? (
+                                <td className="py-3.5 px-4 font-sans align-top">
+                                  {fieldDiffSource !== "ui_fixture" ? (
+                                    <span className="text-amber-300 font-bold flex items-center gap-1">
+                                      <Info className="size-3.5" /> Chưa xác minh PW2
+                                    </span>
+                                  ) : getDisplayEvidenceState(field, fieldDiffSource) === "matched_value" ? (
                                     <span className="text-emerald-400 font-bold flex items-center gap-1">
-                                      <Check className="size-3.5" /> Khớp 100%
+                                      <Check className="size-3.5" /> Khớp có dữ liệu
+                                    </span>
+                                  ) : getDisplayEvidenceState(field, fieldDiffSource) === "matched_empty" ? (
+                                    <span className="text-slate-400 font-bold flex items-center gap-1">
+                                      <Info className="size-3.5" /> Cả hai trống
+                                    </span>
+                                  ) : field.status === "match" && field.legacyValue === null && field.migratedValue === null ? (
+                                    <span className="text-amber-300 font-bold flex items-center gap-1">
+                                      <Info className="size-3.5" /> Cả hai NULL — cần xác minh
                                     </span>
                                   ) : field.status === "warning" ? (
                                     <span className="text-amber-400 font-bold flex items-center gap-1">
@@ -2459,22 +3091,20 @@ export function MigrationDiffClient() {
                                       <AlertOctagon className="size-3.5" /> {field.classification}
                                     </span>
                                   )}
-                                </td>
-                                <td className="py-3.5 px-4 font-sans text-slate-300 max-w-xs">
-                                  {field.remediationAction ? (
+                                  {getDisplayEvidenceState(field, fieldDiffSource) === "attention" && (field.remediationAction ? (
                                     <div className="text-[11px] bg-slate-900 p-2 rounded-lg border border-slate-800 text-indigo-300">
                                       {field.remediationAction}
                                     </div>
                                   ) : (
-                                    <span className="text-emerald-500/80 text-[11px]">✓ Không cần chỉnh sửa</span>
-                                  )}
+                                    <span className="mt-2 block text-[11px] text-slate-400">Chưa có hướng dẫn khắc phục.</span>
+                                  ))}
                                 </td>
                               </tr>
-                            ))}
+                              ))}
                           </tbody>
                         </table>
                       </div>
-                    </div>
+                    </article>
                   ))}
                 </div>
               </div>

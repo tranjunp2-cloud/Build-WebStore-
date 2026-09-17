@@ -51,11 +51,32 @@ export const GET = withSuperAdmin(async (request: NextRequest) => {
     const storeId = searchParams.get("store_id");
 
     if (storeId) {
+      if (!/^SITE-\d{4}$/.test(storeId)) {
+        return NextResponse.json({ error: "store_id must use the SITE-0001 format" }, { status: 400 });
+      }
+      const includeUiDemoFixture = searchParams.get("ui_demo") === "1";
+
+      // Explicit, authenticated QA-only source. Never blend UI fixture records
+      // into a live audit or its summary.
+      if (includeUiDemoFixture) {
+        if (storeId !== "SITE-0001") {
+          return NextResponse.json(
+            { error: "UI demo fixture is available only for SITE-0001" },
+            { status: 400 },
+          );
+        }
+        const demoDiff = getStoreDeepDiff(storeId, undefined, true);
+        if (!demoDiff) {
+          return NextResponse.json({ error: `Store ${storeId} not found` }, { status: 404 });
+        }
+        return NextResponse.json({ data: demoDiff, source: "ui_fixture" });
+      }
+
       // Try live MySQL first if configured
       try {
         const liveDiff = await fetchLivePw1StoreDeepDiff(storeId);
         if (liveDiff) {
-          return NextResponse.json({ data: liveDiff, isLive: true });
+          return NextResponse.json({ data: liveDiff, source: "pw1_snapshot_unverified" });
         }
       } catch (err: any) {
         console.error(`[Live Diff Error] Failed for ${storeId}:`, err?.message || err);
@@ -65,7 +86,7 @@ export const GET = withSuperAdmin(async (request: NextRequest) => {
       if (!diff) {
         return NextResponse.json({ error: `Store ${storeId} not found` }, { status: 404 });
       }
-      return NextResponse.json({ data: diff });
+      return NextResponse.json({ data: diff, source: "catalog_fixture" });
     }
 
     const filter = searchParams.get("filter") || "all";

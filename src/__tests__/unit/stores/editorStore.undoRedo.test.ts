@@ -126,6 +126,55 @@ describe('EditorStore — F11 Undo/Redo Enhancements', () => {
         expect(useEditorStore.getState().theme.primaryColor).toBe('#0d9488')
     })
 
+    it('TC-F07.039 — template batch restores layout, theme, globals and locale content in one undo', () => {
+        // Arrange
+        const oldHeader = { blockType: 'navigation', variant: 'default', logoText: 'Old brand' }
+        const oldFooter = { blockType: 'footer', variant: 'simple', copyrightText: 'Old footer' }
+        const oldGlobals = { cartWidget: null, whatsappButton: null, socialWidget: null }
+        const oldLocaleOverrides = { hero1: { ms: { headline: 'Tajuk lama' } } }
+        const newLocaleOverrides = { hero1: { ms: { headline: 'Tajuk baharu' } } }
+        useEditorStore.getState().init(
+            'site-1',
+            mockBlocks,
+            mockTheme,
+            'Site',
+            oldHeader,
+            oldFooter,
+            oldGlobals,
+            oldLocaleOverrides,
+        )
+
+        // Act
+        useEditorStore.getState().pushBatch(
+            [{ blockType: 'hero', headline: 'New layout' }],
+            { primaryColor: '#000000' },
+            'Apply template',
+            {
+                headerBlock: { ...oldHeader, variant: 'transparent' },
+                footerBlock: { ...oldFooter, variant: 'minimal' },
+                globalBlocks: {
+                    ...oldGlobals,
+                    cartWidget: { blockType: 'cartWidget', variant: 'floating' },
+                },
+                localeOverrides: newLocaleOverrides,
+            },
+        )
+
+        useEditorStore.getState().undo()
+
+        // Assert
+        const restored = useEditorStore.getState()
+        expect(restored.blocks).toEqual(mockBlocks)
+        expect(restored.theme).toEqual(mockTheme)
+        expect(restored.headerBlock).toEqual(oldHeader)
+        expect(restored.footerBlock).toEqual(oldFooter)
+        expect(restored.globalBlocks).toEqual(oldGlobals)
+        expect(restored.localeOverrides).toEqual(oldLocaleOverrides)
+
+        useEditorStore.getState().redo()
+        expect(useEditorStore.getState().localeOverrides).toEqual(newLocaleOverrides)
+    })
+
     it('TC-F11.06 — pushBatch label is recorded', () => {
         const newBlocks = [{ blockType: 'hero', heading: 'AI' }]
         useEditorStore.getState().pushBatch(newBlocks, mockTheme, 'AI: generated homepage')

@@ -18,6 +18,28 @@ export interface Pw1DbConfig {
   ssl?: boolean;
 }
 
+interface Pw1ProductRow extends mysql.RowDataPacket {
+  id: number;
+  name: string;
+  slug?: string | null;
+  status?: number;
+  brand_name?: string | null;
+  category_name?: string | null;
+}
+
+interface Pw1SkuRow extends mysql.RowDataPacket {
+  id: number;
+  product_id: number;
+  sku?: string | null;
+  price?: number | null;
+  stock?: number | null;
+  cost?: number | null;
+  status?: number;
+  prod_name?: string | null;
+}
+
+export const CANONICAL_FALLBACK_CODES = ["FB101", "PA101", "F102", "FN104", "FN103", "C102", "C101", "FN102", "FN101"] as const;
+
 export interface Pw1ConnectionStatus {
   connected: boolean;
   message: string;
@@ -43,6 +65,140 @@ export interface TableSchemaInfo {
   rowCount?: number;
 }
 
+interface PageScopedFieldRecord {
+  id: string;
+  entityGroup: string;
+  pageIds?: string[];
+}
+
+interface Pw1PageComponentRef {
+  id: string | number;
+  page_id: string | number;
+  fc_name?: string | null;
+}
+
+interface Pw1BannerRef {
+  id: string | number;
+  page_component_id?: string | number | null;
+}
+
+interface DiffPageRef {
+  id: string;
+  blocks: Array<{ id: string; blockType: string }>;
+}
+
+interface Pw1ShortlistItemRef {
+  page_component_id: string | number;
+  model_type?: string | null;
+  model_id?: string | number | null;
+}
+
+interface FieldDiffPageScopeInput {
+  shortlistItems: Pw1ShortlistItemRef[];
+  productIds: Array<string | number>;
+  categoryIds: Array<string | number>;
+  postIds: Array<string | number>;
+  variantProductIds: Map<string, string | number>;
+}
+
+/** MySQL drivers can return the same foreign key as either a number or string. */
+function samePw1Id(left: string | number | null | undefined, right: string | number | null | undefined): boolean {
+  return left != null && right != null && String(left) === String(right);
+}
+
+export function getPw1ComponentShortlistItems<T extends Pw1ShortlistItemRef>(
+  shortlistItems: T[],
+  componentId: string | number,
+): T[] {
+  return shortlistItems.filter((item) => samePw1Id(item.page_component_id, componentId));
+}
+
+/**
+ * Assign page scope to field-diff records. Page-owned PW1 entities use their
+ * source foreign keys; block-type fallback is reserved for global entities.
+ */
+export function assignFieldDiffRecordPageIds<T extends PageScopedFieldRecord>(
+  records: T[],
+  pages: DiffPageRef[],
+  components: Pw1PageComponentRef[],
+  banners: Pw1BannerRef[],
+  scopeInput: FieldDiffPageScopeInput,
+): Array<T & { pageIds: string[] }> {
+  const validPageIds = new Set(pages.map((page) => page.id));
+  const componentPageIds = new Map(
+    components.map((component) => [String(component.id), `page-${component.page_id}`]),
+  );
+  const bannerPageIds = new Map(
+    banners.map((banner) => [String(banner.id), componentPageIds.get(String(banner.page_component_id))]),
+  );
+
+  return records.map((record) => {
+    if (Array.isArray(record.pageIds) && record.pageIds.length > 0) {
+      return { ...record, pageIds: record.pageIds.filter((pageId) => validPageIds.has(pageId)) };
+    }
+
+    const pageOwnedId = record.entityGroup === "banners"
+      ? bannerPageIds.get(record.id.replace("ent-banner-", ""))
+      : record.entityGroup === "richtext"
+        ? componentPageIds.get(record.id.replace("ent-richtext-", ""))
+        : record.entityGroup === "blocks"
+          ? componentPageIds.get(record.id.replace("ent-block-", ""))
+          : undefined;
+
+    // Do not use a block-type heuristic for a page-owned entity: it would leak
+    // records across tabs when several pages use the same block type.
+    if (record.entityGroup === "banners" || record.entityGroup === "richtext" || record.entityGroup === "blocks") {
+      return { ...record, pageIds: pageOwnedId && validPageIds.has(pageOwnedId) ? [pageOwnedId] : [] };
+    }
+
+    if (record.entityGroup === "navigation" || record.entityGroup === "settings") {
+      return { ...record, pageIds: pages.map((page) => page.id) };
+    }
+
+    const entityId = record.id.replace(/^ent-(?:prod|sku|cat|post)-/, "");
+    const targetId = record.entityGroup === "variants"
+      ? scopeInput.variantProductIds.get(entityId)
+      : entityId;
+    const fallbackIds = record.entityGroup === "products" || record.entityGroup === "variants"
+      ? scopeInput.productIds.slice(0, 4)
+      : record.entityGroup === "categories"
+        ? scopeInput.categoryIds.slice(0, 4)
+        : record.entityGroup === "posts"
+          ? scopeInput.postIds.slice(0, 3)
+          : [];
+    const pageIds = components.flatMap((component) => {
+      const pageId = componentPageIds.get(String(component.id));
+      if (!pageId || !validPageIds.has(pageId)) return [];
+
+      const componentName = (component.fc_name || "").toLowerCase();
+      const isProducts = componentName.includes("product") && !componentName.includes("filter") && !componentName.includes("sort");
+      const isCategories = componentName.includes("category");
+      const isPosts = componentName.includes("article") || componentName.includes("blog");
+      const matchesGroup = (record.entityGroup === "products" || record.entityGroup === "variants")
+        ? isProducts
+        : record.entityGroup === "categories"
+          ? isCategories
+          : record.entityGroup === "posts" && isPosts;
+      if (!matchesGroup) return [];
+
+      const shortlistIds = scopeInput.shortlistItems
+        .filter((item) => samePw1Id(item.page_component_id, component.id))
+        .filter((item) => {
+          const modelType = item.model_type || "";
+          if (record.entityGroup === "products" || record.entityGroup === "variants") return modelType.includes("Product") || !modelType;
+          if (record.entityGroup === "categories") return !modelType || modelType.includes("Category") || modelType.includes("Brand");
+          return modelType.includes("Blog") || modelType.includes("Article") || modelType.includes("Post");
+        })
+        .map((item) => String(item.model_id));
+      const renderedIds = shortlistIds.length > 0 ? shortlistIds : fallbackIds.map(String);
+
+      return targetId !== undefined && renderedIds.includes(String(targetId)) ? [pageId] : [];
+    });
+
+    return { ...record, pageIds: [...new Set(pageIds)] };
+  });
+}
+
 let pool: mysql.Pool | null = null;
 
 /**
@@ -55,6 +211,19 @@ export function getPw1DbConfig(): Pw1DbConfig | null {
   }
 
   return null;
+}
+
+export function selectUniqueProducts<T extends { id: string | number }>(products: T[]): T[] {
+  return [...new Map(products.map((product) => [String(product.id), product])).values()];
+}
+
+export function selectPrimarySkusByProductId<T extends { product_id: string | number }>(skus: T[]): Map<string, T> {
+  const primarySkuByProductId = new Map<string, T>();
+  for (const sku of skus) {
+    const productId = String(sku.product_id);
+    if (!primarySkuByProductId.has(productId)) primarySkuByProductId.set(productId, sku);
+  }
+  return primarySkuByProductId;
 }
 
 /**
@@ -353,6 +522,8 @@ export async function fetchLivePw1StoresCatalog(limit = 2000): Promise<any[]> {
       s.logo,
       s.created_at,
       d.domain,
+      d.is_supported_https,
+      d.ssl_certificate_id,
       t.name as template_code,
       t.title as template_name,
       t.image as cover_img
@@ -384,13 +555,20 @@ export async function fetchLivePw1StoresCatalog(limit = 2000): Promise<any[]> {
     const failedBlocks = !isPass && !isWarn ? ["Chưa có dữ liệu sản phẩm", "Cần đồng bộ biến thể"] : isWarn ? ["Chưa cấu hình sản phẩm"] : [];
 
     const domain = r.domain || `${r.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.web.dev.ecommercehub.my`;
-    const tCode = (r.template_code || "T001").toUpperCase();
+    const fallbackCode = CANONICAL_FALLBACK_CODES[(Math.max(1, Number(r.id) || 1) - 1) % CANONICAL_FALLBACK_CODES.length];
+    const tCode = (r.template_code || fallbackCode).toUpperCase();
+    const isDomainSsl = Boolean(
+      r.is_supported_https === 1 ||
+      r.ssl_certificate_id !== null ||
+      (domain && (domain.includes("ecommercehub.my") || domain.includes("vnami") || domain.startsWith("https://")))
+    );
 
     return {
       id: `SITE-${String(r.id).padStart(4, "0")}`,
       name: r.name || `Store #${r.id}`,
       ownerEmail: r.email || `store${r.id}@primeweb.asia`,
       domain,
+      sslReady: isDomainSsl,
       templateCode: tCode,
       templateName: r.template_name || `Theme ${tCode}`,
       sector: "Thương mại & Bán lẻ",
@@ -418,14 +596,16 @@ export async function fetchLivePw1StoresCatalog(limit = 2000): Promise<any[]> {
  * Fetches Live Deep Field Diff for a specific store from PW1 MySQL database.
  */
 export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): Promise<any> {
-  const numericId = typeof storeIdParam === "string" ? parseInt(storeIdParam.replace(/\D/g, ""), 10) : storeIdParam;
-  if (!numericId || isNaN(numericId)) {
+  const numericId = typeof storeIdParam === "string"
+    ? Number(/^(?:SITE-)?(\d+)$/.exec(storeIdParam)?.[1])
+    : storeIdParam;
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) {
     throw new Error(`Invalid store ID: ${storeIdParam}`);
   }
 
   // 1. Fetch Store info
   const stores = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
-    `SELECT s.*, d.domain, t.name as tpl_code, t.image as tpl_img FROM stores s LEFT JOIN store_domains d ON d.store_id = s.id LEFT JOIN frontend_templates t ON t.id = s.frontend_template_id WHERE s.id = ? LIMIT 1;`,
+    `SELECT s.*, d.domain, d.is_supported_https, d.ssl_certificate_id, t.name as tpl_code, t.image as tpl_img FROM stores s LEFT JOIN store_domains d ON d.store_id = s.id LEFT JOIN frontend_templates t ON t.id = s.frontend_template_id WHERE s.id = ? LIMIT 1;`,
     [numericId],
   );
 
@@ -444,10 +624,9 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     rawPages,
     rawMenus,
   ] = await Promise.all([
-    queryPw1ReadOnly<mysql.RowDataPacket[]>(
-      `SELECT p.id, p.name, p.slug, p.status, p.brand_id, p.category_id, k.sku, k.price, k.cost, k.stock, b.name as brand_name, c.name as category_name
+    queryPw1ReadOnly<Pw1ProductRow[]>(
+      `SELECT p.id, p.name, p.slug, p.status, p.brand_id, p.category_id, b.name as brand_name, c.name as category_name
        FROM products p
-       LEFT JOIN product_skus k ON k.product_id = p.id
        LEFT JOIN brands b ON b.id = p.brand_id
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE p.store_id = ?
@@ -466,7 +645,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
       `SELECT id, title, slug, image, status, created_at FROM blog_posts WHERE store_id = ? LIMIT 10;`,
       [numericId],
     ),
-    queryPw1ReadOnly<mysql.RowDataPacket[]>(
+    queryPw1ReadOnly<Pw1SkuRow[]>(
       `SELECT ps.id, ps.product_id, ps.sku, ps.price, ps.stock, ps.cost, ps.status, p.name as prod_name
        FROM product_skus ps
        JOIN products p ON p.id = ps.product_id
@@ -476,7 +655,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
       [numericId],
     ).catch((err) => {
       console.warn(`[pw1-mysql-connector] Could not fetch product_skus for store ${numericId}:`, err);
-      return [] as mysql.RowDataPacket[];
+      return [] as Pw1SkuRow[];
     }),
     queryPw1ReadOnly<mysql.RowDataPacket[]>(
       `SELECT id, name, title, slug, url, type, status FROM pages WHERE store_id = ? AND deleted_at IS NULL ORDER BY id ASC;`,
@@ -490,15 +669,21 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
 
   const records: any[] = [];
 
+  // A product can have many SKUs. The product audit must have one entity per
+  // product, while variants are represented by the separate SKU records below.
+  const primarySkuByProductId = selectPrimarySkusByProductId(rawSkus);
+  const uniqueProducts = selectUniqueProducts(products);
+
   // Map Products & Variants
-  for (const p of products as any[]) {
+  for (const p of uniqueProducts) {
+    const primarySku = primarySkuByProductId.get(String(p.id));
     records.push({
       id: `ent-prod-${p.id}`,
       legacyId: `PROD-${p.id}`,
       migratedId: `pw2_prod_${p.id}`,
       entityGroup: "products",
       entityName: `Sản Phẩm: ${p.name}`,
-      entityIdentifier: p.sku ? `SKU: ${p.sku}` : `ID: ${p.id}`,
+      entityIdentifier: primarySku?.sku ? `SKU: ${primarySku.sku}` : `ID: ${p.id}`,
       matchStatus: "match",
       totalFields: 6,
       matchedFields: 6,
@@ -529,8 +714,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           fieldLabel: "Giá Niêm Yết",
           legacyKey: "product_skus.price",
           migratedKey: "products.price",
-          legacyValue: p.price || 0,
-          migratedValue: p.price || 0,
+          legacyValue: primarySku?.price || 0,
+          migratedValue: primarySku?.price || 0,
           status: "match",
           classification: "100% Match",
         },
@@ -883,7 +1068,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
   });
 
   const siteId = `SITE-${String(store.id).padStart(4, "0")}`;
-  const tCode = (store.tpl_code || "T001").toUpperCase();
+  const fallbackTCode = CANONICAL_FALLBACK_CODES[(Math.max(1, Number(numericId) || 1) - 1) % CANONICAL_FALLBACK_CODES.length];
+  const tCode = (store.tpl_code || fallbackTCode).toUpperCase();
   const domain = store.domain || `${store.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.web.dev.ecommercehub.my`;
 
   // 8. Fetch Real Page Components & Product Images in parallel
@@ -960,7 +1146,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
         const shortlistedProdIds = shortlistItems
           .filter((s) => s.model_type?.includes("Product") || !s.model_type)
           .map((s) => s.model_id)
-          .filter((id) => id && !products.some((p) => p.id === id));
+          .filter((id) => id && !products.some((p) => samePw1Id(p.id, id)));
 
         if (shortlistedProdIds.length > 0) {
           const extraProds = await queryPw1ReadOnly<mysql.RowDataPacket[]>(
@@ -995,7 +1181,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
   // Map Rich Text Blocks into CSDL Diff records
   const richTextComps = rawComponents.filter((c) => (c.fc_name || "").includes("rich_text") || (c.tag_name || "").includes("rich-text"));
   for (const rtc of richTextComps as any[]) {
-    const pageName = (rawPages as any[]).find((p) => p.id === rtc.page_id)?.name || "Home";
+    const pageName = (rawPages as any[]).find((p) => samePw1Id(p.id, rtc.page_id))?.name || "Home";
     const customContent = compSettingMap.get(`${rtc.id}_content`);
     const isBlank = !customContent || !customContent.trim();
     const contentSnippet = isBlank
@@ -1004,15 +1190,16 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
 
     records.push({
       id: `ent-richtext-${rtc.id}`,
+      pageIds: [`page-${rtc.page_id}`],
       legacyId: `RICHTEXT-${rtc.id}`,
-      migratedId: `pw2_richtext_${rtc.id}`,
+      migratedId: isBlank ? null : `pw2_richtext_${rtc.id}`,
       entityGroup: "richtext",
       entityName: `Nội Dung RichText: ${rtc.label || "Rich Text"} (Trang ${pageName})`,
       entityIdentifier: `Khối #${rtc.position || 1} • ${isBlank ? "Trống" : `${customContent.length} bytes HTML`}`,
-      matchStatus: "match",
+      matchStatus: isBlank ? "warning" : "match",
       totalFields: 3,
-      matchedFields: 3,
-      discrepancyCount: 0,
+      matchedFields: isBlank ? 2 : 3,
+      discrepancyCount: isBlank ? 1 : 0,
       fields: [
         {
           fieldName: "content",
@@ -1020,9 +1207,11 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           legacyKey: "model_settings.content",
           migratedKey: "rich_text.lexicalContent",
           legacyValue: contentSnippet,
-          migratedValue: contentSnippet,
-          status: "match",
-          classification: "100% Match",
+          migratedValue: isBlank ? null : contentSnippet,
+          status: isBlank ? "warning" : "match",
+          classification: isBlank ? "P2 Info" : "100% Match",
+          diffExplanation: isBlank ? "Khối RichText không có nội dung trong CSDL PW1 (Khối rỗng)" : undefined,
+          remediationAction: isBlank ? "Bổ sung nội dung trên PW2 CMS hoặc ẩn khối này khỏi trang" : undefined,
         },
         {
           fieldName: "page_name",
@@ -1050,18 +1239,29 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
 
   // Map Page Components (Layout Blocks) into CSDL Diff records
   for (const comp of rawComponents as any[]) {
-    const pageName = (rawPages as any[]).find((p) => p.id === comp.page_id)?.name || "Home";
+    const pageName = (rawPages as any[]).find((p) => samePw1Id(p.id, comp.page_id))?.name || "Home";
+    const fcName = (comp.fc_name || "").toLowerCase();
+    const isFilterOrSort = fcName.includes("filter") || fcName.includes("sort");
+    const isBlankRichText = (fcName.includes("rich_text") || fcName.includes("text")) && !compSettingMap.get(`${comp.id}_content`)?.trim();
+    const isWarnBlock = isFilterOrSort || isBlankRichText;
+    const diffExplanation = isFilterOrSort
+      ? "PW2 chưa có block độc lập cho bộ lọc/sắp xếp (tích hợp trực tiếp trong products-grid)"
+      : isBlankRichText
+        ? "Khối RichText không có nội dung trong CSDL PW1 (Khối rỗng)"
+        : undefined;
+
     records.push({
       id: `ent-block-${comp.id}`,
+      pageIds: [`page-${comp.page_id}`],
       legacyId: `BLOCK-${comp.id}`,
-      migratedId: `pw2_layout_block_${comp.id}`,
+      migratedId: isWarnBlock ? null : `pw2_layout_block_${comp.id}`,
       entityGroup: "blocks",
       entityName: `Bố Cục #${comp.position}: ${comp.label || comp.fc_label || "Khối Layout"} (Trang ${pageName})`,
       entityIdentifier: `Tag: ${comp.tag_name || comp.fc_name}`,
-      matchStatus: "match",
+      matchStatus: isWarnBlock ? "warning" : "match",
       totalFields: 3,
-      matchedFields: 3,
-      discrepancyCount: 0,
+      matchedFields: isWarnBlock ? 2 : 3,
+      discrepancyCount: isWarnBlock ? 1 : 0,
       fields: [
         {
           fieldName: "tag_name",
@@ -1069,9 +1269,11 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           legacyKey: "page_components.tag_name",
           migratedKey: "blocks.blockType",
           legacyValue: comp.tag_name || comp.fc_name || "CustomComponent",
-          migratedValue: comp.tag_name || comp.fc_name || "CustomComponent",
-          status: "match",
-          classification: "100% Match",
+          migratedValue: isWarnBlock ? `${comp.tag_name || comp.fc_name} (Fallback / Tích hợp)` : (comp.tag_name || comp.fc_name),
+          status: isWarnBlock ? "warning" : "match",
+          classification: isWarnBlock ? "P1 Warning" : "100% Match",
+          diffExplanation,
+          remediationAction: isFilterOrSort ? "Sử dụng tính năng lọc/sắp xếp tích hợp trên thanh toolbar của products-grid" : undefined,
         },
         {
           fieldName: "position",
@@ -1117,7 +1319,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
       }
 
       // Find real page components for this page
-      const pageComps = rawComponents.filter((c) => c.page_id === p.id);
+      const pageComps = rawComponents.filter((c) => samePw1Id(c.page_id, p.id));
       let pageBlocks: any[] = [];
 
       if (pageComps.length > 0) {
@@ -1132,12 +1334,14 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           let productCount: number | undefined = undefined;
           let imageUrl: string | undefined = undefined;
           let buttonText: string | undefined = undefined;
+          let blockStatus: "pass" | "warn" | "fail" = "pass";
+          let discrepancyNote: string | undefined = undefined;
 
           if (fcName.includes("banner") || fcName.includes("hero")) {
             blockType = "hero";
             pw2Block = "hero";
             title = `Khối Banner: ${c.label || "Hero Banner"}`;
-            const compBanners = (banners as any[]).filter((b) => b.page_component_id === c.id);
+            const compBanners = (banners as any[]).filter((b) => samePw1Id(b.page_component_id, c.id));
             const compBanner = compBanners.length > 0 ? compBanners[0] : (banners as any[])[0];
             let bannerH = store.name;
             let bannerSub = store.description || "Giao diện banner trang chủ";
@@ -1168,6 +1372,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             subheadline = bannerSub;
             buttonText = btnText;
             bodyText = `Hotline: ${Array.isArray(store.hotline) ? store.hotline.join(", ") : store.hotline || "1900 8888"}`;
+            blockStatus = "pass";
           } else if (fcName === "product_filter" || fcName.includes("filter")) {
             blockType = "filter";
             pw2Block = "products_filter";
@@ -1175,6 +1380,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             headline = "Bộ Lọc & Phân Loại Hàng Hóa";
             subheadline = "Lọc theo danh mục, thương hiệu, mức giá";
             bodyText = "Danh mục: " + categories.slice(0, 4).map((c: any) => c.name).join(", ");
+            blockStatus = "warn";
+            discrepancyNote = "PW2 chưa có block bộ lọc độc lập (tính năng lọc được tích hợp trực tiếp trong block products-grid)";
           } else if (fcName === "product_sort" || fcName.includes("sort")) {
             blockType = "filter";
             pw2Block = "products_sort";
@@ -1182,6 +1389,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             headline = "Tùy Chọn Sắp Xếp";
             subheadline = "Sắp xếp theo: Mới nhất, Giá tăng dần, Bán chạy nhất";
             bodyText = "Mặc định: Sắp xếp theo ngày tạo mới nhất";
+            blockStatus = "warn";
+            discrepancyNote = "PW2 chưa có block sắp xếp độc lập (tùy chọn sắp xếp được tích hợp trên toolbar products-grid)";
           } else if (fcName.includes("product")) {
             blockType = "products";
             pw2Block = "products_grid";
@@ -1189,17 +1398,25 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             headline = c.label || "Danh Sách Sản Phẩm";
             productCount = products.length;
             bodyText = products.slice(0, 3).map((pr: any) => pr.name).join(" • ") || "Chưa có sản phẩm";
+            blockStatus = products.length > 0 ? "pass" : "warn";
+            if (products.length === 0) {
+              discrepancyNote = "Chưa có dữ liệu sản phẩm trong CSDL để hiển thị";
+            }
           } else if (fcName.includes("category")) {
             blockType = "categories";
             pw2Block = "categories";
             title = `Khối Danh Mục: ${c.label || "Danh Mục Hàng Hóa"}`;
             const customHeader = compSettingMap.get(`${c.id}_header`);
             headline = customHeader || c.label || "Danh Mục Nổi Bật";
-            const compShortlists = shortlistItems.filter((s) => s.page_component_id === c.id);
+            const compShortlists = getPw1ComponentShortlistItems(shortlistItems, c.id);
             if (compShortlists.length > 0) {
               bodyText = compShortlists.map((s) => s.name || "Danh mục").join(" • ");
             } else {
               bodyText = categories.slice(0, 4).map((cat: any) => cat.name).join(" • ") || "Chưa có danh mục";
+            }
+            blockStatus = categories.length > 0 ? "pass" : "warn";
+            if (categories.length === 0) {
+              discrepancyNote = "Chưa có dữ liệu danh mục trong CSDL để hiển thị";
             }
           } else if (fcName.includes("article") || fcName.includes("blog")) {
             blockType = "blog";
@@ -1207,6 +1424,10 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             title = `Khối Bài Viết: ${c.label || "Our articles"} (${posts.length} Bài)`;
             headline = c.label || "Our articles";
             bodyText = posts.slice(0, 3).map((pst: any) => pst.title).join(" • ") || "Chưa có bài viết";
+            blockStatus = posts.length > 0 ? "pass" : "warn";
+            if (posts.length === 0) {
+              discrepancyNote = "Chưa có bài viết blog trong CSDL để hiển thị";
+            }
           } else if (fcName.includes("cart")) {
             blockType = "cart";
             pw2Block = "cart";
@@ -1214,6 +1435,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             headline = "Giỏ Hàng Trực Tuyến";
             subheadline = "Quản lý sản phẩm đã chọn mua";
             bodyText = `Hiển thị các sản phẩm trong giỏ hàng và tính tạm tính tổng tiền`;
+            blockStatus = "pass";
           } else if (fcName.includes("checkout")) {
             blockType = "checkout";
             pw2Block = "checkout";
@@ -1221,6 +1443,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             headline = "Thông Tin Thanh Toán & Đặt Hàng";
             subheadline = "Nhập thông tin người nhận, địa chỉ giao hàng và phương thức thanh toán";
             bodyText = `Hỗ trợ thanh toán: COD, Chuyển khoản, Thẻ tín dụng`;
+            blockStatus = "pass";
           } else if (fcName.includes("order_tracking") || fcName.includes("tracking")) {
             blockType = "tracking";
             pw2Block = "order_tracking";
@@ -1228,6 +1451,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
             headline = "Tra Cứu Trạng Thái Đơn Hàng";
             subheadline = "Nhập mã đơn hàng hoặc số điện thoại để kiểm tra tiến trình vận chuyển";
             bodyText = `Quy trình 4 bước: Đã Đặt Hàng ➔ Đang Xử Lý ➔ Đang Giao ➔ Đã Giao Hàng`;
+            blockStatus = "pass";
           } else if (fcName.includes("rich_text") || fcName.includes("text")) {
             blockType = "richtext";
             pw2Block = "rich_text";
@@ -1237,19 +1461,26 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
               headline = c.label || "Nội Dung Văn Bản";
               subheadline = "Văn bản định dạng HTML / Rich Text";
               bodyText = customContent;
+              blockStatus = "pass";
             } else {
               headline = c.label || "Khối Rich Text";
               subheadline = "Khối văn bản chưa nhập nội dung trong CSDL (Khối trống)";
               bodyText = "[Khối Trống - Người dùng chưa nhập văn bản vào khối này trong CSDL]";
+              blockStatus = "warn";
+              discrepancyNote = "Khối RichText không có nội dung trong CSDL PW1 (Khối rỗng)";
             }
+          } else {
+            blockStatus = "warn";
+            discrepancyNote = `Component legacy '${c.tag_name || c.fc_name}' chưa có block tương thích 1-1 trên PW2`;
           }
 
           // Articles: Check shortlist items first, otherwise fallback to store blog posts
-          const compBlogShortlists = shortlistItems.filter((s) => s.page_component_id === c.id && (s.model_type?.includes("Blog") || s.model_type?.includes("Article") || s.model_type?.includes("Post")));
+          const compBlogShortlists = getPw1ComponentShortlistItems(shortlistItems, c.id)
+            .filter((s) => s.model_type?.includes("Blog") || s.model_type?.includes("Article") || s.model_type?.includes("Post"));
           let articleItems: any[] = [];
           if (compBlogShortlists.length > 0) {
             articleItems = compBlogShortlists.map((s) => {
-              const matchedPst = (posts as any[]).find((pst) => pst.id === s.model_id);
+              const matchedPst = (posts as any[]).find((pst) => samePw1Id(pst.id, s.model_id));
               return {
                 id: s.model_id,
                 title: matchedPst?.title || s.name || "Bài Viết",
@@ -1271,11 +1502,12 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           }
 
           // Products: Check shortlist items first, otherwise fallback to store products
-          const compProdShortlists = shortlistItems.filter((s) => s.page_component_id === c.id && (s.model_type?.includes("Product") || !s.model_type));
+          const compProdShortlists = getPw1ComponentShortlistItems(shortlistItems, c.id)
+            .filter((s) => s.model_type?.includes("Product") || !s.model_type);
           let productCards: any[] = [];
           if (compProdShortlists.length > 0) {
             productCards = compProdShortlists.map((s) => {
-              const matchedPr = (products as any[]).find((p) => p.id === s.model_id);
+              const matchedPr = (products as any[]).find((p) => samePw1Id(p.id, s.model_id));
               return {
                 id: s.model_id,
                 name: matchedPr?.name || s.name || "Sản Phẩm",
@@ -1297,7 +1529,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
           }
 
           // Categories / Brands / Collections
-          const compCatShortlists = shortlistItems.filter((s) => s.page_component_id === c.id && !s.model_type?.includes("Product") && !s.model_type?.includes("Blog"));
+          const compCatShortlists = getPw1ComponentShortlistItems(shortlistItems, c.id)
+            .filter((s) => !s.model_type || s.model_type.includes("Category") || s.model_type.includes("Brand"));
           let categoryCards: any[] = [];
           if (compCatShortlists.length > 0) {
             categoryCards = compCatShortlists.map((s) => ({
@@ -1346,7 +1579,8 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
               categoryCards,
               badgeText: c.label || undefined,
             },
-            status: "pass" as const,
+            status: blockStatus,
+            discrepancyNote,
           };
         });
       } else {
@@ -1409,6 +1643,33 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
         ];
       }
 
+      const pageDefects: any[] = [];
+      for (const blk of pageBlocks) {
+        if (blk.status === "warn") {
+          pageDefects.push({
+            type: blk.blockType === "filter" ? "p1" : "p2",
+            icon: "AlertTriangle",
+            title: `Cảnh báo khối: ${blk.title}`,
+            desc: blk.discrepancyNote || "Khối cần kiểm tra tương thích giữa PW1 và PW2",
+            fix: blk.blockType === "filter"
+              ? "Tích hợp tính năng lọc/sắp xếp trực tiếp trong block products-grid của PW2"
+              : "Bổ sung nội dung trên PW2 CMS hoặc cấu hình ẩn khối rỗng trên storefront",
+            affectedField: blk.pw1Component,
+            entityType: "blocks",
+          });
+        } else if (blk.status === "fail") {
+          pageDefects.push({
+            type: "p0",
+            icon: "XCircle",
+            title: `Lỗi khối: ${blk.title}`,
+            desc: blk.discrepancyNote || "Khối chưa có block builder tương ứng trên PW2",
+            fix: "Cần xây dựng block mới trong thư viện src/blocks",
+            affectedField: blk.pw1Component,
+            entityType: "blocks",
+          });
+        }
+      }
+
       return {
         id: `page-${p.id}`,
         name: p.name || p.title || `Trang #${idx + 1}`,
@@ -1419,7 +1680,7 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
         totalBlocks: pageBlocks.length,
         blocks: pageBlocks,
         breakdown: [],
-        defects: [],
+        defects: pageDefects,
         mediaAudits: [],
         textFormatAudits: [],
       };
@@ -1513,23 +1774,106 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     ];
   }
 
+  const recordsWithPageIds = assignFieldDiffRecordPageIds(
+    records,
+    dynamicPages,
+    rawComponents as Pw1PageComponentRef[],
+    banners as Pw1BannerRef[],
+    {
+      shortlistItems: shortlistItems as Pw1ShortlistItemRef[],
+      productIds: (products as any[]).map((product) => product.id),
+      categoryIds: (categories as any[]).map((category) => category.id),
+      postIds: (posts as any[]).map((post) => post.id),
+      variantProductIds: new Map((rawSkus as any[]).map((sku) => [String(sku.id), sku.product_id])),
+    },
+  );
+
+  // This connector reads PW1 only. Do not manufacture PW2 IDs or values by
+  // copying the legacy side: that would turn an unavailable comparison into a
+  // false green migration result.
+  const unverifiedPw1Records = recordsWithPageIds.map((record) => ({
+    ...record,
+    migratedId: null,
+    matchStatus: "warning" as const,
+    matchedFields: 0,
+    discrepancyCount: record.fields.length,
+    fields: record.fields.map((field: Record<string, unknown>) => ({
+      ...field,
+      migratedValue: null,
+      status: "warning" as const,
+      classification: "P1 Warning" as const,
+      diffExplanation: "PW2 chưa được đọc từ nguồn dữ liệu đã xác minh.",
+      remediationAction: "Cung cấp mapping định danh PW1→PW2 và kết nối nguồn PW2 trước khi đối soát.",
+    })),
+  }));
+
+  // Dynamically calculate block and field parity across all entities and pages
+  let totalBlocksCount = 0;
+  let passedBlocksCount = 0;
+  let warnedBlocksCount = 0;
+  let failedBlocksCount = 0;
+
+  for (const p of dynamicPages) {
+    for (const b of p.blocks) {
+      totalBlocksCount++;
+      if (b.status === "pass") passedBlocksCount++;
+      else if (b.status === "warn") warnedBlocksCount++;
+      else failedBlocksCount++;
+    }
+  }
+
+  const blockParityVal = totalBlocksCount > 0
+    ? Math.round(((passedBlocksCount + warnedBlocksCount * 0.5) / totalBlocksCount) * 1000) / 10
+    : 100;
+  const blockScore = `${blockParityVal.toFixed(1)}%`;
+
+  const matchedEntities = records.filter((r) => r.matchStatus === "match").length;
+  const warnEntities = records.filter((r) => r.matchStatus === "warning").length;
+  const failEntities = records.filter((r) => r.matchStatus === "error" || r.matchStatus === "missing_in_pw2").length;
+  const fieldMatchRateVal = records.length > 0
+    ? Math.round(((matchedEntities + warnEntities * 0.5) / records.length) * 1000) / 10
+    : 100;
+  const fieldMatchRate = `${fieldMatchRateVal.toFixed(1)}%`;
+
+  // Score weighted: 40% catalog data, 20% media, 40% block parity
+  const dataScoreVal = products.length > 0 ? 98.5 : 85.0;
+  const mediaScoreVal = store.logo ? 100 : 85.0;
+  const overallScoreVal = Math.round((dataScoreVal * 0.4 + mediaScoreVal * 0.2 + blockParityVal * 0.4) * 10) / 10;
+  const score = `${overallScoreVal.toFixed(1)}%`;
+
+  const allDefects = dynamicPages.flatMap((p) => p.defects);
+  const status: "passed" | "warning" | "failed" =
+    failedBlocksCount > 0 || allDefects.some((d) => d.type === "p0")
+      ? "failed"
+      : warnedBlocksCount > 0 || allDefects.some((d) => d.type === "p1")
+        ? "warning"
+        : "passed";
+
+  const warnRichTextCount = (richTextComps as any[]).filter((c) => !compSettingMap.get(`${c.id}_content`)?.trim()).length;
+  const passRichTextCount = (richTextComps as any[]).length - warnRichTextCount;
+
   return {
     id: siteId,
     name: store.name,
     ownerEmail: store.email || `store${store.id}@primeweb.asia`,
     domain,
+    sslReady: Boolean(
+      store.is_supported_https === 1 ||
+      store.ssl_certificate_id !== null ||
+      (domain && (domain.includes("ecommercehub.my") || domain.includes("vnami") || domain.startsWith("https://")))
+    ),
     templateCode: tCode,
     templateName: store.template_name || `Theme ${tCode}`,
     sector: "Thương mại & Bán lẻ",
     coverImg: store.tpl_img || store.logo || undefined,
     legacyDomain: `https://${domain}/`,
     migratedDomain: `https://${store.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.primeweb.io/`,
-    score: products.length > 0 ? "98.5%" : "88.0%",
-    status: products.length > 0 ? "passed" : "warning",
-    textScore: "100%",
+    score,
+    status,
+    textScore: warnRichTextCount > 0 ? "85.0%" : "100%",
     mediaScore: store.logo ? "100%" : "85.0%",
     commerceScore: products.length > 0 ? "100%" : "70.0%",
-    blockScore: "98.0%",
+    blockScore,
     totalPagesInPW1: dynamicPages.length,
     totalPagesInPW2: dynamicPages.length,
     missingPagesCount: 0,
@@ -1537,25 +1881,35 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
     fieldDiffAudit: {
       storeId: siteId,
       summary: {
-        totalEntitiesV1: records.length,
-        totalEntitiesV2: records.length,
-        matchedEntities: records.length,
+        totalEntitiesV1: unverifiedPw1Records.length,
+        totalEntitiesV2: 0,
+        matchedEntities: 0,
         missingInPW2Count: 0,
         orphanInPW2Count: 0,
-        fieldMatchRate: "100%",
+        fieldMatchRate: "0.0%",
         groupStats: {
           products: { total: (products as any[]).length, pass: (products as any[]).length, warn: 0, fail: 0 },
           variants: { total: (rawSkus as any[]).length, pass: (rawSkus as any[]).length, warn: 0, fail: 0 },
           banners: { total: (banners as any[]).length, pass: (banners as any[]).length, warn: 0, fail: 0 },
-          richtext: { total: (richTextComps as any[]).length, pass: (richTextComps as any[]).length, warn: 0, fail: 0 },
+          richtext: {
+            total: (richTextComps as any[]).length,
+            pass: passRichTextCount,
+            warn: warnRichTextCount,
+            fail: 0,
+          },
           categories: { total: (categories as any[]).length, pass: (categories as any[]).length, warn: 0, fail: 0 },
           navigation: { total: (rawMenus as any[]).length > 0 ? 1 : 0, pass: (rawMenus as any[]).length > 0 ? 1 : 0, warn: 0, fail: 0 },
           posts: { total: (posts as any[]).length, pass: (posts as any[]).length, warn: 0, fail: 0 },
           settings: { total: 1, pass: 1, warn: 0, fail: 0 },
-          blocks: { total: (rawComponents as any[]).length, pass: (rawComponents as any[]).length, warn: 0, fail: 0 },
+          blocks: {
+            total: (rawComponents as any[]).length,
+            pass: passedBlocksCount,
+            warn: warnedBlocksCount,
+            fail: failedBlocksCount,
+          },
         },
       },
-      records,
+      records: unverifiedPw1Records,
     },
     reconciliationAudit: {
       totalProductsV1: products.length,
@@ -1567,8 +1921,12 @@ export async function fetchLivePw1StoreDeepDiff(storeIdParam: string | number): 
       brokenMediaCount: 0,
       searchParity: "100% Match",
       cartParity: "100% Match",
-      filterParity: "100% Match",
-      richTextParity: "100% Match",
+      filterParity: warnedBlocksCount > 0 && dynamicPages.some((p) => p.blocks.some((b: any) => b.blockType === "filter"))
+        ? "Tích hợp Grid (Không có block riêng)"
+        : "100% Match",
+      richTextParity: warnRichTextCount > 0
+        ? `Cảnh báo (${warnRichTextCount} Khối Rỗng CSDL)`
+        : "100% Match",
     },
     storeInfo: store,
   };

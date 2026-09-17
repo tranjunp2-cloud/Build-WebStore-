@@ -86,6 +86,7 @@ type EditorSnapshot = {
     headerBlock: BlockData | null
     footerBlock: BlockData | null
     globalBlocks: GlobalBlocksState
+    localeOverrides: Record<string, Record<string, Record<string, unknown>>>
     timestamp: number
     label?: string           // "Changed hero title"
     source?: UndoActionSource
@@ -188,7 +189,7 @@ type BlockPatch = Record<string, unknown>
 
 type EditorActions = {
     // Init
-    init: (siteId: string, blocks: BlockData[], theme: ThemeState, siteName: string, headerBlock?: BlockData | null, footerBlock?: BlockData | null, globalBlocks?: GlobalBlocksState) => void
+    init: (siteId: string, blocks: BlockData[], theme: ThemeState, siteName: string, headerBlock?: BlockData | null, footerBlock?: BlockData | null, globalBlocks?: GlobalBlocksState, localeOverrides?: Record<string, Record<string, Record<string, unknown>>>) => void
 
     // Pages (F-05-02)
     setPages: (pages: PageData[]) => void
@@ -213,7 +214,17 @@ type EditorActions = {
     updateFooterBlock: (changes: BlockPatch) => void
 
     // AI Batch (F-11) — push ALL AI changes as a single undoable action
-    pushBatch: (blocks: BlockData[], theme: ThemeState, label: string) => void
+    pushBatch: (
+        blocks: BlockData[],
+        theme: ThemeState,
+        label: string,
+        globals?: {
+            headerBlock?: BlockData | null
+            footerBlock?: BlockData | null
+            globalBlocks?: GlobalBlocksState
+            localeOverrides?: Record<string, Record<string, Record<string, unknown>>>
+        },
+    ) => void
 
     // Undo/Redo (F-06 / F-11)
     undo: () => void
@@ -284,6 +295,7 @@ function createSnapshot(
     label?: string,
     source?: UndoActionSource,
     globalBlocks: GlobalBlocksState = null,
+    localeOverrides: Record<string, Record<string, Record<string, unknown>>> = {},
 ): EditorSnapshot {
     return {
         id: crypto.randomUUID(),
@@ -292,6 +304,7 @@ function createSnapshot(
         headerBlock: headerBlock ? JSON.parse(JSON.stringify(headerBlock)) : null,
         footerBlock: footerBlock ? JSON.parse(JSON.stringify(footerBlock)) : null,
         globalBlocks: globalBlocks ? JSON.parse(JSON.stringify(globalBlocks)) : null,
+        localeOverrides: JSON.parse(JSON.stringify(localeOverrides)),
         timestamp: Date.now(),
         label,
         source,
@@ -425,7 +438,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     pendingLocale: null,
     localeOverrides: {},
 
-    init: (siteId, blocks, theme, siteName, headerBlock = null, footerBlock = null, globalBlocks = null) => {
+    init: (siteId, blocks, theme, siteName, headerBlock = null, footerBlock = null, globalBlocks = null, localeOverrides = {}) => {
         // Clear any pending auto-save timer from previous page to prevent cross-page save
         const { autoSaveTimer } = get()
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
@@ -437,7 +450,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const effectiveFooter = footerBlock || (fallbackFooter ? JSON.parse(JSON.stringify(fallbackFooter)) : { blockType: 'footer' })
 
         // Keep blocks as-is (including nav/footer) for preview iframe index consistency
-        const snapshot = createSnapshot(blocks, theme, effectiveHeader, effectiveFooter, 'Initial state', 'manual', globalBlocks)
+        const snapshot = createSnapshot(blocks, theme, effectiveHeader, effectiveFooter, 'Initial state', 'manual', globalBlocks, localeOverrides)
         set({
             siteId,
             blocks,
@@ -446,6 +459,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             headerBlock: effectiveHeader,
             footerBlock: effectiveFooter,
             globalBlocks,
+            localeOverrides,
             history: [snapshot],
             historyIndex: 0,
             hasUnsavedChanges: false,
@@ -456,8 +470,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             contentRevision: 0,
             saveStatus: 'idle',
             isAIStreaming: false,
-            // M1 fix: reset locale state on every page switch so stale overrides never bleed.
-            // The loadData caller sets siteLocale + activeLocale + localeOverrides after init().
+            // M1 fix: reset locale selection state on every page switch so stale values never bleed.
+            // localeOverrides itself is hydrated above so the initial undo snapshot is complete.
             // F26-04: also reset pendingLocale + primaryLocale so navigation between sites
             // doesn't carry over translation state from previous site.
             activeLocale: 'en',
@@ -466,7 +480,6 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             primaryLocale: 'en',
             secondaryLocale: null,
             pendingLocale: null,
-            localeOverrides: {},
         })
     },
 
@@ -485,11 +498,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // ── Block Operations ─────────────────────────────────────────────────
 
     updateBlock: (index, changes, label) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         const newBlocks = [...blocks]
         newBlocks[index] = { ...newBlocks[index], ...changes }
 
-        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Edited ${newBlocks[index].blockType}`, 'inline_edit', globalBlocks)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Edited ${newBlocks[index].blockType}`, 'inline_edit', globalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -501,7 +514,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     addBlock: (afterIndex, block, label) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         // Footer must always be last — clamp insert position to just before it
         const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
         const safeAfterIndex = footerIdx >= 0 ? Math.min(afterIndex, footerIdx - 1) : afterIndex
@@ -522,7 +535,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
               }
             : globalBlocks
 
-        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Added ${block.blockType}`, 'manual', effectiveGlobalBlocks)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Added ${block.blockType}`, 'manual', effectiveGlobalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -535,11 +548,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     deleteBlock: (index, label) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         const blockType = blocks[index]?.blockType ?? 'block'
         const newBlocks = blocks.filter((_, i) => i !== index)
 
-        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Deleted ${blockType}`, 'manual', globalBlocks)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Deleted ${blockType}`, 'manual', globalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -551,7 +564,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     duplicateBlock: (index) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
         if (index === footerIdx) return // never duplicate footer
         const blockCopy = JSON.parse(JSON.stringify(blocks[index]))
@@ -562,7 +575,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const newBlocks = [...blocks]
         newBlocks.splice(insertAt, 0, blockCopy)
 
-        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Duplicated ${blocks[index]?.blockType}`, 'manual', globalBlocks)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Duplicated ${blocks[index]?.blockType}`, 'manual', globalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -574,7 +587,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     reorderBlocks: (fromIndex, toIndex) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         // Footer must always be last — block any move that violates this
         const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
         if (footerIdx >= 0) {
@@ -585,7 +598,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const [moved] = newBlocks.splice(fromIndex, 1)
         newBlocks.splice(toIndex, 0, moved)
 
-        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Moved ${moved?.blockType}`, 'manual', globalBlocks)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Moved ${moved?.blockType}`, 'manual', globalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -599,10 +612,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // ── Theme ────────────────────────────────────────────────────────────
 
     updateTheme: (changes, label) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         const newTheme = { ...theme, ...changes }
 
-        const snapshot = createSnapshot(blocks, newTheme, headerBlock, footerBlock, label ?? 'Updated theme', 'theme_change', globalBlocks)
+        const snapshot = createSnapshot(blocks, newTheme, headerBlock, footerBlock, label ?? 'Updated theme', 'theme_change', globalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -620,18 +633,26 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // ── AI Batch (F-11) ─────────────────────────────────────────────────
     // Groups an entire AI response into EXACTLY 1 undoable action (BR-02)
 
-    pushBatch: (blocks, theme, label) => {
-        const { headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+    pushBatch: (blocks, theme, label, globals) => {
+        const { headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
+        const nextHeader = globals?.headerBlock === undefined ? headerBlock : globals.headerBlock
+        const nextFooter = globals?.footerBlock === undefined ? footerBlock : globals.footerBlock
+        const nextGlobalBlocks = globals?.globalBlocks === undefined ? globalBlocks : globals.globalBlocks
+        const nextLocaleOverrides = globals?.localeOverrides === undefined ? localeOverrides : globals.localeOverrides
         // Enforce footer-last invariant on AI-generated blocks — dedupe and sort
         const footerBlocks = blocks.filter(b => b.blockType === 'footer')
         const nonFooter = blocks.filter(b => b.blockType !== 'footer')
         const sanitized = footerBlocks.length > 0 ? [...nonFooter, footerBlocks[0]] : nonFooter
-        const snapshot = createSnapshot(sanitized, theme, headerBlock, footerBlock, label, 'ai_chat', globalBlocks)
+        const snapshot = createSnapshot(sanitized, theme, nextHeader, nextFooter, label, 'ai_chat', nextGlobalBlocks, nextLocaleOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set(state => ({
             blocks: JSON.parse(JSON.stringify(sanitized)),
             theme: JSON.parse(JSON.stringify(theme)),
+            headerBlock: nextHeader ? JSON.parse(JSON.stringify(nextHeader)) : null,
+            footerBlock: nextFooter ? JSON.parse(JSON.stringify(nextFooter)) : null,
+            globalBlocks: nextGlobalBlocks ? JSON.parse(JSON.stringify(nextGlobalBlocks)) : null,
+            localeOverrides: JSON.parse(JSON.stringify(nextLocaleOverrides)),
             history: newHistory,
             historyIndex: newHistory.length - 1,
             hasUnsavedChanges: true,
@@ -654,6 +675,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             headerBlock: snapshot.headerBlock ? JSON.parse(JSON.stringify(snapshot.headerBlock)) : null,
             footerBlock: snapshot.footerBlock ? JSON.parse(JSON.stringify(snapshot.footerBlock)) : null,
             globalBlocks: snapshot.globalBlocks ? JSON.parse(JSON.stringify(snapshot.globalBlocks)) : null,
+            localeOverrides: JSON.parse(JSON.stringify(snapshot.localeOverrides)),
             historyIndex: newIndex,
         })
         get().handleContentChange()
@@ -671,6 +693,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             headerBlock: snapshot.headerBlock ? JSON.parse(JSON.stringify(snapshot.headerBlock)) : null,
             footerBlock: snapshot.footerBlock ? JSON.parse(JSON.stringify(snapshot.footerBlock)) : null,
             globalBlocks: snapshot.globalBlocks ? JSON.parse(JSON.stringify(snapshot.globalBlocks)) : null,
+            localeOverrides: JSON.parse(JSON.stringify(snapshot.localeOverrides)),
             historyIndex: newIndex,
         })
         get().handleContentChange()
@@ -849,13 +872,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // ── Header/Footer (F-05-07) ──────────────────────────────────────────
 
     updateHeaderBlock: (rawChanges) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         // F26: keep per-locale slots in sync on structural link edits (deleted/added/reordered nav links).
         const changes = withLocaleContentReconcile(headerBlock as Record<string, unknown> | null, rawChanges)
         const newHeader = headerBlock ? { ...headerBlock, ...changes } : { blockType: 'navigation', ...changes }
         const newBlocks = syncSystemBlockInLayout(blocks, 'navigation', changes)
 
-        const snapshot = createSnapshot(newBlocks, theme, newHeader, footerBlock, 'Updated Header', 'inline_edit', globalBlocks)
+        const snapshot = createSnapshot(newBlocks, theme, newHeader, footerBlock, 'Updated Header', 'inline_edit', globalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -868,13 +891,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     updateFooterBlock: (rawChanges) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         // F26: keep per-locale slots in sync on structural footer column/link edits.
         const changes = withLocaleContentReconcile(footerBlock as Record<string, unknown> | null, rawChanges)
         const newFooter = footerBlock ? { ...footerBlock, ...changes } : { blockType: 'footer', ...changes }
         const newBlocks = syncSystemBlockInLayout(blocks, 'footer', changes)
 
-        const snapshot = createSnapshot(newBlocks, theme, headerBlock, newFooter, 'Updated Footer', 'inline_edit', globalBlocks)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, newFooter, 'Updated Footer', 'inline_edit', globalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -889,7 +912,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // ── Global Blocks (F-09/F-10) ────────────────────────────────────────
 
     updateGlobalBlock: (type, patch) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         const existing = globalBlocks?.[type] ?? null
         const newEntry = existing ? { ...existing, ...patch } : { blockType: type === 'whatsappButton' ? 'whatsapp-button' : type, ...patch }
         const newGlobalBlocks: NonNullable<GlobalBlocksState> = {
@@ -899,7 +922,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             [type]: newEntry,
         }
 
-        const snapshot = createSnapshot(blocks, theme, headerBlock, footerBlock, `Updated ${type}`, 'inline_edit', newGlobalBlocks)
+        const snapshot = createSnapshot(blocks, theme, headerBlock, footerBlock, `Updated ${type}`, 'inline_edit', newGlobalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({ globalBlocks: newGlobalBlocks, history: newHistory, historyIndex: newHistory.length - 1 })
@@ -907,7 +930,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     deleteGlobalBlock: (type) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         const newGlobalBlocks: NonNullable<GlobalBlocksState> = {
             cartWidget: globalBlocks?.cartWidget ?? null,
             whatsappButton: globalBlocks?.whatsappButton ?? null,
@@ -915,7 +938,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             [type]: null,
         }
 
-        const snapshot = createSnapshot(blocks, theme, headerBlock, footerBlock, `Deleted ${type}`, 'manual', newGlobalBlocks)
+        const snapshot = createSnapshot(blocks, theme, headerBlock, footerBlock, `Deleted ${type}`, 'manual', newGlobalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({ globalBlocks: newGlobalBlocks, history: newHistory, historyIndex: newHistory.length - 1 })
@@ -923,7 +946,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     flipBlockVariant: (blockType, newVariant, sourceIndex) => {
-        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, localeOverrides, history, historyIndex, maxHistory } = get()
         const key = BLOCK_TYPE_TO_KEY[blockType]
         if (!key) return
 
@@ -948,7 +971,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             newBlocks = [...newBlocks, { ...entry, blockType, variant: 'inline' }]
         }
 
-        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Switched ${blockType} to ${newVariant}`, 'manual', newGlobalBlocks)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Switched ${blockType} to ${newVariant}`, 'manual', newGlobalBlocks, localeOverrides)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({ blocks: newBlocks, globalBlocks: newGlobalBlocks, history: newHistory, historyIndex: newHistory.length - 1 })

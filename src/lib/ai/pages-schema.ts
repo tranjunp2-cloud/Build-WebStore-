@@ -110,7 +110,7 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     about: ['variant', 'layout', 'sectionLabel', 'headline', 'body', 'stats'],
     features: ['sectionLabel', 'headline', 'subheadline', 'variant', 'layout', 'features'],
     testimonials: ['headline', 'variant', 'testimonials'],
-    gallery: ['headline', 'variant', 'layout'],
+    gallery: ['sectionLabel', 'headline', 'variant', 'layout'],
     contact: ['variant', 'headline', 'subtext', 'email', 'phone', 'address', 'formFields', 'showMap', 'mapEmbedUrl'],
     footer: ['variant', 'logoText', 'tagline', 'columns', 'copyrightText', 'showSocialLinks'],
     stats: ['variant', 'headline', 'stats'],
@@ -179,10 +179,9 @@ const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
  * already preserved because their parent arrays (members, testimonials) are in
  * CONTENT_FIELDS and copied wholesale.
  *
- * gallery.images is intentionally NOT in this map — gallery.images is also absent
- * from PAGES_FIELDS, so it is neither sanitized from templates nor preserved from
- * users. Wiring it up requires Payload upload-field validation (same class of risk
- * as hero.image); defer to the Unsplash pipeline (Phase 05).
+ * Gallery images are handled separately by USER_PRESERVE_NESTED_MEDIA_FIELDS.
+ * They remain excluded from PAGES_FIELDS so template URL strings never reach
+ * Payload upload validation; only existing persisted media IDs are retained.
  */
 export const USER_PRESERVE_MEDIA_FIELDS: Record<string, string[]> = {
     hero: ['image', 'backgroundImage'],
@@ -190,6 +189,19 @@ export const USER_PRESERVE_MEDIA_FIELDS: Record<string, string[]> = {
     about: ['image'],
     footer: ['logo'],
     video: ['posterImage'], // upload field — excluded from PAGES_FIELDS to prevent template string URLs failing Payload validation
+}
+
+/**
+ * Nested media collections that are safe to retain from an existing user block
+ * during a template swap. Only persisted Media IDs are copied; template URL
+ * strings must never enter a Payload upload field.
+ */
+export const USER_PRESERVE_NESTED_MEDIA_FIELDS: Record<string, {
+    field: string
+    mediaField: string
+    textFields: string[]
+}> = {
+    gallery: { field: 'images', mediaField: 'image', textFields: ['caption'] },
 }
 
 /** PAGES_FIELDS minus structural fields — used by mergeUserContent to preserve user copy. */

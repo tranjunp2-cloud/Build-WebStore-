@@ -34,6 +34,10 @@
       "schedule": "*/1 * * * *"
     },
     {
+      "path": "/api/cron/process-generation-recovery",
+      "schedule": "*/1 * * * *"
+    },
+    {
       "path": "/api/cron/reconcile-qa-targeted-smoke",
       "schedule": "*/10 * * * *"
     }

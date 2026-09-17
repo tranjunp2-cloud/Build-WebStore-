@@ -62,9 +62,11 @@ let mockSiteDB: any[] = []
 let mockPageDB: any[] = []
 let mockTenant: any = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
 let mockPageCreateFailure: { slug: string; error: Error } | null = null
+let mockSiteCreateFailure: Error | null = null
 let mockMediaDB: Array<Record<string, unknown>> = []
 let mockProductDB: Array<Record<string, unknown>> = []
 let mockCategoryDB: Array<Record<string, unknown>> = []
+let mockGenerationRecordDB: Array<Record<string, unknown>> = []
 const mockPayloadLoggerInfo = vi.hoisted(() => vi.fn())
 let mockCompleteBlogCount = 3
 let mockFailedPageCreateData: Record<string, unknown> | null = null
@@ -86,6 +88,7 @@ vi.mock('payload', () => {
             findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
                 if (collection === 'tenants' && id === mockTenant.id) return mockTenant
                 if (collection === 'media') return { id, url: 'https://example.com/media.jpg' }
+                if (collection === 'ai-generation-records') return mockGenerationRecordDB.find((record) => record.id === id) ?? null
                 return null
             }),
             find: vi.fn().mockImplementation(async ({ collection }) => {
@@ -101,6 +104,7 @@ vi.mock('payload', () => {
                 return { totalDocs: 3 }
             }),
             create: vi.fn().mockImplementation(async ({ collection, data }) => {
+                if (collection === 'sites' && mockSiteCreateFailure) throw mockSiteCreateFailure
                 if (collection === 'pages' && mockPageCreateFailure && data.slug === mockPageCreateFailure.slug) {
                     mockFailedPageCreateData = structuredClone(data)
                     const { error } = mockPageCreateFailure
@@ -122,6 +126,7 @@ vi.mock('payload', () => {
                 if (collection === 'sites') mockSiteDB.push(doc)
                 if (collection === 'pages') mockPageDB.push(doc)
                 if (collection === 'products') mockProductDB.push(doc)
+                if (collection === 'ai-generation-records') mockGenerationRecordDB.push(doc)
                 return doc
             }),
             update: vi.fn().mockImplementation(async ({ collection, id, data }) => {
@@ -129,6 +134,11 @@ vi.mock('payload', () => {
                     const pageIdx = mockPageDB.findIndex(page => page.id === id)
                     if (pageIdx > -1) mockPageDB[pageIdx] = { ...mockPageDB[pageIdx], ...data }
                     return mockPageDB[pageIdx]
+                }
+                if (collection === 'ai-generation-records') {
+                    const recordIdx = mockGenerationRecordDB.findIndex((record) => record.id === id)
+                    if (recordIdx > -1) mockGenerationRecordDB[recordIdx] = { ...mockGenerationRecordDB[recordIdx], ...data }
+                    return mockGenerationRecordDB[recordIdx]
                 }
                 const idx = mockSiteDB.findIndex(s => s.id === id)
                 if (idx > -1) mockSiteDB[idx] = { ...mockSiteDB[idx], ...data }
@@ -274,9 +284,11 @@ describe('AI Streaming APIs', () => {
         mockTenant = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
         mockRateLimitAllowed = true
         mockPageCreateFailure = null
+        mockSiteCreateFailure = null
         mockMediaDB = []
         mockProductDB = []
         mockCategoryDB = []
+        mockGenerationRecordDB = []
         mockCompleteBlogCount = 3
         mockFailedPageCreateData = null
         mockIdCounter = 0
@@ -306,15 +318,57 @@ describe('AI Streaming APIs', () => {
             expect(payload.delete).not.toHaveBeenCalled()
         })
 
-        it('returns 400 if businessInfo is missing required fields', async () => {
+        it('TC-F41-26: returns 400 and records only a safe validation incident for an authenticated rejected form', async () => {
+             // Arrange
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
                  method: 'POST',
                  body: JSON.stringify({ extraInstructions: 'Make it pop' }) // Missing businessInfo
              })
+
+             // Act
              const res = await GenerateSitePOST(req)
              const body = await res.json()
+
+             // Assert
              expect(body.error.code).toBe('VALIDATION_ERROR')
              expect(body.error.details.fieldErrors).toHaveProperty('businessInfo')
+             expect(mockGenerationRecordDB).toEqual([expect.objectContaining({
+                 lifecycle: 'terminal', outcome: 'failed', recoveryStatus: 'none',
+                 generationErrors: [expect.objectContaining({
+                     phase: 'validate', locationType: 'input', code: 'FORM_INVALID',
+                 })],
+             })])
+             expect(mockGenerationRecordDB[0]).not.toHaveProperty('inputSnapshot')
+             expect(JSON.stringify(mockGenerationRecordDB)).not.toContain('Make it pop')
+        })
+
+        it('TC-F41-27: does not track an unauthenticated rejected form', async () => {
+             // Arrange
+             vi.mocked(getCurrentUser).mockResolvedValueOnce(null)
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST', body: JSON.stringify({}),
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(400)
+             expect(mockGenerationRecordDB).toHaveLength(0)
+        })
+
+        it('TC-F41-27: does not track malformed JSON because no safe field incident exists', async () => {
+             // Arrange
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST', body: '{not-json',
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(400)
+             expect(mockGenerationRecordDB).toHaveLength(0)
         })
 
         it('returns 200 JSON with generated site data when stream=false', async () => {
@@ -335,6 +389,112 @@ describe('AI Streaming APIs', () => {
              expect(mockPageDB.length).toBe(5) // Four generated pages + system 404
              expect(result.totalPages).toBe(4)
              expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/contact', '404'])
+        })
+
+        it('TC-F41-01: creates a route-owned capture for the authenticated user after validation', async () => {
+             // Arrange
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 headers: { 'x-generation-request-id': 'f41-auth-capture' },
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(200)
+             expect(mockGenerationRecordDB).toHaveLength(1)
+             expect(mockGenerationRecordDB[0]).toMatchObject({
+                 endpoint: 'site-generator',
+                 user: 'user-xyz',
+                 traceId: 'f41-auth-capture',
+                 inputSchemaVersion: 'f41.v1',
+                 lifecycle: 'terminal',
+                 outcome: 'succeeded',
+                 status: 'success',
+                 pageSummary: { expected: 4, persisted: 4, failed: 0 },
+             })
+             expect(mockGenerationRecordDB[0]?.site).toBe(mockSiteDB[0]?.id)
+             expect(mockGenerationRecordDB[0]?.inputSnapshot).toMatchObject({
+                businessInfo: { businessName: 'Bakery' },
+             })
+        })
+
+        it('TC-F41-03: finalizes four-page generation as partial_failed when one page write fails', async () => {
+             // Arrange
+             mockPageCreateFailure = { slug: '/about', error: new Error('timeout writing page') }
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(200)
+             expect(mockGenerationRecordDB[0]).toMatchObject({
+                 lifecycle: 'terminal', outcome: 'partial_failed', status: 'failed',
+                 pageSummary: { expected: 4, persisted: 3, failed: 1 },
+             })
+             expect(mockGenerationRecordDB[0]?.pageOutcomes).toEqual(expect.arrayContaining([
+                 expect.objectContaining({ pageKey: '/about', status: 'failed', errorCode: 'PERSISTENCE_TIMEOUT' }),
+             ]))
+             expect(mockGenerationRecordDB[0]?.pageOutcomes.filter((page) => page.status === 'persisted')).toHaveLength(3)
+        })
+
+        it('TC-F41-02: finalizes failed when site persistence fails after composition', async () => {
+             // Arrange
+             mockSiteCreateFailure = new Error('site persistence unavailable')
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(500)
+             expect(mockGenerationRecordDB[0]).toMatchObject({
+                lifecycle: 'terminal', outcome: 'failed', status: 'failed', recoveryStatus: 'ticket_required',
+                 pageSummary: { expected: 0, persisted: 0, failed: 0 },
+             })
+             expect(mockGenerationRecordDB[0]?.generationErrors).toEqual(expect.arrayContaining([
+                 expect.objectContaining({ code: 'SITE_PERSISTENCE_FAILED', phase: 'site_persist' }),
+             ]))
+             expect(mockGenerationRecordDB[0]?.userSafeMessage).not.toContain('site persistence unavailable')
+        })
+
+        it('TC-F41-02: SSE failure emits a safe error event and finalizes the capture', async () => {
+             // Arrange
+             mockSiteCreateFailure = new Error('site persistence unavailable')
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                 }),
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+             const stream = await res.text()
+
+             // Assert
+             expect(res.status).toBe(200)
+             expect(stream).toContain('event: error')
+             expect(stream).toContain('"code":"GENERATION_FAILED"')
+             expect(stream).not.toContain('site persistence unavailable')
+             expect(mockGenerationRecordDB[0]).toMatchObject({
+                lifecycle: 'terminal', outcome: 'failed', status: 'failed', recoveryStatus: 'ticket_required',
+             })
         })
 
         it('accepts a valid generated site with six pages', async () => {

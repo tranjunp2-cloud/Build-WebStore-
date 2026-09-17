@@ -35,6 +35,13 @@ export const AiGenerationRecords: CollectionConfig = {
             admin: { description: 'Site being generated (optional — not set for template gens)' },
         },
         {
+            name: 'tenant',
+            type: 'relationship',
+            relationTo: 'tenants',
+            index: true,
+            admin: { description: 'Frozen tenant ownership for this generation and any isolated recovery child.' },
+        },
+        {
             name: 'user',
             type: 'relationship',
             relationTo: 'users',
@@ -102,6 +109,71 @@ export const AiGenerationRecords: CollectionConfig = {
                 { label: 'Failed', value: 'failed' },
             ],
         },
+        { name: 'traceId', type: 'text', index: true, admin: { description: 'Route request trace ID for this generation run' } },
+        { name: 'inputSnapshot', type: 'json', admin: { description: 'Frozen, normalized input used for this run' } },
+        { name: 'inputSchemaVersion', type: 'text', admin: { description: 'Schema version of frozen input' } },
+        { name: 'inputHash', type: 'text', index: true, admin: { description: 'SHA256 of frozen normalized input' } },
+        {
+            name: 'lifecycle', type: 'select', index: true,
+            options: ['queued', 'running', 'terminal'],
+            admin: { description: 'F41 lifecycle; terminal is written only after site/page persistence' },
+        },
+        {
+            name: 'outcome', type: 'select', index: true,
+            options: ['succeeded', 'partial_failed', 'failed', 'cancelled'],
+            admin: { description: 'Terminal persistence outcome, independent from legacy status' },
+        },
+        {
+            name: 'recoveryStatus', type: 'select', index: true,
+            options: ['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'stale_running'],
+            admin: { description: 'Operations recovery state; do not infer from error text in UI' },
+        },
+        {
+            name: 'source', type: 'select', index: true,
+            defaultValue: 'user_submit',
+            options: ['user_submit', 'ops_retry'],
+            admin: { description: 'How this run was initiated. Retry runs must be isolated child records.' },
+        },
+        {
+            name: 'parentGeneration', type: 'relationship', relationTo: 'ai-generation-records', index: true,
+            admin: { description: 'Immutable source run for an operations retry.' },
+        },
+        {
+            name: 'retryRootGeneration', type: 'relationship', relationTo: 'ai-generation-records', index: true,
+            admin: { description: 'First run in a retry lineage.' },
+        },
+        { name: 'retryAttempt', type: 'number', min: 0, admin: { description: 'Zero for original runs; increments only for a child retry.' } },
+        {
+            name: 'recoveredSite', type: 'relationship', relationTo: 'sites', index: true,
+            admin: { description: 'Isolated draft site created by an operations retry; never replaces the parent site.' },
+        },
+        {
+            name: 'pageSummary', type: 'group', fields: [
+                { name: 'expected', type: 'number' },
+                { name: 'persisted', type: 'number' },
+                { name: 'failed', type: 'number' },
+            ],
+        },
+        {
+            name: 'pageOutcomes', type: 'array', fields: [
+                { name: 'pageKey', type: 'text' }, { name: 'title', type: 'text' }, { name: 'slug', type: 'text' },
+                { name: 'pageId', type: 'text' }, { name: 'status', type: 'select', options: ['persisted', 'failed'] },
+                { name: 'blockCount', type: 'number' }, { name: 'errorCode', type: 'text' }, { name: 'errorSummary', type: 'textarea' },
+            ],
+        },
+        {
+            name: 'generationErrors', type: 'array', fields: [
+                { name: 'phase', type: 'text' }, { name: 'locationType', type: 'text' }, { name: 'locationKey', type: 'text' },
+                { name: 'locationLabel', type: 'text' },
+                { name: 'validationRule', type: 'select', options: ['required', 'format', 'min_length', 'max_length', 'unsupported_value', 'contract_mismatch'] },
+                { name: 'observedState', type: 'select', options: ['missing', 'invalid_format', 'too_short', 'too_long', 'unsupported', 'unknown'] },
+                { name: 'code', type: 'text' }, { name: 'category', type: 'text' }, { name: 'retryabilityReason', type: 'text' },
+                { name: 'operatorMessage', type: 'textarea' }, { name: 'userSafeMessage', type: 'textarea' },
+                { name: 'sanitizedTechnicalMessage', type: 'textarea' }, { name: 'signature', type: 'text' },
+            ],
+        },
+        { name: 'userSafeMessage', type: 'text', admin: { description: 'Never contains provider/raw error details' } },
+        { name: 'startedAt', type: 'date' }, { name: 'terminalAt', type: 'date', index: true }, { name: 'lastHeartbeatAt', type: 'date' },
         {
             name: 'errorLog',
             type: 'textarea',

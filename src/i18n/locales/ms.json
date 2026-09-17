@@ -4841,6 +4841,7 @@
       "applyButton": "Guna templat",
       "appliedSuccess": "Templat \"{name}\" yang telah digunakan",
       "applyFailed": "Tidak dapat menggunakan templat. Cuba lagi.",
+      "unmatchedBlocks": "{count} bahagian ({types}) tidak sepadan dengan templat baharu dan tidak dipindahkan. Anda boleh memulihkan susun atur sebelumnya dengan Undur.",
       "previewTitle": "Pratonton: {name}",
       "all": "Semua",
       "restaurant": "Restoran",

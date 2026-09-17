@@ -29,6 +29,17 @@ vi.mock('@/lib/rateLimit', () => ({
     }),
 }))
 
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    TenantSiteLockError: class TenantSiteLockError extends Error {},
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: unknown,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'save-transaction' })),
+    lockTenantSiteRows: vi.fn().mockResolvedValue(undefined),
+    executeTenantTransaction: vi.fn().mockResolvedValue({ rows: [] }),
+}))
+
 // Mock cookies từ next/headers
 vi.mock('next/headers', () => {
     return {
@@ -142,7 +153,7 @@ describe('Sites APIs', () => {
             const payload = await getPayload({ config: {} as any })
             expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
                 collection: 'sites',
-                id: '123',
+                id: 123,
                 data: expect.objectContaining({
                     locale: 'ms',
                     shippingConfig: { westRate: 1000, eastRate: 2000, freeAbove: 5000 }
@@ -263,7 +274,7 @@ describe('Sites APIs', () => {
             expect(res.status).toBe(200)
             expect(update).toHaveBeenCalledTimes(1)
             expect(update).toHaveBeenCalledWith(expect.objectContaining({
-                collection: 'sites', id: '123',
+                collection: 'sites', id: 123,
                 data: expect.objectContaining({
                     localBusiness: expect.objectContaining({ businessCategory: 'foodEstablishment', schemaSubtype: 'Bakery', city: 'Petaling Jaya', priceRange: '$$' }),
                 }),
@@ -300,7 +311,7 @@ describe('Sites APIs', () => {
             expect(res.status).toBe(200)
             expect(update).toHaveBeenCalledWith(expect.objectContaining({
                 collection: 'sites',
-                id: '123',
+                id: 123,
                 data: expect.objectContaining({
                     localBusiness: expect.objectContaining({
                         priceRange: '$$',

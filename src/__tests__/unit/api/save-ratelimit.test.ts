@@ -30,6 +30,7 @@ vi.mock('payload', () => ({
             tenant: 'tenant-1',
             status: 'draft',
         }),
+        find: vi.fn().mockResolvedValue({ docs: [] }),
         update: vi.fn().mockResolvedValue({ id: 'site-1' }),
     }),
 }))
@@ -50,6 +51,17 @@ vi.mock('@/lib/ai/media-injector', () => ({
 
 vi.mock('@/lib/block-normalization', () => ({
     normalizeBlocksForPersistence: vi.fn((blocks: unknown[]) => blocks),
+}))
+
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    TenantSiteLockError: class TenantSiteLockError extends Error {},
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: unknown,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'save-transaction' })),
+    lockTenantSiteRows: vi.fn().mockResolvedValue(undefined),
+    executeTenantTransaction: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
 const makeReq = (siteId: string, body: Record<string, unknown>) =>
@@ -74,7 +86,7 @@ describe('PATCH /api/sites/[siteId]/save — rate limiting', () => {
     it('TC-F01.RL.SAVE.01 — allows save when rate limit not exceeded', async () => {
         vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() + 60000 })
 
-        const res = await PATCH(makeReq('site-1', { blocks: [] }), makeParams('site-1'))
+        const res = await PATCH(makeReq('1', { blocks: [] }), makeParams('1'))
         expect(res.status).not.toBe(429)
     })
 
@@ -82,7 +94,7 @@ describe('PATCH /api/sites/[siteId]/save — rate limiting', () => {
         const resetAt = Date.now() + 30000
         vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, remaining: 0, resetAt })
 
-        const res = await PATCH(makeReq('site-1', { blocks: [] }), makeParams('site-1'))
+        const res = await PATCH(makeReq('1', { blocks: [] }), makeParams('1'))
         const body = await res.json()
 
         expect(res.status).toBe(429)
@@ -94,7 +106,7 @@ describe('PATCH /api/sites/[siteId]/save — rate limiting', () => {
     it('TC-F01.RL.SAVE.03 — rate limit key includes user id', async () => {
         vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() + 60000 })
 
-        await PATCH(makeReq('site-1', { blocks: [] }), makeParams('site-1'))
+        await PATCH(makeReq('1', { blocks: [] }), makeParams('1'))
 
         expect(checkRateLimit).toHaveBeenCalledWith('save:user-1', 60, 60_000)
     })
@@ -102,7 +114,7 @@ describe('PATCH /api/sites/[siteId]/save — rate limiting', () => {
     it('TC-F01.RL.SAVE.04 — returns 401 before rate limit check when not authenticated', async () => {
         mockAuthUser = null
 
-        const res = await PATCH(makeReq('site-1', { blocks: [] }), makeParams('site-1'))
+        const res = await PATCH(makeReq('1', { blocks: [] }), makeParams('1'))
 
         expect(res.status).toBe(401)
         expect(checkRateLimit).not.toHaveBeenCalled()

@@ -21,6 +21,8 @@ export interface FieldDiffItem {
 
 export interface EntityDiffRecord {
   id: string;
+  /** Page IDs where this entity is rendered in the migrated storefront. */
+  pageIds: string[];
   legacyId: string | number;
   migratedId?: string | number | null;
   entityGroup: EntityGroupType;
@@ -31,6 +33,36 @@ export interface EntityDiffRecord {
   matchedFields: number;
   discrepancyCount: number;
   fields: FieldDiffItem[];
+}
+
+/**
+ * Keeps the field inspector scoped to the storefront page the QA tester has
+ * selected. An entity can belong to more than one page (for example products
+ * are rendered on both Home and Catalog), so ownership is intentionally an
+ * array rather than a single page ID.
+ */
+export function getFieldDiffRecordsForPage(
+  audit: StoreFieldDiffAudit,
+  pageId: string,
+): EntityDiffRecord[] {
+  return audit.records.filter(
+    (record) => Array.isArray(record.pageIds) && record.pageIds.includes(pageId),
+  );
+}
+
+/**
+ * An entity can be structurally matched while one or more of its fields still
+ * need attention. Keep this rule shared so the inspector never hides those
+ * field-level discrepancies when the error-only filter is enabled.
+ */
+export function hasEntityDiffIssue(record: Pick<EntityDiffRecord, "matchStatus" | "fields">): boolean {
+  return record.matchStatus !== "match" || record.fields.some((field) => field.status !== "match");
+}
+
+export function getVisualDiffGapLabel(status: "pass" | "warn" | "fail", note?: string): string | null {
+  if (status === "fail") return `P0 lệch dữ liệu${note ? `: ${note}` : ""}`;
+  if (status === "warn") return `P1 cần xem lại${note ? `: ${note}` : ""}`;
+  return null;
 }
 
 export interface StoreFieldDiffAudit {
@@ -47,11 +79,27 @@ export interface StoreFieldDiffAudit {
   records: EntityDiffRecord[];
 }
 
+export type FieldEvidenceVisualState =
+  | "attention"
+  | "matched_value"
+  | "matched_empty";
+
+/** UI-only classification. It never upgrades a field into verified evidence. */
+export function getFieldEvidenceVisualState(
+  field: Pick<FieldDiffItem, "status" | "legacyValue" | "migratedValue">,
+): FieldEvidenceVisualState {
+  if (field.status !== "match") return "attention";
+  if (field.legacyValue === null || field.migratedValue === null) return "attention";
+  if (!Object.is(field.legacyValue, field.migratedValue)) return "attention";
+  return field.legacyValue === "" ? "matched_empty" : "matched_value";
+}
+
 export interface StoreSummary {
   id: string;
   name: string;
   ownerEmail: string;
   domain: string;
+  sslReady?: boolean;
   templateCode: string;
   templateName: string;
   sector: string;
@@ -71,6 +119,17 @@ export interface StoreSummary {
   commerceScore: string;
   blockScore: string;
   lastCheckedAt?: string;
+}
+
+/**
+ * Checks whether a merchant store domain supports SSL for secure iframe embedding.
+ * Prioritizes database verified sslReady flag, fallback to wildcard or HTTPS domains.
+ */
+export function isStoreDomainSslReady(store?: { domain?: string; sslReady?: boolean } | null): boolean {
+  if (!store || !store.domain) return false;
+  if (typeof store.sslReady === "boolean") return store.sslReady;
+  const lower = store.domain.toLowerCase();
+  return lower.includes("ecommercehub.my") || lower.includes("vnami") || lower.startsWith("https://");
 }
 
 export interface DefectItem {
@@ -238,6 +297,7 @@ export interface StoreDeepDiff {
   name: string;
   ownerEmail: string;
   domain: string;
+  sslReady?: boolean;
   templateCode: string;
   templateName: string;
   sector: string;
@@ -474,7 +534,17 @@ export const SECTOR_DATA_MAP: Record<string, SectorThemeData> = {
 
 export function getSectorTheme(templateCode?: string): SectorThemeData {
   const code = (templateCode || "FB101").toUpperCase().trim();
-  return SECTOR_DATA_MAP[code] || SECTOR_DATA_MAP.FB101;
+  if (SECTOR_DATA_MAP[code]) return SECTOR_DATA_MAP[code];
+
+  // Map legacy template codes and prefixes to correct sector data
+  if (code.startsWith("F0") || code.startsWith("F1")) return SECTOR_DATA_MAP.F102;
+  if (code.startsWith("C1") || code.startsWith("MP")) return SECTOR_DATA_MAP.C101;
+  if (code.startsWith("FN")) return SECTOR_DATA_MAP.FN101;
+  if (code.startsWith("PA")) return SECTOR_DATA_MAP.PA101;
+  if (code.startsWith("TG") || code.startsWith("T006")) return SECTOR_DATA_MAP.FN104;
+  if (code.startsWith("T010")) return SECTOR_DATA_MAP.F102;
+
+  return SECTOR_DATA_MAP.FB101;
 }
 
 /**
@@ -575,7 +645,11 @@ export function generateReconciliationCatalog(totalCount = 2000): StoreSummary[]
 /**
  * Generate Complete 1-to-1 Field-Level Database Diff Audit for any store
  */
-export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreFieldDiffAudit {
+export function getFieldDiffAuditForStore(
+  siteId: string,
+  overrideStatus?: "passed" | "warning" | "failed",
+  includeUiDemoFixture = false,
+): StoreFieldDiffAudit {
   const allStores = generateReconciliationCatalog(2000);
   const store = allStores.find((s) => s.id === siteId);
   if (!store) {
@@ -594,6 +668,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 1. PRODUCTS
     {
       id: "ent-prod-101",
+      pageIds: ["page-home", "page-catalog"],
       legacyId: "PROD-101",
       migratedId: "pw2_prod_101",
       entityGroup: "products",
@@ -684,6 +759,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 2. PRODUCT VARIANTS (VAR-201: Hũ 500ml)
     {
       id: "ent-var-201",
+      pageIds: ["page-home", "page-catalog"],
       legacyId: "VAR-201",
       migratedId: "pw2_var_201",
       entityGroup: "variants",
@@ -750,6 +826,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 3. PRODUCT VARIANTS (VAR-202: Can 1 Lít - Mất trong failed store)
     {
       id: "ent-var-202",
+      pageIds: ["page-home", "page-catalog"],
       legacyId: "VAR-202",
       migratedId: isFailed ? null : "pw2_var_202",
       entityGroup: "variants",
@@ -818,6 +895,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 4. BANNERS & HERO MEDIA LINKS (BAN-01: Hero Banner)
     {
       id: "ent-ban-01",
+      pageIds: ["page-home"],
       legacyId: "BAN-1365",
       migratedId: "pw2_hero_01",
       entityGroup: "banners",
@@ -904,6 +982,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 5. BANNERS (BAN-02: Small Promo Voucher)
     {
       id: "ent-ban-02",
+      pageIds: ["page-home"],
       legacyId: "BAN-1543",
       migratedId: "pw2_promo_01",
       entityGroup: "banners",
@@ -970,6 +1049,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 6. RICHTEXT & EMBEDDED CONTENT (RT-01: Câu Chuyện & Bảng VietGAP)
     {
       id: "ent-rt-01",
+      pageIds: ["page-home"],
       legacyId: "RT-501",
       migratedId: "pw2_rt_501",
       entityGroup: "richtext",
@@ -1038,6 +1118,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 7. NAVIGATION & HEADER MENUS (NAV-01: Header Menu)
     {
       id: "ent-nav-01",
+      pageIds: ["page-home", "page-catalog", "page-about", "page-blog", "page-contact", "page-custom-policy"],
       legacyId: "NAV-HEADER",
       migratedId: "pw2_nav_header",
       entityGroup: "navigation",
@@ -1094,6 +1175,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 8. CATEGORIES
     {
       id: "ent-cat-12",
+      pageIds: ["page-home", "page-catalog"],
       legacyId: "CAT-12",
       migratedId: "pw2_cat_12",
       entityGroup: "categories",
@@ -1150,6 +1232,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 9. BLOG POSTS
     {
       id: "ent-post-88",
+      pageIds: ["page-home", "page-blog"],
       legacyId: "POST-88",
       migratedId: "pw2_post_88",
       entityGroup: "posts",
@@ -1216,6 +1299,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 10. STORE SETTINGS & FOOTER (SET-01)
     {
       id: "ent-set-01",
+      pageIds: ["page-home", "page-catalog", "page-about", "page-blog", "page-contact", "page-custom-policy"],
       legacyId: "SET-01",
       migratedId: "pw2_settings_01",
       entityGroup: "settings",
@@ -1304,6 +1388,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     // 11. LAYOUT BLOCKS (BLOCKS-01: Hero Banner)
     {
       id: "ent-blk-01",
+      pageIds: ["page-home"],
       legacyId: "BLK-1365",
       migratedId: "pw2_blk_hero",
       entityGroup: "blocks",
@@ -1348,10 +1433,101 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
     },
   ];
 
+  // Fixture only for the default QA demo. It deliberately covers every visual
+  // state so Tester can verify the inspector without changing live PW1/PW2 data.
+  if (includeUiDemoFixture && siteId === "SITE-0001") {
+    records.push(
+      {
+        id: "ent-demo-ui-product",
+        pageIds: ["page-home", "page-catalog"],
+        legacyId: "DEMO-UI-PROD-001",
+        migratedId: "pw2_demo_ui_prod_001",
+        entityGroup: "products",
+        entityName: "[DỮ LIỆU MẪU UI] Sản phẩm kiểm thử đối soát",
+        entityIdentifier: "SKU: DEMO-UI-001",
+        matchStatus: "warning",
+        totalFields: 5,
+        matchedFields: 3,
+        discrepancyCount: 2,
+        fields: [
+          {
+            fieldName: "name",
+            fieldLabel: "Tên sản phẩm",
+            legacyKey: "products.title",
+            migratedKey: "products.title",
+            legacyValue: "Áo thun mẫu UI",
+            migratedValue: "Áo thun mẫu UI",
+            status: "match",
+            classification: "100% Match",
+          },
+          {
+            fieldName: "subtitle",
+            fieldLabel: "Tiêu đề phụ",
+            legacyKey: "products.subtitle",
+            migratedKey: "products.subtitle",
+            legacyValue: "",
+            migratedValue: "",
+            status: "match",
+            classification: "100% Match",
+          },
+          {
+            fieldName: "price",
+            fieldLabel: "Giá niêm yết",
+            legacyKey: "products.price",
+            migratedKey: "products.price",
+            legacyValue: 49000,
+            migratedValue: 39000,
+            status: "warning",
+            classification: "P1 Warning",
+            diffExplanation: "Giá PW2 khác PW1 để minh họa trạng thái cần xem.",
+            remediationAction: "Kiểm tra rule làm tròn giá trong bước transform.",
+          },
+          {
+            fieldName: "brand",
+            fieldLabel: "Thương hiệu",
+            legacyKey: "products.brand_id",
+            migratedKey: "products.brand",
+            legacyValue: "Prime Demo Brand",
+            migratedValue: null,
+            status: "error",
+            classification: "P0 Blocker",
+            diffExplanation: "Trường minh họa dữ liệu PW2 bị thiếu.",
+            remediationAction: "Bổ sung mapping relationship cho thương hiệu.",
+          },
+          {
+            fieldName: "sku",
+            fieldLabel: "Mã SKU",
+            legacyKey: "products.sku",
+            migratedKey: "products.sku",
+            legacyValue: "DEMO-UI-001",
+            migratedValue: "DEMO-UI-001",
+            status: "match",
+            classification: "100% Match",
+          },
+        ],
+      },
+      {
+        id: "ent-demo-ui-orphan",
+        pageIds: ["page-home"],
+        legacyId: "—",
+        migratedId: "pw2_demo_orphan_001",
+        entityGroup: "products",
+        entityName: "[DỮ LIỆU MẪU UI] Bản ghi chỉ có ở PW2",
+        entityIdentifier: "PW2 ID: pw2_demo_orphan_001",
+        matchStatus: "orphan_in_pw2",
+        totalFields: 0,
+        matchedFields: 0,
+        discrepancyCount: 1,
+        fields: [],
+      },
+    );
+  }
+
   // Calculate statistics
-  const totalEntitiesV1 = records.length;
+  const totalEntitiesV1 = records.filter((r) => r.matchStatus !== "orphan_in_pw2").length;
   const missingCount = records.filter((r) => r.matchStatus === "missing_in_pw2").length;
-  const totalEntitiesV2 = totalEntitiesV1 - missingCount;
+  const orphanCount = records.filter((r) => r.matchStatus === "orphan_in_pw2").length;
+  const totalEntitiesV2 = records.filter((r) => r.matchStatus !== "missing_in_pw2").length;
   const matchedEntities = records.filter((r) => r.matchStatus === "match").length;
 
   const allFields = records.flatMap((r) => r.fields);
@@ -1359,17 +1535,17 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
   const totalFieldCount = allFields.length;
   const fieldMatchRate = totalFieldCount > 0 ? `${((matchedFieldCount / totalFieldCount) * 100).toFixed(1)}%` : "100.0%";
 
-  const groupStats: Record<EntityGroupType, { total: number; pass: number; warn: number; fail: number }> = {
-    products: { total: 1, pass: isFailed ? 0 : 1, warn: 0, fail: isFailed ? 1 : 0 },
-    variants: { total: 2, pass: isFailed ? 1 : 2, warn: 0, fail: isFailed ? 1 : 0 },
-    banners: { total: 2, pass: 2, warn: 0, fail: 0 },
-    richtext: { total: 1, pass: isFailed ? 0 : 1, warn: 0, fail: isFailed ? 1 : 0 },
-    categories: { total: 1, pass: 1, warn: 0, fail: 0 },
-    navigation: { total: 1, pass: 1, warn: 0, fail: 0 },
-    posts: { total: 1, pass: 1, warn: 0, fail: 0 },
-    settings: { total: 1, pass: isWarn ? 0 : 1, warn: isWarn ? 1 : 0, fail: 0 },
-    blocks: { total: 1, pass: 1, warn: 0, fail: 0 },
-  };
+  const groupStats = Object.fromEntries(
+    (["products", "variants", "banners", "richtext", "navigation", "categories", "posts", "settings", "blocks"] as EntityGroupType[])
+      .map((group) => [group, { total: 0, pass: 0, warn: 0, fail: 0 }]),
+  ) as Record<EntityGroupType, { total: number; pass: number; warn: number; fail: number }>;
+  for (const record of records) {
+    const stats = groupStats[record.entityGroup];
+    stats.total += 1;
+    if (record.matchStatus === "match") stats.pass += 1;
+    else if (record.matchStatus === "warning") stats.warn += 1;
+    else stats.fail += 1;
+  }
 
   return {
     storeId: siteId,
@@ -1378,7 +1554,7 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
       totalEntitiesV2,
       matchedEntities,
       missingInPW2Count: missingCount,
-      orphanInPW2Count: 0,
+      orphanInPW2Count: orphanCount,
       fieldMatchRate,
       groupStats,
     },
@@ -1389,7 +1565,11 @@ export function getFieldDiffAuditForStore(siteId: string, overrideStatus?: "pass
 /**
  * Get deep store diff with specialized Media, Text Format & Field-by-Field audits
  */
-export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "warning" | "failed"): StoreDeepDiff | null {
+export function getStoreDeepDiff(
+  siteId: string,
+  overrideStatus?: "passed" | "warning" | "failed",
+  includeUiDemoFixture = false,
+): StoreDeepDiff | null {
   const allStores = generateReconciliationCatalog(2000);
   const store = allStores.find((s) => s.id === siteId);
   if (!store) return null;
@@ -2122,7 +2302,7 @@ export function getStoreDeepDiff(siteId: string, overrideStatus?: "passed" | "wa
     totalPagesInPW2: isFailed ? dynamicPages.length - 1 : dynamicPages.length,
     missingPagesCount: isFailed ? 1 : 0,
     pages: dynamicPages,
-    fieldDiffAudit: getFieldDiffAuditForStore(siteId, currentStatus),
+    fieldDiffAudit: getFieldDiffAuditForStore(siteId, currentStatus, includeUiDemoFixture),
     reconciliationAudit: {
       totalProductsV1: 24,
       totalProductsV2: 24,

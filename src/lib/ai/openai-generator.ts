@@ -36,8 +36,6 @@ import { computeGenSeed } from './gen-seed'
 import { pickRecipe } from './category-recipes'
 import { resolveBusinessCategory } from './composer-category-resolver'
 import { getCategoryRequirement } from './category-requirements'
-import { startCapture, finishCapture } from './capture-generation'
-import { countSnapshotFields } from './snapshot-field-counter'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
 import { mapBusinessInfo } from './business-info-mapper'
 import {
@@ -296,13 +294,6 @@ export async function generateSiteWithAI(
         businessInfo.products,
     ].join(' | ')
 
-    // Phase 05 monitoring — capture generation record (best-effort, never blocks)
-    const cap = await startCapture({
-        endpoint: 'site-generator',
-        prompt: promptText,
-        category: businessInfo.industry ?? undefined,
-    })
-
     const inputText = [businessInfo.businessName, businessInfo.shortDescription, businessInfo.products, businessInfo.industry]
         .filter(Boolean).join(' ')
     const { contentLang: detectedLang, gpLang, blockLang } = options.targetLocale
@@ -320,12 +311,6 @@ export async function generateSiteWithAI(
         }
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
         const fallbackResult = await generateWithFallback(promptText, events, detectedLang, businessInfo)
-        const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
-        await finishCapture(cap, {
-            status: 'success',
-            selectedBlocks: fallbackBlocks,
-            outputSnapshot: { path: 'fallback-no-key', siteName: fallbackResult.result.siteName },
-        })
         return {
             ...fallbackResult,
             requestedGenMode,
@@ -365,22 +350,6 @@ export async function generateSiteWithAI(
             detectedLang,
             businessInfo,
         )
-        const fallbackBlocks = quotaFallback.result.blocks.map(
-            (block: GeneratedBlock) => String((block as Record<string, unknown>).blockType ?? ''),
-        )
-        const fallbackFieldCounts = countSnapshotFields({
-            blocks: quotaFallback.result.blocks as Record<string, unknown>[],
-        })
-        await finishCapture(cap, {
-            status: 'success',
-            selectedBlocks: fallbackBlocks,
-            outputSnapshot: {
-                path: 'template-first-quota-fallback',
-                siteName: quotaFallback.result.siteName,
-            },
-            fieldsTotal: fallbackFieldCounts.fieldsTotal,
-            fieldsFilled: fallbackFieldCounts.fieldsFilled,
-        })
         return {
             ...quotaFallback,
             requestedGenMode,
@@ -400,16 +369,6 @@ export async function generateSiteWithAI(
             businessInfo, language, promptText, openai, events,
         )
         if (templateResult) {
-            const tfBlocks = templateResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
-            // Phase 04: count fields from actual blocks for override-rate tracking
-            const tfFieldCounts = countSnapshotFields({ blocks: templateResult.result.blocks as Record<string, unknown>[] })
-            await finishCapture(cap, {
-                status: 'success',
-                selectedBlocks: tfBlocks,
-                outputSnapshot: { path: 'template-first', siteName: templateResult.result.siteName },
-                fieldsTotal: tfFieldCounts.fieldsTotal,
-                fieldsFilled: tfFieldCounts.fieldsFilled,
-            })
             return {
                 ...templateResult,
                 requestedGenMode,
@@ -1028,17 +987,6 @@ export async function generateSiteWithAI(
             },
         })
 
-        const aiBlocks = validBlocks.map((b) => String((b as Record<string, unknown>).blockType ?? ''))
-        // Phase 04: count fields for override-rate tracking
-        const aiFieldCounts = countSnapshotFields({ blocks: validBlocks as Record<string, unknown>[] })
-        await finishCapture(cap, {
-            status: 'success',
-            selectedBlocks: aiBlocks,
-            outputSnapshot: { path: 'ai-first', siteName: result.siteName, totalBlocks: validBlocks.length },
-            fieldsTotal: aiFieldCounts.fieldsTotal,
-            fieldsFilled: aiFieldCounts.fieldsFilled,
-        })
-
         return {
             result,
             events,
@@ -1057,12 +1005,6 @@ export async function generateSiteWithAI(
         // Keep warn log for ops visibility on fallback rate.
         console.warn('[AI Generator] Falling back to smart templates (OpenAI unavailable)')
         const fallbackResult = await generateWithFallback(promptText, events, detectedLang, businessInfo)
-        const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
-        await finishCapture(cap, {
-            status: 'success',
-            selectedBlocks: fallbackBlocks,
-            outputSnapshot: { path: 'ai-first-fallback', siteName: fallbackResult.result.siteName, error: errMessage.slice(0, 200) },
-        })
         return {
             ...fallbackResult,
             requestedGenMode,

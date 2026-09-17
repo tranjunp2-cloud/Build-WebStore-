@@ -3880,6 +3880,144 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
       ADD COLUMN IF NOT EXISTS fields_filled integer,
       ADD COLUMN IF NOT EXISTS fields_edited integer DEFAULT 0;`,
   },
+  // ── F41: durable website generation outcome (additive/idempotent) ────────
+  { name: 'ai_generation_records.f41_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records
+    ADD COLUMN IF NOT EXISTS trace_id varchar, ADD COLUMN IF NOT EXISTS input_snapshot jsonb,
+    ADD COLUMN IF NOT EXISTS input_schema_version varchar, ADD COLUMN IF NOT EXISTS input_hash varchar,
+    ADD COLUMN IF NOT EXISTS lifecycle varchar, ADD COLUMN IF NOT EXISTS outcome varchar,
+    ADD COLUMN IF NOT EXISTS recovery_status varchar, ADD COLUMN IF NOT EXISTS page_summary_expected integer,
+    ADD COLUMN IF NOT EXISTS page_summary_persisted integer, ADD COLUMN IF NOT EXISTS page_summary_failed integer,
+    ADD COLUMN IF NOT EXISTS user_safe_message varchar, ADD COLUMN IF NOT EXISTS started_at timestamp,
+    ADD COLUMN IF NOT EXISTS terminal_at timestamp, ADD COLUMN IF NOT EXISTS last_heartbeat_at timestamp;` },
+  { name: 'ai_generation_records.f41_indexes', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_trace_id_idx ON ai_generation_records (trace_id);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_lifecycle_idx ON ai_generation_records (lifecycle);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_outcome_idx ON ai_generation_records (outcome);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_recovery_status_idx ON ai_generation_records (recovery_status);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_terminal_at_idx ON ai_generation_records (terminal_at);` },
+  { name: 'ai_generation_records_page_outcomes.create_table', sql: `CREATE TABLE IF NOT EXISTS ai_generation_records_page_outcomes (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0,
+    _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
+    _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, page_key varchar, title varchar, slug varchar,
+    page_id varchar, status varchar, block_count integer, error_code varchar, error_summary text);` },
+  { name: 'ai_generation_records_page_outcomes.parent_idx', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_page_outcomes_parent_idx ON ai_generation_records_page_outcomes (_parent_id);` },
+  { name: 'ai_generation_records_generation_errors.create_table', sql: `CREATE TABLE IF NOT EXISTS ai_generation_records_generation_errors (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0,
+    _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
+    _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, phase varchar, location_type varchar, location_key varchar,
+    location_label varchar, validation_rule varchar, observed_state varchar,
+    code varchar, category varchar, retryability_reason varchar, operator_message text, user_safe_message text,
+    sanitized_technical_message text, signature varchar);` },
+  { name: 'ai_generation_records_generation_errors.parent_idx', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_generation_errors_parent_idx ON ai_generation_records_generation_errors (_parent_id);` },
+  // F41-07: CREATE TABLE does not update an existing Payload array table.
+  { name: 'ai_generation_records_generation_errors.structured_incident_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records_generation_errors
+    ADD COLUMN IF NOT EXISTS location_label varchar,
+    ADD COLUMN IF NOT EXISTS validation_rule varchar,
+    ADD COLUMN IF NOT EXISTS observed_state varchar;` },
+
+  // ── F41-03: durable, isolated website recovery queue ────────────────────
+  { name: 'ai_generation_records.f41_retry_lineage_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records
+    ADD COLUMN IF NOT EXISTS source varchar DEFAULT 'user_submit',
+    ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS parent_generation_id integer REFERENCES ai_generation_records(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS retry_root_generation_id integer REFERENCES ai_generation_records(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS retry_attempt integer,
+    ADD COLUMN IF NOT EXISTS recovered_site_id integer REFERENCES sites(id) ON DELETE SET NULL;` },
+  { name: 'ai_generation_records.f41_retry_lineage_indexes', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_source_idx ON ai_generation_records (source);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_tenant_id_idx ON ai_generation_records (tenant_id);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_parent_generation_id_idx ON ai_generation_records (parent_generation_id);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_retry_root_generation_id_idx ON ai_generation_records (retry_root_generation_id);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_recovered_site_id_idx ON ai_generation_records (recovered_site_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS ai_generation_records_one_active_retry_child_idx
+      ON ai_generation_records (parent_generation_id)
+      WHERE parent_generation_id IS NOT NULL AND lifecycle IN ('queued', 'running');` },
+  { name: 'generation_recovery_jobs.create_table', sql: `CREATE TABLE IF NOT EXISTS generation_recovery_jobs (
+    id serial PRIMARY KEY,
+    tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+    source_generation_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE RESTRICT,
+    child_generation_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE RESTRICT,
+    requested_by_id integer NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    idempotency_key varchar NOT NULL,
+    retry_attempt integer NOT NULL,
+    status varchar NOT NULL DEFAULT 'queued',
+    queued_at timestamp NOT NULL DEFAULT now(),
+    started_at timestamp,
+    finished_at timestamp,
+    lease_token varchar,
+    lease_expires_at timestamp,
+    last_heartbeat_at timestamp,
+    attempt_count integer NOT NULL DEFAULT 0,
+    failure_code varchar,
+    user_safe_message varchar,
+    updated_at timestamp DEFAULT now(),
+    created_at timestamp DEFAULT now()
+  );` },
+  { name: 'generation_recovery_jobs.add_columns', sql: `ALTER TABLE IF EXISTS generation_recovery_jobs
+    ADD COLUMN IF NOT EXISTS tenant_id integer,
+    ADD COLUMN IF NOT EXISTS source_generation_id integer,
+    ADD COLUMN IF NOT EXISTS child_generation_id integer,
+    ADD COLUMN IF NOT EXISTS requested_by_id integer,
+    ADD COLUMN IF NOT EXISTS idempotency_key varchar,
+    ADD COLUMN IF NOT EXISTS retry_attempt integer,
+    ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'queued',
+    ADD COLUMN IF NOT EXISTS queued_at timestamp NOT NULL DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS started_at timestamp,
+    ADD COLUMN IF NOT EXISTS finished_at timestamp,
+    ADD COLUMN IF NOT EXISTS lease_token varchar,
+    ADD COLUMN IF NOT EXISTS lease_expires_at timestamp,
+    ADD COLUMN IF NOT EXISTS last_heartbeat_at timestamp,
+    ADD COLUMN IF NOT EXISTS attempt_count integer NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS failure_code varchar,
+    ADD COLUMN IF NOT EXISTS user_safe_message varchar,
+    ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now();` },
+  { name: 'generation_recovery_jobs.indexes', sql: `CREATE INDEX IF NOT EXISTS generation_recovery_jobs_status_queued_at_idx ON generation_recovery_jobs (status, queued_at, id);
+    CREATE INDEX IF NOT EXISTS generation_recovery_jobs_lease_expires_at_idx ON generation_recovery_jobs (lease_expires_at);
+    CREATE INDEX IF NOT EXISTS generation_recovery_jobs_tenant_id_idx ON generation_recovery_jobs (tenant_id);
+    CREATE INDEX IF NOT EXISTS generation_recovery_jobs_source_generation_id_idx ON generation_recovery_jobs (source_generation_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS generation_recovery_jobs_child_generation_id_uniq ON generation_recovery_jobs (child_generation_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS generation_recovery_jobs_source_retry_idempotency_uniq ON generation_recovery_jobs (source_generation_id, retry_attempt, idempotency_key);
+    CREATE UNIQUE INDEX IF NOT EXISTS generation_recovery_jobs_one_active_source_idx
+      ON generation_recovery_jobs (source_generation_id)
+      WHERE status IN ('queued', 'running');` },
+  // ── F41-03: JSONB-safe frozen-input hashes ──────────────────────────────
+  // PostgreSQL JSONB canonicalizes object key order. Recompute existing F41
+  // records with the same recursive canonical form used by application code so
+  // a persisted, unchanged form remains eligible for recovery after deploy.
+  { name: 'system_migration_state.create_table', sql: `CREATE TABLE IF NOT EXISTS system_migration_state (
+    migration_key varchar PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now()
+  );` },
+  { name: 'ai_generation_records.f41_snapshot_hash_pgcrypto', critical: true, sql: `CREATE EXTENSION IF NOT EXISTS pgcrypto;` },
+  { name: 'ai_generation_records.f41_snapshot_hash_function', critical: true, sql: `CREATE OR REPLACE FUNCTION f41_canonical_jsonb(value jsonb)
+    RETURNS text LANGUAGE plpgsql IMMUTABLE AS $fn$
+    DECLARE result text;
+    BEGIN
+      CASE jsonb_typeof(value)
+        WHEN 'object' THEN
+          SELECT '{' || COALESCE(string_agg(to_json(entry.key)::text || ':' || f41_canonical_jsonb(entry.value), ',' ORDER BY convert_to(entry.key, 'UTF8')), '') || '}'
+            INTO result FROM jsonb_each(value) AS entry(key, value);
+        WHEN 'array' THEN
+          SELECT '[' || COALESCE(string_agg(f41_canonical_jsonb(entry.value), ',' ORDER BY entry.ordinality), '') || ']'
+            INTO result FROM jsonb_array_elements(value) WITH ORDINALITY AS entry(value, ordinality);
+        ELSE
+          result := value::text;
+      END CASE;
+      RETURN result;
+    END;
+    $fn$;` },
+  { name: 'ai_generation_records.f41_snapshot_hash_backfill', critical: true, sql: `WITH claim AS (
+      INSERT INTO system_migration_state (migration_key) VALUES ('f41_snapshot_hash_v1')
+      ON CONFLICT (migration_key) DO NOTHING
+      RETURNING migration_key
+    ), hashes AS (
+      SELECT records.id, encode(digest(f41_canonical_jsonb(records.input_snapshot), 'sha256'), 'hex') AS canonical_hash
+      FROM ai_generation_records AS records CROSS JOIN claim
+      WHERE records.input_schema_version = 'f41.v1' AND records.input_snapshot IS NOT NULL
+    )
+    UPDATE ai_generation_records AS records SET input_hash = hashes.canonical_hash
+    FROM hashes WHERE records.id = hashes.id;` },
+  // Keep this immutable helper installed. Concurrent Vercel builds can run
+  // migrations simultaneously; removing it after one build backfills would
+  // make another build fail while planning its guarded backfill query.
 
   // ── Pages: Data cleanup for F05 Footer variants ──
   // Migrate legacy variant values to the new supported values cleanly in the database
@@ -5370,6 +5508,7 @@ async function runMigrations(pool) {
       await pool.query(m.sql);
       console.log(`[db-setup] ✅ ${m.name}`);
     } catch (e) {
+      if (m.critical) throw e;
       // Log but don't fail — column might already exist with different type etc.
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
@@ -5921,6 +6060,7 @@ const COLLECTION_SLUGS = [
   'block_catalog_entries',
   'block_variants',
   'ai_generation_records',
+  'generation_recovery_jobs',
   'template_issues',
   'content_packs',
   'template_versions',

@@ -1,539 +1,210 @@
 'use client'
 
-/**
- * GenerationsLiveFeed — client component that polls /api/admin/generations every 10s.
- * Layout: GenStatsStrip (5 tiles) + filter bar + gen-split (list left | drill-down right).
- * Styled with bundle CSS classes from studio.css (Generations section).
- * All functional logic preserved; only JSX + classNames updated to match design bundle.
- */
-
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, Download, RefreshCw } from 'lucide-react'
-import { StatusDot } from './status-dot'
-import { GenerationDetailDrawer } from './generation-detail-drawer'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Download, Info, RefreshCw, Search } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useTapToggleTooltip } from '@/hooks/use-tap-toggle-tooltip'
 import type { GenerationRecord, GenerationsFilters, GenerationsListResponse } from './generation-types'
+import { GenerationRetryAction } from './generation-retry-action'
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function relativeTime(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime()
-    if (diff < 60_000) return 'just now'
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`
-    return `${Math.floor(diff / 86_400_000)}d`
-}
-
-function fmtMs(ms: number | null | undefined): string {
-    if (!ms) return '—'
-    if (ms < 1000) return `${ms}ms`
-    return `${(ms / 1000).toFixed(1)}s`
-}
-
-function getUserLabel(user: GenerationRecord['user']): string {
-    if (!user) return 'Anonymous'
-    if (typeof user === 'number') return `#${user}`
-    return user.email ?? `#${user.id}`
-}
-
-function getUserInitials(user: GenerationRecord['user']): string {
-    if (!user || typeof user === 'number') return '?'
-    const email = user.email ?? ''
-    const name = [user.firstName, user.lastName].filter(Boolean).join(' ')
-    if (name) return name.split(' ').slice(0, 2).map((s) => s[0]?.toUpperCase() ?? '').join('')
-    return email.slice(0, 2).toUpperCase()
-}
-
-function buildUrl(filters: GenerationsFilters): string {
-    const params = new URLSearchParams()
-    if (filters.status && filters.status !== 'all') params.set('status', filters.status)
-    if (filters.endpoint) params.set('endpoint', filters.endpoint)
-    if (filters.category) params.set('category', filters.category)
-    if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
-    if (filters.dateTo) params.set('dateTo', filters.dateTo)
-    if (filters.search) params.set('search', filters.search)
-    params.set('page', String(filters.page))
-    params.set('limit', String(filters.limit))
-    return `/api/admin/generations?${params.toString()}`
-}
-
-const STATUS_OPTIONS = ['all', 'running', 'success', 'failed'] as const
 const POLL_INTERVAL_MS = 10_000
+const DETAIL_RETURN_MARKER = 'f41-generation-detail-return'
+const priorityLabel: Record<string, string> = { cannot_recover: 'P0', retry_failed: 'P0', retryable: 'P1', retrying: 'P2', stale_running: 'P2', history: '—' }
 
-// Avatar colors per status
-const AVATAR_COLORS = ['#6366F1', '#0EA5E9', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981']
+type OperatorStatus = { label: string; tone: 'danger' | 'warn' | 'accent' | 'success' | 'muted'; description: string }
 
-function avatarColor(id: number): string {
-    return AVATAR_COLORS[id % AVATAR_COLORS.length]!
-}
-
-// ── Stats Strip ────────────────────────────────────────────────────────────────
-
-type StatsStripProps = {
-    records: GenerationRecord[]
-    filtered: number
-    total: number
-    lastPoll: Date
-}
-
-function GenStatsStrip({ records, filtered, total, lastPoll }: StatsStripProps) {
-    const success = records.filter((r) => r.status === 'success').length
-    const running = records.filter((r) => r.status === 'running').length
-    const failed  = records.filter((r) => r.status === 'failed').length
-    const successRate = records.length > 0 ? Math.round((success / records.length) * 100) : 0
-    const durations = records.filter((r) => r.durationMs).map((r) => r.durationMs!)
-    const avgDur = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0
-
-    return (
-        <div className="gen-stats">
-            <div className="gen-stat">
-                <div className="gen-stat-label">Hiển thị</div>
-                <div className="gen-stat-val">{filtered}<span className="gen-stat-sub">/{total}</span></div>
-            </div>
-            <div className="gen-stat">
-                <div className="gen-stat-label">Success rate</div>
-                <div className="gen-stat-val gen-stat-success">{successRate}%</div>
-            </div>
-            <div className="gen-stat">
-                <div className="gen-stat-label">Running</div>
-                <div className="gen-stat-val gen-stat-accent">{running}</div>
-            </div>
-            <div className="gen-stat">
-                <div className="gen-stat-label">Failed</div>
-                <div className="gen-stat-val gen-stat-danger">{failed}</div>
-            </div>
-            <div className="gen-stat">
-                <div className="gen-stat-label">Gen time TB</div>
-                <div className="gen-stat-val">{fmtMs(Math.round(avgDur))}</div>
-            </div>
-            <div className="gen-stat">
-                <div className="gen-stat-label">Updated</div>
-                <div className="gen-stat-val" style={{ fontSize: 11, fontWeight: 500 }}>
-                    {relativeTime(lastPoll.toISOString())} ago
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ── Gen Row ────────────────────────────────────────────────────────────────────
-
-type GenRowProps = {
-    rec: GenerationRecord
-    selected: boolean
-    onClick: () => void
-}
-
-const STATUS_PILL_COLOR: Record<string, string> = {
-    running: 'accent',
-    success: 'success',
-    failed:  'danger',
-}
-
-function GenRow({ rec, selected, onClick }: GenRowProps) {
-    const userId = typeof rec.user === 'number' ? rec.user : (rec.user?.id ?? 0)
-    const pillColor = STATUS_PILL_COLOR[rec.status] ?? 'muted'
-
-    return (
-        <div className={`gen-row${selected ? ' selected' : ''}`} onClick={onClick}>
-            {/* Time + ID */}
-            <div className="gen-row-time">
-                <span className="t">{relativeTime(rec.createdAt)}</span>
-                <span className="id">#{rec.id}</span>
-            </div>
-
-            {/* User */}
-            <div className="gen-row-user">
-                <div
-                    className="user-av"
-                    style={{ width: 28, height: 28, background: avatarColor(userId), fontSize: 11 }}
-                >
-                    {getUserInitials(rec.user)}
-                </div>
-                <div>
-                    <div className="n">{getUserLabel(rec.user)}</div>
-                    <div className="e">{rec.category ?? '—'}</div>
-                </div>
-            </div>
-
-            {/* Prompt / endpoint */}
-            <div className="gen-row-prompt">
-                <div className="prompt-text" title={rec.endpoint}>{rec.endpoint}</div>
-                <div className="gen-row-meta">
-                    {rec.promptMode && (
-                        <span className="cat-chip">{rec.promptMode}</span>
-                    )}
-                    {rec.promptText && (
-                        <span className="cat-chip" title={rec.promptText} style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {rec.promptText.slice(0, 40)}{rec.promptText.length > 40 ? '…' : ''}
-                        </span>
-                    )}
-                </div>
-            </div>
-
-            {/* Template / category */}
-            <div className="gen-row-template">
-                <div className="tn">{rec.category ?? '—'}</div>
-                {rec.costUsd != null && (
-                    <div className="tm">${rec.costUsd.toFixed(4)}</div>
-                )}
-            </div>
-
-            {/* Metrics — duration */}
-            <div className="gen-row-metrics">
-                <div className="mini-metric">
-                    <div className="mm-label">Duration</div>
-                    <div className="mm-val">{fmtMs(rec.durationMs)}</div>
-                </div>
-            </div>
-
-            {/* Status pill */}
-            <div className="gen-row-status">
-                <span className={`gen-pill gen-pill-${pillColor}`}>
-                    <span className="dot" />
-                    {rec.status}
-                </span>
-            </div>
-        </div>
-    )
-}
-
-// ── Drill-down panel ───────────────────────────────────────────────────────────
-
-type DrillDownProps = {
-    rec: GenerationRecord | null
-    onView: () => void
-}
-
-function GenDrillDown({ rec, onView }: DrillDownProps) {
-    if (!rec) {
-        return (
-            <div className="gen-detail gen-detail-empty">
-                <div style={{ textAlign: 'center', padding: 40 }}>
-                    <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>◉</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Chọn 1 generation từ danh sách</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>để xem chi tiết AI fill, block log, và timeline</div>
-                </div>
-            </div>
-        )
+/** Queue priority orders rows; this status tells the operator what to do next. */
+export function getOperatorStatus(record: Pick<GenerationRecord, 'recoveryStatus' | 'lifecycle' | 'outcome'>): OperatorStatus {
+    switch (record.recoveryStatus) {
+        case 'eligible': return { label: 'Có thể gen lại', tone: 'warn', description: 'Lỗi có thể khôi phục. Chọn Gen lại để tạo bản nháp mới từ form gốc.' }
+        case 'retrying': return { label: 'Đang gen lại', tone: 'accent', description: 'Yêu cầu đã được xếp hàng hoặc đang chạy. Chưa cần thao tác thêm.' }
+        case 'stale_running': return { label: 'Có dấu hiệu bị kẹt', tone: 'warn', description: 'Generation không có cập nhật tiến trình trong thời gian dự kiến. Mở chi tiết để kiểm tra.' }
+        case 'ticket_required': return { label: 'Cần Dev xử lý', tone: 'danger', description: 'Không thể gen lại an toàn. Chuyển issue cho team Dev điều tra.' }
+        case 'exhausted': return { label: 'Cần Dev xử lý', tone: 'danger', description: 'Hệ thống không thể tự khôi phục thêm. Chuyển issue cho team Dev điều tra.' }
+        case 'ticket_created': return { label: 'Đã chuyển Dev', tone: 'muted', description: 'Issue đã được tạo. Theo dõi tiến độ tại Issues & feedback.' }
     }
+    if (record.lifecycle === 'queued') return { label: 'Đang chờ tạo website', tone: 'accent', description: 'Generation đã được ghi nhận và đang chờ hệ thống bắt đầu tạo website.' }
+    if (record.lifecycle === 'running') return { label: 'Đang tạo website', tone: 'accent', description: 'Hệ thống đang tạo website.' }
+    if (record.outcome === 'succeeded') return { label: 'Đã hoàn tất', tone: 'success', description: 'Website đã được tạo thành công, không cần thao tác thêm.' }
+    if (record.outcome === 'failed' || record.outcome === 'partial_failed' || record.outcome === 'cancelled') return { label: 'Cần kiểm tra', tone: 'warn', description: 'Generation đã kết thúc nhưng chưa có hướng khôi phục đáng tin cậy. Mở chi tiết để kiểm tra.' }
+    return { label: 'Đã ghi nhận generation', tone: 'muted', description: 'Chưa có đủ dữ liệu để xác định hướng xử lý. Mở chi tiết để kiểm tra.' }
+}
+function relativeTime(value: string) { const d = Date.now() - new Date(value).getTime(); return d < 60_000 ? 'vừa xong' : d < 3_600_000 ? `${Math.floor(d / 60_000)} phút` : `${Math.floor(d / 3_600_000)} giờ` }
+function buildUrl(f: GenerationsFilters) { const p = new URLSearchParams({ view: f.view, status: f.status, recoveryStatus: f.recoveryStatus, limit: String(f.limit) }); for (const [key, value] of Object.entries({ search: f.search, userId: f.userId, siteId: f.siteId, dateFrom: f.dateFrom, dateTo: f.dateTo, cursor: f.cursor })) if (value) p.set(key, value); return `/api/admin/generations?${p}` }
 
-    const pillColor = STATUS_PILL_COLOR[rec.status] ?? 'muted'
-    const userId = typeof rec.user === 'number' ? rec.user : (rec.user?.id ?? 0)
-
-    return (
-        <div className="gen-detail">
-            {/* Head */}
-            <div className="gen-detail-head">
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
-                    <div
-                        className="user-av"
-                        style={{ width: 36, height: 36, background: avatarColor(userId), fontSize: 14, flexShrink: 0 }}
-                    >
-                        {getUserInitials(rec.user)}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                        <div className="gd-title">{getUserLabel(rec.user)}</div>
-                        <div className="gd-sub">
-                            <span className="gen-id-mono">#{rec.id}</span>
-                            {' · '}{relativeTime(rec.createdAt)} ago
-                        </div>
-                    </div>
-                </div>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <span className={`gen-pill gen-pill-${pillColor}`}>
-                        <span className="dot" />
-                        {rec.status}
-                    </span>
-                </div>
-            </div>
-
-            {/* Endpoint section */}
-            <div className="gd-section">
-                <div className="gd-section-label">Endpoint</div>
-                <div className="gd-prompt">{rec.endpoint}</div>
-                {rec.promptText && (
-                    <>
-                        <div className="gd-section-label" style={{ marginTop: 8 }}>Prompt</div>
-                        <div className="gd-prompt" style={{ fontStyle: 'italic' }}>
-                            &ldquo;{rec.promptText}&rdquo;
-                        </div>
-                    </>
-                )}
-                <div className="gd-prompt-meta">
-                    {rec.category && <span>Category: <b>{rec.category}</b></span>}
-                    <span>Mode: <b>{rec.promptMode}</b></span>
-                    {rec.promptHash && <span>Hash: <b style={{ fontFamily: 'monospace' }}>{rec.promptHash.slice(0, 12)}…</b></span>}
-                </div>
-            </div>
-
-            {/* Metrics */}
-            <div className="gd-metrics">
-                <div className="gd-metric">
-                    <div className="gd-metric-v">{fmtMs(rec.durationMs)}</div>
-                    <div className="gd-metric-l">Duration</div>
-                </div>
-                <div className="gd-metric">
-                    <div className="gd-metric-v">
-                        {rec.costUsd != null ? `$${rec.costUsd.toFixed(4)}` : '—'}
-                    </div>
-                    <div className="gd-metric-l">Cost</div>
-                </div>
-                <div className="gd-metric">
-                    <div className="gd-metric-v">{rec.selectedBlocks?.length ?? '—'}</div>
-                    <div className="gd-metric-l">Blocks</div>
-                </div>
-                <div className="gd-metric">
-                    <div className="gd-metric-v">
-                        {rec.completedAt
-                            ? new Date(rec.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                            : '—'}
-                    </div>
-                    <div className="gd-metric-l">Completed</div>
-                </div>
-            </div>
-
-            {/* Error log */}
-            {rec.errorLog && (
-                <div className="gd-flags" style={{ background: 'rgba(239,68,68,0.06)', borderBottom: '1px solid var(--border)' }}>
-                    <span className="flag-chip">⚠ {rec.errorLog.slice(0, 120)}{rec.errorLog.length > 120 ? '…' : ''}</span>
-                </div>
-            )}
-
-            {/* Blocks preview */}
-            {rec.selectedBlocks && rec.selectedBlocks.length > 0 && (
-                <div className="gd-section">
-                    <div className="gd-section-label">Selected blocks ({rec.selectedBlocks.length})</div>
-                    <div className="gd-block-log">
-                        {rec.selectedBlocks.slice(0, 10).map((b, i) => (
-                            <div key={b.id} className="block-log-row block-ok">
-                                <div className="blr-idx">#{i + 1}</div>
-                                <div className="blr-type" style={{ gridColumn: '2 / -2' }}>{b.id}</div>
-                            </div>
-                        ))}
-                        {rec.selectedBlocks.length > 10 && (
-                            <div style={{ fontSize: 10, color: 'var(--text-3)', padding: '4px 8px' }}>
-                                +{rec.selectedBlocks.length - 10} more…
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Footer */}
-            <div className="gd-footer" style={{ marginTop: 'auto' }}>
-                <button className="btn btn-sm btn-ghost">View site ↗</button>
-                <button className="btn btn-sm btn-primary" onClick={onView}>Full detail</button>
-            </div>
-        </div>
-    )
+/** Converts a stored ISO timestamp to the browser-local datetime-local value. */
+export function toDateTimeLocalValue(value: string) {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    const pad = (part: number) => String(part).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
-
-type Props = {
-    initialData: GenerationsListResponse
+export function GenerationTimeHelp() {
+    const { open, onOpenChange, onPointerDown, onTouchStart, onFocus, onClick, ref } = useTapToggleTooltip<HTMLButtonElement>()
+    return <TooltipProvider><Tooltip open={open} onOpenChange={onOpenChange}><TooltipTrigger asChild><button ref={ref} type="button" className="f41-column-help" aria-label="Giải thích thời gian generation" aria-expanded={open} onPointerDown={onPointerDown} onTouchStart={onTouchStart} onFocus={onFocus} onClick={onClick}><Info size={12} aria-hidden /></button></TooltipTrigger><TooltipContent side="top">Thời gian tính từ lúc user gửi form và hệ thống tạo generation; không phải thời lượng AI gen website.</TooltipContent></Tooltip></TooltipProvider>
 }
 
-export function GenerationsLiveFeed({ initialData }: Props) {
-    const [records, setRecords] = useState<GenerationRecord[]>(initialData.data)
-    const [meta, setMeta] = useState(initialData.meta)
-    const [loading, setLoading] = useState(false)
-    const [lastPoll, setLastPoll] = useState<Date>(new Date())
-    const [live, setLive] = useState(true)
-    const [selectedId, setSelectedId] = useState<number | null>(null)
-    const [drawerRecord, setDrawerRecord] = useState<GenerationRecord | null>(null)
+export function GenerationStatusHelp() {
+    const { open, onOpenChange, onPointerDown, onTouchStart, onFocus, onClick, ref } = useTapToggleTooltip<HTMLButtonElement>()
+    return <TooltipProvider><Tooltip open={open} onOpenChange={onOpenChange}><TooltipTrigger asChild><button ref={ref} type="button" className="f41-column-help" aria-label="Giải thích hướng xử lý" aria-expanded={open} onPointerDown={onPointerDown} onTouchStart={onTouchStart} onFocus={onFocus} onClick={onClick}><Info size={12} aria-hidden /></button></TooltipTrigger><TooltipContent side="top">Cho biết người trực cần gen lại, theo dõi hoặc chuyển Dev; không phải riêng kết quả tạo website.</TooltipContent></Tooltip></TooltipProvider>
+}
 
-    const [filters, setFilters] = useState<GenerationsFilters>({
-        status: 'all',
-        endpoint: '',
-        category: '',
-        dateFrom: '',
-        dateTo: '',
-        search: '',
-        page: 1,
-        limit: 50,
+export function getExportScope(filters: GenerationsFilters) {
+    const unsupported = filters.view !== 'all' || filters.recoveryStatus !== 'all' || Boolean(filters.search || filters.siteId)
+    return unsupported
+        ? 'Export CSV chỉ hỗ trợ toàn bộ generation theo trạng thái, User ID và khoảng thời gian. Hãy bỏ Needs Attention, tìm kiếm, Website ID và recovery status trước khi xuất.'
+        : 'Export tối đa 500 generation theo các bộ lọc trạng thái, User ID và khoảng thời gian hiện tại.'
+}
+
+/**
+ * Keeps the first occurrence of each record. The API uses a stable cursor, but
+ * a record can still appear in a later response after its recovery state is
+ * updated between polls. De-duplicating by ID makes "Tải thêm" safe in that
+ * case without losing the order of already visible rows.
+ */
+export function appendUniqueGenerationRecords(current: GenerationRecord[], incoming: GenerationRecord[]) {
+    const ids = new Set(current.map((record) => record.id))
+    return [...current, ...incoming.filter((record) => !ids.has(record.id))]
+}
+
+/**
+ * A retry acknowledgement is applied optimistically so an operator cannot
+ * submit it twice. A poll started immediately before that acknowledgement can
+ * still return the old `eligible` record; retain the local monitor state until
+ * the API also reports retrying (or a terminal/retry-failed state).
+ */
+export function mergePolledGenerationRecords(incoming: GenerationRecord[], current: GenerationRecord[]) {
+    const currentById = new Map(current.map((record) => [record.id, record]))
+    const merged = incoming.map((record) => {
+        const local = currentById.get(record.id)
+        const staleRetryablePoll = local?.recoveryStatus === 'retrying'
+            && local.recoveryPolicy.action === 'monitor'
+            && record.recoveryPolicy.action === 'retry_website'
+        return staleRetryablePoll ? local : record
     })
+    return appendUniqueGenerationRecords(merged, current)
+}
 
-    const filtersRef = useRef(filters)
-    filtersRef.current = filters
+function sameFilters(a: GenerationsFilters, b: GenerationsFilters) {
+    return a.view === b.view && a.status === b.status && a.recoveryStatus === b.recoveryStatus
+        && a.search === b.search && a.userId === b.userId && a.siteId === b.siteId
+        && a.dateFrom === b.dateFrom && a.dateTo === b.dateTo
+}
 
-    const fetchData = useCallback(async (f: GenerationsFilters, isManual = false) => {
-        if (isManual) setLoading(true)
-        try {
-            const res = await fetch(buildUrl(f))
-            if (!res.ok) return
-            const json = await res.json() as GenerationsListResponse
-            setRecords(json.data)
-            setMeta(json.meta)
-            setLastPoll(new Date())
-        } catch {
-            // silent — poll failure must not crash the page
-        } finally {
-            if (isManual) setLoading(false)
-        }
+export function GenerationsLiveFeed({ initialData }: { initialData: GenerationsListResponse }) {
+    const router = useRouter()
+    const [data, setData] = useState(initialData), [filters, setFilters] = useState<GenerationsFilters>({ view: 'needs_attention', status: 'all', recoveryStatus: 'all', search: '', userId: '', siteId: '', dateFrom: '', dateTo: '', cursor: '', limit: 50 }), [loading, setLoading] = useState(false), [advancedOpen, setAdvancedOpen] = useState(false), [timeRange, setTimeRange] = useState('all'), [loadError, setLoadError] = useState<string | null>(null)
+    const ref = useRef(filters); ref.current = filters
+    useEffect(() => {
+        // A browser Back action returns here too, so a stale marker can never
+        // make a later shared detail URL navigate away from Studio.
+        window.sessionStorage.removeItem(DETAIL_RETURN_MARKER)
     }, [])
-
-    // Initial fetch on filter change
-    useEffect(() => {
-        void fetchData(filters, true)
-    }, [filters, fetchData])
-
-    // Polling every 10s (keep existing behavior)
-    useEffect(() => {
-        if (!live) return
-        const id = setInterval(() => {
-            void fetchData(filtersRef.current)
-        }, POLL_INTERVAL_MS)
-        return () => clearInterval(id)
-    }, [live, fetchData])
-
-    function setFilter<K extends keyof GenerationsFilters>(key: K, val: GenerationsFilters[K]) {
-        setFilters((prev) => ({ ...prev, [key]: val, page: key !== 'page' ? 1 : (val as number) }))
+    const load = useCallback(async (f: GenerationsFilters, mode: 'replace' | 'append' | 'poll' = 'replace', manual = false) => {
+        if (manual) setLoading(true)
+        try {
+            const response = await fetch(buildUrl(f))
+            if (!sameFilters(f, ref.current)) return
+            if (!response.ok) {
+                const body = await response.json().catch(() => null) as { error?: { message?: string } } | null
+                // A failed replace represents the active filter, not the prior
+                // successful query. Clear its rows so stale actions cannot be
+                // applied to a generation that is no longer in scope.
+                if (mode === 'replace') {
+                    setData((current) => ({ ...current, items: [], nextCursor: null, meta: { ...current.meta, totalDocs: 0, hasNextPage: false, hasPrevPage: false } }))
+                }
+                setLoadError(body?.error?.message ?? 'Chưa thể tải generations. Vui lòng thử lại.')
+                return
+            }
+            const next = await response.json() as GenerationsListResponse
+            setLoadError(null)
+            setData((current) => {
+                if (mode === 'append') return { ...next, items: appendUniqueGenerationRecords(current.items, next.items) }
+                if (mode === 'poll') {
+                    const nextCursor = current.nextCursor ?? next.nextCursor
+                    return {
+                        ...next,
+                        items: mergePolledGenerationRecords(next.items, current.items),
+                        nextCursor,
+                        meta: { ...next.meta, hasNextPage: Boolean(nextCursor) },
+                    }
+                }
+                return next
+            })
+        } catch {
+            if (sameFilters(f, ref.current)) {
+                if (mode === 'replace') {
+                    setData((current) => ({ ...current, items: [], nextCursor: null, meta: { ...current.meta, totalDocs: 0, hasNextPage: false, hasPrevPage: false } }))
+                }
+                setLoadError('Chưa thể tải generations. Vui lòng kiểm tra kết nối và thử lại.')
+            }
+        } finally { if (manual) setLoading(false) }
+    }, [])
+    useEffect(() => { void load(filters, 'replace', true) }, [filters, load])
+    useEffect(() => { const id = setInterval(() => void load(ref.current, 'poll'), POLL_INTERVAL_MS); return () => clearInterval(id) }, [load])
+    const clearActiveScope = () => {
+        // Filter/view changes define a new queue scope. Do this synchronously,
+        // before its request starts, so a stale row can never be retried in the
+        // short interval between the input event and the API response.
+        setData((current) => ({ ...current, items: [], nextCursor: null, meta: { ...current.meta, totalDocs: 0, hasNextPage: false, hasPrevPage: false } }))
+        setLoadError(null)
     }
-
-    function handleExport() {
+    const update = <K extends keyof GenerationsFilters>(key: K, value: GenerationsFilters[K]) => {
+        clearActiveScope()
+        setFilters((old) => ({ ...old, [key]: value, cursor: '' }))
+    }
+    const updateStatusFilter = (value: string) => {
+        const [status, recoveryStatus] = value.split(':')
+        clearActiveScope()
+        const requiresAllGenerations = status === 'running' || status === 'success' || recoveryStatus === 'ticket_created'
+        setFilters((old) => ({ ...old, view: requiresAllGenerations ? 'all' : old.view, status: status as GenerationsFilters['status'], recoveryStatus: recoveryStatus as GenerationsFilters['recoveryStatus'], cursor: '' }))
+    }
+    const updateTimeRange = (value: string) => {
+        setTimeRange(value)
+        const now = Date.now()
+        const duration = value === '24h' ? 24 * 60 * 60 * 1000 : value === '7d' ? 7 * 24 * 60 * 60 * 1000 : value === '30d' ? 30 * 24 * 60 * 60 * 1000 : 0
+        clearActiveScope()
+        setFilters((old) => ({ ...old, dateFrom: duration ? new Date(now - duration).toISOString() : '', dateTo: '', cursor: '' }))
+    }
+    const loadMore = () => {
+        if (!data.nextCursor || loading) return
+        void load({ ...filters, cursor: data.nextCursor }, 'append', true)
+    }
+    const exportCsv = () => {
+        // The export endpoint deliberately owns its privacy-safe CSV shape. Only
+        // pass filters it supports; recovery/view filtering remains a live queue
+        // concern and must not make the exported data look more scoped than it is.
         const params = new URLSearchParams()
-        if (filters.status && filters.status !== 'all') params.set('status', filters.status)
-        if (filters.endpoint) params.set('endpoint', filters.endpoint)
-        if (filters.category) params.set('category', filters.category)
-        window.open(`/api/admin/generations/export?${params.toString()}`, '_blank')
+        if (filters.status !== 'all') params.set('status', filters.status)
+        if (filters.userId) params.set('userId', filters.userId)
+        if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
+        if (filters.dateTo) params.set('dateTo', filters.dateTo)
+        window.location.assign(`/api/admin/generations/export?${params}`)
     }
-
-    const selectedRec = useMemo(() => records.find((r) => r.id === selectedId) ?? null, [records, selectedId])
-
-    return (
-        <div className="gen-page">
-            {/* Page head */}
-            <div className="page-head">
-                <div>
-                    <h1 className="page-title">User Generations</h1>
-                    <p className="page-sub">Live feed tất cả các lần user tạo website từ AI prompt — drill-down để xem chi tiết block fill, issues, timeline.</p>
-                </div>
-                <div className="page-actions">
-                    <button
-                        className={`btn btn-sm${live ? ' btn-primary' : ''}`}
-                        onClick={() => setLive((l) => !l)}
-                    >
-                        <span className={`live-dot${live ? ' on' : ''}`} />
-                        {live ? 'Live' : 'Paused'}
-                    </button>
-                    <button className="btn btn-sm" onClick={() => fetchData(filters, true)} disabled={loading}>
-                        <RefreshCw size={12} style={{ animation: loading ? 'spin 1s linear infinite' : undefined }} />
-                        Refresh
-                    </button>
-                    <button className="btn btn-sm" onClick={handleExport}>
-                        <Download size={12} />
-                        Export CSV
-                    </button>
-                </div>
-            </div>
-
-            {/* Stats strip */}
-            <GenStatsStrip
-                records={records}
-                filtered={records.length}
-                total={meta.totalDocs}
-                lastPoll={lastPoll}
-            />
-
-            {/* Filter bar */}
-            <div className="gen-filters">
-                {/* Time range seg (maps to page navigation shortcut — just visual; real filter is dateFrom/dateTo) */}
-                <div className="gen-status-chips">
-                    {STATUS_OPTIONS.map((s) => (
-                        <button
-                            key={s}
-                            className={`g-chip g-chip-${s === 'success' ? 'success' : s === 'failed' ? 'danger' : s === 'running' ? 'accent' : ''}${filters.status === s ? ' active' : ''}`}
-                            onClick={() => setFilter('status', s)}
-                        >
-                            {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-                            <span className="c">{s === 'all' ? meta.totalDocs : records.filter((r) => r.status === s).length}</span>
-                        </button>
-                    ))}
-                </div>
-
-                <div style={{ flex: 1 }} />
-
-                <div className="search-wrap" style={{ minWidth: 220 }}>
-                    <Search size={13} />
-                    <input
-                        value={filters.search}
-                        onChange={(e) => setFilter('search', e.target.value)}
-                        placeholder="Tìm user, endpoint, category…"
-                    />
-                </div>
-            </div>
-
-            {/* Split: list | drill-down */}
-            <div className="gen-split">
-                {/* List */}
-                <div className="gen-list">
-                    <div className="gen-list-head">
-                        <div className="col col-time">Time</div>
-                        <div className="col col-user">User</div>
-                        <div className="col col-prompt">Endpoint & context</div>
-                        <div className="col col-template">Category</div>
-                        <div className="col col-metrics">Metrics</div>
-                        <div className="col col-status">Status</div>
-                    </div>
-                    <div className="gen-list-body scroll-thin">
-                        {loading && records.length === 0 && (
-                            <div className="empty-state">
-                                <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Loading…</div>
-                            </div>
-                        )}
-                        {!loading && records.length === 0 && (
-                            <div className="empty-state">
-                                <div style={{ fontSize: 32, opacity: 0.3 }}>○</div>
-                                <div style={{ fontSize: 13, marginTop: 8 }}>Không có generation phù hợp</div>
-                            </div>
-                        )}
-                        {records.map((rec) => (
-                            <GenRow
-                                key={rec.id}
-                                rec={rec}
-                                selected={selectedId === rec.id}
-                                onClick={() => setSelectedId(rec.id === selectedId ? null : rec.id)}
-                            />
-                        ))}
-
-                        {/* Pagination at bottom of list */}
-                        {meta.totalPages > 1 && (
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
-                                <button
-                                    className="btn btn-sm btn-ghost"
-                                    disabled={!meta.hasPrevPage}
-                                    onClick={() => setFilter('page', filters.page - 1)}
-                                >
-                                    ← Prev
-                                </button>
-                                <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                                    {meta.page} / {meta.totalPages}
-                                </span>
-                                <button
-                                    className="btn btn-sm btn-ghost"
-                                    disabled={!meta.hasNextPage}
-                                    onClick={() => setFilter('page', filters.page + 1)}
-                                >
-                                    Next →
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Drill-down */}
-                <GenDrillDown
-                    rec={selectedRec}
-                    onView={() => setDrawerRecord(selectedRec)}
-                />
-            </div>
-
-            {/* Full detail drawer (shadcn Dialog — kept for deep dive) */}
-            <GenerationDetailDrawer
-                record={drawerRecord}
-                onClose={() => setDrawerRecord(null)}
-            />
-        </div>
-    )
+    const exportScope = getExportScope(filters)
+    const canExport = filters.view === 'all' && filters.recoveryStatus === 'all' && !filters.search && !filters.siteId
+    const retryAccepted = (id: string) => {
+        const apply = (record: GenerationRecord) => record.id === id ? { ...record, recoveryStatus: 'retrying', priority: 'retrying', recoveryPolicy: { action: 'monitor' as const, retryable: false, reasonCode: 'RETRY_IN_PROGRESS' } } : record
+        setData((current) => ({ ...current, items: current.items.map(apply) }))
+    }
+    const openDetail = (id: string) => {
+        window.sessionStorage.setItem(DETAIL_RETURN_MARKER, '1')
+        router.push(`/studio/generations/${encodeURIComponent(id)}`)
+    }
+    const visible = data.items
+    const metric = (priority: string) => visible.filter((item) => item.priority === priority).length
+    return <div className="gen-page f41-generation-page">
+        <p className="f41-caption">Needs Attention là queue mặc định. Success chỉ nằm trong history để người trực thấy lỗi cần xử lý trước.</p>
+        <div className="page-head f41-page-head"><div><h1 className="page-title">User Generations</h1><p className="page-sub">Theo dõi website AI gen, khôi phục lỗi và chuyển Dev khi không thể recovery.</p></div><div className="f41-head-actions"><button className="btn btn-sm" onClick={() => void load(filters, 'replace', true)} disabled={loading}><RefreshCw size={13} /> Làm mới</button><button className="btn btn-sm" onClick={exportCsv} disabled={!canExport} title={exportScope} aria-label={exportScope}><Download size={13} /> Export CSV</button></div></div>
+        <div className="f41-kpis" aria-label="Tổng quan generation đang hiển thị"><div><small>Có thể gen lại</small><b className="amber">{metric('retryable')}</b></div><div><small>Đang gen lại</small><b className="blue">{metric('retrying')}</b></div><div><small>Cần Dev xử lý</small><b className="red">{metric('cannot_recover') + metric('retry_failed')}</b></div><div><small>Đã hoàn tất</small><b className="green">{visible.filter((item) => item.outcome === 'succeeded').length}</b></div><div><small>Đang tạo website</small><b className="blue">{visible.filter((item) => item.lifecycle === 'running').length}</b></div></div>
+        <div className="f41-tabs" aria-label="Generation views">{(['needs_attention', 'all'] as const).map((view) => <button key={view} type="button" aria-pressed={filters.view === view} className={filters.view === view ? 'active' : ''} onClick={() => update('view', view)}>{view === 'needs_attention' ? `Needs Attention · ${data.meta.totalDocs}` : 'All Generations'}</button>)}</div>
+        <p className="f41-status-legend" aria-label="Giải thích hướng xử lý"><b>Hướng xử lý:</b> Có thể gen lại — bấm Gen lại; Đang gen lại — chờ hệ thống; Có dấu hiệu bị kẹt — mở chi tiết; Cần Dev xử lý — chuyển issue cho Dev; Đã chuyển Dev — theo dõi issue.</p>
+        <div className="f41-toolbar"><select className="f41-toolbar-control" aria-label="Lọc theo trạng thái" value={`${filters.status}:${filters.recoveryStatus}`} onChange={(e) => updateStatusFilter(e.target.value)}><option value="all:all">Lọc theo trạng thái</option><option value="failed:all">Có lỗi khi tạo website</option><option value="all:eligible">Có thể gen lại</option><option value="all:retrying">Đang gen lại</option><option value="all:stale_running">Có dấu hiệu bị kẹt</option><option value="all:ticket_required">Cần Dev xử lý — chưa gen lại</option><option value="all:exhausted">Cần Dev xử lý — đã thử gen lại</option><option value="all:ticket_created">Đã chuyển Dev</option><option value="running:all">Đang tạo website</option><option value="success:all">Đã hoàn tất</option></select><select className="f41-toolbar-control" aria-label="Thời gian" value={timeRange} onChange={(e) => updateTimeRange(e.target.value)}><option value="all">Thời gian</option><option value="24h">24 giờ gần đây</option><option value="7d">7 ngày gần đây</option><option value="30d">30 ngày gần đây</option></select><button type="button" className="btn btn-sm f41-toolbar-control" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((open) => !open)}>Bộ lọc khác</button><div className="f41-search"><Search size={14} /><input aria-label="Tìm generation" value={filters.search} onChange={(e) => update('search', e.target.value)} placeholder="Tìm user, website, generation ID…" /></div></div>
+        {loadError && <p role="alert" className="f41-load-error">{loadError}</p>}
+        {advancedOpen && <div className="f41-advanced" aria-label="Bộ lọc nâng cao"><input aria-label="User ID" value={filters.userId} onChange={(e) => update('userId', e.target.value)} placeholder="User ID" /><input aria-label="Website ID" value={filters.siteId} onChange={(e) => update('siteId', e.target.value)} placeholder="Website ID" /><label>Từ <input aria-label="Từ ngày" type="datetime-local" value={toDateTimeLocalValue(filters.dateFrom)} onChange={(e) => update('dateFrom', e.target.value ? new Date(e.target.value).toISOString() : '')} /></label><label>Đến <input aria-label="Đến ngày" type="datetime-local" value={toDateTimeLocalValue(filters.dateTo)} onChange={(e) => update('dateTo', e.target.value ? new Date(e.target.value).toISOString() : '')} /></label></div>}
+        <div className="gen-list"><div className="gen-list-head"><div className="col col-time"><span>Ưu tiên / thời gian</span><GenerationTimeHelp /></div><div className="col col-user">User &amp; website</div><div className="col col-metrics">Trang</div><div className="col col-prompt">Loại sự cố</div><div className="col col-status"><span>Hướng xử lý</span><GenerationStatusHelp /></div><div className="col col-action"><span className="sr-only">Hành động</span></div></div><div className="gen-list-body scroll-thin">{data.items.length === 0 ? <div className="empty-state">Không có generation cần xử lý</div> : data.items.map((r: GenerationRecord) => { const operatorStatus = getOperatorStatus(r); return <div className="gen-row-wrap" key={r.id}><button type="button" onClick={() => openDetail(r.id)} className="gen-row" aria-label={`Xem generation ${r.id}`}><div className="gen-row-time"><span className="t">{priorityLabel[r.priority] ?? '—'} · {relativeTime(r.submittedAt)}</span><span className="id">#{r.id}</span></div><div className="gen-row-user-site"><div className="n">{r.user.label}</div><div className="e">{r.site.label}</div></div><div className="gen-row-metrics" aria-label={`${r.pageSummary.persisted} of ${r.pageSummary.expected ?? 'unknown'} pages persisted; ${r.pageSummary.failed} failed`}><b>{r.pageSummary.persisted}/{r.pageSummary.expected ?? '?'}</b><small>pages</small></div><div className="gen-row-prompt">{r.incidentSummary ? <><b>{r.incidentSummary.label}</b><div className="prompt-text" title={r.incidentSummary.scope}>{r.incidentSummary.scope}{r.incidentSummary.totalErrors > 1 ? ` · +${r.incidentSummary.totalErrors - 1} lỗi khác` : ''}</div></> : <><b>—</b><div className="prompt-text">Không có lỗi ảnh hưởng</div></>}</div><div className="gen-row-status"><span className={`gen-pill gen-pill-${operatorStatus.tone}`} title={operatorStatus.description}>{operatorStatus.label}</span></div></button><div className="gen-row-action"><GenerationRetryAction record={r} onAccepted={retryAccepted} /><button type="button" className="btn btn-sm" onClick={() => openDetail(r.id)}>Xem</button></div></div> })}{data.nextCursor && <button className="btn btn-sm" onClick={loadMore} disabled={loading}>Tải thêm</button>}</div></div><p className="f41-list-note">`Gen lại website` tạo child generation bằng form gốc; parent và evidence lỗi luôn được giữ.</p>
+    </div>
 }
