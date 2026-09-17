@@ -38,10 +38,30 @@ vi.mock('@/blocks/shared/SectionWrapper', () => ({
 }))
 
 import { BlogListBlock } from '@/blocks/blog-list'
+import en from '@/i18n/locales/en.json'
+import ms from '@/i18n/locales/ms.json'
 
 describe('BlogListBlock locale rendering', () => {
     afterEach(() => {
         vi.unstubAllGlobals()
+    })
+
+    it.each([
+        ['cards', 'en', '   ', en.storefront.blog.noPosts],
+        ['list', 'ms-MY', '', ms.storefront.blog.noPosts],
+        ['cards', 'fr', 'Aucun article.', 'Aucun article.'],
+    ])('[TC-F35.M20] renders %s empty state for %s without an app locale provider', async (variant, locale, label, expected) => {
+        // Arrange
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ docs: [] }) }))
+        const props = {
+            block: { blockType: 'blog-list', variant, headline: 'News', emptyStateLabel: label },
+            theme: { colorMode: 'light' },
+            site: { tenant: 7, generationLocale: locale },
+        } as unknown as React.ComponentProps<typeof BlogListBlock>
+        // Act
+        render(<BlogListBlock {...props} />)
+        // Assert
+        expect(await screen.findByRole('status')).toHaveTextContent(expected)
     })
 
     it('renders persisted French labels and formats dates with the site locale', async () => {

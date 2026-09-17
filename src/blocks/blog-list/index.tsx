@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { FileText } from 'lucide-react'
-import { useI18n } from '@/i18n'
+import en from '@/i18n/locales/en.json'
+import ms from '@/i18n/locales/ms.json'
 import type { BlockProps } from '../types'
 import { SmartLink } from '@/blocks/_shared/smart-link'
 import type { BlogListConfig } from './config'
@@ -60,8 +61,6 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         uncategorizedLabel = 'Uncategorized',
         emptyStateLabel,
     } = block
-    const { t } = useI18n()
-    const emptyMessage = emptyStateLabel?.trim() || t.storefront.blog.noPosts
     const headline = block.headline || block.sectionLabel || ''
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
@@ -78,6 +77,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         (typeof siteRec?.generationLocale === 'string' && siteRec.generationLocale)
         || (typeof siteRec?.locale === 'string' && siteRec.locale)
         || 'en'
+    const emptyMessage = emptyStateLabel?.trim() || (siteLocale.toLowerCase().split('-')[0] === 'ms' ? ms : en).storefront.blog.noPosts
     const blogPreviewPath = typeof siteRec?.blogPreviewPath === 'string' ? (siteRec.blogPreviewPath as string) : null
     const explicitBase = typeof siteRec?.siteBasePath === 'string' ? (siteRec.siteBasePath as string) : null
     const tenantSlugRaw =
