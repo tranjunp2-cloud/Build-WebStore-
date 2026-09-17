@@ -38,7 +38,7 @@ The preload reads `.env.local` / `.env` from the working directory; existing pro
 - Rerun the same command to retry failed stores. Completed stores with unchanged input are skipped. Changed completed input requires `--rerun`; this also explicitly regenerates unchanged completed stores. Replacement requires a draft site.
 - Progress, mappings and generation/backup artifacts are stored in `pw1_migration_accounts`, `pw1_migration_stores`, `pw1_migration_attempts` and `pw1_migration_batches`. No per-store JSON files are generated. These tables are installed by `db-setup.js` and bootstrapped idempotently by the command.
 
-A database-wide advisory lock prevents overlapping batch commands. Retries reuse the mapped account/tenant/site and tenant-keyed source media cache. Site/page replacement and its commit receipt are atomic; media preparation remains outside the transaction for reuse. The website adapter supports English/Malay and single-segment paths. Product/blog blocks read PW2 database records and show their native empty states when no records exist. Product filters and source-specific sorting remain pending. The command does not import products, blogs or orders and does not publish sites.
+A database-wide advisory lock prevents overlapping batch commands. Retries reuse the mapped account/tenant/site and tenant-keyed source media cache. Site/page replacement and its commit receipt are atomic; media preparation remains outside the transaction for reuse. The website adapter supports English/Malay and single-segment paths. Product/blog blocks read PW2 database records and show their native empty states when no records exist. Product filters and source-specific sorting remain pending. The command does not import products, blogs or orders. Successful stores are automatically published after migration and cleanup.
 
 Local verification: the Amelina array reused user 1847 and provisioned tenant 1821/site 3659. After one rejected AI design, the same command succeeded using that mapping; a subsequent identical run skipped the completed store. Production execution across 1,300+ users has **not** been load-tested.
 
@@ -173,7 +173,7 @@ Local integration: `npx tsx --require ./scripts/seed-preload.cjs scripts/tests/p
 
 ### Automatic cleanup in the single migration command
 
-`npm run migrate:pw1 -- input.json` now handles: failed attempt → rollback → retry when allowed → terminal store failure → queue cleanup → finish/drain all store work → clean queued orphan media → final report. No second command or seven-day wait is required for this path.
+`npm run migrate:pw1 -- input.json` now handles: failed attempt → rollback → retry when allowed → failed-attempt media (whether the store eventually succeeds or fails) → queue cleanup → finish/drain all store work → clean queued orphan media → final report. No second command or seven-day wait is required for this path.
 
 An async store scope tracks IDs returned by actual new imports across all attempts. Cache hits and existing uploaded files recovered by filename are not included. Cleanup runs after all preparation and website writes have drained, uses the runner's existing batch lock, and refuses committed or unresolved attempts. It reuses the reference/storage deletion checks; website, versions, other tenants and `site-before.json` backups remain protected. Temporary generated artifacts from this store's failed attempts are diagnostic, not live references, and do not keep new orphan uploads alive.
 
@@ -244,7 +244,7 @@ Reads mapped sites/pages from DB and visits published `/sites/{tenantSlug}` rout
 
 Outputs JSON + `.md` plus incremental `.jsonl` page results. Each finding has store/page/URL, block index when available and viewport. Per-store status distinguishes `needs-fix`, `needs-review`, `waiting-be`, `checked`, `not-checked`. Exit 2 means detected errors, skipped/unpublished stores or invalid input entries; warnings/BE waits remain visible without making the command fail. Browser/DB setup failures exit 1. An HTTP 200 cannot prove absence of a rendered soft-404, and the scan does not exercise hover menus, carousel navigation or purchase flows.
 
-To retain a single migrate invocation, add both `--audit-base-url ORIGIN --audit-output REPORT.json` to the normal run/retry command. Audit runs after successful batch completion; draft sites are reported as not checked (migration still does not auto-publish). A failed batch keeps its existing error flow; run `audit` separately to inspect its published results. GitHub runner needs Chromium installed as described above, and a reachable running PW2 application. Each page is bounded to 160 scroll steps, 30-second navigation and 15-second link checks; incomplete scan is reported. Only up to 2,000 unique same-store links are requested, redirects are reported rather than followed, and external link health is not checked.
+To retain a single migrate invocation, add both `--audit-base-url ORIGIN --audit-output REPORT.json` to the normal run/retry command. Audit runs after the batch drains, including when individual stores failed; fatal setup failures and cancellation do not start an audit. Migration failure still produces a nonzero exit even if audit succeeds; draft sites are reported as not checked (failed migrations/publications remain unpublished). The combined command audits available published results even after partial migration failure; failed/draft stores remain visible as not checked. GitHub runner needs Chromium installed as described above, and a reachable running PW2 application. Each page is bounded to 160 scroll steps, 30-second navigation and 15-second link checks; incomplete scan is reported. Only up to 2,000 unique same-store links are requested, redirects are reported rather than followed, and external link health is not checked.
 
 ### GitHub Actions (deferred)
 
@@ -263,3 +263,57 @@ Corrections participate in the input hash. They are not fuzzy path matching; ext
 The existing read-only PW1 homepage scan now captures rendered Swiper image frame ratio, image fit and visible slide count. Exact source image URLs bind this evidence to Small banner components, with conflicting observations rejected. Explicit input layout values win. `carousel-evidence.json` records applied/unverified components. This is rendered homepage evidence, not coverage of every legacy theme: inaccessible pages, CSS background images, non-Swiper carousels and inner-page-only banners may still need explicit source configuration. No intrinsic image-size or fixed-height heuristic is used.
 
 Audit scrolling now allows up to 160 steps (previously 20); pages exceeding that bound still produce `SCAN_LIMIT`. Cleanup adds a conservative pages/sites preflight, and local reset reference queries are grouped in batches of 20 tables. Deletion still requires the full locked reference check. Run cleanup during an idle period; concurrent CMS writes can safely reject the lock rather than bypass checks.
+
+
+### Bounded retry and completion checks (2026-09-17)
+
+Each uncommitted generation/apply failure gets up to `--max-attempts` total attempts (default 3, including the initial attempt). AI layout validation and unknown execution errors are included. Safety conflicts, cancellation and operational budgets stop retries. Exhaustion records the store failure and continues the pool; the command exits nonzero only after draining and reporting. Provisioning and preflight retain their separate checks.
+
+Native AI structured output restricts source IDs to permitted block/variant pairs; binder validation still checks exact page/section order and source fidelity. This prevents a category from choosing a product block through independent global enums.
+
+After retries drain, cleanup examines media created during failed attempts even when a subsequent attempt succeeded. Only failed attempt IDs are eligible for runtime-artifact exclusion. Successful attempt artifacts, live documents, versions and before-state backups still protect media; no committed attempt is excluded from reference scanning.
+
+### Missing source-page links (2026-09-17)
+
+The regular batch runner calls `prepareSourceLinks` before generation. Known migrated pages and verified category mappings still resolve first. Remaining same-host page links are checked with the existing CLI browser dependency (up to 10 unique URLs/store, 5 seconds/navigation, 30-second browser budget after launch). External and BE entity links are not probed. DNS guards reject private hosts and cross-host navigations; no authentication/cookies are supplied. As with the existing brand scanner, the source browser permits legacy TLS certificate errors, but other TLS/connection failures remain unverified.
+
+Only same-host HTTP 404/410 responses disable a missing-page link. HTTP 200 alone does not prove a valid source page (PW1 can return an empty SPA shell); retain it for source/input review. Network failures, redirects, server errors and scanner limits retain the link with a diagnostic. No guessed destination or store-specific URL list is used.
+
+Confirmed broken rich-text anchors are unwrapped, preserving text/media. Broken menu items are omitted, promoting valid children. Broken banner CTA labels are preserved as description text with no clickable button. Card content remains, with its broken URL removed. `source-link-checks.json` records URL, status, reason, timestamp and source locations; JSON batch reports expose these checks. `--dry-run` reports missing links without launching a network scan. This does not import a missing page from a live website or edit previously migrated sites; it applies during generation in the normal migration script.
+
+
+### Automatic publish in the same command (2026-09-17)
+
+```sh
+npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts input.json --concurrency 5
+# Resume publication without regenerating completed stores:
+npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts retry input.json
+```
+
+Regular run/retry automatically publishes completed stores using `NEXT_PUBLIC_SERVER_URL` (HTTPS or local HTTP). The app must be running against the same destination DB and Payload secret. No publish flag, new environment variable or link-list export is needed. Dry-run and reporting commands never publish.
+
+After migration and cleanup drain, publication runs sequentially via the existing authenticated publish API, preserving its subscription checks, validation, draft/page-version promotion and cache invalidation. Only completed store mappings with the same input hash/owner are eligible. Already published sites are left untouched. Completed stores skipped by generation can still publish, including on `retry INPUT`.
+
+Publish has its own bounded attempts using `--max-attempts` (default 3), never regenerates a completed store and continues after failure. A publish timeout rechecks destination status before another request. HTTP 429 Retry-After is honored up to 60 seconds per wait. Results contain `publish.status`, `attempts`, and error when present; JSON totals include published/publishFailed and CSV includes the publish field. Publish failure leaves migration completion intact but causes a nonzero batch exit; a requested audit still runs after the batch drains. No automatic link list is produced.
+
+
+### Page-scoped carousel preparation (2026-09-17)
+
+Normal migration now runs a dedicated source-carousel scan before native AI generation. It visits original input paths containing Small banners, including inner pages; generated PW2 slugs are never used as PW1 paths. Frames are scoped to source page ID and matched by exact source image/declared srcset URLs. Supports Swiper, Slick, Owl and Bootstrap carousel structures, including simple CSS URL backgrounds with cover/contain. Gap-aware slide pitch determines visible count; image resolution never determines layout.
+
+Explicit input geometry wins. Conflicting same-page frames or missing matches remain unchanged with a reason in `carousel-evidence.json`. `carousel-scan.json` records source page URLs, observed frames and failed/budget-exhausted pages. The binder keeps measured aspectRatio/imageFit/slidesPerView independently of the AI's images/cards variant selection.
+
+A larger image is used only when declared by srcset, actually loaded and ratio-compatible with the loaded original. No URL rewriting or image enlargement is presented as recovered quality. Verified source images enlarged more than 2× in their observed frame generate page/component warnings; this is not a guarantee about final desktop/mobile sharpness.
+
+The scanner is serialized across stores, limited to 12 source pages and 60 seconds after browser launch (10-second launch timeout), with bounded navigation, scrolling and image probes. Public-network checks and same-host navigation apply; legacy TLS certificates are tolerated for read-only source inspection. Source failures are warnings and do not manufacture layout evidence. Unsupported slider markup, background-size:auto, ambiguous shared images, inaccessible pages, and pages beyond the budget retain PW2 fallback. Brand scanning no longer also scans carousels.
+
+Validation: 165 migration unit tests, TypeScript, real-browser fixtures for gaps/backgrounds/declared alternatives, and read-only live source checks on 205/416/253. No reset or regeneration of the 30 pilot sites in this change.
+
+
+### PW1 SPA missing-link verification (2026-09-17)
+
+The regular migration source-link step now permits SPA rendering and observes the public /pages response. Absence evidence requires a complete nonempty single-page inventory with exact pagination counts and every row scoped to the expected source store. Partial/mixed-store inventories are ignored. Existing destinations and redirects to an existing page are retained. A visible not-found heading plus Back to Home control also confirms a rendered soft404 despite HTTP200. Network/TLS errors, loading shells without inventory and server errors alone do not disable links.
+
+For legacy HTTPS TLS failures, a fresh HTTP page is attempted on the same source host. Public-network guards, same-host navigation, a 60-second browser lifetime and 10-URL cap remain in place. Reports retain final URL, inventory and decision reason per source URL. Existing adapter handling removes confirmed dead links while preserving CTA text/images. No store-ID exceptions or guessed destination rewrites.
+
+Validated with 168 unit tests, browser visibility fixtures, direct checks of all eight URLs and a scoped rerun of stores 1042/1033/645. All three automatically republished; eight links disabled; public audit zero errors/warnings. Other sites remain unchanged.

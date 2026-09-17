@@ -18,3 +18,27 @@ describe('[TC-F35.M41] observed source frames',()=>{
         expect(blueprint.nativeContract.pages[0].components[0].block.sourceLayout).toEqual({size:'small'})
     })
 })
+
+describe('[TC-F35.M49] page-scoped carousel preparation',()=>{
+    it('does not reuse homepage evidence for another page containing the same image',()=>{
+        const blueprint=fixture()
+        blueprint.nativeContract.pages[0].isHomepage=false
+        const frame={imageUrl:'https://example.test/a.jpg',aspectRatio:2,imageFit:'cover' as const,slidesPerView:3}
+        expect(applyCarouselEvidence(blueprint,[frame])[0].status).toBe('unverified')
+        expect(applyCarouselEvidence(blueprint,[{...frame,pageId:'99'}])[0].status).toBe('unverified')
+        expect(applyCarouselEvidence(blueprint,[{...frame,pageId:'1'}])[0].status).toBe('observed-source-frame')
+    })
+    it('keeps explicit geometry and selects only a verified declared alternate',()=>{
+        const blueprint=fixture()
+        blueprint.nativeContract.pages[0].components[0].block.sourceLayout={size:'small',aspectRatio:3,imageFit:'contain',slidesPerView:2}
+        const records=applyCarouselEvidence(blueprint,[{pageId:'1',imageUrl:'https://example.test/large.jpg',sourceImageUrls:['https://example.test/a.jpg'],aspectRatio:2,imageFit:'cover',slidesPerView:3,naturalWidth:1200,naturalHeight:600,frameWidth:400,frameHeight:200}])
+        expect(blueprint.nativeContract.pages[0].components[0].block).toMatchObject({sourceLayout:{aspectRatio:3,imageFit:'contain',slidesPerView:2},slides:[{image:{url:'https://example.test/large.jpg'}}]})
+        expect(records[0]).toMatchObject({pageId:'1',sourceId:'2',status:'explicit-source-config',images:[{sourceUrl:'https://example.test/a.jpg',selectedUrl:'https://example.test/large.jpg'}]})
+    })
+    it('keeps image and layout unchanged when the same-page frames conflict',()=>{
+        const blueprint=fixture(),before=JSON.stringify(blueprint)
+        const f={pageId:'1',imageUrl:'https://example.test/large.jpg',sourceImageUrls:['https://example.test/a.jpg'],aspectRatio:2,imageFit:'cover' as const,slidesPerView:3}
+        expect(applyCarouselEvidence(blueprint,[f,{...f,slidesPerView:2}])[0].status).toBe('unverified')
+        expect(JSON.stringify(blueprint)).toBe(before)
+    })
+})

@@ -1,5 +1,5 @@
 import type { MigrationDestination } from './pw1-destination'
-import { LinkCorrectionsSchema, createSourceLinkResolver, rewriteSourceHtmlLinks } from './pw1-links'
+import { type SourceLinkFinding, LinkCorrectionsSchema, createSourceLinkResolver, rewriteSourceHtmlLinks } from './pw1-links'
 import { SiteSettingsSchema } from './pw1-site-settings'
 import { z } from 'zod'
 import { ContractSchema } from './pw1-contract'
@@ -14,7 +14,7 @@ export const WebsiteInputSchema = z.object({ linkCorrections: LinkCorrectionsSch
 const Slide = z.object({ imageUrl: Url, alt: z.string().default(''), heading: z.string().default(''), description: z.string().default(''), cta: z.object({ label: z.string(), url: z.string() }).nullable().optional() }).strict()
 const Categories = z.object({ heading: z.string(), items: z.array(z.object({ sourceId: Id, title: z.string(), imageUrl: Url, alt: z.string().optional(), url: Url.optional(), pageId: Id.optional(), ctaLabel: z.string().optional() }).strict()) }).strict()
 /** Adapt the compact public contract only; never read a previous export or live DB. */
-export function adaptWebsiteInput(input: unknown, verifiedCategories: MigrationDestination['productCategories'] = []) {
+export function adaptWebsiteInput(input: unknown, verifiedCategories: MigrationDestination['productCategories'] = [], brokenSourceUrls: readonly string[] = []) {
     const data = WebsiteInputSchema.parse(input)
     const ids = new Set<string>(), paths = new Set<string>(), componentIds = new Set<string>()
     for (const page of data.pages) {
@@ -54,16 +54,22 @@ export function adaptWebsiteInput(input: unknown, verifiedCategories: MigrationD
         return { ...category, destinationPath: pageRoutes.get(category.listingPageId)!.path }
     })
     const linkWarnings: string[] = []
+    const linkFindings: SourceLinkFinding[] = []
     const resolveSourceLink = createSourceLinkResolver(data.source.websiteUrl, [...data.pages.map(page => ({ sourcePath: page.path, destinationPath: pageRoutes.get(page.sourceId)!.path })), { sourcePath: '/checkout', destinationPath: '/checkout' }], linkWarnings, categoryLinks, (data.linkCorrections ?? []).map(correction => {
         const route = pageRoutes.get(correction.pageId)
         if (!route) throw new Error(`Reviewed link correction targets missing page ${correction.pageId}`)
         linkWarnings.push(`Reviewed source link correction: ${correction.from} -> ${route.path} (${correction.reason})`)
         return { from: correction.from, destinationPath: route.path }
-    }))
-    const link = (value: InputLink): ResolvedLink => {
-        const url = value.pageId ? pageRoutes.get(value.pageId)?.path : value.url ? resolveSourceLink(value.url) : undefined
+    }), { brokenUrls: brokenSourceUrls, findings: linkFindings })
+    const link = (value: InputLink, location = 'navigation'): ResolvedLink => {
+        const url = value.pageId ? pageRoutes.get(value.pageId)?.path : value.url ? resolveSourceLink(value.url, location) : undefined
+        if (url === '') return { label: value.label, url: '' }
         if (!url || !/^(https?:\/\/|\/(?!\/)|#)/.test(url)) throw new Error('Invalid navigation target')
-        return { label: value.label, url, ...(value.children?.length ? { children: value.children.map(link) } : {}) }
+        return { label: value.label, url, ...(value.children?.length ? { children: value.children.flatMap(child => menuLink(child, location)) } : {}) }
+    }
+    const menuLink = (value: InputLink, location: string): ResolvedLink[] => {
+        const resolved = link(value, `${location}/${value.label}`)
+        return resolved.url ? [resolved] : (value.children ?? []).flatMap(child => menuLink(child, location))
     }
     // Recognize only same-origin legacy system routes; external links stay ordinary links.
     const systemFeature = (value: z.infer<typeof Link>) => {
@@ -81,7 +87,7 @@ export function adaptWebsiteInput(input: unknown, verifiedCategories: MigrationD
     }
     // PW2 order lookup is enabled by the native cart system.
     if (features.orderTracking && !features.cart) throw new Error('PW2 order tracking requires cart to be enabled')
-    const navigation = data.website.navigation.filter(value => !systemFeature(value)).map(link)
+    const navigation = data.website.navigation.filter(value => !systemFeature(value)).flatMap(value => menuLink(value, 'navigation'))
     const pending: Array<{ pageId: string; sourceId: string; type: string; config: unknown; reason: string }> = []
     const excluded: string[] = []
     const warnings: string[] = routeChanges.map(p => `Store ${data.source.storeId}: page ${p.sourceId} retained at temporary URL ${p.destinationPath} (source URL ${p.sourcePath}); review duplicate page after migration`)
@@ -97,13 +103,13 @@ export function adaptWebsiteInput(input: unknown, verifiedCategories: MigrationD
         let block: Record<string, unknown>
         if (component.type === 'banner') {
             const content = z.object({ slides: z.array(Slide).min(1) }).strict().parse(component.content)
-            block = { blockType: 'hero', headline: '', slides: content.slides.map(s => ({ headline: s.heading, subheadline: s.description, image: { url: s.imageUrl, alt: s.alt }, ctaButtons: s.cta ? [{ ...s.cta, url: resolveSourceLink(s.cta.url) }] : [] })), sourceLayout: { ...(component.config.aspectRatio ? { aspectRatio: component.config.aspectRatio } : {}), ...(component.config.imageFit ? { imageFit: component.config.imageFit } : {}), ...(component.config.slidesPerView ? { slidesPerView: component.config.slidesPerView } : {}), sourceComponentId: component.sourceId, size: component.config.size ?? 'hero', autoplay: component.config.autoplay ?? false, interval: component.config.intervalMs ?? 5000 } }
+            block = { blockType: 'hero', headline: '', slides: content.slides.map((s, slideIndex) => { const url = s.cta ? resolveSourceLink(s.cta.url, `page:${page.sourceId}/component:${component.sourceId}/slide:${slideIndex}`) : undefined; return { headline: s.heading, subheadline: s.cta && url === '' ? [s.description, s.cta.label].filter(Boolean).join('\n') : s.description, image: { url: s.imageUrl, alt: s.alt }, ctaButtons: s.cta && url ? [{ ...s.cta, url }] : [] } }), sourceLayout: { ...(component.config.aspectRatio ? { aspectRatio: component.config.aspectRatio } : {}), ...(component.config.imageFit ? { imageFit: component.config.imageFit } : {}), ...(component.config.slidesPerView ? { slidesPerView: component.config.slidesPerView } : {}), sourceComponentId: component.sourceId, size: component.config.size ?? 'hero', autoplay: component.config.autoplay ?? false, interval: component.config.intervalMs ?? 5000 } }
         } else if (component.type === 'rich_text') {
             const content = z.object({ html: z.string() }).strict().parse(component.content)
-            block = { blockType: 'rich-text', html: rewriteSourceHtmlLinks(content.html, resolveSourceLink), paddingY: component.config.paddingY ?? 64 }
+            block = { blockType: 'rich-text', html: rewriteSourceHtmlLinks(content.html, url => resolveSourceLink(url, `page:${page.sourceId}/component:${component.sourceId}/html`)), paddingY: component.config.paddingY ?? 64 }
         } else if (component.type === 'category_listing') {
             const content = Categories.parse(component.content)
-            block = { blockType: 'content-cards', variant: 'categories', headline: content.heading, sourceContent: { capturedAt: data.source.capturedAt ?? '', bindingStatus: 'captured-public-content', items: content.items.map(i => ({ sourceId: i.sourceId, title: i.title, image: { url: i.imageUrl, alt: i.alt ?? i.title }, url: i.pageId ? link({ label: i.ctaLabel ?? i.title, pageId: i.pageId }).url : i.url ? resolveSourceLink(i.url) : undefined, ctaLabel: i.ctaLabel })) } }
+            block = { blockType: 'content-cards', variant: 'categories', headline: content.heading, sourceContent: { capturedAt: data.source.capturedAt ?? '', bindingStatus: 'captured-public-content', items: content.items.map(i => ({ sourceId: i.sourceId, title: i.title, image: { url: i.imageUrl, alt: i.alt ?? i.title }, url: i.pageId ? link({ label: i.ctaLabel ?? i.title, pageId: i.pageId }).url : i.url ? resolveSourceLink(i.url, `page:${page.sourceId}/component:${component.sourceId}/item:${i.sourceId}`) || undefined : undefined, ctaLabel: i.ctaLabel })) } }
         } else {
             const content = z.object({ heading: z.string() }).strict().parse(component.content)
             const product = component.type === 'product_listing'
@@ -113,8 +119,8 @@ export function adaptWebsiteInput(input: unknown, verifiedCategories: MigrationD
         }
         return [{ sourceId: component.sourceId, position: index, kind: component.type, block }]
     }) }))
-    const footerColumns = data.website.footer.columns.map(c => ({ title: c.title, links: c.links.map(link) }))
+    const footerColumns = data.website.footer.columns.map(c => ({ title: c.title, links: c.links.flatMap(value => menuLink(value, `footer/${c.title}`)) }))
     warnings.push(...linkWarnings)
     const contract = ContractSchema.parse({ format: 'pw2-reconstruction-contract', version: '1.0.0', source: { storeId: data.source.storeId, url: data.source.websiteUrl, capturedAt: data.source.capturedAt ?? '', dumpHash: '' }, site: { settings: data.website.settings, name: data.website.name, locale: data.website.locale, features, navigation: { blockType: 'navigation', logoText: data.website.name, logo: { url: data.website.branding.logoUrl, alt: data.website.name }, links: navigation }, footer: { blockType: 'footer', logoText: data.website.name, copyrightText: data.website.footer.copyright, tagline: data.website.footer.tagline, columns: footerColumns } }, pages, reconciliation: [...warnings, ...pending.map(p => `${p.sourceId}: ${p.reason}`), ...excluded.map(id => `${id}: disabled component excluded`)] })
-    return { contract, report: { inputFormat: data.format, locale: data.website.locale, sourceComponents: data.pages.reduce((sum,p) => sum+p.components.length,0), mappedComponents: pages.reduce((sum,p) => sum+p.components.length,0), pending, excluded, warnings, routeChanges, sourceConfigs: data.pages.flatMap(p=>p.components.map(c=>({ pageId:p.sourceId, sourceId:c.sourceId, config:c.config }))) } }
+    return { contract, report: { inputFormat: data.format, locale: data.website.locale, sourceComponents: data.pages.reduce((sum,p) => sum+p.components.length,0), mappedComponents: pages.reduce((sum,p) => sum+p.components.length,0), pending, excluded, warnings, linkFindings, routeChanges, sourceConfigs: data.pages.flatMap(p=>p.components.map(c=>({ pageId:p.sourceId, sourceId:c.sourceId, config:c.config }))) } }
 }

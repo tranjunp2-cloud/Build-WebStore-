@@ -57,3 +57,16 @@ describe('[TC-F35.M42] legacy image-only link names',()=>{
         expect(rewriteSourceHtmlLinks('<a class="citation" href="https://example.test/article"><span></span></a>',value=>value)).toContain('aria-label="Open link to example.test"')
     })
 })
+
+describe('[TC-F35.M47] confirmed broken source links', () => {
+    it('disables only confirmed missing pages, preserves rich content and BE/external links', () => {
+        const findings: import('@/lib/migration/pw1-links').SourceLinkFinding[] = []
+        const resolve = createSourceLinkResolver('https://shop.example', [], [], [], [], { brokenUrls: ['https://shop.example/about', 'https://shop.example/products?category=2'], findings })
+        const html = rewriteSourceHtmlLinks('<a href="/about"><strong>About</strong><img src="/photo.jpg"></a>', url => resolve(url, 'page:1/component:2'))
+        expect(html).toBe('<strong>About</strong><img src="/photo.jpg">')
+        expect(resolve('/products?category=2')).toBe('/products?category=2')
+        expect(resolve('https://other.example/about')).toBe('https://other.example/about')
+        expect(resolve('/unverified')).toBe('/unverified')
+        expect(findings).toContainEqual({ url: 'https://shop.example/about', location: 'page:1/component:2', reason: 'confirmed-broken', action: 'disabled' })
+    })
+})

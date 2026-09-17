@@ -1,8 +1,8 @@
-/** TC-F35.M32–M34: real local CLI budgets, retry, reports and BE gate. Calls configured AI. */
+/** TC-F35.M32–M34 / M46: real local CLI budgets, retry, reports and BE gate. Calls configured AI. */
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Client } from 'pg'
@@ -26,9 +26,9 @@ async function main() {
     await writeFile(strictInput, JSON.stringify([{ ...strict, website: { ...strict.website, pages: [{ sourceId: '1', title: 'Home', path: '/', components: [
         { sourceId: '2', type: 'product_listing', content: { heading: 'Products' }, binding: { source: 'pw2.database', collection: 'products', scope: 'site', emptyBehavior: 'native-empty-state' } },
     ] }] } }]), { mode: 0o600 })
-    const cli = async (...args: string[]) => {
+    const cliAtOrigin = async (origin: string, ...args: string[]) => {
         try {
-            const result = await exec(process.execPath, ['--require', './scripts/seed-preload.cjs', '--import', 'tsx', 'scripts/migrate-pw1.ts', ...args], { timeout: 240000, maxBuffer: 10 * 1024 * 1024 })
+            const result = await exec(process.execPath, ['--require', './scripts/seed-preload.cjs', '--import', 'tsx', 'scripts/migrate-pw1.ts', ...args], { env: { ...process.env, NEXT_PUBLIC_SERVER_URL: origin }, timeout: 240000, maxBuffer: 10 * 1024 * 1024 })
             return { code: 0, output: result.stdout }
         } catch (error) {
             const failure = error as { code?: number; stdout?: string; stderr?: string }
@@ -36,6 +36,7 @@ async function main() {
             return { code: failure.code, output: failure.stdout ?? '', error: failure.stderr }
         }
     }
+    const cli = (...args: string[]) => cliAtOrigin('http://localhost:3000', ...args)
     try {
         // TC-F35.M36: real failure after importing logo; the next store must still run.
         const failInput = join(dir, 'failure-cleanup.json')
@@ -43,24 +44,34 @@ async function main() {
         await writeFile(failInput, JSON.stringify([{ ...failedFixture, website: { ...failedFixture.website,
             settings: { branding: { logo: failedFixture.website.branding.logoUrl, favicon: 'https://example.test/not-approved.png' }, contactInfo: {}, socialLinks: {}, seo: {} },
         } }, fixture(ids[5])]), { mode: 0o600 })
-        const failedRun = await cli(failInput)
+        const auditOutput = join(dir, 'partial-publish-audit.json')
+        const failedRun = await cli(failInput, '--concurrency', '1', '--max-attempts', '3', '--audit-base-url', 'http://localhost:3000', '--audit-output', auditOutput)
         assert.equal(failedRun.code, 1, failedRun.output)
         const failureBatch = (await client.query("SELECT * FROM pw1_migration_batches WHERE results @> $1::jsonb ORDER BY started_at DESC LIMIT 1", [JSON.stringify([{ sourceStoreId: ids[4] }])])).rows[0]
         const failedResult = failureBatch.results.find((r: { sourceStoreId: string }) => r.sourceStoreId === ids[4])
         assert.equal(failedResult.status, 'failed')
+        const failedAttempts = (await client.query('SELECT attempt_number,status FROM pw1_migration_attempts WHERE batch_id=$1 AND source_store_id=$2 ORDER BY attempt_number', [failureBatch.id,ids[4]])).rows
+        assert.deepEqual(failedAttempts.map(a => a.attempt_number), [1,2,3])
+        assert.ok(failedAttempts.every(a => a.status === 'failed'))
+        assert.ok(failedRun.error?.includes('retrying automatically'))
         assert.equal(failedResult.mediaCleanup.status, 'completed', JSON.stringify(failedResult))
         assert.equal(failedResult.mediaCleanup.results.length, 1)
         assert.equal(failedResult.mediaCleanup.results[0].status, 'deleted')
-        assert.equal(failureBatch.results.find((r: { sourceStoreId: string }) => r.sourceStoreId === ids[5]).status, 'completed', JSON.stringify(failureBatch.results) + failedRun.error)
+        assert.ok(['completed','completed_with_warnings'].includes(failureBatch.results.find((r: { sourceStoreId: string }) => r.sourceStoreId === ids[5]).status), JSON.stringify(failureBatch.results) + failedRun.error)
+        assert.equal(failureBatch.results.find((r: { sourceStoreId: string }) => r.sourceStoreId === ids[5]).publish.status, 'published')
+        assert.equal(failedResult.publish, undefined)
+        const audited = JSON.parse(await readFile(auditOutput,'utf8'))
+        assert.equal(audited.summary.checked, 1)
+        assert.equal(audited.summary.skipped, 1)
         const failedMapping = (await client.query('SELECT tenant_id FROM pw1_migration_stores WHERE source_store_id=$1', [ids[4]])).rows[0]
         assert.equal((await client.query('SELECT count(*)::int AS n FROM pw1_migration_media WHERE tenant_id=$1', [failedMapping.tenant_id])).rows[0].n, 0)
-        console.log('PASS: one batch automatically cleans newly imported image on failure and completes next store')
+        console.log('PASS: one batch automatically cleans failed media, generates/publishes next store and audits partial completion')
         const dry = await cli(input, '--dry-run', '--max-generation-attempts', '1')
         assert.equal(dry.code, 0, dry.output)
         const first = await cli(input, '--max-generation-attempts', '1', '--concurrency', '1')
         assert.equal(first.code, 1, first.output)
         const batch = (await client.query("SELECT * FROM pw1_migration_batches WHERE results @> $1::jsonb ORDER BY started_at DESC LIMIT 1", [JSON.stringify([{ sourceStoreId: ids[0] }])])).rows[0]
-        assert.deepEqual(batch.results.map((r: { status: string }) => r.status), ['completed', 'deferred', 'deferred'])
+        assert.deepEqual(batch.results.map((r: { status: string }) => r.status === 'completed_with_warnings' ? 'completed' : r.status), ['completed', 'deferred', 'deferred'])
         assert.equal((await client.query('SELECT count(*)::int AS n FROM pw1_migration_stores WHERE source_store_id=ANY($1)', [ids.slice(0,3)])).rows[0].n, 1)
         const report = await cli('report', '--batch', batch.id)
         assert.equal(report.code, 0)
@@ -75,13 +86,31 @@ async function main() {
         assert.ok(csv.output.startsWith('"sourceStoreId"'))
         console.log('PASS: generation limit defers remaining stores before provisioning; JSON/CSV report includes usage')
 
-        const retry = await cli('retry', input)
-        assert.equal(retry.code, 0, retry.output)
+        const retry = await cliAtOrigin('http://127.0.0.1:1', 'retry', input, '--max-attempts', '2')
+        assert.equal(retry.code, 1, retry.output)
         const rows = (await client.query('SELECT source_store_id,status FROM pw1_migration_stores WHERE source_store_id=ANY($1) ORDER BY source_store_id', [ids.slice(0,3)])).rows
         assert.equal(rows.length, 3)
         assert.ok(rows.every(row => row.status === 'completed'))
         assert.equal((await client.query('SELECT count(*)::int AS n FROM pw1_migration_attempts WHERE source_store_id=$1', [ids[0]])).rows[0].n, 1)
         console.log('PASS: retry resumes only deferred stores and leaves completed store unchanged')
+
+        // TC-F35.M48: publish is automatic and can be retried without new generations.
+        const fixtureSites = (await client.query('SELECT site_id FROM pw1_migration_stores WHERE source_store_id=ANY($1)', [ids.slice(0,3)])).rows.map(r=>r.site_id)
+        const attemptsBeforePublish = (await client.query('SELECT count(*)::int AS n FROM pw1_migration_attempts WHERE source_store_id=ANY($1)', [ids.slice(0,3)])).rows[0].n
+        assert.equal((await client.query("SELECT count(*)::int AS n FROM sites WHERE id=ANY($1) AND status='published'", [fixtureSites])).rows[0].n, 1)
+        const unavailable = await cliAtOrigin('http://127.0.0.1:1', input, '--max-attempts', '2')
+        assert.equal(unavailable.code,1)
+        const publishFailure = (await client.query("SELECT results FROM pw1_migration_batches WHERE results @> $1::jsonb ORDER BY started_at DESC LIMIT 1", [JSON.stringify([{sourceStoreId:ids[0]}])])).rows[0]
+        assert.equal(publishFailure.results.filter((r:{publish:{status:string;attempts:number}})=>r.publish.status==='failed'&&r.publish.attempts===2).length, 2)
+        const published = await cli('retry', input)
+        assert.equal(published.code,0,published.output + published.error)
+        assert.ok((await client.query('SELECT status FROM sites WHERE id=ANY($1)', [fixtureSites])).rows.every(r=>r.status==='published'))
+        assert.equal((await client.query('SELECT count(*)::int AS n FROM pw1_migration_attempts WHERE source_store_id=ANY($1)', [ids.slice(0,3)])).rows[0].n,attemptsBeforePublish)
+        const again = await cli(input)
+        assert.equal(again.code,0,again.output)
+        const latestPublished = (await client.query("SELECT results FROM pw1_migration_batches WHERE results @> $1::jsonb ORDER BY started_at DESC LIMIT 1", [JSON.stringify([{sourceStoreId:ids[0]}])])).rows[0]
+        assert.ok(latestPublished.results.every((r:{publish:{status:string;attempts:number}})=>r.publish.status==='already-published'&&r.publish.attempts===0))
+        console.log('PASS: automatic publish; publish failures retry then continue; retry publishes without generation; already-published is untouched')
 
         const gate = await cli(strictInput, '--require-be-data')
         assert.equal(gate.code, 1, gate.output)

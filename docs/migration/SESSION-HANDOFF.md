@@ -1,3 +1,148 @@
+# Current handoff — 2026-09-17: latest full 30-store reset and migration complete
+
+User requested another full reset/migration of30 after the link fix. New private evidence root: /Users/levietducprime/Work/pw1-exports/reconstruction/pilot-full-links-30-20260917. Backup before-reset.dump, original input snapshot preserved. Reset removed30 mappings/sites/tenants, preserved accounts/outside sites, deleted133 migration media and retained198 referenced/uncertain files.
+
+Important provenance: this run was interrupted by chat/tool cancellation. Initial batch ac0c550f-aa94-4f5d-828c-220c8b79ab41 completed15 before its process stopped. Normal resume batch5a165da9-a1ca-4d6f-b4b6-3e89d2a28a07 recovered interrupted ledger/work and generated the remainder, skipped15 already complete. Local Next server had also stopped, so all30 publication attempts failed connection. Restarted Next dev detached (log /tmp/pw1-local-server-restart.log), then script retry batche296ba62-e069-40b1-9488-97f10e8bc3e0 skipped all generation and automatically published30. Do NOT claim one uninterrupted successful batch or conflate these infrastructure interruptions with store retry behavior.
+
+Final state:30 migrated/published;157 pages including404; branding/contact/social/SEO readback matches all30. Latest automatic desktop/mobile public audit127/127 checked,0errors/0warnings/0skipped/0failed,167waiting-BE findings. All8 confirmed broken source links disabled (1042=2,1033=3,645=3). Site/page IDs changed, public tenant slugs unchanged. Existing links usable for manual review.
+
+Artifacts: run.log, resume.log, publish-recovery.log, report.json (explicit aggregate with source batch IDs), verification.json, published-state.json, published-links.md, quality.json/.json.md/.json.jsonl. Earlier failed publication audit preserved as quality-before-server-restart.json. Final public audit supersedes intermediate reports.
+
+No additional code changes in this rerun. Code/context still uncommitted. Remaining work: larger staging pilot and BE commerce mapping/validation. User explicitly skipped further preserved-label visual checks; do not reopen that task automatically.
+
+---
+
+# Current handoff — 2026-09-17: eight dangling PW1 CTA links fixed and applied
+
+Implemented general source-link verification in the migration runner: complete same-store live /pages inventory and rendered soft404 detection, bounded SPA render, fresh same-host HTTP fallback for TLS failures. Partial inventories, other-store responses, server/network errors and working redirects are retained. Existing adapter disables confirmed dead links, preserving CTA text and images. No store-specific code or post-migration SQL content patches.
+
+168 unit tests, browser not-found visibility fixtures and TypeScript passed. Read-only preparation first confirmed all8 links. Then backed up DB at private pilot-links-3-20260917/before-rerun.dump, captured outside-site state and exact scope, unpublished only3 pilot sites through owner-authorized API to allow existing draft-only migration, and ran ONE --rerun invocation on the 3-store input with automatic publication/audit.
+
+Batch 7fbcb1f4-882b-4ea8-a74c-9baebe8c1261: 1042/1033/645 all completed_with_warnings and published on first attempt. Broken/disabled counts2+3+3=8. Public audit3/3 pages, zero errors/warnings/BE findings in these pages. Other sites' IDs/updated_at/status unchanged. Evidence: /Users/levietducprime/Work/pw1-exports/reconstruction/pilot-links-3-20260917 (input,scope,backup,run.log,verification.json,quality.json and public-links-verification.json).
+
+This supersedes prior “8 unresolved links” task: implemented and applied. Existing 30-store bulk result remains historical; these3 now have newer regenerated page IDs, same site IDs/slugs. Remaining work: larger staging pilot and BE commerce mapping/validation; commit/push still pending. No reset of the other27 stores.
+
+---
+
+# Current handoff — 2026-09-17: remaining eight source links checked
+
+Read-only investigation completed, no code or site data changed. All 8 links originate in source banner CTAs: 1042 component17142 banners9544/9545; 1033 component17014 banners9456/9457/9458; 645 component9373 banners4890/4891/4892.
+
+Full live PW1 /pages API inventories (pagination total_pages=1, counts6/6/7) agree with exported source tables: none of /about-us, /product-service, /contact-us exists for the respective store. Store1042 has2 links, 1033 has3,645 has3. These are dangling source CTA destinations, not export/migration page loss.
+- /product-service (1042/1033/645) and /contact-us (1033/645) render Page Not Found despite HTTP200; 1033 redirects to /page-not-found.
+- /about-us on all3 remains a Loading shell/header/footer without actual page content even after12seconds. Absence confirmed by the complete live page inventory, not by HTTP status alone.
+- 1033 HTTPS fails; a fresh HTTP browser navigation succeeds and exposes the same six-page inventory.
+
+Existing migration checker blocks subresources and checks document HTTP404/410 only, so it cannot detect these SPA soft404s or missing-page shells. Suggested next implementation: verify a complete same-store source page inventory and/or unambiguous rendered not-found, then use existing broken-CTA handling to preserve text while removing the dead link. Do not guess /product-service -> /products or redirect to Home. User requested check only; no fix applied yet.
+
+Evidence: pilot-carousel-auto-30-20260917/missing-links-review.json (sanitized live inventories); /tmp/pw1-eight-links-live.json, /tmp/pw1-links-followup.json, /tmp/pw1-links-1033-http.json and screenshots. Prior "unknown destination" status is now resolved as an investigation; cleanup logic/application is still outstanding.
+
+---
+
+# Current handoff — 2026-09-17: fresh 30-store single-command pilot completed
+
+User requested item 1: reset/re-run the 30 pilot stores with latest migration, retry, cleanup, automatic publication and audit. Completed in ONE migration invocation, no separate retry/publish command.
+
+- Backup: private pilot-carousel-auto-30-20260917/before-reset.dump (40 MB). Scoped reset removed 30 sites/tenants/mappings; accounts preserved, outside site timestamps unchanged. Reset media cleanup deleted 138, conservatively retained 193.
+- Batch **9fd7c3fb-ba94-4e82-ab06-54bf92df2b82**, concurrency 5, max-attempts 3: **30 completed_with_warnings, 30 published, 0 failed/skipped/deferred**, 31 generation attempts.
+- Store 1004 first attempt timed out (code 23); runner retried automatically and succeeded on attempt 2. Failed-attempt cleanup completed; its tracked media was retained because a page-version navigation still references it. Do not claim an orphan was deleted in this particular run.
+- Batch migration+publish duration 223.556 seconds. Whole command including browser audit 635.506 seconds, exit 0. No manual recovery command.
+- DB readback: 157 pages including 404, all 30 branding/contact/social/SEO checks match input.
+- Automatic public browser audit: 127/127 pages checked desktop/mobile, 0 skipped/failed/errors, 3 source-link warnings, 167 waiting-BE findings. This is not full visual/commerce parity certification.
+- Successful attempts: 46 source Small-banner components, 22 observed-source-frame and 24 unverified. Source ambiguity/unavailability remains visible; no blanket claim that image sharpness/layout is fixed.
+- Selected carousel UI checks (205/253/567/416): navigation works where present and frame heights remain stable. Screenshots and carousel-interaction.json saved.
+- Current public slugs are unchanged from prior list, but site/page IDs changed. New published-links.md in this run's private directory points to current sites.
+
+Evidence directory: /Users/levietducprime/Work/pw1-exports/reconstruction/pilot-carousel-auto-30-20260917
+Files: input.json (private snapshot), reset-summary.json, run.log, timing.json, report.json, verification.json, quality.json / .json.md / .json.jsonl, published-links.md, carousel screenshots and interaction results. Do not overwrite historical pilot artifacts.
+
+Context/code changes remain uncommitted. No GitHub Actions added or run. BE mapping validation, ambiguous source links and larger staging performance validation remain separate follow-ups. Do not reset the 30 stores again unless requested.
+
+---
+
+# Current handoff — 2026-09-17: carousel source preparation improved
+
+User approved a general migration-script fix, never store-ID special cases. Added dedicated bounded `scanPw1Carousels` before AI generation. Targets come from original input source page IDs/paths containing Small banners; supports inner pages, Swiper/Slick/Owl/Bootstrap and simple CSS backgrounds. Slide pitch includes gaps. Exact media matching is page-scoped; explicit input geometry wins; conflicting/missing evidence stays unverified with reason. Verified declared srcset alternatives may replace low-resolution input only after real image decode and ratio check. No guessed original URLs, universal height cap or contain override.
+
+Source scan and per-component provenance persist as carousel-scan.json/carousel-evidence.json. Quality warnings carry page/component and observed upscale. Evidence is prepared once per store and reused during generation retries. Scan limit: 12 pages, 60 seconds after browser launch, serialized browser scans; page/budget failures retained. Removed duplicate carousel inspection from brand scan. Existing binder already preserves layout and selected image for both carousel variants; regression added.
+
+Validation: 165 unit tests / 21 suites; TypeScript; real browser fixture verifies gapped Swiper, Slick backgrounds, loaded srcset upgrades, broken/different-ratio alternate rejection. Read-only actual source checks: 205 scanned 2 pages / 14 frames, two components remain unverified; 416 scanned 1 page / 27 frames, component verified; 253 scanned 2 pages / no frames, three components unverified. Evidence /tmp/pw1-carousel-live-new.json. This does not certify all theme coverage or fix all low-resolution sources.
+
+Prior read-only 30-store browser review: 127 pages, 50 rendered image-carousel blocks across 27 stores at desktop/mobile. 10 blocks in 8 stores have a loaded image enlarged ≥3×: 205/253/546/567/602/627/645/939. This is a screening metric, not an automatic repair rule; some lazy images remained unloaded. Selected Next interactions retained stable heights. Evidence /tmp/pw1-carousel-review/README.md.
+
+No 30-store reset, generation, destination data update, publish, commit or push performed in this turn. Next full migration is needed to inspect new generated output. Prior changes below remain uncommitted.
+
+---
+
+# Current handoff — 2026-09-17: automatic CLI publish implemented
+
+User clarified publication must be built directly into the migration flow, not enabled by a flag. Regular run/retry now automatically publishes successful stores using `NEXT_PUBLIC_SERVER_URL`. Removed both publish CLI flags. Origin validation happens before migration writes; dry-run and reporting commands do not require the origin or publish anything.
+
+After migration/cleanup drain, publish runs sequentially through existing PATCH publish API as the verified active owner, retaining API subscription checks, page-version promotion and cache invalidation. Exact completed mapping/input hash/owner/tenant required. Already-published sites are not republished. Previously completed stores skipped by generation can publish, so `retry INPUT` recovers publication without re-running AI.
+
+Publication has a separate bounded attempt loop using `--max-attempts`. Failure records `publish.status/attempts/error`, keeps migration completion intact, continues other stores and makes batch exit nonzero. Requested audit still runs on partial publication failure. HTTP timeout rechecks site status before retry; 429 honors Retry-After up to 60 seconds per wait. Report JSON totals include published/publishFailed; CSV includes publish. No site-link export added. App server must be reachable and configured against the same destination DB/secret.
+
+Usage: `npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts input.json --concurrency 5`.
+
+Verification: 161 tests across 21 suites passed; TypeScript and diff checks passed. Real CLI/DB/API/browser integration passed all five scenarios: automatic publication after partial migration failure, generation budgets, retry/resume, bounded publish failures and recovery without regeneration, already-published skips, BE gate and read-only dry-run. Isolated fixtures were cleaned. Log: /tmp/pw1-auto-publish-integration.log. Existing 30 pilot sites were not regenerated or republished.
+
+Code/docs/context remain uncommitted, together with prior changes below. GitHub Actions remains deferred.
+
+---
+
+# Current handoff — 2026-09-17: missing-page link policy is inside migration
+
+User explicitly requires fixes in the migration script, never post-migration DB patches. Implemented `prepareSourceLinks` in the regular batch runner before AI generation. Adapter now records exact source page/component/slide/menu locations for unresolved links, separately from BE/entity links. Browser verification is bounded to 10 URLs/store, 5 seconds/navigation, 30-second browser lifetime after launch; public-host guard, cross-host navigation blocked, no auth. Only explicit same-host HTTP 404/410 disables a link. Network/TLS failures, external redirects and HTTP 200 SPA shells retain it with diagnostic evidence.
+
+Disabled rich-text anchors retain children/text/images; broken menu items are removed while valid children survive; banner CTA label becomes plain description text; category card URL is omitted. No hardcoded store IDs or `/about-us` rule. Checks and findings persist as `source-link-checks.json`, `input-adaptation.json`, and are exposed in JSON batch reports. `--dry-run` remains network-free.
+
+Source investigation: PW1 snapshot DB has no About Us page for stores 645/1033/1042, including deleted records. Running the **same preparation helper used by the batch** read-only against actual input discovered **8 missing destination URLs**, including links on inactive carousel slides that the prior browser audit did not expose:
+- 1042: `/about-us`, `/product-service`; source responds HTTP 200, no matching input pages.
+- 1033: `/about-us`, `/product-service`, `/contact-us`; HTTPS TLS connection fails.
+- 645: `/about-us`, `/product-service`, `/contact-us`; source responds HTTP 200, no matching input pages.
+The adapter source for 645 is `duc-test-61.web.dev.ecommercehub.my`; `junshop.com` is a separate URL found in source data and was initially inspected in error. Do not use its parked-domain behavior to classify the actual adapter source.
+
+All 8 remain retained/unverified, not automatically deleted: missing input alone and HTTP 200 shells are not conclusive 404 evidence. No source page invented, no links redirected to Home. This step delivers general checking/reporting and confirmed-broken handling; it does **not** claim these 8 links have valid PW2 destinations. To remove these ambiguous links, an explicit reviewed disposition or a complete authoritative page-inventory policy is still needed.
+
+Validation: 153 tests across 20 suites and TypeScript passed. Read-only evidence `/tmp/pw1-source-link-review-20260917.json` (captured before the diagnostic label was refined to distinguish TLS errors). No destination DB patch, no reset/regeneration/republish in this step. Previously published 30 sites remain unchanged. Changes, including the prior finalization work below, are uncommitted.
+
+---
+
+# Current handoff — 2026-09-17: retry finalization implemented; 30 sites published
+
+This section supersedes the unfinished-pilot state below. Current changes are not committed/pushed yet.
+
+## Implementation
+
+- `nativeDesignSchemaForSource` constrains OpenAI structured output by source component ID and allowed block/variant pair. The previous independent global enums admitted incompatible category layouts; strict binding remains intact. Store 546 succeeded on its first attempt with the new schema.
+- Batch tracks failed attempt IDs and media created before those failures. After all work drains, it queues cleanup even when a later attempt succeeded. Only failed runtime artifacts are excluded; successful attempts/receipts, live references, versions and before-state backups remain protected by existing cleanup checks.
+- `MigrationBatchIncompleteError` distinguishes drained store failures from fatal errors/cancellation. `runMigrationWithAudit` runs the requested audit after partial failure, preserves migration nonzero exit and reports both errors if audit also fails. It does not publish draft sites automatically.
+- User's default remains 3 total attempts per store (initial + 2 retries), then record failed and continue within the same command. No workers or GitHub Actions added.
+
+## Verification completed
+
+- 131 unit tests across 18 PW1 suites pass, TypeScript noEmit passes.
+- Real CLI/DB/AI integration `scripts/tests/pw1-batch-operations.ts` passes: one fixture fails all three attempts within one invocation; the next store completes; orphan image is deleted; budget/deferred resume, reports, strict BE gate and dry-run pass. Log `/tmp/pw1-retry-policy-integration.log`.
+- Real DB/storage integration `scripts/tests/pw1-media-cleanup.ts` passes: failed-attempt orphan cleanup with a later committed successful attempt preserves referenced images and versions; unresolved/committed attempts remain protected. Log `/tmp/pw1-retry-cleanup-integration.log`.
+
+## Current pilot results
+
+Run `retry INPUT --concurrency 5 --max-attempts 3` batch `9ae4370e-0659-4ea7-87f4-eeac8ffce8b6`: 546 completed on attempt 1; 29 previous successful stores skipped. Before/after site IDs and updated_at confirm those 29 sites were unchanged by migration. This is a recovery run, not a claim that the initial 30-store batch succeeded without failures.
+
+Aggregate latest state: **30 completed**, 157 pages including 404; branding presence/contact/social/SEO readback checks pass. All 30 published through local publish API with HTTP 200; DB confirms published. Fresh browser audit completed on desktop/mobile: **127/127 pages checked, 0 skipped, 0 failed, 0 errors**. Remaining findings: 3 source-page warnings (About Us links for stores 645, 1033, 1042) and 167 waiting-BE entity-link findings. This is automated quality verification, not full visual/commerce parity certification.
+
+Artifacts: `/Users/levietducprime/Work/pw1-exports/reconstruction/pilot-carousel-30-20260916/`:
+- `retry-final-20260917.log`, `report.json` (explicit aggregate, includes contributing batch IDs), `reconciliations-final.json`, `verification.json`.
+- `publish-final-20260917.log`, `results.json`, `published-links.md` regenerated for current sites.
+- `quality-final-20260917.json` / `.json.md` / `.json.jsonl` for this audit.
+- `/tmp/pw1-before-finalization-30.json` records the pre-recovery mapping snapshot.
+
+Private input/local DB/artifacts are outside Git and do not transfer to another machine through pull. Public links are local `http://localhost:3000/sites/...`.
+
+Pending scope remains real BE import/mapping validation, broader carousel source coverage and large-scale throughput validation. GitHub Actions remains deferred. Do not reset completed stores as a routine continuation.
+
+---
+
 # Current handoff — 2026-09-16: retry policy corrected; pilot unfinished
 
 This section supersedes older pilot completion claims below for the current reset.

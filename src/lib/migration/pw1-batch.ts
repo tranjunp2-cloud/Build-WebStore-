@@ -1,3 +1,6 @@
+import { scanPw1Carousels, type CarouselScan } from './pw1-carousel-scan'
+import { publishMigratedStore, publishOrigin } from './pw1-publish'
+import { prepareSourceLinks } from './pw1-source-link-check'
 import { applyCarouselEvidence } from './pw1-carousel-evidence'
 import { verifyMigrationDestination } from './pw1-destination'
 import { analyzePw1Brand } from './pw1-brand-analysis'
@@ -11,7 +14,7 @@ import { withPw1MediaTracking } from './pw1-media-tracking'
 import { BatchControls, type BatchLimits } from './pw1-batch-controls'
 import { checkBeReadiness } from './pw1-readiness'
 import { readBatchReport } from './pw1-batch-report'
-import { classifyStoreAttemptError, classifyMigrationError, MigrationError, retryDelayMs, shouldRetry } from './pw1-errors'
+import { classifyStoreAttemptError, classifyMigrationError, MigrationBatchIncompleteError, MigrationError, retryDelayMs, shouldRetry } from './pw1-errors'
 import { recoverInterruptedBatches } from './pw1-operations'
 import type { InvalidStore } from './pw1-batch-validation'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -88,6 +91,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
         if (invalid.length) throw new Error(`${invalid.length} invalid store(s)`)
         return
     }
+    const publishBaseUrl = publishOrigin(process.env.NEXT_PUBLIC_SERVER_URL)
     const connectionString = process.env.DATABASE_URI || process.env.DATABASE_URL
     if (!connectionString || !process.env.PAYLOAD_SECRET || !process.env.OPENAI_API_KEY) throw new Error('Configure database, Payload secret and OpenAI credentials')
     process.env.PAYLOAD_PUSH_SCHEMA = 'false'
@@ -112,13 +116,14 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
         configureMigrationTransactions(payload)
         const activePayload = payload
         batchId = randomUUID()
-        await client.query('INSERT INTO pw1_migration_batches(id,results,limits) VALUES($1,$2::jsonb,$3::jsonb)', [batchId, JSON.stringify(invalid), JSON.stringify({ ...controls.limits, requireBeData: Boolean(options.requireBeData), concurrency })])
+        await client.query('INSERT INTO pw1_migration_batches(id,results,limits) VALUES($1,$2::jsonb,$3::jsonb)', [batchId, JSON.stringify(invalid), JSON.stringify({ ...controls.limits, requireBeData: Boolean(options.requireBeData), publish: true, concurrency })])
         const results: Array<Record<string, unknown>> = [...invalid]
         console.log(`Batch ${batchId}: ${entries.length} valid, ${invalid.length} invalid stores; prepare concurrency=${concurrency}, writes serialized, up to ${maxAttempts} attempts/store.`)
         await runStorePool(entries, concurrency, entry => entry.sourceUserId, async entry => {
             const storeStartedAt = Date.now()
             const createdMedia = new Set<number>()
-            const storeAttemptIds: string[] = []
+            const failedAttemptIds: string[] = []
+            const failedMedia = new Set<number>()
             let result: Record<string, unknown>
             try {
                 controller.signal.throwIfAborted()
@@ -171,11 +176,15 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                     }
                     const readiness = await checkBeReadiness(activePayload, entry, mapping)
                     if (options.requireBeData && readiness.status === 'missing-data') throw new MigrationError('BE_DATA_MISSING', readiness.warnings.join('; '))
-                    const adapted = adaptWebsiteInput(compactInput(entry), entry.destination?.productCategories), blueprint = createNativeBlueprint(adapted.contract)
+                    const { adapted, sourceLinkChecks } = await prepareSourceLinks(compactInput(entry), entry.destination?.productCategories, controller.signal)
+                    controls.checkTime(storeStartedAt)
+                    const blueprint = createNativeBlueprint(adapted.contract)
                     const inputReport = options.inputReports?.find(r => r.sourceStoreId === entry.sourceStoreId)
                     const warnings = [...new Set([...readiness.warnings, ...(inputReport?.warnings ?? []).filter(w => !w.includes('category CTA retains source URL')), ...adapted.report.warnings, ...adapted.report.pending.map(p => `${p.sourceId}: ${p.reason}`)])]
                     if (entry.website.pages.some(p => p.components.some(c => c.binding))) warnings.push('Product/blog data is provided by the separate BE import; database bindings were not imported by this batch')
                     await client.query('UPDATE pw1_migration_stores SET warning_count=$2 WHERE source_store_id=$1', [entry.sourceStoreId, warnings.length])
+                    let carouselScan: CarouselScan | undefined
+                    let carouselEvidence: ReturnType<typeof applyCarouselEvidence> | undefined
                     let completed: Record<string, unknown> | undefined
                     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                         controller.signal.throwIfAborted()
@@ -188,7 +197,6 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             controls.beginGeneration()
                         })
                         const attemptId = randomUUID()
-                        storeAttemptIds.push(attemptId)
                         await client.query("INSERT INTO pw1_migration_attempts(id,source_store_id,input_hash,status,batch_id,attempt_number) VALUES($1,$2,$3,'running',$4,$5)", [attemptId, entry.sourceStoreId, hash, batchId, attempt])
                         await client.query("UPDATE pw1_migration_stores SET status='running',input_hash=$2,updated_at=now() WHERE source_store_id=$1", [entry.sourceStoreId, hash])
                         const heartbeat = setInterval(() => { void client.query('UPDATE pw1_migration_attempts SET heartbeat_at=now() WHERE id=$1', [attemptId]).catch(stop) }, 15000)
@@ -207,11 +215,22 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                                 controls.recordDesignTokens(brand.analysisTokens ?? 0)
                             }
                             blueprint.nativeContract.site.brandEvidence = brand
-                            const carouselEvidence = applyCarouselEvidence(blueprint, brand.carouselFrames ?? [])
+                            await onStage('carousel-scan')
+                            if (!carouselEvidence) {
+                                const targets = entry.website.pages.filter(page => blueprint.nativeContract.pages.some(native => native.sourceId === page.sourceId && native.components.some(component => component.kind === 'banner' && (component.block.sourceLayout as {size?:string})?.size === 'small'))).map(page => ({pageId:page.sourceId,path:page.path}))
+                                carouselScan = await scanPw1Carousels(entry.source.websiteUrl, targets, controller.signal)
+                                carouselEvidence = applyCarouselEvidence(blueprint, carouselScan.frames)
+                            }
+                            await save('carousel-scan.json', carouselScan)
+
                             await save('carousel-evidence.json', carouselEvidence)
                             for (const record of carouselEvidence) {
-                                const warning = `${record.sourceId}: PW1 carousel layout not verified; PW2 default presentation used. Image dimensions are not used to infer layout.`
+                                const warning = `page:${record.pageId}/component:${record.sourceId}: PW1 carousel layout not verified; PW2 default presentation used. Image dimensions are not used to infer layout.`
                                 if (record.status === 'unverified' && !warnings.includes(warning)) warnings.push(warning)
+                                for (const image of record.images) if ((image.upscale ?? 0) > 2) {
+                                    const qualityWarning = `page:${record.pageId}/component:${record.sourceId}: source carousel image is enlarged ${image.upscale!.toFixed(1)}x; verified image resolution remains insufficient for the observed frame (${image.selectedUrl}).`
+                                    if (!warnings.includes(qualityWarning)) warnings.push(qualityWarning)
+                                }
                             }
                             if (brand.warning && !warnings.includes(brand.warning)) warnings.push(brand.warning)
                             await save('brand-evidence.json', brand)
@@ -219,6 +238,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             await save('be-readiness.json', readiness)
                             if (entry.destination) await save('be-mapping.json', { status: 'verified-declared-mappings', ...entry.destination, verifiedAt: new Date().toISOString() })
                             await save('input-adaptation.json', adapted.report)
+                            await save('source-link-checks.json', { sourceStoreId: entry.sourceStoreId, checks: sourceLinkChecks, findings: adapted.report.linkFindings })
                             await save('collection-input-report.json', inputReport ?? null)
                             await save('warnings.json', warnings)
                             await save('blueprint.json', { sourceHash: hash, ...blueprint })
@@ -226,11 +246,13 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             const applied = await withPw1MediaTracking(createdMedia, () => applyPw1Website({ destination: entry.destination, payload: activePayload, blueprint, account: entry.owner.email, siteId: mapping.site_id, sourceHash: hash, save, attemptId, onStage, acquireWrite: acquireMediaCreateLock, signal: controller.signal, onDesignUsage: usage => { controls.recordDesignTokens(usage.totalTokens ?? 0) } }))
                             await client.query("UPDATE pw1_migration_attempts SET status='completed',stage='completed',finished_at=now() WHERE id=$1", [attemptId])
                             await client.query("UPDATE pw1_migration_stores SET status='completed',updated_at=now() WHERE source_store_id=$1", [entry.sourceStoreId])
-                            completed = { sourceStoreId: entry.sourceStoreId, status: warnings.length ? 'completed_with_warnings' : 'completed', siteId: mapping.site_id, previewUrl: applied.previewUrl, warnings, readiness, beMapping: entry.destination ? { status: 'verified-declared-mappings', productCategories: entry.destination.productCategories.length, tenantId: entry.destination.tenantId, siteId: entry.destination.siteId } : undefined, attemptId, brand: { status: blueprint.nativeContract.site.brandEvidence?.status, colors: blueprint.nativeContract.site.brandEvidence?.colors } }
+                            completed = { sourceStoreId: entry.sourceStoreId, status: warnings.length ? 'completed_with_warnings' : 'completed', siteId: mapping.site_id, previewUrl: applied.previewUrl, warnings, readiness, sourceLinkChecks, linkFindings: adapted.report.linkFindings, beMapping: entry.destination ? { status: 'verified-declared-mappings', productCategories: entry.destination.productCategories.length, tenantId: entry.destination.tenantId, siteId: entry.destination.siteId } : undefined, attemptId, brand: { status: blueprint.nativeContract.site.brandEvidence?.status, colors: blueprint.nativeContract.site.brandEvidence?.colors } }
                         } catch (error) {
                             // If commit succeeded but ledger update failed, leave running for receipt-based recovery.
                             const committed = await client.query('SELECT 1 FROM pw1_migration_commits WHERE attempt_id=$1', [attemptId])
                             if (committed.rowCount) throw error
+                            failedAttemptIds.push(attemptId)
+                            for (const id of createdMedia) failedMedia.add(id)
                             const failure = classifyStoreAttemptError(error)
                             await client.query("UPDATE pw1_migration_attempts SET status='failed',error=$2,error_code=$3,retryable=$4,finished_at=now() WHERE id=$1", [attemptId, failure.message, failure.code, failure.retryable])
                             await client.query("UPDATE pw1_migration_stores SET status='failed',updated_at=now() WHERE source_store_id=$1", [entry.sourceStoreId])
@@ -248,9 +270,9 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                 const deferred = ['BATCH_TIME_LIMIT','GENERATION_LIMIT','DESIGN_TOKEN_LIMIT','INTERRUPTED'].includes(failure.code)
                 result = { sourceStoreId: entry.sourceStoreId, status: deferred ? 'deferred' : 'failed', ...failure, error: failure.message, durationSeconds: (Date.now() - storeStartedAt) / 1000 }
             }
-            if (result.status === 'failed' && !controller.signal.aborted) {
+            if ((result.status === 'failed' || failedAttemptIds.length > 0) && !controller.signal.aborted) {
                 result.mediaCleanup = { status: 'queued' }
-                cleanupQueue.push({ result, mediaIds: [...createdMedia], attemptIds: storeAttemptIds })
+                cleanupQueue.push({ result, mediaIds: [...failedMedia], attemptIds: failedAttemptIds })
             }
             result.durationSeconds ??= (Date.now() - storeStartedAt) / 1000
             results.push(result)
@@ -265,13 +287,22 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                 task.result.mediaCleanup = { status: 'error', error: error instanceof Error ? error.message : 'Cleanup failed' }
             }
         }
+        for (const [index, result] of results.entries()) {
+            if (!String(result.status).startsWith('completed') && result.status !== 'skipped') continue
+            const entry = entries.find(entry => entry.sourceStoreId === result.sourceStoreId)
+            if (!entry) continue
+            result.publish = await publishMigratedStore(activePayload, client, entry, publishBaseUrl, maxAttempts, controller.signal)
+            await client.query('UPDATE pw1_migration_batches SET results=jsonb_set(results,ARRAY[$2::text],$3::jsonb) WHERE id=$1', [batchId, String(index), JSON.stringify(result)])
+            console.log(JSON.stringify({sourceStoreId:entry.sourceStoreId,publish:result.publish}))
+        }
         await client.query('UPDATE pw1_migration_batches SET results=$2::jsonb WHERE id=$1', [batchId, JSON.stringify(results)])
+        const publishFailures = results.filter(r => ['failed','deferred'].includes((r.publish as {status?:string}|undefined)?.status ?? ''))
         const failures = results.filter(r => r.error)
-        await client.query('UPDATE pw1_migration_batches SET status=$2,finished_at=now() WHERE id=$1', [batchId, failures.length ? 'failed' : 'completed'])
+        await client.query('UPDATE pw1_migration_batches SET status=$2,finished_at=now() WHERE id=$1', [batchId, failures.length || publishFailures.length ? 'failed' : 'completed'])
         console.log(JSON.stringify(await readBatchReport(client, batchId), null, 2))
-        if (failures.length) {
+        if (failures.length || publishFailures.length) {
             const deferred = failures.filter(r => r.status === 'deferred').length
-            throw new Error(`${failures.length - deferred} store(s) failed, ${deferred} deferred; inspect status/logs and retry the same input`)
+            throw new MigrationBatchIncompleteError(`${failures.length - deferred} store(s) failed, ${deferred} deferred, ${publishFailures.length} publish failure(s); inspect status/logs and retry the same input`, !controller.signal.aborted)
         }
     } finally {
         options.signal?.removeEventListener('abort', stop)

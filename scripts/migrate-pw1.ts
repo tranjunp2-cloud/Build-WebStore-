@@ -1,3 +1,4 @@
+import { runMigrationWithAudit } from '../src/lib/migration/pw1-run-audit'
 import { parseArgs } from 'node:util'
 import { readFile, stat, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -26,6 +27,9 @@ async function main() {
   npm run migrate:pw1 -- FILE --audit-base-url ORIGIN --audit-output REPORT.json
   npm run migrate:pw1 -- report --batch UUID [--format json|csv]
   npm run migrate:pw1 -- cleanup-media --store ID [--older-than-hours 168] [--limit 20] [--after-id ID] [--apply]
+Completed matching stores are automatically published through the existing app API.
+Publish origin: NEXT_PUBLIC_SERVER_URL (running app with the same destination database).
+Publish failures are retried separately without regenerating successful migrations.
 Cleanup defaults to dry-run; --apply deletes only unreferenced migration media in a maintenance window.
 Run limits: --max-generation-attempts N --max-batch-seconds N --max-store-seconds N
   --min-generation-interval-seconds N --max-design-tokens N --require-be-data
@@ -99,8 +103,7 @@ Status/logs are read-only and need only database configuration.`)
     process.once('SIGINT', stop); process.once('SIGTERM', stop)
     try {
         const { runPw1Batch } = await import('../src/lib/migration/pw1-batch')
-        await runPw1Batch(entries, { concurrency: numeric('concurrency'), limits, requireBeData: values['require-be-data'], dryRun: values['dry-run'], rerun: values.rerun, retryOnly: command === 'retry', maxAttempts, signal: controller.signal, inputReports: parsed.reports, invalidStores: errors })
-        if (auditRequested) await runAudit()
+        await runMigrationWithAudit(() => runPw1Batch(entries, { concurrency: numeric('concurrency'), limits, requireBeData: values['require-be-data'], dryRun: values['dry-run'], rerun: values.rerun, retryOnly: command === 'retry', maxAttempts, signal: controller.signal, inputReports: parsed.reports, invalidStores: errors }), auditRequested ? runAudit : undefined)
     } finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop) }
 }
 main().then(() => process.exit(process.exitCode ?? 0)).catch(error => {

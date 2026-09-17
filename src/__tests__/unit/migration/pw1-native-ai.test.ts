@@ -3,7 +3,7 @@ import type OpenAI from 'openai'
 import { pw1DesignDirection } from '@/lib/migration/pw1-design-direction'
 import { NavigationConfigSchema } from '@/blocks/navigation/config'
 import { FooterConfigSchema } from '@/blocks/footer/config'
-import { bindNativeDesign, generateNativePw1WithAI, NATIVE_BLOCKS } from '@/lib/migration/pw1-native-ai'
+import { bindNativeDesign, generateNativePw1WithAI, nativeDesignSchemaForSource, NATIVE_BLOCKS } from '@/lib/migration/pw1-native-ai'
 vi.mock('@/lib/ai/log-usage', () => ({ logAiUsage: vi.fn() }))
 function fixture() {
     const source = { format: 'pw2-reconstruction-contract', version: '1.0.0', source: { url: 'https://source.example', storeId: '1', capturedAt: '2026-09-10', dumpHash: 'abc' }, site: { name: 'Tea', navigation: { blockType: 'navigation', links: [] }, footer: { blockType: 'footer', columns: [] } }, reconciliation: [], pages: [{ sourceId: '10', title: 'Home', slug: 'home', isHomepage: true, components: [
@@ -178,4 +178,33 @@ it('[TC-F35.M39] corrects one invalid AI layout without weakening binder validat
     create.mockReset().mockResolvedValue(response(invalid))
     await expect(generateNativePw1WithAI(client, source)).rejects.toThrow('AI page count mismatch')
     expect(create).toHaveBeenCalledTimes(2)
+})
+
+describe('[TC-F35.M46] Source-constrained AI output', () => {
+    it('rejects a product block for a category at the response schema boundary', () => {
+        // Arrange
+        const { source, design } = fixture()
+        source.pages[0].components[1].kind = 'category_listing'
+        const schema = nativeDesignSchemaForSource(source)
+        // Act / Assert
+        expect(schema.safeParse(design).success).toBe(false)
+        design.pages[0].sections[1] = { sourceId: '12', blockType: 'carousel', variant: 'cards' }
+        expect(schema.safeParse(design).success).toBe(true)
+        expect(bindNativeDesign(source, design).pages![0].blocks[2].blockType).toBe('carousel')
+        design.pages[0].sections[1].variant = 'images'
+        expect(schema.safeParse(design).success).toBe(false)
+    })
+})
+
+describe('[TC-F35.M49] verified carousel survives native binding',()=>{
+    it('preserves measured layout and selected source image for either AI carousel presentation',()=>{
+        for(const variant of ['images','cards']) {
+            const {source,design}=fixture()
+            Object.assign(source.pages[0].components[0].block.sourceLayout!,{aspectRatio:2.5,imageFit:'contain',slidesPerView:3})
+            source.pages[0].components[0].block.slides![0].image!.url='https://source.example/verified-large.jpg'
+            design.pages[0].sections[0].variant=variant
+            const result=bindNativeDesign(source,design)
+            expect(result.pages![0].blocks[1]).toMatchObject({blockType:'carousel',variant,aspectRatio:2.5,imageFit:'contain',slidesPerView:3,items:[{image:{url:'https://source.example/verified-large.jpg'}},{}]})
+        }
+    })
 })

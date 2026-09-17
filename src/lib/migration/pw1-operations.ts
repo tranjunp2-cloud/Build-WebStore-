@@ -23,6 +23,7 @@ export async function inspectMigration(command: 'status' | 'logs', store?: strin
         if (!installed.rows[0].installed) return { stores: [], attempts: [], message: 'Migration ledger has not been installed' }
         if (command === 'logs') {
             const result = await client.query(`SELECT a.id,a.source_store_id,a.batch_id,a.status,a.stage,a.error,a.error_code,a.retryable,a.attempt_number,a.started_at,a.finished_at,a.heartbeat_at,c.committed_at,
+                a.artifacts->'carousel-scan.json' AS carousel_scan,a.artifacts->'carousel-evidence.json' AS carousel_evidence,
                 a.artifacts->'warnings.json' AS warnings,a.artifacts->'service-response.json' AS service_response FROM pw1_migration_attempts a LEFT JOIN pw1_migration_commits c ON c.attempt_id=a.id
                 WHERE ($1::text IS NULL OR a.source_store_id=$1) ORDER BY a.started_at DESC LIMIT 100`, [store ?? null])
             const invalid = await client.query(`SELECT id,started_at,results FROM pw1_migration_batches WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(results) r WHERE r ? 'error' AND ($1::text IS NULL OR r->>'sourceStoreId'=$1)) ORDER BY started_at DESC LIMIT 20`, [store ?? null])

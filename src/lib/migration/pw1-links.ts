@@ -7,8 +7,11 @@ export const LinkCorrectionsSchema = z.array(z.object({ from: z.string().min(1),
 
 export type VerifiedCategoryLink = { sourceId: string; destinationId: number; sourcePath: string; destinationPath: string }
 
+export type SourceLinkFinding = { url: string; location: string; reason: 'missing-page' | 'waiting-be' | 'confirmed-broken'; action: 'retained' | 'disabled' }
+export type SourceLinkPolicy = { brokenUrls?: readonly string[]; findings?: SourceLinkFinding[] }
+
 /** Resolve only pages proven to exist in this store. Never reinterpret legacy entity IDs. */
-export function createSourceLinkResolver(sourceUrl: string, pages: Array<{ sourcePath: string; destinationPath: string }>, warnings: string[], categories: readonly VerifiedCategoryLink[] = [], corrections: readonly { from: string; destinationPath: string }[] = []) {
+export function createSourceLinkResolver(sourceUrl: string, pages: Array<{ sourcePath: string; destinationPath: string }>, warnings: string[], categories: readonly VerifiedCategoryLink[] = [], corrections: readonly { from: string; destinationPath: string }[] = [], policy: SourceLinkPolicy = {}) {
     const source = new URL(sourceUrl)
     const normalize = (path: string) => path.replace(/\/+$/, '') || '/'
     const routes = new Map<string, string>()
@@ -16,7 +19,7 @@ export function createSourceLinkResolver(sourceUrl: string, pages: Array<{ sourc
         const path = normalize(page.sourcePath)
         if (!routes.has(path)) routes.set(path, page.destinationPath)
     }
-    return (value: string): string => {
+    return (value: string, location = 'unknown'): string => {
         const correction = corrections.find(item => item.from.trim() === value.trim())
         if (correction) return correction.destinationPath
         if (!value || /^(#|mailto:|tel:|sms:|whatsapp:)/i.test(value)) return value
@@ -35,6 +38,12 @@ export function createSourceLinkResolver(sourceUrl: string, pages: Array<{ sourc
         const path = routes.get(normalize(target.pathname))
         const legacyEntity = [...target.searchParams.keys()].some(key => /^(category|category_id|product|product_id|article|article_id|brand|brand_id)$/i.test(key))
         if (path && !legacyEntity) return `${path}${target.search}${target.hash}`
+        const broken = !legacyEntity && policy.brokenUrls?.includes(target.href)
+        policy.findings?.push({ url: target.href, location, reason: legacyEntity ? 'waiting-be' : broken ? 'confirmed-broken' : 'missing-page', action: broken ? 'disabled' : 'retained' })
+        if (broken) {
+            warnings.push(`Confirmed broken source link disabled: ${target.href} (${location})`)
+            return ''
+        }
         const warning = `Unresolved source link retained: ${target.href} (${legacyEntity ? 'destination entity mapping required' : 'no migrated page matches'})`
         if (!warnings.includes(warning)) warnings.push(warning)
         return value
@@ -47,7 +56,8 @@ export function rewriteSourceHtmlLinks(html: string, resolve: (value: string) =>
     $('a[href]').each((_, node) => {
         const old = $(node).attr('href')!
         const next = resolve(old)
-        if (next !== old) { $(node).attr('href', next); changed = true }
+        if (!next) { $(node).replaceWith($(node).contents()); changed = true }
+        else if (next !== old) { $(node).attr('href', next); changed = true }
     })
     // Empty anchors pasted by legacy editors are invisible keyboard stops. Preserve media and named anchors.
     $('a[href]').each((_, node) => {

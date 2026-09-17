@@ -1,5 +1,4 @@
 /** CLI-only browser collection. No browser dependency is imported by the web generator. */
-import { readCarouselFrames } from './pw1-carousel-evidence'
 import { lookup } from 'node:dns/promises'
 import { MigrationMutex } from './pw1-concurrency'
 import { rankBrandColors, type BrandEvidence } from './pw1-brand-evidence'
@@ -83,15 +82,6 @@ export async function scanPw1Brand(url: string, signal?: AbortSignal, logoUrl?: 
             // Bound a tall-page capture so images cannot exhaust runner memory.
             const height = loaded ? await page.evaluate(() => Math.min(document.documentElement.scrollHeight, 6000)) : 0
             const screenshot = loaded ? (await page.screenshot({ type: 'jpeg', quality: 55, clip: { x: 0, y: 0, width: 1280, height: Math.max(900, height) }, fullPage: true, timeout: 5000 })).toString('base64') : undefined
-            if (loaded) {
-                for (let step = 0; step < 12; step++) {
-                    const end = await page.evaluate(() => { window.scrollBy({top:800,behavior:'instant'}); return window.scrollY + innerHeight >= document.documentElement.scrollHeight - 2 })
-                    await page.waitForTimeout(100)
-                    if (end) break
-                }
-                await page.waitForTimeout(300)
-            }
-            const carouselFrames = loaded ? await readCarouselFrames(page) : []
             let logoScreenshot: string | undefined
             if (logoUrl) {
                 try {
@@ -106,7 +96,7 @@ export async function scanPw1Brand(url: string, signal?: AbortSignal, logoUrl?: 
                     logoScreenshot = (await page.locator('img').screenshot({ type: 'jpeg', quality: 80, timeout: 3000 })).toString('base64')
                 } catch { failure += '; source logo could not be loaded' }
             }
-            evidence = { carouselFrames, status: loaded || logoScreenshot ? 'observed' : 'unavailable', url: target.href, capturedAt, colors, screenshot, logoScreenshot, logoUrl, transport,
+            evidence = { status: loaded || logoScreenshot ? 'observed' : 'unavailable', url: target.href, capturedAt, colors, screenshot, logoScreenshot, logoUrl, transport,
                 ...(!loaded ? { warning: `PW1 website unavailable: ${failure}; ${logoScreenshot ? 'using source logo' : 'no visual evidence'}` } : transport !== 'https' ? { warning: `PW1 read-only scan used ${transport}` } : {}) }
 
         } catch (error) {

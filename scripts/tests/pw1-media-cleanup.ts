@@ -1,4 +1,4 @@
-/** TC-F35.M35: real local storage/DB and CLI; synthetic media only. */
+/** TC-F35.M35 / M46: real local storage/DB and CLI; synthetic media only. */
 import assert from 'node:assert/strict'
 import { randomUUID, createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
@@ -17,7 +17,7 @@ async function main() {
     const source = `97${Date.now()}`
     let tenantId: number | undefined, userId: number | undefined, siteId: number | undefined
     const mediaIds: number[] = []
-    const batchId = randomUUID(), attemptId = randomUUID()
+    const batchId = randomUUID(), attemptId = randomUUID(), successfulAttemptId = randomUUID()
     const cli = async (...args: string[]) => exec(process.execPath, ['--require', './scripts/seed-preload.cjs', '--import', 'tsx', 'scripts/migrate-pw1.ts', 'cleanup-media', '--store', source, '--older-than-hours', '1', ...args], { timeout: 180000, maxBuffer: 5 * 1024 * 1024 })
     try {
         assert.equal((await client.query('SELECT pg_try_advisory_lock(351827,0) AS locked')).rows[0].locked, true)
@@ -67,12 +67,17 @@ async function main() {
         const committed = await cleanupFailedStoreMedia(payload, client, [mediaIds[3]], [attemptId])
         assert.equal(committed.status, 'retained')
         await client.query('DELETE FROM pw1_migration_commits WHERE attempt_id=$1', [attemptId])
+        // A later attempt succeeded and reused one image; failed-attempt leftovers
+        // remain eligible, while live/version/successful-artifact references survive.
+        await client.query("INSERT INTO pw1_migration_attempts(id,source_store_id,input_hash,status,batch_id,artifacts) VALUES($1,$2,'qa','completed',$3,$4::jsonb)", [successfulAttemptId,source,batchId,JSON.stringify({ 'verified-candidate.json': { image: mediaIds[1] } })])
+        await client.query("INSERT INTO pw1_migration_commits(attempt_id,source_store_id,input_hash,summary) VALUES($1,$2,'qa','{}')", [successfulAttemptId,source])
         const auto = await cleanupFailedStoreMedia(payload, client, mediaIds.slice(1), [attemptId])
         assert.equal(auto.results.find(r => r.mediaId === mediaIds[3])?.status, 'deleted', JSON.stringify(auto))
         assert.equal(auto.results.find(r => r.mediaId === mediaIds[1])?.status, 'retained')
         assert.equal(auto.results.find(r => r.mediaId === mediaIds[2])?.status, 'retained')
         console.log('PASS: auto cleanup retains committed/unresolved work and references, ignores only failed runtime artifacts, removes fresh orphan')
-        await client.query('DELETE FROM pw1_migration_attempts WHERE id=$1', [attemptId])
+        await client.query('DELETE FROM pw1_migration_commits WHERE attempt_id=$1', [successfulAttemptId])
+        await client.query('DELETE FROM pw1_migration_attempts WHERE id=ANY($1::uuid[])', [[attemptId,successfulAttemptId]])
         await client.query('DELETE FROM pw1_migration_stores WHERE source_store_id=$1', [source])
         await payload.delete({collection:'pages',where:{site:{equals:siteId}}})
         await payload.delete({collection:'sites',id:siteId!}); siteId=undefined
@@ -84,7 +89,8 @@ async function main() {
 
     } finally {
         await client.query('DELETE FROM pw1_migration_commits WHERE attempt_id=$1', [attemptId])
-        await client.query('DELETE FROM pw1_migration_attempts WHERE id=$1', [attemptId])
+        await client.query('DELETE FROM pw1_migration_commits WHERE attempt_id=$1', [successfulAttemptId])
+        await client.query('DELETE FROM pw1_migration_attempts WHERE id=ANY($1::uuid[])', [[attemptId,successfulAttemptId]])
         await client.query('DELETE FROM pw1_migration_batches WHERE id=$1', [batchId])
         await client.query('DELETE FROM pw1_migration_stores WHERE source_store_id=$1', [source])
         await client.query('DELETE FROM pw1_migration_accounts WHERE source_user_id=$1', [source])

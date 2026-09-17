@@ -32,3 +32,8 @@ export function classifyStoreAttemptError(error: unknown): MigrationFailure {
     if (stopCodes.includes(failure.code)) return { ...failure, retryable: false }
     return { ...failure, code: failure.code === 'VALIDATION_OR_PERMANENT' ? 'STORE_ATTEMPT_FAILED' : failure.code, retryable: true }
 }
+
+/** The batch drained and persisted its report; successful stores can still be audited. */
+export class MigrationBatchIncompleteError extends Error {
+    constructor(message: string, public readonly auditAllowed = true) { super(message); this.name = 'MigrationBatchIncompleteError' }
+}

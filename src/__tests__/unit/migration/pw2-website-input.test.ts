@@ -116,3 +116,17 @@ describe('[TC-F35.M42] reviewed adapter routes',()=>{
         expect(()=>adaptWebsiteInput({...input,linkCorrections:[{from:'/old',pageId:'999',reason:'reviewed'}]})).toThrow('missing page')
     })
 })
+
+describe('[TC-F35.M47] broken link presentation', () => {
+    it('removes a broken menu item, retains its valid children and preserves CTA text without a link', () => {
+        const input = fixture()
+        const url = new URL('/missing', input.source.websiteUrl).href
+        const adapted = adaptWebsiteInput({ ...input,
+            website: { ...input.website, navigation: [{ label:'Missing', url, children:[{label:'Home',pageId:'10'}] }] },
+            pages: [{ ...input.pages[0], components: [{ sourceId:'91',type:'banner',content:{ slides:[{heading:'Hello',description:'Text',imageUrl:'https://img.example/x.jpg',alt:'',cta:{label:'Read more',url}}] } }] }],
+        }, [], [url])
+        expect(adapted.contract.site.navigation.links).toEqual([{label:'Home',url:'/'}])
+        expect(adapted.contract.pages[0].components[0].block.slides).toMatchObject([{subheadline:'Text\nRead more',ctaButtons:[]}])
+        expect(adapted.report.linkFindings).toContainEqual({url,location:'page:10/component:91/slide:0',reason:'confirmed-broken',action:'disabled'})
+    })
+})

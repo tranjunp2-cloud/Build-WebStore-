@@ -98,3 +98,29 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO TC-F35.M41: Browser measures rendered Swiper frame rather than intrinsic image ratio; exact source URL matching rejects conflicting observations.
 - [x] AUTO TC-F35.M42: Reviewed per-store corrections use an existing source page ID; image-only map links receive an accessible label, preserving existing names.
 - [x] AUTO TC-F35.M35: Grouped reset reference queries execute against isolated local fixtures; reference and transaction protections remain enabled.
+
+### TC-F35.M46 — Partial completion finalization
+- [x] AUTO — A drained partial failure runs the requested audit and preserves nonzero migration exit; setup failure/cancellation does not audit; audit failure retains both errors.
+- [x] AUTO — Local CLI records three failed attempts in one batch, cleans orphan media and continues the next store without a manual retry command.
+- [x] AUTO — Local DB cleanup after a later successful attempt removes failed-attempt orphan media while preserving committed references.
+- [x] AUTO — AI response schema rejects block/variant pairs incompatible with the source component before binding.
+
+### TC-F35.M47 — Missing source-page links
+- [x] AUTO — Report missing page links by source store/page/component separately from BE entity mappings; only explicit same-source HTTP 404/410 evidence disables a link.
+- [x] AUTO — Retain HTTP 200 SPA shells, redirects to other domains and network/server failures; never guess Home as a destination.
+- [x] AUTO — Unwrap broken rich-text anchors preserving text/images; remove broken navigation items while preserving valid children; preserve broken CTA label as plain description text.
+
+### TC-F35.M48 — Automatic CLI publish
+- [x] AUTO — Regular run/retry automatically uses existing app publish API; invalid origin fails before mutation; dry-run stays read-only.
+- [x] AUTO — Real CLI: unavailable publish API exhausts its own attempt budget, preserves migration completion and proceeds to other stores; retry succeeds without new generation attempts.
+- [x] AUTO — Already-published sites are skipped; JSON/CSV distinguish publication failure from migration failure.
+
+### TC-F35.M49 — Page-scoped carousel source preparation
+- [x] AUTO — Match source media within its source page, preserve explicit layout, reject conflicting observations and preserve provenance for verified alternate images.
+- [x] AUTO — Browser fixtures measure gapped Swiper, Slick and CSS background frames; srcset upgrade must load and retain image ratio.
+- [x] AUTO — Native binder preserves verified frame/fit/count and chosen image while AI selects the carousel variant.
+
+### TC-F35.M50 — PW1 SPA missing destinations
+- [x] AUTO — Complete single-store page inventory can confirm an absent path; partial pagination, wrong tenant and unreadable responses cannot.
+- [x] AUTO — Same-source HTTP200 rendered not-found can disable a CTA; HTTP errors/timeouts alone cannot; valid pages and working redirects survive.
+- [x] AUTO — Browser rendering requires a visible not-found heading and Back to Home control, not merely a footer/link mentioning 404.
