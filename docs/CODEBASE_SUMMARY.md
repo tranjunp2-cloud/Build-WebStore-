@@ -105,8 +105,6 @@ Adding a new collection requires: Payload config + migration in `scripts/db-setu
 
 ## Notable patterns
 
-- **PW1 migration CLI** (`scripts/migrate-pw1.ts`, `src/lib/migration/`) — one JSON array drives sequential account/store provisioning and native website generation through the shared `generate-site-service.ts`. Database ledgers preserve progress/backups; reruns retry failures and skip unchanged completed stores. Only batch apply/dry-run/rerun remain. Commerce import and full source mapping remain pending. See [operator guide](migration/pw1-website-cli.md).
-
 - **Path alias:** `@/*` → `./src/*` (tsconfig.json)
 - **Strict TS:** `strict: true` in tsconfig; no `any` unless justified
 - **Server components first:** App Router defaults to RSC; add `'use client'` only when needed

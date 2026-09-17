@@ -307,7 +307,6 @@ A larger image is used only when declared by srcset, actually loaded and ratio-c
 
 The scanner is serialized across stores, limited to 12 source pages and 60 seconds after browser launch (10-second launch timeout), with bounded navigation, scrolling and image probes. Public-network checks and same-host navigation apply; legacy TLS certificates are tolerated for read-only source inspection. Source failures are warnings and do not manufacture layout evidence. Unsupported slider markup, background-size:auto, ambiguous shared images, inaccessible pages, and pages beyond the budget retain PW2 fallback. Brand scanning no longer also scans carousels.
 
-Validation: 165 migration unit tests, TypeScript, real-browser fixtures for gaps/backgrounds/declared alternatives, and read-only live source checks on 205/416/253. No reset or regeneration of the 30 pilot sites in this change.
 
 
 ### PW1 SPA missing-link verification (2026-09-17)
@@ -315,5 +314,3 @@ Validation: 165 migration unit tests, TypeScript, real-browser fixtures for gaps
 The regular migration source-link step now permits SPA rendering and observes the public /pages response. Absence evidence requires a complete nonempty single-page inventory with exact pagination counts and every row scoped to the expected source store. Partial/mixed-store inventories are ignored. Existing destinations and redirects to an existing page are retained. A visible not-found heading plus Back to Home control also confirms a rendered soft404 despite HTTP200. Network/TLS errors, loading shells without inventory and server errors alone do not disable links.
 
 For legacy HTTPS TLS failures, a fresh HTTP page is attempted on the same source host. Public-network guards, same-host navigation, a 60-second browser lifetime and 10-URL cap remain in place. Reports retain final URL, inventory and decision reason per source URL. Existing adapter handling removes confirmed dead links while preserving CTA text/images. No store-ID exceptions or guessed destination rewrites.
-
-Validated with 168 unit tests, browser visibility fixtures, direct checks of all eight URLs and a scoped rerun of stores 1042/1033/645. All three automatically republished; eight links disabled; public audit zero errors/warnings. Other sites remain unchanged.
