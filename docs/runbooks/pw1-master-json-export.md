@@ -8,6 +8,21 @@ Lệnh `npm run migrate:pw1:export` đọc CSV trực tiếp, tạo master JSON 
 
 Contract: [pw1-master-export-contract.md](../migration/pw1-master-export-contract.md). Quy tắc nghiệp vụ: [master đã pin](../migration/pw1-pw2-master-field-mapping.md).
 
+## Chạy trên máy khác — config đã đưa vào Git
+
+Dùng [configs/migration/pw1-prod-20260916.json](../../configs/migration/pw1-prod-20260916.json) để xuất snapshot `20260916-1351-1353` theo policy đã chốt. Đây là bản giữ nguyên bytes/hash config của artifact `classification-001`; không phải cấu hình tự chọn snapshot mới nhất.
+
+Cài dependencies bằng `npm ci`, chuyển riêng 93 CSV nguồn và tạo thư mục cha output, rồi chạy từ root repo:
+
+```sh
+npm run migrate:pw1:export -- \
+  --input-dir /absolute/path/to/DB_PROD \
+  --source-config configs/migration/pw1-prod-20260916.json \
+  --output-dir /absolute/path/to/exports/new-run
+```
+
+Không cần DB/server hoặc secret importer. Giữ nguyên UTC/+00:00, mốc `asOf` và policy của snapshot này; suffix đích hiện là domain dev. [Hướng dẫn config](../../configs/migration/README.md) ghi điều kiện RAM/ổ đĩa, validate và quy tắc tạo config cho snapshot khác. Các đường dẫn `.migration/` trong bằng chứng lịch sử bên dưới vẫn là đường dẫn private của những lần chạy trước.
+
 ## Follow-up hiện tại — export, validate-only và archive đã kiểm chứng
 
 Contract §21 bổ sung `promoteActiveCategoriesToRoot`, `preserveHistoricalOrders` và `deferredStoreIds`; tất cả cần evidence trong config/manifest. Store 323 dùng VND hoãn toàn Store, không đổi tiền tệ. Bỏ giới hạn ảnh Product/shortDescription ở mapper, form, collection và gallery; SQL mở rộng mô tả và bỏ NOT NULL của orders_items.product_id. Apply/verify migration đích trước import; không chạy DB migration chỉ để tạo master.
@@ -96,7 +111,7 @@ Không tự bật Category/SKU inactive, đổi giới hạn ảnh/mô tả ho�
 - Một snapshot CSV UTF-8, được giữ nguyên và lưu ngoài Git.
 - Config JSON xác nhận đúng DB nguồn, timezone, domain và chính sách Store deleted.
 - Thư mục cha đầu ra đã tồn tại; mỗi lần chạy dùng tên thư mục đầu ra mới, ngoài cây CSV.
-- Giữ cả CSV và config trong vùng riêng tư. Master có dữ liệu cá nhân cần thiết; không đưa vào Git, public bucket hoặc log.
+- Giữ CSV, credentials và artifact trong vùng riêng tư. Config không chứa secret có thể nằm trong Git; bản production đã rà soát nằm tại `configs/migration/pw1-prod-20260916.json`. Master có dữ liệu cá nhân cần thiết; không đưa vào Git, public bucket hoặc log.
 
 Ví dụ config dưới đây chỉ dùng dữ liệu giả, là **cấu hình inventory tối thiểu**. Export đầy đủ cần chọn đủ bảng thực tế; thiếu bảng sẽ được báo `SOURCE_TABLE_NOT_SELECTED`, không được hiểu thành bảng rỗng.
 
