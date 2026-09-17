@@ -1,0 +1,5 @@
+export const MASTER_SHA256 =
+  '27fbef7ec0fc73e58029295c8fbbe7d276c4d6095e358fe57e3058e1eb4f4567'
+export const LEGACY_MASTER_SHA256 =
+  '8aacb2610d7ceacbe067da4c0e5b8717e0804601715e8d0158b6a619c6bfeae9'
+export const EXPORT_VERSION = '1.2.0'

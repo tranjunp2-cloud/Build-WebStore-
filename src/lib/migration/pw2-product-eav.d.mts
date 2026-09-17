@@ -1,0 +1,3 @@
+import type { Doc, Row } from './pw1-export/contracts'
+export interface CatalogResult { fields: Doc; errors: {code:string;path:string;message:string;reason?:string}[]; identities: { attributeId:string; attributeCode:string|null; targetPath:string; options:{attributeValueId:string;targetPath:string}[] }[]; skuCrosswalk: {sourceSkuId:string;targetPath:string;targetId:string;selectedTuple:string[][]}[]; sourceInstanceToken:string; eligibleSkuCount:number }
+export function buildProductCatalogFromSource(product: Row, tables: Readonly<Record<string,Row[]>>, sourceInstanceToken:string, options?: {allowSparseVariants?: boolean}): CatalogResult

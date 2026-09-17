@@ -97,3 +97,10 @@ coverage/
 .wiki-repo/
 .env*.local
 .gstack/
+
+# Private PW1 export artifacts (prefer a private directory outside this repository)
+/pw1-exports/
+/migration-artifacts/
+
+# Private PW1 migration inputs/artifacts (synthetic test fixtures remain tracked)
+.migration/
