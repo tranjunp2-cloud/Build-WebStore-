@@ -8,6 +8,28 @@ Lệnh `npm run migrate:pw1:export` đọc CSV trực tiếp, tạo master JSON 
 
 Contract: [pw1-master-export-contract.md](../migration/pw1-master-export-contract.md). Quy tắc nghiệp vụ: [master đã pin](../migration/pw1-pw2-master-field-mapping.md).
 
+## CSV của ngày khác — tạo config trước khi export
+
+Dùng profile không gắn ngày `configs/migration/pw1-prod-profile.json`:
+
+```sh
+npm run migrate:pw1:config -- \
+  --input-dir /absolute/path/to/new-snapshot \
+  --profile configs/migration/pw1-prod-profile.json \
+  --snapshot-id pw1-20260918-batch1 \
+  --as-of 2026-09-18T00:00:00Z \
+  --output /absolute/path/to/configs/pw1-20260918.json
+```
+
+Thay snapshot/asOf theo bằng chứng của lần export, không lấy mặc định ngày chạy.
+Sau đó truyền file vừa tạo vào `migrate:pw1:export --source-config ...` như bình thường.
+Lệnh nhận diện đủ 93 bảng từ tên CSV có hậu tố ngày (8/12/14 chữ số), giữ nguyên policy,
+và dừng nếu thiếu/trùng bảng, khác ngày hoặc có file CSV không nhận diện được. Không chọn
+file mới nhất. Thư mục config cha phải có sẵn và nằm ngoài input; không ghi đè file cũ.
+Các file cùng ngày vẫn phải được người vận hành xác nhận cùng snapshot; kiểm tên không
+thay thế đối soát nội dung. Snapshot qua nửa đêm cần config chính xác được review riêng.
+Xem [hướng dẫn profile](../../configs/migration/README.md#new-csv-export-date).
+
 ## Chạy trên máy khác — config đã đưa vào Git
 
 Dùng [configs/migration/pw1-prod-20260916.json](../../configs/migration/pw1-prod-20260916.json) để xuất snapshot `20260916-1351-1353` theo policy đã chốt. Đây là bản giữ nguyên bytes/hash config của artifact `classification-001`; không phải cấu hình tự chọn snapshot mới nhất.

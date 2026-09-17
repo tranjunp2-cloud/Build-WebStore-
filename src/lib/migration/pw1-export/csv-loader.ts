@@ -45,14 +45,14 @@ export async function checkedFile(
     throw new ExportError('SOURCE_NOT_REGULAR_FILE')
   return current
 }
-async function discover(root: string, prefix = ''): Promise<string[]> {
+export async function discoverCsvFiles(root: string, prefix = ''): Promise<string[]> {
   const result: string[] = []
   for (const entry of await readdir(path.join(root, prefix), {
     withFileTypes: true,
   })) {
     const name = prefix ? `${prefix}/${entry.name}` : entry.name
     if (entry.isSymbolicLink()) throw new ExportError('SYMLINK_SOURCE')
-    if (entry.isDirectory()) result.push(...(await discover(root, name)))
+    if (entry.isDirectory()) result.push(...(await discoverCsvFiles(root, name)))
     else if (entry.isFile() && entry.name.toLowerCase().endsWith('.csv'))
       result.push(name)
   }
@@ -70,7 +70,7 @@ export async function loadSource(
   if ((await lstat(inputDir)).isSymbolicLink())
     throw new ExportError('SYMLINK_SOURCE')
   const root = await realpath(inputDir),
-    names = await discover(root)
+    names = await discoverCsvFiles(root)
   const selected = new Map(
     Object.entries(config.tables).map(([t, f]) => [f, t]),
   )
@@ -184,7 +184,7 @@ export async function loadSource(
   return { tables, files, inputRoot: root, config }
 }
 export async function verifySource(source: LoadedSource, progress?: Progress) {
-  const names = await discover(source.inputRoot)
+  const names = await discoverCsvFiles(source.inputRoot)
   const previous = new Set(source.files.map((f) => f.filename))
   const changed = names
     .filter((n) => !previous.has(n))

@@ -10,7 +10,49 @@ settings, Store policy IDs and decision evidence. It contains no passwords,
 credential keys, database connection strings or machine-specific paths.
 `sourceInstanceToken` is an identity namespace, not an authentication token.
 
-## Run on another machine
+## New CSV export date
+
+`pw1-prod-profile.json` keeps shared source identity, timezone, domain, approved
+policy and the 93 required table names, without dated filenames, snapshotId or
+asOf. Use it to generate a new exact source config:
+
+```sh
+npm run migrate:pw1:config -- \
+  --input-dir /absolute/path/to/new-csv-snapshot \
+  --profile configs/migration/pw1-prod-profile.json \
+  --snapshot-id pw1-20260918-batch1 \
+  --as-of 2026-09-18T00:00:00Z \
+  --output /absolute/path/to/configs/pw1-20260918.json
+
+npm run migrate:pw1:export -- \
+  --input-dir /absolute/path/to/new-csv-snapshot \
+  --source-config /absolute/path/to/configs/pw1-20260918.json \
+  --output-dir /absolute/path/to/exports/new-run
+```
+
+Replace the example snapshot/asOf with the verified values for your export.
+The output config parent must exist, be outside CSV input, and the output file
+must not exist. Generated config is mode 0600. No database or source CSV is changed.
+
+Supported filenames: `<table>_YYYYMMDD.csv`, `<table>_YYYYMMDDHHmm.csv`, or
+`<table>_YYYYMMDDHHmmss.csv`; `_attributes__...csv` maps to `attributes`.
+Subdirectories are allowed; symlinks are rejected. All required tables must have
+exactly one CSV. Different minutes in the same date are accepted (as in the old
+snapshot). Duplicate tables, different filename dates, invalid dates and
+unexpected/undated CSVs fail instead of selecting the latest file. Put each
+snapshot in its own directory; an intentionally cross-midnight export needs an
+explicitly reviewed exact config rather than this automatic discovery.
+
+**A matching filename date does not prove transactionally consistent data.**
+The operator must confirm all files came from the same snapshot. This command
+only validates names/config; exporter subsequently parses CSVs, validates policy
+scope/relationships and hashes the exact input bytes. Generated config itself
+is not an import-readiness certificate. Review snapshot-specific decisions such
+as deferred Store323 before reuse; policy content is inherited without rewriting
+its approval evidence. Changing it may require importer policy review.
+
+## Run on another machine (frozen 2026-09-16 snapshot)
+
 
 From the repository root, after installing the project dependencies with `npm ci`:
 

@@ -215,3 +215,5 @@ Audit: `.migration/audits/pw1-prod-20260917-approved-001/`; verification và rec
 - [x] AUTO **TC-F42-EXP-082**: Resolve source-row tenant through verified parent relationships; missing parents, unknown polymorphic types and tenant conflicts remain blocked. Retain only known source metadata; unknown fields and nonempty unmapped avatars stay unresolved.
 
 - [x] AUTO **TC-F42-EXP-083**: Reject contradictory Store ownership, missing/incorrect parent, unknown ownership/retention rules, missing failure diagnostic and cyclic evidence; accept valid child chains and retained orphan evidence with global blockers. Rehashed artifact mutations must still fail classification validation.
+
+- [x] AUTO **TC-F42-EXP-084**: Generate exact CSV selection for a new date from a reusable profile; retain explicit snapshot/asOf and attributes alias; generated config feeds actual exporter. Reject duplicate tables, mixed dates, missing/unexpected tables, invalid filename dates, symlinks, unsafe output and overwrites.
