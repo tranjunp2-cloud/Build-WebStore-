@@ -228,3 +228,25 @@ Audit: `.migration/audits/pw1-prod-20260917-approved-001/`; verification và rec
 - Results unchanged: 2,918 source Stores, 2,799 emitted, 118 blocked, 1 policy-excluded, 107,726 blocker diagnostics. All 9 payload/report files match the prior `pw1-prod-20260917-classification-001` artifact byte-for-byte by SHA-256; manifest matches except the generated source config hash. All 93 source CSV hashes unchanged.
 - This verifies CLI/export equivalence, not full migration readiness: emitted Stores can still have target prerequisites or omitted/unresolved records and fields. Creator/tenant slug prerequisites do not themselves mean records are missing. Rich-text fidelity diagnostics remain in the exporter report even where handling is delegated elsewhere.
 - Private execution evidence and comparison: `.migration/review-20260918/` (ignored by Git); production CSV and generated artifacts are not committed.
+
+- [x] AUTO **TC-F42-EXP-086**: Preserve PW1 Product and Blog active/inactive through mapper, sanitizer and artifact schemas; preserve promotion active/inactive/verified expiry. Missing/unknown status or contradictory expiry is blocked. Never invent publication timestamps. New contract/version pair is pinned; prior 1.1/1.2 pairs remain readable without accepting mismatched pins.
+
+- [x] AUTO **TC-F42-EXP-087**: Master omits pw1_source and current schema rejects reinsertion. Archive-only fields are retained-source with bounded, ownership-checked CSV evidence, never falsely mapped. Operational mapping and unsafe/unknown-field diagnostics remain intact; 1.0–1.3 use legacy site schemas.
+
+- [x] AUTO TC-F42-EXP-088: separate publication/data/import outcome; exact delegated scope; unknown/unsafe/price gaps retained; forged outcome/report rejected.
+
+- [x] AUTO TC-F42-EXP-089: exact warning importer gates; approved excluded Store scope; per-Store emitted/blocked/excluded; historical 1.5.0 contract compatibility.
+
+- [x] AUTO TC-F42-EXP-090: Handoff distinguishes per-Store source errors, global scope review, importer verification (including unknown warnings), exclusions and diagnostic-clear Stores; never certifies import readiness. One-command CLI writes a private report outside the artifact.
+
+- [x] AUTO TC-F42-EXP-091: Product EN/MS descriptions retain exact source strings (HTML, arbitrary links/attributes, JSON-like text, Unicode, CRLF, whitespace and empty string) as Lexical text; no content/raw blockers or media extraction, other field and Blog validation unchanged.
+
+- [x] AUTO TC-F42-EXP-092: Blog author missing/unresolved falls back to the unique emitted tenant owner; preserve resolved source author; reject missing, foreign or ambiguous owner.
+
+- [x] AUTO TC-F42-EXP-093: Blog content is opaque source text; preserve HTML, links, embedded media URLs, entities, Unicode and whitespace without content blockers or media extraction. Raw content/content_ms classification preserves original strings; thumbnail and other Blog fields retain validation.
+
+- [x] AUTO TC-F42-EXP-094: Skip whole Product for absent/null/empty/whitespace eligible SKU price or stock; retain real zero; no SKU rows remain quarantined with Product ID and reason.
+
+- [x] AUTO TC-F42-EXP-095: Recover option definitions from eligible SKU selection rows with verified live same-Store attribute/value ownership; no SKU synthesis or source mutation; retain definition contributions; missing/foreign/deleted/mis-parented definitions and true duplicate tuples stay blocked; incomplete tuples are not falsely reported as duplicate.
+
+- [x] AUTO TC-F42-EXP-096: Product thiếu price/stock bỏ có warning và evidence Product/dòng con; validator reject evidence giả, Product còn emit, sai Store/parent; số sai và ownership lỗi vẫn blocker; zero vẫn giữ.

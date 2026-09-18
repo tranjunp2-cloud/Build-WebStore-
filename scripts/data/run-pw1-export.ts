@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util'
-import { mkdir, realpath, lstat } from 'node:fs/promises'
+import { mkdir, realpath, lstat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { createSnapshotConfig } from '../../src/lib/migration/pw1-export/snapshot-config'
@@ -51,7 +51,12 @@ async function main() {
   await createSnapshotConfig({ inputDir: input, profile: v.profile ?? 'configs/migration/pw1-prod-profile.json',
     snapshotId: v['snapshot-id'] ?? runId, asOf: v['as-of'], output: config })
   const result = await exportMaster(input, config, path.join(output, 'artifact'), false, progressLogger(line => process.stderr.write(line)))
-  process.stdout.write(JSON.stringify({ ...result, sourceConfig: config }) + '\n')
+  const handoffPath = path.join(output, 'handoff.json')
+  if (result.handoff) {
+    await writeFile(handoffPath, JSON.stringify(result.handoff, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
+    process.stderr.write(`Bàn giao: ${JSON.stringify(result.handoff.counts)}. Chưa xác nhận import-ready. Chi tiết: ${handoffPath}\n`)
+  }
+  process.stdout.write(JSON.stringify({ ...result, handoff: result.handoff ? { counts: result.handoff.counts, report: handoffPath } : undefined, sourceConfig: config }) + '\n')
   process.exitCode = result.exitCode
 }
 main().catch(error => {

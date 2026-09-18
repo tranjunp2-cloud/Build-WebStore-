@@ -1,3 +1,6 @@
+import { productExclusionSchema } from './product-exclusions'
+import { outcomeSchema as legacyOutcomeSchema } from './export-outcome-v1'
+import { outcomeSchema } from './export-outcome'
 import { z } from 'zod'
 import { ROOTS, type StoreOutput } from './contracts'
 import { identitySchemas } from './identity-schemas'
@@ -12,6 +15,7 @@ import {
 } from './mappers/commerce-schemas'
 import {
   siteDocumentSchema,
+  legacyRawSource,
   pageDocumentSchema,
   mediaDocumentSchema,
   blogCategoryDocumentSchema,
@@ -46,8 +50,17 @@ export const storeSchema = z
     ),
   )
   .strict()
-export const legacyStoreSchema = storeSchema.extend({
+export const statusStoreSchema = storeSchema.extend({
+  sites: z.array(siteDocumentSchema.extend({ pw1_source: legacyRawSource })),
+})
+export const previousStoreSchema = statusStoreSchema.extend({
+  products: z.array(productDocumentSchema.extend({ status: z.literal('draft') })),
+  blogs: z.array(blogDocumentSchema.extend({ status: z.literal('draft') })),
+  discounts: z.array(discountDocumentSchema.extend({ status: z.literal('inactive') })),
+})
+export const legacyStoreSchema = previousStoreSchema.extend({
   products: z.array(productDocumentSchema.extend({
+    status: z.literal('draft'),
     sku: z.string().min(1).max(50),
     variants: productDocumentSchema.shape.variants.element.extend({
       sku: z.string().min(1).max(50),
@@ -92,6 +105,7 @@ export const reportSchema = z
           storeId: z.string().nullable(),
           record: z.number().int().positive(),
           ownership: z.object({ storeId: z.string().nullable(), rule: z.string().regex(/^[A-Z_]+$/), parentTable: z.string().optional(), parentId: z.string().optional() }).strict().optional(),
+          productExclusion: productExclusionSchema.optional(),
           fieldRetentionRules: z.record(z.string().regex(/^MASTER-[A-Z0-9.-]+$/)).optional(),
           disposition: z.enum([
             'mapped',
@@ -120,7 +134,7 @@ export const reportSchema = z
 export const manifestSchema = z
   .object({
     version: z.literal(1),
-    exporterVersion: z.enum(['1.0.0', '1.1.0', '1.2.0']),
+    exporterVersion: z.enum(['1.0.0', '1.1.0', '1.2.0', '1.3.0', '1.4.0', '1.5.0', '1.5.1', '1.6.0', '1.6.1', '1.6.2', '1.7.0', '1.8.0']),
     classificationVersion: z.literal('source-classification-v1').optional(),
     contractSha256: digest,
     sourceConfigSha256: digest,
@@ -148,6 +162,8 @@ export const manifestSchema = z
     ),
     artifacts: z
       .object({
+        'export-review.json': digest.optional(),
+        'export-review.md': digest.optional(),
         'master.json': digest,
         'mapping-report.json': digest,
         'mapping-report.csv': digest,
@@ -161,7 +177,8 @@ export const manifestSchema = z
       .strict(),
     acceptedExclusions: z.array(exclusionSchema).optional(),
     migrationPolicy: migrationPolicySchema.optional(),
-    status: z.enum(['complete', 'needs_review']),
+    status: z.enum(['complete', 'needs_review', 'exported']),
+    outcome: z.union([outcomeSchema, legacyOutcomeSchema]).optional(),
     importReady: z.literal(false),
     coverage: z.object({ accounted: z.literal(true) }).strict(),
     mapping: z.object({ complete: z.boolean() }).strict(),

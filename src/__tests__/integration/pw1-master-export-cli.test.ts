@@ -77,12 +77,12 @@ describe('PW1 export real CLI subprocess', () => {
     ).toBe(false)
     await expect(readFile(path.join(output, 'master.json'))).rejects.toThrow()
   })
-  it('TC-F42-EXP-006/015/016: exports every synthetic Store deterministically and validates needs_review', async () => {
+  it('TC-F42-EXP-006/015/016: exports every synthetic Store deterministically and validates successful export with partial data', async () => {
     const { input, configPath } = await writeExportFixture(root),
       one = path.join(root, 'one'),
       two = path.join(root, 'two')
     const first = await run(exportArgs(input, configPath, one))
-    expect(first.code, first.stderr).toBe(2)
+    expect(first.code, first.stderr).toBe(0)
     const bytes = await readFile(path.join(one, 'master.json'), 'utf8'),
       master = JSON.parse(bytes)
     expect(
@@ -107,7 +107,7 @@ describe('PW1 export real CLI subprocess', () => {
     expect(first.stderr).toContain('verify-source')
     expect(first.stderr).toContain('published')
     const second = await run(['--quiet', ...exportArgs(input, configPath, two)])
-    expect(second.code, second.stderr).toBe(2)
+    expect(second.code, second.stderr).toBe(0)
     expect(second.stderr).toBe('')
     expect({ ...JSON.parse(second.stdout), outputDir: '' }).toEqual({
       ...JSON.parse(first.stdout),
@@ -115,7 +115,7 @@ describe('PW1 export real CLI subprocess', () => {
     })
     expect(await readFile(path.join(two, 'master.json'), 'utf8')).toBe(bytes)
     const validated = await run(['--validate-only', '--artifact-dir', one])
-    expect(validated.code, validated.stderr).toBe(2)
+    expect(validated.code, validated.stderr).toBe(0)
     expect(validated.stderr).toContain('validate-artifact')
     const quietValidated = await run([
       '--quiet',
@@ -127,7 +127,7 @@ describe('PW1 export real CLI subprocess', () => {
     expect(quietValidated.stderr).toBe('')
     expect(JSON.parse(validated.stdout)).toMatchObject({
       integrityStatus: 'valid',
-      mappingStatus: 'needs_review',
+      mappingStatus: 'partial',
     })
     const overwritten = await run(exportArgs(input, configPath, one))
     expect(overwritten.code).toBe(1)
@@ -144,7 +144,7 @@ describe('PW1 export real CLI subprocess', () => {
         'owner-1@example.test',
       ),
     )
-    expect((await run(exportArgs(input, configPath, output))).code).toBe(2)
+    expect((await run(exportArgs(input, configPath, output))).code).toBe(0)
     const master = JSON.parse(
       await readFile(path.join(output, 'master.json'), 'utf8'),
     )
@@ -184,7 +184,7 @@ describe('PW1 export real CLI subprocess', () => {
       ),
     )
     const result = await run(exportArgs(input, configPath, output))
-    expect(result.code, result.stderr).toBe(2)
+    expect(result.code, result.stderr).toBe(0)
     const manifest = JSON.parse(
       await readFile(path.join(output, 'master-manifest.json'), 'utf8'),
     )
@@ -211,7 +211,7 @@ describe('PW1 export real CLI subprocess', () => {
       ).length,
     )
     const validated = await run(['--validate-only', '--artifact-dir', output])
-    expect(validated.code, validated.stderr).toBe(2)
+    expect(validated.code, validated.stderr).toBe(0)
     cfg.acceptedExclusions[0].collection = 'users'
     await writeFile(configPath, JSON.stringify(cfg))
     const invalid = await run(
@@ -282,7 +282,7 @@ describe('PW1 export real CLI subprocess', () => {
   it('TC-F42-EXP-014/015: validator rejects tampered bytes and report/manifest inconsistency', async () => {
     const { input, configPath } = await writeExportFixture(root),
       output = path.join(root, 'artifact')
-    expect((await run(exportArgs(input, configPath, output))).code).toBe(2)
+    expect((await run(exportArgs(input, configPath, output))).code).toBe(0)
     const masterPath = path.join(output, 'master.json'),
       original = await readFile(masterPath, 'utf8')
     await writeFile(masterPath, original + ' ')
@@ -314,7 +314,7 @@ describe('PW1 export real CLI subprocess', () => {
 it('TC-F42-EXP-016: rejects tampered summary even with updated hash; accepts artifacts predating optional summaries', async () => {
   const { input, configPath } = await writeExportFixture(root)
   const output = path.join(root, 'summary-validation')
-  expect((await run(exportArgs(input, configPath, output))).code).toBe(2)
+  expect((await run(exportArgs(input, configPath, output))).code).toBe(0)
   const summaryPath = path.join(output, 'store-summary.json')
   const manifestPath = path.join(output, 'master-manifest.json')
   const summary = JSON.parse(await readFile(summaryPath, 'utf8'))
@@ -335,7 +335,7 @@ it('TC-F42-EXP-016: rejects tampered summary even with updated hash; accepts art
   await rm(summaryPath)
   await rm(path.join(output, 'store-summary.csv'))
   const legacy = await run(['--validate-only', '--artifact-dir', output])
-  expect(legacy.code, legacy.stderr).toBe(2)
+  expect(legacy.code, legacy.stderr).toBe(0)
   expect(JSON.parse(legacy.stdout).integrityStatus).toBe('valid')
 }, 30000)
 
@@ -353,11 +353,11 @@ it('TC-F42-077: keeps approved Store deferral separate from blocking and validat
   const master = JSON.parse(await readFile(path.join(output, 'master.json'), 'utf8'));
   const checked = await run(['--validate-only', '--artifact-dir', output]);
   // Assert
-  expect(exported.code, exported.stderr).toBe(2);
+  expect(exported.code, exported.stderr).toBe(0);
   expect(manifest.policyExcludedStores).toEqual(['2']);
   expect(manifest.blockedStores).not.toContain('2');
   expect(manifest.counts.policyExcludedStoreCount).toBe(1);
   expect(master.map((store: { tenants: { metaData: { pw1StoreId: string } }[] }) => store.tenants[0].metaData.pw1StoreId)).toEqual(['1', '9007199254740993']);
-  expect(checked.code, checked.stderr).toBe(2);
+  expect(checked.code, checked.stderr).toBe(0);
   expect(JSON.parse(checked.stdout).integrityStatus).toBe('valid');
 });

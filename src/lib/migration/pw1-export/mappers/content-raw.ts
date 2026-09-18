@@ -1,22 +1,15 @@
+import { PRODUCT_EXCLUSION_CODE } from '../product-exclusions'
 import { ref, type Doc, type MappingContext } from '../contracts'
 import { rawChildren, rawRow, settings, sourceOrder } from './raw'
 
 export function mapRawContent(ctx: MappingContext): void {
   const site = ctx.output.sites[0]
   if (!site) return
-  const source: Doc = {}
   const store = ctx.find('stores', ctx.storeId)
   if (store) {
-    source.store = rawRow(ctx, 'stores', store, 'sites.pw1_source.store')
+    rawRow(ctx, 'stores', store, 'sites.pw1_source.store')
     const template = ctx.find('frontend_templates', store.frontend_template_id)
-    source.frontend_template = template
-      ? rawRow(
-          ctx,
-          'frontend_templates',
-          template,
-          'sites.pw1_source.frontend_template',
-        )
-      : null
+    if (template) rawRow(ctx, 'frontend_templates', template, 'sites.pw1_source.frontend_template')
     if (store.frontend_template_id && !template)
       ctx.issue(
         'RAW_TEMPLATE_MISSING',
@@ -25,7 +18,7 @@ export function mapRawContent(ctx: MappingContext): void {
         'frontend_template_id',
       )
   }
-  source.model_settings = settings(
+  settings(
     ctx,
     'Store',
     ctx.storeId,
@@ -41,13 +34,14 @@ export function mapRawContent(ctx: MappingContext): void {
     'attributes',
     'attribute_values',
   ]) {
-    source[table] = ctx
+    ctx
       .rows(table, true)
       .sort(sourceOrder)
-      .map((row) => rawRow(ctx, table, row, `sites.pw1_source.${table}`))
+      .filter(row => table !== 'products' || !ctx.diagnostics.some(d => d.code === PRODUCT_EXCLUSION_CODE && d.storeId === ctx.storeId && d.sourceId === row.id))
+      .forEach((row) => { rawRow(ctx, table, row, `sites.pw1_source.${table}`) })
   }
   const categoryIds = new Set(ctx.rows('categories', true).map((row) => row.id))
-  source.category_attributes = (ctx.tables.category_attributes ?? [])
+  ;(ctx.tables.category_attributes ?? [])
     .filter((row) => categoryIds.has(row.category_id))
     .sort(sourceOrder)
     .map((row) =>
@@ -58,7 +52,6 @@ export function mapRawContent(ctx: MappingContext): void {
         'sites.pw1_source.category_attributes',
       ),
     )
-  site.pw1_source = source
   for (const page of ctx.rows('pages', true).sort(sourceOrder)) {
     const out = rawRow(ctx, 'pages', page, 'pages')
     out._ref = ref('pages', 'pages', page.id!)

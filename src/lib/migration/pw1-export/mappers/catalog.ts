@@ -1,3 +1,5 @@
+import { missingProductData } from './catalog-policy'
+import { PRODUCT_EXCLUSION_CODE } from '../product-exclusions'
 import { inactiveOnlyProduct, packageWeightKg } from "./catalog-policy";
 import { productLexical } from "./product-lexical";
 import { sourceCatalog } from "./catalog-source";
@@ -163,6 +165,10 @@ export function mapCatalog(ctx: MappingContext): void {
   for (const row of ctx.rows("products").filter(live)) {
     try {
       if (!row.id) throw new Error("PRODUCT_ID");
+      if (!["0", "1"].includes(row.status ?? "")) {
+        ctx.issue("PRODUCT_STATUS_UNVERIFIED", "products", row.id, "status");
+        continue;
+      }
       if (
         activeOnly &&
         inactiveOnlyProduct(row, skusByProduct.get(row.id ?? "") ?? [])
@@ -174,6 +180,11 @@ export function mapCatalog(ctx: MappingContext): void {
           undefined,
           "warning",
         );
+        continue;
+      }
+      const exclusion = missingProductData(row, skusByProduct.get(row.id) ?? []);
+      if (exclusion) {
+        ctx.issue(PRODUCT_EXCLUSION_CODE, "products", row.id, undefined, "warning", exclusion.reason);
         continue;
       }
       const sourceCategory = ctx.find("categories", row.category_id);
@@ -197,7 +208,7 @@ export function mapCatalog(ctx: MappingContext): void {
             error.code,
             "products",
             row.id,
-            undefined,
+            error.reason === "MISSING_PRICE" ? "price" : error.reason === "MISSING_STOCK" ? "stock" : undefined,
             "blocker",
             error.reason,
           );
@@ -248,7 +259,7 @@ export function mapCatalog(ctx: MappingContext): void {
         name: row.name?.trim() ?? "",
         slug: row.slug?.trim() ?? "",
         currency,
-        status: "draft",
+        status: row.status === "1" ? "active" : "draft",
         halalCertified: false,
         aiReviewPending: false,
         category: omittedCategory
@@ -269,7 +280,7 @@ export function mapCatalog(ctx: MappingContext): void {
         if (row[`package_${dimension}`])
           dimensions[dimension] = numberValue(row[`package_${dimension}`]);
       if (Object.keys(dimensions).length) doc.dimensions = dimensions;
-      const clean = sanitizeProductDocument(doc, row, {
+      const clean = sanitizeProductDocument(doc, { ...row, description: null, description_ms: null }, {
         sourceInstanceToken: ctx.config.sourceInstanceToken,
       });
       // A missing code is distinct from a missing source price row.
@@ -277,9 +288,9 @@ export function mapCatalog(ctx: MappingContext): void {
         if (item.sku == null || (typeof item.sku === "string" && !item.sku.trim()))
           delete item.sku;
       }
-      if (row.description)
+      if (row.description != null)
         clean.description = productLexical(ctx, row, "description");
-      if (row.description_ms)
+      if (row.description_ms != null)
         clean.descriptionBM = productLexical(ctx, row, "description_ms");
       const errors = validateProductDocument(clean, {
         allowEmptyCategory: omittedCategory,
@@ -310,6 +321,12 @@ export function mapCatalog(ctx: MappingContext): void {
           String(clean._ref) + ".variantConfigs",
           "master-16-eav-domain",
         );
+      }
+      const selectedSkuIds = new Set(catalog.skuCrosswalk.map(item => item.sourceSkuId));
+      const definitionSources = [...domain, ...(ctx.tables.product_variants ?? []).filter(
+        item => selectedSkuIds.has(item.product_sku_id ?? "") && live(item),
+      )];
+      for (const entry of definitionSources) {
         for (const [table, id] of [
           ["attributes", entry.attribute_id],
           ["attribute_values", entry.attribute_value_id],
@@ -343,6 +360,7 @@ export function mapCatalog(ctx: MappingContext): void {
           "category_id",
           "description",
           "description_ms",
+          "status",
           "featured_description",
           "package_weight",
           ...(weight !== undefined ? ["package_weight_type"] : []),

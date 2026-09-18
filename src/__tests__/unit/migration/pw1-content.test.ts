@@ -80,7 +80,7 @@ describe('PW1 content and raw preservation', () => {
       expect.objectContaining({ code: 'RAW_OWNERSHIP_MISMATCH' }),
     )
   })
-  it('TC-F42-EXP-012: builds Lexical with exact image occurrence refs and preserves relative links', () => {
+  it('TC-F42-EXP-012: preserves source image markup and relative links without media extraction', () => {
     // Arrange
     const ctx = fixture({
       blog_posts: [
@@ -89,6 +89,7 @@ describe('PW1 content and raw preservation', () => {
           store_id: '10',
           name: 'Article',
           slug: 'article',
+          status: '1',
           created_by: '20',
           created_at: '2025-01-01 00:00:00',
           updated_at: '2025-01-02 00:00:00',
@@ -102,14 +103,8 @@ describe('PW1 content and raw preservation', () => {
     // Assert
     expect(blogSchema.safeParse(ctx.output.blogs[0]).success).toBe(true)
     expect(JSON.stringify(ctx.output.blogs[0].content)).toContain('../other')
-    expect(ctx.output.media).toEqual([
-      {
-        _ref: '@media:blog_posts_content:50:0',
-        url: 'https://example.test/a.png',
-        sourceUrl: 'https://example.test/a.png',
-        alt: 'Alt',
-      },
-    ])
+    expect(ctx.output.media).toEqual([])
+    expect(ctx.output.blogs[0].content).toMatchObject({ root: { children: [{ children: [{ text: ctx.tables.blog_posts[0].content }] }] } })
   })
   it('TC-F42-EXP-013: excludes nested secrets, credential URLs and unknown settings without logging values', () => {
     // Arrange
@@ -348,16 +343,9 @@ describe('PW1 content and raw preservation', () => {
     // Act
     mapContent(ctx)
     // Assert
-    for (const field of [
-      'medias',
-      'product_images',
-      'product_sku_images',
-      'media_items',
-      'media_categories',
-    ])
-      expect(ctx.output.sites[0].pw1_source).not.toHaveProperty(field)
+    expect(ctx.output.sites[0]).not.toHaveProperty('pw1_source')
   })
-  it('TC-F42-056: cross-tenant category slug is valid and missing author cannot fall back', () => {
+  it('TC-F42-056: cross-tenant category slug is valid and missing author without a verified tenant owner remains blocked', () => {
     // Arrange
     const time = {
       created_at: '2025-01-01 00:00:00',
@@ -388,6 +376,7 @@ describe('PW1 content and raw preservation', () => {
           store_id: '10',
           name: 'Post',
           slug: 'post',
+          status: '1',
           created_by: '999',
           content: '<p>Hello</p>',
           ...time,
@@ -404,7 +393,7 @@ describe('PW1 content and raw preservation', () => {
       expect.arrayContaining(['BLOG_AUTHOR_UNRESOLVED']),
     )
   })
-  it('TC-F42-EXP-012: unsupported HTML is reported and unsafe link is not emitted', () => {
+  it('TC-F42-EXP-093: Blog content is preserved verbatim without filtering HTML', () => {
     // Arrange
     const ctx = fixture({
       blog_posts: [
@@ -413,6 +402,7 @@ describe('PW1 content and raw preservation', () => {
           store_id: '10',
           name: 'Article',
           slug: 'article',
+          status: '1',
           created_by: '20',
           created_at: '2025-01-01 00:00:00',
           updated_at: '2025-01-02 00:00:00',
@@ -424,17 +414,9 @@ describe('PW1 content and raw preservation', () => {
     // Act
     mapContent(ctx)
     // Assert
-    expect(JSON.stringify(ctx.output.blogs[0].content)).not.toMatch(
-      /javascript|alert/,
-    )
-    expect(JSON.stringify(ctx.output.blogs[0].content)).toContain('Cell')
-    expect(ctx.diagnostics.map((item) => item.code)).toEqual(
-      expect.arrayContaining([
-        'BLOG_CONTENT_FIDELITY',
-        'BLOG_LINK_UNSAFE',
-        'BLOG_UNSAFE_HTML_REMOVED',
-      ]),
-    )
+    expect(ctx.output.blogs[0].content).toMatchObject({ root: { children: [{ children: [{ text: ctx.tables.blog_posts[0].content }] }] } })
+    expect(ctx.output.media).toEqual([])
+    expect(ctx.diagnostics).toEqual([])
   })
   it('TC-F42-EXP-012: preserves each email locale and flags empty fallback without inventing updatedBy', () => {
     // Arrange
@@ -519,4 +501,71 @@ describe('[TC-F42-056] normalized blog collision quarantine', () => {
       expect(ctx.output.tenants).toHaveLength(1)
     })
   }
+})
+
+it('TC-F42-EXP-091: preserves opaque Product description fields in raw classification without relaxing other fields', () => {
+  // Arrange
+  const ctx = fixture()
+  const source = '<script>secret=CANARY</script>{invalid JSON}<img src="javascript:example()">'
+  // Act
+  const result = rawRow(ctx, 'products', { id: '1', description: source, description_ms: source, name: '{invalid JSON' }, 'sites.pw1_source.products')
+  // Assert
+  expect(result.description).toBe(source)
+  expect(result.description_ms).toBe(source)
+  expect(ctx.diagnostics.some(d => ['description', 'description_ms'].includes(d.field ?? ''))).toBe(false)
+  expect(ctx.diagnostics.some(d => d.field === 'name' && d.code === 'RAW_VALUE_UNVERIFIED')).toBe(true)
+})
+
+
+describe('[TC-F42-EXP-092] Blog author fallback to tenant owner', () => {
+  function blogContext(createdBy: string | null) {
+    return fixture({ blog_posts: [{ id: '3', store_id: '10', name: 'Post', slug: 'post', status: '1', created_by: createdBy,
+      content: '<p>Hello</p>', created_at: '2025-01-01 00:00:00', updated_at: '2025-01-02 00:00:00' }] })
+  }
+  it.each([null, '', '999'])('uses emitted tenant owner when source author %j cannot resolve', createdBy => {
+    // Arrange
+    const ctx = blogContext(createdBy)
+    ctx.output.users[0].tenants = [{ tenant: '@tenants:stores:10', role: 'owner' }]
+    // Act
+    mapContent(ctx)
+    // Assert
+    expect(ctx.output.blogs).toHaveLength(1)
+    expect(ctx.output.blogs[0].author).toBe('@users:users:20')
+    expect(ctx.diagnostics.some(d => d.code === 'BLOG_AUTHOR_UNRESOLVED')).toBe(false)
+  })
+  it('keeps a resolved author rather than replacing it with the owner', () => {
+    // Arrange
+    const ctx = blogContext('21')
+    ctx.output.users[0].tenants = [{ tenant: '@tenants:stores:10', role: 'owner' }]
+    ctx.output.users.push({ _ref: '@users:users:21', tenants: [{ tenant: '@tenants:stores:10', role: 'editor' }] })
+    // Act
+    mapContent(ctx)
+    // Assert
+    expect(ctx.output.blogs[0].author).toBe('@users:users:21')
+  })
+  it.each(['foreign', 'ambiguous'])('does not guess an owner when %s', kind => {
+    // Arrange
+    const ctx = blogContext(null)
+    ctx.output.users[0].tenants = [{ tenant: kind === 'foreign' ? '@tenants:stores:11' : '@tenants:stores:10', role: 'owner' }]
+    if (kind === 'ambiguous') ctx.output.users.push({ _ref: '@users:users:21', tenants: [{ tenant: '@tenants:stores:10', role: 'owner' }] })
+    // Act
+    mapContent(ctx)
+    // Assert
+    expect(ctx.output.blogs).toEqual([])
+    expect(ctx.diagnostics.some(d => d.code === 'BLOG_AUTHOR_UNRESOLVED')).toBe(true)
+  })
+})
+
+
+describe('[TC-F42-EXP-093] Opaque Blog content', () => {
+  it.each(['', '  \r\nTiếng Việt 🛒 &amp;\t', '{invalid JSON', '<img src="javascript:x"><style>p{color:red}</style><script>canary()</script>'])('preserves raw Blog fields %j', source => {
+    // Arrange
+    const ctx = fixture()
+    // Act
+    const doc = rawRow(ctx, 'blog_posts', { id: '1', content: source, content_ms: source }, 'sites.pw1_source.blog_posts')
+    // Assert
+    expect(doc.content).toBe(source)
+    expect(doc.content_ms).toBe(source)
+    expect(ctx.diagnostics).toEqual([])
+  })
 })

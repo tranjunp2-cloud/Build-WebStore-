@@ -21,7 +21,7 @@ artifact hoàn tất. Lệnh này chỉ export offline, không nhập DB.
 
 Lệnh `npm run migrate:pw1:export` đọc CSV trực tiếp, tạo master JSON và báo cáo để review. Chạy offline, không bootstrap Payload, không ghi DB và không tải ảnh. `npm run migrate:pw1` là lệnh gọn để tạo config và export, không nhập DB.
 
-**Đây chưa phải chứng nhận hoàn tất mapping hoặc nghiệm thu dữ liệu thật.** Ba collection `subscribers`, `contact-submissions`, `analytics` chưa có nguồn được xác minh và mặc định tạo blocker trong phiên bản hiện tại. Vì vậy một lần export chạy đúng vẫn có thể trả `2`, kể cả dữ liệu còn lại hợp lệ. Không dùng exit `2` làm tín hiệu được nhập DB.
+**Exporter 1.5 tách thành công export khỏi mức đầy đủ dữ liệu.** Lệnh thành công trả `0` và `status=exported`; đọc `outcome.dataStatus` và `export-review.md` để biết phần còn thiếu. `importStatus=not_verified` không chứng nhận sẵn sàng ghi DB. Các checkpoint 1.0–1.4 bên dưới giữ nguyên exit/status lịch sử.
 
 Contract: [pw1-master-export-contract.md](../migration/pw1-master-export-contract.md). Quy tắc nghiệp vụ: [master đã pin](../migration/pw1-pw2-master-field-mapping.md).
 
@@ -255,8 +255,8 @@ Validate-only kiểm hash, runtime schema, quan hệ vận hành, counts và nh�
 
 | Exit | Ý nghĩa |
 |---|---|
-| `0` | Export/validate hợp lệ và mapping `complete`; hoặc inventory thành công |
-| `2` | Artifact hợp lệ để review, mapping còn `needs_review` |
+| `0` | Export/validate 1.5 thành công; dữ liệu vẫn có thể `partial`. Hoặc inventory/legacy complete thành công |
+| `2` | Chỉ dành cho validation artifact lịch sử 1.0–1.4 có `needs_review` |
 | `1` | CLI/config/input không hợp lệ, lỗi tài nguyên/runtime hoặc artifact kiểm tra thất bại |
 
 Bắt exit code ngay sau lệnh nếu chạy automation. Không chạy importer chỉ vì file JSON tồn tại. Không thay report/manifest để đổi `needs_review` thành `complete`.
@@ -476,3 +476,56 @@ New exports include `classificationVersion: source-classification-v1`. Each repo
 The current master contract hash remains `27fbef7ec0fc73e58029295c8fbbe7d276c4d6095e358fe57e3058e1eb4f4567`. Customer/Product reconciliation receipts remain required. Exporter validation accepts the known 1.1 contract and legacy 1.0 contract as before, but new 1.2 artifacts require classification evidence.
 
 The importer in `/home/liam/data/ech-prime-web-v2` currently pins an older exporter contract. Confirm explicit importer support before prepare/apply; do not rewrite artifact versions or hashes to make validation pass. Track remaining issues in `docs/migration/pw1-exporter-alignment-tracking.md`.
+
+## Đọc kết quả exporter 1.5
+
+Mở `export-review.md` trước, thay vì mở master hoặc report nhiều GB. `export-review.json` chứa cùng phân nhóm ở dạng máy đọc, có ví dụ Store/source ID. Cả hai được manifest ghi hash và validator kiểm tra lại từ diagnostics.
+
+- `outcome.exportStatus=succeeded`: đã xuất artifact hợp lệ.
+- `outcome.dataStatus=partial`: còn diagnostics dữ liệu hoặc Store chưa xuất. `complete` chỉ nói phạm vi dữ liệu, chưa chứng nhận DB đích.
+- `outcome.importStatus=not_verified`: importer còn phải kiểm tra điều kiện chạy và DB đích.
+- `data_issue`: mapping/record cần đối soát; xem mã, table/field, reason và ví dụ cụ thể.
+- `import_requirement`: creator binding hoặc tenant index; không yêu cầu người dùng quyết định lại.
+- `delegated_content`: khác biệt định dạng rich text đã giao xử lý riêng. URL unsafe/missing media không được tự miễn kiểm tra.
+- `outside_scope`: Pages hoặc raw có bằng chứng chỉ nằm trong CSV; không xóa diagnostics.
+- `warning`: thông tin/policy đã áp dụng.
+
+`mapping.complete` và `counts.blockers` giữ cách tính severity thô để đối soát lịch sử; không dùng chúng thay cho outcome mới. `store-summary` dùng dataStatus complete/partial theo Store, nhưng global diagnostics vẫn phải xem trong export-review. `exportStatus` ngoài cùng của mỗi Store vẫn là emitted/blocked/excluded. Các số nhóm là diagnostics, không phải số record mất và không cộng số Store giữa nhóm vì có giao nhau.
+
+## Outcome correction 1.5.1 — 2026-09-18
+
+Artifact hiện tại: `.migration/runs/pw1-outcome-fix-20260918/artifact`. Master và CSV nguồn không đổi. Diagnostics thuộc Store bị loại theo policy nằm trong `policy_excluded`; warning có gate payment/subscription được tính vào `import_requirement`. Publication thành công không có nghĩa mọi Store import được: summary từng Store giữ đúng `emitted`/`blocked`/`excluded` ở cả trạng thái ngoài và outcome bên trong. Artifact 1.5.0 vẫn được kiểm tra bằng contract cũ. Xem `docs/migration/pw1-export-outcome-tracking-20260918.md` để theo dõi kết quả sửa và kiểm chứng.
+
+## Báo cáo bàn giao theo Store
+
+Lệnh `npm run migrate:pw1 -- <csv-dir> --as-of <timestamp>` tạo thêm `handoff.json` cạnh `source-config.json`, ngoài `artifact/`. Cuối lệnh hiển thị số Store theo nhóm và đường dẫn báo cáo. Lệnh thấp hơn `migrate:pw1:export` trả cùng dữ liệu ở trường `handoff` của JSON stdout. Không đổi manifest/contract 1.5.1 hoặc dữ liệu master; importer vẫn dùng artifact như trước.
+
+- `source_blocked`: Store chưa xuất hoặc còn diagnostic lỗi nguồn; xem `issues` để lấy code, table, field, reason, số lượng và tối đa 5 source IDs mẫu.
+- `global_review_required`: không thấy lỗi riêng Store nhưng còn diagnostic chưa xác định phạm vi; xem `globalIssues`. Không khẳng định lỗi đó thuộc mọi Store.
+- `importer_verification_required`: còn yêu cầu importer hoặc warning cần xác minh theo policy. Không mặc định warning được phép bỏ qua.
+- `source_diagnostics_clear`: không còn diagnostic cần xử lý trong báo cáo; chưa chứng nhận classification/coverage hoặc import-ready.
+- `excluded`: Store đã loại theo policy.
+
+Mỗi Store còn có `globalReviewRequired`, kể cả khi ưu tiên trạng thái `source_blocked`. Counts đếm Store theo trạng thái ưu tiên, không đếm diagnostics. Báo cáo phục vụ bàn giao, không là bằng chứng để bỏ gate importer; importer vẫn kiểm tra nguồn, policy, credentials/binding và DB đích. Exit 0 chỉ xác nhận xuất artifact thành công. Artifact cũ không tự có báo cáo mới; lần export tiếp theo tạo báo cáo này.
+
+## Cập nhật xử lý description Product — 1.6.0
+
+Đã sửa code để giữ nguyên description/description_ms trong Lexical text, không lọc nội dung hoặc trích media. Số liệu conflict của artifact 1.5.1 ở trên là lịch sử; chưa export lại để cập nhật số lượng. Xem [tracking description](../migration/pw1-product-description-preservation-20260918.md).
+
+
+## Checkpoint 1.7.0 — trước policy bỏ Product 1.8.0
+
+Các mục 1.0–1.6 phía trên là checkpoint lịch sử, không phải version hiện tại. Exporter hiện tại giữ trạng thái Product/Blog nguồn, loại sites.pw1_source khỏi master (CSV nguồn vẫn giữ), giữ nguyên description Product và content chính Blog trong Lexical text, fallback tác giả Blog về owner cùng tenant khi cần, và khôi phục định nghĩa option từ selection nguồn hợp lệ. Không tạo SKU hoặc bổ sung tổ hợp thiếu.
+
+Product thiếu giá/stock bị cách ly, không điền mặc định. Việc này chưa miễn gate importer hoặc giải quyết quan hệ phụ thuộc. Category Blog inactive vẫn là việc chưa xử lý. Chưa chạy lại full PROD/DEV export sau toàn bộ sửa đổi; báo cáo từ artifact cũ không phải số blocker còn lại của 1.7.0.
+
+Importer phải hỗ trợ đúng cặp exporterVersion/contractSha256. Test tương thích trên workspace importer local đã pass, nhưng commit exporter không bao gồm những thay đổi chưa commit của repository importer. Profile DEV vẫn cần được importer chấp nhận policy riêng trước khi import.
+
+Xem [biên bản kiểm tra trước commit](../migration/pw1-exporter-verified-20260918.md).
+
+
+## Product thiếu giá/stock — cập nhật 1.8.0
+
+Product thiếu price/stock hoặc không còn dòng SKU nguồn đủ điều kiện được bỏ khỏi master theo policy đã duyệt. mapping-report ghi PRODUCT_MISSING_PRICE_STOCK_EXCLUDED và productExclusion trên Product/dòng con chỉ giữ CSV; đây không còn là blocker của Product đó. Importer 1.8.0 kiểm tra cùng Store, parent SKU→Product, reason, retained fields và Product không còn emit trước khi chấp nhận. Artifact cũ không tự thay đổi: cần export lại bằng code mới.
+
+Giá/stock bằng 0 vẫn giữ. Giá âm, sai số, SKU khác Store hoặc status lạ vẫn có blocker. Order lịch sử giữ các giá trị line nguồn theo policy đã duyệt; các lỗi Order/quan hệ khác không được miễn. Chưa chạy full export PROD/DEV hoặc ghi DB trong đợt sửa này.

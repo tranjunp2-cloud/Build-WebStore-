@@ -245,7 +245,7 @@ export function sanitizeProductDocument(document, sourceRow, { sourceInstanceTok
   if (hasValue(sourceRow?.description_ms)) clean.descriptionBM = htmlToLexical(sourceRow.description_ms)
   else delete clean.descriptionBM
 
-  clean.status = 'draft'
+  // Publication status is mapped by the caller; sanitizing content must not reset it.
   if (clean.hasVariants) clean.sku = deriveVariantBaseSku(clean._ref, sourceInstanceToken)
 
   clean.images = (clean.images ?? []).map((image) => ({

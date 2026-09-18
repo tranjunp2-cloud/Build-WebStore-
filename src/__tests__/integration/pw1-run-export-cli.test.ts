@@ -31,7 +31,7 @@ async function fixture() {
   return { ...source, profile, args }
 }
 describe('[TC-F42-EXP-085] One-command offline export', () => {
-  it('uses the default profile, creates unique private runs and propagates needs-review status', async () => {
+  it('uses the default profile, creates unique private runs and reports success separately from partial data', async () => {
     // Arrange
     const f = await fixture()
     await mkdir(path.join(root, 'configs/migration'), { recursive: true })
@@ -40,10 +40,18 @@ describe('[TC-F42-EXP-085] One-command offline export', () => {
     // Act
     const first = await run(f.args.slice(0, 3)), second = await run(f.args.slice(0, 3))
     // Assert
-    expect(first.code, first.stderr).toBe(2)
-    expect(second.code, second.stderr).toBe(2)
+    expect(first.code, first.stderr).toBe(0)
+    expect(second.code, second.stderr).toBe(0)
     const result = JSON.parse(first.stdout), other = JSON.parse(second.stdout)
     expect(result.counts.emittedStoreCount).toBe(3)
+    // TC-F42-EXP-090: private, reviewable handoff survives publication without changing the import artifact.
+    const handoff = JSON.parse(await readFile(result.handoff.report, 'utf8'))
+    expect(handoff.counts).toEqual(result.handoff.counts)
+    expect(handoff.stores).toHaveLength(3)
+    expect(handoff.importReady).toBe(false)
+    expect((await stat(result.handoff.report)).mode & 0o777).toBe(0o600)
+    expect(path.dirname(result.handoff.report)).toBe(path.dirname(result.sourceConfig))
+    expect(first.stderr).toContain('Chưa xác nhận import-ready')
     expect(result.sourceConfig).not.toBe(other.sourceConfig)
     const config = JSON.parse(await readFile(result.sourceConfig, 'utf8'))
     expect(config.asOf).toBe('2026-09-18T00:00:00Z')
@@ -62,7 +70,7 @@ describe('[TC-F42-EXP-085] One-command offline export', () => {
     const original = await readFile(path.join(output, 'source-config.json'), 'utf8')
     const second = await run(args)
     // Assert
-    expect(first.code, first.stderr).toBe(2)
+    expect(first.code, first.stderr).toBe(0)
     expect(JSON.parse(original).snapshotId).toBe('stable-snapshot')
     expect(second.code).toBe(1)
     expect(second.stderr).toContain('OUTPUT_EXISTS')

@@ -114,3 +114,19 @@ require importer approval updates. Never add credentials, CSV data or generated
 artifacts here; keep those in private locations outside Git.
 
 See [the runbook](../../docs/runbooks/pw1-master-json-export.md).
+
+## DEV CSV profile
+
+`pw1-dev-profile.json` is for the separate PW1 development source. Run from the repository root:
+
+```sh
+npm run migrate:pw1 -- /home/liam/Documents/DB --profile configs/migration/pw1-dev-profile.json --as-of <snapshot-time-in-ISO-8601>
+```
+
+Replace the timestamp placeholder with the snapshot/backup reference time; filename dates do not establish it. The profile has no fixed filenames, snapshotId or asOf, so later CSV dates work with the same discovery checks. CSV input stays outside Git.
+
+DEV identity is `PW1DEV` / `pw1-development-export`, with source domain suffix `web.dev.ecommercehub.my` and target suffix `web-v2.dev.ecommercehub.my`. Keep this namespace stable for this source; do not use it for PROD. UTC/+00:00 follows the checked local PW1 APP_TIMEZONE setting and DB_TIMEZONE default; confirm these if testing a backup from another environment.
+
+The profile reuses the user's general mapping decisions and optional-history exclusions, but has no deferred Store IDs or siteType overrides. In particular, PROD's Store 323 deferral is not copied. This means its migrationPolicy hash differs from the PROD policy pinned by the importer: successful export does not approve the DEV policy for import. Importer policy validation must be handled explicitly before a DEV migration; do not rewrite hashes or bypass checks.
+
+Local inspection found 93 CSVs dated 20260908, no missing/extra/duplicate tables, and 1,133 Store rows. These are inspection results, not a fixed snapshot requirement. Profile validation uses a temporary test timestamp only, not a verified snapshot time.

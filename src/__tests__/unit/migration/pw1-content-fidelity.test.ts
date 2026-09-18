@@ -27,8 +27,8 @@ describe('[TC-F42-057] CSS fidelity reflects discarded declarations', () => {
     const blog = blogLexical(ctx, { id: '2', content: html })
     // Assert
     expect(ctx.diagnostics).toEqual([])
-    expect(JSON.stringify(product)).toContain('color : red; font-size:12px')
-    expect(JSON.stringify(blog)).toContain('color : red; font-size:12px')
+    expect(product).toMatchObject({ root: { children: [{ children: [{ text: html }] }] } })
+    expect(blog).toMatchObject({ root: { children: [{ children: [{ text: html }] }] } })
   })
   it.each(['font-family:Arial', 'background-image:url(https://example.test/a)', 'color:expression(alert(1))'])('still flags unsupported or unsafe declaration %s', (declaration) => {
     // Arrange
@@ -53,7 +53,7 @@ describe('[TC-F42-058] Navigation links remain separate from media URLs', () => 
     // Assert
     expect(result).toBe(false)
   })
-  it('retains actual anchor nodes without weakening media validation', () => {
+  it('retains source anchors as text without weakening media validation', () => {
     // Arrange
     const ctx = context()
     const link = 'https://example.test/help#delivery'

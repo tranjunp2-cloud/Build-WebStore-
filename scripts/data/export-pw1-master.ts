@@ -12,7 +12,7 @@ Validate published artifact:
 
 Progress is written to stderr; --quiet disables progress. Final JSON stays on stdout.
 Output parent must exist. Existing output is never overwritten.
-Exit: 0 complete (or inventory only), 2 needs review, 1 invalid/failed.
+Exit: 0 export/validation succeeded (inspect outcome.dataStatus); 1 invalid/failed. Legacy validation may return 2 for needs_review.
 See docs/runbooks/pw1-master-json-export.md for config and limitations.
 `
 async function main() {
@@ -69,6 +69,9 @@ async function main() {
       values['inventory-only'],
       progress,
     )
+    if (result.handoff && !values.quiet) {
+      process.stderr.write(`Bàn giao: ${JSON.stringify(result.handoff.counts)}. Chưa xác nhận import-ready; xem handoff trong JSON kết quả.\n`)
+    }
     process.stdout.write(JSON.stringify(result) + '\n')
     process.exitCode = result.exitCode
   }

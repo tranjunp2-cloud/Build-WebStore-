@@ -72,14 +72,24 @@ function mapBlogs(ctx: MappingContext): void {
   }
   for (const row of ctx.rows('blog_posts')) {
     if (row.deleted_at) continue
+    if (!['0', '1'].includes(row.status ?? '')) {
+      ctx.issue('BLOG_STATUS_UNVERIFIED', 'blog_posts', row.id, 'status')
+      continue
+    }
     const time = dates(ctx, 'blog_posts', row)
     if (!time || !validSlug(ctx, 'blog_posts', row) || !row.name) {
       if (!row.name)
         ctx.issue('BLOG_TITLE_MISSING', 'blog_posts', row.id, 'name')
       continue
     }
-    const author = ref('users', 'users', row.created_by ?? '')
-    if (!ctx.output.users.some((user) => user._ref === author)) {
+    const sourceAuthor = ref('users', 'users', row.created_by ?? '')
+    const owners = ctx.output.users.filter(user => Array.isArray(user.tenants) &&
+      user.tenants.some(membership => membership && typeof membership === 'object' &&
+        !Array.isArray(membership) && membership.tenant === tenant && membership.role === 'owner'))
+    // Keep a resolved source author; otherwise use the unique emitted owner of this tenant.
+    const author = ctx.output.users.some(user => user._ref === sourceAuthor)
+      ? sourceAuthor : owners.length === 1 ? owners[0]._ref : undefined
+    if (typeof author !== 'string') {
       ctx.issue('BLOG_AUTHOR_UNRESOLVED', 'blog_posts', row.id, 'created_by')
       continue
     }
@@ -89,7 +99,7 @@ function mapBlogs(ctx: MappingContext): void {
       site,
       title: row.name,
       slug: row.slug!,
-      status: 'draft',
+      status: row.status === '1' ? 'published' : 'draft',
       author,
       ...time,
       seo: {

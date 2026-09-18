@@ -41,6 +41,7 @@ function context(extra: Record<string, Row[]> = {}): MappingContext {
         store_id: '1',
         category_id: '10',
         name: 'Book one',
+        status: '1',
         slug: 'book-one',
         package_weight: '2',
         package_weight_type: '2',
@@ -77,13 +78,14 @@ function context(extra: Record<string, Row[]> = {}): MappingContext {
         (row) => row.store_id === '1' && (includeDeleted || !row.deleted_at),
       ),
     find: (table, id) => (tables[table] ?? []).find((row) => row.id === id),
-    issue: (code, table, sourceId, field, severity = 'blocker') =>
+    issue: (code, table, sourceId, field, severity = 'blocker', reason) =>
       ctx.diagnostics.push({
         code,
         table,
         sourceId: sourceId ?? undefined,
         field,
         severity,
+        ...(reason ? { reason } : {}),
       }),
     contribute: (table, row, fields, targetPath, rule) =>
       ctx.contributions.push({
@@ -347,88 +349,31 @@ it('[TC-F42-EXP-010] emits external media without unsupported tenant field', () 
   expect(ctx.output.products).toHaveLength(1)
 })
 
-it('[TC-F42-EXP-012] preserves product images, headings, styles and separate EN/MS media identities', () => {
-  // Arrange
-  const ctx = context()
-  ctx.tables.products[0].description =
-    '<h2>Details</h2><p><strong>Bold</strong><span style="color: red">Red</span></p><img src="https://cdn.example.test/en.jpg" alt="Front"><blockquote>Quote</blockquote>'
-  ctx.tables.products[0].description_ms =
-    '<p>Maklumat</p><img src="https://cdn.example.test/ms.jpg" alt="Belakang">'
-  // Act
-  mapCatalog(ctx)
-  // Assert
-  expect(ctx.output.products).toHaveLength(1)
-  expect(ctx.diagnostics).toEqual([])
-  expect(productDocumentSchema.safeParse(ctx.output.products[0]).success).toBe(
-    true,
-  )
-  expect(ctx.output.products[0].description).toMatchObject({
-    root: {
-      children: [
-        { type: 'heading', tag: 'h2', children: [{ text: 'Details' }] },
-        {
-          type: 'paragraph',
-          children: [
-            { text: 'Bold', format: 1 },
-            { text: 'Red', style: 'color: red' },
-          ],
-        },
-        { type: 'upload', value: '@media:products_content:20:description:0' },
-        { type: 'quote', children: [{ text: 'Quote' }] },
-      ],
-    },
+describe('[TC-F42-EXP-091] Lossless Product description export', () => {
+  it.each([
+    '<h2>Details</h2><p style="color: red">A &amp; B</p><img src="https://cdn.example.test/en.jpg">',
+    '<p onclick="evil()">Text</p><script>canary()</script><a href="javascript:evil()">Link</a>',
+    '  \r\nTiếng Việt 🛒\n\t',
+    '{"unknown_key":"value", invalid JSON',
+    '',
+  ])('retains exact EN/MS source text without content blockers: %j', (source) => {
+    // Arrange
+    const ctx = context()
+    ctx.tables.products[0].description = source
+    ctx.tables.products[0].description_ms = source + ' MS'
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toHaveLength(1)
+    expect(productDocumentSchema.safeParse(ctx.output.products[0]).success).toBe(true)
+    expect(ctx.output.products[0].description).toMatchObject({ root: { children: [{ type: 'paragraph', children: [{ type: 'text', text: source }] }] } })
+    expect(ctx.output.products[0].descriptionBM).toMatchObject({ root: { children: [{ children: [{ text: source + ' MS' }] }] } })
+    expect(ctx.output.media).toEqual([])
+    expect(ctx.diagnostics).toEqual([])
   })
-  expect(ctx.output.products[0].descriptionBM).toMatchObject({
-    root: {
-      children: [
-        { type: 'paragraph', children: [{ text: 'Maklumat' }] },
-        {
-          type: 'upload',
-          value: '@media:products_content:20:description_ms:0',
-        },
-      ],
-    },
-  })
-  expect(ctx.output.media).toEqual([
-    {
-      _ref: '@media:products_content:20:description:0',
-      url: 'https://cdn.example.test/en.jpg',
-      sourceUrl: 'https://cdn.example.test/en.jpg',
-      alt: 'Front',
-    },
-    {
-      _ref: '@media:products_content:20:description_ms:0',
-      url: 'https://cdn.example.test/ms.jpg',
-      sourceUrl: 'https://cdn.example.test/ms.jpg',
-      alt: 'Belakang',
-    },
-  ])
 })
 
-it('[TC-F42-EXP-013] reports unsafe or unsupported product HTML without emitting unsafe URLs', () => {
-  // Arrange
-  const ctx = context()
-  ctx.tables.products[0].description =
-    '<p onclick="evil()">Safe</p><script>unsafeCanary()</script><img src="javascript:evil()"><a href="javascript:evil()">Link</a><table><tr><td>Cell</td></tr></table>'
-  // Act
-  mapCatalog(ctx)
-  // Assert
-  expect(ctx.output.products).toHaveLength(1)
-  expect(ctx.output.media).toEqual([])
-  expect(JSON.stringify(ctx.output.products)).not.toMatch(
-    /javascript:|unsafeCanary|onclick/,
-  )
-  expect(ctx.diagnostics.map((item) => item.code)).toEqual(
-    expect.arrayContaining([
-      'PRODUCT_DESCRIPTION_UNSAFE_HTML_REMOVED',
-      'PRODUCT_DESCRIPTION_MEDIA_UNRESOLVED',
-      'PRODUCT_DESCRIPTION_LINK_UNSAFE',
-      'PRODUCT_DESCRIPTION_CONTENT_FIDELITY',
-    ]),
-  )
-})
-
-it('[TC-F42-EXP-013] applies decoded query allowlist to relative Product and Blog links', () => {
+it('[TC-F42-EXP-013] retains Product and Blog links as source text', () => {
   // Arrange
   const ctx = context()
   const html =
@@ -438,21 +383,9 @@ it('[TC-F42-EXP-013] applies decoded query allowlist to relative Product and Blo
   mapCatalog(ctx)
   const blog = blogLexical(ctx, { id: '88', content: html })
   // Assert
-  for (const document of [ctx.output.products[0].description, blog]) {
-    const serialized = JSON.stringify(document)
-    expect(serialized).not.toContain('CANARY')
-    expect(serialized).toContain('"url":"/view?w=100"')
-    expect(serialized).toContain('"url":"/about#details"')
-    expect(serialized).toContain('"url":"#section"')
-  }
-  expect(
-    ctx.diagnostics.filter(
-      (issue) => issue.code === 'PRODUCT_DESCRIPTION_LINK_UNSAFE',
-    ),
-  ).toHaveLength(3)
-  expect(
-    ctx.diagnostics.filter((issue) => issue.code === 'BLOG_LINK_UNSAFE'),
-  ).toHaveLength(3)
+  expect(ctx.output.products[0].description).toMatchObject({ root: { children: [{ children: [{ text: html }] }] } })
+  expect(blog).toMatchObject({ root: { children: [{ children: [{ text: html }] }] } })
+  expect(ctx.diagnostics.some(issue => issue.code === 'BLOG_LINK_UNSAFE' || issue.code === 'PRODUCT_DESCRIPTION_LINK_UNSAFE')).toBe(false)
 })
 
 
@@ -468,9 +401,8 @@ describe('[TC-F42-076] Full Product short-description preservation', () => {
     // Assert
     expect(ctx.output.products).toHaveLength(1)
     expect(ctx.output.products[0].price).toBe(12.5)
-    expect(ctx.output.sites[0].pw1_source).toMatchObject({
-      products: [expect.objectContaining({ featured_description: description })],
-    })
+    expect(ctx.output.sites[0]).not.toHaveProperty('pw1_source')
+    expect(ctx.tables.products[0].featured_description).toBe(description)
     const mapped = ctx.contributions.filter((entry) => entry.table === 'products'
       && entry.targetPath.startsWith('@products:'))
     expect(ctx.output.products[0].shortDescription).toBe(description)
@@ -489,7 +421,7 @@ it('[TC-F42-076] raw safety remains independent of operational short-description
   // Assert
   expect(ctx.output.products).toHaveLength(1)
   expect(ctx.output.products[0].shortDescription).toBe(ctx.tables.products[0].featured_description)
-  expect(JSON.stringify(ctx.output.sites[0].pw1_source)).not.toContain('secret=')
+  expect(ctx.output.sites[0]).not.toHaveProperty('pw1_source')
   expect(ctx.diagnostics).toContainEqual(expect.objectContaining({
     code: 'RAW_VALUE_UNVERIFIED', table: 'products', sourceId: '20', field: 'featured_description',
   }))
@@ -563,3 +495,43 @@ it('[TC-F42-076] preserves eight source images in order with their media relatio
   expect(ctx.output.media).toHaveLength(8);
   expect(ctx.diagnostics.some(row => row.code === 'TOO_MANY_PRODUCT_IMAGES')).toBe(false);
 });
+
+
+describe('[TC-F42-EXP-094] Skip Product with missing price or stock', () => {
+  it.each(['price', 'stock'])('skips whole Product when eligible SKU %s is missing', field => {
+    for (const value of [undefined, null, '', '   ']) {
+      // Arrange
+      const ctx = context()
+      if (value === undefined) delete ctx.tables.product_skus[0][field]
+      else ctx.tables.product_skus[0][field] = value
+      // Act
+      mapCatalog(ctx)
+      // Assert
+      expect(ctx.output.products).toEqual([])
+      expect(ctx.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({
+        table: 'products', sourceId: '20', code: 'PRODUCT_MISSING_PRICE_STOCK_EXCLUDED', severity: 'warning',
+        reason: field === 'price' ? 'MISSING_PRICE' : 'MISSING_STOCK',
+      })]))
+    }
+  })
+  it('retains actual zero price and zero stock without defaults', () => {
+    // Arrange
+    const ctx = context()
+    ctx.tables.product_skus[0].price = '0'
+    ctx.tables.product_skus[0].stock = '0'
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toHaveLength(1)
+    expect(ctx.output.products[0]).toMatchObject({ price: 0, inventory: 0 })
+  })
+  it('skips Product with no SKU source rows and records its identity', () => {
+    // Arrange
+    const ctx = context({ product_skus: [] })
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toEqual([])
+    expect(ctx.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PRODUCT_MISSING_PRICE_STOCK_EXCLUDED', severity: 'warning', sourceId: '20', reason: 'NO_SKU_ROWS' })]))
+  })
+})

@@ -1,3 +1,4 @@
+import { EXTERNAL_SOURCE_RULE, externalSourcePath } from '../external-source'
 import {
   live,
   type Doc,
@@ -100,6 +101,14 @@ export function rawRow(
       )
       continue
     }
+    // Product descriptions and Blog content are opaque source text by explicit migration policy.
+    // Do not reinterpret JSON-looking text, HTML, URLs or embedded attribute names.
+    if ((table === 'products' && ['description', 'description_ms'].includes(key)) ||
+      (table === 'blog_posts' && ['content', 'content_ms'].includes(key))) {
+      out[key] = value
+      fields.push(key)
+      continue
+    }
     const navigation =
       navigationKeys.has(key) ||
       (table === 'model_settings' &&
@@ -147,7 +156,8 @@ export function rawRow(
     out[key] = value
     fields.push(key)
   }
-  ctx.contribute(table, row, fields, path, 'MASTER_RAW_ALLOWLIST')
+  const external = path.startsWith('sites.pw1_source.')
+  ctx.contribute(table, row, fields, external ? externalSourcePath(table) : path, external ? EXTERNAL_SOURCE_RULE : 'MASTER_RAW_ALLOWLIST')
   return out
 }
 export function sourceOrder(a: Row, b: Row): number {

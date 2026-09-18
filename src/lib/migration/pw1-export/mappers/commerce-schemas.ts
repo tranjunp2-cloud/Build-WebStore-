@@ -42,7 +42,7 @@ export const discountDocumentSchema = z
     code: z.string().regex(/^[A-Z0-9_-]+$/),
     type: z.enum(['percentage', 'fixed']),
     value: amount,
-    status: z.literal('inactive'),
+    status: z.enum(['inactive', 'active']),
     usageCount: z.literal(0),
     usageLimit: z.number().int().positive().optional(),
     description: z.string().max(500).optional(),

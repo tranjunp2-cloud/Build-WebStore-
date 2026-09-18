@@ -1,5 +1,6 @@
 # Bảng mapping field tổng thể PW1 → PW2 cho JSON tenant
 
+> **Cập nhật 2026-09-18 / exporter 1.4:** `sites[].pw1_source` không còn nằm trong master. Các đích raw `sites.pw1_source.*` mô tả bên dưới là cấu trúc lịch sử; dữ liệu này nay giữ ở CSV nguồn có hash trong manifest. Báo cáo dùng `retained-source` và `source-csv.<table>`, không khai chúng là field đã map vào JSON. Xem quyết định cuối tài liệu.
 ## 1. Mục đích và trạng thái
 
 Tài liệu này là contract mapping field dùng chung cho migration tenant/store PW1 → PW2: cấu trúc JSON, nguồn/đích, chuyển đổi và các gap. Số liệu fixture, ID và kết quả từng lần chạy được tách sang [bằng chứng snapshot](../../plans/reports/260914-1440-master-mapping-snapshot-evidence.md), không phải quy tắc mapping.
@@ -714,7 +715,7 @@ Một object `products[]` được phân bổ vào tám bảng vật lý PW2:
 | `featured_description_ms` | Có thể gộp nếu trùng bản chính; nếu khác thì lưu nguồn | Không xuất | Lưu nguồn | `T/A` | `CODE` |
 | `product_skus.price` đủ điều kiện | Product không biến thể: giá SKU duy nhất. Product có biến thể: giá base nhỏ nhất của tất cả SKU đủ điều kiện; không dùng giá khuyến mãi | `price` | `products.price` | `T/Q` | `CODE/SCHEMA`; Sprint 2 §7.3–7.4 |
 | `stores.currency_id → currencies.code` | Không quy đổi tiền; chỉ chấp nhận MYR/USD/SGD | `currency` | `products.currency` | `R/T/Q` | `OBSERVED/SCHEMA` |
-| `products.status` | Đặt tất cả Product được xuất ở trạng thái nháp | `status='draft'` | `products.status` | `G/T` | `CODE/SCHEMA` |
+| `products.status` | Giữ trạng thái hiển thị PW1: 1 → active; 0 → draft (không hiển thị); ngoài miền phải đối soát | `status` | `products.status` | `T/B` | `DECISION 2026-09-18` |
 | `stock` của một SKU đủ điều kiện | Tồn kho sản phẩm không có biến thể | `inventory` | `products.inventory` | `T/Q` | `OBSERVED/SCHEMA` |
 | `stock` của tất cả SKU biến thể được xuất | Cộng tồn kho các biến thể | `inventory` | `products.inventory` | `T/Q` | `CODE/SCHEMA` |
 | `products.stock` | Chỉ dùng đối soát; các bản ghi SKU là nguồn chính thức hiện tại | Không xuất | Manifest/đối soát | `A/B` | `DECISION` |
@@ -819,7 +820,7 @@ Replay phải xác minh archive và scope. Receipt cũ chỉ được nâng cấ
 | `promotions.discount_type_id → discount_types.id` | Phân giải loại nguồn: phần trăm → enum chính xác `percentage`; số tiền cố định → `fixed`. PW2 không nhận `percent`; loại thiếu/lạ phải đối soát, không chọn default | `type` | `discounts.type` | `R/T/Q` | `DECISION/SCHEMA`; `src/collections/Discounts.ts` |
 | `discount_value` dạng số tiền cố định | MYR ×100 → sen | `value` | `discounts.value` | `T/Q` | `OBSERVED/SCHEMA` |
 | `discount_value` dạng phần trăm | Với `type=percentage`, giữ số trong miền 0..100; không nhân 100. Kiểm tra enum và miền giá trị cho từng bản ghi JSON trước bàn giao | `value` | `discounts.value` | `D/Q` | `OBSERVED/SCHEMA` |
-| Trạng thái hoạt động nguồn | Đặt không hoạt động cho đến khi đối soát xong quy tắc | `status='inactive'` | `discounts.status` | `G/T` | `OBSERVED/DECISION` |
+| `promotions.status` | 1 → active; 0 → inactive; 2 → inactive với expiresAt nguồn đã xác minh ≤ asOf, không tự bịa hạn dùng | `status`, `expiresAt` | `discounts.status`, `expires_at` | `T/B` | `DECISION 2026-09-18` |
 | `is_limit`, `limit` | Chỉ xuất khi được bật | `usageLimit` | `discounts.usage_limit` | `T` | `OBSERVED/SCHEMA` |
 | `promotion_codes.used` + Order | Bộ đếm nguồn để đối soát; count đích nhất quán với history giữ lượt theo §7.3, bảo toàn lượt đích hiện hữu; không sao chép rồi tăng lại khi import | `usageCount` | `discounts.usage_count` | `T/B` | `DECISION/SCHEMA`; reconciliation history chưa triển khai |
 | `promotions.start_date`, `promotions.end_date` qua FK promotion_codes.promotion_id | Giữ thời điểm nguồn, offset/timezone tường minh → UTC; không dùng ngày tạo làm hạn hiệu lực. Xem gap hook dưới đây | `startsAt`, `expiresAt` | `discounts.starts_at`, `expires_at` | `T/B` | `CODE/SCHEMA`; chưa giữ nguyên qua import hook |
@@ -1022,7 +1023,7 @@ Các field JSON sau thuộc `discount_usage_history[]`; tất cả quy tắc cò
 | `name` | Tiêu đề quan sát được hiện tại | `title` | `blogs.title` | `D` |
 | `slug` | Giữ khi hợp lệ và duy nhất theo tenant trong blogs; áp dụng quy tắc slug chung §8.1 | `slug` | `blogs.slug` | `D/Q/B` |
 | `blog_posts.content` | HTML nguồn → cấu trúc Lexical hợp lệ của PW2; không gán chuỗi HTML vào richText. Chỉ nhận tương đương sau khi đối chiếu nội dung theo quy tắc bên dưới; phần chưa biểu diễn được giữ nguyên nguồn | `blogs[].content` | `blogs.content` JSONB | `T/A/B` |
-| `status` | Chủ động đặt nháp | `status='draft'` | `blogs.status` | `G/T` |
+| `status` | Giữ trạng thái PW1: 1 → published; 0 → draft; ngoài miền phải đối soát | `status` | `blogs.status` | `T/B` |
 | `blog_category_id` | Resolve category cùng tenant, đã emit và status=active; thiếu/xóa/cách ly thì ghi gap, không âm thầm bỏ quan hệ | `category` | `blogs.category_id` | `R/Q/B` |
 | `image` | Tạo/phân giải Media dùng URL ngoài | `thumbnail` | `blogs.thumbnail_id` | `T/R/B` |
 | `created_by` | Phân giải User đủ điều kiện | `author` | `blogs.author_id` | `R/Q` |
@@ -1049,7 +1050,7 @@ Blog không có `content` chỉ là bản nháp metadata, không được coi l�
 
 **Ảnh và quan hệ tùy chọn:** blog_posts.image có dữ liệu → resolve Media chứa nguyên URL PW1 theo §4.3, rồi đặt thumbnail bằng tham chiếu Media, không đặt URL trực tiếp vào field upload. Không upload lại S3 PW2; giữ query/path URL, không dùng signature để thay URL. Ảnh trong HTML là nội dung riêng, không được chỉ giữ thumbnail rồi bỏ ảnh nội dung. Nguồn không có ảnh thì không cần thumbnail; có ảnh nhưng chưa resolve được phải ghi gap, không coi là nguồn trống. Tương tự, category thực sự rỗng nếu có trong nguồn phải phân biệt với FK có giá trị nhưng mất/đã xóa/cách ly; không tự tạo category giả. Không dùng defaults để che dữ liệu nguồn thiếu.
 
-**Trạng thái bài:** draft là quyết định an toàn của cấu trúc nghiên cứu, không phải ánh xạ 1:1 status PW1. Giữ status nguồn trong bằng chứng đối chiếu; bài hoạt động ở PW1 chưa được xem là tiếp tục xuất bản ở PW2 chỉ vì metadata đã map. Không có ngày xuất bản riêng thì ghi thiếu bằng chứng, không lấy createdAt giả làm publishedAt. Author bắt buộc ở PW2: created_by phải resolve đúng người qua crosswalk User; thiếu hoặc quan hệ tenant chưa rõ thì ghi gap, không tự thay bằng owner/người chạy công cụ.
+**Trạng thái bài — quyết định 2026-09-18:** giữ trạng thái nguồn: status=1 → published, status=0 → draft. Không ép mọi bài thành draft. Giá trị thiếu/ngoài miền bị chặn thay vì đoán. Không có ngày xuất bản riêng thì ghi thiếu bằng chứng, không lấy createdAt giả làm publishedAt. Author bắt buộc ở PW2: created_by phải resolve đúng người qua crosswalk User; thiếu hoặc quan hệ tenant chưa rõ thì ghi gap, không tự thay bằng owner/người chạy công cụ.
 
 **Tương thích quan hệ với PW2 (`BLOG_IMPORT_RELATIONSHIPS`):** JSON phải thể hiện Tenant/Site/Category/Author/Media qua crosswalk đúng phạm vi nguồn: Site thuộc Tenant; Category khi có phải active cùng Tenant; Author tồn tại và quan hệ tenant phù hợp; thumbnail khi có phải resolve đúng Media. Category/thumbnail không có ở nguồn không phải lỗi, khác với tham chiếu có giá trị nhưng chưa resolve. Hook BlogCategories/Blogs có thể thay tenant bằng tenant đầu tiên của actor không phải super-admin; Blogs còn kiểm tra category, thay/bỏ site không phù hợp hoặc chọn site đầu tiên khi thiếu. Ghi nhận đây là rủi ro bảo toàn quan hệ khi dùng dữ liệu mapping với PW2; không coi overrideAccess là vô hiệu hóa hook, không coi ID trong JSON là bằng chứng dữ liệu đích đã đúng. Đây là lưu ý tương thích source/schema, không phải yêu cầu viết writer hay kế hoạch triển khai.
 
@@ -1720,7 +1721,7 @@ Nhãn chi tiết: MAP = sao chép có validation; TRANSFORM = chuyển đổi; R
 | products.featured_description_ms | — | — | GAP | sites[].pw1_source.products[].featured_description_ms | Thiếu field localized tương đương; kể cả trùng bản chính vẫn giữ raw để đối soát. |
 | products.description | products[].description | products.description | TRANSFORM | sites[].pw1_source.products[].description | HTML/text → Lexical; raw giữ HTML khi qua bộ lọc §2.3, nếu bị loại thì CSV nguồn giữ bản gốc; báo phần không chuyển được, không tuyên bố lossless chỉ vì valid JSON. |
 | products.description_ms | products[].descriptionBM | products.description_b_m | TRANSFORM | sites[].pw1_source.products[].description_ms | Chuyển Lexical như bản chính; không tự suy ngôn ngữ khác ngoài contract; raw giữ HTML gốc khi vượt kiểm tra §2.3; nếu bị loại thì CSV nguồn giữ bản gốc. |
-| products.status | products[].status='draft' | products.status | GENERATED | sites[].pw1_source.products[].status | Draft là trạng thái import an toàn hiện tại, không ánh xạ tương đương status nguồn. Raw giữ nguồn; publish là quyết định riêng. |
+| products.status | products[].status | products.status | TRANSFORM | sites[].pw1_source.products[].status | Theo quyết định 2026-09-18: 1 → active; 0 → draft (ẩn). Không ép active thành draft; sanitizer phải giữ trạng thái đã map. |
 | products.package_length | products[].dimensions.length | products.dimensions_length | TRANSFORM | sites[].pw1_source.products[].package_length | Giữ số theo cm đã xác nhận cho nguồn này; không tự chia theo enum chưa rõ. Theo §5.2, phép chia enum kích thước legacy chưa được chứng nhận cho nguồn cm; không dùng làm quy tắc mapping. |
 | products.package_weight | products[].weight | products.weight | TRANSFORM | sites[].pw1_source.products[].package_weight | Đơn vị type 1 (kg) giữ số; type 2 (gram) chia 1000 theo source đã xác minh. Không tính lại phí Order lịch sử. |
 | products.package_height | products[].dimensions.height | products.dimensions_height | TRANSFORM | sites[].pw1_source.products[].package_height | Giữ số theo cm đã xác nhận cho nguồn này; không tự chia theo enum chưa rõ. Theo §5.2, phép chia enum kích thước legacy chưa được chứng nhận cho nguồn cm; không dùng làm quy tắc mapping. |
@@ -1786,3 +1787,67 @@ Nhãn chi tiết: MAP = sao chép có validation; TRANSFORM = chuyển đổi; R
 - **Gap receipt EAV của exporter hiện tại:** cấu trúc `productReconciliation.sourceIdentity[]` từng được mô tả cho công cụ research cũ, gồm sourceRef/sourceInstanceToken/emitted/eligibleSkuCount, tiers/options, sourceSkuId/targetId/selectedTuple và errors, không có trong manifest/artifact của exporter master hiện tại. skuCrosswalk chỉ được dùng trong bộ nhớ; mapping-report.json giữ contributions theo ID/field nguồn và targetPath/rule, chưa giữ toàn bộ tuple/targetId. Đối soát tuple/ownership/giá/tồn vẫn cần CSV nguồn; nếu cần receipt tái sử dụng cho importer thì phải bổ sung và validate riêng. Không coi provenance hiện có là bằng chứng receipt này đã được xuất.
 
 Căn cứ trực tiếp: [Categories](../../src/collections/Categories.ts), [Products](../../src/collections/Products.ts), [DDL](../../scripts/db-setup.js), [EAV transformer](../../src/lib/migration/pw2-product-eav.mjs), [Product preflight](../../src/lib/migration/pw2-product-migration.mjs), [variant resolver](../../src/lib/products/resolve-product-line.ts), [Category PW1](/home/liam/data/prime-web-api/app/Models/Category.php), [ProductController PW1](/home/liam/data/prime-web-api/app/Http/Controllers/Products/ProductController.php), [CategoryRepository PW1](/home/liam/data/prime-web-api/app/Repositories/EloquentCategoryRepository.php). Header baseline là tám bảng CSV nguồn tương ứng; không dùng bản hợp nhất này để chứng nhận DB live đã đồng bộ.
+
+
+## Quyết định trạng thái nguồn — 2026-09-18
+
+Yêu cầu chủ dữ liệu: giữ trạng thái PW1, kể cả Product; thay thế chính sách ép draft/inactive ở các bản trước. Exporter 1.3.0 áp dụng cho Product, Blog và Discount như các bảng trên. Các điều kiện sử dụng discount chưa tương đương vẫn là blocker riêng; active trong JSON không cho phép importer bỏ qua blocker. Phần “inactive cho đến đối soát” của contract 2026-09-15 chỉ mô tả artifact cũ.
+
+Bộ lọc category/SKU active và soft-delete đã duyệt vẫn giữ nguyên. Trạng thái Order, thanh toán, subscription và membership tiếp tục theo mapping nguồn đã đối soát; không đổi thành default. PW2 không có enum inactive cho Product/Blog: draft là đích không hiển thị cho status=0, không phải giữ nguyên nhãn enum. Status expired của promotion giữ bằng inactive + ngày hết hạn nguồn hợp lệ; thiếu/mâu thuẫn ngày hết hạn phải chặn.
+
+Sites.status là trường khởi tạo PW2 không có cột xuất bản tương đương đã xác minh trong PW1; không suy published từ stores.status (trạng thái tài khoản). Pages và nội dung raw tiếp tục giữ status nguồn. Không tự tạo publishedAt/scheduledPublishDate từ created_at hoặc thời gian chạy.
+
+Artifact 1.0–1.2 giữ nguyên contract cũ và vẫn được validator đọc; không đổi nhãn manifest để giả thành artifact mới. Importer đang pin contract 1.2 phải được cập nhật và kiểm thử với contract 1.3 trước khi nhận artifact mới.
+
+## Loại bỏ pw1_source khỏi master — 2026-09-18
+
+Exporter 1.4.0 bỏ hoàn toàn sites[].pw1_source; không tạo thêm raw JSON sidecar. CSV nguồn được giữ ngoài artifact và có tên/hash trong master-manifest.json. Các field chỉ phục vụ raw archive được ghi retained-source theo MASTER-4.1-EXTERNAL-CSV-ARCHIVE; contribution metadata trỏ source-csv.<table>. Field có mapping nghiệp vụ thực tế vẫn là mapped.
+
+Quy tắc này chỉ áp dụng cho các field raw allowlist đã kiểm tra, đúng bảng/ownership; không bỏ qua secret, unknown field, unsafe value hoặc quan hệ nguồn chưa xác minh. Diagnostic vẫn được giữ. Pages/menus và các collection nghiệp vụ không bị loại trong thay đổi này.
+
+Schema 1.4 cấm nhúng lại pw1_source. Validator tiếp tục đọc 1.0–1.3 bằng schema lịch sử tương ứng; importer nhận đúng cặp version/hash mới và hiểu retained-source là archive CSV, không phục hồi nó vào DB.
+
+## Export outcome contract — 2026-09-18
+
+Exporter 1.5 reports successful publication separately from data completeness and import readiness. `status=exported`, `outcome.exportStatus=succeeded`, `outcome.dataStatus=complete|partial`, `outcome.importStatus=not_verified`. Exit 0 means artifact publication/validation succeeded, not that all source data was migrated. Invalid artifacts/runs return 1. Historical artifacts retain their original status and exit semantics.
+
+`export-review.json` and `export-review.md` are manifest-hashed reports grouping diagnostics into data issues, importer requirements, delegated rich-text fidelity, out-of-scope Pages and warnings. Original diagnostic severity, counts, mapping.complete and report evidence remain intact for backward auditing. Importer must still verify creator binding and tenant indexes; unknown diagnostics, unsafe links, missing media, price/variant gaps and ownership failures are not silently waived. Data completeness remains partial while data issues or blocked Stores remain. No skipped data is reintroduced or silently dropped by this reporting change.
+
+Raw diagnostics for model_settings, frontend_templates, brands, attributes, attribute_values and category_attributes may be outside scope only with verified ownership and exclusively matching external CSV contributions for that source identity and consuming Store. Operational/mixed contributions do not qualify. Field-disposition/ownership validation remains mandatory; this does not waive aggregate unresolved-field evidence.
+
+### Outcome correction 1.5.1
+
+Preserve the frozen 1.5.0 outcome/report contract for old artifacts. In 1.5.1, warning diagnostics ORDER_PAYMENT_METHOD_UNVERIFIED and SUBSCRIPTION_CANCEL_FLAG_ABSENT are importer requirements only for the exact table/field/reason evidence accepted by importer. Diagnostics explicitly owned by policyExcludedStores use policy_excluded and policyExcludedDiagnosticCount; they cannot make in-scope data partial. Global diagnostics and other Stores remain in scope. Per-Store outcome exportStatus agrees with emitted/blocked/excluded, with excluded dataStatus and not_applicable importStatus for excluded Stores. Top-level publication status remains succeeded. CSV-only global raw rows require matching verified consumer contributions; unproven or mixed operational contributions remain blocked.
+
+## Product description preservation — exporter 1.6.0
+
+Supersedes Product-description conversion/fidelity/link/media rules above for new exports. By user decision, products.description and products.description_ms are opaque source strings: retain every character, including HTML tags/attributes, embedded URLs, scripts/styles, JSON-looking text, entities, whitespace and line endings. Store respectively in products[].description and descriptionBM as Lexical root → paragraph → one text node; that node's text equals the decoded CSV value exactly. Explicit empty string yields empty text; null/missing source has no description document. This envelope preserves source markup as text for the separate rich-text workflow; it does not recreate HTML rendering.
+
+Do not parse/sanitize/truncate these two fields or emit Product-description fidelity, link, media or raw-value blockers. Do not create media downloads/references from embedded description URLs. Product gallery/media fields and all Blog/Page validators retain their existing rules. Other Product validation can still quarantine the Product; this change does not manufacture missing price/SKU or restore blocked Stores. Old artifacts keep their original diagnostics and contract. Importer accepts the new exact version/hash but retains source/DB/policy gates outside these fields.
+
+## Blog author fallback — exporter 1.6.1
+
+User decision: if blog_posts.created_by cannot resolve to an exported User for the Store (including empty/missing source author), set blogs.author to the unique exported User with an owner membership for that exact tenant. Keep a source author that already resolves. Do not create a new User or use an owner from another tenant. If no unique exported tenant owner exists, retain BLOG_AUTHOR_UNRESOLVED and quarantine the Blog. Export stores a User reference; importer resolves it to the target owner User ID. Original created_by remains in immutable source CSV; fallback is the approved MASTER_8_2 mapping, not preservation of original authorship. Other Blog validation stays unchanged.
+
+## Blog content preservation — exporter 1.6.2
+
+By user decision, blog_posts.content is opaque source text: preserve the decoded CSV string exactly in blogs[].content as Lexical root → paragraph → one text node, without parsing/filtering HTML, links, styles, entities, scripts or embedded images. No content-derived media/downloads or BLOG_LINK_UNSAFE/BLOG_MEDIA_UNRESOLVED/fidelity diagnostics are generated for body content. The separate image/thumbnail, metadata, slug, author and status fields keep their validation. Null/missing content yields an empty text document as before; explicit empty string stays empty text. This stores source markup as text for the separate rendering workflow, not rendered HTML.
+
+Raw source classification for content and content_ms also preserves the strings without content validation. PW2 currently has no separate Malay Blog content field; content_ms remains in the external source CSV, not silently appended to content or claimed as imported. A separate target-field decision is required to migrate that locale. Historical artifacts retain their original diagnostics and exact contract hashes.
+
+## SKU/option reconciliation — exporter 1.7.0
+
+PW1 product_variants records eligible SKU selections independently of product_attributes. Recover missing target option definitions from those actual live selection rows only when the referenced attribute and attribute_value exist, are live, belong to the same Store as the Product/SKU, and the value belongs to that attribute. Retain existing domain definitions too; never infer a selection from SKU code/name, fabricate a SKU or complete the Cartesian matrix. Emit definition contributions for both declared-domain and selected option definitions and preserve source SKU crosswalks.
+
+Continue quarantining foreign/orphan/deleted definitions, incomplete or ambiguous selections, duplicate complete tuples and duplicate SKU codes. Incomplete tuples do not prove duplication and must not emit an extra duplicate-tuple error. No automatic winner selection, merging prices or stock, renaming SKU, or rewriting source rows is approved.
+
+Product missing eligible SKU price/stock remains quarantined as agreed. Empty/null/missing/whitespace values count as missing and produce MISSING_PRICE/MISSING_STOCK metadata; actual zero is valid. This does not waive importer diagnostics or dependencies of quarantined Products.
+
+
+## Approved missing-price/stock Product exclusion — exporter 1.8.0
+
+Supersedes the 1.7.0 statement that missing price/stock Products always block import. A live Product with a recognized source status is omitted as a whole when an eligible SKU has an empty/null/missing/whitespace price or stock, or when no SKU rows / no live owned SKU remain. Zero remains valid. Unknown SKU status, foreign live SKU ownership, negative/non-numeric/out-of-range price/stock are not this exclusion and retain their blockers. Entirely inactive SKU sets keep their existing active-catalog policy.
+
+Emit PRODUCT_MISSING_PRICE_STOCK_EXCLUDED as a warning with the exact Product ID and one of MISSING_PRICE, MISSING_STOCK, MISSING_PRICE_AND_STOCK, NO_SKU_ROWS, NO_LIVE_OWNED_SKU. Retain the Product and its unused owned catalog child rows in source CSV with productExclusion {productId, reason} and MASTER-5.2-PRODUCT-MISSING-PRICE-STOCK field evidence. Only products, product_skus, product_attributes, product_variants, product_images, product_sku_images, product_sku_promotion_prices and Product model_settings qualify. Shared attribute definitions and operational Order/discount rows do not inherit exclusion. Unknown fields and unresolved ownership stay unresolved.
+
+Validators require the matching Product evidence, identical Store/reason, valid family parent ownership, no operational contributions and no emitted Product for the excluded identity. Importer approves this diagnostic only for the exact 1.8.0 contract and verified classification evidence. Historical artifacts keep their original gates. Other diagnostics are never waived by this rule. Historical Order line name, quantity and price remain unchanged under the previously approved order policy; no invented Product/SKU references. Genuine relationship or order-value failures remain blockers.

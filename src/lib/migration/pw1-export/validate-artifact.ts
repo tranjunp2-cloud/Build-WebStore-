@@ -1,3 +1,6 @@
+import * as legacyOutcome from './export-outcome-v1'
+import { exportOutcome, exportReview, reviewMarkdown, externalArchiveKeys } from './export-outcome'
+import { EXTERNAL_SOURCE_RULE } from './external-source'
 import { validateClassification } from './validate-classification'
 import { validateReconciliationReceipts } from './reconciliation-receipts'
 import { validateUserActors } from './user-actors'
@@ -10,10 +13,10 @@ import {
 import type { StoreOutput } from './contracts'
 import { lstat } from 'node:fs/promises'
 import path from 'node:path'
-import { manifestSchema, reportSchema, storeSchema, legacyStoreSchema } from './artifact-schemas'
+import { manifestSchema, reportSchema, storeSchema, legacyStoreSchema, previousStoreSchema, statusStoreSchema } from './artifact-schemas'
 import { operationalIssues } from './validate-master'
 import { checkedFile } from './csv-loader'
-import { MASTER_SHA256, LEGACY_MASTER_SHA256, EXPORT_VERSION } from './master-version'
+import { VARIANT_MASTER_SHA256, BLOG_CONTENT_MASTER_SHA256, BLOG_OWNER_MASTER_SHA256, DESCRIPTION_MASTER_SHA256, CORRECTED_OUTCOME_MASTER_SHA256, MASTER_SHA256, OUTCOME_MASTER_SHA256, ARCHIVE_MASTER_SHA256, STATUS_MASTER_SHA256, PREVIOUS_MASTER_SHA256, LEGACY_MASTER_SHA256, EXPORT_VERSION } from './master-version'
 import { ExportError } from './primitives'
 export async function validateArtifact(directory: string) {
   if ((await lstat(directory)).isSymbolicLink())
@@ -31,11 +34,16 @@ export async function validateArtifact(directory: string) {
   if (!parsed.success) throw new ExportError('MANIFEST_SCHEMA_INVALID')
   const manifest = parsed.data
   const legacy = manifest.contractSha256 === LEGACY_MASTER_SHA256 && manifest.exporterVersion === '1.0.0'
-  if (!legacy && (manifest.contractSha256 !== MASTER_SHA256 || !['1.1.0', EXPORT_VERSION].includes(manifest.exporterVersion)))
+  const previous = manifest.contractSha256 === PREVIOUS_MASTER_SHA256 && ['1.1.0', '1.2.0'].includes(manifest.exporterVersion)
+  const archiveVersion = manifest.contractSha256 === ARCHIVE_MASTER_SHA256 && manifest.exporterVersion === '1.4.0'
+  const outcomeVersion = manifest.contractSha256 === OUTCOME_MASTER_SHA256 && manifest.exporterVersion === '1.5.0'
+  const current = (manifest.contractSha256 === VARIANT_MASTER_SHA256 && manifest.exporterVersion === '1.7.0') || (manifest.contractSha256 === BLOG_CONTENT_MASTER_SHA256 && manifest.exporterVersion === '1.6.2') || (manifest.contractSha256 === BLOG_OWNER_MASTER_SHA256 && manifest.exporterVersion === '1.6.1') || (manifest.contractSha256 === DESCRIPTION_MASTER_SHA256 && manifest.exporterVersion === '1.6.0') || (manifest.contractSha256 === MASTER_SHA256 && manifest.exporterVersion === EXPORT_VERSION) || (manifest.contractSha256 === CORRECTED_OUTCOME_MASTER_SHA256 && manifest.exporterVersion === '1.5.1')
+  const statusVersion = manifest.contractSha256 === STATUS_MASTER_SHA256 && manifest.exporterVersion === '1.3.0'
+  if (!legacy && !previous && !statusVersion && !archiveVersion && !outcomeVersion && !current)
     throw new ExportError('UNSUPPORTED_MAPPING_CONTRACT')
-  if (manifest.exporterVersion === EXPORT_VERSION && manifest.classificationVersion !== 'source-classification-v1')
+  if (['1.2.0', '1.3.0', '1.4.0', '1.5.0', '1.5.1', '1.6.0', '1.6.1', '1.6.2', '1.7.0', EXPORT_VERSION].includes(manifest.exporterVersion) && manifest.classificationVersion !== 'source-classification-v1')
     throw new ExportError('CLASSIFICATION_VERSION_REQUIRED')
-  const schema = legacy ? legacyStoreSchema : storeSchema
+  const schema = legacy ? legacyStoreSchema : previous ? previousStoreSchema : statusVersion ? statusStoreSchema : storeSchema
   if (!legacy && (!manifest.artifacts['customer-reconciliation.json'] || !manifest.artifacts['product-reconciliation.json']))
     throw new ExportError('RECONCILIATION_RECEIPT_REQUIRED')
   if (legacy && (manifest.artifacts['customer-reconciliation.json'] || manifest.artifacts['product-reconciliation.json']))
@@ -51,6 +59,7 @@ export async function validateArtifact(directory: string) {
   if (!Array.isArray(masterValue))
     throw new ExportError('MASTER_SCHEMA_INVALID')
   const master = masterValue as StoreOutput[]
+  const archive = new Set<string>()
   const reportValue = await parse(
     'mapping-report.json',
     (itemPath, _index, item) => {
@@ -61,8 +70,9 @@ export async function validateArtifact(directory: string) {
         if (manifest.classificationVersion && (!row.ownership || row.ownership.storeId !== row.storeId ||
           Object.entries(row.fieldRetentionRules ?? {}).some(([field]) => row.fields[field] !== 'retained-source')))
           throw new ExportError('CLASSIFICATION_EVIDENCE_INVALID')
-          // Contributions were checked above; coverage validation needs only field dispositions.
-        ;(item as { contributions: unknown[] }).contributions = []
+        // Keep external CSV evidence for retention validation; discard operational paths.
+        for (const key of externalArchiveKeys(row)) archive.add(key)
+        if (!row.productExclusion) row.contributions = row.contributions.filter(contribution => contribution.rule === EXTERNAL_SOURCE_RULE)
       }
       if (
         itemPath.length === 1 &&
@@ -86,14 +96,14 @@ export async function validateArtifact(directory: string) {
     !reportSchema.safeParse({ ...report, rows: [], diagnostics: [] }).success
   )
     throw new ExportError('REPORT_SCHEMA_INVALID')
-  if (manifest.classificationVersion) validateClassification(report.rows, report.diagnostics, manifest.migrationPolicy)
+  if (manifest.classificationVersion) validateClassification(report.rows, report.diagnostics, manifest.migrationPolicy, master.flatMap(store => store.products.map(p => ({ storeId: String(store.tenants[0]._ref).split(':').at(-1)!, ref: String(p._ref) }))), manifest.exporterVersion === '1.8.0')
   if (!legacy) validateReconciliationReceipts(
     await parse('customer-reconciliation.json'), await parse('product-reconciliation.json'),
     manifest.sourceSnapshot, master, report.rows,
   )
   if (manifest.artifacts['store-summary.json']) {
     const summary = await parse('store-summary.json')
-    const expected = storeSummaries(master, report.diagnostics, manifest.blockedStores, manifest.policyExcludedStores)
+    const expected = storeSummaries(master, report.diagnostics, manifest.blockedStores, manifest.policyExcludedStores, current || outcomeVersion, archive, outcomeVersion ? 1 : 2)
     if (JSON.stringify(summary) !== JSON.stringify(expected))
       throw new ExportError('STORE_SUMMARY_INCONSISTENT')
   }
@@ -106,10 +116,18 @@ export async function validateArtifact(directory: string) {
     throw new ExportError('USER_ACTORS_POLICY_INVALID')
   if (operationalIssues(master, userActors, manifest.migrationPolicy).length)
     throw new ExportError('ARTIFACT_RELATIONSHIPS_INVALID')
+  if (current || outcomeVersion) {
+    const expected = outcomeVersion ? legacyOutcome.exportOutcome(report.diagnostics, manifest.blockedStores.length, manifest.policyExcludedStores.length, archive) : exportOutcome(report.diagnostics, manifest.blockedStores.length, manifest.policyExcludedStores, archive)
+    if (JSON.stringify(manifest.outcome) !== JSON.stringify(expected) || !manifest.artifacts['export-review.json'] || !manifest.artifacts['export-review.md']) throw new ExportError('ARTIFACT_OUTCOME_INCONSISTENT')
+    const review = (outcomeVersion ? legacyOutcome.exportReview : exportReview)(report.diagnostics, manifest.blockedStores, manifest.policyExcludedStores, archive)
+    if (JSON.stringify(await parse('export-review.json')) !== JSON.stringify(review)) throw new ExportError('ARTIFACT_OUTCOME_INCONSISTENT')
+    const { readFile } = await import('node:fs/promises')
+    if (await readFile(await checkedFile(root, 'export-review.md'), 'utf8') !== (outcomeVersion ? legacyOutcome.reviewMarkdown(review as ReturnType<typeof legacyOutcome.exportReview>) : reviewMarkdown(review as ReturnType<typeof exportReview>))) throw new ExportError('ARTIFACT_OUTCOME_INCONSISTENT')
+  } else if (manifest.outcome || manifest.artifacts['export-review.json'] || manifest.artifacts['export-review.md']) throw new ExportError('ARTIFACT_OUTCOME_INCONSISTENT')
   if (
     counts.blockers !== blockers ||
     manifest.mapping.complete !== (blockers === 0) ||
-    manifest.status !== (blockers ? 'needs_review' : 'complete')
+    manifest.status !== (current || outcomeVersion ? 'exported' : blockers ? 'needs_review' : 'complete')
   )
     throw new ExportError('ARTIFACT_STATUS_INCONSISTENT')
   if (
@@ -178,8 +196,9 @@ export async function validateArtifact(directory: string) {
     throw new ExportError('ARTIFACT_COVERAGE_INCONSISTENT')
   return {
     integrityStatus: 'valid',
-    mappingStatus: manifest.status,
-    exitCode: manifest.status === 'complete' ? 0 : 2,
+    mappingStatus: current || outcomeVersion ? manifest.outcome!.dataStatus : manifest.status,
+    ...((current || outcomeVersion) ? { outcome: manifest.outcome } : {}),
+    exitCode: current || outcomeVersion || manifest.status === 'complete' ? 0 : 2,
     counts,
   }
 }

@@ -21,3 +21,20 @@ export function packageWeightKg(row: Row): number | undefined {
   if (row.package_weight_type === "2") return weight / 1000;
   throw new Error("PRODUCT_WEIGHT_UNIT_UNVERIFIED");
 }
+
+/** Missing is not invalid: foreign ownership, unknown status and bad numeric values stay blockers. */
+export function missingProductData(product: Row, skus: Row[]): import('../product-exclusions').ProductExclusion | undefined {
+  if (!product.id || !live(product) || !['0','1'].includes(product.status ?? '')) return undefined
+  const owned = skus.filter(s => s.product_id === product.id)
+  if (owned.some(s => live(s) && (s.store_id !== product.store_id || !['0','1'].includes(s.status ?? '')))) return undefined
+  const eligible = owned.filter(s => live(s) && s.store_id === product.store_id && s.status === '1')
+  if (!eligible.length) {
+    if (!owned.length) return { productId: product.id, reason: 'NO_SKU_ROWS' }
+    if (!owned.some(s => live(s) && s.store_id === product.store_id)) return { productId: product.id, reason: 'NO_LIVE_OWNED_SKU' }
+    return undefined
+  }
+  const absent = (v: string | null | undefined) => v == null || v.trim() === ''
+  if (eligible.some(s => (!absent(s.price) && (!Number.isFinite(Number(s.price)) || Number(s.price) < 0 || Number(s.price) > 100_000_000)) || (!absent(s.stock) && (!Number.isInteger(Number(s.stock)) || Number(s.stock) < 0 || Number(s.stock) > 1_000_000)))) return undefined
+  const price = eligible.some(s => absent(s.price)), stock = eligible.some(s => absent(s.stock))
+  return price || stock ? { productId: product.id, reason: price && stock ? 'MISSING_PRICE_AND_STOCK' : price ? 'MISSING_PRICE' : 'MISSING_STOCK' } : undefined
+}

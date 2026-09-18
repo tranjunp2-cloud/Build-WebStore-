@@ -24,7 +24,7 @@ function fixture(code: string | null = null, variants = false) {
   const tables: Record<string, Row[]> = {
     stores: [{ id: '1', currency_id: '1' }], currencies: [{ id: '1', code: 'MYR' }],
     categories: [{ id: '10', store_id: '1', name: 'Books', slug: 'books', status: '1', ...dates }],
-    products: [{ id: '20', store_id: '1', category_id: '10', name: 'Book one', slug: 'book-one', ...dates }],
+    products: [{ status: '1', id: '20', store_id: '1', category_id: '10', name: 'Book one', slug: 'book-one', ...dates }],
     product_skus: [{ id: '30', store_id: '1', product_id: '20', status: '1', sku: code, price: '12.50', stock: '5', ...dates }],
     customers: [
       { id: '40', store_id: '1', name: 'Original', phone: '0123456789', rank_id: '70', ...dates },
@@ -83,7 +83,7 @@ describe('[TC-F42-078] Optional business SKU codes', () => {
     long.run(); missing.run()
     expect(long.ctx.output.products).toEqual([])
     expect(missing.ctx.output.products).toEqual([])
-    expect(missing.ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'SOURCE_NO_ELIGIBLE_SKU' }))
+    expect(missing.ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'PRODUCT_MISSING_PRICE_STOCK_EXCLUDED', severity: 'warning', reason: 'NO_SKU_ROWS' }))
   })
   it('keeps the existing 50-character limit on a configured simple SKU', () => {
     // Arrange

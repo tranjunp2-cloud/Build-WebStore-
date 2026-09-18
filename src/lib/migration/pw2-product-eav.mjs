@@ -3,7 +3,8 @@ import { deriveVariantBaseSku } from './pw2-product-migration.mjs'
 
 const present = (v) => v !== '' && v !== null && v !== undefined
 const live = (r) => !present(r.deleted_at)
-const number = (v) => present(v) ? Number(v) : undefined
+const missingNumber = (v) => !present(v) || (typeof v === 'string' && v.trim() === '')
+const number = (v) => missingNumber(v) ? undefined : Number(v)
 const id = (v) => String(v ?? '')
 // PW1 has no tier/option position column. Compare numeric IDs without float loss.
 const compareId = (a, b) => {
@@ -63,6 +64,20 @@ export function buildProductCatalogFromSource(product, tables, sourceInstanceTok
     tier.options.set(vid, value)
     tiers.set(aid, tier)
   }
+  // SKU selections are an independent PW1 relationship. Recover only definitions
+  // actually selected by eligible SKUs, never infer options from SKU names/codes.
+  for (const row of selections) {
+    const aid = id(row.attribute_id), vid = id(row.attribute_value_id)
+    const attr = attributes.get(aid), value = values.get(vid)
+    if (!attr || !value || !live(attr) || !live(value) || id(attr.store_id) !== storeId
+      || id(value.store_id) !== storeId || id(value.attribute_id) !== aid) {
+      fail('SOURCE_EAV_ORPHAN_OR_OWNER_MISMATCH', `Invalid SKU selection definition ${row.id}`)
+      continue
+    }
+    const tier = tiers.get(aid) ?? { attribute: attr, options: new Map() }
+    tier.options.set(vid, value)
+    tiers.set(aid, tier)
+  }
   const orderedTiers = [...tiers].sort(([a], [b]) => compareId(a, b))
   const variantConfigs = orderedTiers.map(([aid, tier], ti) => {
     const options = [...tier.options].sort(([a], [b]) => compareId(a, b))
@@ -91,8 +106,12 @@ export function buildProductCatalogFromSource(product, tables, sourceInstanceTok
       names.push(label(tier.options.get(vid)))
     }
     const key = JSON.stringify(tuple)
-    if (tuples.has(key)) fail('SOURCE_DUPLICATE_VARIANT_TUPLE', `Duplicate selected tuple for SKU ${sku.id}`)
-    tuples.add(key)
+    // An incomplete tuple is not evidence of a duplicate: report the missing
+    // selections instead of conflating all empty/partial tuples.
+    if (selected.length === orderedTiers.length && tuple.length === orderedTiers.length) {
+      if (tuples.has(key)) fail('SOURCE_DUPLICATE_VARIANT_TUPLE', `Duplicate selected tuple for SKU ${sku.id}`)
+      tuples.add(key)
+    }
     const uuid = childId(sourceInstanceToken, id(sku.id))
     skuCrosswalk.push({ sourceSkuId: id(sku.id), targetPath: `variants.${index}`, targetId: uuid, selectedTuple: tuple })
     return { id: uuid, name: names.join(' - '), sku: sku.sku, price: number(sku.price), stock: number(sku.stock) }
@@ -104,8 +123,8 @@ export function buildProductCatalogFromSource(product, tables, sourceInstanceTok
   const stocks = skus.map((r) => number(r.stock))
   for (const sku of skus) {
     const price = number(sku.price), stock = number(sku.stock)
-    if (!Number.isFinite(price) || price < 0 || price > 100_000_000) fail('SOURCE_SKU_PRICE_INVALID', `Invalid base price on SKU ${sku.id}`)
-    if (!Number.isInteger(stock) || stock < 0 || stock > 1_000_000) fail('SOURCE_SKU_STOCK_INVALID', `Invalid stock on SKU ${sku.id}`)
+    if (!Number.isFinite(price) || price < 0 || price > 100_000_000) fail('SOURCE_SKU_PRICE_INVALID', `Invalid base price on SKU ${sku.id}`, missingNumber(sku.price) ? 'MISSING_PRICE' : undefined)
+    if (!Number.isInteger(stock) || stock < 0 || stock > 1_000_000) fail('SOURCE_SKU_STOCK_INVALID', `Invalid stock on SKU ${sku.id}`, missingNumber(sku.stock) ? 'MISSING_STOCK' : undefined)
   }
   const fields = {
     hasVariants, variantConfigs, variants,

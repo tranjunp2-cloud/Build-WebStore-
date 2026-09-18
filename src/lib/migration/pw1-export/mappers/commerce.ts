@@ -492,6 +492,16 @@ function mapDiscounts(ctx: MappingContext, tenant: string, site: string): void {
       continue
     try {
       if (!row.id || !row.code?.trim()) throw new Error('DISCOUNT_REQUIRED')
+      if (!['0', '1', '2'].includes(promotion.status ?? '')) {
+        ctx.issue('DISCOUNT_STATUS_UNVERIFIED', 'promotions', promotion.id, 'status')
+        continue
+      }
+      // PW2 has no expired enum: retain a verified expiry and keep the code disabled.
+      if (promotion.status === '2' && (!promotion.end_date ||
+        Date.parse(timestamp(promotion.end_date, ctx.config)) > Date.parse(ctx.config.asOf))) {
+        ctx.issue('DISCOUNT_EXPIRY_UNVERIFIED', 'promotions', promotion.id, 'status')
+        continue
+      }
       const currency =
         ctx.find('currencies', ctx.find('stores', ctx.storeId)?.currency_id)
           ?.code ?? ''
@@ -519,7 +529,7 @@ function mapDiscounts(ctx: MappingContext, tenant: string, site: string): void {
         code,
         type,
         value: amount,
-        status: 'inactive',
+        status: promotion.status === '1' ? 'active' : 'inactive',
         usageCount: 0,
         ...codeDates,
         updatedAt:
@@ -561,6 +571,7 @@ function mapDiscounts(ctx: MappingContext, tenant: string, site: string): void {
         fields(promotion, [
           'id',
           'store_id',
+          'status',
           'discount_type_id',
           'discount_value',
           'name',

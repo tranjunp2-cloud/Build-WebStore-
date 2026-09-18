@@ -1,3 +1,6 @@
+import { buildHandoff } from './handoff'
+import { exportOutcome, exportReview, reviewMarkdown, externalArchiveKeys } from './export-outcome'
+import { EXTERNAL_SOURCE_RULE, externalSourcePath } from './external-source'
 import { validateClassification } from './validate-classification'
 import {
   customerDiagnosticsSchema, receiptSnapshot, buildCustomerReceiptStore,
@@ -233,6 +236,7 @@ export async function exportMaster(
   )
   const finalContributions = contributions.filter((c) => {
     if (!c.storeId || !emittedIds.has(c.storeId)) return false
+    if (c.rule === EXTERNAL_SOURCE_RULE) return c.targetPath === externalSourcePath(c.table)
     if (c.targetPath.startsWith('@'))
       return emittedRefs.has(c.targetPath.split('.')[0])
     const store = valid.find(
@@ -294,11 +298,14 @@ export async function exportMaster(
     total: source.tables.stores.length,
   })
   validateMaster(valid)
-  validateClassification(rows, uniqueDiagnostics, config.migrationPolicy)
+  validateClassification(rows, uniqueDiagnostics, config.migrationPolicy, valid.flatMap(store => store.products.map(p => ({ storeId: String(store.tenants[0]._ref).split(':').at(-1)!, ref: String(p._ref) }))))
   const blockers = uniqueDiagnostics.filter(
     (d) => d.severity === 'blocker',
   ).length
-  const state = blockers ? 'needs_review' : 'complete'
+  const state = 'exported'
+  const archive = new Set(rows.flatMap(row => externalArchiveKeys(row)))
+  const outcome = exportOutcome(uniqueDiagnostics, blockedStores.length, policyExcludedStores, archive)
+  const review = exportReview(uniqueDiagnostics, [...blockedStores].sort(compareIds), [...policyExcludedStores].sort(compareIds), archive)
   function* masterChunks() {
     yield '[\n'
     for (let i = 0; i < valid.length; i++) {
@@ -352,12 +359,14 @@ export async function exportMaster(
     products: contexts.flatMap(buildProductReceiptEntries),
   }
   validateReconciliationReceipts(customerReceipt, productReceipt, receiptSnapshot(config), valid, rows)
-  const summaries = storeSummaries(valid, uniqueDiagnostics, blockedStores, policyExcludedStores)
+  const summaries = storeSummaries(valid, uniqueDiagnostics, blockedStores, policyExcludedStores, true, archive)
   const summaryCsv = [
-    'storeId,exportStatus,mappingStatus,blockerDiagnosticCount,warningDiagnosticCount,blockerCodes,mappingReviewCodes,targetConstraintCodes,otherBlockerCodes',
-    ...summaries.map(s => [s.storeId, s.exportStatus, s.mappingStatus, String(s.blockerDiagnosticCount), String(s.warningDiagnosticCount), s.blockerCodes.join(';'), s.mappingReviewCodes.join(';'), s.targetConstraintCodes.join(';'), s.otherBlockerCodes.join(';')].map(csvCell).join(',')),
+    'storeId,exportStatus,mappingStatus,blockerDiagnosticCount,warningDiagnosticCount,blockerCodes,mappingReviewCodes,targetConstraintCodes,otherBlockerCodes,importStatus,dataIssueCount,importRequirementCount,delegatedContentCount,outsideScopeCount',
+    ...summaries.map(s => [s.storeId, s.exportStatus, s.mappingStatus, String(s.blockerDiagnosticCount), String(s.warningDiagnosticCount), s.blockerCodes.join(';'), s.mappingReviewCodes.join(';'), s.targetConstraintCodes.join(';'), s.otherBlockerCodes.join(';'), s.outcome!.importStatus, String(s.outcome!.dataIssueCount), String(s.outcome!.importRequirementCount), String(s.outcome!.delegatedContentCount), String(s.outcome!.outsideScopeCount)].map(csvCell).join(',')),
   ].join('\n') + '\n'
   const files: Record<string, ArtifactContent> = {
+    'export-review.json': json(review),
+    'export-review.md': reviewMarkdown(review),
     'customer-reconciliation.json': json(customerReceipt),
     'product-reconciliation.json': json(productReceipt),
     'store-summary.json': json(summaries),
@@ -365,7 +374,7 @@ export async function exportMaster(
     'master.json': masterChunks(),
     'mapping-report.json': reportChunks(),
     'mapping-report.csv': csvChunks(),
-    'README.md': `# PW1 master export\n\nStatus: ${state}. Import readiness: false.\n\nStart with store-summary.csv: emitted means present in master, not complete mapping. Review mappingReviewCodes, targetConstraintCodes and otherBlockerCodes; counts are diagnostics, not lost records. Collection counts are in store-summary.json. Global diagnostics and field dispositions remain in mapping-report.json/csv. Customer and Product reconciliation sidecars carry source-scoped identity evidence validated against emitted targets. Null targets are not importable crosswalks. Customer raw archive remains in the manifest-hashed CSV snapshot outside this artifact; retainedSourceRows lists its IDs, not embedded raw values. Source snapshot is retained externally; no DB was written. If user-actors.json is present, it is a hashed source-identity dependency registry, not pre-created PW2 Users. Import must bind each actor to a verified target User ID without granting source roles or tenant membership, then resolve Users.createdBy and prevent import hooks from overwriting it.\n\nValidate: npm run migrate:pw1:export -- --validate-only --artifact-dir <this-directory>\n\nExit 0: complete; 2: needs review; 1: invalid artifact or failed run.\n`,
+    'README.md': `# PW1 master export\n\nExport: succeeded. Data: ${outcome.dataStatus}. Import: not_verified. Start with export-review.md for actionable groups.\n\nStart with store-summary.csv: emitted means present in master, not complete mapping. Review mappingReviewCodes, targetConstraintCodes and otherBlockerCodes; counts are diagnostics, not lost records. Collection counts are in store-summary.json. Global diagnostics and field dispositions remain in mapping-report.json/csv. Customer and Product reconciliation sidecars carry source-scoped identity evidence validated against emitted targets. Null targets are not importable crosswalks. Customer raw archive remains in the manifest-hashed CSV snapshot outside this artifact; retainedSourceRows lists its IDs, not embedded raw values. Source snapshot is retained externally; sites.pw1_source is not embedded in master. Source-csv contributions describe CSV archive retention, not operational fields imported into PW2. No DB was written. If user-actors.json is present, it is a hashed source-identity dependency registry, not pre-created PW2 Users. Import must bind each actor to a verified target User ID without granting source roles or tenant membership, then resolve Users.createdBy and prevent import hooks from overwriting it.\n\nValidate: npm run migrate:pw1:export -- --validate-only --artifact-dir <this-directory>\n\nExit 0: export succeeded, including partial data; 1: invalid artifact or failed run. Inspect outcome.dataStatus and export-review.md.\n`,
   }
   if (userActors) files['user-actors.json'] = json(userActors)
   checkResources(config)
@@ -387,6 +396,7 @@ export async function exportMaster(
     acceptedExclusions: config.acceptedExclusions ?? [],
     ...(config.migrationPolicy ? { migrationPolicy: config.migrationPolicy } : {}),
     status: state,
+    outcome,
     importReady: false,
     coverage: { accounted: true },
     mapping: { complete: blockers === 0 },
@@ -411,7 +421,9 @@ export async function exportMaster(
   await writeArtifacts(outputDir, source.inputRoot, files, unchanged, progress)
   return {
     status: state,
-    exitCode: blockers ? 2 : 0,
+    outcome,
+    handoff: buildHandoff(summaries, uniqueDiagnostics, archive),
+    exitCode: 0,
     counts: manifest.counts,
     sourceWarnings: [...new Set(sourceWarnings)],
     outputDir: path.resolve(outputDir),

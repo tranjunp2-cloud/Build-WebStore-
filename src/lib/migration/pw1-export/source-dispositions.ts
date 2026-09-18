@@ -1,3 +1,5 @@
+import { PRODUCT_EXCLUSION_CODE, PRODUCT_EXCLUSION_RULE, type ProductExclusion } from './product-exclusions';
+import { EXTERNAL_SOURCE_RULE, externalSourceField, externalSourcePath } from './external-source';
 import { createSourceClassifier, type Ownership } from './source-classification';
 import { inactiveOnlyProduct } from "./mappers/catalog-policy";
 import type { Contribution, Diagnostic, Row } from "./contracts";
@@ -8,6 +10,7 @@ import {
   SOURCE_HEADERS,
 } from "./source-registry";
 export interface RowDisposition {
+  productExclusion?: ProductExclusion;
   table: string;
   sourceId: string;
   storeId: string | null;
@@ -45,6 +48,7 @@ export function dispositions(
     rows.push(sku);
     skusByProduct.set(key, rows);
   }
+  const excludedProducts = new Map(diagnostics.filter(d => d.code === PRODUCT_EXCLUSION_CODE && d.storeId && d.sourceId).map(d => [`${d.storeId}:${d.sourceId}`, { productId: d.sourceId!, reason: d.reason as ProductExclusion['reason'] }]));
   const result: RowDisposition[] = [];
   const classifier = createSourceClassifier(source.tables, source.config, diagnostics);
   for (const file of source.files.filter((f) => f.selected)) {
@@ -87,10 +91,14 @@ export function dispositions(
               )) ||
             (table === "product_variants" &&
               skuById.get(row.product_sku_id)?.status === "0")));
+      const productId = table === 'products' ? row.id : ['product_skus','product_attributes','product_images'].includes(table) ? row.product_id : ['product_variants','product_sku_images','product_sku_promotion_prices'].includes(table) ? skuById.get(row.product_sku_id)?.product_id : table === 'model_settings' && owner.parentTable === 'products' ? owner.parentId : undefined;
+      const productExclusion = !owner.rule.startsWith('OWNERSHIP_') && owner.storeId && productId && used.length === 0 && file.headers.every(field => SOURCE_HEADERS[table]?.includes(field)) ? excludedProducts.get(`${owner.storeId}:${productId}`) : undefined;
+      const mappedUsed = used.filter(c => c.rule !== EXTERNAL_SOURCE_RULE);
       const fields: Record<string, string> = Object.create(null);
       for (const field of file.headers) {
-        const hasMapping = used.some((c) => c.fields.includes(field));
-        const retentionRule = classifier.retention(table, row, field, owner);
+        const hasMapping = mappedUsed.some((c) => c.fields.includes(field));
+        const external = !owner.rule.startsWith('OWNERSHIP_') && externalSourceField(table, field) && used.some(c => c.rule === EXTERNAL_SOURCE_RULE && c.targetPath === externalSourcePath(table) && c.fields.includes(field));
+        const retentionRule = productExclusion ? PRODUCT_EXCLUSION_RULE : external ? EXTERNAL_SOURCE_RULE : classifier.retention(table, row, field, owner);
         if (retentionRule && !hasMapping && !SECRET_FIELDS.has(field)) fieldRetentionRules[field] = retentionRule;
         fields[field] = SECRET_FIELDS.has(field)
           ? "security-excluded"
@@ -113,16 +121,17 @@ export function dispositions(
       }
       const pending = Object.values(fields).includes("unresolved");
       if (pending) unresolved.add(owner.storeId);
-      const disposition = pending
-        ? used.length
+      const disposition = productExclusion ? "retained-source" : pending
+        ? mappedUsed.length
           ? "partial"
           : "unresolved"
-        : used.length
+        : mappedUsed.length
           ? "mapped"
           : row.deleted_at || row.is_frontend === "1"
             ? "excluded"
             : "retained-source";
       result.push({
+        ...(productExclusion ? { productExclusion } : {}),
         table,
         sourceId,
         storeId: owner.storeId,

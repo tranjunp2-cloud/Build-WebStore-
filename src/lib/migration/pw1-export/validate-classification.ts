@@ -1,3 +1,5 @@
+import { createProductExclusionIndex } from './product-exclusions'
+import { EXTERNAL_SOURCE_RULE, externalSourcePath, externalSourceField } from './external-source'
 import type { Diagnostic, MigrationPolicy } from './contracts'
 import type { RowDisposition } from './source-dispositions'
 import { classificationParentTables, classificationRequiresParent, retentionRuleMatches, type Ownership } from './source-classification'
@@ -10,7 +12,12 @@ const key = (table: string, id: string) => JSON.stringify([table, id])
 function fail(): never { throw new ExportError('CLASSIFICATION_EVIDENCE_INVALID') }
 
 /** Validate internal evidence consistency; does not re-read or authenticate source CSV values. */
-export function validateClassification(rows: readonly RowDisposition[], diagnostics: readonly Diagnostic[], policy?: MigrationPolicy) {
+export function validateClassification(rows: readonly RowDisposition[], diagnostics: readonly Diagnostic[], policy?: MigrationPolicy, products: { storeId: string; ref: string }[] = [], allowProductExclusions = true) {
+  const exclusions = createProductExclusionIndex(fail, allowProductExclusions)
+  for (const product of products) exclusions.addProduct(product.storeId, product.ref)
+  for (const d of diagnostics) exclusions.addDiagnostic(d)
+  for (const row of rows) exclusions.addRow(row)
+  exclusions.finish()
   const index = new Map<string, RowDisposition>()
   for (const row of rows) {
     const id = key(row.table, row.sourceId)
@@ -50,8 +57,12 @@ export function validateClassification(rows: readonly RowDisposition[], diagnost
     } else if (owner.rule === 'SOURCE_GLOBAL_SCOPE') {
       if (hasParent || owner.storeId !== null || row.table === 'stores' || classificationRequiresParent(row.table)) fail()
     } else fail()
+    for (const contribution of row.contributions.filter(c => c.rule === EXTERNAL_SOURCE_RULE)) {
+      if (contribution.table !== row.table || contribution.sourceId !== row.sourceId || contribution.targetPath !== externalSourcePath(row.table) || contribution.fields.some(field => !externalSourceField(row.table, field))) fail()
+    }
     for (const [field, rule] of Object.entries(row.fieldRetentionRules ?? {})) {
       if (row.fields[field] !== 'retained-source' || SECRET_FIELDS.has(field) || !retentionRuleMatches(rule, row.table, field, owner)) fail()
+      if (rule === EXTERNAL_SOURCE_RULE && !row.contributions.some(c => c.rule === rule && c.fields.includes(field) && c.targetPath === externalSourcePath(row.table))) fail()
       if (rule === 'MASTER-4.1-APPROVED-SHIPPING-SOURCE' &&
         (policy?.shippingPolicy !== 'pw2-defaults' || !shipping.has(key(row.storeId ?? '', row.sourceId)))) fail()
     }

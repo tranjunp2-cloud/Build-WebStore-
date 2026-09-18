@@ -1,9 +1,12 @@
+import { PRODUCT_EXCLUSION_RULE } from './product-exclusions'
+import { EXTERNAL_SOURCE_RULE, externalSourceField } from './external-source'
 import type { Diagnostic, Row, SourceConfig } from './contracts'
 import { ARCHIVE_TABLES, SOURCE_HEADERS } from './source-registry'
 
 export const CLASSIFICATION_VERSION = 'source-classification-v1' as const
 export interface Ownership { storeId: string | null; rule: string; parentTable?: string; parentId?: string }
 const parents: Record<string, [string, string]> = {
+  product_skus: ['products', 'product_id'],
   category_attributes: ['categories', 'category_id'], product_attributes: ['products', 'product_id'],
   product_images: ['products', 'product_id'], product_variants: ['product_skus', 'product_sku_id'],
   product_sku_images: ['product_skus', 'product_sku_id'], product_sku_promotion_prices: ['product_skus', 'product_sku_id'],
@@ -51,11 +54,13 @@ export function classificationParentTables(table: string): readonly string[] {
   return parents[table] ? [parents[table][0]] : []
 }
 export function classificationRequiresParent(table: string): boolean {
-  return table !== 'shortlist_items' && classificationParentTables(table).length > 0
+  return table !== 'shortlist_items' && table !== 'product_skus' && classificationParentTables(table).length > 0
 }
 export function retentionRuleMatches(rule: string, table: string, field: string, owner: Ownership): boolean {
   if (!SOURCE_HEADERS[table]?.includes(field) || owner.rule.startsWith('OWNERSHIP_')) return false
+  if (rule === PRODUCT_EXCLUSION_RULE) return ['products','product_skus','product_attributes','product_variants','product_images','product_sku_images','product_sku_promotion_prices','model_settings'].includes(table)
   if (sourceOnlyTables[table] === rule) return true
+  if (rule === EXTERNAL_SOURCE_RULE) return externalSourceField(table, field)
   switch (rule) {
     case 'MASTER-2.2-EXISTING-SOURCE-RETENTION': return ARCHIVE_TABLES.has(table)
     case 'MASTER-3.4-GLOBAL-USER-DEPENDENCY': return table === 'users' && owner.storeId === null

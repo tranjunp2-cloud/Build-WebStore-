@@ -66,7 +66,7 @@ export const blogSchema = z
     site: reference,
     title: z.string().min(1),
     slug: z.string().min(1),
-    status: z.literal('draft'),
+    status: z.enum(['draft', 'published']),
     author: reference,
     category: reference.optional(),
     thumbnail: reference.optional(),
@@ -151,7 +151,7 @@ const menuItem = raw('menu_items')
 const menu = raw('menus')
   .extend({ model_settings: z.array(setting), menu_items: z.array(menuItem) })
   .strict()
-const rawSource = z
+export const legacyRawSource = z
   .object({
     store: raw('stores'),
     frontend_template: raw('frontend_templates').nullable(),
@@ -230,7 +230,6 @@ export const siteDocumentSchema = z
         fpxEnabled: z.literal(false),
       })
       .strict(),
-    pw1_source: rawSource,
     menus: z.array(menu),
   })
   .strict()

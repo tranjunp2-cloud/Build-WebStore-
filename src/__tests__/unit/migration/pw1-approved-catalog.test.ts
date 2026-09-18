@@ -1,3 +1,4 @@
+import { historicalOrderItem } from '@/lib/migration/pw1-export/mappers/commerce'
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import {
@@ -47,6 +48,7 @@ function context(tables: Record<string, Row[]>, approved = true, overrides: Part
   return new SourceIndex(tables).context(config, "10", output, [], []);
 }
 const product = {
+  status: "1",
   id: "1",
   store_id: "10",
   name: "Item",
@@ -313,3 +315,88 @@ describe("[TC-F42-073] Approved inactive-parent promotion", () => {
     expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code: "CATEGORY_PARENT_QUARANTINED", sourceId: "7" }));
   });
 });
+
+describe('[TC-F42-EXP-095] Reconcile variant definitions from real SKU selections', () => {
+  function tables(): Record<string, Row[]> {
+    return {
+      stores: [{ id: '10', currency_id: '1' }], currencies: [{ id: '1', code: 'MYR' }],
+      products: [product], categories: [{ ...category, status: '1' }],
+      product_skus: [sku, { ...sku, id: '4', sku: 'other', stock: '3' }],
+      attributes: [{ id: '5', store_id: '10', name: 'Size' }],
+      attribute_values: [{ id: '6', store_id: '10', attribute_id: '5', name: 'S' }, { id: '7', store_id: '10', attribute_id: '5', name: 'M' }],
+      product_attributes: [{ id: '8', product_id: '1', attribute_id: '5', attribute_value_id: '6' }],
+      product_variants: [{ id: '9', product_sku_id: '3', attribute_id: '5', attribute_value_id: '6' }, { id: '10', product_sku_id: '4', attribute_id: '5', attribute_value_id: '7' }],
+    }
+  }
+  it.each([false, true])('recovers valid selected definitions when entire domain missing=%s', missing => {
+    // Arrange
+    const source = tables()
+    if (missing) source.product_attributes = []
+    const ctx = context(source)
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products, JSON.stringify(ctx.diagnostics)).toHaveLength(1)
+    expect(ctx.output.products[0].variants).toHaveLength(2)
+    expect(ctx.output.products[0].inventory).toBe(5)
+    expect(ctx.output.products[0].variantConfigs).toEqual([{ name: 'Size', options: [{ value: 'S' }, { value: 'M' }] }])
+    expect(ctx.contributions).toEqual(expect.arrayContaining([expect.objectContaining({ table: 'attribute_values', sourceId: '7', rule: 'master-16-eav-definition' })]))
+    expect(source.product_skus).toHaveLength(2)
+    expect(source.product_attributes).toHaveLength(missing ? 0 : 1)
+  })
+  it.each(['foreign', 'deleted', 'wrong-attribute'])('rejects %s definition instead of inventing ownership', kind => {
+    // Arrange
+    const source = tables()
+    if (kind === 'foreign') source.attribute_values[1].store_id = '11'
+    if (kind === 'deleted') source.attribute_values[1].deleted_at = '2020-01-01'
+    if (kind === 'wrong-attribute') source.attribute_values[1].attribute_id = '99'
+    // Act
+    const result = buildProductCatalogFromSource(product, source, 'fixture', { allowSparseVariants: true })
+    // Assert
+    expect(result.errors.some(e => e.code === 'SOURCE_EAV_ORPHAN_OR_OWNER_MISMATCH')).toBe(true)
+  })
+  it('keeps real duplicate tuples blocked and does not merge stock', () => {
+    // Arrange
+    const source = tables(); source.product_variants[1].attribute_value_id = '6'
+    // Act
+    const ctx = context(source); mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toEqual([])
+    expect(ctx.diagnostics.some(d => d.code === 'SOURCE_DUPLICATE_VARIANT_TUPLE')).toBe(true)
+  })
+  it('reports missing selections without falsely calling empty tuples duplicates', () => {
+    // Arrange
+    const source = tables(); source.product_variants = []
+    // Act
+    const result = buildProductCatalogFromSource(product, source, 'fixture', { allowSparseVariants: true })
+    // Assert
+    expect(result.errors.some(e => e.code === 'SOURCE_SELECTED_TIER_COUNT')).toBe(true)
+    expect(result.errors.some(e => e.code === 'SOURCE_DUPLICATE_VARIANT_TUPLE')).toBe(false)
+  })
+})
+
+
+describe('[TC-F42-EXP-096] Exclusion boundaries and historical Orders', () => {
+  it('keeps historical line values when its current Product has missing stock', () => {
+    // Arrange
+    const ctx=context({stores:[{id:'10',currency_id:'1'}],currencies:[{id:'1',code:'MYR'}],products:[product],product_skus:[{...sku,stock:''}],categories:[category]},true,{preserveHistoricalOrders:true})
+    // Act
+    mapCatalog(ctx)
+    const item=historicalOrderItem(ctx,{id:'90',store_id:'10',product_sku_id:'3',name:'Historical name',quantity:'2',price:'23.50'},'MYR')
+    // Assert
+    expect(ctx.output.products).toEqual([])
+    expect(item).toMatchObject({productName:'Historical name',quantity:2,unitPrice:23.5})
+    expect(item).not.toHaveProperty('product')
+    expect(ctx.diagnostics).toContainEqual(expect.objectContaining({code:'ORDER_ITEM_CATALOG_REFERENCE_OMITTED',severity:'warning'}))
+  })
+  it.each([{price:'-1',stock:''},{price:'invalid',stock:''},{price:'',stock:'-1'},{price:'',stock:'1.5'},{price:'',stock:'2',store_id:'99'},{price:'',stock:'2',status:'9'}])('does not waive invalid numeric values or ownership/status: %j', change => {
+    // Arrange
+    const ctx=context({stores:[{id:'10',currency_id:'1'}],currencies:[{id:'1',code:'MYR'}],products:[product],product_skus:[{...sku,...change}],categories:[category]})
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toEqual([])
+    expect(ctx.diagnostics.some(d=>d.code==='PRODUCT_MISSING_PRICE_STOCK_EXCLUDED')).toBe(false)
+    expect(ctx.diagnostics.some(d=>d.severity==='blocker')).toBe(true)
+  })
+})

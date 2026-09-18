@@ -39,3 +39,17 @@ describe('[TC-F42-EXP-016] Per-store mapping summary', () => {
     expect(summary).not.toHaveProperty('importReady')
   })
 })
+
+describe('[TC-F42-EXP-089] Per-Store publication semantics', () => {
+  it('does not report successful publication for blocked or excluded Stores', () => {
+    // Arrange
+    const store = emptyStore(); store.tenants.push({ metaData: { pw1StoreId: '1' } })
+    const diagnostics: Diagnostic[] = [{ storeId: '323', code: 'TENANT_LIFECYCLE_CONFLICT', severity: 'blocker' }]
+    // Act
+    const summaries = storeSummaries([store], diagnostics, ['28'], ['323'], true)
+    // Assert
+    expect(summaries[0]).toMatchObject({ exportStatus: 'emitted', outcome: { exportStatus: 'emitted', dataStatus: 'complete', importStatus: 'not_verified' } })
+    expect(summaries[1]).toMatchObject({ exportStatus: 'blocked', outcome: { exportStatus: 'blocked', dataStatus: 'partial' } })
+    expect(summaries[2]).toMatchObject({ exportStatus: 'excluded', outcome: { exportStatus: 'excluded', dataStatus: 'excluded', importStatus: 'not_applicable', dataIssueCount: 0, policyExcludedDiagnosticCount: 1 } })
+  })
+})

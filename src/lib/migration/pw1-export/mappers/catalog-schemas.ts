@@ -27,7 +27,7 @@ export const productDocumentSchema = z
     name: z.string().min(3).max(120),
     slug: z.string().min(1),
     currency: z.enum(['MYR', 'USD', 'SGD']),
-    status: z.literal('draft'),
+    status: z.enum(['draft', 'active']),
     halalCertified: z.literal(false),
     aiReviewPending: z.literal(false),
     category: z.array(reference).max(1),

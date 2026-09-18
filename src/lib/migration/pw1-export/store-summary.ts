@@ -1,3 +1,5 @@
+import { exportOutcome as legacyOutcome } from './export-outcome-v1'
+import { exportOutcome } from './export-outcome'
 import { ROOTS, type Diagnostic, type StoreOutput } from './contracts'
 import { compareIds } from './primitives'
 
@@ -31,7 +33,7 @@ const reasons: Record<string, string> = {
   RAW_OWNERSHIP_MISSING: 'Thiếu bằng chứng sở hữu raw; không suy tenant để đưa dữ liệu vào sai Store.',
 }
 export function storeSummaries(
-  master: StoreOutput[], diagnostics: Diagnostic[], blocked: string[], excluded: string[],
+  master: StoreOutput[], diagnostics: Diagnostic[], blocked: string[], excluded: string[], detailed = false, archive: ReadonlySet<string> = new Set(), outcomeRevision: 1 | 2 = 2,
 ) {
   const output = new Map(master.map(store => [
     String((store.tenants[0].metaData as { pw1StoreId: string }).pw1StoreId), store,
@@ -51,9 +53,16 @@ export function storeSummaries(
     const blockers = issues.filter(d => d.severity === 'blocker')
     const codes = [...new Set(blockers.map(d => d.code))].sort()
     const exportStatus = blockedIds.has(storeId) ? 'blocked' : excludedIds.has(storeId) ? 'excluded' : 'emitted'
+    const assessment = outcomeRevision === 1
+      ? legacyOutcome(issues, blockedIds.has(storeId) ? 1 : 0, excludedIds.has(storeId) ? 1 : 0, archive)
+      : exportOutcome(issues, blockedIds.has(storeId) ? 1 : 0, excludedIds.has(storeId) ? [storeId] : [], archive)
+    const outcome = outcomeRevision === 1 ? assessment : { ...assessment, exportStatus,
+      dataStatus: exportStatus === 'excluded' ? 'excluded' : assessment.dataStatus,
+      importStatus: exportStatus === 'excluded' ? 'not_applicable' : assessment.importStatus }
     return {
       storeId, exportStatus,
-      mappingStatus: exportStatus === 'excluded' ? 'excluded' : blockers.length ? 'needs_review' : 'no_store_blockers',
+      mappingStatus: exportStatus === 'excluded' ? 'excluded' : detailed ? assessment.dataStatus : blockers.length ? 'needs_review' : 'no_store_blockers',
+      ...(detailed ? { outcome } : {}),
       // Global diagnostics remain in mapping-report.json; no_store_blockers is not import readiness.
       blockerDiagnosticCount: blockers.length,
       warningDiagnosticCount: issues.length - blockers.length,
