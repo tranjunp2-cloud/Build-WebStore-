@@ -296,3 +296,8 @@ Accepts exact 1.6.2 version/hash. Primary Blog content is preserved as one Lexic
 ## SKU option reconciliation — exporter 1.7.0
 
 Accepts the exact1.7.0 version/hash. Exporter may recover missing domain definitions from existing eligible SKU selection rows with verified live same-Store attributes/values, retaining crosswalks and definition contributions. No SKU synthesis, duplicate winner selection or stock merge. Existing source/receipt and target gates remain enforced; fixture export → validator → prepare passed.
+
+
+### Exporter 1.8.0: Product thiếu giá/stock
+
+Chấp nhận đúng contract 1.8.0 và warning PRODUCT_MISSING_PRICE_STOCK_EXCLUDED sau khi kiểm tra productExclusion + field retention, Product root/warning cùng Store/reason, SKU parent, không có operational contribution và Product không còn emit. Dòng con được giữ CSV, không phát sinh REPORT_ROW_UNRESOLVED chỉ vì đã bỏ Product. Không miễn số sai, ownership/status sai hoặc Order/discount độc lập. Artifact cũ cần export lại; không sửa hash/diagnostic để vượt gate.

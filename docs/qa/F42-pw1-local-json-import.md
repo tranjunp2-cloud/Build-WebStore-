@@ -114,3 +114,5 @@ Implementation note: server scans lightweight authorized filter/sort metadata in
 - [x] AUTO TC-F42-IMP-DESCRIPTION-001 extension: accepts exact 1.6.2 Blog content contract, retains outcome/target checks and old version support.
 
 - [x] AUTO TC-F42-IMP-DESCRIPTION-001 extension: exact 1.7.0 contract acceptance preserves outcome verification and target checks.
+
+- [x] AUTO TC-F42-IMP-EXCLUSION-001: Exact contract 1.8.0 chỉ nhận Product thiếu giá/stock có evidence đầy đủ và không emit; reject thiếu root/sai reason/sai Store/old contract; không miễn diagnostic khác.

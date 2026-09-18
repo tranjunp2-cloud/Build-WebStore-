@@ -1,3 +1,4 @@
+import { productExclusionSchema, PRODUCT_EXCLUSION_RULE, createProductExclusionIndex } from './product-exclusions'
 import { externalArchiveKeys, archiveKey } from './export-outcome'
 import { EXTERNAL_SOURCE_RULE, externalSourceField, externalSourcePath } from './external-source'
 import { z } from 'zod'
@@ -7,6 +8,7 @@ import type { ImportDiagnostic } from './types'
 import type { createSelectedSourceScope } from './source-scope'
 
 export const CLASSIFIED_MAPPING_HASH = '27fbef7ec0fc73e58029295c8fbbe7d276c4d6095e358fe57e3058e1eb4f4567'
+export const PRODUCT_EXCLUSION_MAPPING_HASH = '763d7ebea95a9772343d135e3943e80cfe94f2b06ca2e466fde54e942972f55e'
 export const VARIANT_MAPPING_HASH = 'b93fbe73dddf63cb1fc51ae4bc0c5bebdacf8e12ee3795cad721a0b9a4181887'
 export const BLOG_CONTENT_MAPPING_HASH = 'b04256a9b01672b244256f2a13a00191c41ee052a8ffefa8b620c2e6ed1f1820'
 export const BLOG_OWNER_MAPPING_HASH = '26946b1948202a6463ca40329befb2886d116d71e3d4e193a31239e3384e3f7c'
@@ -16,7 +18,7 @@ export const OUTCOME_MAPPING_HASH = 'bde643f544656d7f1af2b1a0aed0d40b3c748b30517
 export const ARCHIVE_MAPPING_HASH = '367ad0adb899cfcbc59c4d44cbd735d545419ca7b0afd53491420b112b0bf43a'
 export const STATUS_MAPPING_HASH = 'b531dea88c9fc862b6111df2343dcff0dd0370292dbe308b55ca6b0fc2549870'
 export function isClassifiedMappingHash(hash: string): boolean {
-  return hash === VARIANT_MAPPING_HASH || hash === BLOG_CONTENT_MAPPING_HASH || hash === BLOG_OWNER_MAPPING_HASH || hash === DESCRIPTION_MAPPING_HASH || hash === CORRECTED_OUTCOME_MAPPING_HASH || hash === OUTCOME_MAPPING_HASH || hash === ARCHIVE_MAPPING_HASH || hash === CLASSIFIED_MAPPING_HASH || hash === STATUS_MAPPING_HASH
+  return hash === PRODUCT_EXCLUSION_MAPPING_HASH || hash === VARIANT_MAPPING_HASH || hash === BLOG_CONTENT_MAPPING_HASH || hash === BLOG_OWNER_MAPPING_HASH || hash === DESCRIPTION_MAPPING_HASH || hash === CORRECTED_OUTCOME_MAPPING_HASH || hash === OUTCOME_MAPPING_HASH || hash === ARCHIVE_MAPPING_HASH || hash === CLASSIFIED_MAPPING_HASH || hash === STATUS_MAPPING_HASH
 }
 export const CLASSIFICATION_VERSION = 'source-classification-v1'
 const ownershipSchema = z.object({ storeId: z.string().nullable(), rule: z.enum([
@@ -29,11 +31,12 @@ export const classificationRowSchema = z.object({
   fields: z.record(z.enum(['security-excluded', 'mapped', 'retained-source', 'deleted-retained-source', 'technical-user-excluded', 'source-identity', 'unresolved'])),
   contributions: z.array(z.object({ storeId: z.string().optional(), table: z.string(), sourceId: z.string(), fields: z.array(z.string()), targetPath: z.string(), rule: z.string() }).strict()),
   ownership: ownershipSchema,
+  productExclusion: productExclusionSchema.optional(),
   fieldRetentionRules: z.record(z.string().regex(/^MASTER-[A-Z0-9.-]+$/)).optional(),
 }).strict()
 export type ClassificationRow = z.infer<typeof classificationRowSchema>
 const parents: Record<string, string> = {
-  category_attributes:'categories',product_attributes:'products',product_images:'products',product_variants:'product_skus',
+  product_skus:'products',category_attributes:'categories',product_attributes:'products',product_images:'products',product_variants:'product_skus',
   product_sku_images:'product_skus',product_sku_promotion_prices:'product_skus',order_details:'orders',order_status_histories:'orders',
   promotion_codes:'promotions',promotion_product_skus:'promotions',voucher_product_skus:'vouchers',page_components:'pages',
   menu_items:'menus',menu_lines:'menu_items',plan_subscription_usages:'plan_subscriptions',chat_logs:'users',plan_subscriptions:'stores',shortlist_items:'page_components',
@@ -48,6 +51,7 @@ const sourceOnly: Record<string,string> = {
 const userFields = new Set(['username','backup_email','gender','company_name','introduce','address','signature','birth_day','first_login_status','account_type','verified_at','initial_step1_completed_at','initial_step2_completed_at','initial_step3_completed_at','initial_step4_completed_at','is_enabled_mfa','mfa_type','completed_pages_tour','completed_menu_tour','completed_add_product_tour','completed_delivery_setting_tour'])
 function retentionAllowed(row:ClassificationRow,field:string,rule:string):boolean {
   if(row.fields[field]!=='retained-source'||row.ownership.rule.startsWith('OWNERSHIP_'))return false
+  if(rule===PRODUCT_EXCLUSION_RULE)return Boolean(row.productExclusion)
   if(rule===EXTERNAL_SOURCE_RULE)return externalSourceField(row.table,field)&&row.contributions.some(c=>c.rule===rule&&c.table===row.table&&c.sourceId===row.sourceId&&c.targetPath===externalSourcePath(row.table)&&c.fields.includes(field))
   if(sourceOnly[row.table]===rule)return true
   if(rule==='MASTER-2.2-EXISTING-SOURCE-RETENTION')return archiveTables.has(row.table)
@@ -64,7 +68,8 @@ function retentionAllowed(row:ClassificationRow,field:string,rule:string):boolea
 type Entry = {table:string;sourceId:string;storeId:string|null;owner:ClassificationRow['ownership'];invalid:boolean;unresolved:boolean;visit?:'visiting'|'verified'}
 const key = (table:string,id:string)=>JSON.stringify([table,id])
 /** Metadata index only: never retains field values, diagnostic arrays or report rows. */
-export function createSourceClassificationIndex(scope?: ReturnType<typeof createSelectedSourceScope>) {
+export function createSourceClassificationIndex(scope?: ReturnType<typeof createSelectedSourceScope>, allowProductExclusions = false) {
+  const exclusions = createProductExclusionIndex(() => { throw new MigrationError('PRODUCT_EXCLUSION_EVIDENCE_INVALID') }, allowProductExclusions)
   const rows=new Map<string,Entry>(), owners=new Map<string,{id:number;owner:ClassificationRow['ownership']}>()
   const leafIdentities=new Set<bigint>()
   const parentTables=new Set([...Object.values(parents),...modelParents])
@@ -76,7 +81,9 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
   const pageStoreCounts=new Map<string,{total:number;pages:number}>()
   const pageRows=new Map<string,Entry>(),globalUnresolved=new Map<string,{total:number;pages:number}>()
   return {
+    addProduct: exclusions.addProduct,
     addDiagnostic(d:ImportDiagnostic):void {
+      exclusions.addDiagnostic(d)
       if(finished)throw new MigrationError('CLASSIFICATION_ALREADY_FINISHED')
       if(!d.table||!d.sourceId||!d.storeId)return
       // This Page diagnostic intentionally identifies a referenced row owned by
@@ -104,6 +111,7 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
       if(indexBytes>256*1024*1024)throw new MigrationError('CLASSIFICATION_MEMORY_LIMIT')
     },
     addRow(row:ClassificationRow):void {
+      exclusions.addRow(row)
       if(finished)throw new MigrationError('CLASSIFICATION_ALREADY_FINISHED')
       if(row.ownership.storeId!==row.storeId||Object.keys(row.fieldRetentionRules??{}).some(field=>row.fields[field]!=='retained-source'))throw new MigrationError('CLASSIFICATION_ROW_INVALID')
       if(++sourceCount>1_000_000)throw new MigrationError('CLASSIFICATION_INDEX_LIMIT')
@@ -153,6 +161,7 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
     finish():ImportDiagnostic[] {
       if(finished)throw new MigrationError('CLASSIFICATION_ALREADY_FINISHED')
       finished=true
+      exclusions.finish()
       const validOwner=(entry:Entry):boolean=>{
         if(entry.visit==='verified')return !entry.invalid
         if(entry.visit==='visiting'){entry.invalid=true;return false}
@@ -170,9 +179,9 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
             if(parent&&!parent.owner.rule.startsWith('OWNERSHIP_')&&validOwner(parent))entry.invalid=true
           }
         }
-        else if(o.rule==='SOURCE_GLOBAL_SCOPE'){if(entry.storeId!==null||o.parentTable||o.parentId||modelTables.has(entry.table)||(parents[entry.table]&&entry.table!=='shortlist_items')||entry.table==='stores')entry.invalid=true}
+        else if(o.rule==='SOURCE_GLOBAL_SCOPE'){if(entry.storeId!==null||o.parentTable||o.parentId||modelTables.has(entry.table)||(parents[entry.table]&&entry.table!=='shortlist_items'&&entry.table!=='product_skus')||entry.table==='stores')entry.invalid=true}
         else if(o.rule==='SOURCE_STORE_ID'){
-          if(!entry.storeId||o.parentTable||o.parentId||modelTables.has(entry.table)||(parents[entry.table]&&entry.table!=='shortlist_items')||!rows.has(key('stores',entry.storeId))||(entry.table==='stores'&&entry.sourceId!==entry.storeId))entry.invalid=true
+          if(!entry.storeId||o.parentTable||o.parentId||modelTables.has(entry.table)||(parents[entry.table]&&entry.table!=='shortlist_items'&&entry.table!=='product_skus')||!rows.has(key('stores',entry.storeId))||(entry.table==='stores'&&entry.sourceId!==entry.storeId))entry.invalid=true
         }else {
           const allowed=modelTables.has(entry.table)?modelParents.has(o.parentTable??''):parents[entry.table]===o.parentTable
           const parent=o.parentTable&&o.parentId?rows.get(key(o.parentTable,o.parentId)):undefined

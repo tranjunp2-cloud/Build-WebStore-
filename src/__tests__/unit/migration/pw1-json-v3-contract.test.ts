@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadImportArtifact, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from '@/lib/migration/pw1-json/artifact'
+import { loadImportArtifact, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from '@/lib/migration/pw1-json/artifact'
 import { loadCredentialSidecar, prepareImportArtifact } from '@/lib/migration/pw1-json/credentials'
 import { COLLECTIONS } from '@/lib/migration/pw1-json/types'
 
@@ -18,6 +18,7 @@ interface Row {
   table: string; sourceId: string; storeId: string | null; record: number; disposition: string
   fields: Record<string, string>; contributions: unknown[]
   ownership?: { storeId: string | null; rule: string; parentTable?: string; parentId?: string }
+  productExclusion?: {productId:string;reason:string}
   fieldRetentionRules?: Record<string, string>
 }
 interface Diagnostic { code: string; severity: 'warning' | 'blocker'; storeId?: string; table?: string; sourceId?: string; field?: string; reason?: string }
@@ -565,7 +566,7 @@ describe('[TC-F42-IMP-OUTCOME-001] Published artifact with partial data', () => 
 })
 
 describe('[TC-F42-IMP-OUTCOME-002] Corrected contract acceptance', () => {
-  it.each([['1.5.1', CORRECTED_OUTCOME_MAPPING_HASH], ['1.6.0', DESCRIPTION_MAPPING_HASH], ['1.6.1', BLOG_OWNER_MAPPING_HASH], ['1.6.2', BLOG_CONTENT_MAPPING_HASH], ['1.7.0', VARIANT_MAPPING_HASH]])('prepares %s and retains warning-based target checks [TC-F42-IMP-DESCRIPTION-001]', async (version, mappingHash) => {
+  it.each([['1.5.1', CORRECTED_OUTCOME_MAPPING_HASH], ['1.6.0', DESCRIPTION_MAPPING_HASH], ['1.6.1', BLOG_OWNER_MAPPING_HASH], ['1.6.2', BLOG_CONTENT_MAPPING_HASH], ['1.7.0', VARIANT_MAPPING_HASH], ['1.8.0', PRODUCT_EXCLUSION_MAPPING_HASH]])('prepares %s and retains warning-based target checks [TC-F42-IMP-DESCRIPTION-001]', async (version, mappingHash) => {
     // Arrange
     const diagnostics: Diagnostic[] = [{ code: 'ORDER_PAYMENT_METHOD_UNVERIFIED', severity: 'warning', table: 'orders', storeId: '205', sourceId: '4', field: 'payment_method_id' }]
     const input = await fixture({ diagnostics, override: { exporterVersion: version, contractSha256: mappingHash, status: 'exported', outcome: correctedOutcome.exportOutcome(diagnostics, 0, []) } })
@@ -582,5 +583,22 @@ describe('[TC-F42-IMP-OUTCOME-002] Corrected contract acceptance', () => {
     // Rehashed false summary must still be rejected.
     await writeFile(join(input.source, 'master-manifest.json'), JSON.stringify({ ...input.manifest, outcome: correctedOutcome.exportOutcome([], 0, []) }))
     await expect(prepareImportArtifact({ exportArtifact: input.source, output: join(input.root, 'invalid') })).rejects.toThrow('EXPORT_OUTCOME_INCONSISTENT')
+  })
+})
+
+
+describe('[TC-F42-IMP-EXCLUSION-001] Missing Product data policy through prepare/load', () => {
+  it.each([false,true])('accepts exact verified exclusion; forged reason=%s', async forged => {
+    // Arrange
+    const diagnostics: Diagnostic[] = [{code:'PRODUCT_MISSING_PRICE_STOCK_EXCLUDED',severity:'warning',storeId:'205',table:'products',sourceId:'20',reason:'MISSING_PRICE'}]
+    const rule='MASTER-5.2-PRODUCT-MISSING-PRICE-STOCK'
+    const rows: Row[] = [{table:'products',sourceId:'20',storeId:'205',record:1,disposition:'retained-source',fields:{id:'retained-source',store_id:'retained-source'},fieldRetentionRules:{id:rule,store_id:rule},ownership:{storeId:'205',rule:'SOURCE_STORE_ID'},contributions:[],productExclusion:{productId:'20',reason:forged?'MISSING_STOCK':'MISSING_PRICE'}}]
+    const input=await fixture({rows,diagnostics,products:[{storeId:'205',sourceProductId:'20',emitted:false,targetRef:null,eligibleSkuCount:0,tiers:[],skus:[],errors:['PRODUCT_NOT_EMITTED']}],override:{exporterVersion:'1.8.0',contractSha256:PRODUCT_EXCLUSION_MAPPING_HASH,status:'exported',outcome:correctedOutcome.exportOutcome(diagnostics,0,[])}})
+    const review=correctedOutcome.exportReview(diagnostics,[],[])
+    for(const [name,bytes] of Object.entries({'export-review.json':JSON.stringify(review),'export-review.md':correctedOutcome.reviewMarkdown(review)})){await writeFile(join(input.source,name),bytes);input.manifest.artifacts[name]=digest(bytes)}
+    await input.saveManifest()
+    // Act / Assert
+    if(forged) await expect(prepare(input)).rejects.toThrow('PRODUCT_EXCLUSION_EVIDENCE_INVALID')
+    else {const prepared=await prepare(input);const artifact=await loadImportArtifact(prepared.manifestPath);expect(artifact.blockers).toEqual([])}
   })
 })

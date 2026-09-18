@@ -1,10 +1,11 @@
+import { isProductExclusionDiagnostic } from './product-exclusions'
 import { reviewCategory } from './export-outcome'
 import { z } from 'zod'
 import { SITES_VALID_SITE_TYPES } from '../../ai/site-type'
 import { checksum } from './projection'
 import { MigrationError } from './errors'
 import type { ImportDiagnostic } from './types'
-import { CLASSIFIED_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH, isClassifiedMappingHash } from './classification'
+import { CLASSIFIED_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH, isClassifiedMappingHash } from './classification'
 
 export const migrationPolicySchema = z.object({
   decisionEvidence: z.string().trim().min(1).max(4096),
@@ -29,11 +30,12 @@ interface Context { classificationFinal?: boolean; onTargetCheck?: (diagnostic: 
 function disposition(d: ImportDiagnostic, ctx: Context): Disposition {
   const classified = isClassifiedMappingHash(ctx.contractHash) ? ctx.classify?.(d) : undefined
   if (classified) return classified
+  if (ctx.classificationFinal && ctx.contractHash === PRODUCT_EXCLUSION_MAPPING_HASH && isProductExclusionDiagnostic(d)) return 'APPROVED_POLICY'
   if (d.storeId && ctx.selected && !ctx.selected.has(d.storeId)) return 'OUT_OF_SCOPE'
   if (d.table && pageTables.has(d.table) && pageCodes.has(d.code)) return 'OUT_OF_SCOPE'
-  if ([OUTCOME_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH].includes(ctx.contractHash) && reviewCategory(d) === 'delegated_content') return 'APPROVED_POLICY'
+  if ([OUTCOME_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH].includes(ctx.contractHash) && reviewCategory(d) === 'delegated_content') return 'APPROVED_POLICY'
   if (d.code === 'RAW_SECRET_EXCLUDED' && d.severity === 'warning') return 'INFORMATIONAL'
-  if (![NEW_CONTRACT, CLASSIFIED_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH].includes(ctx.contractHash)) return 'BLOCKED'
+  if (![NEW_CONTRACT, CLASSIFIED_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH].includes(ctx.contractHash)) return 'BLOCKED'
   if (isClassifiedMappingHash(ctx.contractHash) && d.storeId && d.sourceId && d.code === 'ORDER_PAYMENT_METHOD_UNVERIFIED' && d.severity === 'warning' && d.table === 'orders' && d.field === 'payment_method_id' && !d.reason) return 'TARGET_CHECK_REQUIRED'
   if (isClassifiedMappingHash(ctx.contractHash) && d.storeId && d.sourceId && d.code === 'RAW_VALUE_UNVERIFIED' && d.severity === 'blocker' && d.reason === 'UNSAFE_URL' && d.table === 'products' && ['description','description_ms'].includes(d.field ?? '')) return 'TARGET_CHECK_REQUIRED'
   if (isClassifiedMappingHash(ctx.contractHash) && d.code === 'SUBSCRIPTION_CANCEL_FLAG_ABSENT' && d.severity === 'warning' && d.storeId && d.sourceId && d.table === 'plan_subscriptions' && d.field === 'canceled_immediately' && d.reason === 'NO_CANCELLATION_DATE') return 'TARGET_CHECK_REQUIRED'

@@ -1,3 +1,4 @@
+import { isProductExclusionDiagnostic } from './product-exclusions'
 import { z } from 'zod'
 type Diagnostic = { code: string; severity: 'warning' | 'blocker'; storeId?: string; table?: string; sourceId?: string; field?: string; reason?: string }
 
@@ -16,6 +17,7 @@ export function externalArchiveKeys(row: ArchiveRow, selected?: ReadonlySet<stri
   return row.contributions.flatMap(c => c.storeId && (!selected || selected.has(c.storeId)) ? [archiveKey(c.storeId, row.table, row.sourceId)] : [])
 }
 export function reviewCategory(d: Diagnostic, archive: ReadonlySet<string> = new Set(), excluded: ReadonlySet<string> = new Set()): ReviewCategory {
+  if (isProductExclusionDiagnostic(d)) return 'policy_excluded'
   if (d.storeId && excluded.has(d.storeId)) return 'policy_excluded'
   if (d.severity === 'warning' && d.storeId && d.sourceId && (
     (d.code === 'ORDER_PAYMENT_METHOD_UNVERIFIED' && d.table === 'orders' && d.field === 'payment_method_id' && !d.reason) ||
@@ -62,6 +64,7 @@ const actions: Record<ReviewCategory, string> = {
   warning: 'Thông tin hoặc policy đã áp dụng; không chặn export.',
 }
 const guidance: Record<string, string> = {
+  PRODUCT_MISSING_PRICE_STOCK_EXCLUDED: 'Product thiếu giá/stock đã được bỏ theo policy; xem sourceId và reason. Các dòng con chỉ giữ trong CSV có bằng chứng; không tự chặn Store vì Product này.',
   ORDER_PAYMENT_METHOD_UNVERIFIED: 'Importer phải kiểm tra paymentMethod chưa xác định và các giá trị payment được phép; không tự suy ra COD.',
   SUBSCRIPTION_CANCEL_FLAG_ABSENT: 'Importer phải kiểm tra không có ngày hủy và không tự tạo canceledImmediately khi nguồn không có bằng chứng.',
   TARGET_USER_CREATOR_BINDING_REQUIRED: 'Importer bind creator hệ thống sso-service@primeweb.app với User ID đã xác minh; resolve users.createdBy. Không yêu cầu quyết định lại.',
@@ -107,7 +110,7 @@ export function exportReview(diagnostics: readonly Diagnostic[], blocked: string
     if (group.examples.length < 5) group.examples.push({ ...(d.storeId ? { storeId: d.storeId } : {}), ...(d.sourceId ? { sourceId: d.sourceId } : {}) })
   }
   return { version: 1, ...exportOutcome(diagnostics, blocked.length, excluded, archive), blockedStores: blocked, policyExcludedStores: excluded,
-    groups: [...groups.values()].sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category) || b.count - a.count || a.code.localeCompare(b.code)).map(({ stores, ...group }) => ({ ...group, affectedStores: stores.size, action: (group.category === 'data_issue' || group.category === 'import_requirement') ? guidance[group.code] ?? actions[group.category] : actions[group.category] })) }
+    groups: [...groups.values()].sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category) || b.count - a.count || a.code.localeCompare(b.code)).map(({ stores, ...group }) => ({ ...group, affectedStores: stores.size, action: (group.code === 'PRODUCT_MISSING_PRICE_STOCK_EXCLUDED' || group.category === 'data_issue' || group.category === 'import_requirement') ? guidance[group.code] ?? actions[group.category] : actions[group.category] })) }
 }
 export function reviewMarkdown(review: ReturnType<typeof exportReview>): string {
   return `# Kết quả export PW1\n\n- Export: ${review.exportStatus}\n- Dữ liệu: ${review.dataStatus}\n- Import: ${review.importStatus} (chưa kiểm tra DB đích)\n- Store chưa xuất: ${review.blockedStoreCount}; loại theo policy: ${review.policyExcludedStoreCount}.\n\nSố dưới đây là diagnostics, không phải số record mất. Một record có thể xuất hiện nhiều lần. Xem export-review.json để lấy Store/source ID ví dụ; mapping-report.json giữ toàn bộ bằng chứng.\n\n| Nhóm | Mã | Table/field | Reason | Số diagnostics | Số Store | Ví dụ Store/record | Cần làm |\n|---|---|---|---|---:|---:|---|---|\n` + review.groups.map(g => `| ${g.category} | ${g.code} | ${g.table ?? ''}${g.field ? '.' + g.field : ''} | ${g.reason ?? ''} | ${g.count} | ${g.affectedStores} | ${g.examples.map(e => `${e.storeId ?? 'global'}/${e.sourceId ?? '-'}`).join(', ')} | ${g.action} |`).join('\n') + '\n'
