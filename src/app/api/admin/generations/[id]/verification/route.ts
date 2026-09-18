@@ -4,6 +4,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withSuperAdmin } from '@/lib/admin/api-utils'
 
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
 const Body = z.object({ action: z.enum(['start', 'resolve', 'reopen']) }).strict()
 
 /** Operator-only completion of a user-generation support flow. */
