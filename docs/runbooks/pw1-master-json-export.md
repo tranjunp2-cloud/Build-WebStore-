@@ -1,8 +1,25 @@
 # Xuất JSON master từ CSV PW1
 
+## Lệnh ngắn — tạo config và export trong một lần
+
+```sh
+npm run migrate:pw1 -- /path/to/csv --as-of 2026-09-18T00:00:00Z
+```
+
+Thay đường dẫn và mốc đối soát theo snapshot thực tế. Chạy từ root repo.
+Script dùng `configs/migration/pw1-prod-profile.json`, tạo snapshot ID riêng cho lần
+chạy và lưu `source-config.json` cùng `artifact/` trong `.migration/runs/<run-id>/`.
+Mốc asOf không được suy từ tên CSV. Profile mặc định dùng UTC, domain đích dev và
+policy production đã chốt; dữ liệu nguồn khác cần `--profile <file>` phù hợp.
+Có thể thêm `--snapshot-id <id>` để giữ định danh snapshot ổn định khi chạy lại,
+hoặc `--output-dir <new-run-directory>` (thư mục cha có sẵn). Không ghi đè lần cũ.
+Nếu export thất bại, thư mục lần chạy/config có thể còn để kiểm tra; không coi là
+artifact hoàn tất. Lệnh này chỉ export offline, không nhập DB.
+
+
 ## Phạm vi hiện tại
 
-Lệnh `npm run migrate:pw1:export` đọc CSV trực tiếp, tạo master JSON và báo cáo để review. Chạy offline, không bootstrap Payload, không ghi DB và không tải ảnh. `npm run migrate:pw1` để nhập DB chưa thuộc phần này.
+Lệnh `npm run migrate:pw1:export` đọc CSV trực tiếp, tạo master JSON và báo cáo để review. Chạy offline, không bootstrap Payload, không ghi DB và không tải ảnh. `npm run migrate:pw1` là lệnh gọn để tạo config và export, không nhập DB.
 
 **Đây chưa phải chứng nhận hoàn tất mapping hoặc nghiệm thu dữ liệu thật.** Ba collection `subscribers`, `contact-submissions`, `analytics` chưa có nguồn được xác minh và mặc định tạo blocker trong phiên bản hiện tại. Vì vậy một lần export chạy đúng vẫn có thể trả `2`, kể cả dữ liệu còn lại hợp lệ. Không dùng exit `2` làm tín hiệu được nhập DB.
 

@@ -51,6 +51,7 @@
     "measure:variety": "tsx scripts/measure-variety.ts",
     "measure:generation": "tsx scripts/measure-generation-latency.ts",
     "harness:all": "tsx scripts/test-harness/cli.ts --mode=full && tsx scripts/test-harness/check.ts && (playwright test --config=scripts/test-harness/render/playwright.config.ts || true) && tsx scripts/test-harness/render/visual-report.ts; tsx scripts/test-harness/report/generate.ts",
+    "migrate:pw1": "tsx scripts/data/run-pw1-export.ts",
     "migrate:pw1:config": "tsx scripts/data/create-pw1-source-config.ts",
     "migrate:pw1:export": "tsx scripts/data/export-pw1-master.ts",
     "migrate:pw1:audit": "tsx scripts/data/audit-pw1-gaps.ts"

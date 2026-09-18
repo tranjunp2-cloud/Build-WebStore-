@@ -217,3 +217,14 @@ Audit: `.migration/audits/pw1-prod-20260917-approved-001/`; verification và rec
 - [x] AUTO **TC-F42-EXP-083**: Reject contradictory Store ownership, missing/incorrect parent, unknown ownership/retention rules, missing failure diagnostic and cyclic evidence; accept valid child chains and retained orphan evidence with global blockers. Rehashed artifact mutations must still fail classification validation.
 
 - [x] AUTO **TC-F42-EXP-084**: Generate exact CSV selection for a new date from a reusable profile; retain explicit snapshot/asOf and attributes alias; generated config feeds actual exporter. Reject duplicate tables, mixed dates, missing/unexpected tables, invalid filename dates, symlinks, unsafe output and overwrites.
+
+- [x] AUTO **TC-F42-EXP-085**: One-command export uses the default profile, creates unique private output/config, preserves source CSV, supports explicit snapshot/output and propagates needs-review exit status. Reject missing asOf, unsafe output/symlink ancestors, overwrites, missing tables, invalid asOf/profile; help and sanitized errors do not create output.
+
+### One-command CLI verification — 2026-09-18
+
+- Regression: 416 tests across 28 files passed (migration unit tests plus master-export, snapshot-config and one-command CLI integration suites); `tsc --noEmit` passed.
+- Review fix: validate default output ancestors before directory creation so a symlinked `.migration` cannot create directories inside the CSV source. Regression covers this path.
+- Full production snapshot: 93 CSV files, snapshot `20260916-1351-1353`, explicit `asOf=2026-09-16T00:00:00Z`; default profile/output with explicit snapshot ID for comparison. Export completed and independent artifact validation returned `integrityStatus=valid`, `mappingStatus=needs_review`, exit 2.
+- Results unchanged: 2,918 source Stores, 2,799 emitted, 118 blocked, 1 policy-excluded, 107,726 blocker diagnostics. All 9 payload/report files match the prior `pw1-prod-20260917-classification-001` artifact byte-for-byte by SHA-256; manifest matches except the generated source config hash. All 93 source CSV hashes unchanged.
+- This verifies CLI/export equivalence, not full migration readiness: emitted Stores can still have target prerequisites or omitted/unresolved records and fields. Creator/tenant slug prerequisites do not themselves mean records are missing. Rich-text fidelity diagnostics remain in the exporter report even where handling is delegated elsewhere.
+- Private execution evidence and comparison: `.migration/review-20260918/` (ignored by Git); production CSV and generated artifacts are not committed.

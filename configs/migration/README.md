@@ -1,5 +1,22 @@
 # PW1 exporter configs
 
+## Lệnh ngắn — tạo config và export trong một lần
+
+```sh
+npm run migrate:pw1 -- /path/to/csv --as-of 2026-09-18T00:00:00Z
+```
+
+Thay đường dẫn và mốc đối soát theo snapshot thực tế. Chạy từ root repo.
+Script dùng `configs/migration/pw1-prod-profile.json`, tạo snapshot ID riêng cho lần
+chạy và lưu `source-config.json` cùng `artifact/` trong `.migration/runs/<run-id>/`.
+Mốc asOf không được suy từ tên CSV. Profile mặc định dùng UTC, domain đích dev và
+policy production đã chốt; dữ liệu nguồn khác cần `--profile <file>` phù hợp.
+Có thể thêm `--snapshot-id <id>` để giữ định danh snapshot ổn định khi chạy lại,
+hoặc `--output-dir <new-run-directory>` (thư mục cha có sẵn). Không ghi đè lần cũ.
+Nếu export thất bại, thư mục lần chạy/config có thể còn để kiểm tra; không coi là
+artifact hoàn tất. Lệnh này chỉ export offline, không nhập DB.
+
+
 `pw1-prod-20260916.json` selects all 93 CSV files of snapshot
 `20260916-1351-1353` and preserves the approved mapping policies used for
 `pw1-prod-20260917-classification-001`. It is a byte-for-byte copy of that
