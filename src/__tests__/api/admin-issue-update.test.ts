@@ -19,9 +19,9 @@ vi.mock('@/lib/admin/api-utils', () => ({
 import { PATCH } from '@/app/api/admin/issues/[id]/route'
 
 const context = { params: { id: '91' } }
-const request = () => new NextRequest('https://prime.test/api/admin/issues/91', {
+const request = (status = 'done') => new NextRequest('https://prime.test/api/admin/issues/91', {
     method: 'PATCH',
-    body: JSON.stringify({ status: 'done' }),
+    body: JSON.stringify({ status }),
     headers: { 'Content-Type': 'application/json' },
 })
 
@@ -41,15 +41,23 @@ describe('[TC-F41-05] PATCH /api/admin/issues/:id completion handoff', () => {
         ))
     })
 
-    it('marks the linked generation ready for operator verification when a ticket reaches Done', async () => {
-        const response = await PATCH(request(), context)
+    it('marks the linked generation ready for operator verification when Dev marks it fixed', async () => {
+        const response = await PATCH(request('dev_fixed'), context)
 
         expect(response.status).toBe(200)
         expect(mocks.update).toHaveBeenNthCalledWith(1, expect.objectContaining({
-            collection: 'template-issues', data: { status: 'done' },
+            collection: 'template-issues', data: { status: 'dev_fixed' },
         }))
         expect(mocks.update).toHaveBeenNthCalledWith(2, expect.objectContaining({
             collection: 'ai-generation-records', data: { recoveryStatus: 'ticket_verification_required' },
+        }))
+    })
+
+    it('marks the linked generation as being checked when QA Testing starts', async () => {
+        const response = await PATCH(request('testing'), context)
+        expect(response.status).toBe(200)
+        expect(mocks.update).toHaveBeenLastCalledWith(expect.objectContaining({
+            collection: 'ai-generation-records', data: { recoveryStatus: 'operator_verifying' },
         }))
     })
 
