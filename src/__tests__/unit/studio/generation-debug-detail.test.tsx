@@ -127,7 +127,7 @@ describe('[TC-F41-15/16] GenerationDebugDetail', () => {
 
         // Assert
         expect((await screen.findAllByText('Cần Dev xử lý'))[0]).toBeVisible()
-        expect(screen.getByRole('link', { name: 'Mở Issues & feedback' })).toHaveAttribute('href', '/studio/issues')
+        expect(screen.getByRole('button', { name: 'Tạo ticket Dev cho generation #41' })).toBeVisible()
     })
 
     it('TC-F41-20: displays one generation-level impact summary for heterogeneous errors', async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { appendUniqueGenerationRecords, getExportScope, getOperatorStatus, mergePolledGenerationRecords, toDateTimeLocalValue } from '@/app/studio/generations/_components/generations-live-feed'
+import { isIssueUnassigned } from '@/app/studio/issues/_components/issues-list'
 import type { GenerationRecord } from '@/app/studio/generations/_components/generation-types'
 
 function record(id: string): GenerationRecord {
@@ -66,6 +67,12 @@ describe('appendUniqueGenerationRecords', () => {
 })
 
 describe('generation listing presentation guards', () => {
+    it('counts the DEV queue as assigned even though no individual user is stored', () => {
+        expect(isIssueUnassigned({ assignmentTarget: 'dev', assignedTo: null })).toBe(false)
+        expect(isIssueUnassigned({ assignmentTarget: 'unassigned', assignedTo: null })).toBe(true)
+        expect(isIssueUnassigned({ assignedTo: { id: 3 } })).toBe(false)
+    })
+
     it('TC-F41-21: derives an operator-facing status from recovery state and outcome, not queue priority', () => {
         expect(getOperatorStatus({ recoveryStatus: 'ticket_required', lifecycle: 'terminal', outcome: 'failed' }).label).toBe('Cần Dev xử lý')
         expect(getOperatorStatus({ recoveryStatus: 'exhausted', lifecycle: 'terminal', outcome: 'partial_failed' }).label).toBe('Cần Dev xử lý')

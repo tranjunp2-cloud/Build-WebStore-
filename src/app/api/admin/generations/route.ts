@@ -12,7 +12,7 @@ import { resolveGenerationPriority, serializeAdminGeneration, type GenerationLis
 const Query = z.object({
     view: z.enum(['needs_attention', 'all']).default('needs_attention'),
     status: z.enum(['running', 'success', 'failed', 'all']).default('all'),
-    recoveryStatus: z.enum(['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'stale_running', 'all']).default('all'),
+    recoveryStatus: z.enum(['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'ticket_verification_required', 'stale_running', 'all']).default('all'),
     search: z.string().trim().max(120).default(''), userId: z.string().trim().max(100).default(''), siteId: z.string().trim().max(100).default(''),
     dateFrom: z.string().datetime().optional(), dateTo: z.string().datetime().optional(),
     cursor: z.string().max(500).optional(), limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -34,6 +34,10 @@ const ATTENTION_BUCKETS: Bucket[] = [
         where: {
             or: [
                 { recoveryStatus: { equals: 'ticket_required' } },
+                // A ticket in Done has been returned to the operator for a
+                // verification pass, so it must remain visible in the default
+                // Needs Attention queue rather than only in the all-history view.
+                { recoveryStatus: { equals: 'ticket_verification_required' } },
                 { and: [{ recoveryStatus: { equals: 'exhausted' } }, { outcome: { in: ['succeeded', 'cancelled'] } }] },
                 { and: [{ recoveryStatus: { equals: 'exhausted' } }, { outcome: { exists: false } }] },
             ],

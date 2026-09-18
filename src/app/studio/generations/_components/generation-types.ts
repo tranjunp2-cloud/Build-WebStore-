@@ -8,6 +8,7 @@ export type GenerationRecord = {
     lifecycle: 'queued' | 'running' | 'terminal'
     outcome: 'succeeded' | 'partial_failed' | 'failed' | 'cancelled' | null
     recoveryStatus: string
+    ticketRelatedGenerationId: string
     priority: string
     recoveryPolicy: { action: RecoveryAction; retryable: boolean; reasonCode: string }
     pageSummary: { expected: number | null; persisted: number; failed: number }

@@ -12,19 +12,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type {
-    IssueCategory,
-    IssueRecord,
-    IssueRelatedType,
-    IssueSeverity,
-    RuntimePromotionInput,
-} from '@/app/studio/issues/_components/issue-types'
+import type { IssueRecord, IssueRelatedType, IssueSeverity, IssueStatus, RuntimePromotionInput } from '@/app/studio/issues/_components/issue-types'
 import { IssueMarkdown } from '@/app/studio/issues/_components/issue-markdown'
 
 type Props = {
     onClose: () => void
     onCreated?: (issue?: IssueRecord, created?: boolean) => void
-    /** Pre-fill relation context (from template/generation drawers) */
+    /** Board columns can create directly into their own stage. Not user-editable here. */
+    defaultStatus?: IssueStatus
+    /** Context callers may attach a ticket silently without exposing ID inputs. */
     defaultRelatedType?: IssueRelatedType
     defaultRelatedId?: string
     /** Runtime promotion sends provider identity only; evidence is refetched server-side. */
@@ -38,40 +34,60 @@ const SEVERITY_OPTIONS: { value: IssueSeverity; label: string }[] = [
     { value: 'low', label: 'Low' },
 ]
 
-const CATEGORY_OPTIONS: { value: IssueCategory; label: string }[] = [
-    { value: 'accessibility', label: 'Accessibility' },
-    { value: 'performance', label: 'Performance' },
-    { value: 'content', label: 'Content' },
-    { value: 'ui', label: 'UI' },
-    { value: 'ai-quality', label: 'AI Quality' },
-    { value: 'other', label: 'Other' },
-]
+const BUG_REPORT_TEMPLATE = `# Bug Report: [Mô tả ngắn gọn lỗi]
 
-const RELATED_TYPE_OPTIONS: { value: Exclude<IssueRelatedType, 'runtime'>; label: string }[] = [
-    { value: 'template', label: 'Template' },
-    { value: 'generation', label: 'Generation' },
-    { value: 'block', label: 'Block' },
-]
+**Bug ID:** BUG-FXX-XXX
+**Feature/Module:** FXX – [Tên feature]
+**Environment:** Staging / Production
+**Browser/Device:** Chrome xx / macOS / Desktop
+**Tester:** @username
+**Date:** YYYY-MM-DD
+**Severity:** Critical / High / Medium / Low
+**Priority:** P0 / P1 / P2 / P3
+
+### Preconditions
+- Người dùng đã đăng nhập với role: …
+- Có dữ liệu: …
+
+### Steps to Reproduce
+1. Truy cập \`...\`
+2. Thực hiện \`...\`
+3. Nhấn \`...\`
+
+### Actual Result
+Mô tả chính xác hành vi hiện tại.
+
+### Expected Result
+Mô tả hành vi đúng theo yêu cầu/Acceptance Criteria.
+
+### Evidence
+- Screenshot/video: [link]
+- Console error: [nếu có]
+- Network/API response: [nếu có]
+
+### Impact
+- Ảnh hưởng đến: người dùng/chức năng/dữ liệu nào?
+- Tần suất: Always / Intermittent / Once
+- Có workaround không: Có / Không`
 
 export function CreateIssueModal({
     onClose,
     onCreated,
+    defaultStatus,
     defaultRelatedType,
     defaultRelatedId,
     runtimePromotion,
 }: Props) {
     const [title, setTitle] = useState(runtimePromotion?.title ?? '')
-    const [description, setDescription] = useState('')
+    const [description, setDescription] = useState(runtimePromotion ? '' : BUG_REPORT_TEMPLATE)
     const [severity, setSeverity] = useState<IssueSeverity>(runtimePromotion?.severity ?? 'medium')
-    const [category, setCategory] = useState<IssueCategory>('other')
-    const [relatedType, setRelatedType] = useState<IssueRelatedType>(defaultRelatedType ?? 'template')
-    const [relatedId, setRelatedId] = useState(defaultRelatedId ?? '')
+    const [assignmentTarget, setAssignmentTarget] = useState<'unassigned' | 'dev'>('unassigned')
     const [previewMd, setPreviewMd] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     const canSubmit = title.trim().length > 0
-        && (runtimePromotion ? runtimePromotion.providerId.length > 0 : relatedId.trim().length > 0)
+        && (runtimePromotion ? runtimePromotion.providerId.length > 0 : description.trim().length > 0)
 
     async function handleSubmit() {
         if (!canSubmit) return
@@ -93,9 +109,11 @@ export function CreateIssueModal({
                         title: title.trim(),
                         description: description.trim() || undefined,
                         severity,
-                        category,
-                        relatedType,
-                        relatedId: relatedId.trim(),
+                        status: defaultStatus ?? 'backlog',
+                        ...(defaultRelatedType && defaultRelatedId && defaultRelatedType !== 'runtime' && defaultRelatedType !== 'manual'
+                            ? { relatedType: defaultRelatedType, relatedId: defaultRelatedId }
+                            : {}),
+                        assignmentTarget,
                     }),
             })
             if (!res.ok) {
@@ -114,17 +132,17 @@ export function CreateIssueModal({
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="issue-create-dialog">
                 <DialogHeader>
-                    <DialogTitle>{runtimePromotion ? 'Create tracked issue' : 'Report issue'}</DialogTitle>
+                    <DialogTitle>{runtimePromotion ? 'Create tracked issue' : 'Tạo ticket bug'}</DialogTitle>
                     <DialogDescription>
                         {runtimePromotion
                             ? 'Review the title and severity. Prime refetches safe provider evidence when you submit.'
-                            : 'Add an issue to the existing tracking workflow.'}
+                            : 'Điền theo mẫu Bug Report để Dev có thể tái hiện và xử lý ngay.'}
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-2">
+                <div className="issue-create-form">
                     {runtimePromotion && (
                         <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
                             <div className="flex flex-wrap items-center gap-2">
@@ -138,21 +156,21 @@ export function CreateIssueModal({
 
                     {/* Title */}
                     <div className="space-y-1.5">
-                        <Label htmlFor="ci-title">Title <span className="text-destructive">*</span></Label>
+                            <Label htmlFor="ci-title">Tiêu đề lỗi <span className="text-destructive">*</span></Label>
                         <Input
                             id="ci-title"
                             name="issue-title"
                             autoComplete="off"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Brief description of the issue…"
+                            placeholder="Ví dụ: Không thể lưu website sau khi tạo trang Liên hệ"
                             className="min-h-11 text-base sm:text-sm"
                             maxLength={300}
                         />
                     </div>
 
-                    {/* Severity + Category */}
-                    <div className={`grid gap-3 ${runtimePromotion ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {/* Manual ticket: severity plus an optional developer owner. */}
+                    <div className={`issue-create-grid ${runtimePromotion ? 'issue-create-grid-single' : ''}`}>
                         <div className="space-y-1.5">
                             <Label htmlFor="ci-severity">Severity</Label>
                             <select
@@ -167,57 +185,26 @@ export function CreateIssueModal({
                         </div>
                         {!runtimePromotion && (
                             <div className="space-y-1.5">
-                                <Label htmlFor="ci-category">Category</Label>
+                                <Label htmlFor="ci-assignee">Người phụ trách</Label>
                                 <select
-                                    id="ci-category"
-                                    name="issue-category"
-                                    value={category}
-                                    onChange={(e) => setCategory(e.target.value as IssueCategory)}
+                                    id="ci-assignee"
+                                    name="issue-assignee"
+                                    value={assignmentTarget}
+                                    onChange={(e) => setAssignmentTarget(e.target.value as 'unassigned' | 'dev')}
                                     className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-1 text-base sm:text-sm"
                                 >
-                                    {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    <option value="unassigned">Chưa phân công</option>
+                                    <option value="dev">DEV</option>
                                 </select>
                             </div>
                         )}
                     </div>
 
-                    {/* Related entity */}
-                    {!runtimePromotion && (
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                                <Label htmlFor="ci-related-type">Related to</Label>
-                                <select
-                                    id="ci-related-type"
-                                    name="issue-related-type"
-                                    value={relatedType}
-                                    onChange={(e) => setRelatedType(e.target.value as IssueRelatedType)}
-                                    disabled={!!defaultRelatedType}
-                                    className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-1 text-base disabled:opacity-60 sm:text-sm"
-                                >
-                                    {RELATED_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                </select>
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor="ci-related-id">ID / Slug <span className="text-destructive">*</span></Label>
-                                <Input
-                                    id="ci-related-id"
-                                    name="issue-related-id"
-                                    autoComplete="off"
-                                    value={relatedId}
-                                    onChange={(e) => setRelatedId(e.target.value)}
-                                    placeholder="e.g. 42 or block-slug…"
-                                    className="min-h-11 text-base sm:text-sm"
-                                    disabled={!!defaultRelatedId}
-                                />
-                            </div>
-                        </div>
-                    )}
-
                     {/* Description with markdown preview toggle */}
                     {!runtimePromotion && (
                         <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
-                                <Label htmlFor="ci-desc">Description</Label>
+                            <Label htmlFor="ci-desc">Bug report <span className="text-destructive">*</span></Label>
                                 <button
                                     type="button"
                                     onClick={() => setPreviewMd((p) => !p)}
@@ -242,7 +229,7 @@ export function CreateIssueModal({
                                         autoComplete="off"
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
-                                        placeholder="Describe the issue… (markdown supported)"
+                                        placeholder="Mô tả lỗi theo template… (Markdown hỗ trợ)"
                                         className="text-base sm:text-sm"
                                         rows={4}
                                         maxLength={10000}
@@ -254,14 +241,14 @@ export function CreateIssueModal({
 
                     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
-                    <div className="flex justify-end gap-2 pt-2">
+                    <div className="issue-create-actions">
                         <Button variant="outline" type="button" onClick={onClose} disabled={loading}>
-                            Cancel
+                            Hủy
                         </Button>
                         <Button type="button" onClick={handleSubmit} disabled={loading || !canSubmit}>
                             {loading
-                                ? runtimePromotion ? 'Creating…' : 'Reporting…'
-                                : runtimePromotion ? 'Create tracked issue' : 'Report issue'}
+                                ? runtimePromotion ? 'Đang tạo…' : 'Đang tạo…'
+                                : runtimePromotion ? 'Tạo tracked issue' : 'Tạo ticket'}
                         </Button>
                     </div>
                 </div>

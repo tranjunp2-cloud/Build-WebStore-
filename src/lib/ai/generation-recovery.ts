@@ -49,6 +49,26 @@ function hasValidSnapshot(parent: RecoveryParent) {
     return hashGenerationSnapshot(parent.inputSnapshot) === parent.inputHash
 }
 
+function isActiveRecoveryJob(job: RecoveryJob) {
+    return job.status === 'queued' || job.status === 'running'
+}
+
+/**
+ * An active recovery job is authoritative. Reconcile its source generation so
+ * every subsequent list refresh shows the monitor state instead of another
+ * retry CTA. Deliberately let a failed write surface to the caller: reporting
+ * a harmless conflict while leaving the parent stale would invite duplicate
+ * operator actions.
+ */
+async function markParentRetrying(payload: RecoveryPayload, parentId: string | number) {
+    await payload.update({
+        collection: 'ai-generation-records',
+        id: parentId,
+        overrideAccess: true,
+        data: { recoveryStatus: 'retrying' },
+    })
+}
+
 /**
  * Creates only durable retry state. It deliberately never invokes an AI route
  * or reconstructs user input from promptText; the cron worker owns execution.
@@ -72,7 +92,14 @@ export async function queueGenerationRecovery(
     const sameRequest = existing.docs[0] as RecoveryJob | undefined
     const sameChildId = sameRequest ? relationId(sameRequest.childGeneration) : undefined
     if (sameRequest && sameChildId !== undefined) {
-        return { kind: 'accepted', jobId: String(sameRequest.id), parentGenerationId: String(parent.id), childGenerationId: String(sameChildId), idempotent: true }
+        if (isActiveRecoveryJob(sameRequest)) {
+            await markParentRetrying(payload, parent.id)
+            return { kind: 'accepted', jobId: String(sameRequest.id), parentGenerationId: String(parent.id), childGenerationId: String(sameChildId), idempotent: true }
+        }
+        // A delayed replay of a completed request must not overwrite the
+        // worker's terminal parent state with `retrying`. The browser uses a
+        // fresh key for a new retry; this key can only represent the old job.
+        return { kind: 'error', code: 'NOT_RETRYABLE', message: 'Lần yêu cầu gen lại trước đã kết thúc. Hãy tải lại generation để xem kết quả mới nhất.' }
     }
 
     const active = await payload.find({
@@ -81,7 +108,10 @@ export async function queueGenerationRecovery(
         limit: 1, depth: 0, overrideAccess: true,
     })
     const activeChildId = relationId((active.docs[0] as RecoveryJob | undefined)?.childGeneration)
-    if (activeChildId !== undefined) return { kind: 'conflict', childGenerationId: String(activeChildId) }
+    if (activeChildId !== undefined) {
+        await markParentRetrying(payload, parent.id)
+        return { kind: 'conflict', childGenerationId: String(activeChildId) }
+    }
 
     if (parent.lifecycle !== 'terminal' || resolveGenerationRecoveryPolicy(parent as Parameters<typeof resolveGenerationRecoveryPolicy>[0]).action !== 'retry_website') {
         return { kind: 'error', code: 'NOT_RETRYABLE', message: 'Generation này chưa đủ điều kiện gen lại.' }
@@ -124,12 +154,15 @@ export async function queueGenerationRecovery(
             limit: 1, depth: 0, overrideAccess: true,
         })
         const activeChildRecord = activeChild.docs[0] as { id?: string | number } | undefined
-        if (activeChildRecord?.id !== undefined) return { kind: 'conflict', childGenerationId: String(activeChildRecord.id) }
+        if (activeChildRecord?.id !== undefined) {
+            await markParentRetrying(payload, parent.id)
+            return { kind: 'conflict', childGenerationId: String(activeChildRecord.id) }
+        }
         const raced = await payload.find({ collection: 'generation_recovery_jobs', where: { and: [{ sourceGeneration: { equals: parent.id } }, { status: { in: ['queued', 'running'] } }] }, limit: 1, depth: 0, overrideAccess: true })
         const racedChildId = relationId((raced.docs[0] as RecoveryJob | undefined)?.childGeneration)
-        return racedChildId === undefined
-            ? { kind: 'error', code: 'NOT_RETRYABLE', message: 'Chưa thể xếp hàng gen lại. Vui lòng thử lại.' }
-            : { kind: 'conflict', childGenerationId: String(racedChildId) }
+        if (racedChildId === undefined) return { kind: 'error', code: 'NOT_RETRYABLE', message: 'Chưa thể xếp hàng gen lại. Vui lòng thử lại.' }
+        await markParentRetrying(payload, parent.id)
+        return { kind: 'conflict', childGenerationId: String(racedChildId) }
     }
 
     try {
@@ -137,7 +170,7 @@ export async function queueGenerationRecovery(
             collection: 'generation_recovery_jobs', overrideAccess: true,
             data: { tenant, sourceGeneration: parent.id, childGeneration: child.id, requestedBy: input.requestedBy, idempotencyKey: input.idempotencyKey, retryAttempt: (parent.retryAttempt ?? 0) + 1, status: 'queued', queuedAt: now, attemptCount: 0 },
         })
-        await payload.update({ collection: 'ai-generation-records', id: parent.id, overrideAccess: true, data: { recoveryStatus: 'retrying' } })
+        await markParentRetrying(payload, parent.id)
         return { kind: 'accepted', jobId: String(job.id), parentGenerationId: String(parent.id), childGenerationId: String(child.id), idempotent: false }
     } catch {
         // Never leave a false-success child if durable dispatch could not be recorded.

@@ -81,6 +81,23 @@ describe('GET /api/admin/generations', () => {
         }
     })
 
+    it('TC-F41-06: keeps a Done ticket in Needs Attention for operator verification', async () => {
+        // Arrange — Done means Dev has finished, not that the operator has
+        // verified the repaired website. This record must not disappear.
+        findSpy.mockResolvedValue({ docs: [
+            fixture('verification', 'ticket_verification_required', '2026-09-15T12:00:00.000Z'),
+        ] })
+
+        // Act
+        const response = await GET(request())
+        const body = await response.json()
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(body.items.map((item: { id: string }) => item.id)).toEqual(['verification'])
+        expect(JSON.stringify(findSpy.mock.calls[0]?.[0].where)).toContain('ticket_verification_required')
+    })
+
     it('TC-F41-07: returns only safe list fields, including for a document with raw legacy fields', async () => {
         // Arrange
         findSpy.mockResolvedValue({ docs: [fixture('safe', 'eligible', '2026-09-15T10:00:00.000Z', {
