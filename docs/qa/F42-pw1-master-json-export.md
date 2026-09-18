@@ -250,3 +250,8 @@ Audit: `.migration/audits/pw1-prod-20260917-approved-001/`; verification và rec
 - [x] AUTO TC-F42-EXP-095: Recover option definitions from eligible SKU selection rows with verified live same-Store attribute/value ownership; no SKU synthesis or source mutation; retain definition contributions; missing/foreign/deleted/mis-parented definitions and true duplicate tuples stay blocked; incomplete tuples are not falsely reported as duplicate.
 
 - [x] AUTO TC-F42-EXP-096: Product thiếu price/stock bỏ có warning và evidence Product/dòng con; validator reject evidence giả, Product còn emit, sai Store/parent; số sai và ownership lỗi vẫn blocker; zero vẫn giữ.
+
+
+## Kiểm tra phạm vi PR — 18/09/2026
+
+TC-F42-069: cập nhật kỳ vọng CLI creator-sidecar từ exit 2 lịch sử sang exit 0, integrity valid nhưng data partial/import not_verified theo contract 1.8.0. Chạy riêng integration user-actors artifact + gap audit CLI: 10 tests / 2 files PASS. Đây là hai suite bổ sung cho 513 tests / 33 files đã chạy; không thay full-source acceptance.

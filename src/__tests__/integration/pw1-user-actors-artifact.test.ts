@@ -48,8 +48,11 @@ describe('[TC-F42-069] Hashed creator sidecar artifact', () => {
     expect(registry.actors).toHaveLength(1)
     expect(master).toHaveLength(3)
     expect(master[0].users[0].createdBy).toBe('@users:users:51')
-    expect(result.code, result.stderr).toBe(2)
-    expect(result.stdout).toContain('valid')
+    expect(result.code, result.stderr).toBe(0)
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      integrityStatus: 'valid', mappingStatus: 'partial',
+      outcome: { exportStatus: 'succeeded', dataStatus: 'partial', importStatus: 'not_verified' },
+    })
   })
   it('rejects modified sidecar hash', async () => {
     // Arrange
