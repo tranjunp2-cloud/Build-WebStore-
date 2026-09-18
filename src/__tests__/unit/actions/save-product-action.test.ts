@@ -122,19 +122,39 @@ describe('getProductsAction [TC-GH1432-PERF-01]', () => {
         mockFind.mockResolvedValue({ docs: [{ id: 42, name: 'Test Product' }] })
     })
 
-    it('loads only list/quick-view fields without a pagination count query', async () => {
+    it('loads list/quick-view fields across all authorized product pages', async () => {
+        // Arrange: the legacy array caller must receive records beyond the first 100.
+        const firstPage = Array.from({ length: 100 }, (_, index) => ({ id: index + 1, name: `Product ${index + 1}` }))
+        const lastPage = [{ id: 101, name: 'Product 101' }]
+        mockFind.mockResolvedValueOnce({ docs: firstPage, totalPages: 2 })
+            .mockResolvedValueOnce({ docs: lastPage, totalPages: 2 })
+
+        // Act
         const result = await getProductsAction()
 
-        expect(result).toEqual([{ id: 42, name: 'Test Product' }])
-        expect(mockFind).toHaveBeenCalledOnce()
+        // Assert
+        expect(result).toEqual([...firstPage, ...lastPage])
+        expect(mockFind).toHaveBeenCalledTimes(2)
+        for (const [index, [pageQuery]] of mockFind.mock.calls.entries()) {
+            expect(pageQuery).toMatchObject({
+                page: index + 1,
+                user: { id: 'u1', email: 'test@example.com' },
+                overrideAccess: false,
+                pagination: true,
+                limit: 100,
+                sort: ['-createdAt', '-id'],
+                where: { and: [{ deletedAt: { exists: false } }, { tenant: { equals: 68 } }] },
+            })
+        }
 
         const query = mockFind.mock.calls[0][0]
         expect(query).toMatchObject({
             collection: 'products',
             overrideAccess: false,
             limit: 100,
-            pagination: false,
-            sort: '-createdAt',
+            pagination: true,
+            page: 1,
+            sort: ['-createdAt', '-id'],
             depth: 1,
             where: {
                 and: [
