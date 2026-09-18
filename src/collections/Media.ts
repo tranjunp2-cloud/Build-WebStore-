@@ -2,7 +2,7 @@ import { basename, resolve } from 'path'
 
 import type { AccessArgs, CollectionConfig, PayloadHandler } from 'payload'
 import { APIError } from 'payload'
-import { hasValidImageSignature } from '@/lib/media/image-signature'
+import { hasValidEvidenceVideoSignature, hasValidImageSignature } from '@/lib/media/image-signature'
 
 // Plan 260415 fix-500 — custom handler for /api/media/file/[filename] that
 // survives missing-on-disk errors. Payload's default getFileHandler calls
@@ -94,17 +94,24 @@ export const Media: CollectionConfig = {
         beforeChange: [
             async ({ req }) => {
                 if (!req.file) return
-                // Only validate image uploads — skip PDF/video
+                // Images are always validated. Ticket evidence additionally
+                // permits MP4/WebM, so validate those container headers too
+                // rather than trusting a browser-supplied MIME type.
                 const mime = req.file.mimetype || ''
-                if (!mime.startsWith('image/')) return
+                const validatesImage = mime.startsWith('image/')
+                const validatesEvidenceVideo = mime === 'video/mp4' || mime === 'video/webm'
+                if (!validatesImage && !validatesEvidenceVideo) return
                 try {
-                    // Read 12 bytes to cover WebP signature at offset 8–11
+                    // Twelve bytes cover WebP at offset 8–11 and MP4's ftyp box.
                     const raw = req.file.data instanceof Buffer
                         ? req.file.data.subarray(0, 12)
                         : new Uint8Array(req.file.data as unknown as ArrayBufferLike).slice(0, 12)
                     const head = new Uint8Array(raw)
-                    if (!hasValidImageSignature(head)) {
-                        throw new APIError('Invalid image file — only JPEG, PNG, WebP, and ICO are accepted', 400)
+                    const valid = validatesImage ? hasValidImageSignature(head) : hasValidEvidenceVideoSignature(head, mime)
+                    if (!valid) {
+                        throw new APIError(validatesImage
+                            ? 'Invalid image file — only JPEG, PNG, WebP, and ICO are accepted'
+                            : 'Invalid video file — only valid MP4 and WebM are accepted', 400)
                     }
                 } catch (e) {
                     if (e instanceof APIError) throw e

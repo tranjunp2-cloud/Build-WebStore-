@@ -72,7 +72,7 @@ services:
 
   # ── MinIO (S3-compatible Object Storage) ───────────────────────────────
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     container_name: primeweb-storage
     ports:
       - "9000:9000" # API
@@ -89,7 +89,7 @@ services:
 
   # ── MinIO Bucket Setup (runs once) ────────────────────────────────────
   minio-setup:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     container_name: primeweb-storage-setup
     depends_on:
       - minio
