@@ -2660,8 +2660,13 @@
 .issue-ticket-editor-intro b { color: var(--text); font-size: 14px; }
 .issue-ticket-editor-intro span { color: var(--text-2); font-size: 12px; line-height: 1.45; }
 .issue-ticket-editor label { display: flex; flex-direction: column; gap: 6px; color: var(--text); font-size: 12px; font-weight: 700; }
-.issue-ticket-editor input, .issue-ticket-editor textarea { width: 100%; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--bg-elev); color: var(--text); font: inherit; font-size: 13px; font-weight: 400; line-height: 1.55; padding: 9px 10px; }
+.issue-ticket-editor input:not(.sr-only), .issue-ticket-editor textarea { width: 100%; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--bg-elev); color: var(--text); font: inherit; font-size: 13px; font-weight: 400; line-height: 1.55; padding: 9px 10px; }
 .issue-ticket-editor textarea { resize: vertical; min-height: 360px; font-family: var(--mono); }
+.issue-ticket-editor-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.issue-ticket-editor-attach { min-height: 30px; border: 0; border-radius: 5px; background: transparent; color: var(--text-2); cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; }
+.issue-ticket-editor-attach:hover:not(:disabled) { color: var(--accent); }
+.issue-ticket-editor-attach:disabled { cursor: not-allowed; opacity: .6; }
+.issue-ticket-editor-evidence { margin: -7px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.4; }
 .issue-ticket-editor-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 8px; margin: 0 -2px -2px; padding: 14px 2px 2px; border-top: 1px solid var(--border); background: var(--bg-elev); }
 .issue-report-layout { display: grid; gap: 12px; padding: 2px 0 18px; }
 .issue-report-overview, .issue-report-section { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); padding: 15px 16px; }

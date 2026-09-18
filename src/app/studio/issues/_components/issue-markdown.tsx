@@ -28,9 +28,18 @@ function MarkdownBody({ content }: { content: string }) {
         <ReactMarkdown
             rehypePlugins={[[rehypeSanitize, SANITIZE_SCHEMA]]}
             components={{
-                a: ({ href, children }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>{children}</a>
-                ),
+                a: ({ href, children }) => {
+                    const isVideo = typeof href === 'string' && /\.(mp4|webm)(?:[?#].*)?$/i.test(href)
+                    return isVideo ? (
+                        <span style={{ display: 'grid', gap: 6 }}>
+                            <video controls preload="metadata" style={{ width: 'min(100%, 640px)', borderRadius: 6, background: '#111' }}>
+                                <source src={href} />
+                                Trình duyệt không hỗ trợ phát video này.
+                            </video>
+                            <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>{children}</a>
+                        </span>
+                    ) : <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>{children}</a>
+                },
                 code: ({ children }) => (
                     <code style={{ background: 'var(--bg-sunk)', borderRadius: 3, padding: '1px 5px', fontSize: 12, fontFamily: 'monospace' }}>{children}</code>
                 ),

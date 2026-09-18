@@ -6,7 +6,7 @@
  *
  * Fetches full record on open. Supports inline status/severity/assignee change.
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ChangeEvent, type ClipboardEvent } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { SeverityPill } from './severity-pill'
@@ -14,6 +14,7 @@ import { IssueStatusBadge } from './issue-status-badge'
 import { IssueMarkdown } from './issue-markdown'
 import { IssueCommentThread } from './issue-comment-thread'
 import { IssueTimeline } from './issue-timeline'
+import { addEvidenceMedia, EVIDENCE_MEDIA_ACCEPT, uploadIssueEvidence } from './issue-evidence-media'
 import type { IssueRecord, IssueStatus, IssueSeverity } from './issue-types'
 
 type Props = {
@@ -43,6 +44,8 @@ export function IssueDetailDrawer({ issue, onClose, onUpdated }: Props) {
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
+    const [evidenceError, setEvidenceError] = useState<string | null>(null)
+    const [uploadingEvidence, setUploadingEvidence] = useState(false)
     const [editing, setEditing] = useState(false)
     const [draftTitle, setDraftTitle] = useState('')
     const [draftDescription, setDraftDescription] = useState('')
@@ -50,6 +53,8 @@ export function IssueDetailDrawer({ issue, onClose, onUpdated }: Props) {
     // rapid select changes cannot race and overwrite each other's result.
     const savingRef = useRef(false)
     const detailsRequestRef = useRef(0)
+    const evidenceInputRef = useRef<HTMLInputElement>(null)
+    const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
     useEffect(() => {
         let cancelled = false
@@ -80,7 +85,41 @@ export function IssueDetailDrawer({ issue, onClose, onUpdated }: Props) {
         setDraftTitle(displayed.title)
         setDraftDescription(displayed.description ?? '')
         setSaveError(null)
+        setEvidenceError(null)
         setEditing(true)
+    }
+
+    async function uploadEvidence(media: File) {
+        if (draftDescription.length > 9_400) {
+            setEvidenceError('Bug report gần đầy. Hãy rút ngắn nội dung trước khi đính kèm bằng chứng.')
+            return
+        }
+        setEvidenceError(null)
+        setUploadingEvidence(true)
+        try {
+            const uploaded = await uploadIssueEvidence(media, draftTitle)
+            setDraftDescription((current) => addEvidenceMedia(current, uploaded.url, uploaded.type))
+            requestAnimationFrame(() => descriptionRef.current?.focus())
+        } catch (error) {
+            setEvidenceError(error instanceof Error ? error.message : 'Không thể tải tệp. Hãy thử lại.')
+        } finally {
+            setUploadingEvidence(false)
+        }
+    }
+
+    async function handleEvidencePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+        const media = Array.from(event.clipboardData.items)
+            .find((item) => item.kind === 'file' && EVIDENCE_MEDIA_ACCEPT.split(',').includes(item.type))
+            ?.getAsFile()
+        if (!media) return
+        event.preventDefault()
+        await uploadEvidence(media)
+    }
+
+    async function handleEvidenceFileChange(event: ChangeEvent<HTMLInputElement>) {
+        const media = event.target.files?.[0]
+        event.target.value = ''
+        if (media) await uploadEvidence(media)
     }
 
     async function saveTicketContent() {
@@ -214,9 +253,17 @@ export function IssueDetailDrawer({ issue, onClose, onUpdated }: Props) {
                             <input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} maxLength={300} disabled={saving} />
                         </label>
                         <label>
-                            Nội dung Bug Report (Markdown)
-                            <textarea value={draftDescription} onChange={(event) => setDraftDescription(event.target.value)} maxLength={10000} rows={18} disabled={saving} />
+                            <span className="issue-ticket-editor-label-row">
+                                Nội dung Bug Report (Markdown)
+                                <span>
+                                    <input ref={evidenceInputRef} type="file" accept={EVIDENCE_MEDIA_ACCEPT} className="sr-only" onChange={handleEvidenceFileChange} />
+                                    <button type="button" className="issue-ticket-editor-attach" onClick={() => evidenceInputRef.current?.click()} disabled={saving || uploadingEvidence}>Đính kèm ảnh/video</button>
+                                </span>
+                            </span>
+                            <textarea ref={descriptionRef} value={draftDescription} onChange={(event) => setDraftDescription(event.target.value)} onPaste={handleEvidencePaste} maxLength={10000} rows={18} disabled={saving || uploadingEvidence} />
                         </label>
+                        <p className="issue-ticket-editor-evidence" aria-live="polite">{uploadingEvidence ? 'Đang tải bằng chứng…' : 'Dán hoặc đính kèm ảnh JPG/PNG/WebP (tối đa 5MB) hay video MP4/WebM (tối đa 20MB).'}</p>
+                        {evidenceError && <p role="alert" className="issue-triage-error">{evidenceError}</p>}
                         <div className="issue-ticket-editor-actions">
                             <button type="button" className="btn btn-sm" onClick={() => setEditing(false)} disabled={saving}>Hủy</button>
                             <button type="button" className="btn btn-sm btn-primary" onClick={saveTicketContent} disabled={saving || !draftTitle.trim()}>{saving ? 'Đang lưu…' : 'Lưu ticket'}</button>

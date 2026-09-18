@@ -6,7 +6,7 @@
  * category, relatedType, relatedId.
  * Submits → POST /api/admin/issues
  */
-import { useState } from 'react'
+import { useRef, useState, type ChangeEvent, type ClipboardEvent } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { IssueRecord, IssueRelatedType, IssueSeverity, IssueStatus, RuntimePromotionInput } from '@/app/studio/issues/_components/issue-types'
 import { IssueMarkdown } from '@/app/studio/issues/_components/issue-markdown'
+import { addEvidenceMedia, EVIDENCE_MEDIA_ACCEPT, uploadIssueEvidence } from '@/app/studio/issues/_components/issue-evidence-media'
 
 type Props = {
     onClose: () => void
@@ -84,7 +85,11 @@ export function CreateIssueModal({
     const [assignmentTarget, setAssignmentTarget] = useState<'unassigned' | 'dev'>('unassigned')
     const [previewMd, setPreviewMd] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [uploadingEvidence, setUploadingEvidence] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [evidenceError, setEvidenceError] = useState<string | null>(null)
+    const descriptionRef = useRef<HTMLTextAreaElement>(null)
+    const evidenceInputRef = useRef<HTMLInputElement>(null)
 
     const canSubmit = title.trim().length > 0
         && (runtimePromotion ? runtimePromotion.providerId.length > 0 : description.trim().length > 0)
@@ -128,6 +133,40 @@ export function CreateIssueModal({
             setError(err instanceof Error ? err.message : 'Create failed')
             setLoading(false)
         }
+    }
+
+    async function uploadEvidence(media: File) {
+        setEvidenceError(null)
+        if (description.length > 9_400) {
+            setEvidenceError('Bug report gần đầy. Hãy rút ngắn nội dung trước khi đính kèm bằng chứng.')
+            return
+        }
+        setUploadingEvidence(true)
+        try {
+            const uploaded = await uploadIssueEvidence(media, title)
+            setDescription((current) => addEvidenceMedia(current, uploaded.url, uploaded.type))
+            setPreviewMd(false)
+            requestAnimationFrame(() => descriptionRef.current?.focus())
+        } catch (err) {
+            setEvidenceError(err instanceof Error ? err.message : 'Không thể tải tệp. Hãy thử lại.')
+        } finally {
+            setUploadingEvidence(false)
+        }
+    }
+
+    async function handleEvidencePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+        const media = Array.from(event.clipboardData.items)
+            .find((item) => item.kind === 'file' && EVIDENCE_MEDIA_ACCEPT.split(',').includes(item.type))
+            ?.getAsFile()
+        if (!media) return
+        event.preventDefault()
+        await uploadEvidence(media)
+    }
+
+    async function handleEvidenceFileChange(event: ChangeEvent<HTMLInputElement>) {
+        const media = event.target.files?.[0]
+        event.target.value = ''
+        if (media) await uploadEvidence(media)
     }
 
     return (
@@ -203,15 +242,21 @@ export function CreateIssueModal({
                     {/* Description with markdown preview toggle */}
                     {!runtimePromotion && (
                         <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-2">
                             <Label htmlFor="ci-desc">Bug report <span className="text-destructive">*</span></Label>
-                                <button
-                                    type="button"
-                                    onClick={() => setPreviewMd((p) => !p)}
-                                    className="min-h-11 px-2 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                    {previewMd ? 'Edit' : 'Preview'}
-                                </button>
+                                <div className="flex items-center gap-1">
+                                    <input ref={evidenceInputRef} type="file" accept={EVIDENCE_MEDIA_ACCEPT} className="sr-only" onChange={handleEvidenceFileChange} />
+                                    <button type="button" onClick={() => evidenceInputRef.current?.click()} disabled={uploadingEvidence} className="min-h-11 px-2 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                        Đính kèm ảnh/video
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPreviewMd((p) => !p)}
+                                        className="min-h-11 px-2 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        {previewMd ? 'Edit' : 'Preview'}
+                                    </button>
+                                </div>
                             </div>
                             {previewMd
                                 ? (
@@ -225,10 +270,12 @@ export function CreateIssueModal({
                                 : (
                                     <Textarea
                                         id="ci-desc"
+                                        ref={descriptionRef}
                                         name="issue-description"
                                         autoComplete="off"
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
+                                        onPaste={handleEvidencePaste}
                                         placeholder="Mô tả lỗi theo template… (Markdown hỗ trợ)"
                                         className="text-base sm:text-sm"
                                         rows={4}
@@ -236,6 +283,10 @@ export function CreateIssueModal({
                                     />
                                 )
                             }
+                            <p className="text-xs text-muted-foreground" aria-live="polite">
+                                {uploadingEvidence ? 'Đang tải bằng chứng…' : 'Dán hoặc đính kèm ảnh JPG/PNG/WebP (tối đa 5MB) hay video MP4/WebM (tối đa 20MB).'}
+                            </p>
+                            {evidenceError && <p role="alert" className="text-sm text-destructive">{evidenceError}</p>}
                         </div>
                     )}
 
