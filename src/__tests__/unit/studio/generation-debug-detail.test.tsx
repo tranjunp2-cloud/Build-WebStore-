@@ -71,6 +71,19 @@ describe('[TC-F41-15/16] GenerationDebugDetail', () => {
         expect(screen.queryByText('Thông tin kỹ thuật phục vụ Dev debug')).not.toBeInTheDocument()
     })
 
+    it('keeps rendering a legacy page when its component snapshot is omitted', async () => {
+        // Arrange: captures created before F41 do not contain the components field.
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: detail }), { status: 200 })))
+
+        // Act
+        render(<GenerationDebugDetail generationId="41" />)
+
+        // Assert
+        await screen.findByRole('heading', { name: 'Trang và component' })
+        fireEvent.click(document.querySelector('.f41-page-disclosure summary')!)
+        expect(screen.getByText('Trang chưa được lưu nên chưa có component để hiển thị.')).toBeVisible()
+    })
+
     it('shows technical evidence only when the generation contains useful debug data', async () => {
         // Arrange
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { ...detail, durationMs: 1250, incident: { ...detail.incident, developerEvidence: { phase: 'page_persist', technicalMessage: 'Normalized diagnostic: PAGE_FAILED (timeout).' } } } }), { status: 200 })))
