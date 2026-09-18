@@ -124,6 +124,7 @@ export const Categories: CollectionConfig = {
                         }
                         depth++
                         const candidateDoc = await req.payload.findByID({
+                            req,
                             collection: 'categories',
                             id: candidateId,
                             user: req.user,
@@ -156,6 +157,7 @@ export const Categories: CollectionConfig = {
 
                 if (data?.tenant && data?.site) {
                     const siteDoc = await req.payload.findByID({
+                        req,
                         collection: 'sites',
                         id: data.site,
                         overrideAccess: true,
@@ -187,6 +189,7 @@ export const Categories: CollectionConfig = {
                         : undefined
                     if (data.site != null && String(data.site) !== String(originalSiteId ?? '')) {
                         const siteCheck = await req.payload.find({
+                            req,
                             collection: 'sites',
                             where: { id: { equals: data.site }, tenant: { equals: safeTenantId } },
                             limit: 1,
@@ -203,6 +206,7 @@ export const Categories: CollectionConfig = {
                     }
                     if (!data.site && data.tenant && req.payload) {
                         const siteRes = await req.payload.find({
+                            req,
                             collection: 'sites',
                             where: { tenant: { equals: data.tenant } },
                             limit: 1,
@@ -225,6 +229,7 @@ export const Categories: CollectionConfig = {
                 const effectiveParentId = unwrapRelationId(rawParent)
                 if (effectiveParentId) {
                     const parentDoc = await req.payload.findByID({
+                        req,
                         collection: 'categories',
                         id: effectiveParentId,
                         user: req.user,

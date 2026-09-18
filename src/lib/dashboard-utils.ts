@@ -288,8 +288,8 @@ const LEGACY_STAT_NAMES = new Set(['views', 'leads', 'engagement', 'revenue'])
  *  2. legacy stat-name data (views/leads/engagement) → reset to DEFAULT (granularity changed)
  *  3. otherwise: keep valid block IDs in saved order, drop unknowns + duplicates
  */
-export function normalizeDashboardBlocks(raw: string[] | null | undefined): DashboardBlockId[] {
-    if (!raw || raw.length === 0) return [...DEFAULT_DASHBOARD_BLOCKS]
+export function normalizeDashboardBlocks(raw: unknown): DashboardBlockId[] {
+    if (!Array.isArray(raw) || raw.length === 0) return [...DEFAULT_DASHBOARD_BLOCKS]
 
     // Old stat-level prefs → reset (blocks are section-level now)
     if (raw.some(item => LEGACY_STAT_NAMES.has(item))) return [...DEFAULT_DASHBOARD_BLOCKS]

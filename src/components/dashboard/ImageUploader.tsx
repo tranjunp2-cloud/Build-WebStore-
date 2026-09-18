@@ -42,7 +42,7 @@ export function ImageUploader({
     maxSizeMB = 5,
     className,
     label = 'Product Images',
-    description = `Upload up to 5 images (Max ${maxSizeMB}MB each. JPG, PNG, WEBP)`,
+    description = `Upload up to ${maxImages} images (Max ${maxSizeMB}MB each. JPG, PNG, WEBP)`,
     variant = 'square',
     placeholderText = 'Upload',
     showAltInput = false,
@@ -179,7 +179,7 @@ export function ImageUploader({
                     <p className="text-xs text-gray-500 mt-1">{description}</p>
                 </div>
                 <span className="text-xs font-medium text-gray-400">
-                    {value.length} / {maxImages}
+                    {value.length}{Number.isFinite(maxImages) ? ` / ${maxImages}` : ''}
                 </span>
             </div>
 

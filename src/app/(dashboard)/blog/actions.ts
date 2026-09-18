@@ -377,13 +377,13 @@ export async function saveBlogAction(data: {
         body.tenant = tenantId
         body.site = siteId
 
-        // Auto-suffix slug if duplicate exists within same site
+        // Auto-suffix slug if duplicate exists within same tenant
         let slug = body.slug
         let suffix = 0
         while (true) {
             const existing = await payload.find({
                 collection: 'blogs',
-                where: { slug: { equals: slug }, site: { equals: siteId } },
+                where: { slug: { equals: slug }, tenant: { equals: tenantId } },
                 limit: 1,
             })
             if (existing.docs.length === 0) break

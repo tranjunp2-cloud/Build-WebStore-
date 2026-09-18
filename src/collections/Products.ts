@@ -1,5 +1,7 @@
 import type { CollectionConfig, CollectionAfterChangeHook, FieldHook, CollectionBeforeChangeHook } from 'payload'
 import { APIError } from 'payload'
+import { validateProductImages } from '@/lib/products/image-limit-validation'
+import { MAX_PRODUCT_IMAGES } from '@/lib/products/image-limit'
 import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import slugify from 'slugify'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
@@ -12,7 +14,7 @@ import {
 
 const STABLE_AI_DRAFT_SLUG_PATTERN = /-ai-[a-f0-9]{32}$/
 
-const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc, data, req }) => {
+export const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc, data, req, operation }) => {
     // If client supplied a value, use it (or slugify it)
     let baseSlug = ''
     if (typeof value === 'string' && value.trim().length > 0) {
@@ -34,6 +36,12 @@ const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc,
         return baseSlug
     }
 
+    const relation = req.user && !req.user.roles?.includes('super-admin')
+        ? (originalDoc?.tenant ?? req.user.tenants?.[0]?.tenant)
+        : (data?.tenant ?? originalDoc?.tenant ?? (operation === 'create' ? req.user?.tenants?.[0]?.tenant : undefined))
+    const tenantId = typeof relation === 'object' ? relation?.id : relation
+    if (!tenantId) return baseSlug // Required tenant validation rejects unresolved ownership.
+
     let slug = baseSlug
     let count = 1
     let isUnique = false
@@ -41,9 +49,11 @@ const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc,
     // Check uniqueness (BR-03: Duplicate product name cho phép, slug auto-increments)
     while (!isUnique) {
         const existing = await req.payload.find({
+            req,
             collection: 'products',
             where: {
                 slug: { equals: slug },
+                tenant: { equals: tenantId },
                 ...(originalDoc?.id ? { id: { not_equals: originalDoc.id } } : {})
             },
             limit: 1,
@@ -270,6 +280,7 @@ function getTenantIds(user: unknown): (string | number)[] {
 
 export const Products: CollectionConfig = {
     slug: 'products',
+    indexes: [{ fields: ['tenant', 'slug'], unique: true }],
     hooks: {
         beforeChange: [beforeChangeHook, publishGateHook],
         afterChange: [afterChangeHook, lowStockHook, revalidateBadgeCountsAfterChange],
@@ -361,7 +372,6 @@ export const Products: CollectionConfig = {
             name: 'slug',
             type: 'text',
             required: true,
-            unique: true,
             index: true,
             hooks: {
                 beforeValidate: [formatSlug('name')],
@@ -381,8 +391,7 @@ export const Products: CollectionConfig = {
         {
             name: 'shortDescription',
             type: 'textarea',
-            maxLength: 300,
-            admin: { description: 'Short description for cards and SEO (max 300 chars)' },
+            admin: { description: 'Short description for cards and SEO' },
         },
         {
             name: 'price',
@@ -418,7 +427,8 @@ export const Products: CollectionConfig = {
         {
             name: 'images',
             type: 'array',
-            maxRows: 5,
+            maxRows: MAX_PRODUCT_IMAGES,
+            validate: validateProductImages,
             fields: [
                 {
                     name: 'image',
@@ -432,7 +442,7 @@ export const Products: CollectionConfig = {
                     admin: { description: 'Alt text for accessibility and SEO' },
                 },
             ],
-            admin: { description: 'Product images (Max 5, <= 5MB each)' },
+            admin: { description: 'Product images (Max 5 new images, <= 5MB each; existing larger galleries are preserved)' },
         },
         {
             name: 'category',
