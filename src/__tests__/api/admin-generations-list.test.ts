@@ -81,6 +81,15 @@ describe('GET /api/admin/generations', () => {
         }
     })
 
+    it('TC-F41-monitoring: excludes internal SEO captures from the website-generation queue', async () => {
+        findSpy.mockResolvedValue({ docs: [fixture('site', 'eligible', '2026-09-15T10:00:00.000Z')] })
+
+        const response = await GET(request('?view=all'))
+
+        expect(response.status).toBe(200)
+        expect(JSON.stringify(findSpy.mock.calls[0]?.[0].where)).toContain('"endpoint":{"equals":"site-generator"}')
+    })
+
     it('TC-F41-06: keeps a Done ticket in Needs Attention for operator verification', async () => {
         // Arrange — Done means Dev has finished, not that the operator has
         // verified the repaired website. This record must not disappear.

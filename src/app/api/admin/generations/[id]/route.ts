@@ -9,6 +9,17 @@ import { withSuperAdmin } from '@/lib/admin/api-utils'
 import { serializeAdminGenerationDetail, type GenerationDetailSource, type GenerationRecoveryJobDetailSource } from '@/lib/ai/generation-recovery-policy'
 
 type RouteContext = { params: Promise<{ id: string }> }
+type PersistedPage = { id: string | number; title?: string | null; slug?: string | null; layout?: Array<Record<string, unknown>> | null }
+const COMPONENT_CONTENT_FIELDS: Array<[string, string]> = [['headline', 'Tiêu đề'], ['subheadline', 'Tiêu đề phụ'], ['sectionLabel', 'Nhãn section'], ['title', 'Tiêu đề'], ['description', 'Mô tả'], ['content', 'Nội dung'], ['ctaText', 'Nút CTA'], ['buttonText', 'Nút CTA']]
+
+function persistedPageComponents(page: PersistedPage) {
+    return (Array.isArray(page.layout) ? page.layout : []).slice(0, 100).map((block, index) => ({
+        order: index + 1,
+        type: typeof block.blockType === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(block.blockType) ? block.blockType : 'unknown',
+        label: typeof block.headline === 'string' ? block.headline.slice(0, 160) : typeof block.sectionLabel === 'string' ? block.sectionLabel.slice(0, 160) : typeof block.title === 'string' ? block.title.slice(0, 160) : null,
+        fields: COMPONENT_CONTENT_FIELDS.flatMap(([key, label]) => typeof block[key] === 'string' && block[key].trim() ? [[label, block[key].trim().slice(0, 240)] as [string, string]] : []),
+    }))
+}
 
 function isNotFoundError(error: unknown) {
     if (!error || typeof error !== 'object') return false
@@ -67,7 +78,15 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
                 sort: '-queuedAt',
                 overrideAccess: true,
             })
-            return NextResponse.json({ data: serializeAdminGenerationDetail(record, history.docs as unknown as GenerationDetailSource[], jobs.docs as unknown as GenerationRecoveryJobDetailSource[]) })
+            const detail = serializeAdminGenerationDetail(record, history.docs as unknown as GenerationDetailSource[], jobs.docs as unknown as GenerationRecoveryJobDetailSource[])
+            const siteId = detail.website.id
+            const persisted = siteId ? await payload.find({ collection: 'pages', where: { site: { equals: siteId } }, depth: 0, limit: 100, pagination: false, overrideAccess: true }) : { docs: [] }
+            const persistedById = new Map((persisted.docs as unknown as PersistedPage[]).map((page) => [String(page.id), page]))
+            const pages = detail.pages.map((page) => {
+                const persistedPage = page.pageId ? persistedById.get(String(page.pageId)) : undefined
+                return { ...page, components: persistedPage ? persistedPageComponents(persistedPage) : [] }
+            })
+            return NextResponse.json({ data: { ...detail, pages } })
         } catch (error) {
             console.error('[generation-detail] failed to serialize safe detail', { generationId: numericId, error: error instanceof Error ? error.name : 'unknown' })
             return NextResponse.json({ error: 'Unable to load generation detail' }, { status: 500 })
