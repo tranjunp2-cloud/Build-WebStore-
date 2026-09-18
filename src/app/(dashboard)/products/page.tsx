@@ -26,7 +26,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
+import { TablePagination, shouldShowTablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -36,7 +36,7 @@ import { Tabs, TabsList, TabsTrigger, TabsCount } from '@/components/ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
-import { getProductsAction, updateProductFieldAction } from './actions'
+import { getProductsPageAction, updateProductFieldAction } from './actions'
 import { getAiCategoriesAction, getCategoriesAction, type AiCategoryOption } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
 import { getMissingFields } from '@/lib/products/missing-fields'
@@ -181,6 +181,7 @@ export default function ProductsPage() {
     const [aiModalPrompt, setAiModalPrompt] = useState('')
     const [isPreparingAi, setIsPreparingAi] = useState(false)
     const productsLoadRequestId = useRef(0)
+    const initialProductsLoadComplete = useRef(false)
     const aiTextareaRef = useRef<HTMLTextAreaElement>(null)
     const aiPromptComposingRef = useRef(false)
     useAutoResizeTextarea(aiTextareaRef, aiPrompt, 160, t.dashboard.products.list.aiChatPlaceholder)
@@ -191,6 +192,10 @@ export default function ProductsPage() {
     const [showLowStock, setShowLowStock] = useState<boolean>(false)
     const [mounted, setMounted] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage, setItemsPerPage] = useState(10)
+    const [refreshVersion, setRefreshVersion] = useState(0)
+    const [totalProducts, setTotalProducts] = useState(0)
+    const [statusCounts, setStatusCounts] = useState({ all: 0, active: 0, draft: 0, archived: 0 })
 
     const SORT_OPTIONS = [
         'Latest',
@@ -218,9 +223,10 @@ export default function ProductsPage() {
     const [quickViewProduct, setQuickViewProduct] = useState<DetailedProduct | null>(null)
 
     useEffect(() => {
-        loadProducts()
+        const timer = setTimeout(() => { void loadProducts({ showSkeleton: !initialProductsLoadComplete.current, refreshCategories: !initialProductsLoadComplete.current }) }, searchQuery ? 250 : 0)
+        return () => { clearTimeout(timer); productsLoadRequestId.current++ }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    }, [currentPage, itemsPerPage, filterStatus, searchQuery, showLowStock, saleStatus, selectedCategories, sortBy, refreshVersion])
 
     const loadProducts = async ({
         showSkeleton = true,
@@ -242,9 +248,12 @@ export default function ProductsPage() {
             : Promise.resolve<Category[] | null>(null)
 
         try {
-            const fetchedDocs = await getProductsAction()
+            const result = await getProductsPageAction({ page: currentPage, limit: itemsPerPage, status: filterStatus, search: searchQuery, lowStock: showLowStock, sale: saleStatus, categories: selectedCategories, sort: sortBy })
             if (requestId !== productsLoadRequestId.current) return
-            setProducts(fetchedDocs as Product[])
+            setProducts(result.docs as Product[])
+            setTotalProducts(result.totalDocs)
+            setStatusCounts(result.counts)
+            setCurrentPage(result.page)
 
             void categoriesRequest.then(loadedCategories => {
                 if (requestId === productsLoadRequestId.current && loadedCategories) {
@@ -262,7 +271,10 @@ export default function ProductsPage() {
                 },
             })
         } finally {
-            if (showSkeleton && requestId === productsLoadRequestId.current) setIsLoading(false)
+            if (requestId === productsLoadRequestId.current) {
+                initialProductsLoadComplete.current = true
+                if (showSkeleton) setIsLoading(false)
+            }
         }
     }
 
@@ -275,67 +287,11 @@ export default function ProductsPage() {
         setShowLowStock(false)
         setIsAdvancedFiltersOpen(false)
         setCurrentPage(1)
-        void loadProducts({ showSkeleton: false, refreshCategories: false })
+        setRefreshVersion(value => value + 1)
     }
 
-    const filteredAndSortedProducts = products
-        .filter(p => {
-            if (filterStatus !== 'all' && p.status !== filterStatus) {
-                return false
-            }
-            if (searchQuery) {
-                const query = searchQuery.toLowerCase()
-                const matchesName = p.name.toLowerCase().includes(query)
-                const matchesSku = p.sku?.toLowerCase().includes(query)
-                if (!matchesName && !matchesSku) return false
-            }
-            if (showLowStock && (p.inventory === undefined || p.inventory > 5)) {
-                return false
-            }
-            if (saleStatus === 'On Sale' && (!p.compareAtPrice || p.compareAtPrice <= p.price)) {
-                return false
-            }
-            if (saleStatus === 'Regular Price' && p.compareAtPrice && p.compareAtPrice > p.price) {
-                return false
-            }
-            if (selectedCategories.length > 0) {
-                if (!p.category || p.category.length === 0) return false
-                const catNames = p.category.map((c: Category | string) => typeof c === 'object' && c ? c.name : c)
-                const hasMatch = selectedCategories.some(selected => catNames.includes(selected))
-                if (!hasMatch) return false
-            }
-            return true
-        })
-        .sort((a, b) => {
-            switch (sortBy) {
-                case 'Latest':
-                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                case 'Oldest':
-                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-                case 'Price: Low > High':
-                    return getDisplayPrice(a).value - getDisplayPrice(b).value
-                case 'Price: High > Low':
-                    return getDisplayPrice(b).value - getDisplayPrice(a).value
-                case 'Inventory: Low > High':
-                    return (a.inventory || 0) - (b.inventory || 0)
-                default:
-                    return 0
-            }
-        })
-
-    // Rows-per-page stateful so the DS TablePagination selector ([10,25,50,100]) works (GH-1290 Bug 4)
-    const [itemsPerPage, setItemsPerPage] = useState(10)
-    const paginatedProducts = filteredAndSortedProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    const paginatedProducts = products
     const handleLimitChange = (n: number) => { setItemsPerPage(n); setCurrentPage(1) }
-    // GH-1579: snap back when deletions strand currentPage past the last page
-    useTablePageClamp(currentPage, filteredAndSortedProducts.length, itemsPerPage, setCurrentPage)
-
-    const statusCounts = {
-        all: products.length,
-        active: products.filter(p => p.status === 'active').length,
-        draft: products.filter(p => p.status === 'draft').length,
-        archived: products.filter(p => p.status === 'archived').length,
-    }
 
     const handleCreateAi = async () => {
         const prompt = aiPrompt.trim()
@@ -409,6 +365,7 @@ export default function ProductsPage() {
         try {
             await updateProductFieldAction(prod.id, { status: newStatus })
             toast.success(`${t.dashboard.products.form.successMarkedAs} ${newStatus}`)
+            void loadProducts({ showSkeleton: false, refreshCategories: false })
         } catch (e: unknown) {
             const blockedFields = parsePublishBlockedError(e)
             if (blockedFields) {
@@ -451,6 +408,7 @@ export default function ProductsPage() {
 
             // Wait for transition before unmounting modal completely if we want, but closing immediately is also fine
             setProductToDelete(null)
+            void loadProducts({ showSkeleton: false, refreshCategories: false })
 
             // If the deleted product is currently being previewed, close the preview
             if (quickViewProduct?.id === prod.id) {
@@ -495,7 +453,7 @@ export default function ProductsPage() {
     }
 
     // Empty state without filtering
-    const isTotallyEmpty = products.length === 0 && !isLoading
+    const isTotallyEmpty = statusCounts.all === 0 && !isLoading
 
     return (
         <div className="space-y-6 pb-20">
@@ -889,14 +847,14 @@ export default function ProductsPage() {
                             font + padding so the columns fit; no minWidth floor → table-fixed w-full
                             always fits the pane (no horizontal scroll on iPad Pro with sidebar open).
                             At >=1280 the compact class is a no-op → desktop byte-identical. --- */}
-                        {filteredAndSortedProducts.length > 0 && (
+                        {totalProducts > 0 && (
                             <div className="hidden min-[820px]:block">
                                 <Table
                                     className="table-fixed w-full dash-table-compact"
-                                    footer={shouldShowTablePagination(filteredAndSortedProducts.length) ? (
+                                    footer={shouldShowTablePagination(totalProducts) ? (
                                         <TablePagination
                                             page={currentPage}
-                                            total={filteredAndSortedProducts.length}
+                                            total={totalProducts}
                                             limit={itemsPerPage}
                                             onPageChange={setCurrentPage}
                                             onLimitChange={handleLimitChange}
@@ -1239,7 +1197,7 @@ export default function ProductsPage() {
                         </div>
 
                         {/* Empty state — filters produced no results (GH-1222 DS) */}
-                        {filteredAndSortedProducts.length === 0 && (
+                        {totalProducts === 0 && (
                             <TableEmptyState
                                 icon={<SearchX />}
                                 title={t.dashboard.products.list.noResults}
@@ -1248,11 +1206,11 @@ export default function ProductsPage() {
 
                         {/* Card-view Pagination (< 820px) — pairs with the card list; the table's own
                             pager lives in its footer slot from iPad Air up. */}
-                        {shouldShowTablePagination(filteredAndSortedProducts.length) && (
+                        {shouldShowTablePagination(totalProducts) && (
                             <div className="min-[820px]:hidden py-4">
                                 <TablePagination
                                     page={currentPage}
-                                    total={filteredAndSortedProducts.length}
+                                    total={totalProducts}
                                     limit={itemsPerPage}
                                     onPageChange={setCurrentPage}
                                     onLimitChange={handleLimitChange}

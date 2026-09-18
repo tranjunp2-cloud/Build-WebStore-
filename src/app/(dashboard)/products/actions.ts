@@ -14,7 +14,7 @@ import {
     CATEGORY_LOCK_BUSY_ERROR,
     withActiveCategoryRowLock,
 } from '@/lib/payload/category-row-lock'
-import { findDashboardProducts } from '@/lib/products/dashboard-product-list'
+import { findDashboardProducts, findDashboardProductPage } from '@/lib/products/dashboard-product-list'
 
 // NOTE: This check is best-effort, fast-path UX — two limitations apply:
 //   1. NOT concurrent-safe on its own: two parallel saves with the same SKU can both pass this
@@ -128,6 +128,13 @@ async function findConflictingSkus(
         if (typeof row.sku !== 'string') return []
         return [submittedSkuByNormalized.get(row.sku) ?? row.sku]
     })
+}
+
+export async function getProductsPageAction(input: unknown = {}) {
+    const user = await getCurrentUser()
+    if (!user) throw new Error('Unauthorized')
+    const payload = await getPayload({ config: configPromise })
+    return JSON.parse(JSON.stringify(await findDashboardProductPage(payload, user, input)))
 }
 
 export async function getProductsAction() {
