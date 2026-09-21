@@ -125,7 +125,7 @@ export const AiGenerationRecords: CollectionConfig = {
         },
         {
             name: 'recoveryStatus', type: 'select', index: true,
-            options: ['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'ticket_verification_required', 'stale_running'],
+            options: ['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'ticket_verification_required', 'operator_verifying', 'operator_resolved', 'stale_running'],
             admin: { description: 'Operations recovery state; do not infer from error text in UI' },
         },
         {

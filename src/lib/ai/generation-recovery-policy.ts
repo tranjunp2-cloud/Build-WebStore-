@@ -3,7 +3,7 @@ import { sanitizeGenerationEvidence, SERVER_INCIDENT_CODES } from './generation-
 
 export type GenerationRecoveryStatus =
     | 'none' | 'eligible' | 'retrying' | 'exhausted'
-    | 'ticket_required' | 'ticket_created' | 'ticket_verification_required' | 'stale_running' | null | undefined
+    | 'ticket_required' | 'ticket_created' | 'ticket_verification_required' | 'operator_verifying' | 'operator_resolved' | 'stale_running' | null | undefined
 
 export type GenerationLifecycle = 'queued' | 'running' | 'terminal' | null | undefined
 export type GenerationOutcome = 'succeeded' | 'partial_failed' | 'failed' | 'cancelled' | null | undefined
@@ -103,6 +103,7 @@ export function resolveGenerationRecoveryPolicy(record: Pick<GenerationListSourc
     switch (record.recoveryStatus) {
         case 'ticket_created': return { action: 'open_ticket', retryable: false, reasonCode: 'TICKET_CREATED' }
         case 'ticket_verification_required': return { action: 'open_ticket', retryable: false, reasonCode: 'TICKET_VERIFICATION_REQUIRED' }
+        case 'operator_verifying': return { action: 'open_ticket', retryable: false, reasonCode: 'OPERATOR_VERIFYING' }
         case 'ticket_required':
         case 'exhausted': return { action: 'create_ticket', retryable: false, reasonCode: 'TICKET_REQUIRED' }
         case 'retrying': return { action: 'monitor', retryable: false, reasonCode: 'RETRY_IN_PROGRESS' }
@@ -114,7 +115,7 @@ export function resolveGenerationRecoveryPolicy(record: Pick<GenerationListSourc
 
 export function resolveGenerationPriority(record: Pick<GenerationListSource, 'lifecycle' | 'outcome' | 'recoveryStatus'>): GenerationPriority {
     if (record.recoveryStatus === 'ticket_required') return 'cannot_recover'
-    if (record.recoveryStatus === 'ticket_verification_required') return 'cannot_recover'
+    if (record.recoveryStatus === 'ticket_verification_required' || record.recoveryStatus === 'operator_verifying') return 'cannot_recover'
     if (record.recoveryStatus === 'exhausted') return record.outcome === 'failed' || record.outcome === 'partial_failed' ? 'retry_failed' : 'cannot_recover'
     if (record.recoveryStatus === 'eligible') return 'retryable'
     if (record.recoveryStatus === 'retrying') return 'retrying'

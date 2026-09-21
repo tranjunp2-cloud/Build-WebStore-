@@ -64,14 +64,19 @@ export const PATCH = withSuperAdmin(async (req: NextRequest, ctx) => {
         return NextResponse.json({ error: 'Update failed' }, { status: 500 })
     }
 
-    // “Done” means Dev completed its workflow. Return the related generation
-    // to the operator queue for a human verification pass. The issue update
+    // Dev Fixed and QA Testing expose the operator workflow early. Done never
+    // resolves the user by itself: the operator must explicitly confirm it.
+    // The issue update
     // and the generation update are separate Payload writes, so compensate the
     // ticket if the second write fails instead of persisting a false Done.
     if (parsed.data.status !== undefined && before?.relatedType === 'generation' && before.status !== doc.status) {
-        const targetRecoveryStatus = doc.status === 'done'
+        const targetRecoveryStatus = doc.status === 'dev_fixed'
             ? 'ticket_verification_required'
-            : before.status === 'done' ? 'ticket_created' : null
+            : doc.status === 'testing'
+                ? 'operator_verifying'
+                : doc.status === 'done'
+                    ? (before.status === 'testing' ? null : 'ticket_verification_required')
+                    : ['dev_fixed', 'testing', 'done'].includes(before.status) ? 'ticket_created' : null
         if (targetRecoveryStatus) {
             try {
                 await payload.update({
