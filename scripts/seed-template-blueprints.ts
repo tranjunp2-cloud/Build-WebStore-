@@ -96,7 +96,12 @@ async function main() {
     }
 }
 
-main().catch((error: unknown) => {
-    console.error('[templates:seed] Failed:', error)
-    process.exitCode = 1
-})
+// Force explicit exit — payload.destroy() sometimes leaves Neon serverless
+// sockets or Sentry flush handles open, blocking the event loop and hanging
+// the build for 5-17 minutes (see plans/260921-1629-GH-15-deploy-cold-build-perf).
+main()
+    .then(() => process.exit(0))
+    .catch((error: unknown) => {
+        console.error('[templates:seed] Failed:', error)
+        process.exit(1)
+    })
