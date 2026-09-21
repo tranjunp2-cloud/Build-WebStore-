@@ -5556,6 +5556,23 @@ const MIGRATIONS = [
     name: 'categories.drop_image_id',
     sql: `ALTER TABLE categories DROP COLUMN IF EXISTS image_id;`,
   },
+  // ── F41 US-F41-05: safe enum values for operator resolution workflow ──
+  {
+    name: 'enum_ai_generation_records_recovery_status.operator_verifying',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ai_generation_records_recovery_status') THEN
+        ALTER TYPE enum_ai_generation_records_recovery_status ADD VALUE IF NOT EXISTS 'operator_verifying';
+      END IF;
+    END $$;`,
+  },
+  {
+    name: 'enum_ai_generation_records_recovery_status.operator_resolved',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ai_generation_records_recovery_status') THEN
+        ALTER TYPE enum_ai_generation_records_recovery_status ADD VALUE IF NOT EXISTS 'operator_resolved';
+      END IF;
+    END $$;`,
+  },
 ];
 
 async function runMigrations(pool) {
