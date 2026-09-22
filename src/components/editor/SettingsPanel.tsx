@@ -22,6 +22,7 @@ import type { HeroConfig } from '@/blocks/hero/config'
 import FaqSettings from './FaqSettings'
 import TeamSettings from './TeamSettings'
 import LogoCloudSettings from './LogoCloudSettings'
+import PortfolioGridSettings from './PortfolioGridSettings'
 import PricingSettings from './PricingSettings'
 import FeatureComparisonSettings from './FeatureComparisonSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
@@ -34,6 +35,7 @@ import type { MenuCategory, MenuItem } from '@/blocks/menu-food/config'
 import type { FAQConfig } from '@/blocks/faq/config'
 import type { TeamConfig } from '@/blocks/team/config'
 import type { LogoCloudConfig } from '@/blocks/logo-cloud/config'
+import type { PortfolioGridConfig } from '@/blocks/portfolio-grid/config'
 import type { PricingConfig } from '@/blocks/pricing/config'
 import { SETTINGS_PANEL_WIDTH } from './layout-constants'
 import type { PageData } from '@/store/editorStore'
@@ -2948,6 +2950,14 @@ function SettingsPanelInner({
                             {bt === 'logo-cloud' && block && (
                                 <LogoCloudSettings
                                     block={block as LogoCloudConfig}
+                                    blockIndex={currentBlockIndex}
+                                    onBlockUpdate={onBlockUpdate}
+                                />
+                            )}
+
+                            {bt === 'portfolio-grid' && block && (
+                                <PortfolioGridSettings
+                                    block={block as unknown as PortfolioGridConfig}
                                     blockIndex={currentBlockIndex}
                                     onBlockUpdate={onBlockUpdate}
                                 />

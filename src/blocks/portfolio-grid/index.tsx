@@ -11,6 +11,7 @@ import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
 import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 void _CSS_VARS
 
@@ -43,9 +44,15 @@ type ProjectCardProps = {
 }
 
 function ProjectCard({ project, className = '', imageIndex, uploadField }: ProjectCardProps) {
-    const Wrapper = project.linkUrl ? 'a' : 'div'
-    const linkProps = project.linkUrl
-        ? { href: project.linkUrl, target: '_blank' as const, rel: 'noopener noreferrer' }
+    // Internal (/path, #anchor, mailto:, tel:) → same tab, resolved via useLocalHref so
+    // /products?... hits /sites/{slug}/products?... in local dev (custom domains keep it as-is).
+    // External http(s) / protocol-relative → new tab + noopener (same rule as cta/getLinkAttrs).
+    const resolveHref = useLocalHref()
+    const linkUrl = project.linkUrl
+    const isExternal = !!linkUrl && (/^https?:\/\//.test(linkUrl) || linkUrl.startsWith('//'))
+    const Wrapper = linkUrl ? 'a' : 'div'
+    const linkProps = linkUrl
+        ? { href: resolveHref(linkUrl), ...(isExternal ? { target: '_blank' as const, rel: 'noopener noreferrer' } : {}) }
         : {}
     return (
         <Wrapper {...linkProps} className={`group relative overflow-hidden rounded-2xl block ${className}`}>
@@ -130,6 +137,10 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
                         key={cat === null ? 'all-projects' : `category:${cat}`}
                         aria-pressed={selectedCategory === cat}
                         type="button"
+                        // Filter pills are derived UI — "All" is hardcoded, category labels come from
+                        // projects[].category. Inline-editing them would no-op ("All") or silently
+                        // rewrite only the first matching project's category. Edit via settings panel.
+                        data-no-text-edit
                         onClick={() => setActiveCategory(cat)}
                         className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${TOUCH_TARGET.min}`}
                         style={selectedCategory === cat
