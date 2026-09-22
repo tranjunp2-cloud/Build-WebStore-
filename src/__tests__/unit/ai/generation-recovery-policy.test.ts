@@ -312,4 +312,49 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
         expect(details.map((detail) => detail.incident?.cause.code)).toEqual(['AI_QUOTA_EXCEEDED', 'INVALID_TEMPLATE_CONTRACT', 'INVALID_COMPONENT_CONTRACT'])
         expect(details.map((detail) => detail.incident?.developerEvidence)).toEqual([null, null, null])
     })
+
+    it('TC-F41-28: resolves public live URL for published sites via tenant slug when custom domain is not set', () => {
+        // Arrange
+        const source = record({
+            site: { id: 'site-526', name: 'Ice Cube Store', domain: null, status: 'published' },
+            tenant: { id: 'tenant-1', slug: 'hello-guy' },
+        }) as GenerationDetailSource
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.website.urls.preview).toBe('/preview/site-526')
+        expect(detail.website.urls.live).toBeTruthy()
+        expect(detail.website.urls.live).toContain('hello-guy')
+    })
+
+    it('TC-F41-28: keeps live URL null for draft sites without custom domain', () => {
+        // Arrange
+        const source = record({
+            site: { id: 'site-526', name: 'Ice Cube Store', domain: null, status: 'draft' },
+            tenant: { id: 'tenant-1', slug: 'hello-guy' },
+        }) as GenerationDetailSource
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.website.urls.preview).toBe('/preview/site-526')
+        expect(detail.website.urls.live).toBeNull()
+    })
+
+    it('TC-F41-28: prioritizes custom domain when present regardless of tenant slug', () => {
+        // Arrange
+        const source = record({
+            site: { id: 'site-526', name: 'Ice Cube Store', domain: 'https://sharulicecube.my', status: 'published' },
+            tenant: { id: 'tenant-1', slug: 'hello-guy' },
+        }) as GenerationDetailSource
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.website.urls.live).toBe('https://sharulicecube.my')
+    })
 })

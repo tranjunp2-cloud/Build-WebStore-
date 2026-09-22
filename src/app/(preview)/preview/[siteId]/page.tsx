@@ -74,11 +74,12 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
     }
 
     // 3. Tenant Isolation Check (P0 Security Rule - Tenant Isolation)
-    // Ensure user has access to this site's tenant
+    // Ensure user has access to this site's tenant (super-admin has platform-wide access)
+    const isSuperAdmin = Boolean(user.roles?.includes('super-admin'))
     const userTenants = user.tenants?.map((t: NonNullable<PlatformUser['tenants']>[number]) => typeof t.tenant === 'object' ? t.tenant.id : t.tenant) || []
     const siteTenantId = typeof site.tenant === 'object' ? site.tenant?.id : site.tenant
 
-    if (!userTenants.includes(siteTenantId)) {
+    if (!isSuperAdmin && !userTenants.includes(siteTenantId)) {
         return <PreviewAccessDenied />
     }
 

@@ -308,4 +308,29 @@ describe('GET /api/admin/generations', () => {
             site: { id: null, label: 'Unknown', missing: true },
         })
     })
+
+    it('returns global overview statistics in response', async () => {
+        // Arrange
+        findSpy.mockResolvedValue({ docs: [
+            fixture('1', 'none', '2026-09-15T10:00:00.000Z', { outcome: 'succeeded', lifecycle: 'terminal' }),
+            fixture('2', null, '2026-09-15T11:00:00.000Z', { lifecycle: 'running', outcome: null }),
+        ] })
+
+        // Act
+        const response = await GET(request('?view=all'))
+        const body = await response.json()
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(body).toHaveProperty('overview')
+        expect(body.overview).toMatchObject({
+            total: expect.any(Number),
+            needsAttention: expect.any(Number),
+            retryable: expect.any(Number),
+            retrying: expect.any(Number),
+            ticketRequired: expect.any(Number),
+            succeeded: expect.any(Number),
+            running: expect.any(Number),
+        })
+    })
 })

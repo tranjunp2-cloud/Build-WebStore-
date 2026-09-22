@@ -225,6 +225,28 @@ describe('[TC-F41-15/16] GenerationDebugDetail', () => {
         expect(document.body).not.toHaveTextContent('ops-secret')
     })
 
+    it('TC-F41-14: renders public live website link when valid public live URL is present', async () => {
+        // Arrange
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: {
+            ...detail,
+            website: {
+                ...detail.website,
+                status: 'published',
+                urls: { ...detail.website.urls, live: 'https://hello-guy.web-v2.dev.ecommercehub.my' },
+            },
+        } }), { status: 200 })))
+
+        // Act
+        render(<GenerationDebugDetail generationId="41" />)
+
+        // Assert
+        const liveLink = await screen.findByRole('link', { name: /mở website/i })
+        expect(liveLink).toBeVisible()
+        expect(liveLink).toHaveAttribute('href', 'https://hello-guy.web-v2.dev.ecommercehub.my/')
+        expect(liveLink).toHaveAttribute('target', '_blank')
+        expect(screen.queryByText('Chưa có URL public')).not.toBeInTheDocument()
+    })
+
     it('TC-F41-20: ignores a stale detail response after the operator changes generation', async () => {
         // Arrange
         let resolveFirst: ((value: Response) => void) | undefined
