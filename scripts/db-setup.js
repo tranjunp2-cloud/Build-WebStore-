@@ -5575,18 +5575,60 @@ const MIGRATIONS = [
   },
 ];
 
+// PERF: cache applied migration names in a state table so subsequent builds
+// skip the ~1125 idempotent SQL round-trips. Cut staging deploy migration
+// phase from ~5m33s to ~10s (see plans/260921-1629-GH-15-deploy-cold-build-perf).
+// Migrations flagged `critical: true` bypass the cache and always re-run —
+// use only for CREATE OR REPLACE FUNCTION bodies or safety-net idempotent
+// statements that must apply on every deploy.
 async function runMigrations(pool) {
-  console.log(`[db-setup] Running ${MIGRATIONS.length} migrations...`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS _db_setup_state (
+    name varchar PRIMARY KEY,
+    applied_at timestamptz NOT NULL DEFAULT NOW()
+  );`);
+
+  const { rows } = await pool.query('SELECT name FROM _db_setup_state;');
+  const applied = new Set(rows.map((r) => r.name));
+
+  let skipped = 0;
+  let ran = 0;
+  let alwaysRan = 0;
+  let failed = 0;
+
+  console.log(
+    `[db-setup] Running ${MIGRATIONS.length} migrations (${applied.size} previously applied)...`,
+  );
+
   for (const m of MIGRATIONS) {
+    const alwaysRun = m.critical === true;
+    if (!alwaysRun && applied.has(m.name)) {
+      skipped++;
+      continue;
+    }
     try {
       await pool.query(m.sql);
+      if (alwaysRun) {
+        alwaysRan++;
+      } else {
+        await pool.query(
+          'INSERT INTO _db_setup_state (name) VALUES ($1) ON CONFLICT (name) DO NOTHING;',
+          [m.name],
+        );
+        ran++;
+      }
       console.log(`[db-setup] ✅ ${m.name}`);
     } catch (e) {
+      failed++;
       if (m.critical) throw e;
       // Log but don't fail — column might already exist with different type etc.
+      // Not inserted into state → will retry on next build.
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
   }
+
+  console.log(
+    `[db-setup] Migration summary: skipped=${skipped}, applied=${ran}, always-run=${alwaysRan}, failed=${failed}, total=${MIGRATIONS.length}`,
+  );
 }
 
 // PERF-04: only audited pairs may be removed. Unknown duplicate pairs fail the
