@@ -28,7 +28,7 @@ export function shouldRetry(failure: MigrationFailure, attempt: number, maxAttem
 export function classifyStoreAttemptError(error: unknown): MigrationFailure {
     const failure = classifyMigrationError(error)
     const stopCodes = ['INTERRUPTED', 'BATCH_TIME_LIMIT', 'STORE_TIME_LIMIT', 'GENERATION_LIMIT', 'DESIGN_TOKEN_LIMIT',
-        'IDENTITY_CONFLICT', 'BE_MAPPING_INVALID', 'BE_DATA_MISSING', 'PUBLISHED_SITE', 'CONCURRENT_EDIT']
+        'IDENTITY_CONFLICT', 'BE_MAPPING_INVALID', 'BE_DATA_MISSING', 'PUBLISHED_SITE', 'CONCURRENT_EDIT', 'USER_NOT_IMPORTED']
     if (stopCodes.includes(failure.code)) return { ...failure, retryable: false }
     return { ...failure, code: failure.code === 'VALIDATION_OR_PERMANENT' ? 'STORE_ATTEMPT_FAILED' : failure.code, retryable: true }
 }

@@ -78,9 +78,60 @@ export async function importPw1BlockMedia(buckets: Record<string, unknown>[][], 
                     if (!media.url) throw new Error('Imported slide image has no public URL')
                     record[key] = { url: media.url, alt: media.alt || '' }
                 } else record[key] = mediaId
+            } else if (key === 'html' && typeof child === 'string' && child.includes('<img')) {
+                record.html = await rehostHtmlImages(child, tenantId, payload, cache)
             } else await visit(child, jsonField || key === 'slides' || key === 'sourceContent')
         }
     }
     for (const bucket of buckets) await visit(bucket)
     return { succeeded, failed: 0 }
+}
+
+async function rehostHtmlImages(html: string, tenantId: number | string, payload: Payload, cache: Map<string, number>): Promise<string> {
+    const imgRegex = /<img\b([^>]*?)\bsrc=["']([^"']+)["']([^>]*?)>/gi
+    const matches = [...html.matchAll(imgRegex)]
+    if (!matches.length) return html
+
+    let result = html
+    for (const match of matches) {
+        const originalSrc = match[2].trim()
+        if (!/^https?:\/\//i.test(originalSrc)) continue
+
+        try {
+            const httpsUrl = originalSrc.startsWith('http://') ? originalSrc.replace(/^http:\/\//i, 'https://') : originalSrc
+            validatePw1MediaUrl(httpsUrl)
+            let mediaId = cache.get(httpsUrl)
+            if (!mediaId) {
+                const sourceHash = createHash('sha256').update(httpsUrl).digest('hex')
+                const filename = `pw1-${tenantId}-${sourceHash.slice(0, 20)}.jpg`
+                const db = payload.db as unknown as { drizzle: { execute(query: unknown): Promise<{ rows: Array<{ media_id: number }> }> } }
+                const cached = await db.drizzle.execute(sql`SELECT c.media_id FROM pw1_migration_media c JOIN media m ON m.id=c.media_id WHERE c.tenant_id=${tenantId} AND c.source_hash=${sourceHash} AND m.filename LIKE ${`pw1-${tenantId}-${sourceHash.slice(0, 20)}%`}`)
+                mediaId = cached.rows[0]?.media_id
+                if (!mediaId) {
+                    const existing = await payload.find({ collection: 'media', where: { filename: { in: ['jpg','jpeg','png','webp','gif','avif'].map(ext => filename.replace(/\.jpg$/, `.${ext}`)) } }, limit: 1, depth: 0 })
+                    mediaId = existing.docs[0] ? Number(existing.docs[0].id) : undefined
+                }
+                if (!mediaId) {
+                    const { buffer, mimetype } = await downloadSourceImage(httpsUrl)
+                    const uploadFilename = ['image/x-icon', 'image/vnd.microsoft.icon'].includes(mimetype) ? filename.replace(/\.jpg$/, '.ico') : filename
+                    const alt = new URL(httpsUrl).pathname.split('/').pop() || 'PW1 document image'
+                    mediaId = await uploadImageBuffer(buffer, mimetype, uploadFilename, alt, tenantId, payload, false)
+                    if (mediaId) recordCreatedPw1Media(mediaId)
+                }
+                if (mediaId) {
+                    await db.drizzle.execute(sql`INSERT INTO pw1_migration_media(tenant_id,source_hash,media_id) VALUES(${tenantId},${sourceHash},${mediaId}) ON CONFLICT(tenant_id,source_hash) DO UPDATE SET media_id=EXCLUDED.media_id,last_used_at=now()`)
+                    cache.set(httpsUrl, mediaId)
+                }
+            }
+            if (mediaId) {
+                const media = await payload.findByID({ collection: 'media', id: mediaId, depth: 0 })
+                if (media?.url) {
+                    result = result.replaceAll(match[0], `<img${match[1]}src="${media.url}"${match[3]}>`)
+                }
+            }
+        } catch (error) {
+            console.warn(`[rehostHtmlImages] Non-fatal rich-text image rehost error for ${originalSrc}: ${error instanceof Error ? error.message : String(error)}`)
+        }
+    }
+    return result
 }

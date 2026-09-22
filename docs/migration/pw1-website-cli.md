@@ -31,12 +31,12 @@ The positional file is **one JSON array**, with one object per PW1 store. The co
 ]
 ```
 
-This is a structural illustration; supply the actual validated page/component configuration in `website.pages`. The updated external Amelina input retains 3 source pages and 18 components, with one filter component explicitly pending. Multiple stores belonging to one user repeat the same owner identity and use distinct source store IDs. Input is limited to 100 MiB; each store is validated before processing; malformed stores are recorded without blocking unrelated valid stores.
+This is a structural illustration; supply the actual validated page/component configuration in `website.pages`. The updated external Amelina input retains 3 source pages and 18 components, with one filter component explicitly pending. Multiple stores belonging to one user repeat the same owner identity and use distinct source store IDs. There is no fixed input file size limit. The CLI reads and parses the complete JSON file in memory; each store is validated before processing, and malformed stores are recorded without blocking unrelated valid stores.
 
 The preload reads `.env.local` / `.env` from the working directory; existing process environment takes precedence. Configure the destination database, Payload secret, OpenAI and media storage there once. No `--env-file`, account, site ID, output directory or `--apply` argument is required for the batch command.
 
 - Add `--dry-run` to validate and summarize without DB or AI calls.
-- Existing accounts are matched by email; new accounts receive a random password and need the normal password-reset flow to sign in. Existing passwords remain unchanged. No welcome email is sent by this provisioning path.
+- Destination accounts must already exist: accounts are matched by email and the migration never creates users. A store whose owner email has no destination account fails with `USER_NOT_IMPORTED`; run the BE user import first, then retry the same input.
 - Each previously unmapped source store gets a new tenant, draft site and default FREEMIUM subscription. Paid plans and commerce records are not imported. Account, membership, site and source-ID mappings commit together.
 - By default, up to two stores prepare concurrently; website writes are serialized. Stores belonging to the same account run sequentially. A store failure is recorded and processing continues; the command exits nonzero when any store fails.
 - Rerun the same command to retry failed stores. Completed stores with unchanged input are skipped. Changed completed input requires `--rerun`; this also explicitly regenerates unchanged completed stores. Replacement requires a draft site.

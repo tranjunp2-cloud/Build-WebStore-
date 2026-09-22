@@ -92,7 +92,7 @@ Status/logs are read-only and need only database configuration.`)
     if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 5) throw new Error('max-attempts must be 1–5')
     const path = await realpath(resolve(positionals[0]))
     const file = await stat(path)
-    if (!file.isFile() || file.size > 100 * 1024 * 1024) throw new Error('Input must be a JSON file no larger than 100 MiB')
+    if (!file.isFile()) throw new Error('Input must be a file')
     if (auditRequested) for (const suffix of ['', '.md', '.jsonl']) {
         const outputPath = resolve(values['audit-output']! + suffix)
         if (await realpath(outputPath).catch(() => outputPath) === path) throw new Error('Audit output cannot overwrite input')
@@ -100,7 +100,12 @@ Status/logs are read-only and need only database configuration.`)
     const parsed = validateMigrationBatch(JSON.parse(await readFile(path, 'utf8')))
     const entries = values.store ? parsed.entries.filter(e => e.sourceStoreId === values.store) : parsed.entries
     const errors = values.store ? parsed.errors.filter(e => e.sourceStoreId === values.store) : parsed.errors
-    if (!entries.length && !errors.length) throw new Error('No matching source store in input')
+    const skipped = values.store ? parsed.skipped.filter(e => e.sourceStoreId === values.store) : parsed.skipped
+    if (skipped.length) console.log(JSON.stringify({ status: 'skipped', stores: skipped }, null, 2))
+    if (!entries.length && !errors.length) {
+        if (skipped.length) return
+        throw new Error('No matching source store in input')
+    }
     if (command === 'audit' && hasRunOptions) throw new Error('audit does not accept migration run options')
     const runAudit = async () => {
         const { auditPw1Websites } = await import('../src/lib/migration/pw1-quality-audit')

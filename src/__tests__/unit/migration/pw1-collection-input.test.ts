@@ -1,3 +1,4 @@
+import { validateMigrationBatch } from '@/lib/migration/pw1-batch-validation'
 import { compactInput } from '@/lib/migration/pw1-batch-input'
 import { adaptWebsiteInput } from '@/lib/migration/pw2-website-input'
 import { describe, expect, it } from 'vitest'
@@ -82,4 +83,104 @@ it('[TC-F35.M27] ignores disabled legacy CTA configuration while retaining its b
     const {entries} = parseMigrationInput(data)
     const {contract} = adaptWebsiteInput(compactInput(entries[0]))
     expect(contract.pages[0].components[0].block.slides).toMatchObject([{headline:'Keep banner',image:{url:'https://source.example/banner.png'},ctaButtons:[]}])
+})
+
+describe('[TC-F35.M27] legacy banner URL schemes', () => {
+    it.each([
+        ['cdn.example.com/banner.png', 'https://cdn.example.com/banner.png'],
+        ['https://cdn.example.com/Banner 1.png', 'https://cdn.example.com/Banner%201.png'],
+        ['//cdn.example.com/banner.png', 'https://cdn.example.com/banner.png'],
+        ['https://cdn.example.com/banner.png', 'https://cdn.example.com/banner.png'],
+        ['http://cdn.example.com/banner.png', 'http://cdn.example.com/banner.png'],
+    ])('normalizes %s without changing source input', (image, expected) => {
+        const input = fixture()
+        const data = [{ ...input[0], pages: [{ ...input[0].pages[0], components: [{
+            id: '20', page_id: '10', status: '1',
+            frontend_component: { name: 'banner', default_config_values: {} },
+            banners: [{ id: '30', page_component_id: '20', store_id: '205', status: '1', image }],
+        }] }] }]
+        const original = JSON.stringify(data)
+
+        const { entries } = parseMigrationInput(data)
+
+        expect(entries[0].website.pages[0].components[0]).toMatchObject({ content: { slides: [{ imageUrl: expected }] } })
+        expect(JSON.stringify(data)).toBe(original)
+    })
+    it.each(['javascript:alert(1)', '/banner.png'])('rejects invalid image %s instead of inventing a host', (image) => {
+        const input = fixture()
+        const data = [{ ...input[0], pages: [{ ...input[0].pages[0], components: [{
+            id: '20', page_id: '10', status: '1',
+            frontend_component: { name: 'banner', default_config_values: {} },
+            banners: [{ id: '30', page_component_id: '20', store_id: '205', status: '1', image }],
+        }] }] }]
+
+        expect(() => parseMigrationInput(data)).toThrow()
+    })
+})
+
+it.each(['', 'undefined', 'not-a-url', 'javascript:alert(1)', '@media:missing:logo'])('[TC-F35.M27] migrates without invalid logo %s', (logo) => {
+    const input = fixture()
+    input[0].sites[0].branding.logo = logo
+
+    const { entries, reports } = parseMigrationInput(input)
+    const { contract } = adaptWebsiteInput(compactInput(entries[0]))
+
+    expect(contract.site.navigation.logo).toBeUndefined()
+    expect(contract.site.navigation.logoText).toBe('Shop')
+    expect(contract.site.settings?.branding.logo).toBeUndefined()
+    expect(reports[0].warnings.join(' ')).toContain('without logo')
+})
+
+it.each(['', 'undefined', 'not-a-url', 'javascript:alert(1)', '@media:missing:favicon'])('[TC-F35.M27] migrates without invalid favicon %s', (favicon) => {
+    const input = fixture()
+    input[0].sites[0].branding.favicon = favicon
+
+    const { entries, reports } = parseMigrationInput(input)
+    const { contract } = adaptWebsiteInput(compactInput(entries[0]))
+
+    expect(contract.site.settings?.branding.favicon).toBeUndefined()
+    if (favicon === '@media:missing:favicon') {
+        expect(reports[0].warnings.join(' ')).toContain('Favicon media reference could not be resolved')
+    }
+})
+
+it('[TC-F35.M27] maps legacy cart page to the PW2 cart feature', () => {
+    const input = fixture()
+    const cart = { id:'20', store_id:'205', name:'Cart', type:'7', slug:'cart', url:'/cart', status:'1',
+        components:[{id:'30',page_id:'20',status:'1',frontend_component:{name:'cart'}}] }
+    const data = [{...input[0], pages:[...input[0].pages, cart]}]
+
+    const {entries, reports} = parseMigrationInput(data)
+    const {contract} = adaptWebsiteInput(compactInput(entries[0]))
+
+    expect(contract.site.features?.cart).toBe(true)
+    expect(contract.pages.some(p => p.sourceId === '20')).toBe(false)
+    expect(reports[0].excluded).toContainEqual({id:'20',kind:'page',reason:'native-commerce-runtime'})
+})
+
+it('[TC-F35.M27] skips stores without an owner or active pages', () => {
+    const noOwner = fixture()
+    noOwner[0].users = []
+    const noPages = fixture()
+    noPages[0].pages = []
+    for (const input of [noOwner, noPages]) {
+        const result = validateMigrationBatch(input)
+        expect(result.entries).toHaveLength(0)
+        expect(result.errors).toHaveLength(0)
+        expect(result.skipped).toHaveLength(1)
+        expect(result.skipped[0].sourceStoreId).toBe('205')
+    }
+})
+it('[TC-F35.M27] excludes undefined banner images and the resulting empty banner', () => {
+    const input = fixture()
+    const data = [{...input[0], pages:[{...input[0].pages[0], components:[{
+        id:'20',page_id:'10',status:'1',frontend_component:{name:'banner'},
+        banners:[{id:'30',page_component_id:'20',store_id:'205',status:'1',image:'undefined'}],
+    }]}]}]
+    const {entries,reports} = parseMigrationInput(data)
+    expect(entries[0].website.pages[0].components).toHaveLength(0)
+    expect(reports[0].excluded).toEqual(expect.arrayContaining([
+        {id:'30',kind:'slide',reason:'missing-image'},
+        {id:'20',kind:'component',reason:'empty-banner'},
+    ]))
 })

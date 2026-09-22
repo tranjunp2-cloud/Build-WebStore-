@@ -19,7 +19,7 @@ import { recoverInterruptedBatches } from './pw1-operations'
 import type { InvalidStore } from './pw1-batch-validation'
 import { setTimeout as delay } from 'node:timers/promises'
 import { readFile } from 'node:fs/promises'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { Client } from 'pg'
 import { sql } from 'drizzle-orm'
 import type { Payload, PayloadRequest } from 'payload'
@@ -49,18 +49,14 @@ export async function provisionMigrationStore(payload:Payload, entry:BatchEntry)
                 await tx.execute(sql`INSERT INTO pw1_migration_stores(source_store_id,source_user_id,tenant_id,site_id) VALUES(${entry.sourceStoreId},${entry.sourceUserId},${entry.destination.tenantId},${entry.destination.siteId})`)
                 return
             }
+            if(!user) throw new MigrationError('USER_NOT_IMPORTED', `Destination account ${entry.owner.email} does not exist; import the PW1 user via the BE import before migrating this store`)
             const slug = await selectPw1TenantSlug(entry.source.websiteUrl, entry.sourceStoreId, async candidate => {
                 const tenants = await payload.find({ collection: 'tenants', where: { or: [{ slug: { equals: candidate } }, { 'previousSlugs.slug': { equals: candidate } }] }, limit: 1, req })
                 return tenants.totalDocs > 0
             })
             const tenant=await payload.create({collection:'tenants',data:{name:entry.website.name,slug,plan:'free'},req})
             const membership={tenant:tenant.id,role:'owner' as const,status:'active' as const}
-            if(!user) {
-                // Preassigned membership suppresses the welcome-email hook. Passwords are never copied from PW1 or printed.
-                user=await payload.create({collection:'users',data:{email:entry.owner.email,firstName:entry.owner.firstName,lastName:entry.owner.lastName,password:randomBytes(32).toString('base64url'),roles:['tenant-owner'],tenants:[membership]},req})
-            } else {
-                user=await payload.update({collection:'users',id:user.id,data:{tenants:[...(user.tenants??[]),membership]},req})
-            }
+            user=await payload.update({collection:'users',id:user.id,data:{tenants:[...(user.tenants??[]),membership]},req})
             await payload.create({collection:'plan-subscriptions',data:{tenant:tenant.id,name:'main',plan:'FREEMIUM',status:'active',startsAt:new Date().toISOString(),endsAt:new Date(Date.now()+365*86400000).toISOString(),packCode:'FREEMIUM'},req})
             const site=await payload.create({collection:'sites',data:{tenant:tenant.id,name:entry.website.name,status:'draft',generationStatus:'none',siteType:'ecommerce',locale:entry.website.locale,generationLocale:entry.website.locale},req})
             await tx.execute(sql`INSERT INTO pw1_migration_accounts(source_user_id,email,user_id) VALUES(${entry.sourceUserId},${entry.owner.email},${user.id}) ON CONFLICT(source_user_id) DO NOTHING`)

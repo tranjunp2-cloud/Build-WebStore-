@@ -8,6 +8,13 @@ export type CollectionReport = { sourceStoreId: string; excluded: Array<{ id: st
 const rows = (value: unknown): Row[] => z.array(z.record(z.unknown())).parse(value ?? [])
 const str = (value: unknown) => value == null ? '' : String(value)
 const active = (r: Row) => !r.deleted_at && (r.status == null || str(r.status) === '1')
+/** Legacy exports may omit the scheme from an otherwise absolute image URL. */
+function bannerImageUrl(value: unknown): string {
+    const url = str(value).trim().replace(/ /g, '%20')
+    if (url.startsWith('//')) return `https:${url}`
+    if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d+)?(?:[/?#]|$)/i.test(url)) return `https://${url}`
+    return url
+}
 const ordered = (value: unknown) => rows(value).slice().sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0) || str(a.id).localeCompare(str(b.id), 'en', { numeric: true }))
 function object(value: unknown): Row {
     if (value == null || value === '') return {}
@@ -50,15 +57,17 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 return true
             })
             if (!validPages.length) throw new Error(`Store ${storeId}: no active pages to migrate`)
+            const hasCartComponent = (p: Row) => rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'cart')
+            const isNativeCartPage = (p: Row) => pagePath(p) === '/cart' && hasCartComponent(p)
             const pageById = new Map(pageRows.map(p => [str(p.id), p]))
-            const pagePath = (p: Row) => str(p.type) === '1' ? '/' : (str(p.url).trim() || '/' + str(p.slug).replace(/^\/+/, ''))
+            const pagePath = (p: Row) => str(p.type) === '1' ? '/' : (str(p.url).trim() || '/' + str(p.slug).replace(/^\/+/, '')).toLowerCase()
             const resolveTarget = (model: unknown, id: unknown, url: unknown, context: string): Omit<Link, 'label'> | undefined => {
                 if (model) {
                     const kind = str(model).split('\\').filter(Boolean).at(-1)
                     if (kind === 'Page') {
                         const target = pageById.get(str(id))
                         if (!target || !active(target)) { exclude(context, 'link', `missing-or-deleted-page:${str(id)}`); return }
-                        if (['4', '5', '6'].includes(str(target.type))) return { url: new URL(pagePath(target), base).href }
+                        if (['4', '5', '6'].includes(str(target.type)) || isNativeCartPage(target)) return { url: new URL(pagePath(target), base).href }
                         return { pageId: str(id) }
                     }
                     if (kind === 'Brand') { report.warnings.push(`${context}: Brand ${str(id)} CTA deferred`); return }
@@ -75,8 +84,9 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 const target = new URL(str(url), base)
                 if (!['https:', 'http:'].includes(target.protocol)) throw new Error(`${context}: unsupported URL protocol`)
                 if (target.origin === base.origin) {
-                    const page = pageRows.find(p => pagePath(p) === target.pathname)
+                    const page = pageRows.find(p => pagePath(p) === target.pathname.toLowerCase())
                     if (page && !active(page)) { exclude(context, 'link', 'deleted-page-url'); return }
+                    if (page) target.pathname = pagePath(page)
                 }
                 return { url: target.href }
             }
@@ -100,7 +110,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             const headerConfig = object(header?.config)
             if (Number(headerConfig.search_status) === 1) report.warnings.push('Header product search setting is retained in source only; native navigation search mapping is pending')
             const pages = validPages.filter(p => {
-                if (['4', '5', '6'].includes(str(p.type))) { exclude(p.id, 'page', 'native-commerce-runtime'); return false }
+                if (['4', '5', '6'].includes(str(p.type)) || isNativeCartPage(p)) { exclude(p.id, 'page', 'native-commerce-runtime'); return false }
                 return true
             }).map(p => ({ sourceId: str(p.id), title: localized(p) || str(p.title), path: pagePath(p), components: ordered(p.components).flatMap<unknown>(c => {
                 if (str(c.page_id) !== str(p.id)) throw new Error('Component/page ownership mismatch')
@@ -114,18 +124,19 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 const type = str(definition.name) || str(c.tag_name).replace('pa101-', '').replaceAll('-', '_')
                 const common = { sourceId: str(c.id), type, enabled: true }
                 const sourceSettings = { ...config, selectedItems: rows(c.shortlist_items).filter(active).map(i => ({ sourceId: str(i.model_id), modelType: str(i.model_type), position: i.position })) }
+                if (type === 'cart') { exclude(c.id, 'component', 'native-commerce-runtime'); return [] }
                 if (type === 'banner') {
                     const slides = ordered(c.banners).filter(b => {
                         if (str(b.page_component_id) !== str(c.id) || str(b.store_id) !== storeId) throw new Error('Banner ownership mismatch')
                         if (!active(b)) { exclude(b.id, 'slide', 'disabled-or-deleted'); return false }
-                        if (!b.image) { exclude(b.id, 'slide', 'missing-image'); return false }
+                        if (!b.image || str(b.image).trim().toLowerCase() === 'undefined') { exclude(b.id, 'slide', 'missing-image'); return false }
                         return true
                     }).map(b => {
                         const h = object(b.header), sub = object(b.subheader), button = object(b.button)
                         const buttonEnabled = str(button.status) === '1'
                         const dest = buttonEnabled ? resolveTarget(undefined, undefined, b.url, `banner:${str(b.id)}`) : undefined
                         const label = buttonEnabled ? str(object(object(button.mode).default).text) : ''
-                        return { imageUrl: str(b.image), alt: str(b.name), heading: str(h.status) === '1' ? str(h.text) : '', description: str(sub.status) === '1' ? str(sub.text) : '', cta: str(button.status) === '1' && label && dest?.url ? { label, url: dest.url } : null }
+                        return { imageUrl: bannerImageUrl(b.image), alt: str(b.name), heading: str(h.status) === '1' ? str(h.text) : '', description: str(sub.status) === '1' ? str(sub.text) : '', cta: str(button.status) === '1' && label && dest?.url ? { label, url: dest.url } : null }
                     })
                     if (!slides.length) { exclude(c.id, 'component', 'empty-banner'); return [] }
                     return [{ ...common, content: { slides }, config: { size: config.size ?? 'hero', autoplay: config.animation === 'auto', intervalMs: Number(config.timing_animation ?? 5) * 1000, sourceSettings } }]
@@ -168,15 +179,31 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 return url
             }
             const branding = object(site.branding), seo = object(site.seo)
+            let logo: string | undefined
+            try {
+                const resolved = assetUrl(branding.logo)
+                if (resolved && z.string().url().refine(v => /^https?:\/\//i.test(v)).safeParse(resolved).success) logo = resolved
+            } catch {
+                // An unresolved optional logo must not block the store's website migration.
+                report.warnings.push('Logo media reference could not be resolved; migrating without logo')
+            }
+            if (!logo) report.warnings.push('Logo missing or invalid; using website name without logo')
+            let favicon: string | undefined
+            try {
+                const resolved = assetUrl(branding.favicon)
+                if (resolved && z.string().url().refine(v => /^https?:\/\//i.test(v)).safeParse(resolved).success) favicon = resolved
+            } catch {
+                report.warnings.push('Favicon media reference could not be resolved; migrating without favicon')
+            }
             const siteSettings = {
-                branding: { logo: assetUrl(branding.logo), favicon: assetUrl(branding.favicon) },
+                branding: { logo, favicon },
                 contactInfo: pickStrings(site.contactInfo, ['phone', 'email', 'address']),
                 socialLinks: pickStrings(site.socialLinks, ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok']),
                 seo: { ...pickStrings(site.seo, ['metaTitle', 'metaDescription']), ogImage: assetUrl(seo.ogImage) },
             }
             entries.push({ ...(bundle.linkCorrections ? { linkCorrections: bundle.linkCorrections } : {}), ...(bundle.destination ? { destination: bundle.destination } : {}), sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin }, website: {
-                settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: str(object(site.branding).logo) },
-                features: { cart: Number(headerConfig.cart_status) === 1, orderTracking: Number(headerConfig.cart_status) === 1 && validPages.some(p => str(p.type) === '6') },
+                settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
+                features: { cart: Number(headerConfig.cart_status) === 1 || validPages.some(hasCartComponent), orderTracking: Number(headerConfig.cart_status) === 1 && validPages.some(p => str(p.type) === '6') },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(menuLinks),
                 footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns }, pages,
             } })

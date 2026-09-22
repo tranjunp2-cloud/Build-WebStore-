@@ -7,6 +7,7 @@ export function validateMigrationBatch(input: unknown) {
     if (!Array.isArray(input) || !input.length) throw new Error('Input must be a nonempty JSON array')
     const candidates: Array<{ entry: BatchEntry; reports: CollectionReport[]; inputIndex: number }> = []
     const errors: InvalidStore[] = []
+    const skipped: Array<{ inputIndex: number; sourceStoreId?: string; reason: string }> = []
     const identities: Array<{ inputIndex: number; storeId?: string }> = []
     let ordinal = 0
     for (const value of input) {
@@ -28,7 +29,12 @@ export function validateMigrationBatch(input: unknown) {
                 if (parsed.entries.length !== 1) throw new Error('Expected exactly one source store')
                 identities[identities.length - 1].storeId = parsed.entries[0].sourceStoreId
                 candidates.push({ entry: parsed.entries[0], reports: parsed.reports, inputIndex })
-            } catch (error) { errors.push({ inputIndex, sourceStoreId: storeId, error: error instanceof Error ? error.message : 'Invalid store', stage: 'validation' }) }
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Invalid store'
+                if (storeId && [ `Store ${storeId}: no active pages to migrate`, `Store ${storeId}: expected exactly one active owner` ].includes(message)) {
+                    skipped.push({ inputIndex, sourceStoreId: storeId, reason: message })
+                } else errors.push({ inputIndex, sourceStoreId: storeId, error: message, stage: 'validation' })
+            }
         }
     }
     const rejected = new Map<number, string>()
@@ -55,5 +61,5 @@ export function validateMigrationBatch(input: unknown) {
         if (!error) return true
         errors.push({ inputIndex: c.inputIndex, sourceStoreId: c.entry.sourceStoreId, error, stage: 'validation' }); return false
     })
-    return { entries: accepted.map(c => c.entry), reports: accepted.flatMap(c => c.reports), errors }
+    return { entries: accepted.map(c => c.entry), reports: accepted.flatMap(c => c.reports), errors, skipped }
 }
