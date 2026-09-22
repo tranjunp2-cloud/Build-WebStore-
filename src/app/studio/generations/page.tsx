@@ -26,6 +26,15 @@ export default async function GenerationsPage() {
             hasNextPage: false,
             hasPrevPage: false,
         },
+        overview: {
+            total: 0,
+            needsAttention: 0,
+            retryable: 0,
+            retrying: 0,
+            ticketRequired: 0,
+            succeeded: 0,
+            running: 0,
+        },
     }
 
     return <GenerationsLiveFeed initialData={initialData} />

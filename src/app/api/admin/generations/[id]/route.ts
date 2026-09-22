@@ -58,6 +58,29 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         }
 
         try {
+            // Resolve tenantSlug for public live URL if site is published
+            let tenantSlug: string | null = null
+            if (record.tenant && typeof record.tenant === 'object' && 'slug' in record.tenant && typeof record.tenant.slug === 'string') {
+                tenantSlug = record.tenant.slug
+            } else {
+                const tenantId = relationId(record.tenant) ?? (typeof record.site === 'object' && record.site && 'tenant' in record.site ? relationId((record.site as { tenant?: unknown }).tenant as { id: string | number }) : null)
+                if (tenantId) {
+                    try {
+                        const tenantDoc = await payload.findByID({
+                            collection: 'tenants',
+                            id: tenantId,
+                            depth: 0,
+                            overrideAccess: true,
+                        })
+                        if (tenantDoc?.slug && typeof tenantDoc.slug === 'string') {
+                            tenantSlug = tenantDoc.slug
+                        }
+                    } catch {
+                        // ignore fallback lookup failure
+                    }
+                }
+            }
+
             // Bounded root-lineage and recovery job queries provide the exact
             // retry timeline without returning raw worker payloads or scans.
             const retryRootId = relationId(record.retryRootGeneration) ?? String(record.id)
@@ -78,7 +101,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
                 sort: '-queuedAt',
                 overrideAccess: true,
             })
-            const detail = serializeAdminGenerationDetail(record, history.docs as unknown as GenerationDetailSource[], jobs.docs as unknown as GenerationRecoveryJobDetailSource[])
+            const detail = serializeAdminGenerationDetail(record, history.docs as unknown as GenerationDetailSource[], jobs.docs as unknown as GenerationRecoveryJobDetailSource[], tenantSlug)
             const siteId = detail.website.id
             const persisted = siteId ? await payload.find({ collection: 'pages', where: { site: { equals: siteId } }, depth: 0, limit: 100, pagination: false, overrideAccess: true }) : { docs: [] }
             const persistedById = new Map((persisted.docs as unknown as PersistedPage[]).map((page) => [String(page.id), page]))

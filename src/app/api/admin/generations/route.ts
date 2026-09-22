@@ -1,5 +1,6 @@
 /** Safe, keyset-paginated Super Admin generation queue. Never returns raw Payload docs. */
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
@@ -8,6 +9,7 @@ import config from '@payload-config'
 import { z } from 'zod'
 import { withSuperAdmin } from '@/lib/admin/api-utils'
 import { resolveGenerationPriority, serializeAdminGeneration, type GenerationListSource, type GenerationPriority } from '@/lib/ai/generation-recovery-policy'
+import type { GenerationOverview } from '@/app/studio/generations/_components/generation-types'
 
 const Query = z.object({
     view: z.enum(['needs_attention', 'all']).default('needs_attention'),
@@ -145,6 +147,70 @@ async function countMatching(payload: Awaited<ReturnType<typeof getPayload>>, wh
     return result.totalDocs
 }
 
+async function getGlobalOverview(
+    payload: Awaited<ReturnType<typeof getPayload>>,
+    fallbackSources?: GenerationListSource[],
+): Promise<GenerationOverview> {
+    if (typeof payload.count !== 'function') {
+        const sources = fallbackSources ?? []
+        const cannotRecover = sources.filter((s) => resolveGenerationPriority(s) === 'cannot_recover').length
+        const retryFailed = sources.filter((s) => resolveGenerationPriority(s) === 'retry_failed').length
+        const retryable = sources.filter((s) => resolveGenerationPriority(s) === 'retryable').length
+        const retrying = sources.filter((s) => resolveGenerationPriority(s) === 'retrying').length
+        const stale = sources.filter((s) => resolveGenerationPriority(s) === 'stale_running').length
+        const succeeded = sources.filter((s) => s.outcome === 'succeeded').length
+        const running = sources.filter((s) => s.lifecycle === 'running').length
+        return {
+            total: sources.length,
+            needsAttention: cannotRecover + retryFailed + retryable + retrying + stale,
+            retryable,
+            retrying,
+            ticketRequired: cannotRecover + retryFailed,
+            succeeded,
+            running,
+        }
+    }
+
+    const base: Where = { endpoint: { equals: 'site-generator' } }
+
+    const [
+        total,
+        succeeded,
+        running,
+        retryable,
+        retrying,
+        cannotRecover,
+        retryFailed,
+        staleRunning,
+    ] = await Promise.all([
+        countMatching(payload, base),
+        countMatching(payload, combineWhere(base, { outcome: { equals: 'succeeded' } })),
+        countMatching(payload, combineWhere(base, { lifecycle: { equals: 'running' } })),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[1].where)),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[3].where)),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[0].where)),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[2].where)),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[4].where)),
+    ])
+
+    const safe = (v?: number) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+    const cr = safe(cannotRecover)
+    const rf = safe(retryFailed)
+    const ret = safe(retryable)
+    const retying = safe(retrying)
+    const sr = safe(staleRunning)
+
+    return {
+        total: safe(total),
+        needsAttention: cr + rf + ret + retying + sr,
+        retryable: ret,
+        retrying: retying,
+        ticketRequired: cr + rf,
+        succeeded: safe(succeeded),
+        running: safe(running),
+    }
+}
+
 export const GET = withSuperAdmin(async (req: NextRequest) => {
     const parsed = Query.safeParse(Object.fromEntries(req.nextUrl.searchParams))
     if (!parsed.success) return NextResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'Bộ lọc không hợp lệ.' } }, { status: 400 })
@@ -177,7 +243,8 @@ export const GET = withSuperAdmin(async (req: NextRequest) => {
             ? createCursor({ filter: fingerprint, asOf, bucket: 0, createdAt: last.createdAt, id: Number(last.id) })
             : null
         const totalDocs = await countMatching(payload, filters) ?? result.totalDocs
-        return NextResponse.json({ items: pageSources.map(serializeAdminGeneration), nextCursor, meta: { totalDocs, limit: q.limit, hasNextPage: nextCursor !== null, hasPrevPage: Boolean(cursor) } })
+        const overview = await getGlobalOverview(payload, sources)
+        return NextResponse.json({ items: pageSources.map(serializeAdminGeneration), nextCursor, meta: { totalDocs, limit: q.limit, hasNextPage: nextCursor !== null, hasPrevPage: Boolean(cursor) }, overview })
     }
 
     // Priority is an explicit DB state, not a UI inference. Query at most five
@@ -209,5 +276,6 @@ export const GET = withSuperAdmin(async (req: NextRequest) => {
     const totalDocs = totalCounts.every((count): count is number => typeof count === 'number')
         ? totalCounts.reduce((sum, count) => sum + count, 0)
         : pageSources.length + (nextCursor ? 1 : 0)
-    return NextResponse.json({ items: pageSources.map(({ source }) => serializeAdminGeneration(source)), nextCursor, meta: { totalDocs, limit: q.limit, hasNextPage: nextCursor !== null, hasPrevPage: Boolean(cursor) } })
+    const overview = await getGlobalOverview(payload, pageSources.map(({ source }) => source))
+    return NextResponse.json({ items: pageSources.map(({ source }) => serializeAdminGeneration(source)), nextCursor, meta: { totalDocs, limit: q.limit, hasNextPage: nextCursor !== null, hasPrevPage: Boolean(cursor) }, overview })
 })

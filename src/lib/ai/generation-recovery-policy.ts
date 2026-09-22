@@ -1,5 +1,6 @@
 /** Server-owned recovery policy and safe list serialization for F41 Operations. */
 import { sanitizeGenerationEvidence, SERVER_INCIDENT_CODES } from './generation-outcome'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 export type GenerationRecoveryStatus =
     | 'none' | 'eligible' | 'retrying' | 'exhausted'
@@ -188,7 +189,8 @@ export type GenerationDetailSource = GenerationListSource & {
     parentGeneration?: { id: string | number } | string | number | null
     retryRootGeneration?: { id: string | number } | string | number | null
     recoveredSite?: { id: string | number; name?: string | null; domain?: string | null; status?: string | null } | string | number | null
-    site?: { id: string | number; name?: string | null; slug?: string | null; domain?: string | null; status?: string | null } | string | number | null
+    site?: { id: string | number; name?: string | null; slug?: string | null; domain?: string | null; status?: string | null; tenant?: { id: string | number; slug?: string | null } | string | number | null } | string | number | null
+    tenant?: { id: string | number; slug?: string | null } | string | number | null
     user?: { id: string | number; email?: string | null; firstName?: string | null; lastName?: string | null } | string | number | null
     pageOutcomes?: Array<{ pageKey?: string | null; title?: string | null; slug?: string | null; pageId?: string | null; status?: string | null; blockCount?: number | null; errorCode?: string | null; errorSummary?: string | null }> | null
     generationErrors?: Array<{ phase?: string | null; locationType?: string | null; locationKey?: string | null; locationLabel?: string | null; validationRule?: string | null; observedState?: string | null; code?: string | null; category?: string | null; retryabilityReason?: string | null; userSafeMessage?: string | null; sanitizedTechnicalMessage?: string | null }> | null
@@ -307,12 +309,14 @@ function siteDetail(value: GenerationDetailSource['site'] | GenerationDetailSour
     return { id: String(value.id), name: value.name ?? `#${value.id}`, domain: value.domain ?? null, status: value.status ?? null }
 }
 
-function siteUrls(site: ReturnType<typeof siteDetail>) {
+function siteUrls(site: ReturnType<typeof siteDetail>, tenantSlug?: string | null) {
+    const isPublished = site.status === 'published' || site.status === 'live'
+    const liveUrl = site.domain || (isPublished && tenantSlug ? buildStorefrontUrl(tenantSlug) : null)
     return {
         // This is an internal, operator-only preview route; it is derived from
         // the database id rather than accepting an arbitrary stored URL.
         preview: site.id ? `/preview/${encodeURIComponent(site.id)}` : null,
-        live: site.domain,
+        live: liveUrl,
     }
 }
 
@@ -355,6 +359,7 @@ export function serializeAdminGenerationDetail(
     record: GenerationDetailSource,
     retryHistory: GenerationDetailSource[] = [],
     recoveryJobs: GenerationRecoveryJobDetailSource[] = [],
+    tenantSlug?: string | null,
 ) {
     const summary = serializeAdminGeneration(record)
     const capturedSite = siteDetail(record.site)
@@ -363,6 +368,9 @@ export function serializeAdminGenerationDetail(
     // linked to it. Prefer the original relation, but do not hide the recovery
     // website in that transitional state.
     const site = capturedSite.id ? capturedSite : recoveredSite
+    const siteTenantSlug = record.site && typeof record.site === 'object' && 'tenant' in record.site && typeof (record.site as Record<string, unknown>).tenant === 'object' && typeof ((record.site as Record<string, unknown>).tenant as Record<string, unknown>)?.slug === 'string' ? ((record.site as Record<string, unknown>).tenant as Record<string, unknown>).slug as string : null
+    const recordTenantSlug = record.tenant && typeof record.tenant === 'object' && 'slug' in record.tenant && typeof record.tenant.slug === 'string' ? record.tenant.slug : null
+    const resolvedTenantSlug = tenantSlug ?? recordTenantSlug ?? siteTenantSlug
     const boundedRawErrors = recordItems(record.generationErrors).slice(0, 20)
     const pages = recordItems(record.pageOutcomes).slice(0, 100).map((page) => ({
         pageKey: safeDiagnostic(page.pageKey, 160), title: safeDiagnostic(page.title, 240) ?? safeDiagnostic(page.slug, 160) ?? 'Trang chưa đặt tên', slug: safeDiagnostic(page.slug, 160),
@@ -422,8 +430,8 @@ export function serializeAdminGenerationDetail(
     return {
         ...summary,
         endpoint: record.endpoint ?? 'site-generator', category: record.category ?? null,
-        website: { ...site, urls: siteUrls(site) },
-        recoveredWebsite: record.recoveredSite && recoveredSite.id !== site.id ? { ...recoveredSite, urls: siteUrls(recoveredSite) } : null,
+        website: { ...site, urls: siteUrls(site, resolvedTenantSlug) },
+        recoveredWebsite: record.recoveredSite && recoveredSite.id !== site.id ? { ...recoveredSite, urls: siteUrls(recoveredSite, resolvedTenantSlug) } : null,
         user: userDetail(record.user),
         traceId: safeTraceId(record.traceId),
         input: safeInput(record.inputSnapshot), inputSchemaVersion: record.inputSchemaVersion ?? null,
