@@ -8,6 +8,7 @@ import type { ImportDiagnostic } from './types'
 import type { createSelectedSourceScope } from './source-scope'
 
 export const CLASSIFIED_MAPPING_HASH = '27fbef7ec0fc73e58029295c8fbbe7d276c4d6095e358fe57e3058e1eb4f4567'
+export const BLOG_CATEGORY_MAPPING_HASH = '514c3b2ae19649296da4b2deb4952ab690108c6701cde94deb55137aae1e3c16'
 export const PRODUCT_EXCLUSION_MAPPING_HASH = '763d7ebea95a9772343d135e3943e80cfe94f2b06ca2e466fde54e942972f55e'
 export const VARIANT_MAPPING_HASH = 'b93fbe73dddf63cb1fc51ae4bc0c5bebdacf8e12ee3795cad721a0b9a4181887'
 export const BLOG_CONTENT_MAPPING_HASH = 'b04256a9b01672b244256f2a13a00191c41ee052a8ffefa8b620c2e6ed1f1820'
@@ -18,7 +19,7 @@ export const OUTCOME_MAPPING_HASH = 'bde643f544656d7f1af2b1a0aed0d40b3c748b30517
 export const ARCHIVE_MAPPING_HASH = '367ad0adb899cfcbc59c4d44cbd735d545419ca7b0afd53491420b112b0bf43a'
 export const STATUS_MAPPING_HASH = 'b531dea88c9fc862b6111df2343dcff0dd0370292dbe308b55ca6b0fc2549870'
 export function isClassifiedMappingHash(hash: string): boolean {
-  return hash === PRODUCT_EXCLUSION_MAPPING_HASH || hash === VARIANT_MAPPING_HASH || hash === BLOG_CONTENT_MAPPING_HASH || hash === BLOG_OWNER_MAPPING_HASH || hash === DESCRIPTION_MAPPING_HASH || hash === CORRECTED_OUTCOME_MAPPING_HASH || hash === OUTCOME_MAPPING_HASH || hash === ARCHIVE_MAPPING_HASH || hash === CLASSIFIED_MAPPING_HASH || hash === STATUS_MAPPING_HASH
+  return hash === BLOG_CATEGORY_MAPPING_HASH || hash === PRODUCT_EXCLUSION_MAPPING_HASH || hash === VARIANT_MAPPING_HASH || hash === BLOG_CONTENT_MAPPING_HASH || hash === BLOG_OWNER_MAPPING_HASH || hash === DESCRIPTION_MAPPING_HASH || hash === CORRECTED_OUTCOME_MAPPING_HASH || hash === OUTCOME_MAPPING_HASH || hash === ARCHIVE_MAPPING_HASH || hash === CLASSIFIED_MAPPING_HASH || hash === STATUS_MAPPING_HASH
 }
 export const CLASSIFICATION_VERSION = 'source-classification-v1'
 const ownershipSchema = z.object({ storeId: z.string().nullable(), rule: z.enum([

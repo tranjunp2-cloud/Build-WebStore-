@@ -1,4 +1,4 @@
-import { isClassifiedMappingHash, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from './classification'
+import { isClassifiedMappingHash, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from './classification'
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, mkdir, open, realpath, writeFile } from 'node:fs/promises'
@@ -133,7 +133,7 @@ export async function prepareImportArtifact(options: { exportArtifact: string; c
   const credentials = options.credentials ? await readCredentialCsv(options.credentials, { hash: userFiles[0].sha256, headers: userFiles[0].headers, rowCount: userFiles[0].rowCount! }) : undefined
   let creatorBindingsHash: string | null = null
   if (options.creatorBindings) {
-    if (![NEW_MAPPING_HASH, CLASSIFIED_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH].includes(exported.manifest.contractSha256)) throw new MigrationError('CREATOR_BINDINGS_PROFILE_INVALID')
+    if (![NEW_MAPPING_HASH, CLASSIFIED_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH].includes(exported.manifest.contractSha256)) throw new MigrationError('CREATOR_BINDINGS_PROFILE_INVALID')
     creatorBindingsHash = (await readBoundFile(options.creatorBindings, { maxBytes: 16 * 1024 * 1024 })).hash
     await loadCreatorBindings(options.creatorBindings, creatorBindingsHash)
   }

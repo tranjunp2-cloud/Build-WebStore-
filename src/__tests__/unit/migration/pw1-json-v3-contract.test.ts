@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadImportArtifact, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from '@/lib/migration/pw1-json/artifact'
+import { loadImportArtifact, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from '@/lib/migration/pw1-json/artifact'
 import { loadCredentialSidecar, prepareImportArtifact } from '@/lib/migration/pw1-json/credentials'
 import { COLLECTIONS } from '@/lib/migration/pw1-json/types'
 
@@ -566,7 +566,7 @@ describe('[TC-F42-IMP-OUTCOME-001] Published artifact with partial data', () => 
 })
 
 describe('[TC-F42-IMP-OUTCOME-002] Corrected contract acceptance', () => {
-  it.each([['1.5.1', CORRECTED_OUTCOME_MAPPING_HASH], ['1.6.0', DESCRIPTION_MAPPING_HASH], ['1.6.1', BLOG_OWNER_MAPPING_HASH], ['1.6.2', BLOG_CONTENT_MAPPING_HASH], ['1.7.0', VARIANT_MAPPING_HASH], ['1.8.0', PRODUCT_EXCLUSION_MAPPING_HASH]])('prepares %s and retains warning-based target checks [TC-F42-IMP-DESCRIPTION-001]', async (version, mappingHash) => {
+  it.each([['1.5.1', CORRECTED_OUTCOME_MAPPING_HASH], ['1.6.0', DESCRIPTION_MAPPING_HASH], ['1.6.1', BLOG_OWNER_MAPPING_HASH], ['1.6.2', BLOG_CONTENT_MAPPING_HASH], ['1.7.0', VARIANT_MAPPING_HASH], ['1.8.0', PRODUCT_EXCLUSION_MAPPING_HASH], ['1.8.1', BLOG_CATEGORY_MAPPING_HASH]])('prepares %s and retains warning-based target checks [TC-F42-IMP-DESCRIPTION-001]', async (version, mappingHash) => {
     // Arrange
     const diagnostics: Diagnostic[] = [{ code: 'ORDER_PAYMENT_METHOD_UNVERIFIED', severity: 'warning', table: 'orders', storeId: '205', sourceId: '4', field: 'payment_method_id' }]
     const input = await fixture({ diagnostics, override: { exporterVersion: version, contractSha256: mappingHash, status: 'exported', outcome: correctedOutcome.exportOutcome(diagnostics, 0, []) } })
