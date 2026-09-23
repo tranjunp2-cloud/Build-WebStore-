@@ -1,3 +1,5 @@
+import sharp from 'sharp'
+import { PW1_PLACEHOLDER_URL } from './pw1-placeholder'
 import { SUPPORTED_IMAGE_MIMES } from '@/lib/media/image-signature'
 import { recordCreatedPw1Media } from './pw1-media-tracking'
 import { sql } from 'drizzle-orm'
@@ -11,21 +13,32 @@ export function validatePw1MediaUrl(value: string): URL {
     return url
 }
 
-async function downloadSourceImage(value: string) {
+async function placeholderImage() {
+    const svg = '<svg width="960" height="640" xmlns="http://www.w3.org/2000/svg"><rect width="960" height="640" fill="#f1f5f9"/><rect x="360" y="220" width="240" height="180" rx="16" fill="none" stroke="#94a3b8" stroke-width="8"/><circle cx="425" cy="270" r="20" fill="#94a3b8"/><path d="M375 380l70-70 50 45 40-40 50 65" fill="none" stroke="#94a3b8" stroke-width="8"/></svg>'
+    return { buffer: await sharp(Buffer.from(svg)).png().toBuffer(), mimetype: 'image/png' }
+}
+
+export async function downloadSourceImage(value: string) {
+    if (value === PW1_PLACEHOLDER_URL) return placeholderImage()
     const url = validatePw1MediaUrl(value)
     const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000) })
+    if (response.status === 403) {
+        await response.body?.cancel()
+        console.warn('[PW1 media] Source returned HTTP 403; using placeholder')
+        return placeholderImage()
+    }
     if (!response.ok || !response.body) throw new Error(`Source media download failed (HTTP ${response.status})`)
     const mimetype = (response.headers.get('content-type') || '').split(';')[0]
     if (!SUPPORTED_IMAGE_MIMES.has(mimetype) && !['image/gif', 'image/avif'].includes(mimetype)) throw new Error('Source media is not a supported raster image')
-    const limit = 10 * 1024 * 1024
-    if (Number(response.headers.get('content-length')) > limit) { await response.body.cancel(); throw new Error('Source image exceeds 10 MiB') }
+    const limit = 30 * 1024 * 1024
+    if (Number(response.headers.get('content-length')) > limit) { await response.body.cancel(); throw new Error('Source image exceeds 30 MiB') }
     const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0
     try {
         while (true) {
             const { done, value: chunk } = await reader.read()
             if (done) break
             size += chunk.length
-            if (size > limit) { await reader.cancel(); throw new Error('Source image exceeds 10 MiB') }
+            if (size > limit) { await reader.cancel(); throw new Error('Source image exceeds 30 MiB') }
             chunks.push(chunk)
         }
     } finally { reader.releaseLock() }
@@ -33,7 +46,8 @@ async function downloadSourceImage(value: string) {
 }
 
 /** Upload actual source assets through the existing shared uploader. Never replace
- * missing PW1 assets with stock images. Fail before page replacement on error. */
+ * missing category images or HTTP 403 responses with stock photos: use a neutral
+ * local placeholder instead. Other download failures still fail the store. */
 export async function importPw1BlockMedia(buckets: Record<string, unknown>[][], tenantId: number | string, payload: Payload) {
     const cache = new Map<string, number>()
     const visited = new Set<object>()

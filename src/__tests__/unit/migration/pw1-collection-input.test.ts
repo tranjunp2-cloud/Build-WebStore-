@@ -220,3 +220,15 @@ it('[TC-F35.M27] rejects a lost rich-text value instead of publishing an empty p
     setting.value = ''
     expect(() => parseMigrationInput(input)).not.toThrow()
 })
+
+it('[TC-F35.M27] retains category cards without images using the migration placeholder', () => {
+    const input = fixture()
+    const source = [{ ...input[0], pages: [{ ...input[0].pages[0], components: [{
+        id: '40', page_id: '10', status: '1', frontend_component: { name: 'category_listing' },
+        shortlist_items: [{ id: '41', name: 'Category without image', image: '', page_component_id: '40', store_id: '205' }],
+    }] }] }]
+    const entry = parseMigrationInput(source).entries[0]
+    const { contract } = adaptWebsiteInput(compactInput(entry))
+    expect(JSON.stringify(contract)).toContain('Category without image')
+    expect(JSON.stringify(contract)).toContain('https://pw1-migration.invalid/placeholder.png')
+})

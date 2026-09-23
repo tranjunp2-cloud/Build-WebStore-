@@ -1,3 +1,4 @@
+import { PW1_PUBLISH_HEADER, signPw1PublishGrant } from './pw1-publish-grant'
 import { SignJWT } from 'jose'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { Payload } from 'payload'
@@ -39,9 +40,10 @@ export async function publishMigratedStore(payload: Payload, client: Client, ent
             retryAfterMs = 0
             try {
                 // Authenticate as the verified migration owner; normal API authorization,
-                // subscription checks, page-version promotion and cache invalidation apply.
+                // page-version promotion and cache invalidation apply. A scoped grant waives billing only.
                 const token = await new SignJWT({id:user.id,collection:'users',mfa_verified:true}).setProtectedHeader({alg:'HS256'}).setIssuedAt().setExpirationTime('2m').sign(new TextEncoder().encode(secret))
-                const response = await fetch(`${origin}/api/sites/${mapping.site_id}/publish`, {method:'PATCH',redirect:'error',headers:{cookie:`payload-token=${token}`},signal:signal ? AbortSignal.any([signal,AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000)})
+                const grant = await signPw1PublishGrant({ userId: String(user.id), siteId: String(mapping.site_id), tenantId: String(mapping.tenant_id), sourceStoreId: entry.sourceStoreId, inputHash: mapping.input_hash }, secret)
+                const response = await fetch(`${origin}/api/sites/${mapping.site_id}/publish`, {method:'PATCH',redirect:'error',headers:{cookie:`payload-token=${token}`,[PW1_PUBLISH_HEADER]:grant},signal:signal ? AbortSignal.any([signal,AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000)})
                 const retryAfter = Number(response.headers.get('retry-after'))
                 if (response.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0) retryAfterMs = Math.min(60000,retryAfter*1000)
                 const body = await response.json() as {success?:boolean;error?:{code?:string;message?:string}}

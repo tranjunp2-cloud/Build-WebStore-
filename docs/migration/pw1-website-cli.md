@@ -318,3 +318,9 @@ The scanner is serialized across stores, limited to 12 source pages and 60 secon
 The regular migration source-link step now permits SPA rendering and observes the public /pages response. Absence evidence requires a complete nonempty single-page inventory with exact pagination counts and every row scoped to the expected source store. Partial/mixed-store inventories are ignored. Existing destinations and redirects to an existing page are retained. A visible not-found heading plus Back to Home control also confirms a rendered soft404 despite HTTP200. Network/TLS errors, loading shells without inventory and server errors alone do not disable links.
 
 For legacy HTTPS TLS failures, a fresh HTTP page is attempted on the same source host. Public-network guards, same-host navigation, a 60-second browser lifetime and 10-URL cap remain in place. Reports retain final URL, inventory and decision reason per source URL. Existing adapter handling removes confirmed dead links while preserving CTA text/images. No store-ID exceptions or guessed destination rewrites.
+
+### Subscription trong CLI migration
+
+CLI migration website dùng context nội bộ để bỏ qua kiểm tra subscription và quyền `website_builder`. User vẫn phải là owner đang active của tenant chứa site đích. Ngoại lệ không tạo hoặc sửa subscription; API generate trong CMS vẫn giữ nguyên hai kiểm tra và không nhận cờ bypass từ request. Chi phí AI vẫn phát sinh.
+
+Bước publish của CLI gửi grant có chữ ký server, hiệu lực 2 phút, ràng buộc user/site/tenant/source store/input hash. API chỉ miễn kiểm tra subscription cho owner active của site draft có ledger migration `completed` khớp grant. Publish CMS không có grant hợp lệ vẫn kiểm tra subscription và `website_builder`; các bước promote trang, kiểm tra dữ liệu và cache invalidation giữ nguyên.

@@ -1,3 +1,4 @@
+import { PW1_PLACEHOLDER_URL } from './pw1-placeholder'
 import { z } from 'zod'
 import { load } from 'cheerio'
 import { parseBatchInput, type BatchEntry } from './pw1-batch-input'
@@ -155,7 +156,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 if (type === 'category_listing') {
                     const items = ordered(c.shortlist_items).filter(active).map(i => {
                         const dest = resolveTarget(i.model_type, i.model_id, '', `component:${str(c.id)}/item:${str(i.id)}`)
-                        return { sourceId: str(i.id), title: str(i.name), imageUrl: str(i.image), alt: str(i.name), ...(dest ? { ...dest, ctaLabel: str(i.cta_button_text) } : {}) }
+                        return { sourceId: str(i.id), title: str(i.name), imageUrl: str(i.image).trim() || PW1_PLACEHOLDER_URL, alt: str(i.name), ...(dest ? { ...dest, ctaLabel: str(i.cta_button_text) } : {}) }
                     })
                     if (!items.length) { exclude(c.id, 'component', 'empty-category-list'); return [] }
                     return [{ ...common, content: { heading: str(config.header), items }, config: { autoplay: config.animation === 'auto', intervalMs: Number(config.timing_animation ?? 5) * 1000, sourceSettings } }]

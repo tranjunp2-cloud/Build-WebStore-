@@ -370,18 +370,22 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             }
         }
 
-        const genSub = await getActivePlanSubscription(payload, resolvedTenantId)
-        if (!genSub) {
-            return NextResponse.json(
-                { success: false, error: { code: 'SUBSCRIPTION_EXPIRED', message: 'Subscription expired or not found.' } },
-                { status: 403 }
-            )
-        }
-        if (!await canUse(payload, genSub.plan as PlanCode, 'website_builder')) {
-            return NextResponse.json(
-                { success: false, error: { code: 'FEATURE_LOCKED', message: 'Website builder is not available on your current plan.' } },
-                { status: 403 }
-            )
+        // Only the internal CLI context can bypass billing; HTTP input cannot set migration.
+        // Target ownership has already been verified above. CMS generation keeps both gates.
+        if (!migration) {
+            const genSub = await getActivePlanSubscription(payload, resolvedTenantId)
+            if (!genSub) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'SUBSCRIPTION_EXPIRED', message: 'Subscription expired or not found.' } },
+                    { status: 403 }
+                )
+            }
+            if (!await canUse(payload, genSub.plan as PlanCode, 'website_builder')) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'FEATURE_LOCKED', message: 'Website builder is not available on your current plan.' } },
+                    { status: 403 }
+                )
+            }
         }
 
         const safetyCheck = checkBusinessInfoSafety(businessInfo)
