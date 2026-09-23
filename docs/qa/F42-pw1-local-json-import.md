@@ -116,3 +116,33 @@ Implementation note: server scans lightweight authorized filter/sort metadata in
 - [x] AUTO TC-F42-IMP-DESCRIPTION-001 extension: exact 1.7.0 contract acceptance preserves outcome verification and target checks.
 
 - [x] AUTO TC-F42-IMP-EXCLUSION-001: Exact contract 1.8.0 chỉ nhận Product thiếu giá/stock có evidence đầy đủ và không emit; reject thiếu root/sai reason/sai Store/old contract; không miễn diagnostic khác.
+
+## Foundation master destination handoff
+
+- [x] AUTO TC-F42-IMP-DESTINATION: derived master preserves every source collection/Store and adds verified tenant/site IDs plus empty productCategories only to selected Stores; reject hash mismatch, malformed/missing/duplicate identity, unsafe output and existing output; failed publication leaves no final output and source unchanged.
+- [x] AUTO TC-F42-IMP-USERS: users CLI selectors and output-master flag validation; dry-run does not publish destination output. DB foundation verification remains manual until evidenced.
+
+- [x] AUTO TC-F42-IMP-POLICY-001: Contract 1.8.2 accepts absent/false reserved flags, rejects true/unknown flags, preserves manifest policy hashes and prior approval boundaries; prepare/load regression and historical version support.
+
+- [x] AUTO TC-F42-IMP-USERS-SCOPE: Foundation loads only Tenant/User/Site and authenticated identity inputs; unrelated reports/receipts are not read, master tampering is rejected, full loader still rejects invalid receipts.
+
+- [x] AUTO TC-F42-IMP-LEGACY-DASHBOARD: Legacy dashboard object and normalized default blocks compare equal without changing DB values; custom block lists and other settings still conflict.
+
+- [x] AUTO TC-F42-IMP-POLICY-002: Reviewed conflict policies require new contract, exact warning shape and enabled flag; unknown Orders remain blocked.
+
+- [x] AUTO TC-F42-IMP-SYSTEM-EMAIL: Resolve approved system creator by exact email, use arbitrary actual DB ID, reject missing/ambiguous/invalid identity without granting roles.
+
+- [x] AUTO TC-F42-IMP-MISSING-CREDENTIAL: Users-only fallback accepts absent credentials, generates distinct random passwords without keyString, rejects partial/invalid credentials, and preserves strict full-import behavior.
+
+- [x] AUTO TC-F42-IMP-EMAIL-NORMALIZATION: User email projection follows Payload lowercase/trim, leaves source unchanged and produces the same checksum for equivalent email spelling.
+
+- [x] AUTO **TC-F42-IMP-POLICY-003** — Exact 1.9.1 owner/email warning gates, exact invalid-email projection, installed Payload password authentication compatibility.
+
+- [x] AUTO **TC-F42-IMP-POLICY-004** — Catalog exclusion exact-contract/flag guards; canonical lower-ID same-Store source proof; no emitted excluded Product; disabled/historical/forged evidence rejection.
+
+- [x] AUTO **TC-F42-IMP-POLICY-005** — Source-entity omissions require the approved 1.9.3 contract, enabled entity policy and validated exclusion-family proof; earlier contracts reject active omission flags.
+
+- [x] AUTO **TC-F42-IMP-POLICY-006** — 1.9.4 permits only PROD Store 43 Orders 112/132 negative-total omissions; wrong namespace/Store/ID/disabled/historical policy fails; mixed earlier Product/owner/email/raw-retention policies remain accepted.
+
+- [x] AUTO **TC-F42-IMP-PARTS-001** — 1.10.0 descriptor-set binding, streaming/selection/spooling across parts, UTF-8 bytes, missing/extra/reordered/duplicate/tampered parts, EOF hashing and empty set; inherited policies preserved.
+- [x] AUTO **TC-F42-IMP-PARTS-002** — Destination index published last with repartitioned annotated parts; count/byte caps and complete cleanup on failure.
