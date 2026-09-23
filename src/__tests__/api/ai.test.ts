@@ -294,15 +294,56 @@ describe('AI Streaming APIs', () => {
 
     describe('POST /api/ai/generate-site', () => {
         
-        it('returns 400 if businessInfo is missing required fields', async () => {
+        it('TC-F41-26: returns 400 and records only a safe validation incident for an authenticated rejected form', async () => {
+             // Arrange
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
                  method: 'POST',
                  body: JSON.stringify({ extraInstructions: 'Make it pop' }) // Missing businessInfo
              })
+
+             // Act
              const res = await GenerateSitePOST(req)
              const body = await res.json()
+
+             // Assert
              expect(body.error.code).toBe('VALIDATION_ERROR')
              expect(body.error.details.fieldErrors).toHaveProperty('businessInfo')
+             expect(mockGenerationRecordDB).toEqual([expect.objectContaining({
+                 lifecycle: 'terminal', outcome: 'failed', recoveryStatus: 'none',
+                 generationErrors: [expect.objectContaining({
+                     phase: 'validate', locationType: 'input', code: 'FORM_INVALID',
+                 })],
+             })])
+             expect(mockGenerationRecordDB[0]).not.toHaveProperty('inputSnapshot')
+             expect(JSON.stringify(mockGenerationRecordDB)).not.toContain('Make it pop')
+        })
+
+        it('TC-F41-27: does not track an unauthenticated rejected form', async () => {
+             // Arrange
+             vi.mocked(getCurrentUser).mockResolvedValueOnce(null)
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST', body: JSON.stringify({}),
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(400)
+             expect(mockGenerationRecordDB).toHaveLength(0)
+        })
+
+        it('TC-F41-27: does not track malformed JSON because no safe field incident exists', async () => {
+             // Arrange
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST', body: '{not-json',
+             })
+
+             // Act
+             const res = await GenerateSitePOST(req)
+
+             // Assert
+             expect(res.status).toBe(400)
              expect(mockGenerationRecordDB).toHaveLength(0)
         })
 

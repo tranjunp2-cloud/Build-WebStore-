@@ -17,6 +17,7 @@ export async function parseRequest<T>(req: Request, schema: z.ZodType<T>) {
     const parsed = schema.safeParse(body)
     if (!parsed.success) {
         return {
+            validationIssues: parsed.error.issues,
             errorResponse: NextResponse.json(
                 { success: false, error: { code: 'VALIDATION_ERROR', details: parsed.error.flatten() } },
                 { status: 400 }

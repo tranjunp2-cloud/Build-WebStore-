@@ -26,6 +26,7 @@ import { createHash } from 'crypto'
 import { hashGenerationSnapshot } from './generation-snapshot-hash'
 import {
     finalizeGenerationOutcome,
+    normalizeGenerationIncident,
     type FailedPage,
     type PersistedPage,
     type TerminalErrorPhase,
@@ -87,6 +88,90 @@ export type FinishWebsiteCaptureInput = {
     outputSnapshot?: Record<string, unknown>
     fieldsTotal?: number
     fieldsFilled?: number
+}
+
+type InputValidationIssue = {
+    path?: ReadonlyArray<string | number>
+    code?: string
+    minimum?: number | bigint
+    validation?: unknown
+}
+
+function validationRuleForIssue(issue: InputValidationIssue): {
+    validationRule: 'required' | 'format' | 'min_length' | 'max_length' | 'unsupported_value' | 'contract_mismatch'
+    observedState: 'missing' | 'invalid_format' | 'too_short' | 'too_long' | 'unsupported' | 'unknown'
+} {
+    if (issue.code === 'too_small') return issue.minimum === 1
+        ? { validationRule: 'required', observedState: 'missing' }
+        : { validationRule: 'min_length', observedState: 'too_short' }
+    if (issue.code === 'too_big') return { validationRule: 'max_length', observedState: 'too_long' }
+    if (issue.code === 'invalid_string') return { validationRule: 'format', observedState: 'invalid_format' }
+    if (issue.code === 'invalid_enum_value') return { validationRule: 'unsupported_value', observedState: 'unsupported' }
+    return { validationRule: 'contract_mismatch', observedState: 'unknown' }
+}
+
+/**
+ * Records a rejected, authenticated website form without retaining its body.
+ * This is deliberately separate from startCapture: a validation failure has
+ * no safe prompt or input snapshot to persist.
+ */
+export async function captureRejectedWebsiteGeneration(input: {
+    userId: number | string
+    tenantId?: number | string | null
+    traceId?: string
+    issues: ReadonlyArray<InputValidationIssue>
+    payload?: import('payload').Payload
+}): Promise<void> {
+    const incidents = input.issues
+        .slice(0, 10)
+        .map((issue) => {
+            const path = Array.isArray(issue.path)
+                ? issue.path.filter((item): item is string => typeof item === 'string').join('.')
+                : undefined
+            const { validationRule, observedState } = validationRuleForIssue(issue)
+            return normalizeGenerationIncident(undefined, {
+                phase: 'validate', locationType: 'input', locationKey: path,
+                code: 'FORM_INVALID', category: 'input_validation', validationRule, observedState,
+                retryabilityReason: 'requires_user_input',
+                userSafeMessage: 'Thông tin tạo website chưa hợp lệ. Vui lòng kiểm tra và thử lại.',
+            })
+        })
+        .filter((incident, index, all) => all.findIndex((candidate) =>
+            candidate.locationKey === incident.locationKey
+            && candidate.validationRule === incident.validationRule
+            && candidate.observedState === incident.observedState,
+        ) === index)
+    if (incidents.length === 0) return
+    const now = new Date().toISOString()
+
+    try {
+        const payload = await resolvePayload(input.payload)
+        await payload.create({
+            collection: 'ai-generation-records',
+            data: {
+                endpoint: 'site-generator',
+                user: input.userId,
+                tenant: input.tenantId ?? undefined,
+                status: 'failed',
+                lifecycle: 'terminal',
+                outcome: 'failed',
+                // The user must correct the form; this is not a Dev incident
+                // and must never surface a "Tạo ticket" action automatically.
+                recoveryStatus: 'none',
+                traceId: input.traceId,
+                pageSummary: { expected: 0, persisted: 0, failed: 0 },
+                generationErrors: incidents,
+                userSafeMessage: incidents[0]?.userSafeMessage,
+                startedAt: now,
+                terminalAt: now,
+                lastHeartbeatAt: now,
+                completedAt: now,
+            },
+        })
+    } catch {
+        // A validation response remains authoritative even if observability is unavailable.
+        console.warn('[capture-generation] rejected website capture failed')
+    }
 }
 
 // ── SHA256 helper ────────────────────────────────────────────────────────────

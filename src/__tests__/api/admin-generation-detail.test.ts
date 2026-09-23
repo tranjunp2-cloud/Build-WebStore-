@@ -22,10 +22,10 @@ describe('[TC-F41-01/14] GET /api/admin/generations/:id', () => {
             id: 41, createdAt: '2026-09-15T08:00:00.000Z', endpoint: 'site-generator', lifecycle: 'terminal', outcome: 'partial_failed', recoveryStatus: 'eligible',
             user: { id: 2, firstName: 'Mai', lastName: 'Lan', email: 'mai@example.test' }, site: { id: 3, name: 'Lan Store', domain: 'https://lan.example.test', status: 'draft' },
             inputSnapshot: { businessInfo: { businessName: 'Lan Store', industry: 'Retail', shortDescription: 'Hoa', products: 'Hoa tươi' }, language: 'vi' },
-            pageSummary: { expected: 2, persisted: 1, failed: 1 }, pageOutcomes: [{ pageKey: 'contact', title: 'Liên hệ', status: 'failed', errorCode: 'PAGE_FAILED' }],
+            pageSummary: { expected: 2, persisted: 1, failed: 1 }, pageOutcomes: [{ pageKey: 'contact', pageId: '7', title: 'Liên hệ', status: 'persisted', errorCode: 'PAGE_FAILED' }],
             generationErrors: [{ code: 'PAGE_FAILED', locationType: 'page', userSafeMessage: 'Không thể lưu trang', sanitizedTechnicalMessage: 'safe evidence' }],
             promptText: 'do not leak', outputSnapshot: { raw: 'do not leak' }, errorLog: 'do not leak',
-        }), find: vi.fn().mockResolvedValue({ docs: [] }) }
+        }), find: vi.fn().mockResolvedValueOnce({ docs: [] }).mockResolvedValueOnce({ docs: [] }).mockResolvedValueOnce({ docs: [{ id: 7, layout: [{ blockType: 'hero', headline: 'Chào mừng' }] }] }) }
         getPayload.mockResolvedValue(payload)
 
         // Act
@@ -34,7 +34,7 @@ describe('[TC-F41-01/14] GET /api/admin/generations/:id', () => {
         // Assert
         expect(response.status).toBe(200)
         const body = await response.json() as { data: Record<string, unknown> }
-        expect(body.data).toMatchObject({ website: { name: 'Lan Store' }, user: { email: 'mai@example.test' }, pages: [{ title: 'Liên hệ', status: 'failed' }] })
+        expect(body.data).toMatchObject({ website: { name: 'Lan Store' }, user: { email: 'mai@example.test' }, pages: [{ title: 'Liên hệ', status: 'persisted', components: [{ order: 1, type: 'hero', label: 'Chào mừng' }] }] })
         expect(JSON.stringify(body)).not.toContain('do not leak')
         expect(payload.find).toHaveBeenCalledWith(expect.objectContaining({ collection: 'ai-generation-records', limit: 10, overrideAccess: true }))
         expect(payload.find).toHaveBeenCalledWith(expect.objectContaining({ collection: 'generation_recovery_jobs', limit: 10, overrideAccess: true }))

@@ -22,3 +22,16 @@ export function hasValidImageSignature(data: Uint8Array): boolean {
         signature.bytes.every((byte, index) => data[signature.offset + index] === byte),
     )
 }
+
+/** Validate the container header for the video formats accepted as ticket evidence. */
+export function hasValidEvidenceVideoSignature(data: Uint8Array, mime: string): boolean {
+    if (mime === 'video/mp4') {
+        // ISO Base Media File Format: size (4 bytes) followed by the `ftyp` box.
+        return data[4] === 0x66 && data[5] === 0x74 && data[6] === 0x79 && data[7] === 0x70
+    }
+    if (mime === 'video/webm') {
+        // EBML header; WebM is an EBML container.
+        return data[0] === 0x1A && data[1] === 0x45 && data[2] === 0xDF && data[3] === 0xA3
+    }
+    return false
+}

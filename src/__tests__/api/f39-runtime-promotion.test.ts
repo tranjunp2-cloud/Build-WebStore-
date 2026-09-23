@@ -123,7 +123,7 @@ describe('[TC-F39-AC12,15] POST /api/admin/issues runtime promotion', () => {
                 title: 'sentry: Server-authoritative failure',
                 severity: 'high',
                 category: 'other',
-                status: 'open',
+                status: 'backlog',
                 relatedType: 'runtime',
                 relatedId: 'sentry:9001',
                 description: expect.stringContaining('Server-authoritative failure'),

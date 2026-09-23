@@ -44,13 +44,14 @@ export default async function PreviewBlogDetailPage({ params, searchParams }: Pr
     const site = await payload.findByID({ collection: 'sites', id: siteId, depth: 2 }) as any
     if (!site) return notFound()
 
-    // 3. Tenant isolation (P0 — copied from main preview page)
+    // 3. Tenant isolation (P0 — super-admin has platform-wide access)
+    const isSuperAdmin = Boolean(user.roles?.includes('super-admin'))
     const userTenants = user.tenants?.map(
         (t: NonNullable<PlatformUser['tenants']>[number]) =>
             typeof t.tenant === 'object' ? t.tenant.id : t.tenant
     ) || []
     const siteTenantId = typeof site.tenant === 'object' ? site.tenant?.id : site.tenant
-    if (!userTenants.includes(siteTenantId)) {
+    if (!isSuperAdmin && !userTenants.includes(siteTenantId)) {
         console.warn('[PreviewBlog] Tenant isolation rejected: siteId=', siteId)
         return <PreviewAccessDenied />
     }

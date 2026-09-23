@@ -51,23 +51,41 @@ async function main() {
     }
     const inputHash = hashGenerationSnapshot(snapshot)
     const fixtures = [
-        { key: 'component', siteName: 'Lala Florist · component lỗi', recoveryStatus: 'eligible', outcome: 'partial_failed', locationType: 'component', locationKey: 'Sản phẩm / Gallery', code: 'INVALID_COMPONENT_CONTRACT', category: 'contract', message: 'Gallery không thỏa contract template.', retryable: true },
-        { key: 'page', siteName: 'Mộc Home · trang lỗi', recoveryStatus: 'eligible', outcome: 'partial_failed', locationType: 'page', locationKey: 'Liên hệ', code: 'PAGE_GENERATION_FAILED', category: 'generation', message: 'Không tạo được trang Liên hệ.', retryable: true },
-        { key: 'quota', siteName: 'Bình Minh Coffee · hết quota', recoveryStatus: 'ticket_required', outcome: 'failed', locationType: 'website', locationKey: null, code: 'AI_QUOTA_EXCEEDED', category: 'quota', message: 'Quota AI của website đã hết.', retryable: false },
-        { key: 'system', siteName: 'An Nhiên Studio · dịch vụ AI', recoveryStatus: 'eligible', outcome: 'failed', locationType: 'website', locationKey: null, code: 'UPSTREAM_TIMEOUT', category: 'transient', message: 'Dịch vụ AI không phản hồi trong thời gian cho phép.', retryable: true },
-        { key: 'persistence', siteName: 'Sora Bakery · không lưu được', recoveryStatus: 'ticket_required', outcome: 'failed', locationType: 'website', locationKey: null, code: 'SITE_PERSISTENCE_FAILED', category: 'persistence', message: 'Không thể lưu website sau khi AI tạo nội dung.', retryable: false },
-        { key: 'input', siteName: 'Nắng Spa · dữ liệu nhập lỗi', recoveryStatus: 'ticket_required', outcome: 'failed', locationType: 'input', locationKey: 'Thông tin doanh nghiệp', code: 'INVALID_INPUT', category: 'validation', message: 'Dữ liệu nhập chưa hợp lệ để tạo website.', retryable: false },
+        { key: 'component', siteName: 'Lala Florist · component lỗi', recoveryStatus: 'eligible', outcome: 'partial_failed', phase: 'component_persist', locationType: 'component', locationKey: 'products-gallery', code: 'INVALID_COMPONENT_CONTRACT', category: 'composition', message: 'Không thể tạo component Gallery.', retryable: true },
+        { key: 'page', siteName: 'Mộc Home · trang lỗi', recoveryStatus: 'eligible', outcome: 'partial_failed', phase: 'page_persist', locationType: 'page', locationKey: 'contact', code: 'PAGE_GENERATION_FAILED', category: 'composition', message: 'Không tạo được trang Liên hệ.', retryable: true },
+        { key: 'quota', siteName: 'Bình Minh Coffee · hết quota', recoveryStatus: 'ticket_required', outcome: 'failed', phase: 'composition', locationType: 'site', locationKey: null, code: 'AI_QUOTA_EXCEEDED', category: 'quota', message: 'Quota AI của website đã hết.', retryable: false },
+        { key: 'system', siteName: 'An Nhiên Studio · dịch vụ AI', recoveryStatus: 'eligible', outcome: 'failed', phase: 'composition', locationType: 'site', locationKey: null, code: 'UPSTREAM_TIMEOUT', category: 'system', message: 'Dịch vụ AI không phản hồi trong thời gian cho phép.', retryable: true },
+        { key: 'persistence', siteName: 'Sora Bakery · không lưu được', recoveryStatus: 'ticket_required', outcome: 'failed', phase: 'site_persist', locationType: 'site', locationKey: null, code: 'SITE_PERSISTENCE_FAILED', category: 'persistence', message: 'Không thể lưu website sau khi AI tạo nội dung.', retryable: false },
+        // Keep one untouched escalation fixture so operators can open the
+        // confirmation dialog and inspect the generated Dev handoff locally.
+        { key: 'ticket-preview', siteName: 'Demo ticket Dev · chưa gửi', recoveryStatus: 'ticket_required', outcome: 'partial_failed', phase: 'page_persist', locationType: 'page', locationKey: 'about', code: 'PAGE_GENERATION_FAILED', category: 'persistence', message: 'Không thể lưu trang Giới thiệu sau khi AI tạo nội dung.', retryable: false },
+        { key: 'ticket-handoff-preview', siteName: 'Demo ticket Dev · đủ context', recoveryStatus: 'ticket_required', outcome: 'partial_failed', phase: 'page_persist', locationType: 'page', locationKey: 'contact', code: 'PAGE_GENERATION_FAILED', category: 'persistence', message: 'Không thể lưu trang Liên hệ sau khi AI tạo nội dung.', retryable: false },
+        { key: 'operator-resolution', siteName: 'Demo người trực xác nhận · tạo ticket', recoveryStatus: 'ticket_required', outcome: 'partial_failed', phase: 'page_persist', locationType: 'page', locationKey: 'contact', code: 'PAGE_GENERATION_FAILED', category: 'persistence', message: 'Fixture để test ticket Done → người trực kiểm tra → hoàn tất hoặc reopen.', retryable: false },
+        { key: 'workflow-ticket-page', siteName: 'Test workflow · lỗi tạo trang', recoveryStatus: 'ticket_required', outcome: 'partial_failed', phase: 'page_persist', locationType: 'page', locationKey: 'about', code: 'PAGE_GENERATION_FAILED', category: 'persistence', message: 'Fixture độc lập để test tạo ticket và kéo status.', retryable: false },
+        { key: 'workflow-ticket-save', siteName: 'Test workflow · không lưu website', recoveryStatus: 'ticket_required', outcome: 'failed', phase: 'site_persist', locationType: 'site', locationKey: null, code: 'SITE_PERSISTENCE_FAILED', category: 'persistence', message: 'Fixture độc lập để test reopen ticket sau khi QA fail.', retryable: false },
+        { key: 'workflow-ticket-quota', siteName: 'Test workflow · hết quota AI', recoveryStatus: 'ticket_required', outcome: 'failed', phase: 'composition', locationType: 'site', locationKey: null, code: 'AI_QUOTA_EXCEEDED', category: 'quota', message: 'Fixture độc lập để test ticket Done và xác nhận user.', retryable: false },
+        { key: 'input', siteName: 'Nắng Spa · dữ liệu nhập lỗi', recoveryStatus: 'none', outcome: 'failed', phase: 'validate', locationType: 'input', locationKey: 'businessInfo.businessName', code: 'INVALID_INPUT', category: 'input_validation', message: 'Tên doanh nghiệp đang bị thiếu.', retryable: false, validationRule: 'required', observedState: 'missing' },
     ] as const
 
     let created = 0
     for (const fixture of fixtures) {
         const traceId = `f41-ui-fixture-${fixture.key}-v1`
+        const pageOutcomes = fixture.key === 'page'
+            ? [{ pageKey: 'contact', title: 'Liên hệ', slug: 'contact', status: 'failed', blockCount: 2, errorCode: fixture.code, errorSummary: 'Không thể tạo trang Liên hệ.' }]
+            : fixture.key === 'component'
+                ? [{ pageKey: 'products', title: 'Sản phẩm', slug: 'products', status: 'failed', blockCount: 4, errorCode: fixture.code, errorSummary: 'Component Gallery không thể tạo.' }]
+                : []
         const existing = await payload.find({ collection: 'ai-generation-records', where: { traceId: { equals: traceId } }, limit: 1, depth: 0, overrideAccess: true })
         if (existing.docs[0]) {
             // Fixtures created before canonical hashing used insertion-order
             // JSON.stringify and cannot be retried after JSONB reload. Keep
             // this local-only seed idempotent while repairing its test data.
-            await payload.update({ collection: 'ai-generation-records', id: existing.docs[0].id, overrideAccess: true, data: { inputSnapshot: snapshot, inputHash, inputSchemaVersion: 'f41.v1' } })
+            await payload.update({ collection: 'ai-generation-records', id: existing.docs[0].id, overrideAccess: true, data: {
+                inputSnapshot: snapshot, inputHash, inputSchemaVersion: 'f41.v1',
+                recoveryStatus: fixture.recoveryStatus,
+                pageOutcomes,
+                generationErrors: [{ phase: fixture.phase, locationType: fixture.locationType, ...(fixture.locationKey ? { locationKey: fixture.locationKey } : {}), ...(fixture.validationRule ? { validationRule: fixture.validationRule, observedState: fixture.observedState } : {}), code: fixture.code, category: fixture.category, retryabilityReason: fixture.retryable ? 'transient_timeout' : 'requires_operator_review', operatorMessage: fixture.message, userSafeMessage: 'Đã ghi nhận lỗi. Xem detail để xử lý.', sanitizedTechnicalMessage: `Normalized diagnostic: ${fixture.code}.` }],
+            } })
             continue
         }
         const site = await payload.create({
@@ -81,7 +99,8 @@ async function main() {
                 promptMode: 'hashed', promptHash: inputHash, status: 'failed', lifecycle: 'terminal', outcome: fixture.outcome, recoveryStatus: fixture.recoveryStatus,
                 traceId, inputSnapshot: snapshot, inputSchemaVersion: 'f41.v1', inputHash,
                 pageSummary: { expected: 5, persisted: fixture.outcome === 'partial_failed' ? 4 : 0, failed: fixture.outcome === 'partial_failed' ? 1 : 5 },
-                generationErrors: [{ phase: fixture.locationType === 'input' ? 'validate_input' : 'site_generation', locationType: fixture.locationType, ...(fixture.locationKey ? { locationKey: fixture.locationKey } : {}), code: fixture.code, category: fixture.category, retryabilityReason: fixture.retryable ? 'website_retry_allowed' : 'ticket_required', operatorMessage: fixture.message, userSafeMessage: fixture.message }],
+                pageOutcomes,
+                generationErrors: [{ phase: fixture.phase, locationType: fixture.locationType, ...(fixture.locationKey ? { locationKey: fixture.locationKey } : {}), ...(fixture.validationRule ? { validationRule: fixture.validationRule, observedState: fixture.observedState } : {}), code: fixture.code, category: fixture.category, retryabilityReason: fixture.retryable ? 'transient_timeout' : 'requires_operator_review', operatorMessage: fixture.message, userSafeMessage: 'Đã ghi nhận lỗi. Xem detail để xử lý.', sanitizedTechnicalMessage: `Normalized diagnostic: ${fixture.code}.` }],
                 userSafeMessage: fixture.retryable ? 'Chúng tôi đang hoàn thiện website của bạn.' : 'Thông tin của bạn đã được lưu.', startedAt: new Date(Date.now() - 120_000).toISOString(), terminalAt: new Date(Date.now() - 10_000).toISOString(), lastHeartbeatAt: new Date(Date.now() - 10_000).toISOString(),
             },
         })

@@ -125,7 +125,7 @@ export const AiGenerationRecords: CollectionConfig = {
         },
         {
             name: 'recoveryStatus', type: 'select', index: true,
-            options: ['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'stale_running'],
+            options: ['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'ticket_verification_required', 'operator_verifying', 'operator_resolved', 'stale_running'],
             admin: { description: 'Operations recovery state; do not infer from error text in UI' },
         },
         {
@@ -164,6 +164,9 @@ export const AiGenerationRecords: CollectionConfig = {
         {
             name: 'generationErrors', type: 'array', fields: [
                 { name: 'phase', type: 'text' }, { name: 'locationType', type: 'text' }, { name: 'locationKey', type: 'text' },
+                { name: 'locationLabel', type: 'text' },
+                { name: 'validationRule', type: 'select', options: ['required', 'format', 'min_length', 'max_length', 'unsupported_value', 'contract_mismatch'] },
+                { name: 'observedState', type: 'select', options: ['missing', 'invalid_format', 'too_short', 'too_long', 'unsupported', 'unknown'] },
                 { name: 'code', type: 'text' }, { name: 'category', type: 'text' }, { name: 'retryabilityReason', type: 'text' },
                 { name: 'operatorMessage', type: 'textarea' }, { name: 'userSafeMessage', type: 'textarea' },
                 { name: 'sanitizedTechnicalMessage', type: 'textarea' }, { name: 'signature', type: 'text' },

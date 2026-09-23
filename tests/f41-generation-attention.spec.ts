@@ -41,6 +41,8 @@ const attentionRow = {
   },
 };
 
+const realTicketGenerationId = process.env.E2E_F41_TICKET_GENERATION_ID;
+
 const successRow = {
   id: "e2e-success-run",
   submittedAt: "2026-09-15T07:00:00.000Z",
@@ -104,6 +106,7 @@ function response(items: Array<Record<string, unknown>>): GenerationListResponse
 }
 
 function detailResponse(row: typeof attentionRow | typeof retryableRow) {
+  const isRetryable = row.recoveryPolicy.action === "retry_website";
   return {
     data: {
       ...row,
@@ -114,8 +117,22 @@ function detailResponse(row: typeof attentionRow | typeof retryableRow) {
       input: { available: true, summary: [["Tên doanh nghiệp", "E2E recovery site"], ["Ngành hàng", "Retail"], ["Mô tả", "Test store"], ["Sản phẩm / dịch vụ", "Flowers"], ["Ngôn ngữ", "vi"]], full: { businessName: "E2E recovery site", extraInstructions: "Keep this content concise" } },
       inputSchemaVersion: "f41.v1",
       inputHash: "fixture-hash",
+      traceId: "f41-ui-fixture-e2e-detail",
       pages: [{ pageKey: "contact", title: "Liên hệ", slug: "contact", pageId: "page-1", status: "failed", blockCount: 2, errorCode: "PAGE_FAILED", errorSummary: "Không thể lưu trang" }],
       errors: [{ phase: "page_persist", locationType: "page", locationKey: "contact", code: "PAGE_FAILED", category: "persistence", retryabilityReason: null, message: "Không thể lưu trang", technicalMessage: "safe evidence" }],
+      incident: {
+        kind: row.incidentSummary?.kind ?? "unknown",
+        label: row.incidentSummary?.label ?? "Lỗi tạo website",
+        location: { type: "page", key: null, label: "Trang bị ảnh hưởng", known: true },
+        cause: { label: "Không thể tạo trang", code: "PAGE_GENERATION_FAILED", phase: "page_persist", validationRule: null, observedState: null },
+        impact: { expected: 5, persisted: 4, failed: 1, summary: "1/5 trang chưa tạo, 4 trang đã lưu." },
+        recovery: { retryable: isRetryable, scope: isRetryable ? "website" : "none", reasonCode: row.recoveryPolicy.reasonCode },
+        owner: { kind: isRetryable ? "operator" : "dev", label: isRetryable ? "Người trực tracking" : "Team Dev" },
+        nextAction: isRetryable ? { kind: "retry_website", label: "Gen lại toàn bộ website." } : { kind: "open_issues", label: "Tạo ticket để team Dev điều tra." },
+        developerEvidence: { phase: "page_persist", technicalMessage: "safe evidence" },
+        legacy: false,
+        relatedErrorCount: 1,
+      },
       timeline: [{ event: "submitted", at: row.submittedAt }, { event: "terminal", at: row.submittedAt }],
       durationMs: 1200,
       lineage: { source: "user_submit", parentGenerationId: null, retryRootGenerationId: null, retryAttempt: 0 },
@@ -186,6 +203,57 @@ test.describe("US-F41-02 Needs Attention", () => {
     ]);
   });
 
+  test("[TC-F41-23] Super Admin creates one Dev ticket from a non-recoverable generation", async ({ page }) => {
+    test.skip(
+      !process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE,
+      "Requires the dedicated Super Admin E2E account configured by auth.setup.ts.",
+    );
+
+    // Arrange
+    await page.route("**/api/admin/generations**", async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(response([attentionRow])) });
+    });
+    await page.route("**/api/admin/generations/e2e-attention-run/issue", async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { id: "e2e-issue", created: true, href: "/studio/issues?relatedType=generation&relatedId=e2e-attention-run" } }),
+      });
+    });
+
+    // Act
+    await page.goto("/studio/generations");
+    await page.getByRole("button", { name: "Tạo ticket Dev cho generation #e2e-attention-run" }).click();
+    await expect(page.getByRole("heading", { name: "Chuyển lỗi này cho team Dev?" })).toBeVisible();
+    await expect(page.getByText("Dev cần làm")).toBeVisible();
+    await expect(page.getByText("Không gửi:")).toBeVisible();
+    await page.getByRole("button", { name: "Tạo ticket Dev", exact: true }).click();
+
+    // Assert
+    await expect(page.getByRole("link", { name: "Mở ticket" })).toHaveAttribute("href", "/studio/issues?relatedType=generation&relatedId=e2e-attention-run");
+    await expect(page.getByRole("status")).toHaveText("Đã tạo ticket Dev.");
+  });
+
+  test("[TC-F41-23] Super Admin creates or opens a Dev ticket against the real protected endpoint", async ({ page }) => {
+    test.skip(
+      !process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE || !realTicketGenerationId,
+      "Requires Super Admin credentials and an e2e-f41 ticket-eligible generation fixture.",
+    );
+
+    // Arrange / Act — no API route is mocked. The configured fixture belongs
+    // only to the E2E tenant and is safe to dedupe across reruns.
+    await page.goto(`/studio/generations/${realTicketGenerationId}`);
+    const create = page.getByRole("button", { name: `Tạo ticket Dev cho generation #${realTicketGenerationId}` });
+    if (await create.isVisible()) {
+      await create.click();
+      await page.getByRole("button", { name: "Tạo ticket Dev", exact: true }).click();
+    }
+
+    // Assert
+    await expect(page.getByRole("link", { name: "Mở ticket" })).toBeVisible();
+  });
+
   test("[TC-F41-13] Super Admin sees a queued retry only after the retry API returns 202", async ({ page }) => {
     test.skip(
       !process.env.TEST_EMAIL || !process.env.TEST_PASSWORD || !process.env.E2E_TEST_OTP_CODE,
@@ -209,7 +277,7 @@ test.describe("US-F41-02 Needs Attention", () => {
     // Act
     await page.goto("/studio/generations");
     await page.getByRole("button", { name: "Gen lại website e2e-retryable-run" }).click();
-    await page.getByRole("button", { name: "Xác nhận gen lại" }).click();
+    await page.getByRole("button", { name: "Tạo lần gen lại" }).click();
 
     // Assert — only a positive accepted response changes the row into monitor state.
     await expect(page.getByRole("button", { name: "Đang gen lại website e2e-retryable-run" })).toBeDisabled();
@@ -238,7 +306,7 @@ test.describe("US-F41-02 Needs Attention", () => {
     // Act
     await page.goto("/studio/generations");
     await page.getByRole("button", { name: "Gen lại website e2e-retryable-run" }).click();
-    await page.getByRole("button", { name: "Xác nhận gen lại" }).click();
+    await page.getByRole("button", { name: "Tạo lần gen lại" }).click();
 
     // Assert — a generic conflict must never be represented as a queued retry.
     await expect(page.getByRole("alert")).toHaveText("Retry đã hết lượt.");
@@ -276,7 +344,7 @@ test.describe("US-F41-02 Needs Attention", () => {
     await page.goto("/studio/generations");
     await page.getByRole("button", { name: "Xem generation e2e-retryable-run" }).click();
     await page.getByRole("button", { name: "Gen lại website e2e-retryable-run" }).click();
-    await page.getByRole("button", { name: "Xác nhận gen lại" }).click();
+    await page.getByRole("button", { name: "Tạo lần gen lại" }).click();
 
     // Assert — the detail page reloads its server-owned state after acceptance.
     await expect(page.getByRole("button", { name: "Đang gen lại website e2e-retryable-run" })).toBeDisabled();

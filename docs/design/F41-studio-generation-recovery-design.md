@@ -82,6 +82,37 @@ Auto-retry đã thất bại 1/1 · Có thể retry website
 
 Không dùng raw stack trace làm primary copy. Không hiển thị action retry nếu backend không trả policy hợp lệ.
 
+## 3.1 Sự cố cần xử lý — nguồn sự thật cho Operations
+
+Không lặp một alert trạng thái và một card lỗi chung chung. Detail lỗi render
+một khối **Sự cố cần xử lý**; status header chỉ làm tín hiệu ngắn. Khối này là
+nguồn chung cho Tracker, QA, Dev và snapshot của Issue & Feedback.
+
+```text
+SỰ CỐ CẦN XỬ LÝ                              [Cần Dev xử lý]
+Lỗi gì?        Dữ liệu đầu vào không hợp lệ
+Vị trí lỗi     Form tạo website → Thông tin doanh nghiệp
+Nguyên nhân    Chưa có dữ liệu hợp lệ để tạo nội dung website.
+Ảnh hưởng      Không tạo được 5/5 trang · chưa có website preview.
+Khôi phục      Không thể gen lại: form gốc sẽ lặp lại lỗi này.
+Owner / next   Dev điều tra → [Tạo ticket Dev] (US-F41-05)
+
+▸ Thông tin Dev (phase, normalized code, sanitized technical evidence)
+```
+
+| Loại incident | Vị trí phải hiển thị | Điều không được suy diễn |
+|---|---|---|
+| Input | `Form tạo website → {locationLabel}` | Không show raw value của field. |
+| Page | `Trang → {page title/key}` | Không tự gán component khi chưa capture. |
+| Component | `Trang → component type/key` | Không hiển thị stack/provider error làm primary copy. |
+| Quota/system | `Toàn website → quota/dịch vụ` | Không lộ account/quota secret hoặc provider credentials. |
+| Legacy | `Unknown — dữ liệu cũ chưa capture` | Không báo chính xác vị trí lỗi khi không có evidence. |
+
+`Thông tin Dev` chỉ render khi có sanitized evidence hoặc duration hữu ích;
+schema/hash đơn lẻ không phải nội dung vận hành. CTA `Tạo ticket Dev` chỉ
+render khi API F41-05 tồn tại; trước đó copy phải là `Mở Issues & feedback`,
+không tuyên bố ticket đã được tạo.
+
 ## End-user copy
 
 | Internal state | Copy user thấy |

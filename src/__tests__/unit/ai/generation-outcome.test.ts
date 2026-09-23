@@ -1,10 +1,82 @@
 import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { finalizeGenerationOutcome } from '@/lib/ai/generation-outcome'
-import { finishWebsiteCapture } from '@/lib/ai/capture-generation'
+import { finalizeGenerationOutcome, normalizeGenerationIncident } from '@/lib/ai/generation-outcome'
+import { captureRejectedWebsiteGeneration, finishWebsiteCapture } from '@/lib/ai/capture-generation'
 
 describe('finalizeGenerationOutcome', () => {
+    it('TC-F41-26: persists an allowlisted input incident without a submitted value', () => {
+        // Arrange
+        const submittedValue = 'private-business@example.com'
+
+        // Act
+        const incident = normalizeGenerationIncident(new Error(`validation failed: ${submittedValue}`), {
+            phase: 'validate',
+            locationType: 'input',
+            locationKey: 'businessInfo.businessName',
+            code: 'FORM_INVALID',
+            category: 'input_validation',
+            validationRule: 'required',
+            observedState: 'missing',
+            operatorMessage: 'Tên doanh nghiệp là bắt buộc.',
+            sanitizedTechnicalMessage: `FORM_INVALID value=${submittedValue}`,
+        })
+
+        // Assert
+        expect(incident).toMatchObject({
+            phase: 'validate', locationType: 'input', locationKey: 'businessInfo.businessName',
+            locationLabel: 'Tên doanh nghiệp', validationRule: 'required', observedState: 'missing',
+            code: 'FORM_INVALID', category: 'input_validation',
+        })
+        expect(JSON.stringify(incident)).not.toContain(submittedValue)
+    })
+
+    it('TC-F41-26: marks an unsupported location as Unknown instead of persisting a raw key', () => {
+        // Arrange
+        const rawLocation = 'businessInfo.private note: private-business@example.com'
+
+        // Act
+        const incident = normalizeGenerationIncident(undefined, {
+            phase: 'validate', locationType: 'input', locationKey: rawLocation,
+            code: 'FORM_INVALID', category: 'input_validation', observedState: 'unknown',
+        })
+
+        // Assert
+        expect(incident.locationKey).toBeUndefined()
+        expect(incident.locationLabel).toBeUndefined()
+        expect(JSON.stringify(incident)).not.toContain(rawLocation)
+    })
+
+    it('TC-F41-26: stores an authenticated rejected form as a terminal incident without its body', async () => {
+        // Arrange
+        const create = vi.fn().mockResolvedValue({ id: 71 })
+        const privateValue = 'private-business@example.com'
+
+        // Act
+        await captureRejectedWebsiteGeneration({
+            userId: 3,
+            tenantId: 8,
+            traceId: 'request-71',
+            issues: [
+                { path: ['businessInfo', 'businessName'], code: 'too_small', minimum: 1 },
+                { path: ['businessInfo', 'products'], code: 'too_small', minimum: 1 },
+            ],
+            payload: { create } as never,
+        })
+
+        // Assert
+        const data = create.mock.calls[0]?.[0].data
+        expect(data).toMatchObject({
+            user: 3, tenant: 8, lifecycle: 'terminal', outcome: 'failed', recoveryStatus: 'none',
+            generationErrors: [expect.objectContaining({
+                phase: 'validate', locationType: 'input', locationKey: 'businessInfo.businessName',
+                locationLabel: 'Tên doanh nghiệp', validationRule: 'required', observedState: 'missing',
+            }), expect.objectContaining({ locationKey: 'businessInfo.products' })],
+        })
+        expect(data).not.toHaveProperty('inputSnapshot')
+        expect(JSON.stringify(data)).not.toContain(privateValue)
+    })
+
     it('TC-F41-02: does not report success when site persistence fails after composition', () => {
         // Arrange
         const input = {
@@ -21,7 +93,7 @@ describe('finalizeGenerationOutcome', () => {
         // Assert
         expect(result.outcome).toBe('failed')
         expect(result.errors[0]).toMatchObject({ code: 'SITE_PERSISTENCE_FAILED', phase: 'site_persist' })
-        expect(result.errors[0]?.operatorMessage).not.toContain('/vercel/path0')
+        expect(result.errors[0]?.sanitizedTechnicalMessage).toBe('Normalized diagnostic: SITE_PERSISTENCE_FAILED.')
     })
 
     it('TC-F41-02: classifies a composition timeout without inventing a persistence failure', () => {
@@ -78,6 +150,24 @@ describe('finalizeGenerationOutcome', () => {
         expect(result.errors[0]).toMatchObject({ code: 'PERSISTENCE_TIMEOUT', locationKey: 'blog' })
     })
 
+    it('TC-F41-26: never persists a generated page title inside the incident record', () => {
+        // Arrange
+        const privateTitle = 'Liên hệ private-business@example.com token=private-token'
+
+        // Act
+        const result = finalizeGenerationOutcome({
+            expectedPages: 1,
+            persistedPages: [],
+            failedPages: [{ key: 'contact', slug: 'contact', title: privateTitle, error: new Error('page write failed') }],
+        })
+
+        // Assert
+        expect(result.errors[0]).toMatchObject({ locationType: 'page', locationKey: 'contact' })
+        expect(result.errors[0]).toHaveProperty('locationLabel', 'Trang bị ảnh hưởng')
+        expect(JSON.stringify(result.errors[0])).not.toContain(privateTitle)
+        expect(JSON.stringify(result.errors[0])).not.toContain('private-token')
+    })
+
     it('TC-F41-04: preserves only bounded, sanitized operator evidence', () => {
         // Arrange
         const input = {
@@ -85,7 +175,7 @@ describe('finalizeGenerationOutcome', () => {
             persistedPages: [],
             failedPages: [{
                 key: 'home', slug: '/', title: 'Home',
-                error: 'password=super-secret token=abc /home/runner/app/route.ts',
+                error: 'password=super-secret token=abc prompt=private-business@example.com /home/runner/app/route.ts',
             }],
         }
 
@@ -93,9 +183,11 @@ describe('finalizeGenerationOutcome', () => {
         const result = finalizeGenerationOutcome(input)
 
         // Assert
-        expect(result.errors[0]?.operatorMessage).toContain('password=<redacted>')
-        expect(result.errors[0]?.operatorMessage).not.toContain('super-secret')
-        expect(result.errors[0]?.operatorMessage).not.toContain('/home/runner')
+        expect(result.errors[0]?.operatorMessage).toBe('Hệ thống chưa thể lưu một trang của website.')
+        expect(result.errors[0]?.sanitizedTechnicalMessage).toBe('Normalized diagnostic: PAGE_PERSISTENCE_FAILED.')
+        expect(JSON.stringify(result.errors[0])).not.toContain('super-secret')
+        expect(JSON.stringify(result.errors[0])).not.toContain('private-business@example.com')
+        expect(JSON.stringify(result.errors[0])).not.toContain('/home/runner')
         expect(result.userSafeMessage).not.toContain('PAGE_PERSISTENCE_FAILED')
     })
 
@@ -114,9 +206,8 @@ describe('finalizeGenerationOutcome', () => {
         const result = finalizeGenerationOutcome(input)
 
         // Assert
-        expect(result.errors[0]?.operatorMessage).toContain('Authorization=<redacted>')
-        expect(result.errors[0]?.operatorMessage).not.toContain('secret-token')
-        expect(result.errors[0]?.operatorMessage).not.toContain('private-value')
+        expect(JSON.stringify(result.errors[0])).not.toContain('secret-token')
+        expect(JSON.stringify(result.errors[0])).not.toContain('private-value')
     })
 
     it('TC-F41-04: redacts JSON-shaped provider secrets', () => {
@@ -134,10 +225,10 @@ describe('finalizeGenerationOutcome', () => {
         const result = finalizeGenerationOutcome(input)
 
         // Assert
-        expect(result.errors[0]?.operatorMessage).not.toContain('private-provider-token')
-        expect(result.errors[0]?.operatorMessage).not.toContain('private-bearer')
-        expect(result.errors[0]?.operatorMessage).not.toContain('secret-value')
-        expect(result.errors[0]?.operatorMessage).not.toContain('sk-private-key')
+        expect(JSON.stringify(result.errors[0])).not.toContain('private-provider-token')
+        expect(JSON.stringify(result.errors[0])).not.toContain('private-bearer')
+        expect(JSON.stringify(result.errors[0])).not.toContain('secret-value')
+        expect(JSON.stringify(result.errors[0])).not.toContain('sk-private-key')
     })
 
     it('TC-F41-04: reports an explicit successful terminal state without error evidence', () => {
@@ -233,6 +324,9 @@ describe('finalizeGenerationOutcome', () => {
         expect(f41Block).toContain('ADD COLUMN IF NOT EXISTS lifecycle varchar')
         expect(f41Block).toContain('CREATE TABLE IF NOT EXISTS ai_generation_records_page_outcomes')
         expect(f41Block).toContain('CREATE TABLE IF NOT EXISTS ai_generation_records_generation_errors')
+        expect(f41Block).toContain('location_label varchar, validation_rule varchar, observed_state varchar')
+        expect(f41Block).toContain("name: 'ai_generation_records_generation_errors.structured_incident_columns'")
+        expect(f41Block).toContain('ADD COLUMN IF NOT EXISTS location_label varchar')
         expect(f41Block).toMatch(/id varchar PRIMARY KEY DEFAULT gen_random_uuid\(\)::text/)
         expect(f41Block).toContain('_order integer NOT NULL DEFAULT 0')
         expect(f41Block).toContain('_parent_id integer NOT NULL REFERENCES ai_generation_records(id)')

@@ -3397,6 +3397,14 @@ const MIGRATIONS = [
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS related_id varchar;`,
   },
   {
+    name: 'template_issues.alter_dedupe_key',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS dedupe_key varchar;`,
+  },
+  {
+    name: 'template_issues.create_dedupe_key_uniq',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS template_issues_dedupe_key_uniq ON template_issues (dedupe_key) WHERE dedupe_key IS NOT NULL;`,
+  },
+  {
     name: 'template_issues.alter_reported_by_id',
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS reported_by_id integer REFERENCES users(id) ON DELETE SET NULL;`,
   },
@@ -3407,6 +3415,76 @@ const MIGRATIONS = [
   {
     name: 'template_issues.alter_resolved_at',
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS resolved_at timestamp;`,
+  },
+  {
+    name: 'enum_template_issues_status.add_f41_workflow_values',
+    sql: `DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_template_issues_status') THEN
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'in_progress';
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'dev_fixed';
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'testing';
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'done';
+            END IF;
+          END $$;`,
+  },
+  {
+    name: 'template_issues.normalize_f41_workflow_statuses',
+    sql: `UPDATE template_issues
+          SET status = CASE status
+            WHEN 'in-review' THEN 'in_progress'
+            WHEN 'fixed' THEN 'done'
+            WHEN 'wont-fix' THEN 'done'
+            ELSE status
+          END
+          WHERE status IN ('in-review', 'fixed', 'wont-fix');`,
+  },
+  {
+    name: 'enum_template_issues_status.add_f41_board_values',
+    sql: `DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_template_issues_status') THEN
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'backlog';
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'review';
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'reopen';
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'code_review';
+        END IF;
+      END $$;`,
+  },
+  {
+    name: 'template_issues.normalize_f41_board_statuses',
+    sql: `UPDATE template_issues
+          SET status = CASE status
+            WHEN 'open' THEN 'backlog'
+            WHEN 'dev_fixed' THEN 'code_review'
+            ELSE status
+          END
+          WHERE status IN ('open', 'dev_fixed');`,
+  },
+  {
+    name: 'template_issues.default_f41_board_status',
+    sql: `ALTER TABLE IF EXISTS template_issues ALTER COLUMN status SET DEFAULT 'backlog';`,
+  },
+  {
+    name: 'template_issues.remove_f41_review_code_review_statuses',
+    sql: `UPDATE template_issues
+          SET status = CASE status
+            WHEN 'review' THEN 'backlog'
+            WHEN 'code_review' THEN 'dev_fixed'
+            ELSE status
+          END
+          WHERE status IN ('review', 'code_review');`,
+  },
+  {
+    name: 'enum_template_issues_related_type.add_manual',
+    sql: `DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_template_issues_related_type') THEN
+              ALTER TYPE enum_template_issues_related_type ADD VALUE IF NOT EXISTS 'manual';
+            END IF;
+          END $$;`,
+  },
+  {
+    name: 'template_issues.assignment_target',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS assignment_target varchar NOT NULL DEFAULT 'unassigned';`,
   },
 
   // ── F40: QA run / result / immutable deploy-impact snapshot ──────────────
@@ -3888,9 +3966,15 @@ const MIGRATIONS = [
     id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0,
     _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
     _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, phase varchar, location_type varchar, location_key varchar,
+    location_label varchar, validation_rule varchar, observed_state varchar,
     code varchar, category varchar, retryability_reason varchar, operator_message text, user_safe_message text,
     sanitized_technical_message text, signature varchar);` },
   { name: 'ai_generation_records_generation_errors.parent_idx', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_generation_errors_parent_idx ON ai_generation_records_generation_errors (_parent_id);` },
+  // F41-07: CREATE TABLE does not update an existing Payload array table.
+  { name: 'ai_generation_records_generation_errors.structured_incident_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records_generation_errors
+    ADD COLUMN IF NOT EXISTS location_label varchar,
+    ADD COLUMN IF NOT EXISTS validation_rule varchar,
+    ADD COLUMN IF NOT EXISTS observed_state varchar;` },
 
   // ── F41-03: durable, isolated website recovery queue ────────────────────
   { name: 'ai_generation_records.f41_retry_lineage_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records
@@ -5477,23 +5561,82 @@ const MIGRATIONS = [
     name: 'categories.drop_image_id',
     sql: `ALTER TABLE categories DROP COLUMN IF EXISTS image_id;`,
   },
+  // ── F41 US-F41-05: safe enum values for operator resolution workflow ──
+  {
+    name: 'enum_ai_generation_records_recovery_status.operator_verifying',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ai_generation_records_recovery_status') THEN
+        ALTER TYPE enum_ai_generation_records_recovery_status ADD VALUE IF NOT EXISTS 'operator_verifying';
+      END IF;
+    END $$;`,
+  },
+  {
+    name: 'enum_ai_generation_records_recovery_status.operator_resolved',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ai_generation_records_recovery_status') THEN
+        ALTER TYPE enum_ai_generation_records_recovery_status ADD VALUE IF NOT EXISTS 'operator_resolved';
+      END IF;
+    END $$;`,
+  },
 ];
 
+// PERF: cache applied migration names in a state table so subsequent builds
+// skip the ~1125 idempotent SQL round-trips. Cut staging deploy migration
+// phase from ~5m33s to ~10s (see plans/260921-1629-GH-15-deploy-cold-build-perf).
+// Migrations flagged `critical: true` bypass the cache and always re-run —
+// use only for CREATE OR REPLACE FUNCTION bodies or safety-net idempotent
+// statements that must apply on every deploy.
 async function runMigrations(pool) {
-  console.log(`[db-setup] Running ${MIGRATIONS.length} migrations...`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS _db_setup_state (
+    name varchar PRIMARY KEY,
+    applied_at timestamptz NOT NULL DEFAULT NOW()
+  );`);
+
+  const { rows } = await pool.query('SELECT name FROM _db_setup_state;');
+  const applied = new Set(rows.map((r) => r.name));
+
+  let skipped = 0;
+  let ran = 0;
+  let alwaysRan = 0;
+  let failed = 0;
+
+  console.log(
+    `[db-setup] Running ${MIGRATIONS.length} migrations (${applied.size} previously applied)...`,
+  );
+
   for (const m of MIGRATIONS) {
+    const alwaysRun = m.critical === true;
+    if (!alwaysRun && applied.has(m.name)) {
+      skipped++;
+      continue;
+    }
     try {
       await pool.query(m.sql);
+      if (alwaysRun) {
+        alwaysRan++;
+      } else {
+        await pool.query(
+          'INSERT INTO _db_setup_state (name) VALUES ($1) ON CONFLICT (name) DO NOTHING;',
+          [m.name],
+        );
+        ran++;
+      }
       console.log(`[db-setup] ✅ ${m.name}`);
     } catch (e) {
+      failed++;
       if (m.critical) throw e;
       // Log but don't fail — column might already exist with different type etc.
+      // Not inserted into state → will retry on next build.
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
   }
   // Import ledger failures must abort setup: claims and fencing are safety boundaries.
   await runPw1MigrationSchema(pool);
   await runPw1JsonMigrationSchema(pool);
+
+  console.log(
+    `[db-setup] Migration summary: skipped=${skipped}, applied=${ran}, always-run=${alwaysRan}, failed=${failed}, total=${MIGRATIONS.length}`,
+  );
 }
 
 // PERF-04: only audited pairs may be removed. Unknown duplicate pairs fail the

@@ -4,17 +4,19 @@
  * IssueStatusBadge — colored badge for issue status.
  */
 
-export type IssueStatus = 'open' | 'in-review' | 'fixed' | 'wont-fix'
+export type IssueStatus = 'backlog' | 'reopen' | 'in_progress' | 'dev_fixed' | 'testing' | 'done'
 
 const STATUS_STYLES: Record<IssueStatus, { bg: string; text: string; label: string }> = {
-    'open':      { bg: '#eff6ff', text: '#2563eb', label: 'Open' },
-    'in-review': { bg: '#f5f3ff', text: '#7c3aed', label: 'In Review' },
-    'fixed':     { bg: '#f0fdf4', text: '#16a34a', label: 'Fixed' },
-    'wont-fix':  { bg: '#f8fafc', text: '#64748b', label: "Won't Fix" },
+    backlog:       { bg: '#f1f5f9', text: '#475569', label: 'Backlog' },
+    reopen:        { bg: '#fdf2f8', text: '#be185d', label: 'Reopen' },
+    in_progress:   { bg: '#f5f3ff', text: '#7c3aed', label: 'Dev đang xử lý' },
+    dev_fixed:     { bg: '#eff6ff', text: '#2563eb', label: 'Dev đã sửa' },
+    testing:       { bg: '#faf5ff', text: '#7e22ce', label: 'QA Testing' },
+    done:          { bg: '#f0fdf4', text: '#15803d', label: 'Done · cần test lại' },
 }
 
 export function IssueStatusBadge({ status }: { status: IssueStatus }) {
-    const s = STATUS_STYLES[status] ?? STATUS_STYLES.open
+    const s = STATUS_STYLES[status] ?? STATUS_STYLES.backlog
     return (
         <span
             style={{
