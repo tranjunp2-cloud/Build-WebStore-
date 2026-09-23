@@ -1,3 +1,4 @@
+import { masterSetHash, type MasterPart } from '@/lib/migration/pw1-json/master-parts'
 import * as correctedOutcome from '@/lib/migration/pw1-json/export-outcome'
 import { exportOutcome, exportReview, reviewMarkdown } from '@/lib/migration/pw1-json/export-outcome-v1'
 // @vitest-environment node
@@ -6,8 +7,10 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadImportArtifact, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from '@/lib/migration/pw1-json/artifact'
+import { loadImportArtifact, readImportStore, CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from '@/lib/migration/pw1-json/artifact'
 import { loadCredentialSidecar, prepareImportArtifact } from '@/lib/migration/pw1-json/credentials'
+import { checksum } from '@/lib/migration/pw1-json/projection'
+import { PENDING_POLICY_KEYS } from '@/lib/migration/pw1-json/diagnostics'
 import { COLLECTIONS } from '@/lib/migration/pw1-json/types'
 
 const CONTRACT = '27fbef7ec0fc73e58029295c8fbbe7d276c4d6095e358fe57e3058e1eb4f4567'
@@ -18,33 +21,36 @@ interface Row {
   table: string; sourceId: string; storeId: string | null; record: number; disposition: string
   fields: Record<string, string>; contributions: unknown[]
   ownership?: { storeId: string | null; rule: string; parentTable?: string; parentId?: string }
-  productExclusion?: {productId:string;reason:string}
+  sourceExclusion?: {table:string;sourceId:string;storeId:string;reason:string}
+  productExclusion?: {productId:string;reason:string;canonicalProductId?:string}
   fieldRetentionRules?: Record<string, string>
 }
 interface Diagnostic { code: string; severity: 'warning' | 'blocker'; storeId?: string; table?: string; sourceId?: string; field?: string; reason?: string }
 const snapshot = { sourceInstance: 'synthetic-v3', sourceDatabase: 'synthetic', sourceInstanceToken: 'synthetic', snapshotId: 'snapshot-v3', asOf: '2026-09-17T00:00:00Z' }
 const emptyDiagnostics = () => ({ customerCrosswalk: [], addressDispositions: [], rankDispositions: [], rankConflicts: [], profileConflicts: [] })
 const emptyCustomerStore = (storeId: string) => ({ storeId, status: 'reconciled', retainedSourceRows: [], quarantinedCustomerRefs: [], diagnostics: emptyDiagnostics() })
-async function fixture(options: { actors?: unknown[]; rows?: Row[]; diagnostics?: Diagnostic[]; customerStores?: unknown[]; products?: unknown[]; documents?: { storeId: string; collection: string; documents: unknown[] }[]; override?: Record<string, unknown> } = {}) {
+async function fixture(options: { storeIds?: string[]; sourceSnapshot?: typeof snapshot; actors?: unknown[]; rows?: Row[]; diagnostics?: Diagnostic[]; customerStores?: unknown[]; products?: unknown[]; documents?: { storeId: string; collection: string; documents: unknown[] }[]; override?: Record<string, unknown> } = {}) {
+  const fixtureStores = options.storeIds ?? ['205','285']
+  const sourceSnapshot = options.sourceSnapshot ?? snapshot
   const root = await mkdtemp(join(tmpdir(), 'pw1-json-v3-test-')); roots.push(root)
   const source = join(root, 'export'); await mkdir(source, { mode: 0o700 })
-  const rows: Row[] = ['205', '285'].map((id, i) => ({ table: 'stores', sourceId: id, storeId: id, record: i + 1,
+  const rows: Row[] = fixtureStores.map((id, i) => ({ table: 'stores', sourceId: id, storeId: id, record: i + 1,
     disposition: 'mapped', fields: { id: 'source-identity' }, contributions: [], ownership: { storeId: id, rule: 'SOURCE_STORE_ID' } }))
   rows.push(...(options.rows ?? []))
   const diagnostics = options.diagnostics ?? []
-  const master: Record<string, unknown[]>[] = ['205', '285'].map(id => ({ ...Object.fromEntries(COLLECTIONS.map(collection => [collection, []])),
+  const master: Record<string, unknown[]>[] = fixtureStores.map(id => ({ ...Object.fromEntries(COLLECTIONS.map(collection => [collection, []])),
     tenants: [{ _ref: `@tenants:stores:${id}`, metaData: { pw1StoreId: id } }], sites: [{ _ref: `@sites:stores:${id}`, tenant: `@tenants:stores:${id}` }] }))
   for (const addition of options.documents ?? []) {
-    const index = ['205', '285'].indexOf(addition.storeId)
+    const index = fixtureStores.indexOf(addition.storeId)
     if (index < 0) throw new Error('UNKNOWN_FIXTURE_STORE')
     master[index][addition.collection] = addition.documents
   }
   const files: Record<string, string> = {
     'master.json': JSON.stringify(master), 'mapping-report.json': JSON.stringify({ version: 1, diagnostics, rows }),
     'mapping-report.csv': 'table\n', 'README.md': 'Synthetic v3 reconciliation contract fixture',
-    'user-actors.json': JSON.stringify({ version: 1, purpose: 'creator-target-binding-required', sourceInstanceToken: 'synthetic', snapshotId: 'snapshot-v3', actors: options.actors ?? [] }),
-    'customer-reconciliation.json': JSON.stringify({ version: 1, sourceSnapshot: snapshot, archiveStorage: 'external-source-csv', stores: options.customerStores ?? ['205', '285'].map(emptyCustomerStore) }),
-    'product-reconciliation.json': JSON.stringify({ version: 1, sourceSnapshot: snapshot, products: options.products ?? [] }),
+    'user-actors.json': JSON.stringify({ version: 1, purpose: 'creator-target-binding-required', sourceInstanceToken: sourceSnapshot.sourceInstanceToken, snapshotId: sourceSnapshot.snapshotId, actors: options.actors ?? [] }),
+    'customer-reconciliation.json': JSON.stringify({ version: 1, sourceSnapshot, archiveStorage: 'external-source-csv', stores: options.customerStores ?? fixtureStores.map(emptyCustomerStore) }),
+    'product-reconciliation.json': JSON.stringify({ version: 1, sourceSnapshot, products: options.products ?? [] }),
   }
   for (const [name, value] of Object.entries(files)) await writeFile(join(source, name), value, { mode: 0o600 })
   const tables = [...new Set(rows.map(row => row.table))]
@@ -52,7 +58,7 @@ async function fixture(options: { actors?: unknown[]; rows?: Row[]; diagnostics?
     sha256: digest(`synthetic-${table}`), bytes: 1, selected: true, rowCount: entries.length, headers: Object.keys(entries[0].fields) } })
   const blockers = diagnostics.filter(row => row.severity === 'blocker').length
   const manifest = { version: 1, exporterVersion: '1.2.0', classificationVersion: 'source-classification-v1', contractSha256: CONTRACT,
-    sourceConfigSha256: digest('synthetic-config'), sourceSnapshot: snapshot, files: inventory,
+    sourceConfigSha256: digest('synthetic-config'), sourceSnapshot, files: inventory,
     migrationPolicy: { decisionEvidence: 'Synthetic fixture; no policy transformations authorized', preserveHistoricalOrders: false, promoteActiveCategoriesToRoot: false, deferredStoreIds: [], activeCatalogOnly: false, deferEmailTemplates: false, allowSparseVariants: false, preserveUserCreators: true, siteTypeDefault: 'ecommerce', siteTypeOverrides: {}, shippingPolicy: 'review' },
     artifacts: Object.fromEntries(Object.entries(files).map(([name, value]) => [name, digest(value)])),
     status: blockers ? 'needs_review' : 'complete', importReady: false, coverage: { accounted: true }, mapping: { complete: blockers === 0 },
@@ -566,7 +572,7 @@ describe('[TC-F42-IMP-OUTCOME-001] Published artifact with partial data', () => 
 })
 
 describe('[TC-F42-IMP-OUTCOME-002] Corrected contract acceptance', () => {
-  it.each([['1.5.1', CORRECTED_OUTCOME_MAPPING_HASH], ['1.6.0', DESCRIPTION_MAPPING_HASH], ['1.6.1', BLOG_OWNER_MAPPING_HASH], ['1.6.2', BLOG_CONTENT_MAPPING_HASH], ['1.7.0', VARIANT_MAPPING_HASH], ['1.8.0', PRODUCT_EXCLUSION_MAPPING_HASH], ['1.8.1', BLOG_CATEGORY_MAPPING_HASH]])('prepares %s and retains warning-based target checks [TC-F42-IMP-DESCRIPTION-001]', async (version, mappingHash) => {
+  it.each([['1.5.1', CORRECTED_OUTCOME_MAPPING_HASH], ['1.6.0', DESCRIPTION_MAPPING_HASH], ['1.6.1', BLOG_OWNER_MAPPING_HASH], ['1.6.2', BLOG_CONTENT_MAPPING_HASH], ['1.7.0', VARIANT_MAPPING_HASH], ['1.8.0', PRODUCT_EXCLUSION_MAPPING_HASH], ['1.8.1', BLOG_CATEGORY_MAPPING_HASH], ['1.8.2', POLICY_BOUNDARY_MAPPING_HASH]])('prepares %s and retains warning-based target checks [TC-F42-IMP-DESCRIPTION-001]', async (version, mappingHash) => {
     // Arrange
     const diagnostics: Diagnostic[] = [{ code: 'ORDER_PAYMENT_METHOD_UNVERIFIED', severity: 'warning', table: 'orders', storeId: '205', sourceId: '4', field: 'payment_method_id' }]
     const input = await fixture({ diagnostics, override: { exporterVersion: version, contractSha256: mappingHash, status: 'exported', outcome: correctedOutcome.exportOutcome(diagnostics, 0, []) } })
@@ -600,5 +606,369 @@ describe('[TC-F42-IMP-EXCLUSION-001] Missing Product data policy through prepare
     // Act / Assert
     if(forged) await expect(prepare(input)).rejects.toThrow('PRODUCT_EXCLUSION_EVIDENCE_INVALID')
     else {const prepared=await prepare(input);const artifact=await loadImportArtifact(prepared.manifestPath);expect(artifact.blockers).toEqual([])}
+  })
+})
+
+
+describe('[TC-F42-IMP-POLICY-001] Reserved flags through artifact prepare/load', () => {
+  it('loads disabled flags and rejects each true flag in a rewritten manifest', async () => {
+    // Arrange
+    const input = await fixture({ override: { exporterVersion: '1.8.2', contractSha256: POLICY_BOUNDARY_MAPPING_HASH, status: 'exported', outcome: correctedOutcome.exportOutcome([], 0, []) } })
+    Object.assign(input.manifest.migrationPolicy, Object.fromEntries(PENDING_POLICY_KEYS.map(key => [key, false])))
+    const review = correctedOutcome.exportReview([], [], [])
+    for (const [name, bytes] of Object.entries({ 'export-review.json': JSON.stringify(review), 'export-review.md': correctedOutcome.reviewMarkdown(review) })) {
+      await writeFile(join(input.source, name), bytes); input.manifest.artifacts[name] = digest(bytes)
+    }
+    await input.saveManifest()
+    // Act / Assert
+    const prepared = await prepare(input)
+    const artifact = await loadImportArtifact(prepared.manifestPath)
+    expect(artifact.manifest.mappingHash).toBe(POLICY_BOUNDARY_MAPPING_HASH)
+    expect(artifact.manifest.migrationPolicyHash).toBe(checksum(input.manifest.migrationPolicy))
+    for (const key of PENDING_POLICY_KEYS) {
+      await writeFile(join(input.source, 'master-manifest.json'), JSON.stringify({ ...input.manifest, migrationPolicy: { ...input.manifest.migrationPolicy, [key]: true } }))
+      await expect(prepareImportArtifact({ exportArtifact: input.source, output: join(input.root, key) })).rejects.toThrow('EXPORT_MANIFEST_INVALID')
+    }
+  })
+})
+
+
+describe('[TC-F42-IMP-USERS-SCOPE] Temporary foundation loader', () => {
+  it('ignores unrelated receipts while preserving full-import validation', async () => {
+    // Arrange
+    const input = await fixture()
+    const prepared = await prepare(input)
+    await writeFile(join(input.output, 'product-reconciliation.json'), '{}')
+    await writeFile(join(input.output, 'mapping-report.json'), '{}')
+    const progress = vi.fn()
+    // Act
+    const artifact = await loadImportArtifact(prepared.manifestPath, { scope: 'foundation', selector: { store: '205' }, progress })
+    // Assert
+    expect(artifact.stores.map(store => store.storeId)).toEqual(['205'])
+    expect(artifact.stores[0].collections.tenants).toHaveLength(1)
+    expect(artifact.stores[0].collections.products).toEqual([])
+    expect(progress.mock.calls.map(([event]) => event.file)).not.toContain('mapping-report.json')
+    expect(progress.mock.calls.map(([event]) => event.file)).not.toContain('product-reconciliation.json')
+    await expect(loadImportArtifact(prepared.manifestPath)).rejects.toThrow()
+  })
+  it('still rejects tampered master in foundation scope', async () => {
+    // Arrange
+    const input = await fixture()
+    const prepared = await prepare(input)
+    await writeFile(join(input.output, 'master.json'), '[]')
+    // Act / Assert
+    await expect(loadImportArtifact(prepared.manifestPath, { scope: 'foundation' })).rejects.toThrow('ARTIFACT_HASH_MISMATCH')
+  })
+})
+
+
+describe('[TC-F42-IMP-POLICY-003] Owner/email artifact handoff', () => {
+  const policy = {"decisionEvidence": "User decisions 2026-09-17: active Category/SKU only; existing SKU tuples; defer Email; siteType ecommerce with Store overrides; preserve creator in Users only; shipping follows PW2. Incompatible shipping uses explicit PW2 defaults as stated in implementation update. User follow-up 2026-09-17 approves active child promotion, preserving all images/short descriptions, deferring Store 323 and optional history. User decision 2026-09-23: temporarily defer PROD Stores 54 and 161 because original backend owners 118 and 343 are soft-deleted; preserve source data, omit these Stores from master JSON, report policy exclusion without blocking other Stores.", "activeCatalogOnly": true, "deferEmailTemplates": true, "allowSparseVariants": true, "preserveUserCreators": true, "siteTypeDefault": "ecommerce", "siteTypeOverrides": {}, "shippingPolicy": "pw2-defaults", "promoteActiveCategoriesToRoot": true, "deferredStoreIds": ["54", "161", "323"], "preserveHistoricalOrders": true, "gracefulTenantResolution": true, "resolveDuplicateSkus": true, "resolveDuplicateVariantTuples": true, "treatSingleSkuWithoutSelectionsAsSimple": true, "pruneUnreferencedTiers": true, "allowInactiveSkusForInactiveProduct": true, "resolveDuplicateCategorySlugs": true, "resolveDuplicateCategoryNames": true, "flattenBlogCategoriesToRoot": true, "resolveDuplicateBlogCategorySlugs": true, "resolveDuplicateBlogSlugs": true, "allowCustomerAddressOverflow": true, "allowInvalidCustomerAddresses": true, "allowHistoricalDiscountEligibilityGap": true, "preserveRefundedOrdersWithoutEvidence": true, "skipInvalidDiscountCodes": true, "allowUnresolvedBlogMedia": true, "fallbackBlogAuthorToOwner": true, "allowContactStructureGap": true, "allowBracketedProductNames": true, "pruneInvalidVariantSkus": true, "selectOldestOwner": true, "preserveInvalidUserEmails": true}
+  async function currentFixture(enabled = true) {
+    const diagnostics: Diagnostic[] = [{ code: 'USER_EMAIL_INVALID', severity: 'warning', storeId: '205', sourceId: '9', table: 'users', field: 'email', reason: 'SOURCE_EMAIL_PRESERVED' }]
+    const input = await fixture({ diagnostics, override: { exporterVersion: '1.9.1', contractSha256: OWNER_EMAIL_MAPPING_HASH, migrationPolicy: { ...policy, preserveInvalidUserEmails: enabled }, status: 'exported', outcome: correctedOutcome.exportOutcome(diagnostics, 0, []) } })
+    const review = correctedOutcome.exportReview(diagnostics, [], [])
+    for (const [name, bytes] of Object.entries({ 'export-review.json': JSON.stringify(review), 'export-review.md': correctedOutcome.reviewMarkdown(review) })) {
+      await writeFile(join(input.source, name), bytes)
+      input.manifest.artifacts[name] = digest(bytes)
+    }
+    await input.saveManifest()
+    return input
+  }
+  it('prepares and loads approved policy capability, without weakening disabled policy or historical contracts', async () => {
+    // Arrange / Act
+    const enabled = await prepare(await currentFixture())
+    const artifact = await loadImportArtifact(enabled.manifestPath)
+    const disabled = await prepare(await currentFixture(false))
+    const blocked = await loadImportArtifact(disabled.manifestPath)
+    // Assert
+    expect(artifact.preserveInvalidUserEmails).toBe(true)
+    expect(artifact.blockers).not.toEqual(expect.arrayContaining([expect.objectContaining({ code: 'USER_EMAIL_INVALID' })]))
+    expect(blocked.preserveInvalidUserEmails).toBe(false)
+    expect(blocked.blockers).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'USER_EMAIL_INVALID' })]))
+    const old = await currentFixture()
+    old.manifest.exporterVersion = '1.9.0'; old.manifest.contractSha256 = CONFLICT_RESOLUTION_MAPPING_HASH
+    await old.saveManifest()
+    await expect(prepare(old)).rejects.toThrow('EXPORT_MANIFEST_INVALID')
+  })
+})
+
+
+describe('[TC-F42-IMP-POLICY-004] Catalog exclusion artifact handoff', () => {
+  const policy = {"decisionEvidence": "User decisions 2026-09-17: active Category/SKU only; existing SKU tuples; defer Email; siteType ecommerce with Store overrides; preserve creator in Users only; shipping follows PW2. Incompatible shipping uses explicit PW2 defaults as stated in implementation update. User follow-up 2026-09-17 approves active child promotion, preserving all images/short descriptions, deferring Store 323 and optional history. User decision 2026-09-23: temporarily defer PROD Stores 54 and 161 because original backend owners 118 and 343 are soft-deleted; preserve source data, omit these Stores from master JSON, report policy exclusion without blocking other Stores.", "activeCatalogOnly": true, "deferEmailTemplates": true, "allowSparseVariants": true, "preserveUserCreators": true, "siteTypeDefault": "ecommerce", "siteTypeOverrides": {}, "shippingPolicy": "pw2-defaults", "promoteActiveCategoriesToRoot": true, "deferredStoreIds": ["54", "161", "323"], "preserveHistoricalOrders": true, "gracefulTenantResolution": true, "resolveDuplicateSkus": true, "resolveDuplicateVariantTuples": true, "treatSingleSkuWithoutSelectionsAsSimple": true, "pruneUnreferencedTiers": true, "allowInactiveSkusForInactiveProduct": true, "resolveDuplicateCategorySlugs": true, "resolveDuplicateCategoryNames": true, "flattenBlogCategoriesToRoot": true, "resolveDuplicateBlogCategorySlugs": true, "resolveDuplicateBlogSlugs": true, "allowCustomerAddressOverflow": true, "allowInvalidCustomerAddresses": true, "allowHistoricalDiscountEligibilityGap": true, "preserveRefundedOrdersWithoutEvidence": true, "skipInvalidDiscountCodes": true, "allowUnresolvedBlogMedia": true, "fallbackBlogAuthorToOwner": true, "allowContactStructureGap": true, "allowBracketedProductNames": true, "pruneInvalidVariantSkus": true, "selectOldestOwner": true, "preserveInvalidUserEmails": true, "excludeDuplicateProductSlugs": true, "excludeProductsWithoutValidVariants": true}
+  async function catalogFixture(enabled = true, reason = 'DUPLICATE_PRODUCT_SLUG') {
+    const rule = 'MASTER-5.2-PRODUCT-CATALOG-POLICY'
+    const diagnostics: Diagnostic[] = [{ code: 'PRODUCT_CATALOG_POLICY_EXCLUDED', severity: 'warning', storeId: '205', sourceId: '20', table: 'products', reason }]
+    const rows: Row[] = [
+      { table: 'products', sourceId: '10', storeId: '205', record: 1, disposition: 'mapped', fields: { id: 'source-identity' }, contributions: [], ownership: { storeId: '205', rule: 'SOURCE_STORE_ID' } },
+      { table: 'products', sourceId: '20', storeId: '205', record: 2, disposition: 'retained-source', fields: { id: 'retained-source' }, fieldRetentionRules: { id: rule }, contributions: [], ownership: { storeId: '205', rule: 'SOURCE_STORE_ID' }, productExclusion: { productId: '20', reason, ...(reason === 'DUPLICATE_PRODUCT_SLUG' ? { canonicalProductId: '10' } : {}) } },
+    ]
+    const input = await fixture({ rows, diagnostics, products: [{ storeId: '205', sourceProductId: '20', emitted: false, targetRef: null, eligibleSkuCount: 0, tiers: [], skus: [], errors: ['PRODUCT_NOT_EMITTED'] }], override: { exporterVersion: '1.9.2', contractSha256: PRODUCT_CATALOG_MAPPING_HASH, migrationPolicy: { ...policy, excludeDuplicateProductSlugs: enabled, excludeProductsWithoutValidVariants: enabled }, status: 'exported', outcome: correctedOutcome.exportOutcome(diagnostics, 0, []) } })
+    const review = correctedOutcome.exportReview(diagnostics, [], [])
+    for (const [name, bytes] of Object.entries({ 'export-review.json': JSON.stringify(review), 'export-review.md': correctedOutcome.reviewMarkdown(review) })) {
+      await writeFile(join(input.source, name), bytes); input.manifest.artifacts[name] = digest(bytes)
+    }
+    await input.saveManifest()
+    return input
+  }
+  it.each(['DUPLICATE_PRODUCT_SLUG', 'NO_VALID_VARIANTS', 'MISSING_VARIANT_DOMAIN'])('loads approved %s without emitting excluded Product', async reason => {
+    // Arrange / Act
+    const input = await catalogFixture(true, reason), prepared = await prepare(input)
+    const artifact = await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers).toEqual([])
+    expect(artifact.stores.every(store => store.collections.products.length === 0)).toBe(true)
+    expect(artifact.manifest.mappingHash).toBe(PRODUCT_CATALOG_MAPPING_HASH)
+  })
+  it('rejects policy-disabled and historical manifests carrying new exclusion evidence', async () => {
+    // Arrange / Act / Assert
+    await expect(prepare(await catalogFixture(false))).rejects.toThrow('PRODUCT_EXCLUSION_EVIDENCE_INVALID')
+    const historical = await catalogFixture()
+    historical.manifest.exporterVersion = '1.9.1'; historical.manifest.contractSha256 = OWNER_EMAIL_MAPPING_HASH
+    await historical.saveManifest()
+    await expect(prepare(historical)).rejects.toThrow('EXPORT_MANIFEST_INVALID')
+    const legacyPolicy = { ...policy }
+    delete (legacyPolicy as Partial<typeof policy>).excludeDuplicateProductSlugs
+    delete (legacyPolicy as Partial<typeof policy>).excludeProductsWithoutValidVariants
+    Object.assign(historical.manifest, { migrationPolicy: legacyPolicy })
+    await historical.saveManifest()
+    await expect(prepare(historical)).rejects.toThrow('PRODUCT_EXCLUSION_EVIDENCE_INVALID')
+  })
+})
+
+
+describe('[TC-F42-IMP-POLICY-005] Source omission handoff requires verified family proof', () => {
+  const policy = {"decisionEvidence": "User decisions 2026-09-17: active Category/SKU only; existing SKU tuples; defer Email; siteType ecommerce with Store overrides; preserve creator in Users only; shipping follows PW2. Incompatible shipping uses explicit PW2 defaults as stated in implementation update. User follow-up 2026-09-17 approves active child promotion, preserving all images/short descriptions, deferring Store 323 and optional history. User decision 2026-09-23: temporarily defer PROD Stores 54 and 161 because original backend owners 118 and 343 are soft-deleted; preserve source data, omit these Stores from master JSON, report policy exclusion without blocking other Stores.", "activeCatalogOnly": true, "deferEmailTemplates": true, "allowSparseVariants": true, "preserveUserCreators": true, "siteTypeDefault": "ecommerce", "siteTypeOverrides": {}, "shippingPolicy": "pw2-defaults", "promoteActiveCategoriesToRoot": true, "deferredStoreIds": ["54", "161", "323"], "preserveHistoricalOrders": true, "gracefulTenantResolution": true, "resolveDuplicateSkus": true, "resolveDuplicateVariantTuples": true, "treatSingleSkuWithoutSelectionsAsSimple": true, "pruneUnreferencedTiers": true, "allowInactiveSkusForInactiveProduct": true, "resolveDuplicateCategorySlugs": true, "resolveDuplicateCategoryNames": true, "flattenBlogCategoriesToRoot": true, "resolveDuplicateBlogCategorySlugs": true, "resolveDuplicateBlogSlugs": true, "allowCustomerAddressOverflow": true, "allowInvalidCustomerAddresses": true, "allowHistoricalDiscountEligibilityGap": true, "preserveRefundedOrdersWithoutEvidence": true, "skipInvalidDiscountCodes": true, "allowUnresolvedBlogMedia": true, "fallbackBlogAuthorToOwner": true, "allowContactStructureGap": true, "allowBracketedProductNames": true, "pruneInvalidVariantSkus": true, "selectOldestOwner": true, "preserveInvalidUserEmails": true, "excludeDuplicateProductSlugs": true, "excludeProductsWithoutValidVariants": true, "excludeInvalidProducts": true, "excludeInvalidBlogs": true, "skipUnverifiedOrders": true, "omitUnmappablePayments": true}
+  async function omissionFixture(table = 'products', reason = 'PRODUCT_NAME_TOO_SHORT', mode = 'valid') {
+    const rule = 'MASTER-APPROVED-SOURCE-ENTITY-EXCLUSION'
+    const exclusion = { table, sourceId: '20', storeId: '205', reason }
+    const rows: Row[] = [{ table, sourceId: '20', storeId: '205', record: 1, disposition: 'retained-source', fields: { id: 'retained-source' }, fieldRetentionRules: { id: rule }, contributions: [], ownership: { storeId: '205', rule: 'SOURCE_STORE_ID' }, sourceExclusion: exclusion }]
+    const diagnostics: Diagnostic[] = [{ code: 'SOURCE_ENTITY_EXCLUDED', severity: 'warning', table, storeId: '205', sourceId: '20', reason }]
+    if (mode === 'ownership-conflict' || mode === 'forged-ownership') {
+      rows.push({ table: 'product_skus', sourceId: '30', storeId: null, record: 1, disposition: 'retained-source', fields: { id: 'retained-source' }, fieldRetentionRules: { id: rule }, contributions: [], ownership: { storeId: null, rule: mode === 'forged-ownership' ? 'OWNERSHIP_PARENT_UNVERIFIED' : 'OWNERSHIP_STORE_CONFLICT', parentTable: 'products', parentId: '20' }, sourceExclusion: exclusion })
+      diagnostics.push({ code: 'SOURCE_OWNERSHIP_UNRESOLVED', severity: 'warning', table: 'product_skus', sourceId: '30', reason: rows[1].ownership!.rule })
+    }
+    if (mode === 'missing-root') rows.length = 0
+    if (mode === 'wrong-fields') rows[0].fields.id = 'mapped'
+    if (mode === 'operational-error') diagnostics.push({ code: 'PRODUCT_MAPPING_INVALID', severity: 'blocker', table: 'products', storeId: '205', sourceId: '20', reason: 'UNEXPECTED_MAPPING_ERROR' })
+    const gatewayValue = mode === 'enabled-gateway'
+    const documents = table === 'store_payments' ? [
+      { storeId: '205', collection: 'tenants', documents: [{ _ref: '@tenants:stores:205', metaData: { pw1StoreId: '205' }, payments: { payment_card: gatewayValue, payment_fpx: false, payment_qr: false } }] },
+      { storeId: '205', collection: 'sites', documents: [{ _ref: '@sites:stores:205', tenant: '@tenants:stores:205', paymentConfig: { cardEnabled: gatewayValue, fpxEnabled: false, enableQrBanking: false } }] },
+    ] : []
+    if (mode === 'order-snapshot' || mode === 'order-dangling') {
+      rows.push({ table: 'orders', sourceId: '90', storeId: '205', record: 1, disposition: 'mapped', fields: { id: 'source-identity' }, contributions: [], ownership: { storeId: '205', rule: 'SOURCE_STORE_ID' } })
+      diagnostics.push({ code: 'ORDER_ITEM_CATALOG_REFERENCE_OMITTED', severity: 'warning', table: 'orders', storeId: '205', sourceId: '90', field: 'items.product', reason: 'SOURCE_PRODUCT_EXCLUDED' })
+      documents.push({ storeId: '205', collection: 'orders', documents: [{ _ref: '@orders:orders:90', tenant: '@tenants:stores:205', items: [{ productName: 'Historical product', quantity: 1, unitPrice: 12.5, ...(mode === 'order-dangling' ? { product: '@products:products:20' } : {}) }] }] })
+    }
+    if (mode === 'emitted') documents.push({ storeId: '205', collection: table === 'blog_posts' ? 'blogs' : table, documents: [{ _ref: `@${table === 'blog_posts' ? 'blogs' : table}:${table}:20`, tenant: '@tenants:stores:205' }] })
+    const customerStores = ['205','285'].map(id => ({ ...emptyCustomerStore(id), retainedSourceRows: rows.filter(row => row.storeId === id && row.table === 'orders').map(row => ({ table: 'orders', sourceId: row.sourceId })) }))
+    const input = await fixture({ rows, diagnostics, documents, customerStores, override: { exporterVersion: '1.9.3', contractSha256: SOURCE_OMISSION_MAPPING_HASH, migrationPolicy: { ...policy, ...(mode === 'disabled' ? { excludeInvalidProducts: false } : {}) }, status: 'exported', outcome: correctedOutcome.exportOutcome(diagnostics, 0, []) } })
+    const review = correctedOutcome.exportReview(diagnostics, [], [])
+    for (const [name, bytes] of Object.entries({ 'export-review.json': JSON.stringify(review), 'export-review.md': correctedOutcome.reviewMarkdown(review) })) { await writeFile(join(input.source, name), bytes); input.manifest.artifacts[name] = digest(bytes) }
+    await input.saveManifest(); return input
+  }
+  it.each([['products','PRODUCT_NAME_TOO_SHORT'], ['orders','ORDER_STATUS_UNVERIFIED'], ['blog_posts','BLOG_TITLE_MISSING'], ['blog_categories','BLOG_CATEGORY_STATUS_UNVERIFIED'], ['store_payments','PAYMENT_PROVIDER_UNKNOWN']])('accepts proven %s source omission', async (table, reason) => {
+    // Arrange / Act
+    const prepared = await prepare(await omissionFixture(table,reason)), artifact = await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers).toEqual([])
+  })
+  it('accepts truthful failed child ownership without rewriting its tenant relation', async () => {
+    // Arrange / Act
+    const input = await omissionFixture('products','SOURCE_SKU_OWNER_MISMATCH','ownership-conflict'), prepared = await prepare(input)
+    const artifact = await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers).toEqual([])
+    expect(input.rows.find(row => row.table === 'product_skus')?.ownership).toMatchObject({ storeId: null, rule: 'OWNERSHIP_STORE_CONFLICT' })
+  })
+  it.each(['disabled','missing-root','wrong-fields','emitted'])('rejects %s exclusion proof', async mode => {
+    // Arrange / Act / Assert
+    await expect(prepare(await omissionFixture('products','PRODUCT_NAME_TOO_SHORT',mode))).rejects.toThrow('SOURCE_EXCLUSION_EVIDENCE_INVALID')
+  })
+  it('does not excuse forged ownership or unexpected mapper failures', async () => {
+    // Arrange / Act / Assert
+    for (const mode of ['forged-ownership','operational-error']) {
+      const prepared = await prepare(await omissionFixture('products','SOURCE_SKU_OWNER_MISMATCH',mode))
+      const artifact = await loadImportArtifact(prepared.manifestPath)
+      expect(artifact.blockers).toEqual(expect.arrayContaining([expect.objectContaining({ code: mode === 'forged-ownership' ? 'SOURCE_CLASSIFICATION_INVALID' : 'PRODUCT_MAPPING_INVALID' })]))
+    }
+  })
+  it('keeps historical Order snapshots and does not waive a dangling Product reference', async () => {
+    // Arrange / Act / Assert
+    for (const mode of ['order-snapshot','order-dangling']) {
+      const prepared = await prepare(await omissionFixture('products','PRODUCT_NAME_TOO_SHORT',mode))
+      const artifact = await loadImportArtifact(prepared.manifestPath)
+      const warnings = artifact.blockers.filter(d => d.code === 'ORDER_ITEM_CATALOG_REFERENCE_OMITTED')
+      expect(warnings).toHaveLength(mode === 'order-snapshot' ? 0 : 1)
+      expect(artifact.stores.find(store => store.storeId === '205')?.collections.orders[0]).toMatchObject({ items: [{ productName: 'Historical product', quantity: 1, unitPrice: 12.5 }] })
+    }
+  })
+  it('rejects new omission proof in a historical contract even with new flags removed', async () => {
+    // Arrange
+    const input = await omissionFixture()
+    const priorPolicy: Record<string, unknown> = { ...policy }
+    for (const key of ['excludeInvalidProducts','excludeInvalidBlogs','skipUnverifiedOrders','omitUnmappablePayments']) delete priorPolicy[key]
+    Object.assign(input.manifest, { exporterVersion: '1.9.2', contractSha256: PRODUCT_CATALOG_MAPPING_HASH, migrationPolicy: priorPolicy })
+    await input.saveManifest()
+    // Act / Assert
+    await expect(prepare(input)).rejects.toThrow('SOURCE_EXCLUSION_EVIDENCE_INVALID')
+  })
+  it('requires disabled gateway flags and rejects non-status Order omissions', async () => {
+    // Arrange / Act / Assert
+    await expect(prepare(await omissionFixture('store_payments','PAYMENT_PROVIDER_UNKNOWN','enabled-gateway'))).rejects.toThrow('SOURCE_EXCLUSION_EVIDENCE_INVALID')
+    await expect(prepare(await omissionFixture('orders','ORDER_MAPPING_INVALID'))).rejects.toThrow()
+  })
+})
+
+
+describe('[TC-F42-IMP-POLICY-006] Exact negative-total Orders and inherited policy handoff', () => {
+  const policy = {"decisionEvidence": "User decisions 2026-09-17: active Category/SKU only; existing SKU tuples; defer Email; siteType ecommerce with Store overrides; preserve creator in Users only; shipping follows PW2. Incompatible shipping uses explicit PW2 defaults as stated in implementation update. User follow-up 2026-09-17 approves active child promotion, preserving all images/short descriptions, deferring Store 323 and optional history. User decision 2026-09-23: temporarily defer PROD Stores 54 and 161 because original backend owners 118 and 343 are soft-deleted; preserve source data, omit these Stores from master JSON, report policy exclusion without blocking other Stores.", "activeCatalogOnly": true, "deferEmailTemplates": true, "allowSparseVariants": true, "preserveUserCreators": true, "siteTypeDefault": "ecommerce", "siteTypeOverrides": {}, "shippingPolicy": "pw2-defaults", "promoteActiveCategoriesToRoot": true, "deferredStoreIds": ["54", "161", "323"], "preserveHistoricalOrders": true, "gracefulTenantResolution": true, "resolveDuplicateSkus": true, "resolveDuplicateVariantTuples": true, "treatSingleSkuWithoutSelectionsAsSimple": true, "pruneUnreferencedTiers": true, "allowInactiveSkusForInactiveProduct": true, "resolveDuplicateCategorySlugs": true, "resolveDuplicateCategoryNames": true, "flattenBlogCategoriesToRoot": true, "resolveDuplicateBlogCategorySlugs": true, "resolveDuplicateBlogSlugs": true, "allowCustomerAddressOverflow": true, "allowInvalidCustomerAddresses": true, "allowHistoricalDiscountEligibilityGap": true, "preserveRefundedOrdersWithoutEvidence": true, "skipInvalidDiscountCodes": true, "allowUnresolvedBlogMedia": true, "fallbackBlogAuthorToOwner": true, "allowContactStructureGap": true, "allowBracketedProductNames": true, "pruneInvalidVariantSkus": true, "selectOldestOwner": true, "preserveInvalidUserEmails": true, "excludeDuplicateProductSlugs": true, "excludeProductsWithoutValidVariants": true, "excludeInvalidProducts": true, "excludeInvalidBlogs": true, "skipUnverifiedOrders": true, "omitUnmappablePayments": true, "approvedNegativeTotalOrders": [{"storeId": "43", "orderId": "112"}, {"storeId": "43", "orderId": "132"}]}
+  async function mixedFixture(mode = 'valid') {
+    const storeId = mode === 'other-store' ? '44' : '43'
+    const orderIds = mode === 'inherit193' ? [] : mode === 'other-order' ? ['113','132'] : ['112','132']
+    const sourceRule = 'MASTER-APPROVED-SOURCE-ENTITY-EXCLUSION'
+    const root = (table: string, sourceId: string, disposition = 'retained-source'): Row => ({ table, sourceId, storeId, record: 1, disposition, fields: { id: disposition === 'mapped' ? 'source-identity' : 'retained-source' }, contributions: [], ownership: { storeId, rule: 'SOURCE_STORE_ID' } })
+    const rows: Row[] = [
+      { ...root('products','10'), fieldRetentionRules: { id: 'MASTER-5.2-PRODUCT-CATALOG-POLICY' }, productExclusion: { productId: '10', reason: 'NO_VALID_VARIANTS' } },
+      { ...root('products','20'), fieldRetentionRules: { id: sourceRule }, sourceExclusion: { table: 'products', sourceId: '20', storeId, reason: 'PRODUCT_NAME_TOO_SHORT' } },
+      { ...root('products','30'), fieldRetentionRules: { id: 'MASTER-5.2-PRODUCT-MISSING-PRICE-STOCK' }, productExclusion: { productId: '30', reason: 'MISSING_PRICE' } },
+      { ...root('products','40'), fields: { description: 'retained-source' }, fieldRetentionRules: { description: 'MASTER-4.1-EXTERNAL-CSV-ARCHIVE' }, contributions: [{ table: 'products', sourceId: '40', storeId, fields: ['description'], rule: 'MASTER-4.1-EXTERNAL-CSV-ARCHIVE', targetPath: 'source-csv.products' }] },
+      root('users','9','mapped'),
+      ...orderIds.map(id => ({ ...root('orders',id), fieldRetentionRules: { id: sourceRule }, sourceExclusion: { table: 'orders', sourceId: id, storeId, reason: 'APPROVED_NEGATIVE_TOTAL' } })),
+    ]
+    const records = new Map<string, number>()
+    for (const row of rows) {
+      row.record = (records.get(row.table) ?? 0) + 1; records.set(row.table,row.record)
+      if (row.table === 'products') {
+        const rule = Object.values(row.fieldRetentionRules!)[0]
+        row.fields = { id: 'retained-source', description: 'retained-source' }; row.fieldRetentionRules = { id: rule, description: rule }
+        if (row.sourceId === '40') row.contributions = [{ table: 'products', sourceId: '40', storeId, fields: ['id','description'], rule, targetPath: 'source-csv.products' }]
+      }
+    }
+    const diagnostics: Diagnostic[] = [
+      { code: 'PRODUCT_CATALOG_POLICY_EXCLUDED', severity: 'warning', table: 'products', sourceId: '10', storeId, reason: 'NO_VALID_VARIANTS' },
+      { code: 'SOURCE_ENTITY_EXCLUDED', severity: 'warning', table: 'products', sourceId: '20', storeId, reason: 'PRODUCT_NAME_TOO_SHORT' },
+      { code: 'PRODUCT_MISSING_PRICE_STOCK_EXCLUDED', severity: 'warning', table: 'products', sourceId: '30', storeId, reason: 'MISSING_PRICE' },
+      { code: 'USER_EMAIL_INVALID', severity: 'warning', table: 'users', sourceId: '9', storeId, field: 'email', reason: 'SOURCE_EMAIL_PRESERVED' },
+      { code: 'OWNER_IDENTITY_RESOLVED', severity: 'warning', table: 'users', sourceId: '9', storeId, field: 'is_store_owner', reason: 'OLDEST_OWNER_SELECTED' },
+      ...orderIds.map(id => ({ code: 'SOURCE_ENTITY_EXCLUDED', severity: 'warning' as const, table: 'orders', sourceId: id, storeId, reason: 'APPROVED_NEGATIVE_TOTAL' })),
+    ]
+    const customerStores = [storeId,'285'].map(id => ({ ...emptyCustomerStore(id), retainedSourceRows: id === storeId ? orderIds.map(sourceId => ({ table: 'orders', sourceId })) : [] }))
+    const sourceSnapshot = { ...snapshot, sourceInstance: mode === 'wrong-instance' ? 'SYNTHETIC' : 'PW1PROD', sourceInstanceToken: mode === 'wrong-token' ? 'SYNTHETIC' : 'PW1PROD' }
+    const migrationPolicy = mode === 'disabled' || mode === 'historical' || mode === 'inherit193' ? { ...policy, approvedNegativeTotalOrders: [] } : policy
+    const input = await fixture({ storeIds: [storeId,'285'], sourceSnapshot, rows, diagnostics, customerStores, documents: [{ storeId, collection: 'users', documents: [{ _ref: '@users:users:9', email: 'preserved-invalid-email', roles: ['tenant-owner'], tenants: [{ tenant: `@tenants:stores:${storeId}`, role: 'owner' }] }] }], override: { exporterVersion: ['historical','inherit193'].includes(mode) ? '1.9.3' : '1.9.4', contractSha256: ['historical','inherit193'].includes(mode) ? SOURCE_OMISSION_MAPPING_HASH : NEGATIVE_ORDER_MAPPING_HASH, migrationPolicy, status: 'exported', outcome: correctedOutcome.exportOutcome(diagnostics, 0, []) } })
+    if (['historical','inherit193'].includes(mode)) delete (input.manifest.migrationPolicy as Record<string, unknown>).approvedNegativeTotalOrders
+    const review = correctedOutcome.exportReview(diagnostics, [], [])
+    for (const [name, bytes] of Object.entries({ 'export-review.json': JSON.stringify(review), 'export-review.md': correctedOutcome.reviewMarkdown(review) })) { await writeFile(join(input.source, name), bytes); input.manifest.artifacts[name] = digest(bytes) }
+    await input.saveManifest(); return input
+  }
+  it('loads exact PROD Orders 112/132 exclusions alongside all earlier Product/owner/email/raw-retention policies', async () => {
+    // Arrange / Act
+    const prepared = await prepare(await mixedFixture()), artifact = await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers).toEqual([])
+    expect(artifact.preserveInvalidUserEmails).toBe(true)
+    expect(artifact.stores.find(store => store.storeId === '43')?.collections.orders).toEqual([])
+    expect(artifact.stores.find(store => store.storeId === '43')?.collections.users[0].email).toBe('preserved-invalid-email')
+  })
+  it('inherits all mixed policies and exact PROD Order exemptions in chunked 1.10.0', async () => {
+    // Arrange / Act
+    const input=await mixedFixture();await chunkify(input)
+    const prepared=await prepare(input),artifact=await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers).toEqual([]);expect(artifact.preserveInvalidUserEmails).toBe(true)
+    expect(artifact.masterParts).toHaveLength(2)
+  })
+  it('keeps earlier exclusions and owner/email policies working together on 1.9.3', async () => {
+    // Arrange / Act
+    const prepared = await prepare(await mixedFixture('inherit193')), artifact = await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers).toEqual([])
+    expect(artifact.preserveInvalidUserEmails).toBe(true)
+  })
+  it.each(['other-store','other-order','disabled','historical'])('rejects %s negative-total exclusion', async mode => {
+    // Arrange / Act / Assert
+    await expect(prepare(await mixedFixture(mode))).rejects.toThrow('SOURCE_EXCLUSION_EVIDENCE_INVALID')
+  })
+  it.each(['wrong-instance','wrong-token'])('rejects %s namespace', async mode => {
+    // Arrange / Act / Assert
+    await expect(prepare(await mixedFixture(mode))).rejects.toThrow('NEGATIVE_ORDER_POLICY_SCOPE_INVALID')
+  })
+})
+
+
+async function chunkify(input: Awaited<ReturnType<typeof fixture>>) {
+  const master = JSON.parse(await readFile(join(input.source,'master.json'),'utf8')) as Record<string,unknown>[]
+  const parts: MasterPart[] = []
+  for (const [index,store] of master.entries()) {
+    const tenants=store.tenants as {_ref:string}[], storeId=tenants[0]._ref.slice('@tenants:stores:'.length)
+    const text=JSON.stringify([store]), filename=`master-${String(index+1).padStart(4,'0')}.json`
+    await writeFile(join(input.source,filename),text,{mode:0o600})
+    const part={filename,sha256:digest(text),bytes:Buffer.byteLength(text),storeIds:[storeId]};parts.push(part);input.manifest.artifacts[filename]=part.sha256
+  }
+  await rm(join(input.source,'master.json'));delete input.manifest.artifacts['master.json']
+  const diagnostics=(JSON.parse(input.files['mapping-report.json']) as {diagnostics:Diagnostic[]}).diagnostics
+  const review=correctedOutcome.exportReview(diagnostics,input.manifest.blockedStores,input.manifest.policyExcludedStores)
+  for(const [name,text] of Object.entries({'export-review.json':JSON.stringify(review),'export-review.md':correctedOutcome.reviewMarkdown(review)})) { await writeFile(join(input.source,name),text,{mode:0o600});input.manifest.artifacts[name]=digest(text) }
+  Object.assign(input.manifest,{exporterVersion:'1.10.0',contractSha256:CHUNKED_MASTER_MAPPING_HASH,masterParts:parts,masterSetHash:masterSetHash(parts),status:'exported',outcome:correctedOutcome.exportOutcome(diagnostics,input.manifest.blockedStores.length,input.manifest.policyExcludedStores)})
+  await input.saveManifest();return parts
+}
+
+describe('[TC-F42-IMP-PARTS-001] Bound master parts without aggregate',()=>{
+  async function setup() {
+    const input=await fixture({documents:[{storeId:'205',collection:'tenants',documents:[{_ref:'@tenants:stores:205',metaData:{pw1StoreId:'205'},name:'Cửa hàng Việt 🙂'}]}]})
+    const parts=await chunkify(input)
+    return {input,parts}
+  }
+  it('prepares, streams and spools selected Stores across parts while binding the descriptor set',async()=>{
+    // Arrange / Act
+    const {input,parts}=await setup(), prepared=await prepare(input)
+    const artifact=await loadImportArtifact(prepared.manifestPath,{storeIds:['205','285'],spoolDirectory:input.root})
+    // Assert
+    expect(artifact.manifest.masterHash).toBe(masterSetHash(parts));expect(artifact.masterParts).toEqual(parts)
+    expect(artifact.stores).toEqual([]);expect(artifact.storeIds).toEqual(['205','285'])
+    expect((await readImportStore(artifact,'205')).collections.tenants[0].name).toBe('Cửa hàng Việt 🙂')
+    expect((await readImportStore(artifact,'285')).storeId).toBe('285')
+    await expect(readFile(join(input.output,'master.json'))).rejects.toThrow()
+    const foundation=await loadImportArtifact(prepared.manifestPath,{scope:'foundation',selector:{store:'285'}})
+    expect(foundation.stores.map(store=>store.storeId)).toEqual(['285'])
+  })
+  it.each(['missing','extra','reordered','duplicate-id','wrong-ids','wrong-size','wrong-hash','wrong-set-hash','aggregate','utf8-char-count','too-many-stores','size-limit','path'])('rejects %s part metadata or files',async mutation=>{
+    // Arrange
+    const {input,parts}=await setup()
+    if(mutation==='missing')await rm(join(input.source,parts[1].filename))
+    if(mutation==='extra')await writeFile(join(input.source,'master-0003.json'),'[]')
+    if(mutation==='aggregate')await writeFile(join(input.source,'master.json'),'[]')
+    if(mutation==='reordered')parts.reverse()
+    if(mutation==='duplicate-id')parts[1].storeIds=['205']
+    if(mutation==='wrong-ids')parts[0].storeIds=['206']
+    if(mutation==='wrong-size')parts[0].bytes++
+    if(mutation==='utf8-char-count')parts[0].bytes=(await readFile(join(input.source,parts[0].filename),'utf8')).length
+    if(mutation==='wrong-hash'){parts[0].sha256='0'.repeat(64);input.manifest.artifacts[parts[0].filename]=parts[0].sha256}
+    if(mutation==='too-many-stores')parts[0].storeIds=Array.from({length:301},(_,i)=>String(i+1))
+    if(mutation==='size-limit')parts[0].bytes=200_000_000
+    if(mutation==='path')parts[0].filename='../master-0001.json'
+    Object.assign(input.manifest,{masterSetHash:mutation==='wrong-set-hash'?'0'.repeat(64):masterSetHash(parts)})
+    await input.saveManifest()
+    // Act / Assert
+    await expect(prepare(input)).rejects.toThrow()
+  })
+  it('hashes an unselected later part to EOF and rejects tampering even in foundation mode',async()=>{
+    // Arrange
+    const {input,parts}=await setup(),prepared=await prepare(input)
+    const path=join(input.output,parts[1].filename),text=await readFile(path,'utf8')
+    await writeFile(path,text.replace('285','286'))
+    // Act / Assert
+    await expect(loadImportArtifact(prepared.manifestPath,{scope:'foundation',selector:{store:'205'}})).rejects.toThrow()
+  })
+  it('accepts an empty declared set with zero emitted Stores and no empty part file',async()=>{
+    // Arrange
+    const input=await fixture({customerStores:[],override:{blockedStores:['205','285'],counts:{sourceStoreCount:2,selectedStoreCount:2,policyExcludedStoreCount:0,emittedStoreCount:0,blockedStoreCount:2,blockers:0}}})
+    await writeFile(join(input.source,'master.json'),'[]')
+    const parts=await chunkify(input),prepared=await prepare(input)
+    // Act / Assert
+    const artifact=await loadImportArtifact(prepared.manifestPath,{storeIds:[]})
+    expect(parts).toEqual([]);expect(artifact.storeIds).toEqual([]);expect(artifact.manifest.masterHash).toBe(masterSetHash([]))
   })
 })

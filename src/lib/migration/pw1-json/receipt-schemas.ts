@@ -56,6 +56,7 @@ export const productReceiptSchema = z.object({
     storeId: id, sourceProductId: id, emitted: z.boolean(),
     targetRef: z.string().regex(/^@products:products:[^:]+$/).nullable(),
     eligibleSkuCount: z.number().int().nonnegative(),
+    excludedSkus: z.array(z.object({ sourceSkuId: id, reasons: z.array(z.string().regex(/^[A-Z][A-Z0-9_]*$/)).min(1) }).strict()).optional(),
     tiers: z.array(tier),
     skus: z.array(z.object({
       sourceSkuId: id, targetPath: z.string().nullable(), targetId: z.string().uuid().nullable(),

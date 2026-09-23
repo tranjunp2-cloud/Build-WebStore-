@@ -1,6 +1,6 @@
 import { storeGroups } from './groups'
 import { DiskRegistry } from './disk-registry'
-import { RunLogger, safeLogEvent } from './run-logger'
+import { RunLogger, safeLogEvent, type StoreDestination } from './run-logger'
 import { leaseHeartbeat } from './lease-heartbeat'
 import { progressLogger } from './progress'
 import { parseArgs } from 'node:util'
@@ -45,7 +45,7 @@ export function validateResumeCursor(ids: string[], states: Record<string, strin
   const index = ids.indexOf(cursor), firstIncomplete = ids.findIndex(id => states[id] !== 'VERIFIED')
   if (index < 0 || (firstIncomplete >= 0 && index > firstIncomplete)) throw new MigrationError('RESUME_CANNOT_SKIP_STORE')
 }
-async function writerHash(): Promise<string> {
+export async function writerHash(): Promise<string> {
   const files: string[] = []
   const walk = async (directory: string): Promise<void> => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -61,7 +61,7 @@ async function writerHash(): Promise<string> {
   for (const path of files.sort()) { hash.update(relative(process.cwd(), path)); hash.update('\0'); hash.update(await readFile(path)); hash.update('\0') }
   return hash.digest('hex')
 }
-async function schemaHash(runtime: Runtime): Promise<string> {
+export async function schemaHash(runtime: Runtime): Promise<string> {
   const columns = await runtime.pool.query(`SELECT table_name,column_name,ordinal_position,data_type,udt_name,is_nullable,column_default
     FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,ordinal_position`)
   const indexes = await runtime.pool.query(`SELECT tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public' ORDER BY tablename,indexname`)
@@ -120,6 +120,7 @@ export async function runImport(args: Arguments): Promise<void> {
     await assertWritableProfile(runtime.pool)
     let batch: LedgerBatch | undefined = args.resume ? await getBatch(runtime.pool, args.resume) : undefined
     if (batch) { context.runId = batch.id; await logger.event({ status: 'BATCH_RESUMED', runId: batch.id }) }
+    if (batch?.binding.executionScope === 'foundation') throw new MigrationError('FOUNDATION_RESUME_REQUIRES_USER_RUNNER')
     if (batch && batch.binding.executionVersion !== 'grouped-v1') throw new MigrationError('GROUPED_RESUME_UNSUPPORTED')
     const groupSize = batch?.binding.groupSize ?? args.groupSize ?? 100
     storeGroups([], groupSize)
@@ -193,7 +194,7 @@ export async function runImport(args: Arguments): Promise<void> {
       for (const [offset, storeId] of ids.entries()) {
         check(); context.storeId = storeId; context.phase = 'preflight'
         progress.report({ phase: 'preflight', storeId, completed: offset, total: ids.length })
-        const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs)
+        const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs, artifact.preserveInvalidUserEmails)
         await registry.add(sourceKeyRecords(runtime, entities))
         const creatorContext = await resolveCreatorContext(runtime.pool, creatorInput, entities)
       for (const gate of await readStoreTargetChecks(artifact, storeId)) {
@@ -203,12 +204,27 @@ export async function runImport(args: Arguments): Promise<void> {
         if (!entity || gate.count !== 1) throw new MigrationError('TARGET_DIAGNOSTIC_SOURCE_MISMATCH')
         if (d.code === 'TARGET_USER_CREATOR_BINDING_REQUIRED' && !creatorDiagnosticResolved(entity, creatorContext.targets)) throw new MigrationError('CREATOR_DIAGNOSTIC_UNRESOLVED')
         if (d.code === 'SUBSCRIPTION_CANCEL_FLAG_ABSENT' && (entity.collection !== 'plan-subscriptions' || entity.data.canceledAt !== null || 'canceledImmediately' in entity.data)) throw new MigrationError('SUBSCRIPTION_CANCEL_EVIDENCE_MISMATCH')
-        if (d.code === 'ORDER_PAYMENT_METHOD_UNVERIFIED' && (entity.collection !== 'orders' || entity.data.paymentMethod != null || entity.data.verificationSource !== 'manual' || (entity.data.paymentProvider != null && entity.data.paymentProvider !== 'stripe'))) throw new MigrationError('ORDER_PAYMENT_EVIDENCE_MISMATCH')
+        if (['ORDER_PAYMENT_METHOD_UNVERIFIED','ORDER_PAYMENT_METHOD_OMITTED'].includes(d.code) && (entity.collection !== 'orders' || entity.data.paymentMethod != null || entity.data.verificationSource !== 'manual' || (entity.data.paymentProvider != null && entity.data.paymentProvider !== 'stripe'))) throw new MigrationError('ORDER_PAYMENT_EVIDENCE_MISMATCH')
         if (d.code === 'RAW_VALUE_UNVERIFIED' && (entity.collection !== 'products' || !entity.data[d.field === 'description_ms' ? 'descriptionBM' : 'description'])) throw new MigrationError('RICH_TEXT_EVIDENCE_MISSING')
         if (d.field === 'slug' && typeof entity.data.slug !== 'string') throw new MigrationError('TARGET_DIAGNOSTIC_SOURCE_MISMATCH')
       }
         const proposal = await preflightStore(runtime, entities, binding.sourceInstance, credentials, batch, undefined, creatorContext, preflightContext)
-        if (batch && states[storeId] === 'VERIFIED') await verifyStore(runtime, entities, proposal.targets, batch, undefined, undefined, creatorContext)
+        if (batch && states[storeId] === 'VERIFIED') {
+          await verifyStore(runtime, entities, proposal.targets, batch, undefined, undefined, creatorContext)
+          if (!args.dryRun) {
+            const tenantEntity = entities.find(e => e.collection === 'tenants')
+            const siteEntity = entities.find(e => e.collection === 'sites')
+            const categoryEntities = entities.filter(e => e.collection === 'categories')
+            await logger.recordDestination(storeId, {
+              tenantId: tenantEntity ? proposal.targets.get(tenantEntity.ref) ?? null : null,
+              siteId: siteEntity ? proposal.targets.get(siteEntity.ref) ?? null : null,
+              productCategories: categoryEntities
+                .map(e => proposal.targets.get(e.ref))
+                .filter((id): id is number => typeof id === 'number')
+                .sort((a, b) => a - b),
+            })
+          }
+        }
         creates += proposal.creates; reuses += proposal.reuses
         await emit({ status: 'STORE_PREFLIGHT_PASSED', storeId, creates: proposal.creates, reuses: proposal.reuses })
       }
@@ -224,7 +240,7 @@ export async function runImport(args: Arguments): Promise<void> {
         if (states[storeId] === 'VERIFIED') { await emit({ status: 'STORE_REVERIFIED', storeId }); continue }
         await renewLease(runtime.pool, currentLease)
         await emit({ status: 'STORE_STARTED', storeId })
-        const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs)
+        const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs, artifact.preserveInvalidUserEmails)
         const creatorContext = await resolveCreatorContext(runtime.pool, creatorInput, entities)
         const proposal = await preflightStore(runtime, entities, binding.sourceInstance, credentials, currentBatch, undefined, creatorContext, preflightContext)
         const targets = proposal.targets, remaining = [...entities]
@@ -253,7 +269,19 @@ export async function runImport(args: Arguments): Promise<void> {
           await markStoreVerified(db, currentLease, storeId)
         })
         states[storeId] = 'VERIFIED'
-        await emit({ status: 'STORE_VERIFIED', runId: currentBatch.id, storeId, entities: entities.length })
+        const tenantEntity = entities.find(e => e.collection === 'tenants')
+        const siteEntity = entities.find(e => e.collection === 'sites')
+        const categoryEntities = entities.filter(e => e.collection === 'categories')
+        const destination: StoreDestination = {
+          tenantId: tenantEntity ? targets.get(tenantEntity.ref) ?? null : null,
+          siteId: siteEntity ? targets.get(siteEntity.ref) ?? null : null,
+          productCategories: categoryEntities
+            .map(e => targets.get(e.ref))
+            .filter((id): id is number => typeof id === 'number')
+            .sort((a, b) => a - b),
+        }
+        await logger.recordDestination(storeId, destination)
+        await emit({ status: 'STORE_VERIFIED', runId: currentBatch.id, storeId, entities: entities.length, destination })
       }
       delete context.storeId
       await emit({ status: 'GROUP_VERIFIED', ...context, stores: ids.length })

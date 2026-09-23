@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { createHash } from 'node:crypto'
 import { normalizeDashboardBlocks } from '../../dashboard-utils'
 import type { Field, SanitizedCollectionConfig } from 'payload'
@@ -16,6 +17,7 @@ export interface Entity {
   refs: Reference[]
   sourceChecksum: string
   /** Operator-approved source creator policy; never read from caller-provided fields. */
+  preserveInvalidEmail?: true
   nullifiedCreatorRef?: '@users:users:1'
 }
 export function object(value: unknown): value is Record<string, unknown> {
@@ -63,7 +65,7 @@ function stableChildId(namespace: string): string {
 }
 
 /** Select schema-declared fields, rejecting unknown business keys rather than silently discarding them. */
-export function buildEntities(store: ImportStore, collections: Record<string, SanitizedCollectionConfig>, namespace: string, externalActorRefs: ReadonlySet<string> = new Set()): Entity[] {
+export function buildEntities(store: ImportStore, collections: Record<string, SanitizedCollectionConfig>, namespace: string, externalActorRefs: ReadonlySet<string> = new Set(), preserveInvalidUserEmails = false): Entity[] {
   const entities: Entity[] = []
   const seen = new Set<string>()
   for (const [slug, records] of Object.entries(store.collections)) {
@@ -81,6 +83,11 @@ export function buildEntities(store: ImportStore, collections: Record<string, Sa
       const entity: Entity = { ref: document._ref, collection: slug as CollectionName, ...sourceKey(document._ref, slug as CollectionName), storeId: store.storeId, data: {}, refs: [], sourceChecksum: '' }
       const source: ImportDocument = { ...document }
       delete source._ref
+      // Payload auth normalizes email before persistence; checksums and unique checks must use the same value.
+      if (slug === 'users' && typeof source.email === 'string') {
+        if (preserveInvalidUserEmails && !z.string().email().safeParse(source.email).success) entity.preserveInvalidEmail = true
+        else source.email = source.email.toLowerCase().trim()
+      }
       // PW1 root creator has no corresponding PW2 account. Preserve the source
       // artifact, but persist an explicit null (not an omitted field/default).
       if (slug === 'users' && source.createdBy === '@users:users:1') {
@@ -303,4 +310,15 @@ export function creatorDiagnosticResolved(entity: Entity, targets: ReadonlyMap<s
   if (entity.collection !== 'users') return false
   if (entity.nullifiedCreatorRef === '@users:users:1' && entity.data.createdBy === null) return true
   return entity.refs.some(ref => ref.path === 'createdBy' && ref.externalActor && targets.has(ref.ref))
+}
+
+
+/** Legacy dashboard objects render as the default block list; compare that same view without rewriting DB. */
+export function targetProjectionMatches(expected: unknown, actual: unknown): boolean {
+  if (object(expected) && object(actual) && object(expected.settings) && object(actual.settings)
+      && Array.isArray(expected.settings.dashboardPreferences) && object(actual.settings.dashboardPreferences)) {
+    return projectionMatches(expected, { ...actual, settings: { ...actual.settings,
+      dashboardPreferences: normalizeDashboardBlocks(actual.settings.dashboardPreferences) } })
+  }
+  return projectionMatches(expected, actual)
 }

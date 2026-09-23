@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { MigrationError } from './errors'
 import type { ImportStore } from './types'
 import { canonical } from './projection'
@@ -16,10 +17,11 @@ const text = (value: unknown): string => typeof value === 'string' ? value : fai
 const key = (table: string, sourceId: string) => JSON.stringify([table, sourceId])
 interface ProductTarget { ref: string; hasVariants: boolean; options: string[][]; variants: { id: string; name: string }[] }
 interface StoreTarget { customers: Map<string, number>; products: Map<string, ProductTarget> }
-export interface SourceReconciliationRow { table: string; sourceId: string; storeId: string | null }
+export interface SourceReconciliationRow { table: string; sourceId: string; storeId: string | null; parentId?: string; parentTable?: string; ownershipRule?: string }
 
 /** Mirrors exporter receipt validation using only target identity/path indexes, never whole documents. */
-export function createReconciliationIndex() {
+export function createReconciliationIndex(policy?: { resolveDuplicateVariantTuples?: boolean; pruneInvalidVariantSkus?: boolean }, sourceInstanceToken?: string) {
+  const parents = new Map<string, string>()
   const stores = new Map<string, StoreTarget>()
   const sources = new Map<string, string | null>()
   const retainedCounts = new Map<string, number>()
@@ -69,6 +71,7 @@ export function createReconciliationIndex() {
       if (sources.has(identity)) fail()
       charge(identity, row.storeId ?? '')
       sources.set(identity, row.storeId)
+      if (row.parentId && row.parentTable === 'products' && row.ownershipRule === 'SOURCE_PARENT_RELATION') parents.set(identity, row.parentId)
       if (row.storeId && CUSTOMER_TABLES.has(row.table)) retainedCounts.set(row.storeId, (retainedCounts.get(row.storeId) ?? 0) + 1)
     },
     validateCustomerStore(value: unknown): void {
@@ -138,7 +141,7 @@ export function createReconciliationIndex() {
       charge(entry.sourceProductId); seenProducts.add(entry.sourceProductId)
       owned('products', entry.sourceProductId, entry.storeId)
       const doc = store.products.get(entry.sourceProductId)
-      if (entry.emitted !== Boolean(doc) || entry.targetRef !== (doc?.ref ?? null) || entry.skus.length !== entry.eligibleSkuCount) fail()
+      if (entry.emitted !== Boolean(doc) || entry.targetRef !== (doc?.ref ?? null) || entry.skus.length + (entry.excludedSkus?.length ?? 0) !== entry.eligibleSkuCount) fail()
       if (!doc && (entry.tiers.length || !entry.errors.includes('PRODUCT_NOT_EMITTED'))) fail()
       if (doc && doc.options.length !== entry.tiers.length) fail()
       entry.tiers.forEach((tier, i) => {
@@ -149,7 +152,14 @@ export function createReconciliationIndex() {
           if (option.targetPath !== `variantConfigs.${i}.options.${j}.value`) fail()
         })
       })
-      if (doc && entry.skus.length !== (doc.hasVariants ? doc.variants.length : 1)) fail()
+      if (entry.excludedSkus !== undefined && !policy?.pruneInvalidVariantSkus) fail()
+      for (const excluded of entry.excludedSkus ?? []) {
+        owned('product_skus', excluded.sourceSkuId, entry.storeId)
+        if (parents.get(key('product_skus', excluded.sourceSkuId)) !== entry.sourceProductId || seenSkus.has(excluded.sourceSkuId) || excluded.reasons.some(reason => !['MISSING_SELECTION','DUPLICATE_SELECTION','OUT_OF_DOMAIN','SOURCE_SELECTED_TIER_COUNT'].includes(reason))) fail()
+        seenSkus.add(excluded.sourceSkuId)
+      }
+      if (doc && (!doc.hasVariants || !policy?.resolveDuplicateVariantTuples) && entry.skus.length !== (doc.hasVariants ? doc.variants.length : 1)) fail()
+      const targetTuples = new Map<string, string>()
       const variantIds = new Set<string>()
       for (const sku of entry.skus) {
         owned('product_skus', sku.sourceSkuId, entry.storeId)
@@ -161,7 +171,10 @@ export function createReconciliationIndex() {
           continue
         }
         const index = doc.variants.findIndex(variant => variant.id === sku.targetId)
-        if (index < 0 || sku.targetPath !== `variants.${index}` || variantIds.has(sku.targetId!)) fail()
+        if (index < 0 || sku.targetPath !== `variants.${index}` ) fail()
+        const tuple = JSON.stringify(sku.selectedTuple)
+        if (variantIds.has(sku.targetId!) && (!policy?.resolveDuplicateVariantTuples || targetTuples.get(sku.targetId!) !== tuple)) fail()
+        targetTuples.set(sku.targetId!, tuple)
         variantIds.add(sku.targetId!)
         if (sku.selectedTuple.length !== entry.tiers.length) fail()
         const labels = sku.selectedTuple.map(([attributeId, valueId], i) => {
@@ -170,6 +183,16 @@ export function createReconciliationIndex() {
           return doc.options[i][optionIndex]
         })
         if (labels.join(' - ') !== doc.variants[index].name) fail()
+      }
+      if (doc?.hasVariants && variantIds.size !== doc.variants.length) fail()
+      if (doc?.hasVariants && policy?.resolveDuplicateVariantTuples) {
+        if (!sourceInstanceToken || new Set(targetTuples.values()).size !== targetTuples.size) fail()
+        for (const targetId of variantIds) {
+          const aliases = entry.skus.filter(sku => sku.targetId === targetId).sort((a,b) => BigInt(a.sourceSkuId) < BigInt(b.sourceSkuId) ? -1 : 1)
+          if (aliases.length > 1 && aliases.some(sku => parents.get(key('product_skus', sku.sourceSkuId)) !== entry.sourceProductId)) fail()
+          const hex = createHash('sha256').update(JSON.stringify([sourceInstanceToken, 'product_skus', aliases[0].sourceSkuId])).digest('hex')
+          if (targetId !== `${hex.slice(0,8)}-${hex.slice(8,12)}-5${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20,32)}`) fail()
+        }
       }
     },
     finish(customerRoot: unknown, productRoot: unknown, snapshot: unknown): void {

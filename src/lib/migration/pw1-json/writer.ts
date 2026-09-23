@@ -1,8 +1,6 @@
-import { compare } from 'bcryptjs'
 import type { CollectionSlug, PayloadRequest, SanitizedCollectionConfig, Where } from 'payload'
-import { encryptPassword } from '../../sso/sso-api-client'
-import { recoverPw1Password } from './laravel6-credential'
-import { checksum, object, projectionMatches, resolveData, type Entity } from './projection'
+import { passwordFor, userAuth, legacyEmailAuth } from './user-auth'
+import { checksum, object, projectionMatches, targetProjectionMatches, resolveData, type Entity } from './projection'
 import { findClaim, findOperation, recordEntity, lockStore, assertFence, type LedgerBatch, type LedgerLease, type EntityClaim, type SqlClient } from './ledger'
 import { MigrationError } from './errors'
 import type { Runtime } from './runtime'
@@ -100,23 +98,22 @@ function expected(entity: Entity, targets: Map<string, number>, clock?: string, 
   return data
 }
 function match(data: Doc, doc: Doc): void {
-  if (!projectionMatches(data, doc)) throw new MigrationError('TARGET_PROJECTION_CONFLICT')
+  if (!targetProjectionMatches(data, doc)) {
+    const fields = Object.keys(data).flatMap(key => {
+      if (projectionMatches(data[key], doc[key])) return []
+      if (key === 'settings' && object(data[key]) && object(doc[key])) {
+        const source = data[key] as Doc, target = doc[key] as Doc
+        return Object.keys(source).filter(field => !projectionMatches(source[field], target[field])).map(field => `settings.${field}`)
+      }
+      return [key]
+    })
+    // Field names only; never expose actual user values or credentials.
+    throw new MigrationError('TARGET_PROJECTION_CONFLICT', `TARGET_PROJECTION_CONFLICT fields=${fields.join(',')}`)
+  }
 }
 function evidence(data: Doc, deferred: boolean, entity: Entity): Doc {
   return { projection: data, pendingReferences: deferred, updatedAt: data.updatedAt ?? null,
     timestampDefaults: ['createdAt', 'updatedAt'].filter(key => entity.data[key] == null) }
-}
-async function passwordFor(entity: Entity, credentials: Map<string, SourceCredential>): Promise<string> {
-  const record = credentials.get(entity.sourceId)
-  if (!record?.key_string || !record.passwordHash) throw new MigrationError('VERIFIABLE_CREDENTIAL_REQUIRED')
-  const appKey = process.env.PW1_APP_KEY
-  if (!appKey) throw new MigrationError('PW1_APP_KEY_REQUIRED')
-  if (!/^[a-fA-F0-9]{64}$/.test(process.env.SSO_ENCRYPTION_KEY ?? '')) throw new MigrationError('SSO_KEY_INVALID')
-  // Laravel bcrypt uses 2y; bcryptjs implements equivalent 2b. Unsupported hashes fail closed.
-  if (!/^\$2[aby]\$(0[4-9]|1[0-5])\$[./A-Za-z0-9]{53}$/.test(record.passwordHash)) throw new MigrationError('SOURCE_PASSWORD_HASH_UNSUPPORTED')
-  const plaintext = recoverPw1Password(record, appKey)
-  if (!plaintext || Buffer.byteLength(plaintext) > 72 || !(await compare(plaintext, record.passwordHash.replace(/^\$2y\$/, '$2b$')))) throw new MigrationError('SOURCE_PASSWORD_MISMATCH')
-  return plaintext
 }
 
 /** Check known unique business keys before any business write; DB constraints remain the final arbiter. */
@@ -137,6 +134,12 @@ async function uniqueChecks(runtime: Runtime, entities: Entity[], targets: Map<s
         if (matches.rows.some(row => !owner || String(row.id) !== owner.targetId)) throw new MigrationError('TARGET_SKU_CONFLICT')
       }
     }
+    if (entity.collection === 'users' && typeof entity.data.email === 'string' && entity.data.email.trim()) {
+      // PW1 invalid email is preserved byte-for-byte, but uniqueness uses the same canonical account identity.
+      const matches = await db.query(`SELECT id FROM ${table(runtime, entity)} WHERE lower(btrim(email))=lower(btrim($1))`, [entity.data.email])
+      const owner = claims.get(entity.ref)
+      if (matches.rows.some(row => !owner || String(row.id) !== owner.targetId)) throw new MigrationError('UNCLAIMED_TARGET_COLLISION')
+    }
     for (const paths of groups) {
       const values = paths.map(path => path.split('.').reduce<unknown>((value, key) => object(value) ? value[key] : undefined, entity.data))
       if (values.some(value => value == null || value === '')) continue
@@ -152,7 +155,7 @@ async function uniqueChecks(runtime: Runtime, entities: Entity[], targets: Map<s
     }
   }
 }
-export async function preflightStore(runtime: Runtime, entities: Entity[], sourceInstance: string, credentials: Map<string, SourceCredential>, batch?: LedgerBatch, registry?: PreflightRegistry, creatorContext?: CreatorContext, observer?: PreflightObserver): Promise<StoreProposal> {
+export async function preflightStore(runtime: Runtime, entities: Entity[], sourceInstance: string, credentials: Map<string, SourceCredential>, batch?: LedgerBatch, registry?: PreflightRegistry, creatorContext?: CreatorContext, observer?: PreflightObserver, allowMissingCredentials = false): Promise<StoreProposal> {
   observer?.(undefined)
   if (registry) registerSourceKeys(runtime, entities, registry)
   const targets = new Map<string, number>(), claims = new Map<string, EntityClaim>()
@@ -187,7 +190,7 @@ export async function preflightStore(runtime: Runtime, entities: Entity[], sourc
       }
     } else {
       expected(entity, new Map(entity.refs.map(ref => [ref.ref, 1])), '2000-01-01T00:00:00.000Z')
-      if (entity.collection === 'users') await passwordFor(entity, credentials)
+      if (entity.collection === 'users') await passwordFor(entity, credentials, allowMissingCredentials)
       if (entity.collection === 'media') validateMedia(entity.data)
     }
   }
@@ -259,13 +262,20 @@ export async function writeEntity(runtime: Runtime, entity: Entity, targets: Map
     // Repeat collision checks under the same transaction; unique DB indexes close concurrent races.
     await uniqueChecks(runtime, [entity], targets, new Map(), req, db)
     let doc: Doc
+    let passwordResetRequired = false
     if (entity.collection === 'media') {
       validateMedia(data)
       doc = await runtime.payload.db.create({ collection: 'media', data: { ...data, filename: null }, req: req as PayloadRequest })
+    } else if (entity.collection === 'users' && entity.preserveInvalidEmail) {
+      const password = await passwordFor(entity, credentials, batch.binding.executionScope === 'foundation')
+      passwordResetRequired = password === null
+      // Only the verified artifact policy sets this internal marker. App auth validation is unchanged.
+      doc = await runtime.payload.db.create({ collection: 'users', data: { loginAttempts: 0, prefer_lang: 'en', has_seen_ai_wizard: false, migrationStatus: 'migrated', ...data, ...await legacyEmailAuth(password) }, req: req as PayloadRequest })
     } else {
       const auth: Doc = entity.collection === 'users' ? await (async () => {
-        const password = await passwordFor(entity, credentials)
-        return { password, keyString: encryptPassword(password) }
+        const password = await passwordFor(entity, credentials, batch.binding.executionScope === 'foundation')
+        passwordResetRequired = password === null
+        return userAuth(password)
       })() : {}
       // The schema validator has checked the dynamic document; collection-specific TS unions cannot express this runtime dispatch.
       doc = await runtime.payload.create({ collection: entity.collection as CollectionSlug, data: { ...data, ...auth } as never, depth: 0, overrideAccess: true, req, context: req.context, disableVerificationEmail: true }) as unknown as Doc
@@ -273,7 +283,7 @@ export async function writeEntity(runtime: Runtime, entity: Entity, targets: Map
     const id = idNumber(String(doc.id))
     await restoreTimestamps(runtime, entity, id, data, db)
     match(data, await read(runtime, entity, id, req))
-    await recordEntity(db, lease, { batchId: batch.id, storeId: entity.storeId, sourceInstance: batch.binding.sourceInstance, sourceEntity: entity.sourceEntity, sourceId: entity.sourceId, targetCollection: entity.collection, targetId: String(id), sourceChecksum: entity.sourceChecksum, targetChecksum: checksum(data), evidence: evidence(data, result.deferred, entity), action: 'CREATE' })
+    await recordEntity(db, lease, { batchId: batch.id, storeId: entity.storeId, sourceInstance: batch.binding.sourceInstance, sourceEntity: entity.sourceEntity, sourceId: entity.sourceId, targetCollection: entity.collection, targetId: String(id), sourceChecksum: entity.sourceChecksum, targetChecksum: checksum(data), evidence: { ...evidence(data, result.deferred, entity), ...(entity.collection === 'users' ? { passwordResetRequired } : {}) }, action: 'CREATE' })
     await assertFence(db, lease)
     return id
   }))
@@ -294,7 +304,8 @@ export async function finalizeEntity(runtime: Runtime, entity: Entity, targets: 
     if (operation.detail.pendingReferences) {
       if (operation.action !== 'CREATE' || operation.claim_active !== true) throw new MigrationError('DEFERRED_UPDATE_NOT_OWNED')
       // Only rows created by this batch may complete deferred relationships. Never update an existing owner.
-      await runtime.payload.update({ collection: entity.collection as CollectionSlug, id, data: data as never, depth: 0, overrideAccess: true, req, context: req.context })
+      if (entity.collection === 'users' && entity.preserveInvalidEmail) await runtime.payload.db.updateOne({ collection: 'users', id, data, req: req as PayloadRequest })
+      else await runtime.payload.update({ collection: entity.collection as CollectionSlug, id, data: data as never, depth: 0, overrideAccess: true, req, context: req.context })
       await restoreTimestamps(runtime, entity, id, data, db)
       match(data, await read(runtime, entity, id, req))
       await db.query(`UPDATE migration_entity_map SET target_checksum=$1,transformed_checksum=$1,detail=$2::jsonb WHERE id=$3 AND action='CREATE' AND claim_active=true`, [checksum(data), JSON.stringify({ ...operation.detail, ...evidence(data, false, entity) }), operation.id])

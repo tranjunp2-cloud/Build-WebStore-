@@ -20,6 +20,11 @@ export function safeLogEvent(event: Record<string, unknown>): Record<string, str
   }
   return safe
 }
+export interface StoreDestination {
+  tenantId: number | null
+  siteId: number | null
+  productCategories: number[]
+}
 export class RunLogger {
   private sequence = 0
   private eventPart = 1
@@ -33,6 +38,7 @@ export class RunLogger {
   private summary: Record<string, unknown>
   private failedStoreIds = new Set<string>()
   private entityCounts: Record<string, number> = Object.create(null)
+  private destinations: Record<string, StoreDestination> = Object.create(null)
   private constructor(readonly directory: string, readonly sessionId: string, mode: string, private rotationBytes: number) {
     this.summary = { version: 1, sessionId, mode, startedAt: this.startedAt, outcome: 'RUNNING', verifiedThisSession: 0 }
   }
@@ -101,13 +107,31 @@ export class RunLogger {
       }
     } catch { this.failed = true; throw new MigrationError('LOG_WRITE_FAILED') }
   }
+  async recordDestination(storeId: string, destination: StoreDestination): Promise<void> {
+    if (this.failed) throw new MigrationError('LOG_WRITE_FAILED')
+    this.destinations[storeId] = destination
+    const temp = join(this.directory, `store-destinations-${randomUUID()}.tmp`)
+    try {
+      const handle = await open(temp, 'wx', 0o600)
+      try {
+        await handle.writeFile(JSON.stringify(this.destinations, null, 2) + '\n')
+        await handle.sync()
+      } finally {
+        await handle.close()
+      }
+      await rename(temp, join(this.directory, 'store-destinations.json'))
+    } catch {
+      this.failed = true
+      throw new MigrationError('LOG_WRITE_FAILED')
+    }
+  }
   async checkpoint(outcome = 'RUNNING', result: Record<string, unknown> = {}): Promise<void> {
     if (this.failed) throw new MigrationError('LOG_WRITE_FAILED')
     const temp = join(this.directory, `summary-${randomUUID()}.tmp`)
     try {
       const handle = await open(temp, 'wx', 0o600)
       try {
-        const summary = { ...this.summary, ...safeLogEvent(result), outcome, updatedAt: new Date().toISOString(), entityCounts: this.entityCounts, failedStoreIds: [...this.failedStoreIds], remainingStores: Math.max(0, Number(this.summary.stores ?? 0) - (this.summary.mode === 'dry-run' ? Number(this.summary.preflightedStores ?? 0) : Number(this.summary.verifiedBefore ?? 0) + Number(this.summary.verifiedThisSession))) }
+        const summary = { ...this.summary, ...safeLogEvent(result), outcome, updatedAt: new Date().toISOString(), entityCounts: this.entityCounts, destinationsCount: Object.keys(this.destinations).length, failedStoreIds: [...this.failedStoreIds], remainingStores: Math.max(0, Number(this.summary.stores ?? 0) - (this.summary.mode === 'dry-run' ? Number(this.summary.preflightedStores ?? 0) : Number(this.summary.verifiedBefore ?? 0) + Number(this.summary.verifiedThisSession))) }
         await handle.writeFile(JSON.stringify(summary, null, 2) + '\n'); await handle.sync()
       } finally { await handle.close() }
       await this.events.sync(); await this.errors.sync()

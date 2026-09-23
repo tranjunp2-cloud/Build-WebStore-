@@ -203,3 +203,60 @@ describe('[TC-F42-IMP-ROOT-CREATOR] approved PW1 root creator policy', () => {
     expect(creatorDiagnosticResolved(user, new Map())).toBe(false)
   })
 })
+
+
+describe('[TC-F42-IMP-POLICY-002] Missing source address fidelity', () => {
+  it('preserves explicit null country and omitted line1 without filling Malaysia', () => {
+    // Arrange
+    const { store, configs } = fixture()
+    configs.orders.fields = [{ name: 'shippingAddress', type: 'group', fields: [{ name: 'line1', type: 'text' }, { name: 'country', type: 'text', defaultValue: 'Malaysia' }] }]
+    store.collections.orders = [{ _ref: '@orders:orders:1', shippingAddress: { country: null } }]
+    // Act
+    const order = buildEntities(store, configs, 'snapshot').find(entity => entity.collection === 'orders')!
+    // Assert
+    expect(order.data.shippingAddress).toEqual({ country: null })
+    expect(resolveData(order, new Map()).data).toMatchObject({ shippingAddress: { country: null } })
+  })
+})
+
+
+describe('[TC-F42-IMP-EMAIL-NORMALIZATION] Payload user email projection', () => {
+  it('normalizes target email and checksum without mutating the source document', () => {
+    // Arrange
+    const {store,configs}=fixture()
+    configs.users.fields=[{name:'email',type:'email',required:true},{name:'roles',type:'select',hasMany:true,options:['tenant-owner']},{name:'tenants',type:'array',fields:[{name:'tenant',type:'relationship',relationTo:'tenants'}]}]
+    store.collections.users=[{_ref:'@users:users:230',roles:['tenant-owner'],tenants:[{tenant:'@tenants:stores:205'}],email:'  Example@Example.COM  '}]
+    // Act
+    const first=buildEntities(store,configs,'source:snapshot').find(e=>e.collection==='users')!
+    const original=store.collections.users[0].email
+    store.collections.users=[{_ref:'@users:users:230',roles:['tenant-owner'],tenants:[{tenant:'@tenants:stores:205'}],email:'example@example.com'}]
+    const second=buildEntities(store,configs,'source:snapshot').find(e=>e.collection==='users')!
+    // Assert
+    expect(first.data.email).toBe('example@example.com')
+    expect(original).toBe('  Example@Example.COM  ')
+    expect(first.sourceChecksum).toBe(second.sourceChecksum)
+    expect(projectionMatches(first.data,{...first.data,email:'example@example.com'})).toBe(true)
+    expect(projectionMatches(first.data,{...first.data,email:'other@example.com'})).toBe(false)
+  })
+})
+
+
+describe('[TC-F42-IMP-POLICY-003] Invalid source email fidelity', () => {
+  it('preserves exact invalid email only with the internal approved policy capability', () => {
+    // Arrange
+    const { store, configs } = fixture()
+    store.collections.users = [{ _ref: '@users:users:9', email: ' Broken@Email ', roles: ['tenant-owner'], tenants: [{ tenant: '@tenants:stores:205', role: 'owner' }] }]
+    configs.users.fields = [{ name: 'email', type: 'email', required: true }, { name: 'roles', type: 'select', hasMany: true, options: ['tenant-owner'] }, { name: 'tenants', type: 'array', fields: [{ name: 'tenant', type: 'relationship', relationTo: 'tenants' }, { name: 'role', type: 'text' }] }]
+    // Act
+    const preserved = buildEntities(store, configs, 'source', new Set(), true).find(e => e.collection === 'users')!
+    const ordinary = buildEntities(store, configs, 'source').find(e => e.collection === 'users')!
+    // Assert
+    expect(preserved.data.email).toBe(' Broken@Email ')
+    expect(preserved.preserveInvalidEmail).toBe(true)
+    expect(preserved.data).not.toHaveProperty('preserveInvalidEmail')
+    expect(ordinary.data.email).toBe('broken@email')
+    expect(ordinary.preserveInvalidEmail).toBeUndefined()
+    store.collections.users[0].email = 'VALID@example.com'
+    expect(buildEntities(store, configs, 'source', new Set(), true).find(e => e.collection === 'users')?.preserveInvalidEmail).toBeUndefined()
+  })
+})

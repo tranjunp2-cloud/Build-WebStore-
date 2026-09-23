@@ -1,3 +1,4 @@
+import { sourceExclusionDiagnostic } from './source-exclusions'
 import { isProductExclusionDiagnostic } from './product-exclusions'
 import { z } from 'zod'
 type Diagnostic = { code: string; severity: 'warning' | 'blocker'; storeId?: string; table?: string; sourceId?: string; field?: string; reason?: string }
@@ -17,7 +18,7 @@ export function externalArchiveKeys(row: ArchiveRow, selected?: ReadonlySet<stri
   return row.contributions.flatMap(c => c.storeId && (!selected || selected.has(c.storeId)) ? [archiveKey(c.storeId, row.table, row.sourceId)] : [])
 }
 export function reviewCategory(d: Diagnostic, archive: ReadonlySet<string> = new Set(), excluded: ReadonlySet<string> = new Set()): ReviewCategory {
-  if (isProductExclusionDiagnostic(d)) return 'policy_excluded'
+  if (isProductExclusionDiagnostic(d) || sourceExclusionDiagnostic(d)) return 'policy_excluded'
   if (d.storeId && excluded.has(d.storeId)) return 'policy_excluded'
   if (d.severity === 'warning' && d.storeId && d.sourceId && (
     (d.code === 'ORDER_PAYMENT_METHOD_UNVERIFIED' && d.table === 'orders' && d.field === 'payment_method_id' && !d.reason) ||

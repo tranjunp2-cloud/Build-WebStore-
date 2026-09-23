@@ -1,4 +1,5 @@
-import { isClassifiedMappingHash, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from './classification'
+import { masterFiles, boundMasterHash } from './master-parts'
+import { isClassifiedMappingHash, CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from './classification'
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, mkdir, open, realpath, writeFile } from 'node:fs/promises'
@@ -118,6 +119,10 @@ async function copyBoundFile(source: string, target: string, expectedHash: strin
   } finally { await output?.close(); await input.close() }
 }
 
+export function requiredPrepareDiskBytes(copyBytes: bigint, masterBytes: bigint, encryptedBytes: bigint, chunked: boolean): bigint {
+  return copyBytes + (chunked ? BigInt(0) : masterBytes * BigInt(2)) + encryptedBytes + BigInt(64 * 1024 * 1024)
+}
+
 export async function prepareImportArtifact(options: { exportArtifact: string; credentials?: string; creatorBindings?: string; output: string }): Promise<{ manifestPath: string }> {
   const source = resolve(options.exportArtifact)
   const output = resolve(options.output)
@@ -133,7 +138,7 @@ export async function prepareImportArtifact(options: { exportArtifact: string; c
   const credentials = options.credentials ? await readCredentialCsv(options.credentials, { hash: userFiles[0].sha256, headers: userFiles[0].headers, rowCount: userFiles[0].rowCount! }) : undefined
   let creatorBindingsHash: string | null = null
   if (options.creatorBindings) {
-    if (![NEW_MAPPING_HASH, CLASSIFIED_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH].includes(exported.manifest.contractSha256)) throw new MigrationError('CREATOR_BINDINGS_PROFILE_INVALID')
+    if (![NEW_MAPPING_HASH, CLASSIFIED_MAPPING_HASH, CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH].includes(exported.manifest.contractSha256)) throw new MigrationError('CREATOR_BINDINGS_PROFILE_INVALID')
     creatorBindingsHash = (await readBoundFile(options.creatorBindings, { maxBytes: 16 * 1024 * 1024 })).hash
     await loadCreatorBindings(options.creatorBindings, creatorBindingsHash)
   }
@@ -147,7 +152,7 @@ export async function prepareImportArtifact(options: { exportArtifact: string; c
     sourceDatabase: exported.manifest.sourceSnapshot.sourceDatabase, snapshotId: exported.manifest.sourceSnapshot.snapshotId,
     asOf: exported.manifest.sourceSnapshot.asOf, mappingHash: exported.manifest.contractSha256,
     ...(v3 && 'classificationVersion' in exported.manifest ? { classificationVersion: exported.manifest.classificationVersion, customerReconciliationHash: exported.manifest.artifacts['customer-reconciliation.json'], productReconciliationHash: exported.manifest.artifacts['product-reconciliation.json'] } : {}),
-    masterHash: exported.manifest.artifacts['master.json'], credentialHash: null, exporterManifestHash: exported.hash,
+    masterHash: boundMasterHash(exported.manifest), credentialHash: null, exporterManifestHash: exported.hash,
   }
   let encrypted: string | undefined
   if (credentials) {
@@ -164,8 +169,8 @@ export async function prepareImportArtifact(options: { exportArtifact: string; c
   }
   let copyBytes = BigInt(0)
   for (const name of ['master-manifest.json', ...Object.keys(exported.manifest.artifacts)]) copyBytes += BigInt((await lstat(resolve(source, name))).size)
-  const masterBytes = BigInt((await lstat(resolve(source, 'master.json'))).size)
-  await assertDiskSpace(parent, copyBytes + masterBytes * BigInt(2) + BigInt(encrypted ? Buffer.byteLength(encrypted) : 0) + BigInt(64) * BigInt(1024) * BigInt(1024))
+  const masterBytes = (await Promise.all(masterFiles(exported.manifest).map(async part => BigInt((await lstat(resolve(source,part.filename))).size)))).reduce((sum,bytes) => sum+bytes,BigInt(0))
+  await assertDiskSpace(parent, requiredPrepareDiskBytes(copyBytes,masterBytes,BigInt(encrypted ? Buffer.byteLength(encrypted) : 0),'masterParts' in exported.manifest))
   await mkdir(output, { mode: 0o700 })
   for (const name of ['master-manifest.json', ...Object.keys(exported.manifest.artifacts)]) {
     const expectedHash = name === 'master-manifest.json' ? exported.hash : exported.manifest.artifacts[name as keyof typeof exported.manifest.artifacts]

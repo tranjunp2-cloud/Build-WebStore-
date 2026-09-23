@@ -32,6 +32,8 @@ export interface ArtifactCoverage {
   blockers: number
 }
 export interface ImportArtifact {
+  masterParts?: import('./master-parts').MasterPart[]
+  preserveInvalidUserEmails?: boolean
   coverage: ArtifactCoverage
   pageExcludedRecords: number
   optionalDispositions: Record<string, 'ACCEPTED_SOURCE_EXCLUSION' | 'SOURCE_UNVERIFIED'>

@@ -1,23 +1,24 @@
+import { masterPartsSchema, masterFiles, boundMasterHash, validateMasterParts, MAX_MASTER_PART_BYTES, type MasterPart } from './master-parts'
 import * as legacyOutcome from './export-outcome-v1'
 import { outcomeSchema, exportOutcome, externalArchiveKeys } from './export-outcome'
 import type { Progress } from './progress'
 import { createSelectedSourceScope } from './source-scope'
 import { constants, mkdtempSync, writeFileSync, appendFileSync, chmodSync, rmSync } from 'node:fs'
-import { open, lstat, realpath, statfs, access } from 'node:fs/promises'
+import { open, lstat, realpath, statfs, access, readdir } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve, basename, relative, isAbsolute } from 'node:path'
 import { z } from 'zod'
 import { parseJsonChunks, type ArrayItemVisitor } from './stream-json'
 import { MigrationError } from './errors'
 import { checksum } from './projection'
-import { migrationPolicySchema, createDiagnosticCollector, APPROVED_POLICY } from './diagnostics'
+import { migrationPolicySchema, conflictMigrationPolicySchema, ownerEmailMigrationPolicySchema, productCatalogMigrationPolicySchema, sourceOmissionMigrationPolicySchema, negativeOrderMigrationPolicySchema, createDiagnosticCollector, approvedPolicyHash, APPROVED_POLICY } from './diagnostics'
 import { validateUserActors, loadCreatorBindings } from './creator-bindings'
 import { COLLECTIONS, type ImportArtifact, type ImportDiagnostic, type ImportManifest, type ImportStore, type ImportDocument, type StoreSelector } from './types'
 import { createReconciliationIndex } from './reconciliation'
-import { createSourceClassificationIndex, classificationRowSchema, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from './classification'
+import { createSourceClassificationIndex, classificationRowSchema, CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from './classification'
 import { compareStoreIds, normalizeStoreId, selectStoreIds } from './selectors'
 
-export { BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from './classification'
+export { CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH } from './classification'
 
 export const MAX_ARTIFACT_BYTES = 8 * 1024 * 1024 * 1024
 export const EXPECTED_MAPPING_HASH = '62cd5561bff68111aacb55c857b8820647f6d55d9658ec136e46daab36dd9d26'
@@ -37,7 +38,7 @@ const importManifestV2 = importManifestV1.extend({
   actorArtifactHash: digest.nullable(), creatorBindingsHash: digest.nullable(), classifierVersion: z.literal('diagnostic-policy-v1'),
 }).strict()
 const importManifestV3 = importManifestV2.extend({
-  version: z.literal(3), profile: z.literal('pw1-json-v3'), mappingHash: z.enum([CLASSIFIED_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH]),
+  version: z.literal(3), profile: z.literal('pw1-json-v3'), mappingHash: z.enum([CLASSIFIED_MAPPING_HASH, CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH, OUTCOME_MAPPING_HASH, ARCHIVE_MAPPING_HASH, STATUS_MAPPING_HASH]),
   classifierVersion: z.literal('diagnostic-policy-v2'), classificationVersion: z.literal('source-classification-v1'),
   customerReconciliationHash: digest, productReconciliationHash: digest,
 }).strict()
@@ -73,6 +74,14 @@ const exporterV10 = exporterV9.extend({ exporterVersion: z.literal('1.6.2'), con
 const exporterV11 = exporterV10.extend({ exporterVersion: z.literal('1.7.0'), contractSha256: z.literal(VARIANT_MAPPING_HASH) })
 const exporterV12 = exporterV11.extend({ exporterVersion: z.literal('1.8.0'), contractSha256: z.literal(PRODUCT_EXCLUSION_MAPPING_HASH) })
 const exporterV13 = exporterV12.extend({ exporterVersion: z.literal('1.8.1'), contractSha256: z.literal(BLOG_CATEGORY_MAPPING_HASH) })
+const exporterV14 = exporterV13.extend({ exporterVersion: z.literal('1.8.2'), contractSha256: z.literal(POLICY_BOUNDARY_MAPPING_HASH) })
+const exporterV15 = exporterV14.extend({ exporterVersion: z.literal('1.9.0'), contractSha256: z.literal(CONFLICT_RESOLUTION_MAPPING_HASH), migrationPolicy: conflictMigrationPolicySchema.optional(), artifacts: exporterV14.shape.artifacts.extend({ 'conflict-details.json': digest.optional(), 'conflict-details.md': digest.optional() }).strict() })
+const exporterV16 = exporterV15.extend({ exporterVersion: z.literal('1.9.1'), contractSha256: z.literal(OWNER_EMAIL_MAPPING_HASH), migrationPolicy: ownerEmailMigrationPolicySchema.optional() })
+const exporterV17 = exporterV16.extend({ exporterVersion: z.literal('1.9.2'), contractSha256: z.literal(PRODUCT_CATALOG_MAPPING_HASH), migrationPolicy: productCatalogMigrationPolicySchema.optional() })
+const exporterV18 = exporterV17.extend({ exporterVersion: z.literal('1.9.3'), contractSha256: z.literal(SOURCE_OMISSION_MAPPING_HASH), migrationPolicy: sourceOmissionMigrationPolicySchema.optional() })
+const exporterV19 = exporterV18.extend({ exporterVersion: z.literal('1.9.4'), contractSha256: z.literal(NEGATIVE_ORDER_MAPPING_HASH), migrationPolicy: negativeOrderMigrationPolicySchema.optional() })
+const chunkArtifacts = exporterV19.shape.artifacts.omit({ 'master.json': true }).catchall(digest)
+const exporterV20 = exporterV19.extend({ exporterVersion: z.literal('1.10.0'), contractSha256: z.literal(CHUNKED_MASTER_MAPPING_HASH), masterSetHash: digest, masterParts: masterPartsSchema, artifacts: chunkArtifacts }).strict()
 const exporterV4 = exporterV3.extend({
   exporterVersion: z.literal('1.3.0'), contractSha256: z.literal(STATUS_MAPPING_HASH),
 }).strict()
@@ -131,11 +140,19 @@ function validate<T>(schema: z.ZodType<T>, value: unknown, code: string): T {
 
 export async function inspectExportArtifact(directory: string) {
   const manifestFile = await readBoundFile(resolve(directory, 'master-manifest.json'), { json: true, maxBytes: 16 * 1024 * 1024 })
-  const manifest = validate(z.union([exporterSchema, exporterV2, exporterV3, exporterV4, exporterV5, exporterV6, exporterV7, exporterV8, exporterV9, exporterV10, exporterV11, exporterV12, exporterV13]), manifestFile.value, 'EXPORT_MANIFEST_INVALID')
+  const manifest = validate(z.union([exporterSchema, exporterV2, exporterV3, exporterV4, exporterV5, exporterV6, exporterV7, exporterV8, exporterV9, exporterV10, exporterV11, exporterV12, exporterV13, exporterV14, exporterV15, exporterV16, exporterV17, exporterV18, exporterV19, exporterV20]), manifestFile.value, 'EXPORT_MANIFEST_INVALID')
+  if ('masterParts' in manifest) {
+    const known = new Set(Object.keys(exporterV19.shape.artifacts.shape).filter(name => name !== 'master.json'))
+    const parts = new Set(manifest.masterParts.map(part => part.filename))
+    if (Object.keys(manifest.artifacts).some(name => !known.has(name) && !parts.has(name))) throw new MigrationError('MASTER_PART_INDEX_INVALID')
+    validateMasterParts(manifest.masterParts,manifest.masterSetHash,manifest.artifacts,manifest.counts.emittedStoreCount)
+    for (const name of await readdir(directory)) if ((name === 'master.json' || /^master-[0-9]+\.json$/.test(name)) && !parts.has(name)) throw new MigrationError('MASTER_PART_EXTRA_FILE')
+    for (const part of manifest.masterParts) if ((await lstat(await secureFilePath(resolve(directory,part.filename)))).size !== part.bytes) throw new MigrationError('MASTER_PART_SIZE_MISMATCH')
+  }
   return { manifest, hash: manifestFile.hash }
 }
 
-export async function loadImportArtifact(manifestPath: string, options: { progress?: Progress; selector?: StoreSelector; storeIds?: readonly string[]; maxRetainedBytes?: number; spoolDirectory?: string } = {}): Promise<ImportArtifact> {
+export async function loadImportArtifact(manifestPath: string, options: { scope?: 'foundation'; progress?: Progress; selector?: StoreSelector; storeIds?: readonly string[]; maxRetainedBytes?: number; spoolDirectory?: string } = {}): Promise<ImportArtifact> {
   const readArtifact: typeof readBoundFile = (filename, readOptions = {}) => readBoundFile(filename, {
     ...readOptions,
     onBytes: (bytes, totalBytes) => options.progress?.({ phase: 'read-artifact', file: basename(filename), bytes, totalBytes }),
@@ -150,9 +167,10 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
   const manifest: ImportManifest = validate(importManifestSchema, source.value, 'IMPORT_MANIFEST_INVALID')
   if (((await lstat(resolve(directory, 'master-manifest.json'))).mode & 0o077) !== 0) throw new MigrationError('ARTIFACT_FILE_NOT_PRIVATE')
   const exported = await inspectExportArtifact(directory)
-  if (exported.hash !== manifest.exporterManifestHash || exported.manifest.artifacts['master.json'] !== manifest.masterHash || exported.manifest.sourceSnapshot.sourceInstance !== manifest.sourceInstance || exported.manifest.sourceSnapshot.sourceDatabase !== manifest.sourceDatabase || exported.manifest.sourceSnapshot.snapshotId !== manifest.snapshotId || exported.manifest.sourceSnapshot.asOf !== manifest.asOf) throw new MigrationError('IMPORT_EXPORT_BINDING_MISMATCH')
+  if (exported.hash !== manifest.exporterManifestHash || boundMasterHash(exported.manifest) !== manifest.masterHash || exported.manifest.sourceSnapshot.sourceInstance !== manifest.sourceInstance || exported.manifest.sourceSnapshot.sourceDatabase !== manifest.sourceDatabase || exported.manifest.sourceSnapshot.snapshotId !== manifest.snapshotId || exported.manifest.sourceSnapshot.asOf !== manifest.asOf) throw new MigrationError('IMPORT_EXPORT_BINDING_MISMATCH')
   if (manifest.mappingHash !== exported.manifest.contractSha256) throw new MigrationError('IMPORT_EXPORT_BINDING_MISMATCH')
-  const policy = 'migrationPolicy' in exported.manifest ? exported.manifest.migrationPolicy : undefined
+  const policy: z.infer<typeof negativeOrderMigrationPolicySchema> | undefined = 'migrationPolicy' in exported.manifest ? exported.manifest.migrationPolicy : undefined
+  if (policy?.approvedNegativeTotalOrders?.length && (![CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH].includes(manifest.mappingHash) || exported.manifest.sourceSnapshot.sourceInstance !== 'PW1PROD' || exported.manifest.sourceSnapshot.sourceInstanceToken !== 'PW1PROD')) throw new MigrationError('NEGATIVE_ORDER_POLICY_SCOPE_INVALID')
   const actorHash = 'user-actors.json' in exported.manifest.artifacts ? exported.manifest.artifacts['user-actors.json'] : undefined
   if (manifest.version >= 2 && (manifest.sourceInstanceToken !== exported.manifest.sourceSnapshot.sourceInstanceToken || manifest.migrationPolicyHash !== (policy ? checksum(policy) : null) || manifest.actorArtifactHash !== (actorHash ?? null))) throw new MigrationError('IMPORT_EXPORT_BINDING_MISMATCH')
   if (manifest.version === 3) {
@@ -178,6 +196,8 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
     if (partitionIds.has(id)) throw new MigrationError('EXPORT_PARTITION_INVALID')
     partitionIds.add(id)
   }
+  const masters = masterFiles(exported.manifest)
+  const masterByName = new Map(masters.map(part => [part.filename,part]))
   const counts = exported.manifest.counts
   if (counts.sourceStoreCount !== counts.selectedStoreCount + counts.policyExcludedStoreCount || counts.selectedStoreCount !== counts.emittedStoreCount + counts.blockedStoreCount) throw new MigrationError('EXPORT_PARTITION_INVALID')
   const sourceTables = new Map<string, { count: number; headers: string[]; seen: number }>()
@@ -206,9 +226,10 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
   const outcomeDiagnostics: ImportDiagnostic[] = []
   const outcomeArchive = new Set<string>()
   let exporterBlockerCount = 0
-  const sourceScope = manifest.version === 3 ? createSelectedSourceScope(actors, Boolean(policy && checksum(policy) === APPROVED_POLICY && policy.shippingPolicy === 'pw2-defaults')) : undefined
-  const classification = manifest.version === 3 ? createSourceClassificationIndex(sourceScope, [PRODUCT_EXCLUSION_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH].includes(manifest.mappingHash)) : undefined
-  const reconciliation = manifest.version === 3 ? createReconciliationIndex() : undefined
+  const foundation = options.scope === 'foundation'
+  const sourceScope = !foundation && manifest.version === 3 ? createSelectedSourceScope(actors, Boolean(policy && approvedPolicyHash(policy, manifest.mappingHash) === APPROVED_POLICY && policy.shippingPolicy === 'pw2-defaults')) : undefined
+  const classification = !foundation && manifest.version === 3 ? createSourceClassificationIndex(sourceScope, [PRODUCT_EXCLUSION_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH].includes(manifest.mappingHash), [CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH].includes(manifest.mappingHash) ? policy : undefined, [CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH].includes(manifest.mappingHash) && policy && approvedPolicyHash(policy, manifest.mappingHash) === APPROVED_POLICY ? policy : undefined, [CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH].includes(manifest.mappingHash) && policy && approvedPolicyHash(policy, manifest.mappingHash) === APPROVED_POLICY ? policy : undefined) : undefined
+  const reconciliation = !foundation && manifest.version === 3 ? createReconciliationIndex([CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH].includes(manifest.mappingHash) ? policy : undefined, exported.manifest.sourceSnapshot.sourceInstanceToken) : undefined
   let customerRoot: unknown, productRoot: unknown
   let spoolDirectory: string | undefined
   const storeFiles: Record<string, { path: string; hash: string }> = Object.create(null)
@@ -216,7 +237,7 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
     const parent = resolve(options.spoolDirectory)
     await assertOutsideRepository(parent)
     if (await realpath(parent) !== parent || !(await lstat(parent)).isDirectory()) throw new MigrationError('SPOOL_PARENT_UNSAFE')
-    const masterSize = (await lstat(resolve(directory, 'master.json'))).size
+    const masterSize = (await Promise.all(masters.map(async part => (await lstat(resolve(directory,part.filename))).size))).reduce((sum,bytes) => sum+bytes,0)
     await assertDiskSpace(parent, BigInt(masterSize) * BigInt(2) + BigInt(64) * BigInt(1024) * BigInt(1024))
     spoolDirectory = mkdtempSync(resolve(parent, 'pw1-json-store-cache-'))
     chmodSync(spoolDirectory, 0o700)
@@ -248,14 +269,18 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
   const stores: ImportStore[] = []
   const seenStores = new Set<string>()
   let retainedBytes = 0
-  const priority = (name: string) => name === 'master.json' ? 0 : name === 'mapping-report.json' ? 1 : 2
-  for (const [name, expectedHash] of Object.entries(exported.manifest.artifacts).sort(([a], [b]) => priority(a) - priority(b))) {
-    if (!expectedHash) continue
+  const priority = (name: string) => name === 'mapping-report.json' ? 0 : 1
+  const entries: [string,string | undefined][] = [...masters.map(part => [part.filename,part.sha256] as [string,string]), ...Object.entries(exported.manifest.artifacts).filter(([name]) => !masterByName.has(name)).sort(([a],[b]) => priority(a)-priority(b))]
+  for (const [name, expectedHash] of entries) {
+    if (!expectedHash || (foundation && !masterByName.has(name))) continue
     const path = resolve(directory, name)
     if (((await lstat(path)).mode & 0o077) !== 0) throw new MigrationError('ARTIFACT_FILE_NOT_PRIVATE')
-    if (name === 'master.json') {
-      const result = await readArtifact(path, { json: true, expectedHash, visit: (position, _index, value) => {
+    if (masterByName.has(name)) {
+      const part = masterByName.get(name)!
+      const actualStoreIds: string[] = []
+      const result = await readArtifact(path, { json: true, expectedHash, ...(part.storeIds ? { maxBytes: MAX_MASTER_PART_BYTES-1 } : {}), visit: (position, _index, value) => {
         // Page documents are explicitly outside this import scope; still parsed strictly and hashed.
+        if (foundation && position.length === 2 && !['tenants', 'users', 'sites'].includes(String(position[1]))) return true
         if (position.length === 2 && position[1] === 'pages') { pageExcludedRecords++; return true }
         if (position.length !== 0) return false
         if (!value || typeof value !== 'object' || Array.isArray(value)) throw new MigrationError('STORE_SHAPE_INVALID')
@@ -269,7 +294,9 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
         if (partitionIds.has(storeId)) throw new MigrationError('EXPORT_PARTITION_INVALID')
         if (seenStores.has(storeId)) throw new MigrationError('DUPLICATE_STORE')
         seenStores.add(storeId)
+        actualStoreIds.push(storeId)
         for (const product of collections.products as ImportDocument[]) if (typeof product._ref === 'string') classification?.addProduct(storeId, product._ref)
+        classification?.addStore({ storeId, collections: collections as ImportStore['collections'] })
         reconciliation?.addStore({ storeId, collections: collections as ImportStore['collections'] })
         if (retainStore(storeId)) {
           const store: ImportStore = { storeId, collections: collections as ImportStore['collections'] }
@@ -289,6 +316,7 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
         return true
       } })
       if (!Array.isArray(result.value)) throw new MigrationError('MASTER_ROOT_INVALID')
+      if (part.storeIds && JSON.stringify(actualStoreIds) !== JSON.stringify(part.storeIds)) throw new MigrationError('MASTER_PART_STORES_MISMATCH')
     } else if (name === 'mapping-report.json') {
       // Index diagnostics before compact rows regardless of JSON object key order.
       // Both passes verify the same artifact digest.
@@ -300,15 +328,16 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
         return position.length === 1 && position[0] === 'rows'
       } })
       const result = await readArtifact(path, { json: true, expectedHash, visit: (position, _index, value) => {
-        if (position.length === 1 && position[0] === 'diagnostics') { const diagnostic = validate(diagnosticSchema, value, 'DIAGNOSTIC_INVALID'); if (manifest.version === 1 && diagnostic.reason !== undefined) throw new MigrationError('DIAGNOSTIC_INVALID'); if ([OUTCOME_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH].includes(manifest.mappingHash)) { if (outcomeDiagnostics.length >= 1000000) throw new MigrationError('DIAGNOSTIC_LIMIT'); outcomeDiagnostics.push(diagnostic) }; if (diagnostic.severity === 'blocker') exporterBlockerCount++; if (!classification) addDiagnostic(diagnostic); return true }
+        if (position.length === 1 && position[0] === 'diagnostics') { const diagnostic = validate(diagnosticSchema, value, 'DIAGNOSTIC_INVALID'); if (manifest.version === 1 && diagnostic.reason !== undefined) throw new MigrationError('DIAGNOSTIC_INVALID'); if ([OUTCOME_MAPPING_HASH, CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH].includes(manifest.mappingHash)) { if (outcomeDiagnostics.length >= 1000000) throw new MigrationError('DIAGNOSTIC_LIMIT'); outcomeDiagnostics.push(diagnostic) }; if (diagnostic.severity === 'blocker') exporterBlockerCount++; if (!classification) addDiagnostic(diagnostic); return true }
         if (position.length === 1 && position[0] === 'rows') {
           if (!value || typeof value !== 'object' || Array.isArray(value)) throw new MigrationError('REPORT_ROW_INVALID')
           const row = manifest.version === 3 ? validate(classificationRowSchema, value, 'REPORT_ROW_INVALID') : validate(reportRowSchema, value, 'REPORT_ROW_INVALID')
           const table = sourceTables.get(row.table)
           if (!table || row.record !== table.seen + 1 || row.record > table.count || Object.keys(row.fields).length !== table.headers.length || table.headers.some(header => !(header in row.fields)) || row.contributions.some(contribution => contribution.table !== row.table || contribution.sourceId !== row.sourceId)) throw new MigrationError('REPORT_COVERAGE_INVALID')
           table.seen++
-          if (classification) { const classifiedRow = classificationRowSchema.parse(row); classification.addRow(classifiedRow); if ([OUTCOME_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH].includes(manifest.mappingHash)) for (const key of externalArchiveKeys(classifiedRow)) outcomeArchive.add(key) }
-          reconciliation?.addSourceRow({ table: row.table, sourceId: row.sourceId, storeId: row.storeId })
+          if (classification) { const classifiedRow = classificationRowSchema.parse(row); classification.addRow(classifiedRow); if ([OUTCOME_MAPPING_HASH, CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH].includes(manifest.mappingHash)) for (const key of externalArchiveKeys(classifiedRow)) outcomeArchive.add(key) }
+          const ownership = manifest.version === 3 ? classificationRowSchema.parse(row).ownership : undefined
+          reconciliation?.addSourceRow({ table: row.table, sourceId: row.sourceId, storeId: row.storeId, parentId: ownership?.parentId, parentTable: ownership?.parentTable, ownershipRule: ownership?.rule })
           if (!classification && (row.disposition === 'unresolved' || row.disposition === 'partial' || Object.values(row.fields).includes('unresolved')) && !(typeof row.table === 'string' && pageTables.has(row.table))) addDiagnostic({ code: 'REPORT_ROW_UNRESOLVED', severity: 'blocker', sourceId: row.sourceId, ...(typeof row.storeId === 'string' ? { storeId: row.storeId } : {}), ...(typeof row.table === 'string' ? { table: row.table } : {}) })
           return true
         }
@@ -350,8 +379,8 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
     } else await readArtifact(path, { expectedHash })
   }
   reconciliation?.finish(customerRoot, productRoot, exported.manifest.sourceSnapshot)
-  if ([...sourceTables.values()].some(table => table.seen !== table.count)) throw new MigrationError('REPORT_COVERAGE_INVALID')
-  if (exporterBlockerCount !== exported.manifest.counts.blockers || exported.manifest.mapping.complete !== (exporterBlockerCount === 0) || exported.manifest.status !== ([OUTCOME_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH].includes(manifest.mappingHash) ? 'exported' : exporterBlockerCount === 0 ? 'complete' : 'needs_review') || exported.manifest.blockedStores.length !== exported.manifest.counts.blockedStoreCount || exported.manifest.policyExcludedStores.length !== exported.manifest.counts.policyExcludedStoreCount) throw new MigrationError('EXPORT_REPORT_COUNT_MISMATCH')
+  if (!foundation && [...sourceTables.values()].some(table => table.seen !== table.count)) throw new MigrationError('REPORT_COVERAGE_INVALID')
+  if (!foundation && (exporterBlockerCount !== exported.manifest.counts.blockers || exported.manifest.mapping.complete !== (exporterBlockerCount === 0) || exported.manifest.status !== ([OUTCOME_MAPPING_HASH, CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH, CONFLICT_RESOLUTION_MAPPING_HASH, POLICY_BOUNDARY_MAPPING_HASH, BLOG_CATEGORY_MAPPING_HASH, PRODUCT_EXCLUSION_MAPPING_HASH, VARIANT_MAPPING_HASH, BLOG_CONTENT_MAPPING_HASH, BLOG_OWNER_MAPPING_HASH, DESCRIPTION_MAPPING_HASH, CORRECTED_OUTCOME_MAPPING_HASH].includes(manifest.mappingHash) ? 'exported' : exporterBlockerCount === 0 ? 'complete' : 'needs_review') || exported.manifest.blockedStores.length !== exported.manifest.counts.blockedStoreCount || exported.manifest.policyExcludedStores.length !== exported.manifest.counts.policyExcludedStoreCount)) throw new MigrationError('EXPORT_REPORT_COUNT_MISMATCH')
   if (seenStores.size !== exported.manifest.counts.emittedStoreCount) throw new MigrationError('EXPORT_STORE_COUNT_MISMATCH')
   if (selector) selectStoreIds([...seenStores], selector)
   if (selected && [...selected].some(id => !seenStores.has(id))) throw new MigrationError('STORE_NOT_IN_ARTIFACT')
@@ -364,10 +393,10 @@ export async function loadImportArtifact(manifestPath: string, options: { progre
     targetCheckFiles[storeId] = { path: writer.path, hash: writer.hash.update(']').digest('hex') }
   }
   targetWriters.clear()
-  if (exported.manifest.exporterVersion === '1.5.0' && JSON.stringify(exported.manifest.outcome) !== JSON.stringify(legacyOutcome.exportOutcome(outcomeDiagnostics, exported.manifest.blockedStores.length, exported.manifest.policyExcludedStores.length, outcomeArchive))) throw new MigrationError('EXPORT_OUTCOME_INCONSISTENT')
-  if ((exported.manifest.exporterVersion === '1.5.1' || exported.manifest.exporterVersion === '1.6.0' || exported.manifest.exporterVersion === '1.6.1' || exported.manifest.exporterVersion === '1.6.2' || exported.manifest.exporterVersion === '1.7.0' || exported.manifest.exporterVersion === '1.8.0' || exported.manifest.exporterVersion === '1.8.1') && JSON.stringify(exported.manifest.outcome) !== JSON.stringify(exportOutcome(outcomeDiagnostics, exported.manifest.blockedStores.length, exported.manifest.policyExcludedStores, outcomeArchive))) throw new MigrationError('EXPORT_OUTCOME_INCONSISTENT')
+  if (!foundation && exported.manifest.exporterVersion === '1.5.0' && JSON.stringify(exported.manifest.outcome) !== JSON.stringify(legacyOutcome.exportOutcome(outcomeDiagnostics, exported.manifest.blockedStores.length, exported.manifest.policyExcludedStores.length, outcomeArchive))) throw new MigrationError('EXPORT_OUTCOME_INCONSISTENT')
+  if (!foundation && (exported.manifest.exporterVersion === '1.5.1' || exported.manifest.exporterVersion === '1.6.0' || exported.manifest.exporterVersion === '1.6.1' || exported.manifest.exporterVersion === '1.6.2' || exported.manifest.exporterVersion === '1.7.0' || exported.manifest.exporterVersion === '1.8.0' || exported.manifest.exporterVersion === '1.8.1' || exported.manifest.exporterVersion === '1.8.2' || exported.manifest.exporterVersion === '1.9.0' || exported.manifest.exporterVersion === '1.9.1' || exported.manifest.exporterVersion === '1.9.2' || exported.manifest.exporterVersion === '1.9.3' || exported.manifest.exporterVersion === '1.9.4' || exported.manifest.exporterVersion === '1.10.0') && JSON.stringify(exported.manifest.outcome) !== JSON.stringify(exportOutcome(outcomeDiagnostics, exported.manifest.blockedStores.length, exported.manifest.policyExcludedStores, outcomeArchive))) throw new MigrationError('EXPORT_OUTCOME_INCONSISTENT')
   const { diagnostics, blockers, summary: diagnosticSummary } = collector.result()
-  return { actors, creatorBindings, diagnosticSummary, coverage: exported.manifest.counts, pageExcludedRecords, optionalDispositions, manifest, manifestHash: source.hash, manifestPath: resolve(manifestPath), directory, stores, ...(spoolDirectory ? { spoolDirectory, storeFiles, targetCheckFiles } : {}), storeIds: [...seenStores].sort(compareStoreIds), diagnostics, blockers }
+  return { ...('masterParts' in exported.manifest ? { masterParts: exported.manifest.masterParts as MasterPart[] } : {}), preserveInvalidUserEmails: [CHUNKED_MASTER_MAPPING_HASH, NEGATIVE_ORDER_MAPPING_HASH, SOURCE_OMISSION_MAPPING_HASH, PRODUCT_CATALOG_MAPPING_HASH, OWNER_EMAIL_MAPPING_HASH].includes(manifest.mappingHash) && policy && approvedPolicyHash(policy, manifest.mappingHash) === APPROVED_POLICY && 'preserveInvalidUserEmails' in policy && policy.preserveInvalidUserEmails === true, actors, creatorBindings, diagnosticSummary, coverage: exported.manifest.counts, pageExcludedRecords, optionalDispositions, manifest, manifestHash: source.hash, manifestPath: resolve(manifestPath), directory, stores, ...(spoolDirectory ? { spoolDirectory, storeFiles, targetCheckFiles } : {}), storeIds: [...seenStores].sort(compareStoreIds), diagnostics, blockers }
   } catch (error) {
     if (spoolDirectory) rmSync(spoolDirectory, { recursive: true, force: true })
     throw error

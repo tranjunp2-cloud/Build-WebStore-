@@ -9,6 +9,9 @@ async function main(): Promise<void> {
   process.stdout.write(JSON.stringify({ status: 'PREPARED', manifestPath: result.manifestPath }) + '\n')
 }
 main().catch((error: unknown) => {
-  process.stderr.write(JSON.stringify({ code: error instanceof MigrationError ? error.code : 'PREPARE_FAILED' }) + '\n')
+  const filesystemCodes: Record<string, string> = { ENOENT: 'PREPARE_INPUT_OR_PARENT_NOT_FOUND', EACCES: 'PREPARE_PERMISSION_DENIED', EPERM: 'PREPARE_PERMISSION_DENIED', EEXIST: 'PREPARE_OUTPUT_ALREADY_EXISTS', ENOSPC: 'PREPARE_DISK_FULL' }
+  const systemCode = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : ''
+  const code = error instanceof MigrationError ? error.code : filesystemCodes[systemCode] ?? 'PREPARE_FAILED'
+  process.stderr.write(JSON.stringify({ code }) + '\n')
   process.exitCode = 2
 })

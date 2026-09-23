@@ -53,8 +53,10 @@
     "measure:variety": "tsx scripts/measure-variety.ts",
     "measure:generation": "tsx scripts/measure-generation-latency.ts",
     "harness:all": "tsx scripts/test-harness/cli.ts --mode=full && tsx scripts/test-harness/check.ts && (playwright test --config=scripts/test-harness/render/playwright.config.ts || true) && tsx scripts/test-harness/render/visual-report.ts; tsx scripts/test-harness/report/generate.ts",
+    "migrate:pw1:bind-system": "tsx --require ./scripts/seed-preload.cjs scripts/prepare-pw1-system-creator.ts",
     "migrate:pw1:prepare": "tsx --require ./scripts/seed-preload.cjs scripts/prepare-pw1-import.ts",
     "migrate:pw1:import": "tsx --require ./scripts/seed-preload.cjs scripts/import-pw1-json.ts",
+    "migrate:pw1:users": "tsx --require ./scripts/seed-preload.cjs scripts/import-pw1-users.ts",
     "migrate:pw1:test:local": "tsx --require ./scripts/seed-preload.cjs src/__tests__/integration/pw1-json-clone-rehearsal.ts"
   },
   "dependencies": {

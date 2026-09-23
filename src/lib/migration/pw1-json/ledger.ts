@@ -7,6 +7,7 @@ export interface SqlClient {
 }
 export interface BatchBinding {
   executionVersion?: 'grouped-v1'
+  executionScope?: 'foundation'
   groupSize?: number
   profile?: 'pw1-json-v1' | 'pw1-json-v2' | 'pw1-json-v3'
   sourceInstanceToken?: string

@@ -1,4 +1,6 @@
-import { productExclusionSchema, PRODUCT_EXCLUSION_RULE, createProductExclusionIndex } from './product-exclusions'
+import { sourceExclusionSchema, SOURCE_EXCLUSION_RULE, createSourceExclusionIndex } from './source-exclusions'
+import { createConflictRetention, CONFLICT_RETENTION_RULE } from './conflict-retention'
+import { productExclusionSchema, PRODUCT_EXCLUSION_RULE, PRODUCT_CATALOG_EXCLUSION_RULE, productExclusionRule, type ProductCatalogPolicy, createProductExclusionIndex } from './product-exclusions'
 import { externalArchiveKeys, archiveKey } from './export-outcome'
 import { EXTERNAL_SOURCE_RULE, externalSourceField, externalSourcePath } from './external-source'
 import { z } from 'zod'
@@ -8,6 +10,13 @@ import type { ImportDiagnostic } from './types'
 import type { createSelectedSourceScope } from './source-scope'
 
 export const CLASSIFIED_MAPPING_HASH = '27fbef7ec0fc73e58029295c8fbbe7d276c4d6095e358fe57e3058e1eb4f4567'
+export const CHUNKED_MASTER_MAPPING_HASH = '0ac3452beeb4d13ff5ec8bab692b96c4a0a7b54a5ee4f109c28725734d795375'
+export const NEGATIVE_ORDER_MAPPING_HASH = '072db65ddeac43bbc709852467a6df6c7c27119a55259614041d9d6bc76cf2a7'
+export const SOURCE_OMISSION_MAPPING_HASH = '15303a3f1d6e0efe0bef44a0df294471a70ee82bf75c5e373b5e23182b0c2aee'
+export const PRODUCT_CATALOG_MAPPING_HASH = 'b18aba17b84fd99aba8b18808b6f245bca4782c8cb7951a2a82837303c4c147b'
+export const OWNER_EMAIL_MAPPING_HASH = 'bd1013ca744f7e8dda398de395c04c1801a8bb7160b390d3c34086da059c97cd'
+export const CONFLICT_RESOLUTION_MAPPING_HASH = '8b230a503dba36d690bdae60ecd5bae9b04c6485977a90dc9011c99e61597ab4'
+export const POLICY_BOUNDARY_MAPPING_HASH = '8894e3ab00ac2707d724349335dcf20722be5ba53c7e91924a2bb6af23bf5c93'
 export const BLOG_CATEGORY_MAPPING_HASH = '514c3b2ae19649296da4b2deb4952ab690108c6701cde94deb55137aae1e3c16'
 export const PRODUCT_EXCLUSION_MAPPING_HASH = '763d7ebea95a9772343d135e3943e80cfe94f2b06ca2e466fde54e942972f55e'
 export const VARIANT_MAPPING_HASH = 'b93fbe73dddf63cb1fc51ae4bc0c5bebdacf8e12ee3795cad721a0b9a4181887'
@@ -19,7 +28,7 @@ export const OUTCOME_MAPPING_HASH = 'bde643f544656d7f1af2b1a0aed0d40b3c748b30517
 export const ARCHIVE_MAPPING_HASH = '367ad0adb899cfcbc59c4d44cbd735d545419ca7b0afd53491420b112b0bf43a'
 export const STATUS_MAPPING_HASH = 'b531dea88c9fc862b6111df2343dcff0dd0370292dbe308b55ca6b0fc2549870'
 export function isClassifiedMappingHash(hash: string): boolean {
-  return hash === BLOG_CATEGORY_MAPPING_HASH || hash === PRODUCT_EXCLUSION_MAPPING_HASH || hash === VARIANT_MAPPING_HASH || hash === BLOG_CONTENT_MAPPING_HASH || hash === BLOG_OWNER_MAPPING_HASH || hash === DESCRIPTION_MAPPING_HASH || hash === CORRECTED_OUTCOME_MAPPING_HASH || hash === OUTCOME_MAPPING_HASH || hash === ARCHIVE_MAPPING_HASH || hash === CLASSIFIED_MAPPING_HASH || hash === STATUS_MAPPING_HASH
+  return hash === CHUNKED_MASTER_MAPPING_HASH || hash === NEGATIVE_ORDER_MAPPING_HASH || hash === SOURCE_OMISSION_MAPPING_HASH || hash === PRODUCT_CATALOG_MAPPING_HASH || hash === OWNER_EMAIL_MAPPING_HASH || hash === CONFLICT_RESOLUTION_MAPPING_HASH || hash === POLICY_BOUNDARY_MAPPING_HASH || hash === BLOG_CATEGORY_MAPPING_HASH || hash === PRODUCT_EXCLUSION_MAPPING_HASH || hash === VARIANT_MAPPING_HASH || hash === BLOG_CONTENT_MAPPING_HASH || hash === BLOG_OWNER_MAPPING_HASH || hash === DESCRIPTION_MAPPING_HASH || hash === CORRECTED_OUTCOME_MAPPING_HASH || hash === OUTCOME_MAPPING_HASH || hash === ARCHIVE_MAPPING_HASH || hash === CLASSIFIED_MAPPING_HASH || hash === STATUS_MAPPING_HASH
 }
 export const CLASSIFICATION_VERSION = 'source-classification-v1'
 const ownershipSchema = z.object({ storeId: z.string().nullable(), rule: z.enum([
@@ -33,6 +42,7 @@ export const classificationRowSchema = z.object({
   contributions: z.array(z.object({ storeId: z.string().optional(), table: z.string(), sourceId: z.string(), fields: z.array(z.string()), targetPath: z.string(), rule: z.string() }).strict()),
   ownership: ownershipSchema,
   productExclusion: productExclusionSchema.optional(),
+  sourceExclusion: sourceExclusionSchema.optional(),
   fieldRetentionRules: z.record(z.string().regex(/^MASTER-[A-Z0-9.-]+$/)).optional(),
 }).strict()
 export type ClassificationRow = z.infer<typeof classificationRowSchema>
@@ -51,8 +61,9 @@ const sourceOnly: Record<string,string> = {
 }
 const userFields = new Set(['username','backup_email','gender','company_name','introduce','address','signature','birth_day','first_login_status','account_type','verified_at','initial_step1_completed_at','initial_step2_completed_at','initial_step3_completed_at','initial_step4_completed_at','is_enabled_mfa','mfa_type','completed_pages_tour','completed_menu_tour','completed_add_product_tour','completed_delivery_setting_tour'])
 function retentionAllowed(row:ClassificationRow,field:string,rule:string):boolean {
+  if (rule===SOURCE_EXCLUSION_RULE) return row.fields[field]==='retained-source' && Boolean(row.sourceExclusion)
   if(row.fields[field]!=='retained-source'||row.ownership.rule.startsWith('OWNERSHIP_'))return false
-  if(rule===PRODUCT_EXCLUSION_RULE)return Boolean(row.productExclusion)
+  if(rule===PRODUCT_EXCLUSION_RULE||rule===PRODUCT_CATALOG_EXCLUSION_RULE)return Boolean(row.productExclusion && productExclusionRule(row.productExclusion)===rule)
   if(rule===EXTERNAL_SOURCE_RULE)return externalSourceField(row.table,field)&&row.contributions.some(c=>c.rule===rule&&c.table===row.table&&c.sourceId===row.sourceId&&c.targetPath===externalSourcePath(row.table)&&c.fields.includes(field))
   if(sourceOnly[row.table]===rule)return true
   if(rule==='MASTER-2.2-EXISTING-SOURCE-RETENTION')return archiveTables.has(row.table)
@@ -69,8 +80,10 @@ function retentionAllowed(row:ClassificationRow,field:string,rule:string):boolea
 type Entry = {table:string;sourceId:string;storeId:string|null;owner:ClassificationRow['ownership'];invalid:boolean;unresolved:boolean;visit?:'visiting'|'verified'}
 const key = (table:string,id:string)=>JSON.stringify([table,id])
 /** Metadata index only: never retains field values, diagnostic arrays or report rows. */
-export function createSourceClassificationIndex(scope?: ReturnType<typeof createSelectedSourceScope>, allowProductExclusions = false) {
-  const exclusions = createProductExclusionIndex(() => { throw new MigrationError('PRODUCT_EXCLUSION_EVIDENCE_INVALID') }, allowProductExclusions)
+export function createSourceClassificationIndex(scope?: ReturnType<typeof createSelectedSourceScope>, allowProductExclusions = false, conflictPolicy?: Parameters<typeof createConflictRetention>[0], catalogPolicy?: ProductCatalogPolicy, omissionPolicy?: Parameters<typeof createSourceExclusionIndex>[0]) {
+  const omissions = createSourceExclusionIndex(omissionPolicy)
+  const conflicts = createConflictRetention(conflictPolicy)
+  const exclusions = createProductExclusionIndex(() => { throw new MigrationError('PRODUCT_EXCLUSION_EVIDENCE_INVALID') }, allowProductExclusions, catalogPolicy)
   const rows=new Map<string,Entry>(), owners=new Map<string,{id:number;owner:ClassificationRow['ownership']}>()
   const leafIdentities=new Set<bigint>()
   const parentTables=new Set([...Object.values(parents),...modelParents])
@@ -83,8 +96,11 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
   const pageRows=new Map<string,Entry>(),globalUnresolved=new Map<string,{total:number;pages:number}>()
   return {
     addProduct: exclusions.addProduct,
+    addStore: omissions.addStore,
     addDiagnostic(d:ImportDiagnostic):void {
+      omissions.addDiagnostic(d)
       exclusions.addDiagnostic(d)
+      conflicts.add(d)
       if(finished)throw new MigrationError('CLASSIFICATION_ALREADY_FINISHED')
       if(!d.table||!d.sourceId||!d.storeId)return
       // This Page diagnostic intentionally identifies a referenced row owned by
@@ -112,6 +128,7 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
       if(indexBytes>256*1024*1024)throw new MigrationError('CLASSIFICATION_MEMORY_LIMIT')
     },
     addRow(row:ClassificationRow):void {
+      omissions.addRow(row)
       exclusions.addRow(row)
       if(finished)throw new MigrationError('CLASSIFICATION_ALREADY_FINISHED')
       if(row.ownership.storeId!==row.storeId||Object.keys(row.fieldRetentionRules??{}).some(field=>row.fields[field]!=='retained-source'))throw new MigrationError('CLASSIFICATION_ROW_INVALID')
@@ -127,7 +144,7 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
         const diagnostic=diagnosticChecks.get(key(row.table,row.sourceId)+suffix)
         if(diagnostic)diagnostic.actualStore=row.storeId
       }
-      const invalid=row.contributions.some(c=>c.rule===EXTERNAL_SOURCE_RULE&&(c.table!==row.table||c.sourceId!==row.sourceId||c.targetPath!==externalSourcePath(row.table)||c.fields.some(field=>!externalSourceField(row.table,field))))||Object.entries(row.fieldRetentionRules??{}).some(([field,rule])=>!retentionAllowed(row,field,rule))
+      const invalid=row.contributions.some(c=>c.rule===EXTERNAL_SOURCE_RULE&&(c.table!==row.table||c.sourceId!==row.sourceId||c.targetPath!==externalSourcePath(row.table)||c.fields.some(field=>!externalSourceField(row.table,field))))||Object.entries(row.fieldRetentionRules??{}).some(([field,rule])=>!(rule === CONFLICT_RETENTION_RULE ? conflicts.allows(row.table, row.sourceId, field, row.ownership) : retentionAllowed(row,field,rule)))
       if (!invalid && row.storeId === null && row.ownership.rule === 'SOURCE_GLOBAL_SCOPE') {
         for (const consumer of externalArchiveKeys(row)) if (!externalConsumers.has(consumer)) { externalConsumers.add(consumer); indexBytes += 48 + 2 * consumer.length }
       }
@@ -135,7 +152,7 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
       const ownerKey=JSON.stringify(row.ownership)
       // Leaf rows cannot be ownership parents. Equivalent checks need one entry,
       // while model_settings IDs remain available for exact diagnostic discharge.
-      const indexed=parentTables.has(row.table)||(row.table==='model_settings'&&unresolved)
+      const indexed=Boolean(row.sourceExclusion)||parentTables.has(row.table)||(row.table==='model_settings'&&unresolved)
       if(!indexed||row.table==='model_settings'){
         // A fingerprint collision rejects safely; it can never hide a duplicate.
         const bytes=createHash('sha256').update(key(row.table,row.sourceId)).digest()
@@ -163,6 +180,7 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
       if(finished)throw new MigrationError('CLASSIFICATION_ALREADY_FINISHED')
       finished=true
       exclusions.finish()
+      omissions.finish()
       const validOwner=(entry:Entry):boolean=>{
         if(entry.visit==='verified')return !entry.invalid
         if(entry.visit==='visiting'){entry.invalid=true;return false}
@@ -221,6 +239,8 @@ export function createSourceClassificationIndex(scope?: ReturnType<typeof create
     },
     disposition(d:ImportDiagnostic):'OUT_OF_SCOPE'|undefined {
       if(!finished)return undefined
+      const omitted=omissions.disposition(d)
+      if(omitted)return omitted
       const scoped = scope?.disposition(d)
       if(scoped)return scoped
       if(d.severity==='blocker'&&d.code==='SOURCE_OWNERSHIP_UNRESOLVED'&&d.field===undefined&&d.sourceId&&['pages','page_components','banners','shortlist_items','frontend_components'].includes(d.table??'')&&['OWNERSHIP_CYCLE','OWNERSHIP_MODEL_UNVERIFIED','OWNERSHIP_PARENT_UNVERIFIED','OWNERSHIP_STORE_CONFLICT','OWNERSHIP_STORE_MISSING'].includes(d.reason??''))return 'OUT_OF_SCOPE'
