@@ -46,7 +46,9 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             if (owners.length !== 1) throw new Error(`Store ${storeId}: expected exactly one active owner`)
             const owner = owners[0], ownerMatch = /^@users:users:(\d+)$/.exec(str(owner._ref))
             if (!ownerMatch) throw new Error('Missing source owner reference')
-            const locale = z.enum(['en', 'ms']).parse(site.locale)
+            // BE exports default site.locale to ms independently of the PW1 storefront.
+            // PW1's unprefixed public routes use English; sourceLocale explicitly selects /ms content.
+            const locale = z.enum(['en', 'ms']).parse(site.sourceLocale ?? 'en')
             const localized = (r: Row, key = 'name') => str(locale === 'ms' && r[`${key}_ms`] ? r[`${key}_ms`] : r[key])
             const base = new URL(/^https?:\/\//.test(str(site.domain)) ? str(site.domain) : `https://${str(site.domain)}`)
             if (!site.domain) throw new Error(`Store ${storeId}: missing website domain`)
@@ -57,8 +59,8 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 return true
             })
             if (!validPages.length) throw new Error(`Store ${storeId}: no active pages to migrate`)
-            const hasCartComponent = (p: Row) => rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'cart')
-            const isNativeCartPage = (p: Row) => pagePath(p) === '/cart' && hasCartComponent(p)
+            const hasCommerceComponent = (p: Row) => rows(p.components).some(c => active(c) && ['cart', 'checkout'].includes(str(object(c.frontend_component).name)))
+            const isNativeCommercePage = (p: Row) => ['/cart', '/checkout'].includes(pagePath(p)) && hasCommerceComponent(p)
             const pageById = new Map(pageRows.map(p => [str(p.id), p]))
             const pagePath = (p: Row) => str(p.type) === '1' ? '/' : (str(p.url).trim() || '/' + str(p.slug).replace(/^\/+/, '')).toLowerCase()
             const resolveTarget = (model: unknown, id: unknown, url: unknown, context: string): Omit<Link, 'label'> | undefined => {
@@ -67,7 +69,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                     if (kind === 'Page') {
                         const target = pageById.get(str(id))
                         if (!target || !active(target)) { exclude(context, 'link', `missing-or-deleted-page:${str(id)}`); return }
-                        if (['4', '5', '6'].includes(str(target.type)) || isNativeCartPage(target)) return { url: new URL(pagePath(target), base).href }
+                        if (['4', '5', '6'].includes(str(target.type)) || isNativeCommercePage(target)) return { url: new URL(pagePath(target), base).href }
                         return { pageId: str(id) }
                     }
                     if (kind === 'Brand') { report.warnings.push(`${context}: Brand ${str(id)} CTA deferred`); return }
@@ -110,7 +112,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             const headerConfig = object(header?.config)
             if (Number(headerConfig.search_status) === 1) report.warnings.push('Header product search setting is retained in source only; native navigation search mapping is pending')
             const pages = validPages.filter(p => {
-                if (['4', '5', '6'].includes(str(p.type)) || isNativeCartPage(p)) { exclude(p.id, 'page', 'native-commerce-runtime'); return false }
+                if (['4', '5', '6'].includes(str(p.type)) || isNativeCommercePage(p)) { exclude(p.id, 'page', 'native-commerce-runtime'); return false }
                 return true
             }).map(p => ({ sourceId: str(p.id), title: localized(p) || str(p.title), path: pagePath(p), components: ordered(p.components).flatMap<unknown>(c => {
                 if (str(c.page_id) !== str(p.id)) throw new Error('Component/page ownership mismatch')
@@ -124,7 +126,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 const type = str(definition.name) || str(c.tag_name).replace('pa101-', '').replaceAll('-', '_')
                 const common = { sourceId: str(c.id), type, enabled: true }
                 const sourceSettings = { ...config, selectedItems: rows(c.shortlist_items).filter(active).map(i => ({ sourceId: str(i.model_id), modelType: str(i.model_type), position: i.position })) }
-                if (type === 'cart') { exclude(c.id, 'component', 'native-commerce-runtime'); return [] }
+                if (['cart', 'checkout'].includes(type)) { exclude(c.id, 'component', 'native-commerce-runtime'); return [] }
                 if (type === 'banner') {
                     const slides = ordered(c.banners).filter(b => {
                         if (str(b.page_component_id) !== str(c.id) || str(b.store_id) !== storeId) throw new Error('Banner ownership mismatch')
@@ -142,6 +144,10 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                     return [{ ...common, content: { slides }, config: { size: config.size ?? 'hero', autoplay: config.animation === 'auto', intervalMs: Number(config.timing_animation ?? 5) * 1000, sourceSettings } }]
                 }
                 if (type === 'rich_text') {
+                    const contentSetting = rows(c.model_settings).find(r => active(r) && r.key === 'content')
+                    if (contentSetting && !Object.prototype.hasOwnProperty.call(contentSetting, 'value')) {
+                        throw new Error(`Store ${storeId}, page ${str(p.id)}, component ${str(c.id)}: source rich-text setting ${str(contentSetting.id)} is missing value; re-export source content`)
+                    }
                     const html = str(config.content)
                     if (!textContent(html)) { exclude(c.id, 'component', 'empty-rich-text'); return [] }
                     return [{ ...common, content: { html }, config: { sourceSettings } }]
@@ -203,7 +209,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             }
             entries.push({ ...(bundle.linkCorrections ? { linkCorrections: bundle.linkCorrections } : {}), ...(bundle.destination ? { destination: bundle.destination } : {}), sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin }, website: {
                 settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
-                features: { cart: Number(headerConfig.cart_status) === 1 || validPages.some(hasCartComponent), orderTracking: Number(headerConfig.cart_status) === 1 && validPages.some(p => str(p.type) === '6') },
+                features: { cart: Number(headerConfig.cart_status) === 1 || validPages.some(hasCommerceComponent), orderTracking: Number(headerConfig.cart_status) === 1 && validPages.some(p => str(p.type) === '6') },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(menuLinks),
                 footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns }, pages,
             } })

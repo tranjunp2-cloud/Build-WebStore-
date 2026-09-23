@@ -20,7 +20,7 @@ describe('[TC-F35.M27] BE collection input', () => {
     it('projects source content and locale, excludes disabled/empty/deleted data and promotes valid child links', () => {
         const input = fixture(), original = JSON.stringify(input)
         const {entries,reports} = parseMigrationInput(input)
-        expect(entries[0].website.locale).toBe('ms')
+        expect(entries[0].website.locale).toBe('en')
         expect(entries[0].website.pages).toHaveLength(1)
         expect(entries[0].website.pages[0].components.map(c=>c.sourceId)).toEqual(['1'])
         expect(entries[0].website.navigation).toEqual([{label:'Home',pageId:'10'}])
@@ -183,4 +183,40 @@ it('[TC-F35.M27] excludes undefined banner images and the resulting empty banner
         {id:'30',kind:'slide',reason:'missing-image'},
         {id:'20',kind:'component',reason:'empty-banner'},
     ]))
+})
+
+it('[TC-F35.M27] maps checkout to native PW2 checkout and preserves its navigation link', () => {
+    const input = fixture()
+    const checkout = { id:'20',store_id:'205',name:'Checkout',type:'7',slug:'checkout',url:'/checkout',status:'1',
+        components:[{id:'30',page_id:'20',status:'1',frontend_component:{name:'checkout'}}] }
+    const data = [{...input[0],pages:[...input[0].pages,checkout],sites:[{...input[0].sites[0],menus:[{
+        id:'1',type:'1',status:'1',menu_items:[{id:'2',name:'Checkout',model_type:'App\\Models\\Page',model_id:'20'}],
+    }]}]}]
+
+    const {entries,reports} = parseMigrationInput(data)
+    const {contract} = adaptWebsiteInput(compactInput(entries[0]))
+
+    expect(contract.site.features?.cart).toBe(true)
+    expect(contract.pages.some(p => p.sourceId === '20')).toBe(false)
+    expect(contract.site.navigation.links).toContainEqual({label:'Checkout',url:'/checkout'})
+    expect(reports[0].excluded).toContainEqual({id:'20',kind:'page',reason:'native-commerce-runtime'})
+})
+
+// The BE locale can represent the owner's dashboard preference.
+it('[TC-F35.M27] uses public PW1 labels independently of owner locale', () => {
+    const input = fixture()
+    input[0].pages[0].name = 'Contact Us'
+    input[0].pages[0].name_ms = 'Halaman Baharu 3'
+    expect(parseMigrationInput(input).entries[0].website.pages[0].title).toBe('Contact Us')
+    const malay = [{ ...input[0], sites: [{ ...input[0].sites[0], sourceLocale: 'ms' }] }]
+    expect(parseMigrationInput(malay).entries[0].website.pages[0].title).toBe('Halaman Baharu 3')
+})
+
+it('[TC-F35.M27] rejects a lost rich-text value instead of publishing an empty page', () => {
+    const input = fixture()
+    const setting = input[0].pages[0].components[0].model_settings[0]
+    Reflect.deleteProperty(setting, 'value')
+    expect(() => parseMigrationInput(input)).toThrow('missing value; re-export source content')
+    setting.value = ''
+    expect(() => parseMigrationInput(input)).not.toThrow()
 })
