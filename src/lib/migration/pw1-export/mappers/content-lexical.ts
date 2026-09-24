@@ -18,7 +18,10 @@ export function contentMedia(
     ctx.output.media.push({ _ref: identity, url, sourceUrl: url, alt })
     return identity
   } catch {
-    ctx.issue('BLOG_MEDIA_UNRESOLVED', 'blog_posts', row.id, suffix)
+    const severity = ctx.config.migrationPolicy?.allowUnresolvedBlogMedia
+      ? 'warning'
+      : 'blocker'
+    ctx.issue('BLOG_MEDIA_UNRESOLVED', 'blog_posts', row.id, suffix, severity)
     return undefined
   }
 }

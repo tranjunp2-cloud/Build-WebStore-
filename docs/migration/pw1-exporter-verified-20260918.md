@@ -40,3 +40,15 @@ Các đối soát dữ liệu thật đã thực hiện trước đó là kiểm
 - CSV audit toàn nguồn trước Store identity gates: PROD 256 Product (246 không có SKU, 9 không còn SKU live owned, 1 thiếu stock); DEV 541 (442 / 24 / 75). Đây không phải số Product đã export/import. Hash nguồn trước/sau không đổi.
 - Artifact thật do exporter tạo từ fixture đã qua validate → importer prepare/load: không có Product-family blockers; các blocker không liên quan của fixture vẫn còn. Chưa ghi DB hoặc chạy full export PROD/DEV.
 - Review độc lập phát hiện và đã sửa: disposition child soft-delete, bằng chứng parent SKU→Product, report mô tả nhầm bỏ Product thành hoãn Store.
+
+
+## Cập nhật 18/09 — Blog category inactive, contract 1.8.1
+
+- Đã duyệt và triển khai: category status=0 bỏ khỏi master JSON, giữ CSV nguồn; Blog trỏ category live/inactive đúng Store giữ content/status/author, bỏ liên kết category.
+- Inactive không gây slug collision với active. Category active trùng nhau, status không xác định, quan hệ thiếu/deleted/sai Store vẫn cần xử lý.
+- Exporter 521 tests / 33 files PASS; importer contract 73 tests PASS; TypeScript hai workspace PASS. Fixture thực tế export → validate → importer prepare/load PASS; các blocker fixture không liên quan vẫn giữ. Không ghi DB.
+- Importer local nhận 1.8.1 và giữ compatibility phiên bản cũ. Thay đổi lượt này chưa commit/push. Chưa rerun toàn nguồn PROD/DEV; báo cáo và master cũ không tự cập nhật.
+
+## Cập nhật 23/09/2026
+
+Source local đã lên contract 1.8.2. Chi tiết các lỗi còn sót, guard policy chưa duyệt và bằng chứng kiểm tra mới nằm ở [pw1-exporter-fixes-20260923.md](pw1-exporter-fixes-20260923.md). Checkpoint 1.8.0/1.8.1 bên trên là lịch sử; chưa có full-source export mới.

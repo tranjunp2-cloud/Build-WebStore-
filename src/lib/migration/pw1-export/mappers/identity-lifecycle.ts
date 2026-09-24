@@ -25,8 +25,14 @@ export function membership(
   ctx: MappingContext,
 ): 'active' | 'suspended' {
   const now = Date.parse(ctx.config.asOf)
-  if (!live(row) || !['0', '1', '2', '3'].includes(row.status ?? ''))
+  const graceful = Boolean(ctx.config.migrationPolicy?.gracefulTenantResolution)
+  if (!live(row) || !['0', '1', '2', '3'].includes(row.status ?? '')) {
+    if (graceful) {
+      ctx.issue('USER_LIFECYCLE_CONFLICT', 'users', row.id, 'status', 'warning', 'SAFE_HOLD_APPLIED')
+      return 'suspended'
+    }
     throw new Error('USER_LIFECYCLE_CONFLICT')
+  }
   const ban = row.banned_at ? Date.parse(sourceTime(row.banned_at, ctx)) : null
   const expiry = row.expired_at
     ? Date.parse(sourceTime(row.expired_at, ctx))
@@ -34,12 +40,27 @@ export function membership(
   if (
     (row.status === '3' && (ban === null || ban > now)) ||
     (row.status !== '3' && ban !== null)
-  )
+  ) {
+    if (graceful) {
+      ctx.issue('USER_LIFECYCLE_CONFLICT', 'users', row.id, 'status', 'warning', 'SAFE_HOLD_APPLIED')
+      return 'suspended'
+    }
     throw new Error('USER_LIFECYCLE_CONFLICT')
-  if (row.status === '2' && (expiry === null || expiry > now))
+  }
+  if (row.status === '2' && (expiry === null || expiry > now)) {
+    if (graceful) {
+      ctx.issue('USER_LIFECYCLE_CONFLICT', 'users', row.id, 'status', 'warning', 'SAFE_HOLD_APPLIED')
+      return 'suspended'
+    }
     throw new Error('USER_LIFECYCLE_CONFLICT')
-  if (row.status === '1' && expiry !== null && expiry <= now)
+  }
+  if (row.status === '1' && expiry !== null && expiry <= now) {
+    if (graceful) {
+      ctx.issue('USER_LIFECYCLE_CONFLICT', 'users', row.id, 'status', 'warning', 'SAFE_HOLD_APPLIED')
+      return 'suspended'
+    }
     throw new Error('USER_LIFECYCLE_CONFLICT')
+  }
   return row.status === '1' ? 'active' : 'suspended'
 }
 const TIERS: Record<string, string> = {
@@ -93,7 +114,9 @@ export function mainSubscription(ctx: MappingContext): {
     (immediate && cancel === null)
   )
     throw new Error('SUBSCRIPTION_TIME_CONFLICT')
-  if (start > now) throw new Error('SUBSCRIPTION_FUTURE_START')
+  const graceful = Boolean(ctx.config.migrationPolicy?.gracefulTenantResolution)
+  if (start > now && !graceful) throw new Error('SUBSCRIPTION_FUTURE_START')
+  if (start > now) ctx.issue('SUBSCRIPTION_FUTURE_START', 'plan_subscriptions', row.id, 'starts_at', 'warning', 'PW2_START_DATE_NOT_ENFORCED')
   if (!immediate && end <= now && trial !== null && trial > now)
     throw new Error('SUBSCRIPTION_TRIAL_PARITY')
   const status = immediate

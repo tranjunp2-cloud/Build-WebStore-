@@ -9,7 +9,7 @@ npm run migrate:pw1 -- /path/to/csv --as-of 2026-09-18T00:00:00Z
 Thay đường dẫn và mốc đối soát theo snapshot thực tế. Chạy từ root repo.
 Script dùng `configs/migration/pw1-prod-profile.json`, tạo snapshot ID riêng cho lần
 chạy và lưu `source-config.json` cùng `artifact/` trong `.migration/runs/<run-id>/`.
-Mốc asOf không được suy từ tên CSV. Profile mặc định dùng UTC, domain đích dev và
+Mốc asOf không được suy từ tên CSV. Profile mặc định dùng UTC, giữ domain PW1 và
 policy production đã chốt; dữ liệu nguồn khác cần `--profile <file>` phù hợp.
 Có thể thêm `--snapshot-id <id>` để giữ định danh snapshot ổn định khi chạy lại,
 hoặc `--output-dir <new-run-directory>` (thư mục cha có sẵn). Không ghi đè lần cũ.
@@ -18,9 +18,10 @@ artifact hoàn tất. Lệnh này chỉ export offline, không nhập DB.
 
 
 `pw1-prod-20260916.json` selects all 93 CSV files of snapshot
-`20260916-1351-1353` and preserves the approved mapping policies used for
-`pw1-prod-20260917-classification-001`. It is a byte-for-byte copy of that
-run's private source config, so its config hash is unchanged.
+`20260916-1351-1353`. Its mapping policies and source-domain bindings include
+subsequent approved decisions; it is no longer a byte-for-byte copy of the
+historical `pw1-prod-20260917-classification-001` config. Use the config saved
+with each run to reproduce that run's provenance and hash.
 
 This file contains source labels, CSV filenames, domain suffixes, snapshot/time
 settings, Store policy IDs and decision evidence. It contains no passwords,
@@ -96,9 +97,13 @@ node --max-old-space-size=8192 --import tsx scripts/data/export-pw1-master.ts \
   --validate-only --artifact-dir /absolute/path/to/exports/new-run
 ```
 
-Exit 0 means mapping complete; exit 2 means the artifact still needs review;
-exit 1 means invalid input/artifact or a failed run. Export is offline and needs
-no DB connection, Payload server or importer credentials.
+For the current contract, exit 0 means export or validation succeeded; data may
+still be `partial`, and `importStatus=not_verified` does not certify DB readiness.
+Read `master-manifest.json` and `export-review.md` for the outcome. Exit 1 means
+invalid input/artifact or a failed run. Exit 2 applies only when validating a
+historical contract that defined `needs_review`; it is not the current export
+result. Export is offline and needs no DB connection, Payload server or importer
+credentials.
 
 ## Scope and changes
 
@@ -106,6 +111,16 @@ This is a frozen snapshot config, not a template for arbitrary production data.
 It pins `asOf=2026-09-16T00:00:00Z`, UTC/+00:00, empty `nullTokens`, and the current
 source/target suffixes. In particular, `targetPlatformSuffix` points to
 `web-v2.dev.ecommercehub.my`; it is not an instruction to deploy to production.
+From contract 1.10.5, this field is retained for compatibility and no longer
+constructs `sites.domain`: the exporter preserves the original live PW1 default
+domain string. Tenant slug and custom-domain policies remain independent.
+For a Store with multiple live default domains, configure `sourceDomainBindings`
+at the source-config top level as Store ID → `store_domains.id`. Each selected
+row must be live, default, and belong to that Store. Do not invent a choice; the
+source-config hash records the reviewed selection.
+The PROD configs retain the original domains approved on 2026-09-24:
+Store `1327` selects domain row `1282`, and Store `1329` selects row `1182`.
+The alternate `-2` domains are not selected for `sites.domain`.
 Do not silently change timezone, asOf, namespace or policy to clear blockers.
 
 A different snapshot or approved policy requires a separately reviewed config.

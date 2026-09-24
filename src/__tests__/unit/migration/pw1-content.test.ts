@@ -22,14 +22,14 @@ function fixture(extra: Record<string, Row[]> = {}) {
   })
   const output = emptyStore()
   output.sites.push({ _ref: '@sites:stores:10' })
-  output.users.push({ _ref: '@users:users:20' })
+  output.users.push({ _ref: '@users:users:20', tenants: [{ tenant: '@tenants:stores:10', role: 'editor' }] })
   return new SourceIndex({
     stores: [{ id: '10', name: 'Example' }],
     ...extra,
   }).context(config, '10', output, [], [])
 }
 describe('PW1 content and raw preservation', () => {
-  it('TC-F42-EXP-012: retains deleted Page raw timestamps and nests only matching discriminator/store', () => {
+  it('TC-F42-EXP-112: retains deleted Page timestamps and settings with raw fallback', () => {
     // Arrange
     const ctx = fixture({
       pages: [
@@ -73,12 +73,12 @@ describe('PW1 content and raw preservation', () => {
     // Assert
     expect(ctx.output.pages[0]).toMatchObject({
       deleted_at: '2020-01-01 10:00:00',
-      model_settings: [{ id: '40', value: 'Original' }],
+      model_settings: [ctx.tables.model_settings[0]],
     })
     expect(ctx.output.pages[0]).not.toHaveProperty('layout')
-    expect(ctx.diagnostics).toContainEqual(
-      expect.objectContaining({ code: 'RAW_OWNERSHIP_MISMATCH' }),
-    )
+    expect(ctx.diagnostics.filter(item => item.table === 'model_settings')).toEqual([])
+    expect(ctx.contributions.filter(item => item.table === 'model_settings').map(item => item.sourceId)).toEqual(['40', '42'])
+    expect(ctx.output.sites[0].raw_model_settings).toEqual([ctx.tables.model_settings[2]])
   })
   it('TC-F42-EXP-012: preserves source image markup and relative links without media extraction', () => {
     // Arrange
@@ -129,12 +129,12 @@ describe('PW1 content and raw preservation', () => {
     )
     // Assert
     expect(row).toEqual({ id: '10' })
-    expect(setting).not.toHaveProperty('value')
+    expect(setting).toEqual({ id: '1', key: 'unknown', value: 'opaque-private' })
     expect(JSON.stringify(ctx.diagnostics)).not.toMatch(
       /secret-value|hidden-value|private/,
     )
   })
-  it('TC-F42-EXP-013: preserves verified PW1 settings and rejects invalid types and disguised keys', () => {
+  it('TC-F42-EXP-112: preserves verified, invalid and secret-like setting values without logging them', () => {
     // Arrange
     const ctx = fixture()
     const values: [string, string][] = [
@@ -166,12 +166,12 @@ describe('PW1 content and raw preservation', () => {
       rawRow(ctx, 'model_settings', { id: '2', ...row }, 'settings'),
     )
     // Assert
-    expect(preserved.map((row) => row.value)).toEqual(
-      values.map(([, value]) => value),
-    )
-    for (const row of invalid) expect(row).not.toHaveProperty('value')
+    expect(preserved.map(row => [row.key, row.value])).toEqual(values)
+    expect(invalid.map(row => row.value)).toEqual(['twenty', 'opaque', '{"category":"password=hidden"}', 'opaque', '{"secret":1}'])
+    expect(ctx.diagnostics).toEqual([])
+    expect(ctx.contributions.length).toBeGreaterThan(0)
   })
-  it('TC-F42-EXP-013: scopes definition grammar to components and continues rejecting secrets', () => {
+  it('TC-F42-EXP-013: preserves component definitions as opaque source content', () => {
     // Arrange
     const ctx = fixture()
     const config =
@@ -198,7 +198,7 @@ describe('PW1 content and raw preservation', () => {
     // Assert
     expect(definition.config).toBe(config)
     expect(store).not.toHaveProperty('social_channel')
-    expect(secret).not.toHaveProperty('config')
+    expect(secret.config).toBe('{"animation":{"token":"hidden"}}')
   })
   it('TC-F42-EXP-013: retains source-defined banner, menu, page and checkout UI data without widening other fields', () => {
     // Arrange
@@ -253,19 +253,15 @@ describe('PW1 content and raw preservation', () => {
     cases.forEach(([, field, value], index) =>
       expect(rows[index][field]).toBe(value),
     )
-    expect(settingsRows.map((row) => row.value)).toEqual([
-      '#fff',
-      '{"fullname":1,"note_for_delivery":0}',
-      'Checkout',
-    ])
+    expect(settingsRows.map(row => row.value)).toEqual(['#fff', '{"fullname":1,"note_for_delivery":0}', 'Checkout'])
     expect(rejected).toEqual([
       { id: '1' },
-      { id: '1' },
-      { id: '1', key: 'receiver_information' },
-      { id: '1', key: 'theme.primary_color' },
+      { id: '1', button: '{"mode":{"token":"hidden"}}' },
+      { id: '1', key: 'receiver_information', value: '{"unknown":1}' },
+      { id: '1', key: 'theme.primary_color', value: 'https://example.test/?token=hidden' },
     ])
   })
-  it('TC-F42-EXP-013: preserves only source-defined MenuLine dotted item keys', () => {
+  it('TC-F42-EXP-112: preserves all MenuLine dotted settings regardless of key', () => {
     // Arrange
     const ctx = fixture()
     const model_type = 'App\\Models\\MenuLine'
@@ -300,10 +296,11 @@ describe('PW1 content and raw preservation', () => {
       ),
     )
     // Assert
-    expect(valid.every((row) => row.value === 'source-value')).toBe(true)
-    invalid.forEach((row) => expect(row).not.toHaveProperty('value'))
+    for (const row of [...valid, ...invalid]) expect(row.value).toBe('source-value')
+    expect(ctx.diagnostics).toEqual([])
+    expect(ctx.contributions.length).toBeGreaterThan(0)
   })
-  it('TC-F42-EXP-012: missing setting ownership remains blocked separately from conflicting owner', () => {
+  it('TC-F42-EXP-112: settings infer missing direct Store from the requested parent and reject foreign Store', () => {
     // Arrange
     const ctx = fixture({
       model_settings: [
@@ -328,11 +325,9 @@ describe('PW1 content and raw preservation', () => {
     // Act
     const output = settings(ctx, 'Page', '30', 'settings')
     // Assert
-    expect(output).toEqual([])
-    expect(ctx.diagnostics.map((item) => item.code)).toEqual([
-      'RAW_OWNERSHIP_MISSING',
-      'RAW_OWNERSHIP_MISMATCH',
-    ])
+    expect(output).toEqual([ctx.tables.model_settings[0]])
+    expect(ctx.diagnostics).toEqual([])
+    expect(ctx.contributions.length).toBeGreaterThan(0)
   })
   it('TC-F42-EXP-020: raw Site source omits five excluded media arrays', () => {
     // Arrange
@@ -568,4 +563,89 @@ describe('[TC-F42-EXP-093] Opaque Blog content', () => {
     expect(doc.content_ms).toBe(source)
     expect(ctx.diagnostics).toEqual([])
   })
+})
+
+
+describe('[TC-F42-EXP-097] Skip inactive Blog categories', () => {
+  const dates = { created_at: '2025-01-01 00:00:00', updated_at: '2025-01-02 00:00:00' }
+  const category = { id: '1', store_id: '10', name: 'Old', slug: 'same', status: '0', ...dates }
+  const blog = { id: '3', store_id: '10', name: 'Post', slug: 'post', status: '1', created_by: '20', blog_category_id: '1', content: 'Original <b>content</b>', ...dates }
+  it.each(['0', '1'])('keeps Blog status %s and content without its inactive category', status => {
+    // Arrange
+    const ctx = fixture({ blog_categories: [category, { ...category, id: '2', status: '1' }], blog_posts: [{ ...blog, status }] })
+    // Act
+    mapContent(ctx)
+    // Assert
+    expect(ctx.output.blog_categories.map(row => row._ref)).toEqual(['@blog_categories:blog_categories:2'])
+    expect(ctx.output.blogs).toHaveLength(1)
+    expect(ctx.output.blogs[0]).not.toHaveProperty('category')
+    expect(ctx.output.blogs[0]).toMatchObject({ status: status === '1' ? 'published' : 'draft', author: '@users:users:20', content: { root: { children: [{ children: [{ text: blog.content }] }] } } })
+    expect(ctx.diagnostics.filter(d => ['BLOG_CATEGORY_INACTIVE', 'BLOG_CATEGORY_UNRESOLVED', 'BLOG_SLUG_COLLISION'].includes(d.code))).toEqual([])
+  })
+  it.each([
+    { categories: [] },
+    { categories: [{ ...category, deleted_at: '2025-01-01 00:00:00' }] },
+    { categories: [{ ...category, store_id: '11' }] },
+    { categories: [{ ...category, status: '2' }] },
+  ])('retains unresolved relationship for missing/deleted/foreign/unknown category %#', ({ categories }) => {
+    // Arrange
+    const ctx = fixture({ blog_categories: categories, blog_posts: [blog] })
+    // Act
+    mapContent(ctx)
+    // Assert
+    expect(ctx.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'BLOG_CATEGORY_UNRESOLVED', sourceId: '3' })]))
+  })
+  it('does not validate inactive category content destined only for the source CSV', () => {
+    // Arrange
+    const ctx = fixture({ blog_categories: [{ ...category, slug: '/', name: '{invalid JSON' }] })
+    // Act
+    mapContent(ctx)
+    // Assert
+    expect(ctx.output.blog_categories).toEqual([])
+    expect(ctx.diagnostics.filter(d => d.table === 'blog_categories')).toEqual([])
+    expect(ctx.contributions).toEqual(expect.arrayContaining([expect.objectContaining({ table: 'blog_categories', sourceId: '1', rule: 'MASTER-4.1-EXTERNAL-CSV-ARCHIVE' })]))
+  })
+})
+
+
+describe('[TC-F42-EXP-099] Default path preserves source slugs', () => {
+  it('does not silently trim Blog/category slugs when draft normalization is disabled', () => {
+    // Arrange
+    const dates = { created_at: '2025-01-01 00:00:00', updated_at: '2025-01-02 00:00:00' }
+    const ctx = fixture({ blog_categories: [{ id: '1', store_id: '10', name: 'Category', slug: ' category ', status: '1', ...dates }], blog_posts: [{ id: '2', store_id: '10', name: 'Blog', slug: ' blog ', status: '1', created_by: '20', blog_category_id: '1', content: 'Original', ...dates }] })
+    // Act
+    mapContent(ctx)
+    // Assert
+    expect(ctx.output.blog_categories[0].slug).toBe(' category ')
+    expect(ctx.output.blogs[0].slug).toBe(' blog ')
+  })
+})
+
+it('TC-F42-EXP-012: preserves opaque Page content and its template without interpreting embedded markers', () => {
+  // Arrange
+  const original = '  {broken JSON <a href="javascript:test()">Password: original</a>  '
+  const ctx = fixture({
+    stores: [{ id: '10', frontend_template_id: '9' }],
+    frontend_templates: [{ id: '9', config: original, future_column: 'unchanged' }],
+    pages: [{ id: '30', store_id: '10', content: original, future_column: original }],
+  })
+  // Act
+  mapContent(ctx)
+  // Assert
+  expect(ctx.output.pages[0]).toMatchObject({ content: original, future_column: original })
+  expect(ctx.output.sites[0].raw_frontend_template).toEqual({ id: '9', config: original, future_column: 'unchanged' })
+  expect(ctx.diagnostics.filter(d => ['RAW_VALUE_UNVERIFIED', 'RAW_FIELD_UNVERIFIED'].includes(d.code))).toEqual([])
+})
+
+it('TC-F42-EXP-012: skips raw validation of deleted Products while checking live Products', () => {
+  // Arrange
+  const ctx = fixture({ products: [
+    { id: '5341', store_id: '10', deleted_at: '2022-06-17 00:00:00', featured_description: 'Password: source' },
+    { id: '5342', store_id: '10', deleted_at: null, featured_description: 'Password: source' },
+  ] })
+  // Act
+  mapContent(ctx)
+  // Assert
+  expect(ctx.diagnostics.some(d => d.sourceId === '5341' && d.code === 'RAW_VALUE_UNVERIFIED')).toBe(false)
+  expect(ctx.diagnostics.some(d => d.sourceId === '5342' && d.code === 'RAW_VALUE_UNVERIFIED')).toBe(true)
 })

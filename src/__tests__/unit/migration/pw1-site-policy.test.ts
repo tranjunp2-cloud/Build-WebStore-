@@ -53,13 +53,23 @@ describe('[TC-F42-071] Approved site classification', () => {
 describe('[TC-F42-072] PW2 shipping migration policy', () => {
   it.each([['8.50', 850], ['0', 0], ['1000', 100000]])('maps MYR %s to sen without losing zero', (fee, expected) => {
     // Arrange
-    const { ctx, site } = fixture({ store_deliveries: [{ ...delivery, shipping_fee_config: JSON.stringify({ condition_type: 1, shipping_fee: fee, api_key: 'PRIVATE' }), credentials: 'PRIVATE' }] })
+    const { ctx, site } = fixture({ store_deliveries: [{ ...delivery, shipping_fee_config: JSON.stringify({ condition_type: 1, shipping_fee: fee, api_key: 'PRIVATE' }), credentials: 'PRIVATE' }] }, { ...policy, shippingPolicy: 'review' })
     // Act
     applySitePolicy(ctx, site)
     // Assert
     expect(site.shippingConfig).toEqual({ enabled: true, westRate: expected, eastRate: expected, freeAbove: null, shippingSetupConfirmed: false })
     expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'SHIPPING_FIXED_FEE_MAPPED' }))
     expect(JSON.stringify(site)).not.toMatch(/PRIVATE|credentials|api_key|easyParcel/)
+  })
+  it('TC-F42-EXP-111: pw2-defaults never copies an otherwise valid legacy fixed fee', () => {
+    // Arrange
+    const { ctx, site } = fixture()
+    // Act
+    applySitePolicy(ctx, site)
+    // Assert
+    expect(site.shippingConfig).toEqual({ enabled: true, westRate: 800, eastRate: 1500, freeAbove: null, shippingSetupConfirmed: false })
+    expect(ctx.contributions).toEqual([])
+    expect(ctx.diagnostics.some(d => d.code === 'SHIPPING_FIXED_FEE_MAPPED')).toBe(false)
   })
   it.each(['USD', ''])('blocks unsupported or unknown currency %s', code => {
     // Arrange
@@ -92,7 +102,7 @@ describe('[TC-F42-072] PW2 shipping migration policy', () => {
     applySitePolicy(review.ctx, review.site)
     // Assert
     expect(defaults.site.shippingConfig).toEqual({ enabled: true, westRate: 800, eastRate: 1500, freeAbove: null, shippingSetupConfirmed: false })
-    expect(defaults.ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'SHIPPING_SOURCE_REPLACED_BY_PW2_DEFAULT', severity: 'warning', reason }))
+    expect(defaults.ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'SHIPPING_SOURCE_REPLACED_BY_PW2_DEFAULT', table: 'stores', sourceId: '10', severity: 'warning', reason: 'APPROVED_PW2_DEFAULTS' }))
     expect(review.site.shippingConfig).toBeUndefined()
     expect(review.ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'SITE_SHIPPING_RECONFIGURATION_REQUIRED', severity: 'blocker', reason }))
     expect(defaults.ctx.contributions).toEqual([])

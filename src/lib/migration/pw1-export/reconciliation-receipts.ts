@@ -1,8 +1,10 @@
+import { ADDRESS_OVERFLOW_RULE } from './approved-source-scope'
 import { z } from 'zod'
-import type { Doc, MappingContext, SourceConfig, StoreOutput } from './contracts'
+import { createHash } from 'node:crypto'
+import type { Doc, MappingContext, MigrationPolicy, SourceConfig, StoreOutput } from './contracts'
 import { live, ref } from './contracts'
 import { sourceCatalog } from './mappers/catalog-source'
-import { ExportError } from './primitives'
+import { compareIds, ExportError } from './primitives'
 
 const id = z.string().min(1)
 const customerRef = z.string().regex(/^@customers:customers:[^:]+$/)
@@ -67,6 +69,7 @@ export const productReceiptSchema = z.object({
     targetRef: z.string().regex(/^@products:products:[^:]+$/).nullable(),
     eligibleSkuCount: z.number().int().nonnegative(),
     tiers: z.array(tier),
+    excludedSkus: z.array(z.object({sourceSkuId: id, reasons: z.array(z.enum(["MISSING_SELECTION", "DUPLICATE_SELECTION", "OUT_OF_DOMAIN", "SOURCE_SELECTED_TIER_COUNT"])).min(1)}).strict()).optional(),
     skus: z.array(z.object({
       sourceSkuId: id, targetPath: z.string().nullable(), targetId: z.string().uuid().nullable(),
       selectedTuple: z.array(z.tuple([id, id])),
@@ -105,7 +108,8 @@ export function buildProductReceiptEntries(ctx: MappingContext): ProductReceipt[
   const docs = new Map(ctx.output.products.map(doc => [String(doc._ref), doc]))
   const sourceSkus = new Map<string, import('./contracts').Row[]>()
   for (const row of ctx.rows('product_skus')) {
-    if (row.status !== '1') continue
+    const product = ctx.find('products', row.product_id)
+    if (!live(row) || (row.status !== '1' && !(ctx.config.migrationPolicy?.allowInactiveSkusForInactiveProduct && product?.status === '0' && row.status === '0'))) continue
     const rows = sourceSkus.get(row.product_id ?? '') ?? []
     rows.push(row); sourceSkus.set(row.product_id ?? '', rows)
   }
@@ -125,7 +129,8 @@ export function buildProductReceiptEntries(ctx: MappingContext): ProductReceipt[
       storeId: ctx.storeId, sourceProductId: product.id!, emitted: !!doc,
       targetRef: doc ? productRef : null, eligibleSkuCount: rows.length,
       tiers: doc ? source.identities : [],
-      skus: rows.map(row => {
+      ...(doc && source.excludedSkus.length ? { excludedSkus: source.excludedSkus } : {}),
+      skus: rows.filter(row => !doc || !source.excludedSkus.some(excluded => excluded.sourceSkuId === row.id)).map(row => {
         const crosswalk = source.skuCrosswalk.find(item => item.sourceSkuId === row.id)
         return {
           sourceSkuId: row.id!,
@@ -143,11 +148,12 @@ export function buildProductReceiptEntries(ctx: MappingContext): ProductReceipt[
   })
 }
 
-type SourceEvidence = { table: string; sourceId: string; storeId: string | null }
+type SourceEvidence = { table: string; sourceId: string; storeId: string | null; fieldRetentionRules?: Record<string,string>; ownership?: { rule: string; parentTable?: string; parentId?: string } }
 /** Validate identity, ownership, closure and target paths without claiming CSV-value parity. */
 export function validateReconciliationReceipts(
   customerValue: unknown, productValue: unknown,
   snapshot: z.infer<typeof snapshotSchema>, master: StoreOutput[], sourceRows: SourceEvidence[],
+  policy?: MigrationPolicy,
 ) {
   const c = customerReceiptSchema.safeParse(customerValue), p = productReceiptSchema.safeParse(productValue)
   if (!c.success || !p.success) throw new ExportError('RECONCILIATION_SCHEMA_INVALID')
@@ -157,6 +163,7 @@ export function validateReconciliationReceipts(
       throw new ExportError('RECONCILIATION_PROVENANCE_INVALID')
   const fail = () => { throw new ExportError('RECONCILIATION_REFERENCES_INVALID') }
   const sources = new Map(sourceRows.map(row => [`${row.table}:${row.sourceId}`, row.storeId]))
+  const sourceOwnership = new Map(sourceRows.map(row => [`${row.table}:${row.sourceId}`, row.ownership]))
   const retainedByStore = new Map<string, string[]>()
   for (const row of sourceRows) {
     if (!row.storeId || !['customers', 'addresses', 'ranks', 'orders'].includes(row.table)) continue
@@ -167,6 +174,7 @@ export function validateReconciliationReceipts(
     if (sources.get(`${table}:${sourceId}`) !== storeId) fail()
   }
   const stores = new Map(master.map(store => [String((store.tenants[0].metaData as Doc).pw1StoreId), store]))
+  const addressOverflow = new Set<string>()
   const seenStores = new Set<string>()
   for (const receipt of c.data.stores) {
     const store = stores.get(receipt.storeId)
@@ -202,6 +210,7 @@ export function validateReconciliationReceipts(
     }
     for (const entry of receipt.diagnostics.addressDispositions) {
       owned('orders', entry.sourceOrderId, receipt.storeId)
+      if (entry.disposition === 'overflow') addressOverflow.add(JSON.stringify([receipt.storeId,entry.sourceAddressId]))
       if (entry.disposition !== 'invalid-source-address') owned('addresses', entry.sourceAddressId, receipt.storeId)
       if (entry.targetRef && ['emitted', 'deduplicated'].includes(entry.disposition)) {
         const addresses = customers.get(entry.targetRef)!.addresses
@@ -239,7 +248,7 @@ export function validateReconciliationReceipts(
     owned('products', entry.sourceProductId, entry.storeId)
     const expectedRef = ref('products', 'products', entry.sourceProductId)
     const doc = store!.products.find(doc => doc._ref === expectedRef)
-    if (entry.emitted !== !!doc || entry.targetRef !== (doc ? expectedRef : null) || entry.skus.length !== entry.eligibleSkuCount) fail()
+    if (entry.emitted !== !!doc || entry.targetRef !== (doc ? expectedRef : null) || entry.skus.length + (entry.excludedSkus?.length ?? 0) !== entry.eligibleSkuCount) fail()
     if (!doc && (entry.tiers.length || !entry.errors.includes('PRODUCT_NOT_EMITTED'))) fail()
     const configs = (doc?.variantConfigs ?? []) as Doc[]
     if (doc && configs.length !== entry.tiers.length) fail()
@@ -252,7 +261,18 @@ export function validateReconciliationReceipts(
       })
     })
     const variants = (doc?.variants ?? []) as Doc[]
-    if (doc && entry.skus.length !== (doc.hasVariants ? variants.length : 1)) fail()
+    if (entry.excludedSkus?.length) {
+      if (!doc?.hasVariants || !policy?.pruneInvalidVariantSkus || !variants.length) fail()
+      for (const excluded of entry.excludedSkus) {
+        owned("product_skus", excluded.sourceSkuId, entry.storeId)
+        const owner = sourceOwnership.get(`product_skus:${excluded.sourceSkuId}`)
+        if (owner?.rule !== "SOURCE_PARENT_RELATION" || owner.parentTable !== "products" || owner.parentId !== entry.sourceProductId) fail()
+        if (seenSkus.has(excluded.sourceSkuId)) fail()
+        seenSkus.add(excluded.sourceSkuId)
+      }
+    }
+    if (doc && (doc.hasVariants && policy?.resolveDuplicateVariantTuples ? entry.skus.length < variants.length : entry.skus.length !== (doc.hasVariants ? variants.length : 1))) fail()
+    const targetTuples = new Map<string, string>()
     const variantIds = new Set<string>()
     for (const sku of entry.skus) {
       owned('product_skus', sku.sourceSkuId, entry.storeId)
@@ -264,7 +284,10 @@ export function validateReconciliationReceipts(
         continue
       }
       const index = variants.findIndex(variant => variant.id === sku.targetId)
-      if (index < 0 || sku.targetPath !== `variants.${index}` || variantIds.has(sku.targetId!)) fail()
+      if (index < 0 || sku.targetPath !== `variants.${index}`) fail()
+      const tupleKey = JSON.stringify(sku.selectedTuple)
+      if (variantIds.has(sku.targetId!) && (!policy?.resolveDuplicateVariantTuples || targetTuples.get(sku.targetId!) !== tupleKey)) fail()
+      targetTuples.set(sku.targetId!, tupleKey)
       variantIds.add(sku.targetId!)
       if (sku.selectedTuple.length !== entry.tiers.length) fail()
       const labels = sku.selectedTuple.map(([attributeId, valueId], i) => {
@@ -275,9 +298,26 @@ export function validateReconciliationReceipts(
       })
       if (labels.join(' - ') !== variants[index].name) fail()
     }
+    if (doc?.hasVariants && variantIds.size !== variants.length) fail()
+    if (doc?.hasVariants && policy?.resolveDuplicateVariantTuples) {
+      const tupleTargets = new Map<string, string>()
+      for (const targetId of variantIds) {
+        const aliases = entry.skus.filter(sku => sku.targetId === targetId).sort((a,b) => compareIds(a.sourceSkuId,b.sourceSkuId))
+        if (aliases.length > 1) for (const alias of aliases) {
+          const owner = sourceOwnership.get(`product_skus:${alias.sourceSkuId}`)
+          if (owner?.rule !== "SOURCE_PARENT_RELATION" || owner.parentTable !== "products" || owner.parentId !== entry.sourceProductId) fail()
+        }
+        const tupleKey = JSON.stringify(aliases[0].selectedTuple)
+        if (tupleTargets.has(tupleKey)) fail()
+        tupleTargets.set(tupleKey, targetId)
+        const hex = createHash('sha256').update(JSON.stringify([snapshot.sourceInstanceToken, 'product_skus', aliases[0].sourceSkuId])).digest('hex')
+        if (targetId !== `${hex.slice(0,8)}-${hex.slice(8,12)}-5${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20,32)}`) fail()
+      }
+    }
   }
   for (const store of master)
     for (const doc of store.products)
       if (!seenProducts.has(String(doc._ref).split(':').at(-1)!)) fail()
+  for (const row of sourceRows) if (Object.values(row.fieldRetentionRules ?? {}).includes(ADDRESS_OVERFLOW_RULE) && (!policy?.allowCustomerAddressOverflow || row.table !== 'addresses' || !addressOverflow.has(JSON.stringify([row.storeId,row.sourceId])))) fail()
   return { customers: c.data, products: p.data }
 }

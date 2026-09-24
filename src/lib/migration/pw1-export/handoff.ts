@@ -1,11 +1,12 @@
 import type { Diagnostic } from './contracts'
-import { reviewCategory } from './export-outcome'
+import { approvedReviewScope, reviewCategory } from './export-outcome'
 
 type StoreSummary = { storeId: string; exportStatus: string }
 type Status = 'excluded' | 'source_blocked' | 'global_review_required' | 'importer_verification_required' | 'source_diagnostics_clear'
 
 /** Conservative source-diagnostic triage, never an importer preflight or permission to write DB. */
 export function buildHandoff(stores: readonly StoreSummary[], diagnostics: readonly Diagnostic[], archive: ReadonlySet<string> = new Set()) {
+  const scope = approvedReviewScope(diagnostics)
   const excluded = new Set(stores.filter(s => s.exportStatus === 'excluded').map(s => s.storeId))
   const local = new Map<string, Diagnostic[]>()
   const global: Diagnostic[] = []
@@ -15,12 +16,12 @@ export function buildHandoff(stores: readonly StoreSummary[], diagnostics: reado
       group.push(d); local.set(d.storeId, group)
     } else global.push(d)
   }
-  const unresolved = (d: Diagnostic) => ['data_issue', 'import_requirement', 'warning'].includes(reviewCategory(d, archive, excluded))
+  const unresolved = (d: Diagnostic) => ['data_issue', 'import_requirement', 'warning'].includes(reviewCategory(d, archive, excluded, scope))
   const globalIssues = global.filter(unresolved)
   const evidence = (issues: Diagnostic[]) => {
     const groups = new Map<string, { code: string; table?: string; field?: string; reason?: string; category: string; count: number; sourceIds: string[] }>()
     for (const d of issues) {
-      const category = reviewCategory(d, archive, excluded)
+      const category = reviewCategory(d, archive, excluded, scope)
       const key = JSON.stringify([category, d.code, d.table, d.field, d.reason])
       const group = groups.get(key) ?? { category, code: d.code, table: d.table, field: d.field, reason: d.reason, count: 0, sourceIds: [] }
       group.count++
@@ -31,7 +32,7 @@ export function buildHandoff(stores: readonly StoreSummary[], diagnostics: reado
   }
   const rows = stores.map(store => {
     const issues = (local.get(store.storeId) ?? []).filter(unresolved)
-    const data = issues.filter(d => reviewCategory(d, archive, excluded) === 'data_issue')
+    const data = issues.filter(d => reviewCategory(d, archive, excluded, scope) === 'data_issue')
     const status: Status = excluded.has(store.storeId) ? 'excluded'
       : store.exportStatus === 'blocked' || data.length ? 'source_blocked'
       : globalIssues.length ? 'global_review_required'

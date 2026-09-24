@@ -41,11 +41,43 @@ export interface MigrationPolicy {
   deferEmailTemplates: boolean
   allowSparseVariants: boolean
   preserveUserCreators: boolean
+  approvedNegativeTotalOrders?: { storeId: '43'; orderId: '112' | '132' }[]
+  excludeInvalidProducts?: boolean
+  excludeInvalidBlogs?: boolean
+  omitUnmappablePayments?: boolean
+  excludeDuplicateProductSlugs?: boolean
+  excludeProductsWithoutValidVariants?: boolean
+  excludeProductsInInactiveCategories?: boolean
+  selectOldestOwner?: boolean
+  preserveInvalidUserEmails?: boolean
+  gracefulTenantResolution?: boolean
+  resolveDuplicateSkus?: boolean
+  resolveDuplicateVariantTuples?: boolean
+  treatSingleSkuWithoutSelectionsAsSimple?: boolean
+  pruneInvalidVariantSkus?: boolean
+  pruneUnreferencedTiers?: boolean
+  allowInactiveSkusForInactiveProduct?: boolean
+  resolveDuplicateCategorySlugs?: boolean
+  resolveDuplicateCategoryNames?: boolean
+  flattenBlogCategoriesToRoot?: boolean
+  resolveDuplicateBlogCategorySlugs?: boolean
+  resolveDuplicateBlogSlugs?: boolean
+  allowCustomerAddressOverflow?: boolean
+  allowInvalidCustomerAddresses?: boolean
+  allowHistoricalDiscountEligibilityGap?: boolean
+  preserveRefundedOrdersWithoutEvidence?: boolean
+  skipInvalidDiscountCodes?: boolean
+  skipUnverifiedOrders?: boolean
+  allowUnresolvedBlogMedia?: boolean
+  fallbackBlogAuthorToOwner?: boolean
+  allowContactStructureGap?: boolean
+  allowBracketedProductNames?: boolean
   siteTypeDefault: 'ecommerce'
   siteTypeOverrides: Record<string, SiteType>
   shippingPolicy: 'pw2-defaults' | 'review'
 }
 export interface SourceConfig {
+  sourceDomainBindings?: Record<string, string>
   migrationPolicy?: MigrationPolicy
   acceptedExclusions?: {
     ruleId: 'MASTER-2.2-OPTIONAL-HISTORY'

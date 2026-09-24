@@ -27,3 +27,23 @@ describe('[TC-F42-EXP-096] Product exclusion evidence', () => {
     }).toThrow('INVALID_EXCLUSION')
   })
 })
+
+describe('[TC-F42-EXP-109] Inactive-category Product exclusion proof', () => {
+  it.each(['valid', 'flag-off', 'emitted', 'missing-warning', 'wrong-store'])('checks %s', mutation => {
+    // Arrange
+    const fail = (): never => { throw new Error('INVALID_EXCLUSION') }
+    const proof = createProductExclusionIndex(fail, true, { decisionEvidence: 'approved', excludeProductsInInactiveCategories: mutation !== 'flag-off' })
+    const row = { ...source(), productExclusion: { productId: '20', reason: 'INACTIVE_CATEGORY' as const }, fieldRetentionRules: { id: 'MASTER-5.2-PRODUCT-CATALOG-POLICY' } }
+    // Act
+    const validate = () => {
+      if (mutation !== 'missing-warning') proof.addDiagnostic({ ...warning, code: 'PRODUCT_CATALOG_POLICY_EXCLUDED', reason: 'INACTIVE_CATEGORY' })
+      if (mutation === 'wrong-store') row.storeId = '2'
+      if (mutation === 'emitted') proof.addProduct('1', '@products:products:20')
+      proof.addRow(row)
+      proof.finish()
+    }
+    // Assert
+    if (mutation === 'valid') expect(validate).not.toThrow()
+    else expect(validate).toThrow('INVALID_EXCLUSION')
+  })
+})

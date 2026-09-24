@@ -1,3 +1,5 @@
+import { mapSocialLinks } from './social-links'
+import { z } from 'zod'
 import { applySitePolicy } from './site-policy'
 import { globalCreatorChain } from '../user-actors'
 import {
@@ -7,7 +9,7 @@ import {
   ref,
   live,
 } from '../contracts'
-import { safeUrl } from '../primitives'
+import { safeUrl, compareIds } from '../primitives'
 import {
   isReservedSlug,
   validateSlugFormat,
@@ -21,28 +23,43 @@ import {
 
 function hostname(raw: string | null | undefined): string {
   const host = (raw ?? '').trim().toLowerCase().replace(/\.$/, '')
-  if (
-    host.length > 253 ||
-    !host.includes('.') ||
-    host
-      .split('.')
-      .some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))
-  )
-    throw new Error('DOMAIN_INVALID')
+  if (host.length > 253 || !host.includes('.') || host.split('.').some(
+    label => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label),
+  )) throw new Error('DOMAIN_INVALID')
   return host
 }
-function sourceText(raw: string | null | undefined): string {
+function sourceText(raw: string | null | undefined, allowContactGap = false): string {
   if (!raw) return ''
   if (!/^[\[{]/.test(raw.trim())) return raw.trim()
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
   } catch {
+    if (allowContactGap) return raw.trim()
     throw new Error('CONTACT_JSON_INVALID')
   }
   if (Array.isArray(parsed) && parsed.every((v) => typeof v === 'string'))
     return parsed[0] ?? ''
   if (typeof parsed === 'string') return parsed
+  if (allowContactGap) {
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      if (typeof parsed[0] === 'string') return parsed[0]
+      if (typeof parsed[0] === 'object' && parsed[0] !== null) {
+        const firstVal = Object.values(parsed[0]).find((v) => typeof v === 'string')
+        if (typeof firstVal === 'string') return firstVal
+      }
+    }
+    if (typeof parsed === 'object' && parsed !== null) {
+      const obj = parsed as Record<string, unknown>
+      if (typeof obj.en === 'string' && obj.en.trim()) return obj.en.trim()
+      if (typeof obj.ms === 'string' && obj.ms.trim()) return obj.ms.trim()
+      if (typeof obj.phone === 'string' && obj.phone.trim()) return obj.phone.trim()
+      if (typeof obj.hotline === 'string' && obj.hotline.trim()) return obj.hotline.trim()
+      const firstStr = Object.values(obj).find((v) => typeof v === 'string' && v.trim())
+      if (typeof firstStr === 'string') return firstStr.trim()
+    }
+    return raw.trim()
+  }
   throw new Error('CONTACT_STRUCTURE_UNRESOLVED')
 }
 function ownerRole(row: Row, ctx: MappingContext): boolean {
@@ -61,17 +78,28 @@ function codEnabled(ctx: MappingContext): boolean {
   const cod: Row[] = []
   for (const row of ctx.rows('store_payments', true).filter(live)) {
     const method = ctx.find('payment_methods', row.payment_method_id)
-    if (!method || !['cod', 'stripe', 'billplz'].includes(method.code ?? ''))
-      throw new Error('PAYMENT_PROVIDER_UNKNOWN')
+    if (!method || !['cod', 'stripe', 'billplz'].includes(method.code ?? '')) {
+      if (!ctx.config.migrationPolicy?.omitUnmappablePayments) throw new Error('PAYMENT_PROVIDER_UNKNOWN')
+      ctx.issue('SOURCE_ENTITY_EXCLUDED', 'store_payments', row.id, undefined, 'warning', 'PAYMENT_PROVIDER_UNKNOWN')
+      continue
+    }
     if (
       !['0', '1'].includes(row.status ?? '') ||
       !['0', '1'].includes(method.status ?? '')
-    )
-      throw new Error('PAYMENT_STATUS_UNKNOWN')
+    ) {
+      if (!ctx.config.migrationPolicy?.omitUnmappablePayments) throw new Error('PAYMENT_STATUS_UNKNOWN')
+      ctx.issue('SOURCE_ENTITY_EXCLUDED', 'store_payments', row.id, undefined, 'warning', 'PAYMENT_STATUS_UNKNOWN')
+      continue
+    }
     if (method.code === 'cod') cod.push(row)
+    else if (ctx.config.migrationPolicy?.omitUnmappablePayments) ctx.issue('SOURCE_ENTITY_EXCLUDED', 'store_payments', row.id, undefined, 'warning', 'PAYMENT_PROVIDER_NOT_ACTIVATED')
     else ctx.issue('PAYMENT_PROVIDER_NOT_ACTIVATED', 'store_payments', row.id)
   }
-  if (cod.length > 1) throw new Error('COD_CONFIGURATION_AMBIGUOUS')
+  if (cod.length > 1) {
+    if (!ctx.config.migrationPolicy?.omitUnmappablePayments) throw new Error('COD_CONFIGURATION_AMBIGUOUS')
+    for (const row of cod) ctx.issue('SOURCE_ENTITY_EXCLUDED', 'store_payments', row.id, undefined, 'warning', 'COD_CONFIGURATION_AMBIGUOUS')
+    return false
+  }
   if (!cod.length) return false
   const method = ctx.find('payment_methods', cod[0].payment_method_id)!
   ctx.contribute(
@@ -85,14 +113,18 @@ function codEnabled(ctx: MappingContext): boolean {
 }
 function userDoc(row: Row, owner: boolean, ctx: MappingContext): Doc {
   if (!row.name?.trim()) throw new Error('USER_NAME_REQUIRED')
-  if (!row.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email))
-    throw new Error('USER_EMAIL_INVALID')
+  const email = row.email
+  if (!z.string().email().safeParse(email).success) {
+    if (!ctx.config.migrationPolicy?.preserveInvalidUserEmails || typeof email !== 'string')
+      throw new Error('USER_EMAIL_INVALID')
+    ctx.issue('USER_EMAIL_INVALID', 'users', row.id, 'email', 'warning', 'SOURCE_EMAIL_PRESERVED')
+  }
   const [firstName, ...rest] = row.name.trim().split(/\s+/)
   const readOnly = ctx.config.readOnlyUserIds?.includes(row.id!)
   const role = owner ? 'owner' : readOnly ? 'viewer' : 'editor'
   const doc: Doc = {
     _ref: ref('users', 'users', row.id!),
-    email: row.email,
+    email,
     firstName,
     lastName: rest.join(' '),
     phone: row.phone ?? null,
@@ -139,58 +171,99 @@ export function mapIdentity(ctx: MappingContext): boolean {
     const owners = users.filter(
       (row) => row.is_store_owner === '1' || ownerRole(row, ctx),
     )
-    if (
-      owners.length !== 1 ||
-      owners[0].is_store_owner !== '1' ||
-      !ownerRole(owners[0], ctx)
-    )
-      throw new Error('OWNER_IDENTITY_CONFLICT')
-    const owner = owners[0],
-      ownerOutput = userDoc(owner, true, ctx)
-    if (store.status !== owner.status)
-      throw new Error('TENANT_LIFECYCLE_CONFLICT')
+    const graceful = Boolean(ctx.config.migrationPolicy?.gracefulTenantResolution)
+    let owner: Row
+    if (ctx.config.migrationPolicy?.selectOldestOwner) {
+      // Only same-tenant live backend users qualify; never resurrect a deleted account.
+      const candidates = owners.length ? owners : users
+      const dated = candidates.map(row => ({ row, createdAt: sourceTime(row.created_at, ctx) }))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || compareIds(a.row.id!, b.row.id!))
+      if (!dated.length) throw new Error('OWNER_IDENTITY_CONFLICT')
+      owner = dated[0].row
+      if (owners.length !== 1 || owner.is_store_owner !== '1' || !ownerRole(owner, ctx))
+        ctx.issue('OWNER_IDENTITY_RESOLVED', 'users', owner.id, 'is_store_owner', 'warning', owners.length ? 'OLDEST_OWNER_SELECTED' : 'OLDEST_USER_PROMOTED')
+    } else {
+      if (owners.length !== 1 || owners[0].is_store_owner !== '1' || !ownerRole(owners[0], ctx))
+        throw new Error('OWNER_IDENTITY_CONFLICT')
+      owner = owners[0]
+    }
+    const ownerOutput = userDoc(owner, true, ctx)
     const subscription = mainSubscription(ctx)
-    if (store.status === '2' && subscription.doc.status !== 'ended')
-      throw new Error('TENANT_LIFECYCLE_CONFLICT')
+    const hasLifecycleConflict =
+      store.status !== owner.status ||
+      (store.status === '2' && subscription.doc.status !== 'ended')
+    if (hasLifecycleConflict) {
+      if (!graceful) throw new Error('TENANT_LIFECYCLE_CONFLICT')
+      ctx.issue('TENANT_LIFECYCLE_CONFLICT', 'stores', ctx.storeId, 'status', 'warning', 'SAFE_HOLD_APPLIED')
+    }
     const domains = ctx.rows('store_domains', true).filter(live)
     const defaults = domains.filter((row) => row.is_default === '1')
-    if (defaults.length !== 1) throw new Error('DEFAULT_DOMAIN_AMBIGUOUS')
-    const domain = hostname(defaults[0].domain),
-      suffix = hostname(ctx.config.sourcePlatformSuffix)
-    if (!domain.endsWith(`.${suffix}`))
-      throw new Error('DEFAULT_DOMAIN_SUFFIX_MISMATCH')
-    const slug = domain.slice(0, -(suffix.length + 1))
-    if (validateSlugFormat(slug) || isReservedSlug(slug))
-      throw new Error('TENANT_SLUG_INVALID')
+    // Source Site domain selection is independent of tenant slug fallback and custom domains.
+    const boundDomainId = ctx.config.sourceDomainBindings?.[ctx.storeId]
+    const selectedSiteDomain = boundDomainId ? domains.find(row => row.id === boundDomainId && row.is_default === '1') : defaults.length === 1 ? defaults[0] : undefined
+    if (!selectedSiteDomain) throw new Error(boundDomainId ? 'SOURCE_DOMAIN_BINDING_INVALID' : 'SOURCE_SITE_DOMAIN_SELECTION_REQUIRED')
+    if (!selectedSiteDomain.domain?.trim()) throw new Error('SOURCE_SITE_DOMAIN_EMPTY')
+    try { hostname(selectedSiteDomain.domain) } catch {
+      if (!graceful) throw new Error('DOMAIN_INVALID')
+      ctx.issue('SOURCE_SITE_DOMAIN_FORMAT_PRESERVED', 'store_domains', selectedSiteDomain.id, 'domain', 'warning', 'ORIGINAL_PW1_VALUE')
+    }
+    const suffix = hostname(ctx.config.sourcePlatformSuffix)
+    let slug = `store-${ctx.storeId}`
+    if (defaults.length !== 1) {
+      if (!graceful) throw new Error('DEFAULT_DOMAIN_AMBIGUOUS')
+      ctx.issue('DEFAULT_DOMAIN_AMBIGUOUS', 'stores', ctx.storeId, undefined, 'warning', 'PLATFORM_DOMAIN_FALLBACK')
+    } else {
+      let domain: string | undefined
+      try { domain = hostname(defaults[0].domain) } catch {
+        if (!graceful) throw new Error('DOMAIN_INVALID')
+      }
+      if (domain && !domain.endsWith(`.${suffix}`)) throw new Error('DEFAULT_DOMAIN_SUFFIX_MISMATCH')
+      if (domain) slug = domain.slice(0, -(suffix.length + 1))
+      if (validateSlugFormat(slug) || isReservedSlug(slug)) {
+        if (!graceful) throw new Error('TENANT_SLUG_INVALID')
+        slug = `${slug}-store-${ctx.storeId}`
+        if (validateSlugFormat(slug) || isReservedSlug(slug)) slug = `store-${ctx.storeId}`
+        ctx.issue('TENANT_SLUG_INVALID', 'store_domains', defaults[0].id, 'domain', 'warning', 'TENANT_SLUG_FALLBACK_APPLIED')
+      }
+    }
     const customDomains: Doc[] = []
     const seenDomains = new Set<string>()
     for (const row of domains) {
-      const host = hostname(row.domain)
+      let host: string
+      try { host = hostname(row.domain) } catch {
+        if (!graceful) throw new Error('DOMAIN_INVALID')
+        ctx.issue('DOMAIN_INVALID', 'store_domains', row.id, 'domain', 'warning', 'INVALID_CUSTOM_DOMAIN_EXCLUDED')
+        continue
+      }
       if (seenDomains.has(host)) throw new Error('DOMAIN_DUPLICATE')
       seenDomains.add(host)
       if (host === suffix || host.endsWith(`.${suffix}`)) continue
       customDomains.push({ domain: host, status: 'pending', isPrimary: false })
     }
     if (domains.filter((row) => row.is_main === '1').length !== 1)
-      ctx.issue('SOURCE_MAIN_DOMAIN_AMBIGUOUS', 'store_domains', ctx.storeId)
-    const cod = codEnabled(ctx),
+      ctx.issue('SOURCE_MAIN_DOMAIN_AMBIGUOUS', 'stores', ctx.storeId, undefined, graceful ? 'warning' : 'blocker', graceful ? 'CUSTOM_DOMAINS_PENDING' : undefined)
+    const sourceCod = codEnabled(ctx),
       tenantRef = ref('tenants', 'stores', ctx.storeId)
     const contact: Record<string, string | null> = {}
+    const allowContactGap = ctx.config.migrationPolicy?.allowContactStructureGap === true
     for (const field of ['hotline', 'address']) {
       try {
-        contact[field] = sourceText(store[field])
+        contact[field] = sourceText(store[field], allowContactGap)
       } catch {
         contact[field] = null
-        ctx.issue('CONTACT_STRUCTURE_UNRESOLVED', 'stores', ctx.storeId, field)
+        const severity = allowContactGap ? 'warning' : 'blocker'
+        ctx.issue('CONTACT_STRUCTURE_UNRESOLVED', 'stores', ctx.storeId, field, severity)
       }
     }
     const contactPhone = contact.hotline,
       address = contact.address
+    const tenantStatus = (hasLifecycleConflict || store.status !== '1' || membership(owner, ctx) !== 'active') ? 'suspended' : 'active'
+    const cod = sourceCod && tenantStatus === 'active'
     const tenant: Doc = {
       _ref: tenantRef,
       name: store.name.trim(),
       slug,
-      status: owner.status === '1' ? 'active' : 'suspended',
+      status: tenantStatus,
       plan: subscription.tier,
       metaData: { pw1StoreId: ctx.storeId },
       migrationStatus: 'pending',
@@ -222,7 +295,7 @@ export function mapIdentity(ctx: MappingContext): boolean {
       siteType: 'ecommerce',
       locale: 'ms',
       generationLocale: 'ms',
-      domain: `${slug}.${hostname(ctx.config.targetPlatformSuffix)}`,
+      domain: selectedSiteDomain.domain,
       seo: {
         metaTitle: store.name.trim(),
         metaDescription: store.description ?? '',
@@ -233,7 +306,7 @@ export function mapIdentity(ctx: MappingContext): boolean {
         email: store.email ?? '',
         ...(address === null ? {} : { address }),
       },
-      socialLinks: {},
+      socialLinks: mapSocialLinks(ctx, store),
       paymentConfig: {
         enableCod: cod,
         enableQrBanking: false,
@@ -273,13 +346,14 @@ export function mapIdentity(ctx: MappingContext): boolean {
       'tenants[] + sites[]',
       'MASTER-3.1-4.1',
     )
-    ctx.contribute(
+    if (defaults.length === 1) ctx.contribute(
       'store_domains',
       defaults[0],
       ['domain', 'is_default', 'deleted_at'],
-      'tenants[].slug + sites[].domain',
+      'tenants[].slug',
       'MASTER-3.1-DOMAIN',
     )
+    ctx.contribute('store_domains', selectedSiteDomain, ['id', 'store_id', 'domain', 'is_default', 'deleted_at'].filter(field => Object.hasOwn(selectedSiteDomain, field)), 'sites[].domain', 'MASTER-4.1-SOURCE-SITE-DOMAIN')
     ctx.contribute(
       'plan_subscriptions',
       subscription.row,
@@ -330,8 +404,10 @@ export function mapIdentity(ctx: MappingContext): boolean {
       }
       if (row.id !== owner.id) {
         try {
-          if (row.is_store_owner !== '0' || ownerRole(row, ctx))
-            throw new Error('USER_OWNER_FLAG_CONFLICT')
+          if (row.is_store_owner !== '0' || ownerRole(row, ctx)) {
+            if (!ctx.config.migrationPolicy?.selectOldestOwner) throw new Error('USER_OWNER_FLAG_CONFLICT')
+            if (!ctx.config.readOnlyUserIds?.includes(row.id!)) ctx.issue('OWNER_SECONDARY_MAPPED_EDITOR', 'users', row.id, 'is_store_owner', 'warning', 'PRIMARY_OWNER_SELECTED')
+          }
           ctx.output.users.push(userDoc(row, false, ctx))
         } catch (error) {
           ctx.issue(

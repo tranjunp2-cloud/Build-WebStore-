@@ -108,7 +108,7 @@ Full **205 tests / 15 files pass**, TypeScript pass: `/tmp/pw1-tenant-slug-all-f
 
 Sửa nằm trong script/mapper; không chỉnh CSV nguồn hay master JSON đã xuất. Registry raw mới phục hồi các cấu trúc UI có bằng chứng PW1: banner typography/button modes, menu cart/search config, page article-date config, checkout/receiver settings, theme/typography constants và `MenuLine` keys `items.N.{id,position,url,size,type,image,signature}`. Các chuỗi được giữ nguyên; scope bảng/cột và discriminator MenuLine được kiểm tra. Nguồn: `FrontendTemplate.php`, `EloquentMenuLineRepository::save`, Header/MenuController, migrations `2021_08_12_083607`, `2021_10_21_032723`, `2022_10_12_062304`, `2025_05_27_042542` của PW1.
 
-Không chấp nhận mọi JSON tùy ý: khóa lạ, URL không an toàn và thông tin bí mật vẫn bị loại. `model_settings.store_id` thiếu/mismatch vẫn bị chặn theo master §4 ownership; không suy ownership từ created_by. Các khóa UI `items.N.idEdit/srcUpload` chưa có bằng chứng schema được giữ là unresolved. Raw được bảo toàn không đồng nghĩa đã chuyển thành block vận hành PW2.
+Chính sách lịch sử tại checkpoint 2026-09-16: khóa lạ, URL không an toàn và thông tin bí mật trong raw bị loại; `model_settings.store_id` thiếu/mismatch bị chặn, các khóa UI chưa xác minh được giữ là unresolved. Chính sách này đã được thay thế đối với raw Page/Menu và `model_settings`: từ contract 1.10.4, giữ nguyên chuỗi `value` theo quyết định ngày 2026-09-24, kể cả HTML, `tel:` có khoảng trắng, khóa lạ và JSON chưa parse được. Không suy ownership từ created_by hoặc tự gán setting cho model khác Store. Raw được bảo toàn không đồng nghĩa đã chuyển thành block vận hành PW2.
 
 TC-F42-EXP-012/013: 15 focused tests pass (raw/content), gồm scope cấu trúc, dotted keys, unknown/secret rejection và ownership. Full suite và export production mới đang được kiểm chứng; chưa dùng số liệu cũ để khẳng định khôi phục đầy đủ. Mapping acceptance vẫn pending cho đến khi xử lý các gap thực sự.
 
@@ -208,7 +208,7 @@ Audit: `.migration/audits/pw1-prod-20260917-approved-001/`; verification và rec
 | TC-ID | Automation | Scenario / Expected |
 |---|---|---|
 | TC-F42-078 | [x] AUTO | Missing/blank SKU code with eligible price row emits draft Product; variant codes 51–100 preserved, >100 rejected; actual SKU collisions and missing price sources remain blocked |
-| TC-F42-079 | [x] AUTO | Customer receipt preserves canonical/merged IDs, address usage/index/dedup/overflow/legacy geography and rank/profile decisions; quarantined targets become null; raw archive remains explicitly external |
+| TC-F42-079 | [x] AUTO | Customer receipt preserves canonical/merged IDs, address usage/index/dedup/overflow/legacy geography and rank/profile decisions; quarantined targets become null; raw archive remains explicitly external; emitted/deduplicated Customer address contributions remain accurate when Orders are skipped; overflow requires approved flag and matching receipt, tampering is rejected |
 | TC-F42-080 | [x] AUTO | Product receipt covers simple and variant source SKUs, selected tuples and target UUID/path; no live target after quarantine; missing/foreign/duplicate refs and forged tuples rejected |
 | TC-F42-081 | [x] AUTO | Current export hashes and requires both strict receipts; tampered bytes/provenance/refs rejected; current mapping pin matches document; legacy followup contract validated with legacy SKU schema; unknown contract/version rejected |
 
@@ -255,3 +255,40 @@ Audit: `.migration/audits/pw1-prod-20260917-approved-001/`; verification và rec
 ## Kiểm tra phạm vi PR — 18/09/2026
 
 TC-F42-069: cập nhật kỳ vọng CLI creator-sidecar từ exit 2 lịch sử sang exit 0, integrity valid nhưng data partial/import not_verified theo contract 1.8.0. Chạy riêng integration user-actors artifact + gap audit CLI: 10 tests / 2 files PASS. Đây là hai suite bổ sung cho 513 tests / 33 files đã chạy; không thay full-source acceptance.
+
+- [x] AUTO TC-F42-EXP-097: Bỏ Blog category status=0; Blog cùng Store giữ content/status/author và bỏ category; inactive không gây slug collision với active; active-active trùng, category thiếu/deleted/foreign/status lạ vẫn báo lỗi; artifact phân loại CSV retained-source và validate được.
+
+- [x] AUTO TC-F42-EXP-098: 21 draft policy flags absent/false preserve approved policy; true rejected before CSV read/publication and by artifact validator. Tests of dormant mapper strategies are isolated prototypes, not approved migration behavior.
+- [x] AUTO TC-F42-EXP-099: Report reasons schema-valid; excluded Blog category has no emitted-target contribution; SKU receipts reject missing coverage and many-to-one even after rehashing.
+
+## Conflict decisions implementation — 23/09/2026
+
+- [x] AUTO TC-F42-EXP-100: Canonical tuple inventory/price, conditional aliases, partial SKU pruning and inactive eligibility; foreign ownership remains blocked. SKU suffix resolution reserves original sibling codes case-insensitively and checks every assigned target field; a generated suffix collision must not exclude an otherwise valid Product.
+- [x] AUTO TC-F42-EXP-101: No arbitrary owner or author; suspended COD off; invalid domain omitted; no fake country; retain unknown Orders as blocker; refund failed/partial not fully refunded; colliding coupons all excluded.
+- [x] AUTO TC-F42-EXP-102: Contract 1.9.0 accepts approved flags, rejects skipUnverifiedOrders; historical contracts cannot activate new flags; conflict audit lists IDs/values without credentials.
+
+- [x] AUTO TC-F42-EXP-103: PROD selects oldest live backend user if owner missing, oldest owner if multiple, timestamp tie numeric ID; preserves invalid email exactly with warning; no foreign/deleted/frontend candidates; legacy artifact email schema remains strict.
+
+- [x] AUTO TC-F42-EXP-104: Product slug trùng cùng Store giữ ID số nhỏ nhất bất kể CSV order; scope khác Store không loại. Product có biến thể nhưng không có variant hợp lệ/thiếu domain được loại theo flag; simple Product vẫn giữ; ownership/giá lỗi khác không được miễn. Exclusion receipt/classification liên kết canonical và nguồn cùng Store; thiếu flag/contract cũ/tamper bị từ chối; Order lịch sử giữ nguyên.
+
+- [x] AUTO TC-F42-EXP-105: Explicit invalid Product/Blog/Order-status/Payment source omissions have exact retained-source root/family receipts; per-record contributions/media rollback; unknown runtime errors and unrelated ownership remain blocked; null failed ownership is preserved with verified family evidence; old/missing policy rejects; soft-deleted Store excluded without blocking.
+
+- [x] AUTO TC-F42-EXP-106: PROD-only explicit Store43/Order112,132 negative-total exclusions preserve original amounts and exact root/child evidence; corrected total, absent policy, wrong Store/ID, DEV scope and historical contract cannot use the waiver.
+
+- [x] AUTO TC-F42-EXP-107: Master parts max300 Stores and strictly<200000000 UTF-8 bytes including syntax/escapes; numeric ordering, Store atomic; emptyset/noaggregate; oversizedStore reports ID and never publishes. Validator rejects missing/extra/renumbered parts, wrong size/hash/store IDs/duplicates/sethash; historic master.json contracts remain supported.
+
+- [x] AUTO TC-F42-EXP-108: Historical contracts 1.10.1–1.10.3 keep all model_settings source-only (including unknown keys/headers and failed ownership), zero mapping/contributions, secret fields excluded; classifier retains truthful ownership; earlier contract/other-table scope rule, forged contribution/duplicate ID/false ownership rejected. This is compatibility coverage, not the current export policy. Aggregate domain warning references Store ID in stores and reports actual related domain IDs.
+
+
+- [x] AUTO TC-F42-EXP-109: Product có Category cùng Store, live, status0 và flag mới bị loại toàn bộ, có family proof và warning INACTIVE_CATEGORY; Category active/missing/deleted/foreign và flag-off không được miễn theo policy này. Order snapshot/tổng tiền giữ nguyên, references tới catalog đã loại không dangling. Contract cũ/flag-off/emitted Product/forged family không được nhận ngoại lệ. Secondary owners emit editor + empty permissions; readOnly không có marker editor.
+
+
+- [x] AUTO TC-F42-EXP-110: social_channel chỉ xuất platform PW2 hỗ trợ, giữ URL gốc, first-entry khi trùng, không copy metadata/secret; hostname lookalike/prototype không được coi platform, malformed/unsafe entry warning và không xuất. Library medias đúng Store/live/type1 xuất URL/sourceUrl nguyên trạng, timestamps nguồn, không binary/filename/MIME/tenant giả; folder/deleted/emptyURL giữ nguồn warning, malformed URL/type/timestamp vẫn blocker. Artifact reject oldcontract retention, forged/media-emitted source-only receipt, wrongtable/field hoặc missingwarning.
+
+
+- [x] AUTO TC-F42-EXP-111: metadata allowlist không miễn fields vận hành hoặc Users.created_by; technical queue_sync/model_exports ngoài scope nhưng ownership/secret/hash vẫn đúng; Order residual chỉ source-only khi Order emitted và có root contribution, foreign/missingroot/oldcontract bị chặn. Page/Menu giữ nguyên chuỗi nguồn/definitions/children, top-level secret columns không xuất, orphan không bị gán sai Store; marker và raw feature chỉ contract mới. Shipping pw2-defaults luôn dùng PW2defaults, review mode vẫn kiểm tra nguồn. Address mapped/deduplicated Customer có contribution đúng targetindex; overflow cần flag + exactwarning + receipt, sai receipt/flag bị chặn. Discount bị skip cần warning được duyệt, absenttarget, không contribution, parent chỉ source-only khi mọi code được đối soát; unexpectederrors không được miễn. Handoff không tạo global blocker từ Page/technical scope đã có bằng chứng; lịch sử không tự được miễn.
+
+- [x] AUTO TC-F42-EXP-112: Contract 1.10.4 khôi phục model_settings với ID/key/value nguyên văn; HTML, tel có khoảng trắng, JSON lỗi, null/chuỗi rỗng và khóa lạ không làm mất value. Nested Page/PageComponent/Menu chỉ nhận quan hệ đúng Store; setting còn lại có Store nguồn hợp lệ được giữ raw ở Site, không giả quan hệ vận hành hoặc khôi phục Product đã bỏ qua. Không xác định được Store thì ghi rõ lý do trong report; auth columns riêng vẫn không replay. Classifier/manifest không dùng marker ngoài scope lịch sử cho contract mới; artifact lịch sử giữ semantics cũ; receipt giả, sai Store/contract bị từ chối. Kiểm chứng PROD phải đọc master parts và so ID/key/value với CSV, đặc biệt Store411/465, không suy đủ content từ số blocker bằng 0.
+
+
+- [x] AUTO TC-F42-EXP-113: Contract 1.10.5 giữ `sites.domain` nguyên văn từ default domain còn sống của PW1, độc lập tenant slug và targetPlatformSuffix; không đổi customDomains hoặc dữ liệu khác. Scope lựa chọn chỉ default domain nguồn, không tự chọn custom/main domain khác. Binding ID phải đúng Store/live/default; sai hoặc thiếu bằng chứng khi ambiguous không được thay bằng domain PW2. Store55 giữ domain có nhãn `mk.web` dù slug xử lý riêng; domain sai grammar nhưng có giá trị như Store2330 được giữ warning theo graceful policy, không mất Store hoặc đổi chuỗi. Gate contract lịch sử không tự nhận binding mới; importer không rewrite domain. Audit PROD so mọi sites.domain với CSV, duy trì đầy đủ model_settings và xác nhận ngoài sites.domain không đổi. Receipt validation requires exactly one source-domain contribution per emitted site, rejects missing/duplicate/foreign or unemitted Store evidence and missing/duplicate/unmapped fields, while historical contracts remain exempt from the new requirement.

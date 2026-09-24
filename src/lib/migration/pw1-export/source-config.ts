@@ -27,6 +27,37 @@ export const migrationPolicySchema = z.object({
   deferEmailTemplates: z.boolean().default(false),
   allowSparseVariants: z.boolean().default(false),
   preserveUserCreators: z.boolean().default(false),
+  approvedNegativeTotalOrders: z.array(z.object({ storeId: z.literal('43'), orderId: z.enum(['112', '132']) }).strict()).max(2).refine(entries => new Set(entries.map(e => e.orderId)).size === entries.length).optional(),
+  excludeInvalidProducts: z.boolean().optional(),
+  excludeInvalidBlogs: z.boolean().optional(),
+  omitUnmappablePayments: z.boolean().optional(),
+  excludeDuplicateProductSlugs: z.boolean().optional(),
+  excludeProductsWithoutValidVariants: z.boolean().optional(),
+  excludeProductsInInactiveCategories: z.boolean().optional(),
+  selectOldestOwner: z.boolean().optional(),
+  preserveInvalidUserEmails: z.boolean().optional(),
+  gracefulTenantResolution: z.boolean().optional(),
+  resolveDuplicateSkus: z.boolean().optional(),
+  resolveDuplicateVariantTuples: z.boolean().optional(),
+  treatSingleSkuWithoutSelectionsAsSimple: z.boolean().optional(),
+  pruneInvalidVariantSkus: z.boolean().optional(),
+  pruneUnreferencedTiers: z.boolean().optional(),
+  allowInactiveSkusForInactiveProduct: z.boolean().optional(),
+  resolveDuplicateCategorySlugs: z.boolean().optional(),
+  resolveDuplicateCategoryNames: z.boolean().optional(),
+  flattenBlogCategoriesToRoot: z.boolean().optional(),
+  resolveDuplicateBlogCategorySlugs: z.boolean().optional(),
+  resolveDuplicateBlogSlugs: z.boolean().optional(),
+  allowCustomerAddressOverflow: z.boolean().optional(),
+  allowInvalidCustomerAddresses: z.boolean().optional(),
+  allowHistoricalDiscountEligibilityGap: z.boolean().optional(),
+  preserveRefundedOrdersWithoutEvidence: z.boolean().optional(),
+  skipInvalidDiscountCodes: z.boolean().optional(),
+  skipUnverifiedOrders: z.boolean().optional(),
+  allowUnresolvedBlogMedia: z.boolean().optional(),
+  fallbackBlogAuthorToOwner: z.boolean().optional(),
+  allowContactStructureGap: z.boolean().optional(),
+  allowBracketedProductNames: z.boolean().optional(),
   siteTypeDefault: z.literal('ecommerce'),
   siteTypeOverrides: z.record(z.string().regex(/^[0-9]+$/), z.enum(SITES_VALID_SITE_TYPES)).default({}),
   shippingPolicy: z.enum(['pw2-defaults', 'review']),
@@ -39,10 +70,17 @@ export function validateMigrationPolicyScope(config: SourceConfig, tables: Reado
     if (!stores.has(id)) throw new ExportError('DEFERRED_STORE_INVALID')
   for (const id of Object.keys(config.migrationPolicy?.siteTypeOverrides ?? {}))
     if (!stores.has(id)) throw new ExportError('SITE_TYPE_OVERRIDE_STORE_INVALID')
+  const domains = new Map((tables.store_domains ?? []).map(row => [row.id, row]))
+  for (const [storeId, domainId] of Object.entries(config.sourceDomainBindings ?? {})) {
+    const domain = domains.get(domainId)
+    if (!stores.has(storeId) || !domain || domain.store_id !== storeId || domain.deleted_at || domain.is_default !== '1') throw new ExportError('SOURCE_DOMAIN_BINDING_INVALID')
+  }
+
 }
 
 export const sourceConfigSchema = z
   .object({
+    sourceDomainBindings: z.record(z.string().regex(/^[1-9]\d*$/), z.string().regex(/^[1-9]\d*$/)).optional(),
     migrationPolicy: migrationPolicySchema.optional(),
     acceptedExclusions: z
       .array(exclusionSchema)
@@ -110,6 +148,7 @@ export function parseConfig(bytes: Buffer): SourceConfig {
   }
   const result = sourceConfigSchema.safeParse(data)
   if (!result.success) throw new ExportError('INVALID_SOURCE_CONFIG')
+  if (result.data.migrationPolicy?.approvedNegativeTotalOrders?.length && (result.data.sourceInstance !== 'PW1PROD' || result.data.sourceInstanceToken !== 'PW1PROD')) throw new ExportError('NEGATIVE_ORDER_POLICY_SOURCE_SCOPE_INVALID')
   if (
     new Set(Object.values(result.data.tables)).size !==
     Object.values(result.data.tables).length

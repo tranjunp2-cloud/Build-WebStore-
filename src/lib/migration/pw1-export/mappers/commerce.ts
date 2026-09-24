@@ -7,9 +7,10 @@ import {
   ref,
   type Doc,
   type MappingContext,
+  type MigrationPolicy,
   type Row,
 } from '../contracts'
-import { timestamp, numberValue } from '../primitives'
+import { timestamp, numberValue, ExportError } from '../primitives'
 
 const present = (value: string | null | undefined) =>
   value !== null && value !== undefined && value.trim() !== ''
@@ -65,6 +66,7 @@ export function historicalOrderItem(
 export function orderState(
   row: Row,
   provider: string,
+  policy?: MigrationPolicy,
 ): { status: string; paymentStatus: string } {
   const statuses: Record<string, string> = {
     '1': 'pending',
@@ -88,8 +90,17 @@ export function orderState(
   )
     throw new Error('ORDER_STATUS_UNVERIFIED')
   // Source can mark failed refunds as success. A final flag alone is insufficient evidence.
-  if (row.refund_status === '1')
+  if (row.refund_status === '1') {
+    if (row.refund_type === '1' || /partial|fail|reject|error/i.test(row.refund_message ?? ''))
+      throw new Error('ORDER_REFUND_EVIDENCE_CONFLICT')
+    if (policy?.preserveRefundedOrdersWithoutEvidence) {
+      return {
+        status,
+        paymentStatus: 'refunded',
+      }
+    }
     throw new Error('ORDER_REFUND_EVIDENCE_REQUIRED')
+  }
   if (
     present(row.refund_status) &&
     !['2', '3', '4'].includes(row.refund_status ?? '')
@@ -111,33 +122,44 @@ function shippingAddress(ctx: MappingContext, source: Row): Doc {
   if (
     !row ||
     !live(row) ||
-    row.store_id !== ctx.storeId ||
-    !row.address?.trim()
+    row.store_id !== ctx.storeId
   )
     throw new Error('ORDER_ADDRESS_INVALID')
   const country = ctx.find('countries', row.country_id)
   const province = ctx.find('provinces', row.province_id)
   const district = ctx.find('districts', row.district_id)
   const ward = ctx.find('wards', row.ward_id)
-  if (
+  const hasGeographyMismatch =
     !country?.name ||
     (present(row.province_id) &&
       (!province?.name || province.country_id !== country.id)) ||
     (present(row.district_id) &&
       (!district?.name || district.province_id !== province?.id)) ||
     (present(row.ward_id) && (!ward?.name || ward.district_id !== district?.id))
-  )
-    throw new Error('ORDER_ADDRESS_GEOGRAPHY')
-  const result: Doc = { line1: row.address, country: country.name }
-  const city = row.city?.trim() || district?.name
+  if (hasGeographyMismatch) {
+    if (ctx.config.migrationPolicy?.allowInvalidCustomerAddresses === true) {
+      ctx.issue(
+        'ORDER_ADDRESS_GEOGRAPHY_FALLBACK',
+        'orders',
+        source.id,
+        'shipping_address_id',
+        'warning',
+        'ORDER_ADDRESS_GEOGRAPHY_MISMATCH_FALLBACK',
+      )
+    } else {
+      throw new Error('ORDER_ADDRESS_GEOGRAPHY')
+    }
+  }
+  const result: Doc = { line1: row.address?.trim() ? row.address : null, country: country?.name || null }
+  const city = row.city?.trim() || (!hasGeographyMismatch ? district?.name : undefined)
   if (city) result.city = city
   const line2 = [
     ...new Set(
-      [ward?.name, district?.name].filter((item) => item && item !== city),
+      (hasGeographyMismatch ? [] : [ward?.name, district?.name]).filter((item) => item && item !== city),
     ),
   ].join(', ')
   if (line2) result.line2 = line2
-  if (province?.name) result.state = province.name
+  if (!hasGeographyMismatch && province?.name) result.state = province.name
   if (row.post_code) result.postcode = row.post_code
   ctx.contribute(
     'addresses',
@@ -207,14 +229,48 @@ export function mapCommerce(ctx: MappingContext): void {
           'master-6-canonical-customer',
         )
     }
-    for (const entry of reconciled.diagnostics.addressDispositions)
-      if (['invalid-source-address', 'overflow'].includes(entry.disposition))
+    const allowAddressOverflow =
+      ctx.config.migrationPolicy?.allowCustomerAddressOverflow === true
+    const allowInvalidAddresses =
+      ctx.config.migrationPolicy?.allowInvalidCustomerAddresses === true
+    const customerAddressTargets = new Map(ctx.output.customers.map(customer => [customer._ref, customer]))
+    const contributedAddresses = new Set<string>()
+    for (const entry of reconciled.diagnostics.addressDispositions) {
+      if (entry.disposition === 'emitted' || entry.disposition === 'deduplicated') {
+        const row = ctx.find('addresses', entry.sourceAddressId)
+        const addresses = customerAddressTargets.get(entry.targetRef)?.addresses
+        const index = entry.targetIndex
+        if (!row || !live(row) || row.store_id !== ctx.storeId ||
+          typeof index !== 'number' || !Number.isSafeInteger(index) || index < 0 ||
+          !Array.isArray(addresses) || !addresses[index]) throw new Error('CUSTOMER_ADDRESS_EVIDENCE_INVALID')
+        const targetPath = `${entry.targetRef}.addresses.${index}`
+        const identity = JSON.stringify([entry.sourceAddressId, targetPath])
+        if (!contributedAddresses.has(identity)) {
+          ctx.contribute('addresses', row, fields(row, [
+            'id', 'store_id', 'address', 'city', 'country_id', 'province_id',
+            'district_id', 'ward_id', 'post_code',
+          ]), targetPath, 'master-6-customer-address')
+          contributedAddresses.add(identity)
+        }
+      }
+      if (entry.disposition === 'overflow') {
         ctx.issue(
-          'CUSTOMER_ADDRESS_' +
-            entry.disposition.toUpperCase().replaceAll('-', '_'),
+          'CUSTOMER_ADDRESS_OVERFLOW',
           'addresses',
           entry.sourceAddressId,
+          undefined,
+          allowAddressOverflow ? 'warning' : 'blocker',
         )
+      } else if (entry.disposition === 'invalid-source-address') {
+        ctx.issue(
+          'CUSTOMER_ADDRESS_INVALID_SOURCE_ADDRESS',
+          'addresses',
+          entry.sourceAddressId,
+          undefined,
+          allowInvalidAddresses ? 'warning' : 'blocker',
+        )
+      }
+    }
     for (const entry of reconciled.diagnostics.rankDispositions)
       if (entry.disposition === 'unmapped-rank')
         ctx.issue(
@@ -230,6 +286,12 @@ export function mapCommerce(ctx: MappingContext): void {
 
   mapDiscounts(ctx, tenant, site)
   for (const row of ctx.rows('orders').filter(live)) {
+    if (ctx.config.sourceInstance === 'PW1PROD' && ctx.config.sourceInstanceToken === 'PW1PROD' &&
+      ctx.config.migrationPolicy?.approvedNegativeTotalOrders?.some(entry => entry.storeId === ctx.storeId && entry.orderId === row.id) &&
+      row.store_id === ctx.storeId && /^-\d+(?:\.\d{1,2})?$/.test(row.total ?? '') && Number(row.total) < 0) {
+      ctx.issue('SOURCE_ENTITY_EXCLUDED', 'orders', row.id, undefined, 'warning', 'APPROVED_NEGATIVE_TOTAL')
+      continue
+    }
     try {
       if (!row.id || !row.code?.trim() || !row.customer_name?.trim())
         throw new Error('ORDER_REQUIRED')
@@ -237,7 +299,21 @@ export function mapCommerce(ctx: MappingContext): void {
       const minor = (raw: string | null | undefined) =>
         sourceDiscountMinorUnits(raw, currency)
       const method = ctx.find('payment_methods', row.payment_method_id)
-      const state = orderState(row, method?.code ?? '')
+      if (row.refund_status === '1' && (ctx.tables.queue_sync ?? []).some(queue =>
+        queue.store_id === ctx.storeId && queue.code === row.code && queue.type === '1' &&
+        queue.sync_name === 'sync_order_refund' &&
+        (queue.status === '3' || /partial|fail|reject|error/i.test(queue.error_message ?? '')),
+      )) throw new Error('ORDER_REFUND_EVIDENCE_CONFLICT')
+      const state = orderState(row, method?.code ?? '', ctx.config.migrationPolicy)
+      if (row.refund_status === '1') {
+        ctx.issue(
+          'ORDER_REFUND_EVIDENCE_ABSENT',
+          'orders',
+          row.id,
+          'refund_status',
+          'warning',
+        )
+      }
       const details = (ctx.tables.order_details ?? []).filter(
         (detail) => detail.order_id === row.id && live(detail),
       )
@@ -361,7 +437,7 @@ export function mapCommerce(ctx: MappingContext): void {
       if (method?.code === 'cod') doc.paymentMethod = 'cod'
       else
         ctx.issue(
-          'ORDER_PAYMENT_METHOD_UNVERIFIED',
+          ctx.config.migrationPolicy?.omitUnmappablePayments ? 'ORDER_PAYMENT_METHOD_OMITTED' : 'ORDER_PAYMENT_METHOD_UNVERIFIED',
           'orders',
           row.id,
           'payment_method_id',
@@ -397,7 +473,7 @@ export function mapCommerce(ctx: MappingContext): void {
           ctx.issue('DISCOUNT_HISTORY_SOURCE_UNVERIFIED', 'promotion_codes')
         const codes = (ctx.tables.promotion_codes ?? []).filter(
           (code) =>
-            code.code === row.promotion_code &&
+            code.code?.trim().toUpperCase() === row.promotion_code?.trim().toUpperCase() &&
             ctx.find('promotions', code.promotion_id)?.store_id === ctx.storeId,
         )
         const target =
@@ -409,14 +485,22 @@ export function mapCommerce(ctx: MappingContext): void {
               )
             : undefined
         if (target) doc.discount = target._ref
-        else
+        else {
+          const excludedByPolicy = ctx.config.migrationPolicy?.skipInvalidDiscountCodes === true && codes.length > 0 && codes.every(code => ctx.diagnostics.some(d =>
+            d.storeId === ctx.storeId && d.severity === 'warning' && (
+              (d.table === 'promotion_codes' && d.sourceId === code.id && ['DISCOUNT_CODE_COLLISION', 'DISCOUNT_MAPPING_INVALID'].includes(d.code)) ||
+              (d.table === 'promotions' && d.sourceId === code.promotion_id && ['DISCOUNT_STATUS_UNVERIFIED', 'DISCOUNT_EXPIRY_UNVERIFIED'].includes(d.code))
+            ),
+          ))
           ctx.issue(
-            'ORDER_DISCOUNT_REFERENCE_UNVERIFIED',
+            excludedByPolicy ? 'ORDER_DISCOUNT_REFERENCE_OMITTED' : 'ORDER_DISCOUNT_REFERENCE_UNVERIFIED',
             'orders',
             row.id,
             'promotion_code',
             'warning',
+            excludedByPolicy ? 'COUPON_EXCLUDED_BY_POLICY' : undefined,
           )
+        }
       }
       ctx.output.orders.push(doc)
       ctx.contribute(
@@ -453,13 +537,24 @@ export function mapCommerce(ctx: MappingContext): void {
         'master-7.2',
       )
     } catch (error) {
-      ctx.issue(
+      const code =
         error instanceof Error && /^ORDER_[A-Z_]+$/.test(error.message)
           ? error.message
-          : 'ORDER_MAPPING_INVALID',
-        'orders',
-        row.id,
-      )
+          : 'ORDER_MAPPING_INVALID'
+      if (code === 'ORDER_STATUS_UNVERIFIED' && ctx.config.migrationPolicy?.skipUnverifiedOrders)
+        ctx.issue('SOURCE_ENTITY_EXCLUDED', 'orders', row.id, undefined, 'warning', code)
+      else {
+        const sourceMoneyReasons: Record<string, string> = {
+          'Unsupported discount currency': 'UNSUPPORTED_SOURCE_CURRENCY',
+          'Missing or invalid source discount': 'SOURCE_AMOUNT_MISSING',
+          'Source discount exceeds supported range': 'SOURCE_AMOUNT_OUT_OF_RANGE',
+          'Invalid source discount': 'SOURCE_AMOUNT_INVALID',
+          'Source discount contains sub-minor-unit precision': 'SOURCE_AMOUNT_PRECISION_INVALID',
+          'Source discount exceeds safe integer range': 'SOURCE_AMOUNT_OUT_OF_RANGE',
+        }
+        const reason = code === 'ORDER_MAPPING_INVALID' ? error instanceof ExportError ? error.code : error instanceof Error ? sourceMoneyReasons[error.message] ?? 'UNEXPECTED_MAPPING_ERROR' : 'UNEXPECTED_MAPPING_ERROR' : undefined
+        ctx.issue(code, 'orders', row.id, undefined, 'blocker', reason)
+      }
     }
   }
   // History eligibility is not inferred from final order state or source counters.
@@ -481,25 +576,52 @@ export function mapCommerce(ctx: MappingContext): void {
       present(code.used) &&
       (!/^\d+$/.test(code.used!) || BigInt(code.used!) > BigInt(0)),
   )
-  if (codedOrders.length || counters)
-    ctx.issue('DISCOUNT_HISTORY_ELIGIBILITY_UNVERIFIED', 'orders')
+  if (codedOrders.length || counters) {
+    const severity =
+      ctx.config.migrationPolicy?.allowHistoricalDiscountEligibilityGap
+        ? 'warning'
+        : 'blocker'
+    ctx.issue(
+      'DISCOUNT_HISTORY_ELIGIBILITY_UNVERIFIED',
+      'orders',
+      undefined,
+      undefined,
+      severity,
+    )
+  }
 }
 
 function mapDiscounts(ctx: MappingContext, tenant: string, site: string): void {
+  const sourceCodes = (ctx.tables.promotion_codes ?? []).filter(row => {
+    const promotion = ctx.find('promotions', row.promotion_id)
+    return promotion?.store_id === ctx.storeId && live(row) && live(promotion)
+  })
+  const groups = new Map<string, Row[]>()
+  for (const row of sourceCodes) {
+    const code = row.code?.trim().toUpperCase()
+    if (code) groups.set(code, [...(groups.get(code) ?? []), row])
+  }
   for (const row of ctx.tables.promotion_codes ?? []) {
     const promotion = ctx.find('promotions', row.promotion_id)
     if (promotion?.store_id !== ctx.storeId || !live(row) || !live(promotion))
       continue
+    if ((groups.get(row.code?.trim().toUpperCase() ?? '')?.length ?? 0) > 1) {
+      ctx.issue('DISCOUNT_CODE_COLLISION', 'promotion_codes', row.id, undefined,
+        ctx.config.migrationPolicy?.skipInvalidDiscountCodes ? 'warning' : 'blocker')
+      continue
+    }
     try {
       if (!row.id || !row.code?.trim()) throw new Error('DISCOUNT_REQUIRED')
       if (!['0', '1', '2'].includes(promotion.status ?? '')) {
-        ctx.issue('DISCOUNT_STATUS_UNVERIFIED', 'promotions', promotion.id, 'status')
+        const severity = ctx.config.migrationPolicy?.skipInvalidDiscountCodes ? 'warning' : 'blocker'
+        ctx.issue('DISCOUNT_STATUS_UNVERIFIED', 'promotions', promotion.id, 'status', severity)
         continue
       }
       // PW2 has no expired enum: retain a verified expiry and keep the code disabled.
       if (promotion.status === '2' && (!promotion.end_date ||
         Date.parse(timestamp(promotion.end_date, ctx.config)) > Date.parse(ctx.config.asOf))) {
-        ctx.issue('DISCOUNT_EXPIRY_UNVERIFIED', 'promotions', promotion.id, 'status')
+        const severity = ctx.config.migrationPolicy?.skipInvalidDiscountCodes ? 'warning' : 'blocker'
+        ctx.issue('DISCOUNT_EXPIRY_UNVERIFIED', 'promotions', promotion.id, 'status', severity)
         continue
       }
       const currency =
@@ -586,8 +708,15 @@ function mapDiscounts(ctx: MappingContext, tenant: string, site: string): void {
         String(doc._ref),
         'master-7.1',
       )
-    } catch {
-      ctx.issue('DISCOUNT_MAPPING_INVALID', 'promotion_codes', row.id)
+    } catch (error) {
+      const knownSourceError = error instanceof ExportError || (error instanceof Error && (
+        /^DISCOUNT_[A-Z_]+$/.test(error.message) || [
+          'Unsupported discount currency', 'Missing or invalid source discount', 'Source discount exceeds supported range',
+          'Invalid source discount', 'Source discount contains sub-minor-unit precision', 'Source discount exceeds safe integer range',
+        ].includes(error.message)
+      ))
+      const severity = knownSourceError && ctx.config.migrationPolicy?.skipInvalidDiscountCodes ? 'warning' : 'blocker'
+      ctx.issue('DISCOUNT_MAPPING_INVALID', 'promotion_codes', row.id, undefined, severity, knownSourceError ? undefined : 'UNEXPECTED_MAPPING_ERROR')
     }
   }
   const duplicates = new Set(
@@ -601,10 +730,15 @@ function mapDiscounts(ctx: MappingContext, tenant: string, site: string): void {
   )
   ctx.output.discounts = ctx.output.discounts.filter((doc) => {
     if (!duplicates.has(doc._ref)) return true
+    const severity = ctx.config.migrationPolicy?.skipInvalidDiscountCodes
+      ? 'warning'
+      : 'blocker'
     ctx.issue(
       'DISCOUNT_CODE_COLLISION',
       'promotion_codes',
       String(doc._ref).split(':').at(-1),
+      undefined,
+      severity,
     )
     return false
   })

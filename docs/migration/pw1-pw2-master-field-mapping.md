@@ -1851,3 +1851,157 @@ Supersedes the 1.7.0 statement that missing price/stock Products always block im
 Emit PRODUCT_MISSING_PRICE_STOCK_EXCLUDED as a warning with the exact Product ID and one of MISSING_PRICE, MISSING_STOCK, MISSING_PRICE_AND_STOCK, NO_SKU_ROWS, NO_LIVE_OWNED_SKU. Retain the Product and its unused owned catalog child rows in source CSV with productExclusion {productId, reason} and MASTER-5.2-PRODUCT-MISSING-PRICE-STOCK field evidence. Only products, product_skus, product_attributes, product_variants, product_images, product_sku_images, product_sku_promotion_prices and Product model_settings qualify. Shared attribute definitions and operational Order/discount rows do not inherit exclusion. Unknown fields and unresolved ownership stay unresolved.
 
 Validators require the matching Product evidence, identical Store/reason, valid family parent ownership, no operational contributions and no emitted Product for the excluded identity. Importer approves this diagnostic only for the exact 1.8.0 contract and verified classification evidence. Historical artifacts keep their original gates. Other diagnostics are never waived by this rule. Historical Order line name, quantity and price remain unchanged under the previously approved order policy; no invented Product/SKU references. Genuine relationship or order-value failures remain blockers.
+
+
+### Contract 1.8.1 — Bỏ qua Blog category inactive (2026-09-18)
+
+Quyết định chủ dữ liệu: Blog category `status=0` không cần mapping. Thay thế quy tắc cách ly inactive ở §8.1: không emit category đó vào master JSON, không tự đổi thành active/deleted, giữ bản ghi ở CSV nguồn và phân loại retained-source. Không kiểm tra nội dung các giá trị đã biết chỉ lưu CSV; field lạ và ownership lỗi vẫn được báo.
+
+Blog tham chiếu category nguồn live/status=0/cùng Store vẫn được giữ, bỏ field category; bảo toàn content, author và status theo quy tắc hiện hành. Category inactive không tham gia kiểm tra trùng slug với category active. Category thiếu nguồn, đã xóa, sai Store hoặc status không xác định không thuộc ngoại lệ này. Category active trùng slug với nhau vẫn bị chặn. Không miễn blocker lịch sử trong artifact cũ; phải export lại bằng phiên bản mới.
+
+
+### Contract 1.8.2 — Policy boundary và đối soát artifact (2026-09-23)
+
+Issue #1885 vẫn là yêu cầu gốc. Các cờ thử nghiệm sau chưa có quyết định nghiệp vụ phê duyệt; exporter từ chối `true` trước khi đọc CSV/publish và validator từ chối artifact bật chúng. Giữ code mapper thử nghiệm để đối soát, không coi unit test mapper là nghiệm thu hoặc quyền migrate.
+
+`gracefulTenantResolution`, `resolveDuplicateSkus`, `resolveDuplicateVariantTuples`, `treatSingleSkuWithoutSelectionsAsSimple`, `pruneUnreferencedTiers`, `allowInactiveSkusForInactiveProduct`, `resolveDuplicateCategorySlugs`, `resolveDuplicateCategoryNames`, `flattenBlogCategoriesToRoot`, `resolveDuplicateBlogCategorySlugs`, `resolveDuplicateBlogSlugs`, `allowCustomerAddressOverflow`, `allowInvalidCustomerAddresses`, `allowHistoricalDiscountEligibilityGap`, `preserveRefundedOrdersWithoutEvidence`, `skipInvalidDiscountCodes`, `skipUnverifiedOrders`, `allowUnresolvedBlogMedia`, `fallbackBlogAuthorToOwner`, `allowContactStructureGap`, `allowBracketedProductNames`.
+
+Các cờ trên là optional: thiếu không tự thêm field vào policy đã duyệt; explicit false không làm thay đổi ý nghĩa policy. Importer 1.8.2 nhận các field này chỉ với false, không miễn diagnostic vì có cờ. Trạng thái false không chứng minh policy nguồn DEV hoặc policy khác đã được phê duyệt. Vẫn giữ kiểm tra checksum toàn bộ manifest/policy gốc; chỉ bỏ các field false mới khi so sánh với policy nghiệp vụ đã duyệt.
+
+Bảo toàn contract Blog category inactive của 1.8.1. Đối soát SKU tiếp tục một-một: mỗi variant đích có đúng một SKU nguồn; receipt thiếu SKU hoặc nhiều SKU trỏ cùng variant đều bị từ chối, bao gồm artifact phiên bản lịch sử. Không tự gom tuple, đổi mã hoặc chọn record chuẩn.
+
+Diagnostic reason dùng mã UPPER_CASE, không đưa câu văn/source payload vào stderr khi validation thất bại. Full-source acceptance vẫn cần chạy riêng; không suy từ fixture sang dữ liệu PROD/DEV.
+
+
+## Contract 1.9.0 — reviewed conflict resolutions (23/09/2026)
+
+Supersedes the blanket pending-policy interpretation in the 1.8.2 appendix. The reviewed rules are specified in `docs/migration/pw1-conflict-decisions-20260923.md`. Enabled flags are explicit in the PROD/DEV profiles; flags absent/false retain strict behavior. Historical contracts may not activate these flags. `skipUnverifiedOrders` remains forbidden.
+
+- Keep unresolved owner identity blocked; never select first User, restore deleted owner, or demote another owner. Creator stays Users-only and requires verified binding.
+- Invalid custom domains are omitted with source evidence, never truncated into another domain. Suspended tenants have draft Sites and storefront payments disabled, including COD.
+- Preserve delivery status for refunded Orders; failed/partial refund evidence remains blocked. Unknown Orders remain blocked rather than being silently excluded. Coupon collisions exclude all colliding coupon records while historical code/amount remain on Orders.
+- Order shipping address permits absent source line1 and explicit null country when source lacks it; never invent Malaysia. Customer address schema stays unchanged. Null country must survive importer projection.
+- Approved Category/Blog/SKU collision policies are deterministic by numeric source IDs. Alias SKU crosswalks only allowed under resolveDuplicateVariantTuples and require same tuple/canonical target and full coverage; price/inventory derive from emitted canonical variants.
+- `pruneInvalidVariantSkus` allows only known selection errors to exclude individual SKU with receipt IDs/reasons, and requires at least one valid variant. Ownership errors and all-invalid Products remain blocked. Inactive-SKU exception is limited to inactive Products under its explicit policy.
+- Preserve Blog content; missing author falls back only to verified tenant owner. Excluded inactive/child categories do not compete for emitted slugs.
+- New optional hashed sidecars `conflict-details.json` and `conflict-details.md` expose source IDs, collision group IDs and before/after values through a business-field allowlist; never credentials or full content bodies. Product reconciliation additionally records excluded SKU IDs/reasons when present.
+- Importer accepts new policy values only for this exact version/hash and approves only exact diagnostic signatures with corresponding enabled flags. Existing checksum checks, tenant isolation, target constraints and creator binding remain required. Export success does not imply import-ready.
+
+### 1.9.0 retention and historical coupon evidence
+
+`MASTER-5.2-REVIEWED-CONFLICT-SOURCE` marks only allowlisted EAV fields retained in source CSV after an exact enabled-policy warning and valid parent ownership: alias SKU values, pruned SKU/its selection rows, or unreferenced/simple-product attribute definitions. It never claims unused values were mapped. Exporter and importer validate the same rule; historical contracts cannot use it.
+
+Order coupon relationships omitted because every matching coupon was explicitly excluded use `ORDER_DISCOUNT_REFERENCE_OMITTED` / `COUPON_EXCLUDED_BY_POLICY`. Unknown/missing coupon relationships remain unverified. Unexpected discount mapper errors remain blockers even when skipping invalid source coupons is enabled.
+
+
+## Contract 1.9.1 — Owner selection and source email preservation (23/09/2026)
+
+Supersedes the strict owner/email rules above only when the corresponding explicit policy is enabled. `selectOldestOwner` selects the oldest live backend owner (`is_frontend=0`) in the same Store; if no owner exists, selects the oldest live backend User. Sort by valid source `created_at`, then numeric User ID for equal timestamps, independent of CSV ordering. Frontend, deleted and foreign-Store Users never qualify. Missing/invalid timestamps or no eligible User remain blockers. Non-selected owners become ordinary members under the existing editor/viewer policy, with `OWNER_SECONDARY_MAPPED_EDITOR` / `PRIMARY_OWNER_SELECTED`; the chosen owner records `OWNER_IDENTITY_RESOLVED` / `OLDEST_OWNER_SELECTED` or `OLDEST_USER_PROMOTED` when resolving a conflict.
+
+`preserveInvalidUserEmails` retains a string email byte-for-byte, without trimming, case changes or invented values, and records `USER_EMAIL_INVALID` / `SOURCE_EMAIL_PRESERVED` as warning. Missing/null email remains blocked. Importer accepts this only for the exact 1.9.1 contract and approved policy; normal application email validation is unchanged. Target identity/uniqueness, credentials and creator binding still require verification. Historical artifacts and current artifacts without this flag retain strict email validation.
+
+PROD Store 54 (deleted owner User 118) and Store 161 (deleted owner User 343) are temporarily deferred by explicit policy, alongside existing deferred Store 323. They are absent from master JSON, listed as policy exclusions and do not block other Stores. Source CSV remains unchanged; frontend Users 119/344 are not promoted. No PW2 deletedAt schema change is introduced. DEV policy is unchanged.
+
+
+## Contract 1.9.2 — Approved Product catalog exclusions (23/09/2026)
+
+PROD-only explicit policy `excludeDuplicateProductSlugs` groups live Products by same Store and trimmed, case-folded slug; retain the numerically lowest Product ID, exclude later IDs irrespective of CSV order or draft/active status. The canonical record still undergoes all normal validation; never substitute a later Product if it fails. Empty slug remains subject to normal validation.
+
+`excludeProductsWithoutValidVariants` excludes only variant Products with an empty resulting variants array and catalog errors exclusively SOURCE_NO_VALID_VARIANT or SOURCE_VARIANT_DOMAIN_MISSING. Valid simple Products are unchanged; invalid ownership, prices, stock or other catalog definitions remain blockers. No missing SKU combinations are synthesized.
+
+Emit PRODUCT_CATALOG_POLICY_EXCLUDED as warning on products, no field, with reason DUPLICATE_PRODUCT_SLUG, NO_VALID_VARIANTS or MISSING_VARIANT_DOMAIN. Retained-source productExclusion evidence uses MASTER-5.2-PRODUCT-CATALOG-POLICY for the existing allowlisted Product-owned family only. DUPLICATE_PRODUCT_SLUG requires canonicalProductId, a smaller positive numeric source ID with a same-Store Product source row; all family rows share this canonical ID and reason. Other reasons forbid canonicalProductId. Excluded Products cannot be emitted. Shared attributes and operational Order rows never inherit exclusion. Report shows affected Product IDs, slug and canonical ID. Historical Order line data remains unchanged; no reference is redirected to the canonical Product.
+
+New evidence/reasons are accepted only under exact 1.9.2 contract and corresponding enabled policy; previous artifacts retain previous validation gates. PROD source snapshots are unchanged; DEV policies are unchanged. Export integrity does not certify DB target readiness.
+
+
+## Contract 1.9.3 — Explicit source-invalid record omissions (23/09/2026)
+
+PROD `deletedStores=exclude` retains soft-deleted Stores in source only and records them as policyExcludedStores, without blocking the other Stores. Existing deferred Stores remain deferred. DEV is unchanged.
+
+Explicit flags: `excludeInvalidProducts` omits source-invalid Products (EAV ownership/definitions, invalid name/slug/price/stock, source number/timestamp/media/package values); `excludeInvalidBlogs` omits invalid Blog posts/categories including unsafe metadata, missing title/slug and unresolved source relations; `skipUnverifiedOrders` now permits omission solely for ORDER_STATUS_UNVERIFIED; other Order/refund/total errors remain blockers. `omitUnmappablePayments` omits unsupported/invalid Store payment configurations and disables ambiguous COD, never invents a replacement provider. Retained Orders may omit unsupported paymentMethod via ORDER_PAYMENT_METHOD_OMITTED, preserving status, amounts and source history.
+
+Each omitted source entity produces SOURCE_ENTITY_EXCLUDED warning on products/orders/blog_posts/blog_categories/store_payments, sourceId and no field, with an allowlisted stable original source-error reason. No arbitrary exception message/content is emitted. Unknown programming/runtime errors remain blockers. Per-record output/media/contributions are rolled back; historical Order line values are not changed or redirected. Invalid Blog categories cannot leave dangling Blog relations. Generic mapping failures now expose a known safe source reason when available; unexpected failures stay PRODUCT_MAPPING_INVALID / UNEXPECTED_MAPPING_ERROR.
+
+Source classification retains an explicit sourceExclusion {table, sourceId, storeId, reason} with MASTER-APPROVED-SOURCE-ENTITY-EXCLUSION, proving an omitted root and only its source-owned descendants. Failed ownership stays truthful (including null Store ownership); it is not fabricated as a valid relation. Only an exclusion with a verified same-root chain and matching warning may waive that family's source ownership diagnostic. Shared definitions/addresses, arbitrary orphan rows, unrecognized fields and unrelated operational records do not inherit blanket approval. Validator/importer accept these omissions only for exact 1.9.3 contract and corresponding flags, enforce non-emission and source scope, and keep historical gates unchanged.
+
+
+## Contract 1.9.4 — Explicit two-Order negative-total exclusion (23/09/2026)
+
+User approves omitting only PROD Store 43 / Order 112 and Order 132, whose source totals are -31.0 and -81.0. Optional `approvedNegativeTotalOrders` contains explicit {storeId, orderId} pairs, restricted to these two identities and only the PW1PROD source namespace. This is not a blanket waiver for invalid amounts or unknown Orders.
+
+Mapper checks matching Store/Order and an actual valid negative decimal source total before emitting SOURCE_ENTITY_EXCLUDED / orders / APPROVED_NEGATIVE_TOTAL with no field. Positive/zero/corrected or malformed totals, different Store/Order and absent policy do not qualify. Exclusion runs before Order contributions. Source total/subtotal/discount/shipping remain unchanged in CSV and visible in the report; no total is clamped to zero and no replacement Order/payment state is invented.
+
+Existing generic sourceExclusion evidence and MASTER-APPROVED-SOURCE-ENTITY-EXCLUSION retain the Order and its owned order_details/order_status_histories only. Validator/importer require exact 1.9.4 contract, approved explicit identity pair and PW1PROD namespace. Historical contracts reject nonempty approvedNegativeTotalOrders; other source omissions retain their own version/flag guards. No DEV/source/DB changes.
+
+
+## Contract 1.10.0 — Store-atomic master parts
+
+Master data is an ordered set of JSON array files: master-0001.json, master-0002.json, ... (one-based sequence padded to at least four digits). Each file has at most 300 Stores and strictly fewer than 200,000,000 UTF-8 bytes, counting all serialized content, escaping, indentation, brackets, separators and newlines. Sort Stores by numeric PW1 Store ID; a Store is never split. If a single Store cannot fit under the byte limit, fail with MASTER_STORE_TOO_LARGE:<StoreID> before publication. No oversized file or partial artifact may be published.
+
+The manifest contains required masterParts entries with exactly {filename, sha256, bytes, storeIds}. Entries follow file sequence; storeIds follow file order and are globally strictly increasing, with no duplicates. Each part checksum also appears under artifacts. Required masterSetHash is SHA-256 of UTF-8 JSON.stringify(masterParts.map(({filename,sha256,bytes,storeIds}) => ({filename,sha256,bytes,storeIds}))), with the literal key order shown, no indentation/newline. This identifies the entire ordered master set for importer resume/replay.
+
+Do not generate an aggregate master.json or empty part files. Zero emitted Stores is represented by masterParts:[] and masterSetHash=SHA256('[]'). Validators require exact registered part filenames on disk, contiguous numbering, matching hashes/actual byte sizes, max 300 Stores, exact per-part storeIds, global Store uniqueness/order and manifest counts. Missing parts, extra master files, extra aggregate master.json, changed part bytes or descriptor tampering are invalid. Atomic artifact publication and all source/mapping/receipt checks remain unchanged.
+
+Historical versions through 1.9.4 keep their original master.json format and hash semantics; they cannot claim a masterParts set. Importers must consume the manifest set for 1.10.0 and must not assume a single master.json. Source-omission and other business policies are unchanged.
+
+
+## Contract 1.10.1 — All model_settings outside migration scope
+
+User explicitly excludes all model_settings from mapping. No Store/Page/Menu/Product setting key or value is copied to master or contributes to an operational target. Exact rows remain in the manifest-hashed source CSV; every field is retained-source under MASTER-2.2-MODEL-SETTINGS-OUTSIDE-SCOPE, except secret-named fields remain security-excluded. Unknown setting keys, serialized values and extra headers do not block this excluded table. Structural source/artifact corruption, duplicate identities or forged ownership evidence are still invalid.
+
+Emit one MODEL_SETTINGS_OUTSIDE_SCOPE warning for the selected table (no Store/source ID/field/reason). Preserve truthful source ownership, including null ownership and original failure rule; model_settings SOURCE_OWNERSHIP_UNRESOLVED diagnostics become outside-scope warnings. New rule requires exact 1.10.1 contract, zero contributions and no Product/entity exclusion metadata; it cannot be attached to another table or accepted by an old contract. CSV/accounting/parent evidence continues to validate. No unrelated tables or diagnostics inherit a blanket waiver.
+
+DEFAULT_DOMAIN_AMBIGUOUS / PLATFORM_DOMAIN_FALLBACK and SOURCE_MAIN_DOMAIN_AMBIGUOUS / CUSTOM_DOMAINS_PENDING describe Store-level choices. Emit table=stores and sourceId=StoreID rather than fabricating a store_domains row ID equal to StoreID. Reports list the actual related domain record IDs. Existing conservative fallback/draft behavior is unchanged. Master part layout and byte/Store limits remain 1.10.0-compatible.
+
+
+### Contract 1.10.2 — loại Product thuộc Category inactive
+
+Theo quyết định đã duyệt, khi `excludeProductsInInactiveCategories=true`, Product có Category nguồn cùng Store, chưa xóa mềm và `status=0` bị loại toàn bộ khỏi master, không chỉ bỏ quan hệ Category. Không tự đổi Category hoặc trạng thái Product. Category thiếu, khác Store hoặc đã xóa mềm không thuộc ngoại lệ này.
+
+Exporter ghi `PRODUCT_CATALOG_POLICY_EXCLUDED` (warning, table `products`, sourceId=Product ID, storeId=Store ID, reason `INACTIVE_CATEGORY`, không field). Root Product và catalog children được giữ bằng chứng `productExclusion` dưới rule `MASTER-5.2-PRODUCT-CATALOG-POLICY`; không được phát sinh Product hoặc contribution operational. `model_settings` vẫn thuộc scope riêng 1.10.1. Source CSV giữ nguyên để đối soát Category ID/status. Order đã có giữ snapshot lịch sử và giá trị tiền; bỏ tham chiếu Product/SKU không còn được xuất bằng cơ chế reconciliation hiện tại. Policy và reason mới chỉ hợp lệ từ contract 1.10.2; các hợp đồng cũ không được tự nhận ngoại lệ.
+
+
+Trong cùng contract 1.10.2, secondary owners theo `selectOldestOwner` được hạ quyền editor, gồm User2697/Store1327 và User2701/Store1329. Bằng chứng bắt buộc: `OWNER_SECONDARY_MAPPED_EDITOR` / users / is_store_owner / warning / `PRIMARY_OWNER_SELECTED`, User emitted có `roles=[editor]`, membership của đúng tenant có `role=editor`, `permissions=[]`. Không giữ quyền owner hoặc custom permission từ PW1. Importer chỉ được miễn `USER_PERMISSION_RUNTIME_PARITY_UNVERIFIED` cho User thỏa toàn bộ bằng chứng trên; không miễn chung các non-owner, viewer/readOnly hoặc actor ngoài tenant. Exporter không ghi marker editor cho User được cấu hình readOnly.
+
+
+Contract 1.10.2 đồng thời chốt hai phần sau, thay trạng thái OPEN về mapping exporter ở các ghi chú lịch sử phía trên (không tự chứng nhận URL còn truy cập hoặc migration DB):
+
+- `stores.social_channel`: đọc array nguồn theo thứ tự, nhận diện platform bằng hostname chính xác; chỉ xuất `sites[].socialLinks.facebook/instagram/twitter/linkedin/youtube/tiktok`. Twitter nhận thêm hostname x.com. Giữ URL nguyên chuỗi, không đổi host/path/query. ID/icon/image/signature và metadata PW1 không có đích PW2 được bỏ khỏi master, còn CSV để đối soát. Trùng platform lấy entry đầu; unsupported platform hoặc entry/JSON không dùng được được bỏ kèm warning không chặn. Không đưa URL sai protocol/có username-password vào master. `SOCIAL_CHANNEL_METADATA_OMITTED` dùng field social_channel, reason `PW2_SUPPORTED_FIELDS_ONLY`, `UNSUPPORTED_PLATFORM` hoặc `DUPLICATE_PLATFORM_FIRST_RETAINED`; `SOCIAL_CHANNEL_INVALID` dùng reason `SOURCE_ENTRY_OMITTED`. Các warning này chỉ được miễn theo contract mới với bằng chứng projection/retention đúng. Field source-only dùng rule `MASTER-4-SOCIAL-SOURCE-METADATA`; mapping dùng `MASTER-4-SOCIAL-SUPPORTED-FIELDS`.
+- `medias`: file `type=1`, chưa xóa, thuộc đúng Store, URL qua kiểm tra HTTP(S)/credential/query hiện hành được xuất `_ref=@media:medias:{id}`, `url=sourceUrl` giữ nguyên chuỗi PW1; `alt` lấy name không rỗng hoặc nhãn `Media {id}`. Chỉ map timestamps có trong dòng nguồn theo offset snapshot. Không tải/upload, không thêm filename, MIME, kích thước, dung lượng hay provider giả. Schema Media hiện không có tenant field; ownership dựa Store chứa document, source classification/crosswalk; không tự thêm tenant_id. Metadata nguồn id/store_id/signature/type/parent_id/created_by/deleted_at giữ nguồn dưới rule `MASTER-10-MEDIA-SOURCE-METADATA`. Folder/type2, dòng deleted hoặc URL rỗng không tạo Media: toàn dòng giữ CSV và `MEDIA_SOURCE_ONLY` warning với reason `FOLDER`/`DELETED`/`EMPTY_URL`, không contribution operational. Media URL sai, loại chưa xác minh hoặc timestamp sai vẫn có blocker cụ thể; không tự đoán hoặc dùng quyền bỏ social để miễn các lỗi Media. Rule/warning mới không được gán cho contract cũ.
+
+
+### Contract 1.10.3 — chỉ chặn dữ liệu cần cho PW2, giữ Page/Menu nguồn
+
+Quyết định bổ sung 23/09/2026, thay những điểm OPEN tương ứng của ghi chú lịch sử; không tự chứng nhận import DB hay khôi phục tính năng PW1 không có ở PW2:
+
+1. **Metadata không có đích:** `MASTER-2.2-APPROVED-SOURCE-METADATA` chỉ allowlist: `created_by` ngoài Users; signature và *_signature của bảng có field nguồn đã biết (medias dùng rule chuyên biệt); Product SKU cost/created_at/updated_at; Product attributes/variants created_at/updated_at; address phone/full_address/comment/created_at/updated_at. Creator ở Users vẫn phải resolve. Không miễn giá/stock, trạng thái, relation hay field lạ của bảng nghiệp vụ. Metadata vẫn giữ CSV nguồn, không thêm vào master như field vận hành.
+2. **Page/Menu:** giữ nguyên strings/null nguồn, không parse/rewrite HTML, JSON, URL hoặc definitions/children cho pages/page_components/banners/shortlist_items/menus/menu_items/menu_lines/frontend_components/frontend_templates/menu_line_types. Mapping dùng `MASTER_RAW_PW1_CONTENT`; template gốc giữ `sites[].raw_frontend_template`, không phục hồi toàn bộ pw1_source. Không xuất cột có tên auth-secret; không quét hoặc sửa nội dung chuỗi bên trong. Phần không thể gắn quan hệ giữ CSV dưới `MASTER-PAGE-MENU-RAW-SOURCE`, có marker `PAGE_MENU_RAW_SOURCE_ONLY` cấp bảng; không tự đổi owner hay gắn child khác Store. Missing definition/ownership warnings của scope này không chặn nghiệp vụ. model_settings tiếp tục nằm ngoài migration theo 1.10.1. Importer hiện không dựng website Page/Menu từ raw: bảo toàn artifact không đồng nghĩa chuyển thành cấu trúc builder PW2.
+3. **Order đã map đủ:** `MASTER-7-MAPPED-ORDER-SOURCE-METADATA` cho phần cột còn lại của orders/order_details chỉ khi đúng Order cùng Store đã emitted và root contribution `master-7.2` trỏ đúng Order. Schema/money/history/reference checks tiếp tục chạy. Không áp rule này cho Order chưa map hoặc thiếu dữ liệu bắt buộc. Các khoản/ghi chú nguồn chưa có cột PW2 vẫn nguyên trong CSV, không tự suy hoặc đổi tổng tiền.
+4. **Address:** ghi contribution thật cho địa chỉ Customer emitted/deduplicated theo receipt và target index, kể cả Order nguồn không emitted. Phone/full_address/comment/timestamps là metadata nguồn; `MASTER-6-ADDRESS-OVERFLOW-SOURCE-ONLY` chỉ cho địa chỉ có flag allowCustomerAddressOverflow, warning CUSTOMER_ADDRESS_OVERFLOW đúng Store/ID và matching overflow receipt. Không tăng cap, không bịa địa lý hoặc miễn toàn bộ địa chỉ. Audit 891 địa chỉ:789 represented Customer (679 emitted,110 deduplicated),99 overflow,3 invalid geography được đối soát riêng; 869 dùng trong Order.shippingAddress. 22 dòng trước đây thiếu contribution gồm19 Customer đã có và3 overflow.
+5. **Shipping/discount/store_codes:** shippingPolicy=pw2-defaults luôn dùng literal PW2 defaults, không lấy cả fixed fee PW1; giữ tất cả store_deliveries đã xác định Store theo rule shipping nguồn. Marker mới SHIPPING_SOURCE_REPLACED_BY_PW2_DEFAULT dùng table stores, sourceId=StoreID, field shipping_fee_config, warning, reason APPROVED_PW2_DEFAULTS. Review mode vẫn giữ kiểm tra và fixed-fee mapping đã có. Discount map đúng các field PW2 hỗ trợ; phần promotions name_ms/slug/description_ms/image/signature/type_id/is_max_discount_value/max_discount_value/is_min_payment/min_payment/limit_per_user và promotion_codes.used giữ nguồn. PW1 extra discount constraints không được replay bởi PW2; không mô tả mapping là tương đương toàn bộ hành vi PW1. Code đã bỏ theo skipInvalidDiscountCodes chỉ nhận `MASTER-7-EXCLUDED-DISCOUNT-SOURCE` nếu warning DISCOUNT_MAPPING_INVALID hoặc DISCOUNT_CODE_COLLISION đúng ID/Store, không field/reason, không contribution hoặc Discount emitted; parent promotions chỉ nhận khi toàn bộ source codes có bằng chứng bỏ. Unexpected mapping errors vẫn chặn. store_codes là CRUD code/type của Store ở PW1, không phải promotion_codes, không có consumer PW2; giữ toàn dòng nguồn theo `MASTER-2.2-STORE-CODES-SOURCE-ONLY`, không tạo voucher.
+6. **Technical:** queue_sync/model_exports không replay hoặc migrate payload. `MASTER-2.2-TECHNICAL-OUTSIDE-SCOPE`, marker SOURCE_TABLE_OUTSIDE_SCOPE cấp bảng, zero contributions; unknown fields giữ nguồn, auth-secret columns security-excluded. Ownership nguồn vẫn ghi đúng kể cả không resolve được, không fake Store.
+
+Tất cả rule/marker/raw feature mới chỉ có hiệu lực với exact contract 1.10.3; old artifacts không tự nhận ngoại lệ. Structural duplicate IDs, field/ownership/contribution giả, checksum/manifest sai vẫn bị từ chối. Những mục outside_scope có bằng chứng không sinh global review blocker; các diagnostic ngoài allowlist vẫn giữ nguyên.
+
+
+### Contract 1.10.4 — khôi phục toàn bộ model_settings trong artifact
+
+Quyết định ngày 2026-09-24 thay thế việc loại toàn bảng tại 1.10.1–1.10.3. Với mỗi Store được xuất, giữ nguyên các cột nguồn của model_settings (string/null), không trim, parse JSON, kiểm tra URL hoặc quét nội dung value. HTML gồm tel có dấu cách, key lạ, value rỗng/null và trạng thái/xóa mềm đều được giữ. Chỉ cột có tên auth-secret riêng được security-excluded; không suy đoán từ nội dung text.
+
+- Settings có đúng Page/PageComponent/Menu/MenuItem/MenuLine nguồn nằm trong model_settings của đối tượng raw tương ứng.
+- Settings còn lại (Store/Product/Category/User, cha bị bỏ/xóa/thiếu hoặc model không biết) nằm ở sites[].raw_model_settings của Store nguồn; mỗi ID chỉ xuất một lần. Không khôi phục giant pw1_source.
+- Khi store_id thiếu/rỗng, quan hệ model hợp lệ được dùng để xác định Store, giữ nguyên store_id nguồn. Khi model mồ côi/mâu thuẫn nhưng store_id trỏ Store tồn tại, dùng ownership SOURCE_SETTING_STORE_ID, giữ raw trong Site; không gắn nhầm cha hoặc sửa model_id/model_type.
+- Không xác định được Store hoặc Store nằm ngoài output: giữ CSV với MASTER-MODEL-SETTINGS-UNOWNED-SOURCE và lý do ownership/Store exclusion tương ứng. Marker toàn bảng MODEL_SETTINGS_RAW_PRESERVED là thông báo policy, không có nghĩa mọi dòng CSV đều xuất.
+- Contribution MASTER_RAW_MODEL_SETTINGS chứng minh row tồn tại tại một trong sáu đường dẫn raw; validator kiểm tra receipt, ID duy nhất, đúng Store và đúng parent cho nested. Các trường này là artifact nguồn, không tự replay thành bảng runtime hoặc xác nhận website builder đã dựng xong.
+- Hợp đồng 1.10.3 tiếp tục dùng hash và semantics cũ. Chỉ 1.10.4 nhận raw_model_settings và contribution/ownership mới.
+
+
+### Contract 1.10.5 — giữ nguyên domain PW1 tại Site
+
+`sites[].domain` lấy nguyên string `store_domains.domain` của dòng mặc định (`is_default=1`) còn sống, đúng Store nguồn. Không ghép tenant slug với targetPlatformSuffix, không lowercase/trim/đổi domain nguồn. Tenant slug và customDomains tiếp tục theo policy hiện có, độc lập lựa chọn này; binding không thay đổi fallback slug của Store có nhiều domain mặc định.
+
+Nếu có đúng một dòng mặc định thì chọn dòng đó. Nếu có nhiều dòng, yêu cầu `sourceDomainBindings` trong source-config: object ánh xạ Store ID → ID dòng store_domains. Binding phải trỏ đúng Store đang sống, dòng domain chưa xóa và is_default=1; sai binding bị từ chối trước mapping. Không có dòng đủ điều kiện, không có lựa chọn khi mơ hồ hoặc domain rỗng: không tự dựng domain PW2 thay thế. Các lựa chọn nguồn nằm ngoài migrationPolicy; source-config SHA-256 ghi nhận binding của lần export.
+
+Hostname được kiểm tra nhưng giá trị nguồn không được rewrite. Với gracefulTenantResolution đã duyệt, domain nguồn không rỗng nhưng sai định dạng (như Store2330) vẫn được giữ nguyên cùng warning SOURCE_SITE_DOMAIN_FORMAT_PRESERVED / ORIGINAL_PW1_VALUE; strict mode vẫn từ chối. Giữ domain text không đồng nghĩa DNS đã hoạt động hoặc domain đã xác minh trên PW2. Kiểm tra uniqueness sites.domain giữa các Store được xuất không phân biệt hoa/thường.
+
+Contribution `MASTER-4.1-SOURCE-SITE-DOMAIN` tại `sites[].domain` ghi đúng ID dòng nguồn được chọn và các field hiện có trong id/store_id/domain/is_default/deleted_at. Contribution slug trước đây chỉ chứng minh `tenants[].slug`. Importer giữ sites.domain nguyên văn; không thêm rewrite sang suffix đích. Contract1.10.4 cùng hash cũ vẫn được nhận, tiếp tục mang domain đã xuất theo semantics cũ. Raw settings và mọi dữ liệu master khác tiếp tục giữ policy1.10.4.

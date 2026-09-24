@@ -22,7 +22,7 @@ function fixture(status: string | null) {
   }
   const config = sourceConfigSchema.parse({ version: 1, sourceInstance: 'fixture', sourceDatabase: 'fixture', sourceInstanceToken: 'fixture', snapshotId: 'status', asOf: '2026-01-01T00:00:00Z', utcOffset: '+00:00', sourcePlatformSuffix: 'old.test', targetPlatformSuffix: 'new.test', tables: { stores: 'stores.csv' }, deletedStores: 'review' })
   const output = emptyStore()
-  output.sites.push({ _ref: '@sites:stores:1' }); output.users.push({ _ref: '@users:users:2' })
+  output.sites.push({ _ref: '@sites:stores:1' }); output.users.push({ _ref: '@users:users:2', tenants: [{ tenant: '@tenants:stores:1', role: 'owner' }] })
   const ctx = new SourceIndex(tables).context(config, '1', output, [], [])
   return { ctx, tables, run() { mapCatalog(ctx); mapContent(ctx); mapCommerce(ctx) } }
 }

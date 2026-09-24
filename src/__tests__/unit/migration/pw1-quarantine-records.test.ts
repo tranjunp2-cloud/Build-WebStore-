@@ -1,3 +1,4 @@
+import { readFixtureMasterText } from '@/__tests__/helpers/pw1-master-artifact'
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -264,7 +265,7 @@ describe('[TC-F42-EXP-001/015] Master Unicode roundtrip', () => {
       const output = path.join(root, 'output')
       // Act
       const result = await exportMaster(input, configPath, output)
-      const bytes = await readFile(path.join(output, 'master.json'), 'utf8')
+      const bytes = await readFixtureMasterText(output)
       // Assert
       expect(result.counts.emittedStoreCount).toBe(3)
       expect(bytes).not.toContain('\u2028')

@@ -1,5 +1,6 @@
+import { approvedSourceExclusionReason } from '../source-exclusions'
 import { missingProductData } from './catalog-policy'
-import { PRODUCT_EXCLUSION_CODE } from '../product-exclusions'
+import { PRODUCT_EXCLUSION_CODE, PRODUCT_CATALOG_EXCLUSION_CODE } from '../product-exclusions'
 import { inactiveOnlyProduct, packageWeightKg } from "./catalog-policy";
 import { productLexical } from "./product-lexical";
 import { sourceCatalog } from "./catalog-source";
@@ -28,9 +29,14 @@ export function mapCatalog(ctx: MappingContext): void {
   const tenant = ref("tenants", "stores", ctx.storeId);
   const site = String(ctx.output.sites[0]?._ref ?? "");
   const activeOnly = ctx.config.migrationPolicy?.activeCatalogOnly === true;
+  const resolveDuplicateCategorySlugs =
+    ctx.config.migrationPolicy?.resolveDuplicateCategorySlugs === true;
+  const resolveDuplicateCategoryNames =
+    ctx.config.migrationPolicy?.resolveDuplicateCategoryNames === true;
   const categories = ctx
     .rows("categories")
-    .filter((row) => live(row) && (!activeOnly || row.status !== "0"));
+    .filter((row) => live(row) && (!activeOnly || row.status !== "0"))
+    .sort((a, b) => compareIds(a.id ?? "", b.id ?? ""));
   const categoryMap = new Map(categories.map((row) => [row.id, row]));
   const promoted = new Set<string>();
   const effectiveParent = new Map<string, string>();
@@ -44,6 +50,8 @@ export function mapCatalog(ctx: MappingContext): void {
     effectiveParent.set(row.id ?? "", promote ? "" : parentId);
     if (promote) promoted.add(row.id ?? "");
   }
+  const seenCategorySlugs = new Map<string, string>();
+  const seenSiblingNames = new Map<string, string>();
   for (const row of categories) {
     try {
       if (!row.id || !row.name?.trim() || !row.slug?.trim())
@@ -60,29 +68,76 @@ export function mapCatalog(ctx: MappingContext): void {
         trail.unshift(ancestor);
         parent = effectiveParent.get(parent);
       }
-      if (
-        categories.some(
+      if (resolveDuplicateCategoryNames) {
+        const parentKey = effectiveParent.get(row.id ?? "") ?? "0";
+        const normalizedName = row.name.trim().toLowerCase();
+        const siblingKey = `${parentKey}::${normalizedName}`;
+        const existingOwner = seenSiblingNames.get(siblingKey);
+        if (!existingOwner || existingOwner === row.id) {
+          seenSiblingNames.set(siblingKey, row.id);
+        } else {
+          ctx.issue(
+            "CATEGORY_SIBLING_NAME_COLLISION_RESOLVED",
+            "categories",
+            row.id,
+            "name",
+            "warning",
+            "CATEGORY_SIBLING_NAME_COLLISION_RESOLVED",
+          );
+        }
+      } else {
+        const hasSiblingDuplicate = categories.some(
           (other) =>
             other.id !== row.id &&
-            (other.slug === row.slug ||
-              (effectiveParent.get(other.id ?? "") === effectiveParent.get(row.id ?? "") &&
-                other.name?.trim().toLowerCase() ===
-                  row.name?.trim().toLowerCase())),
-        )
-      )
-        throw new Error(
-          categories.some(
-            (other) => other.id !== row.id && other.slug === row.slug,
-          )
-            ? "DUPLICATE_SLUG_IN_STORE"
-            : "DUPLICATE_SIBLING_NAME",
+            effectiveParent.get(other.id ?? "") === effectiveParent.get(row.id ?? "") &&
+            other.name?.trim().toLowerCase() === row.name?.trim().toLowerCase(),
         );
+        if (hasSiblingDuplicate) {
+          throw new Error("DUPLICATE_SIBLING_NAME");
+        }
+      }
+      let resolvedSlug = row.slug.trim();
+      if (resolveDuplicateCategorySlugs) {
+        const normalized = resolvedSlug.toLowerCase();
+        const existingOwner = seenCategorySlugs.get(normalized);
+        if (!existingOwner || existingOwner === row.id) {
+          seenCategorySlugs.set(normalized, row.id);
+        } else {
+          const suffix = `-C${row.id}`;
+          let candidate = `${resolvedSlug}${suffix}`;
+          let collisionCounter = 1;
+          while (
+            seenCategorySlugs.has(candidate.toLowerCase()) &&
+            seenCategorySlugs.get(candidate.toLowerCase()) !== row.id
+          ) {
+            candidate = `${resolvedSlug}-C${row.id}-${collisionCounter}`;
+            collisionCounter++;
+          }
+          seenCategorySlugs.set(candidate.toLowerCase(), row.id);
+          ctx.issue(
+            "CATEGORY_SLUG_COLLISION_RESOLVED",
+            "categories",
+            row.id,
+            "slug",
+            "warning",
+            "CATEGORY_SLUG_COLLISION_RESOLVED",
+          );
+          resolvedSlug = candidate;
+        }
+      } else {
+        const hasSlugDuplicate = categories.some(
+          (other) => other.id !== row.id && other.slug === row.slug,
+        );
+        if (hasSlugDuplicate) {
+          throw new Error("DUPLICATE_SLUG_IN_STORE");
+        }
+      }
       const doc: Doc = {
         _ref: ref("categories", "categories", row.id),
         tenant,
         site,
         name: row.name,
-        slug: row.slug,
+        slug: resolveDuplicateCategorySlugs ? resolvedSlug : row.slug,
         breadcrumbs: trail.map((item) => item.name).join(" > "),
         ...dates(row, ctx),
       };
@@ -162,15 +217,28 @@ export function mapCatalog(ctx: MappingContext): void {
   }
   const store = ctx.find("stores", ctx.storeId);
   const currency = ctx.find("currencies", store?.currency_id)?.code ?? "";
-  for (const row of ctx.rows("products").filter(live)) {
+  const firstProductBySlug = new Map<string, string>();
+  const seenSkusInStore = new Map<string, string>();
+  for (const row of ctx.rows("products").filter(live).sort((a, b) => compareIds(a.id ?? "", b.id ?? ""))) {
+    const diagnosticStart = ctx.diagnostics.length, contributionStart = ctx.contributions.length;
+    const productStart = ctx.output.products.length, mediaStart = ctx.output.media.length;
     try {
       if (!row.id) throw new Error("PRODUCT_ID");
+      const slugKey = row.slug?.trim().toLowerCase();
+      if (ctx.config.migrationPolicy?.excludeDuplicateProductSlugs && slugKey) {
+        if (firstProductBySlug.has(slugKey)) {
+          ctx.issue(PRODUCT_CATALOG_EXCLUSION_CODE, "products", row.id, undefined, "warning", "DUPLICATE_PRODUCT_SLUG");
+          continue;
+        }
+        firstProductBySlug.set(slugKey, row.id);
+      }
       if (!["0", "1"].includes(row.status ?? "")) {
         ctx.issue("PRODUCT_STATUS_UNVERIFIED", "products", row.id, "status");
         continue;
       }
       if (
         activeOnly &&
+        !(row.status === "0" && ctx.config.migrationPolicy?.allowInactiveSkusForInactiveProduct) &&
         inactiveOnlyProduct(row, skusByProduct.get(row.id ?? "") ?? [])
       ) {
         ctx.issue(
@@ -182,7 +250,7 @@ export function mapCatalog(ctx: MappingContext): void {
         );
         continue;
       }
-      const exclusion = missingProductData(row, skusByProduct.get(row.id) ?? []);
+      const exclusion = missingProductData(row, skusByProduct.get(row.id) ?? [], ctx.config.migrationPolicy?.allowInactiveSkusForInactiveProduct);
       if (exclusion) {
         ctx.issue(PRODUCT_EXCLUSION_CODE, "products", row.id, undefined, "warning", exclusion.reason);
         continue;
@@ -193,6 +261,10 @@ export function mapCatalog(ctx: MappingContext): void {
         sourceCategory?.store_id === ctx.storeId &&
         live(sourceCategory) &&
         sourceCategory.status === "0";
+      if (omittedCategory && ctx.config.migrationPolicy?.excludeProductsInInactiveCategories) {
+        ctx.issue(PRODUCT_CATALOG_EXCLUSION_CODE, "products", row.id, undefined, "warning", "INACTIVE_CATEGORY");
+        continue;
+      }
       if (omittedCategory)
         ctx.issue(
           "PRODUCT_INACTIVE_CATEGORY_OMITTED",
@@ -202,6 +274,10 @@ export function mapCatalog(ctx: MappingContext): void {
           "warning",
         );
       const catalog = sourceCatalog(ctx, row);
+      if (catalog.errors.length && ctx.config.migrationPolicy?.excludeProductsWithoutValidVariants && catalog.fields.hasVariants === true && Array.isArray(catalog.fields.variants) && catalog.fields.variants.length === 0 && catalog.errors.every(error => ['SOURCE_NO_VALID_VARIANT', 'SOURCE_VARIANT_DOMAIN_MISSING'].includes(error.code))) {
+        ctx.issue(PRODUCT_CATALOG_EXCLUSION_CODE, "products", row.id, undefined, "warning", catalog.errors.some(error => error.code === 'SOURCE_VARIANT_DOMAIN_MISSING') ? 'MISSING_VARIANT_DOMAIN' : 'NO_VALID_VARIANTS');
+        continue;
+      }
       if (catalog.errors.length) {
         for (const error of catalog.errors)
           ctx.issue(
@@ -214,6 +290,8 @@ export function mapCatalog(ctx: MappingContext): void {
           );
         continue;
       }
+      for (const warning of catalog.warnings) ctx.issue(warning.code, "product_skus", warning.sourceSkuId, undefined, "warning", "CANONICAL_SKU_ALIAS");
+      for (const excluded of catalog.excludedSkus) ctx.issue("PRODUCT_VARIANT_SKU_EXCLUDED", "product_skus", excluded.sourceSkuId, undefined, "warning", excluded.reasons[0]);
       const images = (ctx.tables.product_images ?? [])
         .filter((image) => image.product_id === row.id && live(image))
         .sort(
@@ -288,6 +366,59 @@ export function mapCatalog(ctx: MappingContext): void {
         if (item.sku == null || (typeof item.sku === "string" && !item.sku.trim()))
           delete item.sku;
       }
+      if (ctx.config.migrationPolicy?.resolveDuplicateSkus) {
+        // Preserve untouched sibling codes, even when they resemble a generated suffix.
+        const reservedSkus = new Set(
+          [clean, ...((clean.variants as Doc[]) ?? [])]
+            .map(item => item.sku)
+            .filter((sku): sku is string => typeof sku === "string" && Boolean(sku.trim()))
+            .map(sku => sku.trim().toLowerCase()),
+        );
+        const resolveSku = (rawSku: unknown, targetPath: string): string | undefined => {
+          if (typeof rawSku !== "string" || !rawSku.trim()) return undefined;
+          const trimmed = rawSku.trim();
+          const normalized = trimmed.toLowerCase();
+          if (!seenSkusInStore.has(normalized)) {
+            seenSkusInStore.set(normalized, row.id!);
+            return trimmed;
+          }
+          // Each target field needs a unique code, including siblings in this product.
+          const suffix = `-P${row.id}`;
+          const maxBaseLength = Math.max(1, 50 - suffix.length);
+          let candidate = `${trimmed.slice(0, maxBaseLength)}${suffix}`;
+          let collisionCounter = 1;
+          while (seenSkusInStore.has(candidate.toLowerCase()) || reservedSkus.has(candidate.toLowerCase())) {
+            const indexedSuffix = `-P${row.id}-${collisionCounter}`;
+            const maxLen = Math.max(1, 50 - indexedSuffix.length);
+            candidate = `${trimmed.slice(0, maxLen)}${indexedSuffix}`;
+            collisionCounter++;
+          }
+          seenSkusInStore.set(candidate.toLowerCase(), row.id!);
+          ctx.issue(
+            "SKU_COLLISION_RESOLVED",
+            "products",
+            row.id,
+            targetPath,
+            "warning",
+            "SKU_COLLISION_RESOLVED",
+          );
+          return candidate;
+        };
+
+        if (clean.sku) {
+          const resolved = resolveSku(clean.sku, "sku");
+          if (resolved) clean.sku = resolved;
+        }
+        if (Array.isArray(clean.variants)) {
+          for (let vi = 0; vi < clean.variants.length; vi++) {
+            const v = clean.variants[vi] as Doc;
+            if (v.sku) {
+              const resolved = resolveSku(v.sku, `variants.${vi}.sku`);
+              if (resolved) v.sku = resolved;
+            }
+          }
+        }
+      }
       if (row.description != null)
         clean.description = productLexical(ctx, row, "description");
       if (row.description_ms != null)
@@ -306,8 +437,13 @@ export function mapCatalog(ctx: MappingContext): void {
       }
       ctx.output.products.push(clean);
       const domain = (ctx.tables.product_attributes ?? []).filter(
-        (item) => item.product_id === row.id && live(item),
+        (item) => item.product_id === row.id && live(item) && catalog.identities.some(tier => tier.attributeId === item.attribute_id && tier.options.some(option => option.attributeValueId === item.attribute_value_id)),
       );
+      for (const entry of (ctx.tables.product_attributes ?? []).filter(item => item.product_id === row.id && live(item) && !domain.includes(item))) {
+        const reason = clean.hasVariants ? "UNREFERENCED_TIER" : "SIMPLE_PRODUCT_ATTRIBUTES";
+        if ((clean.hasVariants && ctx.config.migrationPolicy?.pruneUnreferencedTiers) || (!clean.hasVariants && ctx.config.migrationPolicy?.treatSingleSkuWithoutSelectionsAsSimple))
+          ctx.issue("PRODUCT_VARIANT_DEFINITION_RETAINED", "product_attributes", entry.id, undefined, "warning", reason);
+      }
       for (const entry of domain) {
         ctx.contribute(
           "product_attributes",
@@ -378,7 +514,8 @@ export function mapCatalog(ctx: MappingContext): void {
           item.product_id === row.id &&
           item.store_id === ctx.storeId &&
           live(item) &&
-          item.status === "1",
+          (item.status === "1" || (row.status === "0" && ctx.config.migrationPolicy?.allowInactiveSkusForInactiveProduct && item.status === "0")) &&
+          !catalog.excludedSkus.some(excluded => excluded.sourceSkuId === item.id),
       )) {
         const variant = catalog.skuCrosswalk.find(
           (item) => item.sourceSkuId === sku.id,
@@ -405,9 +542,9 @@ export function mapCatalog(ctx: MappingContext): void {
             "id",
             "product_id",
             "store_id",
-            "sku",
-            "price",
-            "stock",
+            // Alias identity is mapped, but canonical SKU alone supplies values.
+            ...(!variant || catalog.skuCrosswalk.find(item => item.targetId === variant.targetId)?.sourceSkuId === sku.id
+              ? ["sku", "price", "stock"] : []),
             "status",
           ]),
           `${clean._ref}${variant ? "." + variant.targetPath : ""}`,
@@ -415,13 +552,21 @@ export function mapCatalog(ctx: MappingContext): void {
         );
       }
     } catch (error) {
+      const sourceReason = error instanceof Error && approvedSourceExclusionReason('products', error.message) ? error.message : undefined;
       ctx.issue(
-        error instanceof Error && /^PRODUCT_[A-Z_]+$/.test(error.message)
-          ? error.message
-          : "PRODUCT_MAPPING_INVALID",
-        "products",
-        row.id,
+        sourceReason ?? (error instanceof Error && /^PRODUCT_[A-Z_]+$/.test(error.message) ? error.message : "PRODUCT_MAPPING_INVALID"),
+        "products", row.id, undefined, 'blocker', sourceReason ? undefined : 'UNEXPECTED_MAPPING_ERROR',
       );
+    } finally {
+      const issues = ctx.diagnostics.slice(diagnosticStart).filter(d => d.severity === 'blocker');
+      if (ctx.config.migrationPolicy?.excludeInvalidProducts && row.id && issues.length && issues.every(d => d.table === 'products' && d.sourceId === row.id && approvedSourceExclusionReason('products', d.code))) {
+        ctx.output.products.length = productStart;
+        ctx.output.media.length = mediaStart;
+        ctx.contributions.splice(contributionStart);
+        ctx.diagnostics.splice(diagnosticStart);
+        for (const [key, owner] of seenSkusInStore) if (owner === row.id) seenSkusInStore.delete(key);
+        ctx.issue('SOURCE_ENTITY_EXCLUDED', 'products', row.id, undefined, 'warning', issues[0].code);
+      }
     }
   }
   const collisions = findProductSkuCollisions(ctx.output.products);

@@ -1,6 +1,5 @@
 import { EXTERNAL_SOURCE_RULE, externalSourcePath } from '../external-source'
 import {
-  live,
   type Doc,
   type Json,
   type MappingContext,
@@ -10,9 +9,12 @@ import { RAW_FIELDS } from './raw-fields'
 import { verifiedSetting } from './raw-setting-registry'
 import { safeUrl } from '../primitives'
 import { isSafeContentLink } from './content-link'
-import { matchingRows, matchingSettings } from './raw-row-index'
+import { createSourceClassifier } from '../source-classification'
+import { RAW_MODEL_SETTINGS_RULE, modelSettingsSecurityField } from '../model-settings-scope'
+import { matchingSettings, matchingRows } from './raw-row-index'
 import { rawStructureKeys, verifiedUiSettingKey } from './raw-ui-registry'
 
+const preservedSettings = new WeakMap<MappingContext, Set<string>>()
 const sensitive =
   /password|passwd|secret|token|credential|authorization|api[_-]?key|private[_-]?key|cookie/i
 const nestedKeys = new Set(
@@ -81,16 +83,39 @@ function textReason(text: string, navigation = false): RawReason | undefined {
   }
   return undefined
 }
-/** Unknown serialized structures stay in the immutable source, never pass through blind. */
+const opaqueContentTables = new Set(['pages', 'page_components', 'banners', 'shortlist_items', 'menus', 'menu_items', 'menu_lines', 'frontend_components', 'frontend_templates', 'menu_line_types'])
+
+/** Delegated Page/Menu content retains original CSV strings without interpreting their contents. */
 export function rawRow(
   ctx: MappingContext,
   table: string,
   row: Row,
   path: string,
 ): Doc {
+  if (table === 'model_settings') {
+    const ids = preservedSettings.get(ctx) ?? new Set<string>()
+    if (row.id) ids.add(row.id)
+    preservedSettings.set(ctx, ids)
+    const out = Object.fromEntries(Object.entries(row).filter(([field]) => !modelSettingsSecurityField(field)))
+    ctx.contribute(table, row, Object.keys(out), path, RAW_MODEL_SETTINGS_RULE)
+    return out
+  }
+  if (opaqueContentTables.has(table)) {
+    const preserved: Doc = {}
+    for (const [key, value] of Object.entries(row)) {
+      if (sensitive.test(key)) {
+        ctx.issue('RAW_SECRET_EXCLUDED', table, row.id, key, 'warning')
+        continue
+      }
+      preserved[key] = value
+    }
+    ctx.contribute(table, row, Object.keys(preserved), path, 'MASTER_RAW_PW1_CONTENT')
+    return preserved
+  }
   const out: Doc = {}
   const fields: string[] = []
   for (const [key, value] of Object.entries(row)) {
+    if (table === 'stores' && key === 'social_channel') continue // Projected to supported PW2 fields; metadata stays in CSV.
     if (!RAW_FIELDS[table]?.includes(key) || sensitive.test(key)) {
       ctx.issue(
         sensitive.test(key) ? 'RAW_SECRET_EXCLUDED' : 'RAW_FIELD_UNVERIFIED',
@@ -103,7 +128,9 @@ export function rawRow(
     }
     // Product descriptions and Blog content are opaque source text by explicit migration policy.
     // Do not reinterpret JSON-looking text, HTML, URLs or embedded attribute names.
-    if ((table === 'products' && ['description', 'description_ms'].includes(key)) ||
+    // Inactive Blog categories stay only in the external CSV; no value is imported.
+    if ((table === 'blog_categories' && row.status === '0') ||
+      (table === 'products' && ['description', 'description_ms'].includes(key)) ||
       (table === 'blog_posts' && ['content', 'content_ms'].includes(key))) {
       out[key] = value
       fields.push(key)
@@ -125,7 +152,15 @@ export function rawRow(
           navigation,
         )
       } catch {
-        reason = 'INVALID_JSON'
+        if (
+          ctx.config.migrationPolicy?.allowBracketedProductNames &&
+          table === 'products' &&
+          (key === 'name' || key === 'name_ms')
+        ) {
+          reason = textReason(value, navigation)
+        } else {
+          reason = 'INVALID_JSON'
+        }
       }
     }
     if (table === 'model_settings' && key === 'value') {
@@ -190,60 +225,34 @@ export function rawChildren(
     .sort(sourceOrder)
     .flatMap((row) => {
       if (row.store_id && row.store_id !== ctx.storeId) {
-        ctx.issue('RAW_OWNERSHIP_MISMATCH', table, row.id, 'store_id')
+        ctx.issue('RAW_OWNERSHIP_MISMATCH', table, row.id, 'store_id', opaqueContentTables.has(table) ? 'warning' : 'blocker')
         return []
       }
       return [rawRow(ctx, table, row, path)]
     })
 }
-export function settings(
-  ctx: MappingContext,
-  model: string,
-  id: string,
-  path: string,
-): Json[] {
-  return matchingSettings(
-    ctx.tables.model_settings ?? [],
-    `App\\Models\\${model}`,
-    id,
-  )
-    .sort(sourceOrder)
-    .flatMap((row) => {
-      const store = ctx.find('stores', ctx.storeId)
-      const resolvedFromStoreModel =
-        !row.store_id &&
-        model === 'Store' &&
-        id === ctx.storeId &&
-        row.model_type === 'App\\Models\\Store' &&
-        row.model_id === ctx.storeId &&
-        store?.id === ctx.storeId &&
-        live(store)
-      if (row.store_id !== ctx.storeId && !resolvedFromStoreModel) {
-        ctx.issue(
-          row.store_id ? 'RAW_OWNERSHIP_MISMATCH' : 'RAW_OWNERSHIP_MISSING',
-          'model_settings',
-          row.id,
-          'store_id',
-        )
-        return []
-      }
-      if (resolvedFromStoreModel) {
-        // Preserve immutable row/store_id; record the exact source ownership evidence.
-        ctx.contribute(
-          'model_settings',
-          row,
-          ['model_type', 'model_id'],
-          path,
-          'MASTER_RAW_STORE_MODEL_OWNERSHIP',
-        )
-        ctx.issue(
-          'RAW_OWNERSHIP_RESOLVED_FROM_STORE_MODEL',
-          'model_settings',
-          row.id,
-          'store_id',
-          'warning',
-        )
-      }
-      return [rawRow(ctx, 'model_settings', row, path)]
-    })
+/** Values are opaque CSV strings, including malformed JSON and HTML navigation links. */
+export function settings(ctx: MappingContext, model: string, id: string, path: string): Json[] {
+  return matchingSettings(ctx.tables.model_settings ?? [], `App\\Models\\${model}`, id)
+    .filter(row => !row.store_id || row.store_id === ctx.storeId)
+    .sort(sourceOrder).map(row => rawRow(ctx, 'model_settings', row, path))
+}
+
+const settingOwners = new WeakMap<MappingContext['tables'], Map<string, Row[]>>()
+export function remainingSettings(ctx: MappingContext): Json[] {
+  let groups = settingOwners.get(ctx.tables)
+  if (!groups) {
+    groups = new Map()
+    const classifier = createSourceClassifier(ctx.tables, ctx.config, [])
+    for (const row of ctx.tables.model_settings ?? []) {
+      const owner = classifier.ownership('model_settings', row)
+      if (!owner.storeId) continue
+      const list = groups.get(owner.storeId) ?? []
+      list.push(row); groups.set(owner.storeId, list)
+    }
+    settingOwners.set(ctx.tables, groups)
+  }
+  const nested = preservedSettings.get(ctx) ?? new Set<string>()
+  return (groups.get(ctx.storeId) ?? []).filter(row => !nested.has(row.id ?? '')).slice().sort(sourceOrder)
+    .map(row => rawRow(ctx, 'model_settings', row, 'sites.raw_model_settings'))
 }

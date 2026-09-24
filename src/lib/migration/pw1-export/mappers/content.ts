@@ -1,5 +1,7 @@
+import { approvedSourceExclusionReason } from '../source-exclusions'
+import { documentSchemas } from '../artifact-schemas'
 import { ref, type Doc, type MappingContext, type Row } from '../contracts'
-import { timestamp } from '../primitives'
+import { timestamp, compareIds } from '../primitives'
 import { mapRawContent } from './content-raw'
 import { blogLexical, contentMedia } from './content-lexical'
 
@@ -24,9 +26,21 @@ function validSlug(ctx: MappingContext, table: string, row: Row): boolean {
     ctx.issue('BLOG_SLUG_INVALID', table, row.id, 'slug')
     return false
   }
+  const flattenBlogCategories =
+    ctx.config.migrationPolicy?.flattenBlogCategoriesToRoot === true
   if (
     (ctx.tables[table] ?? []).filter(
-      (candidate) => !candidate.deleted_at && candidate.store_id === row.store_id && candidate.slug?.trim().toLowerCase() === row.slug?.trim().toLowerCase(),
+      (candidate) =>
+        !candidate.deleted_at &&
+        !(
+          table === 'blog_categories' &&
+          (candidate.status === '0' ||
+            (flattenBlogCategories &&
+              candidate.parent_id &&
+              candidate.parent_id !== '0'))
+        ) &&
+        candidate.store_id === row.store_id &&
+        candidate.slug?.trim().toLowerCase() === row.slug?.trim().toLowerCase(),
     ).length !== 1
   ) {
     ctx.issue('BLOG_SLUG_COLLISION', table, row.id, 'slug')
@@ -37,14 +51,41 @@ function validSlug(ctx: MappingContext, table: string, row: Row): boolean {
 function mapBlogs(ctx: MappingContext): void {
   const tenant = ref('tenants', 'stores', ctx.storeId)
   const site = ref('sites', 'stores', ctx.storeId)
-  for (const row of ctx.rows('blog_categories')) {
-    if (row.deleted_at) continue
+  const flattenBlogCategories =
+    ctx.config.migrationPolicy?.flattenBlogCategoriesToRoot === true
+  const resolveDuplicateBlogCategorySlugs =
+    ctx.config.migrationPolicy?.resolveDuplicateBlogCategorySlugs === true
+  const resolveDuplicateBlogSlugs =
+    ctx.config.migrationPolicy?.resolveDuplicateBlogSlugs === true
+  const sourceBlogCategories = new Map(
+    (ctx.tables.blog_categories ?? [])
+      .filter((c) => c.store_id === ctx.storeId && !c.deleted_at)
+      .map((c) => [c.id!, c]),
+  )
+  const blogCategories = ctx
+    .rows('blog_categories')
+    .sort((a, b) => compareIds(a.id ?? '', b.id ?? ''))
+  const seenBlogCategorySlugs = new Map<string, string>()
+  for (const row of blogCategories) {
+    if (row.deleted_at || row.status === '0') continue
+    if (flattenBlogCategories && row.parent_id && row.parent_id !== '0') {
+      ctx.issue(
+        'BLOG_CHILD_CATEGORY_EXCLUDED',
+        'blog_categories',
+        row.id,
+        'parent_id',
+        'warning',
+        'CHILD_CATEGORY_OUTSIDE_FLAT_TAXONOMY',
+      )
+      // The category is not emitted; raw CSV retention accounts for its fields.
+      continue
+    }
     if (row.status !== '1') {
-      ctx.issue('BLOG_CATEGORY_INACTIVE', 'blog_categories', row.id, 'status')
+      ctx.issue('BLOG_CATEGORY_STATUS_UNVERIFIED', 'blog_categories', row.id, 'status')
       continue
     }
     const time = dates(ctx, 'blog_categories', row)
-    if (!time || !validSlug(ctx, 'blog_categories', row) || !row.name) {
+    if (!time || !row.name) {
       if (!row.name)
         ctx.issue(
           'BLOG_CATEGORY_NAME_MISSING',
@@ -54,11 +95,51 @@ function mapBlogs(ctx: MappingContext): void {
         )
       continue
     }
+    let resolvedSlug = row.slug?.trim()
+    if (
+      !resolvedSlug ||
+      resolvedSlug === '.' ||
+      resolvedSlug === '..' ||
+      resolvedSlug.includes('/')
+    ) {
+      ctx.issue('BLOG_SLUG_INVALID', 'blog_categories', row.id, 'slug')
+      continue
+    }
+    if (resolveDuplicateBlogCategorySlugs) {
+      const normalized = resolvedSlug.toLowerCase()
+      const existingOwner = seenBlogCategorySlugs.get(normalized)
+      if (!existingOwner || existingOwner === row.id) {
+        seenBlogCategorySlugs.set(normalized, row.id ?? '')
+      } else {
+        const suffix = `-BC${row.id}`
+        let candidate = `${resolvedSlug}${suffix}`
+        let collisionCounter = 1
+        while (
+          seenBlogCategorySlugs.has(candidate.toLowerCase()) &&
+          seenBlogCategorySlugs.get(candidate.toLowerCase()) !== row.id
+        ) {
+          candidate = `${resolvedSlug}-BC${row.id}-${collisionCounter}`
+          collisionCounter++
+        }
+        seenBlogCategorySlugs.set(candidate.toLowerCase(), row.id ?? '')
+        ctx.issue(
+          'BLOG_CATEGORY_SLUG_COLLISION_RESOLVED',
+          'blog_categories',
+          row.id,
+          'slug',
+          'warning',
+          'BLOG_CATEGORY_SLUG_COLLISION_RESOLVED',
+        )
+        resolvedSlug = candidate
+      }
+    } else {
+      if (!validSlug(ctx, 'blog_categories', row)) continue
+    }
     ctx.output.blog_categories.push({
       _ref: ref('blog_categories', 'blog_categories', row.id!),
       tenant,
       name: row.name,
-      slug: row.slug!,
+      slug: resolveDuplicateBlogCategorySlugs ? resolvedSlug : row.slug!,
       status: 'active',
       ...time,
     })
@@ -70,35 +151,91 @@ function mapBlogs(ctx: MappingContext): void {
       'MASTER_8_1',
     )
   }
-  for (const row of ctx.rows('blog_posts')) {
+  const blogPosts = ctx
+    .rows('blog_posts')
+    .sort((a, b) => compareIds(a.id ?? '', b.id ?? ''))
+  const seenBlogSlugs = new Map<string, string>()
+  for (const row of blogPosts) {
     if (row.deleted_at) continue
     if (!['0', '1'].includes(row.status ?? '')) {
       ctx.issue('BLOG_STATUS_UNVERIFIED', 'blog_posts', row.id, 'status')
       continue
     }
     const time = dates(ctx, 'blog_posts', row)
-    if (!time || !validSlug(ctx, 'blog_posts', row) || !row.name) {
+    if (!time || !row.name) {
       if (!row.name)
         ctx.issue('BLOG_TITLE_MISSING', 'blog_posts', row.id, 'name')
       continue
+    }
+    let resolvedSlug = row.slug?.trim()
+    if (
+      !resolvedSlug ||
+      resolvedSlug === '.' ||
+      resolvedSlug === '..' ||
+      resolvedSlug.includes('/')
+    ) {
+      ctx.issue('BLOG_SLUG_INVALID', 'blog_posts', row.id, 'slug')
+      continue
+    }
+    if (resolveDuplicateBlogSlugs) {
+      const normalized = resolvedSlug.toLowerCase()
+      const existingOwner = seenBlogSlugs.get(normalized)
+      if (!existingOwner || existingOwner === row.id) {
+        seenBlogSlugs.set(normalized, row.id ?? '')
+      } else {
+        const suffix = `-B${row.id}`
+        let candidate = `${resolvedSlug}${suffix}`
+        let collisionCounter = 1
+        while (
+          seenBlogSlugs.has(candidate.toLowerCase()) &&
+          seenBlogSlugs.get(candidate.toLowerCase()) !== row.id
+        ) {
+          candidate = `${resolvedSlug}-B${row.id}-${collisionCounter}`
+          collisionCounter++
+        }
+        seenBlogSlugs.set(candidate.toLowerCase(), row.id ?? '')
+        ctx.issue(
+          'BLOG_SLUG_COLLISION_RESOLVED',
+          'blog_posts',
+          row.id,
+          'slug',
+          'warning',
+          'BLOG_SLUG_COLLISION_RESOLVED',
+        )
+        resolvedSlug = candidate
+      }
+    } else {
+      if (!validSlug(ctx, 'blog_posts', row)) continue
     }
     const sourceAuthor = ref('users', 'users', row.created_by ?? '')
     const owners = ctx.output.users.filter(user => Array.isArray(user.tenants) &&
       user.tenants.some(membership => membership && typeof membership === 'object' &&
         !Array.isArray(membership) && membership.tenant === tenant && membership.role === 'owner'))
-    // Keep a resolved source author; otherwise use the unique emitted owner of this tenant.
-    const author = ctx.output.users.some(user => user._ref === sourceAuthor)
-      ? sourceAuthor : owners.length === 1 ? owners[0]._ref : undefined
+    const fallbackUser = owners.length === 1 ? owners[0]._ref : undefined
+    const author = ctx.output.users.some(user => user._ref === sourceAuthor && Array.isArray(user.tenants) &&
+      user.tenants.some(membership => membership && typeof membership === 'object' &&
+        !Array.isArray(membership) && membership.tenant === tenant))
+      ? sourceAuthor : fallbackUser
     if (typeof author !== 'string') {
       ctx.issue('BLOG_AUTHOR_UNRESOLVED', 'blog_posts', row.id, 'created_by')
       continue
+    }
+    if (author !== sourceAuthor && ctx.config.migrationPolicy?.fallbackBlogAuthorToOwner) {
+      ctx.issue(
+        'BLOG_AUTHOR_FALLBACK_OWNER',
+        'blog_posts',
+        row.id,
+        'created_by',
+        'warning',
+        'AUTHOR_FALLBACK_APPLIED',
+      )
     }
     const blog: Doc = {
       _ref: ref('blogs', 'blog_posts', row.id!),
       tenant,
       site,
       title: row.name,
-      slug: row.slug!,
+      slug: resolveDuplicateBlogSlugs ? resolvedSlug : row.slug!,
       status: row.status === '1' ? 'published' : 'draft',
       author,
       ...time,
@@ -108,14 +245,52 @@ function mapBlogs(ctx: MappingContext): void {
       },
     }
     if (row.blog_category_id) {
+      let targetCategoryId = row.blog_category_id
+      if (flattenBlogCategories) {
+        let currentId: string | undefined = row.blog_category_id
+        const visited = new Set<string>()
+        while (currentId) {
+          if (visited.has(currentId)) {
+            break
+          }
+          visited.add(currentId)
+          const cat = sourceBlogCategories.get(currentId)
+          if (!cat) break
+          const parentId =
+            cat.parent_id && cat.parent_id !== '0' ? cat.parent_id : ''
+          if (!parentId) {
+            targetCategoryId = cat.id!
+            break
+          }
+          currentId = parentId
+        }
+        if (targetCategoryId !== row.blog_category_id) {
+          ctx.issue(
+            'BLOG_CATEGORY_REMAPPED_TO_ROOT',
+            'blog_posts',
+            row.id,
+            'blog_category_id',
+            'warning',
+            'CHILD_CATEGORY_REMAPPED_TO_ROOT',
+          )
+        }
+      }
       const category = ref(
         'blog_categories',
         'blog_categories',
-        row.blog_category_id,
+        targetCategoryId,
       )
       if (ctx.output.blog_categories.some((item) => item._ref === category))
         blog.category = category
-      else
+      else if (
+        !ctx.tables.blog_categories?.some(
+          (source) =>
+            source.id === targetCategoryId &&
+            source.store_id === ctx.storeId &&
+            !source.deleted_at &&
+            source.status === '0',
+        )
+      )
         ctx.issue(
           'BLOG_CATEGORY_UNRESOLVED',
           'blog_posts',
@@ -257,5 +432,34 @@ function mapEmail(ctx: MappingContext): void {
 export function mapContent(ctx: MappingContext): void {
   mapRawContent(ctx)
   mapBlogs(ctx)
+  excludeInvalidBlogs(ctx)
   mapEmail(ctx)
+}
+
+/** Omit only identified source-invalid Blog records; retain unexpected errors as blockers. */
+function excludeInvalidBlogs(ctx: MappingContext): void {
+  if (!ctx.config.migrationPolicy?.excludeInvalidBlogs) return
+  for (const [table, collection] of [['blog_categories', 'blog_categories'], ['blog_posts', 'blogs']] as const) {
+    for (const row of ctx.rows(table).filter(row => !row.deleted_at)) {
+      const reference = ref(collection, table, row.id!)
+      const doc = ctx.output[collection].find(doc => doc._ref === reference)
+      if (doc && !documentSchemas[collection].safeParse(doc).success)
+        ctx.issue('DOCUMENT_SCHEMA_INVALID', table, row.id)
+      if (table === 'blog_posts' && doc?.category && !ctx.output.blog_categories.some(category => category._ref === doc.category))
+        ctx.issue('BLOG_CATEGORY_UNRESOLVED', table, row.id, 'blog_category_id')
+      const issues = ctx.diagnostics.filter(d => d.storeId === ctx.storeId && d.table === table && d.sourceId === row.id)
+      const reasonOf = (d: typeof issues[number]) => d.code === 'RAW_VALUE_UNVERIFIED' ? d.reason ?? '' : d.code
+      const sourceIssues = issues.filter(d => approvedSourceExclusionReason(table, reasonOf(d)))
+      if (!sourceIssues.length || issues.some(d => d.severity === 'blocker' && !approvedSourceExclusionReason(table, reasonOf(d)))) continue
+      ctx.output[collection] = ctx.output[collection].filter(doc => doc._ref !== reference)
+      const mediaRef = ref('media', table, row.id!)
+      ctx.output.media = ctx.output.media.filter(doc => doc._ref !== mediaRef && !String(doc._ref).startsWith(`@media:blog_posts_content:${row.id}:`))
+      for (let i = ctx.contributions.length - 1; i >= 0; i--) {
+        const c = ctx.contributions[i]
+        if ((c.table === table && c.sourceId === row.id) || c.targetPath === reference) ctx.contributions.splice(i, 1)
+      }
+      for (let i = ctx.diagnostics.length - 1; i >= 0; i--) if (issues.includes(ctx.diagnostics[i])) ctx.diagnostics.splice(i, 1)
+      ctx.issue('SOURCE_ENTITY_EXCLUDED', table, row.id, undefined, 'warning', reasonOf(sourceIssues[0]))
+    }
+  }
 }

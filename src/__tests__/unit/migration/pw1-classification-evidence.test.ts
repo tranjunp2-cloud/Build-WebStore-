@@ -10,6 +10,50 @@ function row(table: string, id: string, storeId: string | null, rule: string, pa
 const store = () => row('stores', '1', '1', 'SOURCE_STORE_ID')
 const failure = (table: string, sourceId: string, reason: string): Diagnostic => ({ code: 'SOURCE_OWNERSHIP_UNRESOLVED', severity: 'blocker', table, sourceId, reason })
 
+describe('[TC-F42-EXP-113] Source domain receipt integrity', () => {
+  function domainRow(): RowDisposition {
+    const domain = row('store_domains', '10', '1', 'SOURCE_STORE_ID')
+    domain.disposition = 'mapped'
+    domain.fields = { id: 'mapped', store_id: 'mapped', domain: 'mapped', is_default: 'mapped', deleted_at: 'mapped' }
+    domain.contributions = [{ table: 'store_domains', sourceId: '10', storeId: '1', fields: Object.keys(domain.fields), targetPath: 'sites[].domain', rule: 'MASTER-4.1-SOURCE-SITE-DOMAIN' }]
+    return domain
+  }
+  const validate = (rows: RowDisposition[], refs = new Set(['@sites:stores:1']), enabled = true) => validateClassification(rows, [], undefined, [], true, refs, true, true, true, true, true, enabled)
+
+  it('accepts one complete mapped receipt for the emitted site', () => {
+    const rows = [store(), domainRow()]
+    expect(() => validate(rows)).not.toThrow()
+  })
+  it.each(['duplicate-receipt', 'second-source-row', 'missing-receipt', 'unemitted-site', 'missing-field', 'duplicate-field', 'unmapped-field', 'unknown-field', 'old-contract'])('rejects %s', mutation => {
+    // Arrange
+    const domain = domainRow(), rows = [store(), domain]
+    if (mutation === 'duplicate-receipt') domain.contributions.push(structuredClone(domain.contributions[0]))
+    if (mutation === 'second-source-row') {
+      const second = domainRow()
+      second.sourceId = '11'
+      second.contributions[0].sourceId = '11'
+      rows.push(second)
+    }
+    if (mutation === 'missing-receipt') domain.contributions = []
+    if (mutation === 'missing-field') domain.contributions[0].fields.pop()
+    if (mutation === 'duplicate-field') domain.contributions[0].fields.push('domain')
+    if (mutation === 'unmapped-field') domain.fields.domain = 'retained-source'
+    if (mutation === 'unknown-field') domain.contributions[0].fields.push('unknown')
+    const refs = mutation === 'unemitted-site' ? new Set<string>() : new Set(['@sites:stores:1'])
+    // Act / Assert
+    expect(() => validate(rows, refs, mutation !== 'old-contract')).toThrow('CLASSIFICATION_EVIDENCE_INVALID')
+  })
+  it('accepts optional source columns absent from both row and receipt', () => {
+    const domain = domainRow()
+    delete domain.fields.deleted_at
+    domain.contributions[0].fields = domain.contributions[0].fields.filter(field => field !== 'deleted_at')
+    expect(() => validate([store(), domain])).not.toThrow()
+  })
+  it('does not require source-domain receipts for historical contracts', () => {
+    expect(() => validate([store()], undefined, false)).not.toThrow()
+  })
+})
+
 describe('[TC-F42-EXP-083] Classification evidence graph', () => {
   it('accepts a child chain independent of report order', () => {
     const rows = [row('product_images', '3', '1', 'SOURCE_PARENT_RELATION', 'products', '2'), row('products', '2', '1', 'SOURCE_STORE_ID'), store()]

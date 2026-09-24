@@ -400,3 +400,182 @@ describe('[TC-F42-EXP-096] Exclusion boundaries and historical Orders', () => {
     expect(ctx.diagnostics.some(d=>d.severity==='blocker')).toBe(true)
   })
 })
+
+describe('[TC-F42-EXP-100] Canonical tuple inventory and partial invalid selections', () => {
+  const tables = () => ({
+    product_skus: [sku, {...sku,id:'4',sku:'alias',price:'1',stock:'99'}],
+    attributes: [{id:'5',store_id:'10',name:'Size'}],
+    attribute_values: [{id:'6',store_id:'10',attribute_id:'5',name:'S'}],
+    product_attributes: [{id:'7',product_id:'1',attribute_id:'5',attribute_value_id:'6'}],
+    product_variants: [{id:'8',product_sku_id:'3',attribute_id:'5',attribute_value_id:'6'},{id:'9',product_sku_id:'4',attribute_id:'5',attribute_value_id:'6'}],
+  })
+  it('uses numeric canonical SKU price and stock once regardless of CSV order', () => {
+    // Arrange
+    const source=tables(); source.product_skus.reverse()
+    // Act
+    const result=buildProductCatalogFromSource(product,source,'fixture',{allowSparseVariants:true,resolveDuplicateVariantTuples:true})
+    // Assert
+    expect(result.errors).toEqual([])
+    expect(result.fields).toMatchObject({price:10,inventory:2})
+    expect(result.skuCrosswalk).toHaveLength(2)
+    expect(result.warnings).toEqual([{code:'DUPLICATE_VARIANT_TUPLE_RESOLVED',sourceSkuId:'4',canonicalSourceSkuId:'3'}])
+  })
+  it('excludes a SKU with missing selections but retains the valid variant', () => {
+    // Arrange
+    const source=tables(); source.product_variants.pop()
+    // Act
+    const result=buildProductCatalogFromSource(product,source,'fixture',{allowSparseVariants:true,pruneInvalidVariantSkus:true})
+    // Assert
+    expect(result.errors).toEqual([])
+    expect(result.fields).toMatchObject({price:10,inventory:2})
+    expect(result.excludedSkus).toEqual([{sourceSkuId:'4',reasons:['SOURCE_SELECTED_TIER_COUNT','MISSING_SELECTION']}])
+  })
+  it('quarantines when all selections are missing and never waives foreign ownership', () => {
+    // Arrange
+    const source=tables(); source.product_variants=[]
+    // Act
+    const result=buildProductCatalogFromSource(product,source,'fixture',{allowSparseVariants:true,pruneInvalidVariantSkus:true})
+    source.product_skus[1].store_id='99'
+    const foreign=buildProductCatalogFromSource(product,source,'fixture',{allowSparseVariants:true,pruneInvalidVariantSkus:true})
+    // Assert
+    expect(result.errors.map(e=>e.code)).toContain('SOURCE_NO_VALID_VARIANT')
+    expect(foreign.errors.map(e=>e.code)).toContain('SOURCE_SKU_OWNER_MISMATCH')
+  })
+})
+
+describe('[TC-F42-EXP-100] Inactive SKU mapping consistency', () => {
+  it('retains an inactive Product using its inactive SKU and records that SKU contribution', () => {
+    // Arrange
+    const ctx=context({stores:[{id:'10',currency_id:'1'}],currencies:[{id:'1',code:'MYR'}],products:[{...product,status:'0'}],product_skus:[{...sku,status:'0'}],categories:[category]},true,{allowInactiveSkusForInactiveProduct:true})
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toHaveLength(1)
+    expect(ctx.output.products[0]).toMatchObject({status:'draft',inventory:2,price:10})
+    expect(ctx.contributions).toContainEqual(expect.objectContaining({table:'product_skus',sourceId:'3'}))
+  })
+})
+
+describe('TC-F42-EXP-104: explicit Product exclusions', () => {
+  const base = () => ({ stores: [{ id: '10', currency_id: '1' }], currencies: [{ id: '1', code: 'MYR' }], categories: [category], products: [product], product_skus: [sku] })
+  it.each([false, true])('keeps lowest numeric Product ID for normalized slug (reversed=%s)', reverse => {
+    // Arrange
+    const tables = base()
+    tables.products = [{ ...product, id: '100', slug: ' ITEM ' }, { ...product, id: '9' }, { ...product, id: '8', store_id: '99' }]
+    tables.product_skus = [{ ...sku, product_id: '9' }, { ...sku, id: '4', product_id: '100', sku: 'OTHER' }]
+    if (reverse) tables.products.reverse()
+    const ctx = context(tables, true, { excludeDuplicateProductSlugs: true })
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products.map(p => p._ref)).toEqual(['@products:products:9'])
+    expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'PRODUCT_CATALOG_POLICY_EXCLUDED', sourceId: '100', severity: 'warning', reason: 'DUPLICATE_PRODUCT_SLUG' }))
+    expect(ctx.contributions.some(c => c.table === 'products' && c.sourceId === '100')).toBe(false)
+  })
+  it('excludes variant Product missing a domain while retaining simple Products', () => {
+    // Arrange
+    const tables = base()
+    tables.products.push({ ...product, id: '2', slug: 'simple' })
+    tables.product_skus.push({ ...sku, id: '4', sku: 'OTHER' }, { ...sku, id: '5', product_id: '2', sku: 'SIMPLE' })
+    const ctx = context(tables, true, { excludeProductsWithoutValidVariants: true })
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products.map(p => p._ref)).toEqual(['@products:products:2'])
+    expect(ctx.output.products[0].hasVariants).toBe(false)
+    expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'PRODUCT_CATALOG_POLICY_EXCLUDED', sourceId: '1', reason: 'MISSING_VARIANT_DOMAIN', severity: 'warning' }))
+  })
+  it.each([false, true])('all invalid variant selections excluded only without ownership errors (foreign=%s)', foreign => {
+    // Arrange
+    const tables = { ...base(), attributes: [{ id: '5', store_id: '10', name: 'Size' }], attribute_values: [{ id: '6', store_id: '10', attribute_id: '5', name: 'S' }], product_attributes: [{ id: '7', product_id: '1', attribute_id: '5', attribute_value_id: '6' }], product_variants: [] }
+    if (foreign) tables.product_skus.push({ ...sku, id: '4', store_id: '99' })
+    const ctx = context(tables, true, { pruneInvalidVariantSkus: true, excludeProductsWithoutValidVariants: true })
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toEqual([])
+    if (foreign) {
+      expect(ctx.diagnostics.some(d => d.code === 'SOURCE_SKU_OWNER_MISMATCH' && d.severity === 'blocker')).toBe(true)
+      expect(ctx.diagnostics.some(d => d.code === 'PRODUCT_CATALOG_POLICY_EXCLUDED')).toBe(false)
+    } else expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'PRODUCT_CATALOG_POLICY_EXCLUDED', reason: 'NO_VALID_VARIANTS', severity: 'warning' }))
+  })
+})
+
+describe('TC-F42-EXP-105: invalid source record rollback', () => {
+  it('removes a source-invalid Product and its newly-created media/contributions', () => {
+    // Arrange
+    const ctx = context({ stores: [{ id: '10', currency_id: '1' }], currencies: [{ id: '1', code: 'MYR' }], categories: [category], products: [{ ...product, name: 'x' }], product_skus: [sku], product_images: [{ id: '9', product_id: '1', url: 'https://example.test/image.png', created_at: product.created_at, updated_at: product.updated_at }] }, true, { excludeInvalidProducts: true })
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toEqual([])
+    expect(ctx.output.media).toEqual([])
+    expect(ctx.contributions.some(c => ['products', 'product_images'].includes(c.table))).toBe(false)
+    expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'SOURCE_ENTITY_EXCLUDED', table: 'products', sourceId: '1', reason: 'PRODUCT_NAME_TOO_SHORT' }))
+  })
+  it('keeps an unexpected programming exception as a blocker without leaking its message', () => {
+    // Arrange
+    const ctx = context({ stores: [{ id: '10', currency_id: '1' }], currencies: [{ id: '1', code: 'MYR' }], products: [product], product_skus: [sku] }, true, { excludeInvalidProducts: true })
+    const find = ctx.find
+    ctx.find = (table, id) => { if (table === 'categories') throw new TypeError('PRIVATE_ERROR_CANARY'); return find(table, id) }
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'PRODUCT_MAPPING_INVALID', severity: 'blocker', reason: 'UNEXPECTED_MAPPING_ERROR' }))
+    expect(ctx.diagnostics.some(d => d.code === 'SOURCE_ENTITY_EXCLUDED')).toBe(false)
+    expect(JSON.stringify(ctx.diagnostics)).not.toContain('PRIVATE_ERROR_CANARY')
+  })
+})
+
+describe('[TC-F42-EXP-109] Products in inactive categories are omitted explicitly', () => {
+  function source(categories: Row[] = [category]) {
+    return { stores: [{ id: '10', currency_id: '1' }], currencies: [{ id: '1', code: 'MYR' }], products: [product], product_skus: [sku], categories }
+  }
+  it('omits the whole Product without contributions and preserves historical Order snapshot values', () => {
+    // Arrange
+    const ctx = context(source(), true, { excludeProductsInInactiveCategories: true, preserveHistoricalOrders: true })
+    // Act
+    mapCatalog(ctx)
+    const item = historicalOrderItem(ctx, { id: '91', store_id: '10', product_sku_id: '3', name: 'Original historical item', quantity: '3', price: '23.50', variant: 'Original selection' }, 'MYR')
+    // Assert
+    expect(ctx.output.products).toEqual([])
+    expect(ctx.output.media).toEqual([])
+    expect(ctx.contributions.filter(c => c.table === 'products' || c.table === 'product_skus')).toEqual([])
+    expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'PRODUCT_CATALOG_POLICY_EXCLUDED', table: 'products', sourceId: '1', severity: 'warning', reason: 'INACTIVE_CATEGORY' }))
+    expect(ctx.diagnostics.some(d => d.code === 'PRODUCT_INACTIVE_CATEGORY_OMITTED' || d.severity === 'blocker')).toBe(false)
+    expect(item).toMatchObject({ productName: 'Original historical item', quantity: 3, unitPrice: 23.5, variant: 'Original selection' })
+    expect(item).not.toHaveProperty('product')
+  })
+  it('retains historical policy behavior when the new omission flag is absent', () => {
+    // Arrange
+    const ctx = context(source())
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toHaveLength(1)
+    expect(ctx.diagnostics.some(d => d.reason === 'INACTIVE_CATEGORY')).toBe(false)
+  })
+  it('keeps a Product whose category is active', () => {
+    // Arrange
+    const ctx = context(source([{ ...category, status: '1' }]), true, { excludeProductsInInactiveCategories: true })
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.output.products).toHaveLength(1)
+    expect(ctx.diagnostics.some(d => d.reason === 'INACTIVE_CATEGORY')).toBe(false)
+  })
+  it.each([
+    ['missing', []],
+    ['deleted', [{ ...category, deleted_at: '2025-01-01 00:00:00' }]],
+    ['foreign', [{ ...category, store_id: '99' }]],
+    ['unknown status', [{ ...category, status: '9' }]],
+  ] as const)('does not disguise %s category problems as approved inactive omission', (_name, categories) => {
+    // Arrange
+    const ctx = context(source([...categories]), true, { excludeProductsInInactiveCategories: true })
+    // Act
+    mapCatalog(ctx)
+    // Assert
+    expect(ctx.diagnostics.some(d => d.reason === 'INACTIVE_CATEGORY')).toBe(false)
+    expect(ctx.diagnostics.some(d => d.severity === 'blocker')).toBe(true)
+  })
+})

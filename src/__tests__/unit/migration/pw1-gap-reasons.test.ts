@@ -32,76 +32,32 @@ const setting: Row = {
   value: 'Display',
 }
 
-describe('[TC-F42-060] Store setting ownership resolution', () => {
-  it('retains source row and records evidence only for an exact live Store model', () => {
+describe('[TC-F42-EXP-112] Settings lookup preserves raw rows within its caller parent scope', () => {
+  it('leaves source rows unchanged and preserves an exact model and ID match', () => {
     // Arrange
     const ctx = context({ stores: [{ id: '10' }], model_settings: [setting] })
     const original = structuredClone(setting)
     // Act
-    const result = settings(ctx, 'Store', '10', 'settings')
+    const result = settings(ctx, 'Store', '10', 'sites.raw_model_settings')
     // Assert
     expect(result).toEqual([original])
     expect(setting).toEqual(original)
-    expect(ctx.diagnostics).toEqual([
-      expect.objectContaining({
-        code: 'RAW_OWNERSHIP_RESOLVED_FROM_STORE_MODEL',
-        severity: 'warning',
-      }),
-    ])
-    expect(ctx.contributions).toContainEqual(
-      expect.objectContaining({
-        fields: ['model_type', 'model_id'],
-        rule: 'MASTER_RAW_STORE_MODEL_OWNERSHIP',
-      }),
-    )
+    expect(ctx.diagnostics).toEqual([])
+    expect(ctx.contributions).toHaveLength(1)
   })
   it.each([
-    ['missing Store', [], setting, 'Store', '10', 'RAW_OWNERSHIP_MISSING'],
-    [
-      'deleted Store',
-      [{ id: '10', deleted_at: '2020-01-01' }],
-      setting,
-      'Store',
-      '10',
-      'RAW_OWNERSHIP_MISSING',
-    ],
-    [
-      'conflicting owner',
-      [{ id: '10' }],
-      { ...setting, store_id: '11' },
-      'Store',
-      '10',
-      'RAW_OWNERSHIP_MISMATCH',
-    ],
-    [
-      'different Store',
-      [{ id: '10' }, { id: '11' }],
-      { ...setting, model_id: '11' },
-      'Store',
-      '11',
-      'RAW_OWNERSHIP_MISSING',
-    ],
-    [
-      'other model',
-      [{ id: '10' }],
-      { ...setting, model_type: 'App\\Models\\Page' },
-      'Page',
-      '10',
-      'RAW_OWNERSHIP_MISSING',
-    ],
-  ] as const)(
-    'does not infer ownership for %s',
-    (_name, stores, row, model, id, code) => {
-      // Arrange
-      const ctx = context({ stores: [...stores], model_settings: [row] })
-      // Act
-      const result = settings(ctx, model, id, 'settings')
-      // Assert
-      expect(result).toEqual([])
-      expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code }))
-      expect(ctx.contributions).toEqual([])
-    },
-  )
+    { ...setting, store_id: '11' },
+    { ...setting, model_id: '11' },
+    { ...setting, model_type: 'App\\Models\\Page' },
+  ])('does not nest a setting with conflicting direct Store/model/ID %#', row => {
+    // Arrange
+    const ctx = context({ stores: [{ id: '10' }], model_settings: [row] })
+    // Act
+    const result = settings(ctx, 'Store', '10', 'sites.raw_model_settings')
+    // Assert
+    expect(result).toEqual([])
+    expect(ctx.contributions).toEqual([])
+  })
 })
 
 describe('[TC-F42-061] Scoped raw grammar and safe reasons', () => {
@@ -119,11 +75,11 @@ describe('[TC-F42-061] Scoped raw grammar and safe reasons', () => {
       const result = rawRow(
         ctx,
         'stores',
-        { id: '1', social_channel: value },
+        { id: '1', description: value },
         'raw',
       )
       // Assert
-      expect(result).not.toHaveProperty('social_channel')
+      expect(result).not.toHaveProperty('description')
       expect(ctx.diagnostics).toContainEqual(
         expect.objectContaining({ code: 'RAW_VALUE_UNVERIFIED', reason }),
       )
@@ -131,7 +87,7 @@ describe('[TC-F42-061] Scoped raw grammar and safe reasons', () => {
       expect(JSON.stringify(ctx.diagnostics)).not.toContain('unverified_field')
     },
   )
-  it('separates unknown setting keys from invalid supported settings', () => {
+  it('TC-F42-EXP-112: preserves setting payloads without interpreting their values', () => {
     // Arrange
     const ctx = context()
     // Act
@@ -148,10 +104,8 @@ describe('[TC-F42-061] Scoped raw grammar and safe reasons', () => {
       'raw',
     )
     // Assert
-    expect(ctx.diagnostics.map(({ reason }) => reason)).toEqual([
-      'UNKNOWN_SETTING_KEY',
-      'INVALID_SETTING_VALUE',
-    ])
+    expect(ctx.diagnostics).toEqual([])
+    expect(ctx.contributions.map(row => row.sourceId)).toEqual(['1', '2'])
   })
   it('allows verified template/menu declarations only on their source fields', () => {
     // Arrange
@@ -187,9 +141,9 @@ describe('[TC-F42-061] Scoped raw grammar and safe reasons', () => {
     expect(template.config).toBe(config)
     expect(store).not.toHaveProperty('social_channel')
     expect(menu).toHaveProperty('config')
-    expect(secret).not.toHaveProperty('config')
+    expect(secret.config).toBe('{"component":{"token":"fixture-secret"}}')
   })
-  it('allows public navigation queries without widening media or signed URL policy', () => {
+  it('preserves original Page/Menu navigation and media strings', () => {
     // Arrange
     const ctx = context()
     const url = 'https://example.test/catalog?page=2'
@@ -203,8 +157,8 @@ describe('[TC-F42-061] Scoped raw grammar and safe reasons', () => {
     )
     // Assert
     expect(row.url).toBe(url)
-    expect(row).not.toHaveProperty('image')
-    expect(signed).not.toHaveProperty('url')
+    expect(row.image).toBe(url)
+    expect(signed.url).toBe('https://example.test/?token=fixture-secret')
   })
 })
 
@@ -316,7 +270,7 @@ describe('[TC-F42-062] Catalog reason classification preserves quarantine', () =
 
 // Navigation validation must not treat polymorphic ownership metadata as a URL.
 describe('[TC-F42-061] Raw navigation field boundaries', () => {
-  it('keeps MenuLine owner metadata and checks every URL in navigation arrays', () => {
+  it('preserves MenuLine settings and opaque navigation arrays', () => {
     // Arrange
     const ctx = context()
     const row = {
@@ -344,9 +298,7 @@ describe('[TC-F42-061] Raw navigation field boundaries', () => {
     // Assert
     expect(result).toEqual(row)
     expect(valid).toHaveProperty('url')
-    expect(unsafe).not.toHaveProperty('url')
-    expect(ctx.diagnostics).toContainEqual(
-      expect.objectContaining({ sourceId: '3', reason: 'UNSAFE_URL' }),
-    )
+    expect(unsafe.url).toBe('["javascript:alert(1)"]')
+    expect(ctx.diagnostics).toEqual([])
   })
 })

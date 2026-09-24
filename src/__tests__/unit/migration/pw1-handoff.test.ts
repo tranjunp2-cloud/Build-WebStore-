@@ -30,3 +30,19 @@ describe('[TC-F42-EXP-090] Source handoff triage', () => {
     expect(result.globalIssues[0].sourceIds).toEqual(['99'])
   })
 })
+
+
+describe('[TC-F42-EXP-111] Proven raw/technical handoff scope', () => {
+  it('does not turn a source-only Page ownership warning into global review', () => {
+    // Arrange
+    const stores = [{ storeId: '1', exportStatus: 'emitted' }]
+    const warning = { code: 'SOURCE_OWNERSHIP_UNRESOLVED', severity: 'warning' as const, table: 'page_components', sourceId: '9', reason: 'OWNERSHIP_PARENT_UNVERIFIED' }
+    // Act
+    const approved = buildHandoff(stores, [{ code: 'PAGE_MENU_RAW_SOURCE_ONLY', table: 'page_components', severity: 'warning' }, warning])
+    const historical = buildHandoff(stores, [warning])
+    // Assert
+    expect(approved.counts.source_diagnostics_clear).toBe(1)
+    expect(approved.globalIssues).toEqual([])
+    expect(historical.counts.global_review_required).toBe(1)
+  })
+})

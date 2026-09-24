@@ -23,11 +23,11 @@ export function packageWeightKg(row: Row): number | undefined {
 }
 
 /** Missing is not invalid: foreign ownership, unknown status and bad numeric values stay blockers. */
-export function missingProductData(product: Row, skus: Row[]): import('../product-exclusions').ProductExclusion | undefined {
+export function missingProductData(product: Row, skus: Row[], allowInactive = false): import('../product-exclusions').ProductExclusion | undefined {
   if (!product.id || !live(product) || !['0','1'].includes(product.status ?? '')) return undefined
   const owned = skus.filter(s => s.product_id === product.id)
   if (owned.some(s => live(s) && (s.store_id !== product.store_id || !['0','1'].includes(s.status ?? '')))) return undefined
-  const eligible = owned.filter(s => live(s) && s.store_id === product.store_id && s.status === '1')
+  const eligible = owned.filter(s => live(s) && s.store_id === product.store_id && (s.status === '1' || (allowInactive && product.status === '0' && s.status === '0')))
   if (!eligible.length) {
     if (!owned.length) return { productId: product.id, reason: 'NO_SKU_ROWS' }
     if (!owned.some(s => live(s) && s.store_id === product.store_id)) return { productId: product.id, reason: 'NO_LIVE_OWNED_SKU' }

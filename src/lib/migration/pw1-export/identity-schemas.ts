@@ -54,7 +54,7 @@ const tenantSchema = z
 const userSchema = z
   .object({
     _ref: reference,
-    email: z.string().email(),
+    email: z.string(),
     firstName: z.string().min(1),
     lastName: z.string(),
     phone: z.string().nullable(),

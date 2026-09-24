@@ -39,7 +39,7 @@ export function references(
     )
       visit(value.value, path + '.value')
     for (const [child, v] of Object.entries(value))
-      if (!['_ref', 'pw1_source', 'menus'].includes(child))
+      if (!['_ref', 'pw1_source', 'menus', 'model_settings', 'raw_model_settings'].includes(child))
         references(v, `${path}.${child}`, visit, child)
   }
 }
@@ -94,7 +94,9 @@ export function operationalIssues(stores: StoreOutput[], userActors?: UserActors
             ? ['slug']
             : ['products', 'blogs', 'blog_categories'].includes(root)
               ? ['slug']
-              : root === 'users'
+              : root === 'sites'
+                ? ['domain']
+                : root === 'users'
                 ? ['email']
                 : root === 'orders'
                   ? ['orderNumber']

@@ -1,3 +1,4 @@
+import { readFixtureMasterText, writeFixtureMaster } from '@/__tests__/helpers/pw1-master-artifact'
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
@@ -83,7 +84,7 @@ describe('PW1 export real CLI subprocess', () => {
       two = path.join(root, 'two')
     const first = await run(exportArgs(input, configPath, one))
     expect(first.code, first.stderr).toBe(0)
-    const bytes = await readFile(path.join(one, 'master.json'), 'utf8'),
+    const bytes = await readFixtureMasterText(one),
       master = JSON.parse(bytes)
     expect(
       master,
@@ -113,7 +114,7 @@ describe('PW1 export real CLI subprocess', () => {
       ...JSON.parse(first.stdout),
       outputDir: '',
     })
-    expect(await readFile(path.join(two, 'master.json'), 'utf8')).toBe(bytes)
+    expect(await readFixtureMasterText(two)).toBe(bytes)
     const validated = await run(['--validate-only', '--artifact-dir', one])
     expect(validated.code, validated.stderr).toBe(0)
     expect(validated.stderr).toContain('validate-artifact')
@@ -131,7 +132,7 @@ describe('PW1 export real CLI subprocess', () => {
     })
     const overwritten = await run(exportArgs(input, configPath, one))
     expect(overwritten.code).toBe(1)
-    expect(await readFile(path.join(one, 'master.json'), 'utf8')).toBe(bytes)
+    expect(await readFixtureMasterText(one)).toBe(bytes)
   }, 30000)
   it('TC-F42-EXP-016: globally conflicting Users block both Stores without claiming their rows mapped', async () => {
     const { input, configPath } = await writeExportFixture(root),
@@ -146,7 +147,7 @@ describe('PW1 export real CLI subprocess', () => {
     )
     expect((await run(exportArgs(input, configPath, output))).code).toBe(0)
     const master = JSON.parse(
-      await readFile(path.join(output, 'master.json'), 'utf8'),
+      await readFixtureMasterText(output),
     )
     expect(master).toHaveLength(1)
     expect(master[0].tenants[0].metaData.pw1StoreId).toBe('9007199254740993')
@@ -283,9 +284,9 @@ describe('PW1 export real CLI subprocess', () => {
     const { input, configPath } = await writeExportFixture(root),
       output = path.join(root, 'artifact')
     expect((await run(exportArgs(input, configPath, output))).code).toBe(0)
-    const masterPath = path.join(output, 'master.json'),
+    const masterPath = path.join(output, 'master-0001.json'),
       original = await readFile(masterPath, 'utf8')
-    await writeFile(masterPath, original + ' ')
+    await writeFile(masterPath, original.slice(0, -1) + ' ')
     const changed = await run(['--validate-only', '--artifact-dir', output])
     expect(changed.code).toBe(1)
     expect(changed.stderr).toContain('ARTIFACT_HASH_MISMATCH')
@@ -299,11 +300,7 @@ describe('PW1 export real CLI subprocess', () => {
     expect(mismatch.code).toBe(1)
     expect(mismatch.stderr).toContain('ARTIFACT_STATUS_INCONSISTENT')
     // Even rehashed invalid JSON shape fails runtime schema validation.
-    await writeFile(masterPath, '[{"tenants":[]}]')
-    manifest.artifacts['master.json'] = createHash('sha256')
-      .update('[{"tenants":[]}]')
-      .digest('hex')
-    await writeFile(manifestPath, JSON.stringify(manifest))
+    await writeFixtureMaster(output, [{ tenants: [] }])
     const schema = await run(['--validate-only', '--artifact-dir', output])
     expect(schema.code).toBe(1)
     expect(schema.stderr).toContain('MASTER_SCHEMA_INVALID')
@@ -350,7 +347,7 @@ it('TC-F42-077: keeps approved Store deferral separate from blocking and validat
   // Act
   const exported = await run(exportArgs(input, configPath, output));
   const manifest = JSON.parse(await readFile(path.join(output, 'master-manifest.json'), 'utf8'));
-  const master = JSON.parse(await readFile(path.join(output, 'master.json'), 'utf8'));
+  const master = JSON.parse(await readFixtureMasterText(output));
   const checked = await run(['--validate-only', '--artifact-dir', output]);
   // Assert
   expect(exported.code, exported.stderr).toBe(0);

@@ -50,7 +50,15 @@ export function sourceCatalog(
       "\0" +
       id +
       "\0" +
-      Boolean(ctx.config.migrationPolicy?.allowSparseVariants);
+      Boolean(ctx.config.migrationPolicy?.allowSparseVariants) +
+      "\0" +
+      Boolean(ctx.config.migrationPolicy?.resolveDuplicateVariantTuples) +
+      "\0" +
+      Boolean(ctx.config.migrationPolicy?.treatSingleSkuWithoutSelectionsAsSimple) +
+      "\0" +
+      Boolean(ctx.config.migrationPolicy?.pruneUnreferencedTiers) +
+      "\0" +
+      Boolean(ctx.config.migrationPolicy?.allowInactiveSkusForInactiveProduct) + "\0" + Boolean(ctx.config.migrationPolicy?.pruneInvalidVariantSkus);
   const cached = index.results.get(cacheKey);
   if (cached) return cached;
   const skus = index.skus.get(id) ?? [],
@@ -79,7 +87,14 @@ export function sourceCatalog(
     product,
     tables,
     ctx.config.sourceInstanceToken,
-    { allowSparseVariants: ctx.config.migrationPolicy?.allowSparseVariants },
+    {
+      allowSparseVariants: ctx.config.migrationPolicy?.allowSparseVariants,
+      pruneInvalidVariantSkus: ctx.config.migrationPolicy?.pruneInvalidVariantSkus,
+      resolveDuplicateVariantTuples: ctx.config.migrationPolicy?.resolveDuplicateVariantTuples,
+      treatSingleSkuWithoutSelectionsAsSimple: ctx.config.migrationPolicy?.treatSingleSkuWithoutSelectionsAsSimple,
+      pruneUnreferencedTiers: ctx.config.migrationPolicy?.pruneUnreferencedTiers,
+      allowInactiveSkusForInactiveProduct: ctx.config.migrationPolicy?.allowInactiveSkusForInactiveProduct,
+    },
   );
   index.results.set(cacheKey, result);
   return result;

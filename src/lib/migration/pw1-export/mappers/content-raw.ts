@@ -1,6 +1,7 @@
-import { PRODUCT_EXCLUSION_CODE } from '../product-exclusions'
-import { ref, type Doc, type MappingContext } from '../contracts'
-import { rawChildren, rawRow, settings, sourceOrder } from './raw'
+import { sourceExclusionDiagnostic } from '../source-exclusions'
+import { isProductExclusionDiagnostic } from '../product-exclusions'
+import { live, ref, type Doc, type MappingContext } from '../contracts'
+import { rawChildren, rawRow, settings, remainingSettings, sourceOrder } from './raw'
 
 export function mapRawContent(ctx: MappingContext): void {
   const site = ctx.output.sites[0]
@@ -9,21 +10,16 @@ export function mapRawContent(ctx: MappingContext): void {
   if (store) {
     rawRow(ctx, 'stores', store, 'sites.pw1_source.store')
     const template = ctx.find('frontend_templates', store.frontend_template_id)
-    if (template) rawRow(ctx, 'frontend_templates', template, 'sites.pw1_source.frontend_template')
+    if (template) site.raw_frontend_template = rawRow(ctx, 'frontend_templates', template, 'sites.raw_frontend_template')
     if (store.frontend_template_id && !template)
       ctx.issue(
         'RAW_TEMPLATE_MISSING',
         'stores',
         store.id,
         'frontend_template_id',
+        'warning',
       )
   }
-  settings(
-    ctx,
-    'Store',
-    ctx.storeId,
-    'sites.pw1_source.model_settings',
-  )
   for (const table of [
     'brands',
     'categories',
@@ -37,7 +33,9 @@ export function mapRawContent(ctx: MappingContext): void {
     ctx
       .rows(table, true)
       .sort(sourceOrder)
-      .filter(row => table !== 'products' || !ctx.diagnostics.some(d => d.code === PRODUCT_EXCLUSION_CODE && d.storeId === ctx.storeId && d.sourceId === row.id))
+      .filter(row => table !== 'products' || live(row))
+      .filter(row => !ctx.diagnostics.some(d=> { const ex=sourceExclusionDiagnostic(d); return ex?.table===table && ex.storeId===ctx.storeId && ex.sourceId===row.id }))
+      .filter(row => table !== 'products' || !ctx.diagnostics.some(d => isProductExclusionDiagnostic(d) && d.storeId === ctx.storeId && d.sourceId === row.id))
       .forEach((row) => { rawRow(ctx, table, row, `sites.pw1_source.${table}`) })
   }
   const categoryIds = new Set(ctx.rows('categories', true).map((row) => row.id))
@@ -102,6 +100,7 @@ export function mapRawContent(ctx: MappingContext): void {
           'page_components',
           id,
           'frontend_component_id',
+          'warning',
         )
       return component
     })
@@ -125,6 +124,7 @@ export function mapRawContent(ctx: MappingContext): void {
           model === 'MenuItem' ? 'menu_items' : 'menu_lines',
           String(doc.id),
           'type_id',
+          'warning',
         )
     } else doc.menu_line_type = null
     return doc
@@ -159,4 +159,5 @@ export function mapRawContent(ctx: MappingContext): void {
       })
       return menu
     })
+  site.raw_model_settings = remainingSettings(ctx)
 }

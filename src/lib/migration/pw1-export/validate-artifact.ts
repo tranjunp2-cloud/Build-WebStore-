@@ -1,3 +1,8 @@
+import { validateRawSettings } from './raw-settings-proof'
+import { legacyModelSettingsValid, legacyRawContentValid } from './legacy-raw-content'
+import { PAGE_MENU_TABLES } from './approved-source-scope'
+import { readMasterParts } from './master-parts'
+import { assertApprovedMigrationPolicy } from './policy-boundary'
 import * as legacyOutcome from './export-outcome-v1'
 import { exportOutcome, exportReview, reviewMarkdown, externalArchiveKeys } from './export-outcome'
 import { EXTERNAL_SOURCE_RULE } from './external-source'
@@ -13,10 +18,10 @@ import {
 import type { StoreOutput } from './contracts'
 import { lstat } from 'node:fs/promises'
 import path from 'node:path'
-import { manifestSchema, reportSchema, storeSchema, legacyStoreSchema, previousStoreSchema, statusStoreSchema } from './artifact-schemas'
+import { manifestSchema, reportSchema, storeSchema, conflictStoreSchema, preConflictStoreSchema, legacyStoreSchema, previousStoreSchema, statusStoreSchema } from './artifact-schemas'
 import { operationalIssues } from './validate-master'
 import { checkedFile } from './csv-loader'
-import { VARIANT_MASTER_SHA256, BLOG_CONTENT_MASTER_SHA256, BLOG_OWNER_MASTER_SHA256, DESCRIPTION_MASTER_SHA256, CORRECTED_OUTCOME_MASTER_SHA256, MASTER_SHA256, OUTCOME_MASTER_SHA256, ARCHIVE_MASTER_SHA256, STATUS_MASTER_SHA256, PREVIOUS_MASTER_SHA256, LEGACY_MASTER_SHA256, EXPORT_VERSION } from './master-version'
+import { RAW_SETTINGS_MASTER_SHA256, APPROVED_SCOPE_MASTER_SHA256, CATALOG_SOCIAL_MEDIA_MASTER_SHA256, MODEL_SETTINGS_MASTER_SHA256, MULTIPART_MASTER_SHA256, NEGATIVE_ORDER_MASTER_SHA256, SOURCE_OMISSION_MASTER_SHA256, PRODUCT_CATALOG_MASTER_SHA256, OWNER_EMAIL_MASTER_SHA256, CONFLICT_MASTER_SHA256, POLICY_BOUNDARY_MASTER_SHA256, BLOG_CATEGORY_MASTER_SHA256, PRODUCT_EXCLUSION_MASTER_SHA256, VARIANT_MASTER_SHA256, BLOG_CONTENT_MASTER_SHA256, BLOG_OWNER_MASTER_SHA256, DESCRIPTION_MASTER_SHA256, CORRECTED_OUTCOME_MASTER_SHA256, MASTER_SHA256, OUTCOME_MASTER_SHA256, ARCHIVE_MASTER_SHA256, STATUS_MASTER_SHA256, PREVIOUS_MASTER_SHA256, LEGACY_MASTER_SHA256, EXPORT_VERSION } from './master-version'
 import { ExportError } from './primitives'
 export async function validateArtifact(directory: string) {
   if ((await lstat(directory)).isSymbolicLink())
@@ -33,32 +38,47 @@ export async function validateArtifact(directory: string) {
   const parsed = manifestSchema.safeParse(await parse('master-manifest.json'))
   if (!parsed.success) throw new ExportError('MANIFEST_SCHEMA_INVALID')
   const manifest = parsed.data
+  assertApprovedMigrationPolicy(manifest.migrationPolicy, !['1.9.0', '1.9.1', '1.9.2', '1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.9.1', '1.9.2', '1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.9.2', '1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion))
+  if (manifest.migrationPolicy?.approvedNegativeTotalOrders?.length && (manifest.sourceSnapshot.sourceInstance !== 'PW1PROD' || manifest.sourceSnapshot.sourceInstanceToken !== 'PW1PROD')) throw new ExportError('NEGATIVE_ORDER_POLICY_SOURCE_SCOPE_INVALID')
   const legacy = manifest.contractSha256 === LEGACY_MASTER_SHA256 && manifest.exporterVersion === '1.0.0'
   const previous = manifest.contractSha256 === PREVIOUS_MASTER_SHA256 && ['1.1.0', '1.2.0'].includes(manifest.exporterVersion)
   const archiveVersion = manifest.contractSha256 === ARCHIVE_MASTER_SHA256 && manifest.exporterVersion === '1.4.0'
   const outcomeVersion = manifest.contractSha256 === OUTCOME_MASTER_SHA256 && manifest.exporterVersion === '1.5.0'
-  const current = (manifest.contractSha256 === VARIANT_MASTER_SHA256 && manifest.exporterVersion === '1.7.0') || (manifest.contractSha256 === BLOG_CONTENT_MASTER_SHA256 && manifest.exporterVersion === '1.6.2') || (manifest.contractSha256 === BLOG_OWNER_MASTER_SHA256 && manifest.exporterVersion === '1.6.1') || (manifest.contractSha256 === DESCRIPTION_MASTER_SHA256 && manifest.exporterVersion === '1.6.0') || (manifest.contractSha256 === MASTER_SHA256 && manifest.exporterVersion === EXPORT_VERSION) || (manifest.contractSha256 === CORRECTED_OUTCOME_MASTER_SHA256 && manifest.exporterVersion === '1.5.1')
+  const current = (manifest.contractSha256 === RAW_SETTINGS_MASTER_SHA256 && manifest.exporterVersion === '1.10.4') || (manifest.contractSha256 === APPROVED_SCOPE_MASTER_SHA256 && manifest.exporterVersion === '1.10.3') || (manifest.contractSha256 === CATALOG_SOCIAL_MEDIA_MASTER_SHA256 && manifest.exporterVersion === '1.10.2') || (manifest.contractSha256 === MODEL_SETTINGS_MASTER_SHA256 && manifest.exporterVersion === '1.10.1') || (manifest.contractSha256 === MULTIPART_MASTER_SHA256 && manifest.exporterVersion === '1.10.0') || (manifest.contractSha256 === NEGATIVE_ORDER_MASTER_SHA256 && manifest.exporterVersion === '1.9.4') || (manifest.contractSha256 === SOURCE_OMISSION_MASTER_SHA256 && manifest.exporterVersion === '1.9.3') || (manifest.contractSha256 === PRODUCT_CATALOG_MASTER_SHA256 && manifest.exporterVersion === '1.9.2') || (manifest.contractSha256 === OWNER_EMAIL_MASTER_SHA256 && manifest.exporterVersion === '1.9.1') || (manifest.contractSha256 === CONFLICT_MASTER_SHA256 && manifest.exporterVersion === '1.9.0') || (manifest.contractSha256 === POLICY_BOUNDARY_MASTER_SHA256 && manifest.exporterVersion === '1.8.2') || (manifest.contractSha256 === BLOG_CATEGORY_MASTER_SHA256 && manifest.exporterVersion === '1.8.1') || (manifest.contractSha256 === PRODUCT_EXCLUSION_MASTER_SHA256 && manifest.exporterVersion === '1.8.0') || (manifest.contractSha256 === VARIANT_MASTER_SHA256 && manifest.exporterVersion === '1.7.0') || (manifest.contractSha256 === BLOG_CONTENT_MASTER_SHA256 && manifest.exporterVersion === '1.6.2') || (manifest.contractSha256 === BLOG_OWNER_MASTER_SHA256 && manifest.exporterVersion === '1.6.1') || (manifest.contractSha256 === DESCRIPTION_MASTER_SHA256 && manifest.exporterVersion === '1.6.0') || (manifest.contractSha256 === MASTER_SHA256 && manifest.exporterVersion === EXPORT_VERSION) || (manifest.contractSha256 === CORRECTED_OUTCOME_MASTER_SHA256 && manifest.exporterVersion === '1.5.1')
   const statusVersion = manifest.contractSha256 === STATUS_MASTER_SHA256 && manifest.exporterVersion === '1.3.0'
   if (!legacy && !previous && !statusVersion && !archiveVersion && !outcomeVersion && !current)
     throw new ExportError('UNSUPPORTED_MAPPING_CONTRACT')
-  if (['1.2.0', '1.3.0', '1.4.0', '1.5.0', '1.5.1', '1.6.0', '1.6.1', '1.6.2', '1.7.0', EXPORT_VERSION].includes(manifest.exporterVersion) && manifest.classificationVersion !== 'source-classification-v1')
+  if (['1.2.0', '1.3.0', '1.4.0', '1.5.0', '1.5.1', '1.6.0', '1.6.1', '1.6.2', '1.7.0', '1.8.0', '1.8.1', '1.8.2', '1.9.0', '1.9.1', '1.9.2', '1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion) && manifest.classificationVersion !== 'source-classification-v1')
     throw new ExportError('CLASSIFICATION_VERSION_REQUIRED')
-  const schema = legacy ? legacyStoreSchema : previous ? previousStoreSchema : statusVersion ? statusStoreSchema : storeSchema
+  const schema = legacy ? legacyStoreSchema : previous ? previousStoreSchema : statusVersion ? statusStoreSchema : ['1.9.1', '1.9.2', '1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion) ? (manifest.migrationPolicy?.preserveInvalidUserEmails ? storeSchema : conflictStoreSchema) : manifest.exporterVersion === '1.9.0' ? conflictStoreSchema : preConflictStoreSchema
   if (!legacy && (!manifest.artifacts['customer-reconciliation.json'] || !manifest.artifacts['product-reconciliation.json']))
     throw new ExportError('RECONCILIATION_RECEIPT_REQUIRED')
   if (legacy && (manifest.artifacts['customer-reconciliation.json'] || manifest.artifacts['product-reconciliation.json']))
     throw new ExportError('UNSUPPORTED_MAPPING_CONTRACT')
-  for (const [name, digest] of Object.entries(manifest.artifacts))
+  const multipart = ['1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion)
+  if (multipart ? manifest.masterParts === undefined || manifest.masterSetHash === undefined || manifest.artifacts['master.json'] !== undefined : manifest.masterParts !== undefined || manifest.masterSetHash !== undefined || !manifest.artifacts['master.json'] || Object.keys(manifest.artifacts).some(name => /^master-\d+\.json$/.test(name)))
+    throw new ExportError('MASTER_LAYOUT_INVALID')
+  const partNames = new Set(manifest.masterParts?.map(part => part.filename) ?? [])
+  for (const [name, digest] of Object.entries(manifest.artifacts)) {
+    if (multipart && partNames.has(name)) continue // verified with size and Store boundaries below
     if ((await hashFileStream(await checkedFile(root, name))) !== digest)
       throw new ExportError('ARTIFACT_HASH_MISMATCH')
-  const masterValue = await parse('master.json', (itemPath, _index, item) => {
-    if (itemPath.length === 0 && !schema.safeParse(item).success)
-      throw new ExportError('MASTER_SCHEMA_INVALID')
-    return false
-  })
-  if (!Array.isArray(masterValue))
-    throw new ExportError('MASTER_SCHEMA_INVALID')
-  const master = masterValue as StoreOutput[]
+  }
+  let master: StoreOutput[]
+  if (multipart) {
+    master = await readMasterParts(root, manifest.masterParts!, manifest.masterSetHash!, manifest.artifacts,
+      (value): value is StoreOutput => schema.safeParse(value).success)
+  } else {
+    const masterValue = await parse('master.json', (itemPath, _index, item) => {
+      if (itemPath.length === 0 && !schema.safeParse(item).success)
+        throw new ExportError('MASTER_SCHEMA_INVALID')
+      return false
+    })
+    if (!Array.isArray(masterValue)) throw new ExportError('MASTER_SCHEMA_INVALID')
+    master = masterValue as StoreOutput[]
+  }
+  if (!['1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion) && master.some(store => !legacyRawContentValid(store) || store.sites.some(site => site.raw_frontend_template !== undefined))) throw new ExportError('UNSUPPORTED_MAPPING_CONTRACT')
+  if (!['1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion) && master.some(store => !legacyModelSettingsValid(store))) throw new ExportError('UNSUPPORTED_MAPPING_CONTRACT')
   const archive = new Set<string>()
   const reportValue = await parse(
     'mapping-report.json',
@@ -72,7 +92,7 @@ export async function validateArtifact(directory: string) {
           throw new ExportError('CLASSIFICATION_EVIDENCE_INVALID')
         // Keep external CSV evidence for retention validation; discard operational paths.
         for (const key of externalArchiveKeys(row)) archive.add(key)
-        if (!row.productExclusion) row.contributions = row.contributions.filter(contribution => contribution.rule === EXTERNAL_SOURCE_RULE)
+        if (!row.productExclusion && !row.sourceExclusion && !PAGE_MENU_TABLES.has(row.table) && !['store_domains', 'model_settings', 'medias', 'orders', 'order_details', 'queue_sync', 'model_exports', 'promotions', 'promotion_codes'].includes(row.table)) row.contributions = row.contributions.filter(contribution => contribution.rule === EXTERNAL_SOURCE_RULE)
       }
       if (
         itemPath.length === 1 &&
@@ -96,10 +116,11 @@ export async function validateArtifact(directory: string) {
     !reportSchema.safeParse({ ...report, rows: [], diagnostics: [] }).success
   )
     throw new ExportError('REPORT_SCHEMA_INVALID')
-  if (manifest.classificationVersion) validateClassification(report.rows, report.diagnostics, manifest.migrationPolicy, master.flatMap(store => store.products.map(p => ({ storeId: String(store.tenants[0]._ref).split(':').at(-1)!, ref: String(p._ref) }))), manifest.exporterVersion === '1.8.0')
+  if (manifest.classificationVersion) validateClassification(report.rows, report.diagnostics, manifest.migrationPolicy, master.flatMap(store => store.products.map(p => ({ storeId: String(store.tenants[0]._ref).split(':').at(-1)!, ref: String(p._ref) }))), ['1.8.0', '1.8.1', '1.8.2', '1.9.0', '1.9.1', '1.9.2', '1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), new Set(master.flatMap(store=>Object.values(store).flatMap(docs=>docs.map(doc=>String(doc._ref))))), ['1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), manifest.exporterVersion === EXPORT_VERSION)
+  if (['1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion)) validateRawSettings(master, report.rows)
   if (!legacy) validateReconciliationReceipts(
     await parse('customer-reconciliation.json'), await parse('product-reconciliation.json'),
-    manifest.sourceSnapshot, master, report.rows,
+    manifest.sourceSnapshot, master, report.rows, manifest.migrationPolicy,
   )
   if (manifest.artifacts['store-summary.json']) {
     const summary = await parse('store-summary.json')

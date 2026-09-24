@@ -7,6 +7,7 @@ import { mapCatalog } from '@/lib/migration/pw1-export/mappers/catalog'
 import { mapCommerce } from '@/lib/migration/pw1-export/mappers/commerce'
 import { productDocumentSchema } from '@/lib/migration/pw1-export/mappers/catalog-schemas'
 import { operationalIssues } from '@/lib/migration/pw1-export/validate-master'
+import { ADDRESS_OVERFLOW_RULE } from '@/lib/migration/pw1-export/approved-source-scope'
 import {
   buildCustomerReceiptStore, buildProductReceiptEntries, customerDiagnosticsSchema,
   receiptSnapshot, validateReconciliationReceipts, type CustomerDiagnostics,
@@ -20,7 +21,7 @@ const config = sourceConfigSchema.parse({
   deletedStores: 'review', migrationPolicy: { decisionEvidence: 'approved test', activeCatalogOnly: true,
     allowSparseVariants: true, siteTypeDefault: 'ecommerce', shippingPolicy: 'pw2-defaults' },
 })
-function fixture(code: string | null = null, variants = false) {
+function fixture(code: string | null = null, variants = false, alias = false) {
   const tables: Record<string, Row[]> = {
     stores: [{ id: '1', currency_id: '1' }], currencies: [{ id: '1', code: 'MYR' }],
     categories: [{ id: '10', store_id: '1', name: 'Books', slug: 'books', status: '1', ...dates }],
@@ -41,6 +42,10 @@ function fixture(code: string | null = null, variants = false) {
     tables.product_attributes = [{ id: '82', product_id: '20', attribute_id: '80', attribute_value_id: '81' }]
     tables.product_variants = [{ id: '83', product_sku_id: '30', attribute_id: '80', attribute_value_id: '81' }]
   }
+  if (alias) {
+    tables.product_skus.push({...tables.product_skus[0],id:"31",stock:"99"})
+    tables.product_variants.push({...tables.product_variants[0],id:"84",product_sku_id:"31"})
+  }
   const output = emptyStore()
   output.tenants.push({ _ref: '@tenants:stores:1', metaData: { pw1StoreId: '1' } })
   output.sites.push({ _ref: '@sites:stores:1', tenant: '@tenants:stores:1' })
@@ -51,7 +56,7 @@ function fixture(code: string | null = null, variants = false) {
     return {
       customer: { version: 1, sourceSnapshot: receiptSnapshot(config), archiveStorage: 'external-source-csv', stores: [buildCustomerReceiptStore(ctx, captured)] },
       product: { version: 1, sourceSnapshot: receiptSnapshot(config), products: buildProductReceiptEntries(ctx) },
-      rows: Object.entries(tables).flatMap(([table, rows]) => rows.map(row => ({ table, sourceId: row.id!, storeId: row.store_id ?? null }))),
+      rows: Object.entries(tables).flatMap(([table, rows]) => rows.map(row => ({ table, sourceId: row.id!, storeId: row.store_id ?? null, ...(table === "product_skus" ? {ownership:{rule:"SOURCE_PARENT_RELATION",parentTable:"products",parentId:row.product_id!}} : {}) }))),
     }
   } }
 }
@@ -111,8 +116,8 @@ describe('[TC-F42-079/080] Source reconciliation evidence', () => {
     expect(result.products.products[0].skus[0]).toMatchObject({ sourceSkuId: '30', targetPath: variants ? 'variants.0' : '', selectedTuple: variants ? [['80', '81']] : [] })
     expect(result.customers.stores[0].diagnostics.customerCrosswalk).toContainEqual({ sourceCustomerId: '41', targetRef: '@customers:customers:40', disposition: 'merged' })
     expect(result.customers.stores[0].diagnostics.addressDispositions).toEqual([
-      expect.objectContaining({ usage: 'Shipping', targetIndex: 0, legacyGeographyTypes: ['country'], disposition: 'emitted' }),
-      expect.objectContaining({ usage: 'Billing', targetIndex: 0, disposition: 'deduplicated' }),
+      expect.objectContaining({ usage: 'Billing', targetIndex: 0, legacyGeographyTypes: ['country'], disposition: 'emitted' }),
+      expect.objectContaining({ usage: 'Shipping', targetIndex: 0, disposition: 'deduplicated' }),
     ])
     expect(result.customers.stores[0].diagnostics.rankConflicts[0].selectedSourceRankId).toBe('70')
     expect(result.customers.stores[0].diagnostics.profileConflicts[0].nameSourceId).toBe('41')
@@ -132,9 +137,19 @@ describe('[TC-F42-079/080] Source reconciliation evidence', () => {
     const receipt = buildCustomerReceiptStore(ctx, evidence)
     // Assert
     expect(ctx.output.customers[0].addresses).toHaveLength(10)
-    expect(receipt.diagnostics.addressDispositions.filter(entry => entry.disposition === 'overflow')).toEqual([expect.objectContaining({ sourceAddressId: '610', sourceOrderId: '510', targetIndex: null })])
+    expect(receipt.diagnostics.addressDispositions.filter(entry => entry.disposition === 'overflow')).toEqual([expect.objectContaining({ sourceAddressId: '600', sourceOrderId: '500', targetIndex: null })])
     expect(receipt.retainedSourceRows.filter(row => row.table === 'addresses')).toHaveLength(11)
     expect(receipt.retainedSourceRows.filter(row => row.table === 'orders')).toHaveLength(11)
+    const rows = f.receipts().rows.map(row => ({ ...row, ...(row.table === 'addresses' && row.sourceId === '600' ? { fieldRetentionRules: { address: ADDRESS_OVERFLOW_RULE } } : {}) }))
+    const customer = { version: 1, sourceSnapshot: receiptSnapshot(config), archiveStorage: 'external-source-csv', stores: [receipt] }
+    const product = { version: 1, sourceSnapshot: receiptSnapshot(config), products: [] }
+    const policy = { ...config.migrationPolicy!, allowCustomerAddressOverflow: true }
+    const check = (value = customer, approvedPolicy = policy) => validateReconciliationReceipts(value, product, receiptSnapshot(config), [ctx.output], rows, approvedPolicy)
+    expect(() => check()).not.toThrow()
+    expect(() => check(customer, { ...policy, allowCustomerAddressOverflow: false })).toThrow('RECONCILIATION_REFERENCES_INVALID')
+    const tampered = structuredClone(customer)
+    tampered.stores[0].diagnostics.addressDispositions = tampered.stores[0].diagnostics.addressDispositions.filter(entry => entry.sourceAddressId !== '600')
+    expect(() => check(tampered)).toThrow('RECONCILIATION_REFERENCES_INVALID')
   })
   it('clears targets after downstream product and customer quarantine', () => {
     const f = fixture(null, true)
@@ -156,5 +171,64 @@ describe('[TC-F42-079/080] Source reconciliation evidence', () => {
     if (corruption === 'namespace') r.product.sourceSnapshot.sourceInstanceToken = 'other'
     if (corruption === 'missing-product') r.product.products.length = 0
     expect(() => validate(f, r)).toThrow(/RECONCILIATION_/)
+  })
+})
+
+
+describe('[TC-F42-EXP-099] Complete one-to-one SKU receipt coverage', () => {
+  it('rejects an emitted variant Product with an empty SKU receipt', () => {
+    // Arrange
+    const f = fixture(null, true); f.run()
+    const receipts = f.receipts(), entry = receipts.product.products[0]
+    entry.skus = []; entry.eligibleSkuCount = 0
+    // Act / Assert
+    expect(() => validate(f, receipts)).toThrow('RECONCILIATION_REFERENCES_INVALID')
+  })
+  it('rejects duplicate SKU targets while another target variant has no receipt', () => {
+    // Arrange
+    const f = fixture(null, true); f.run()
+    const receipts = f.receipts(), entry = receipts.product.products[0]
+    const variants = f.ctx.output.products[0].variants as { id: string; name: string }[]
+    variants.push({ ...variants[0], id: 'another-variant' })
+    receipts.rows.push({ table: 'product_skus', sourceId: '31', storeId: '1' })
+    entry.skus.push({ ...entry.skus[0], sourceSkuId: '31' }); entry.eligibleSkuCount = 2
+    // Act / Assert
+    expect(() => validate(f, receipts)).toThrow('RECONCILIATION_REFERENCES_INVALID')
+  })
+})
+
+describe('[TC-F42-EXP-100] Conditional canonical alias receipts', () => {
+  it('accepts proven same-tuple aliases only with policy and rejects mismatched tuple', () => {
+    // Arrange
+    const f=fixture(null,true,true)
+    f.ctx.config.migrationPolicy!.resolveDuplicateVariantTuples=true
+    f.run(); const r=f.receipts()
+    // Act / Assert
+    expect(()=>validateReconciliationReceipts(r.customer,r.product,receiptSnapshot(config),[f.ctx.output],r.rows,f.ctx.config.migrationPolicy)).not.toThrow()
+    expect(f.ctx.output.products[0].inventory).toBe(5)
+    expect(()=>validateReconciliationReceipts(r.customer,r.product,receiptSnapshot(config),[f.ctx.output],r.rows)).toThrow('RECONCILIATION_REFERENCES_INVALID')
+    const aliasRow=r.rows.find(row=>row.table==='product_skus' && row.sourceId==='31')!
+    aliasRow.ownership!.parentId='other-product'
+    expect(()=>validateReconciliationReceipts(r.customer,r.product,receiptSnapshot(config),[f.ctx.output],r.rows,f.ctx.config.migrationPolicy)).toThrow('RECONCILIATION_REFERENCES_INVALID')
+    aliasRow.ownership!.parentId='20'
+    r.product.products[0].skus[1].selectedTuple=[['80','unknown']]
+    expect(()=>validateReconciliationReceipts(r.customer,r.product,receiptSnapshot(config),[f.ctx.output],r.rows,f.ctx.config.migrationPolicy)).toThrow('RECONCILIATION_REFERENCES_INVALID')
+    delete f.ctx.config.migrationPolicy!.resolveDuplicateVariantTuples
+  })
+})
+
+describe('[TC-F42-EXP-100] Partial SKU exclusion receipts', () => {
+  it('records excluded SKU IDs and rejects the receipt without pruning policy', () => {
+    // Arrange
+    const f=fixture(null,true,true)
+    f.ctx.config.migrationPolicy!.pruneInvalidVariantSkus=true
+    // A deleted selection leaves SKU31 incomplete while SKU30 remains valid.
+    f.tables.product_variants[1].deleted_at='2025-01-01'
+    f.run(); const r=f.receipts()
+    // Act / Assert
+    expect(r.product.products[0].excludedSkus?.map(row=>row.sourceSkuId)).toEqual(['31'])
+    expect(()=>validateReconciliationReceipts(r.customer,r.product,receiptSnapshot(config),[f.ctx.output],r.rows,f.ctx.config.migrationPolicy)).not.toThrow()
+    expect(()=>validateReconciliationReceipts(r.customer,r.product,receiptSnapshot(config),[f.ctx.output],r.rows)).toThrow()
+    delete f.ctx.config.migrationPolicy!.pruneInvalidVariantSkus
   })
 })

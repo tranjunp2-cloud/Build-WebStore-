@@ -1,5 +1,7 @@
 # Xuất JSON master từ CSV PW1
 
+> **Trạng thái mới nhất 23/09/2026:** exporter/importer local contract 1.10.0. Xem [triển khai và kết quả kiểm chứng](../migration/pw1-conflict-implementation-20260923.md). Các checkpoint 1.8.x và số Store bên dưới là lịch sử.
+
 ## Lệnh ngắn — tạo config và export trong một lần
 
 ```sh
@@ -16,6 +18,18 @@ hoặc `--output-dir <new-run-directory>` (thư mục cha có sẵn). Không ghi
 Nếu export thất bại, thư mục lần chạy/config có thể còn để kiểm tra; không coi là
 artifact hoàn tất. Lệnh này chỉ export offline, không nhập DB.
 
+
+## Đọc master được chia theo Store từ 1.10.0
+
+Lệnh export giữ nguyên. Trong `artifact/`, đọc `master-manifest.json` để lấy danh sách `masterParts`; dữ liệu nằm ở `master-0001.json`, `master-0002.json`, ... theo thứ tự Store ID số. Không tạo lại file `master.json` tổng hợp.
+
+- Mỗi file tối đa **300 Store** và **nhỏ hơn 200.000.000 byte UTF-8**, tính cả định dạng JSON. Một Store luôn nằm trọn trong một file.
+- Manifest ghi `filename`, `sha256`, `bytes`, `storeIds` cho từng phần; `masterSetHash` định danh toàn bộ tập đã sắp thứ tự. Các báo cáo/receipt dùng chung vẫn nằm cùng thư mục.
+- Nếu không Store nào được xuất, `masterParts=[]`; không tạo file phần rỗng. Đây không tự chứng minh mapping đã đầy đủ.
+- Nếu riêng một Store quá lớn, export dừng với `MASTER_STORE_TOO_LARGE:<StoreID>` và không publish artifact dở hoặc quá giới hạn.
+- Importer tương thích 1.10.0 đọc manifest và lần lượt các phần; không tự nối file bằng tay. Giữ nguyên toàn bộ thư mục artifact để import/validate, không chỉ sao chép một phần.
+
+Validator vẫn dùng lệnh hiện tại với `--artifact-dir`, kiểm tra đủ phần, hash/byte thực tế, ID/thứ tự Store, không trùng/thiếu phần và không có `master.json` tổng hợp lẫn trong bộ mới. Artifact lịch sử đến 1.9.4 vẫn dùng `master.json` như trước.
 
 ## Phạm vi hiện tại
 
@@ -529,3 +543,35 @@ Xem [biên bản kiểm tra trước commit](../migration/pw1-exporter-verified-
 Product thiếu price/stock hoặc không còn dòng SKU nguồn đủ điều kiện được bỏ khỏi master theo policy đã duyệt. mapping-report ghi PRODUCT_MISSING_PRICE_STOCK_EXCLUDED và productExclusion trên Product/dòng con chỉ giữ CSV; đây không còn là blocker của Product đó. Importer 1.8.0 kiểm tra cùng Store, parent SKU→Product, reason, retained fields và Product không còn emit trước khi chấp nhận. Artifact cũ không tự thay đổi: cần export lại bằng code mới.
 
 Giá/stock bằng 0 vẫn giữ. Giá âm, sai số, SKU khác Store hoặc status lạ vẫn có blocker. Order lịch sử giữ các giá trị line nguồn theo policy đã duyệt; các lỗi Order/quan hệ khác không được miễn. Chưa chạy full export PROD/DEV hoặc ghi DB trong đợt sửa này.
+
+### Contract 1.9.0 — triển khai quyết định conflict ngày 23/09
+
+Checkpoint 1.8.2 từng khóa chung 21 cờ đã được thay thế cho artifact mới. Các quyết định đã ghi trong strategy và [tài liệu bổ sung](../migration/pw1-conflict-decisions-20260923.md) được triển khai theo từng policy. `skipUnverifiedOrders=true` vẫn bị từ chối: không bỏ Order để làm Store hết blocker. Artifact lịch sử không được bật các policy mới bằng cách sửa manifest.
+
+Export tạo thêm `conflict-details.md` và `conflict-details.json`, có hash trong manifest. Mở Markdown để xem Store ID, bảng/record ID, mã lỗi, giá trị nguồn, các ID liên quan và giá trị đích. Nhóm ID có thể gồm cả bản ghi inactive/đã lưu trữ để đối chiếu; không suy ra mọi record trong nhóm đều bị loại. Receipt Product cho biết canonical/alias, tuple, SKU bị loại; dữ liệu nguồn vẫn giữ ở CSV ngoài artifact.
+
+Cần dùng importer hỗ trợ đúng version/hash 1.9.0 và kiểm tra policy theo bằng chứng; exporter thành công không đồng nghĩa Store sẵn sàng ghi DB. Owner chưa xác minh, trạng thái Order lạ, refund mâu thuẫn/một phần và EAV thiếu bằng chứng vẫn blocked. Không tự đặt country Malaysia khi Order thiếu country.
+
+Xem [tracking triển khai](../migration/pw1-conflict-implementation-20260923.md) để biết kiểm thử và giới hạn nghiệm thu. Các số lượng từ report 18/09 phía trên vẫn là baseline lịch sử; chưa thay bằng số hiện tại khi chưa có kết quả đối soát mới.
+
+
+### Scope model_settings từ exporter 1.10.1
+
+Toàn bộ bảng `model_settings` không được mapping vào master JSON. Giữ CSV nguồn để đối soát; `mapping-report.json` ghi rule `MASTER-2.2-MODEL-SETTINGS-OUTSIDE-SCOPE` và cảnh báo cấp bảng `MODEL_SETTINGS_OUTSIDE_SCOPE`. Các trường không biết, nội dung JSON/URL lỗi hoặc ownership chưa resolve của bảng này không chặn luồng. Secret-like fields vẫn được đánh dấu `security-excluded`. Điều này không miễn kiểm tra cấu trúc/identity/hash hay cho phép contribution từ bảng này.
+
+`DEFAULT_DOMAIN_AMBIGUOUS` và `SOURCE_MAIN_DOMAIN_AMBIGUOUS` là cảnh báo cấp Store, vì vậy dùng `table=stores`, `sourceId=Store ID`; xem `relatedIds` trong conflict report để tìm những dòng `store_domains` thật gây trùng.
+
+
+### Phạm vi mới từ 1.10.2
+
+PROD profile bật `excludeProductsInInactiveCategories`: Product thuộc Category cùng Store/live/status0 bị loại toàn bộ với warning `PRODUCT_CATALOG_POLICY_EXCLUDED`, reason `INACTIVE_CATEGORY`. Order lịch sử giữ snapshot và tổng tiền, bỏ references catalog bị loại. Category thiếu/khác Store/đã xóa không thuộc ngoại lệ này.
+
+Secondary owner được map editor, không custom permissions; importer kiểm chứng đúng marker và output editor, không miễn chung warning quyền cho mọi User. Social channel chỉ giữ sáu platform PW2 hỗ trợ, bỏ metadata và entry không dùng được có warning. Library medias dùng URL/sourceUrl gốc, không tải/upload; nguồn file chưa hợp lệ vẫn cần xử lý theo report. Các artifact đã export trước thay đổi không tự được nâng phiên bản: export lại để nhận dữ liệu mới.
+
+
+### Phạm vi mới từ 1.10.3
+
+- Page/Menu được bảo toàn dạng raw trong artifact, thêm `sites[].raw_frontend_template`; importer hiện chưa chuyển thành builder PW2. Raw không được parse/rewrite để xác nhận URL/JSON, nhưng cột auth-secret không xuất và ownership không bị gán giả. Bảng kỹ thuật queue_sync/model_exports không replay.
+- Metadata nguồn ngoài schema PW2 giữ trong CSV với allowlist; Order residual chỉ miễn khi Order vận hành đã được map đủ. Địa chỉ Customer đã emitted/deduplicated có contribution riêng, overflow phải khớp receipt và policy.
+- `shippingPolicy=pw2-defaults` dùng đúng defaults PW2 kể cả PW1 có fixed fee hợp lệ. `review` vẫn kiểm tra nguồn. Các ràng buộc promotion không có field PW2 chỉ giữ nguồn, không được mô tả là đã bảo toàn toàn bộ hành vi PW1.
+- Artifact cũ1.10.2 không tự cập nhật. Chạy export lại để nhận1.10.3; kiểm tra source handoff và importer preflight theo artifact mới.

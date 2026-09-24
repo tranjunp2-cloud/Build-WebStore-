@@ -117,16 +117,17 @@ const raw = (table: string) =>
       ),
     )
     .strict()
-const setting = raw('model_settings')
-const component = raw('page_components')
+const setting = raw('model_settings').catchall(z.string().nullable())
+const opaqueRaw = (table: string) => raw(table).catchall(z.string().nullable())
+const component = opaqueRaw('page_components')
   .extend({
-    frontend_component: raw('frontend_components').nullable(),
+    frontend_component: opaqueRaw('frontend_components').nullable(),
     model_settings: z.array(setting),
-    banners: z.array(raw('banners')),
-    shortlist_items: z.array(raw('shortlist_items')),
+    banners: z.array(opaqueRaw('banners')),
+    shortlist_items: z.array(opaqueRaw('shortlist_items')),
   })
-  .strict()
-export const pageDocumentSchema = raw('pages')
+  .catchall(z.string().nullable())
+export const pageDocumentSchema = opaqueRaw('pages')
   .extend({
     _ref: reference,
     id: z.string().min(1),
@@ -134,23 +135,23 @@ export const pageDocumentSchema = raw('pages')
     components: z.array(component),
     model_settings: z.array(setting),
   })
-  .strict()
-const menuLine = raw('menu_lines')
+  .catchall(z.string().nullable())
+const menuLine = opaqueRaw('menu_lines')
   .extend({
-    menu_line_type: raw('menu_line_types').nullable(),
+    menu_line_type: opaqueRaw('menu_line_types').nullable(),
     model_settings: z.array(setting),
   })
-  .strict()
-const menuItem = raw('menu_items')
+  .catchall(z.string().nullable())
+const menuItem = opaqueRaw('menu_items')
   .extend({
-    menu_line_type: raw('menu_line_types').nullable(),
+    menu_line_type: opaqueRaw('menu_line_types').nullable(),
     model_settings: z.array(setting),
     menu_lines: z.array(menuLine),
   })
-  .strict()
-const menu = raw('menus')
+  .catchall(z.string().nullable())
+const menu = opaqueRaw('menus')
   .extend({ model_settings: z.array(setting), menu_items: z.array(menuItem) })
-  .strict()
+  .catchall(z.string().nullable())
 export const legacyRawSource = z
   .object({
     store: raw('stores'),
@@ -221,7 +222,7 @@ export const siteDocumentSchema = z
         address: z.string().optional(),
       })
       .strict(),
-    socialLinks: z.object({}).strict(),
+    socialLinks: z.object(Object.fromEntries(['facebook','instagram','twitter','linkedin','youtube','tiktok'].map(key => [key, z.string().refine(value => { try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password } catch { return false } }).optional()]))).strict(),
     paymentConfig: z
       .object({
         enableCod: z.boolean(),
@@ -231,6 +232,8 @@ export const siteDocumentSchema = z
       })
       .strict(),
     menus: z.array(menu),
+    raw_model_settings: z.array(setting).optional(),
+    raw_frontend_template: opaqueRaw('frontend_templates').optional(),
   })
   .strict()
 export const blogCategoryDocumentSchema = blogCategorySchema

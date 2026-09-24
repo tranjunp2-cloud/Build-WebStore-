@@ -80,7 +80,12 @@ export function reconcileCustomers(store, storeId, tables, { utcOffset }) {
     related.sort((a, b) => b.dates.createdAt.localeCompare(a.dates.createdAt) || compareId(a.row.id, b.row.id))
     if (related.length) { customer.latestOrderAt = related[0].dates.createdAt; customer.firstOrderAt = related.at(-1).dates.createdAt }
     const locations = new Map(), selected = []
-    for (const order of related) for (const [field, label] of [['shipping_address_id', 'Shipping'], ['billing_address_id', 'Billing']]) {
+    const usages = related.flatMap(order => [['shipping_address_id', 'Shipping'], ['billing_address_id', 'Billing']]
+      .map(([field, label]) => ({ order, field, label })))
+    usages.sort((a, b) => b.order.dates.createdAt.localeCompare(a.order.dates.createdAt)
+      || compareId(b.order.row[b.field], a.order.row[a.field])
+      || compareId(b.order.row.id, a.order.row.id) || a.field.localeCompare(b.field))
+    for (const { order, field, label } of usages) {
       if (!present(order.row[field])) continue
       const address = maps.addresses.get(id(order.row[field]))
       const disposition = { targetRef: ref, sourceOrderId: id(order.row.id), sourceAddressId: id(order.row[field]), usage: label }

@@ -22,6 +22,11 @@ export function applySitePolicy(ctx: MappingContext, site: Doc): void {
     ctx.issue('SITE_SHIPPING_CURRENCY_UNSUPPORTED', 'stores', ctx.storeId, 'currency_id')
     return
   }
+  if (policy.shippingPolicy === 'pw2-defaults') {
+    site.shippingConfig = { enabled: true, westRate: SHIPPING_DEFAULTS.westRate, eastRate: SHIPPING_DEFAULTS.eastRate, freeAbove: null, shippingSetupConfirmed: false }
+    ctx.issue('SHIPPING_SOURCE_REPLACED_BY_PW2_DEFAULT', 'stores', ctx.storeId, 'shipping_fee_config', 'warning', 'APPROVED_PW2_DEFAULTS')
+    return
+  }
   const rows = ctx.rows('store_deliveries').filter(row => live(row) && row.store_id === ctx.storeId)
   const self = rows.filter(row => {
     const provider = ctx.find('delivery_providers', row.delivery_provider_id)

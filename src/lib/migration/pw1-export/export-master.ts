@@ -1,3 +1,8 @@
+import { validateRawSettings } from './raw-settings-proof'
+import { planMasterParts, masterPartChunks, masterSetHash } from './master-parts'
+import { SOURCE_EXCLUSION_CODE } from './source-exclusions'
+import { conflictDetails, conflictDetailsMarkdown } from './conflict-details'
+import { assertApprovedMigrationPolicy } from './policy-boundary'
 import { buildHandoff } from './handoff'
 import { exportOutcome, exportReview, reviewMarkdown, externalArchiveKeys } from './export-outcome'
 import { EXTERNAL_SOURCE_RULE, externalSourcePath } from './external-source'
@@ -32,6 +37,7 @@ import { mapIdentity } from './mappers/identity-site'
 import { mapEntitlements } from './mappers/entitlements'
 import { mapCatalog } from './mappers/catalog'
 import { mapCommerce } from './mappers/commerce'
+import { mapLibraryMedia } from './mappers/library-media'
 import { mapContent } from './mappers/content'
 import { dispositions } from './source-dispositions'
 import { operationalIssues } from './validate-master'
@@ -63,6 +69,7 @@ export async function exportMaster(
   progress?.({ phase: 'load-config' })
   const configBytes = await readConfigFile(configPath),
     config = parseConfig(configBytes)
+  assertApprovedMigrationPolicy(config.migrationPolicy)
   const source = await loadSource(inputDir, config, progress)
   const sourceWarnings: string[] = []
   const unchanged = async () => {
@@ -172,14 +179,34 @@ export async function exportMaster(
     mapCatalog(ctx)
     mapCommerce(ctx)
     mapContent(ctx)
+    mapLibraryMedia(ctx)
     mapEntitlements(ctx)
     // Reject invalid documents before reference closure; never publish invalid operational records.
     for (const root of ROOTS) {
       output[root] = output[root].filter((doc) => {
         const parsed = documentSchemas[root].safeParse(doc)
         if (parsed.success) return true
-        ctx.issue('DOCUMENT_SCHEMA_INVALID', root, String(doc._ref ?? row.id))
+        const sourceTable=root==='blogs'?'blog_posts':root
+        const sourceId=String(doc._ref??'').split(':').at(-1)
+        const allowed=root==='products'?config.migrationPolicy?.excludeInvalidProducts:['blogs','blog_categories'].includes(root)?config.migrationPolicy?.excludeInvalidBlogs:false
+        if(allowed && sourceId && /^[1-9]\d*$/.test(sourceId)) ctx.issue(SOURCE_EXCLUSION_CODE,sourceTable,sourceId,undefined,'warning','DOCUMENT_SCHEMA_INVALID')
+        else ctx.issue('DOCUMENT_SCHEMA_INVALID', root, String(doc._ref ?? row.id))
         return false
+      })
+    }
+    const schemaExcludedProducts=new Set(diagnostics.filter(d=>d.storeId===row.id && d.code===SOURCE_EXCLUSION_CODE && d.table==='products').map(d=>`@products:products:${d.sourceId}`))
+    if(config.migrationPolicy?.preserveHistoricalOrders)for(const order of output.orders)for(const item of (Array.isArray(order.items)?order.items:[]) as Record<string,unknown>[]){
+      if(typeof item.product==='string' && schemaExcludedProducts.has(item.product)) {
+        delete item.product
+        ctx.issue('ORDER_ITEM_CATALOG_REFERENCE_OMITTED','orders',String(order._ref).split(':').at(-1),'items.product','warning','SOURCE_PRODUCT_EXCLUDED')
+      }
+    }
+    if(config.migrationPolicy?.excludeInvalidBlogs){
+      const categories=new Set(output.blog_categories.map(doc=>String(doc._ref)))
+      output.blogs=output.blogs.filter(doc=>{
+        const refs=Array.isArray(doc.categories)?doc.categories:doc.category?[doc.category]:[]
+        if(refs.every(ref=>typeof ref!=='string'||categories.has(ref)))return true
+        ctx.issue(SOURCE_EXCLUSION_CODE,'blog_posts',String(doc._ref).split(':').at(-1),undefined,'warning','BLOG_CATEGORY_UNRESOLVED');return false
       })
     }
     if (output.tenants.length !== 1 || output.sites.length !== 1) {
@@ -290,15 +317,15 @@ export async function exportMaster(
     !reportSchema.safeParse({ ...report, rows: [], diagnostics: [] }).success ||
     uniqueDiagnostics.some(d => !reportSchema.shape.diagnostics.element.safeParse(d).success) ||
     rows.some(row => !reportSchema.shape.rows.element.safeParse(row).success)
-  )
-    throw new ExportError('REPORT_SCHEMA_INVALID')
+  ) throw new ExportError('REPORT_SCHEMA_INVALID')
   progress?.({
     phase: 'validate-master',
     completed: valid.length,
     total: source.tables.stores.length,
   })
   validateMaster(valid)
-  validateClassification(rows, uniqueDiagnostics, config.migrationPolicy, valid.flatMap(store => store.products.map(p => ({ storeId: String(store.tenants[0]._ref).split(':').at(-1)!, ref: String(p._ref) }))))
+  validateRawSettings(valid, rows)
+  validateClassification(rows, uniqueDiagnostics, config.migrationPolicy, valid.flatMap(store => store.products.map(p => ({ storeId: String(store.tenants[0]._ref).split(':').at(-1)!, ref: String(p._ref) }))), true, emittedRefs)
   const blockers = uniqueDiagnostics.filter(
     (d) => d.severity === 'blocker',
   ).length
@@ -306,14 +333,6 @@ export async function exportMaster(
   const archive = new Set(rows.flatMap(row => externalArchiveKeys(row)))
   const outcome = exportOutcome(uniqueDiagnostics, blockedStores.length, policyExcludedStores, archive)
   const review = exportReview(uniqueDiagnostics, [...blockedStores].sort(compareIds), [...policyExcludedStores].sort(compareIds), archive)
-  function* masterChunks() {
-    yield '[\n'
-    for (let i = 0; i < valid.length; i++) {
-      checkResources(config)
-      yield (i ? ',\n' : '') + json(valid[i]).trimEnd()
-    }
-    yield '\n]\n'
-  }
   function* reportChunks() {
     yield '{"version":1,"diagnostics":' +
       JSON.stringify(uniqueDiagnostics) +
@@ -358,23 +377,29 @@ export async function exportMaster(
     version: 1, sourceSnapshot: receiptSnapshot(config),
     products: contexts.flatMap(buildProductReceiptEntries),
   }
-  validateReconciliationReceipts(customerReceipt, productReceipt, receiptSnapshot(config), valid, rows)
+  validateReconciliationReceipts(customerReceipt, productReceipt, receiptSnapshot(config), valid, rows, config.migrationPolicy)
   const summaries = storeSummaries(valid, uniqueDiagnostics, blockedStores, policyExcludedStores, true, archive)
   const summaryCsv = [
     'storeId,exportStatus,mappingStatus,blockerDiagnosticCount,warningDiagnosticCount,blockerCodes,mappingReviewCodes,targetConstraintCodes,otherBlockerCodes,importStatus,dataIssueCount,importRequirementCount,delegatedContentCount,outsideScopeCount',
     ...summaries.map(s => [s.storeId, s.exportStatus, s.mappingStatus, String(s.blockerDiagnosticCount), String(s.warningDiagnosticCount), s.blockerCodes.join(';'), s.mappingReviewCodes.join(';'), s.targetConstraintCodes.join(';'), s.otherBlockerCodes.join(';'), s.outcome!.importStatus, String(s.outcome!.dataIssueCount), String(s.outcome!.importRequirementCount), String(s.outcome!.delegatedContentCount), String(s.outcome!.outsideScopeCount)].map(csvCell).join(',')),
   ].join('\n') + '\n'
+  const conflicts = conflictDetails(source.tables, valid, uniqueDiagnostics, config, productReceipt.products)
+  progress?.({ phase: 'plan-master-parts' })
+  const plannedParts = planMasterParts(valid, { checkResources: () => checkResources(config) })
+  const masterParts = plannedParts.map(part => part.descriptor)
   const files: Record<string, ArtifactContent> = {
+    'conflict-details.json': json(conflicts),
+    'conflict-details.md': conflictDetailsMarkdown(conflicts),
     'export-review.json': json(review),
     'export-review.md': reviewMarkdown(review),
     'customer-reconciliation.json': json(customerReceipt),
     'product-reconciliation.json': json(productReceipt),
     'store-summary.json': json(summaries),
     'store-summary.csv': summaryCsv,
-    'master.json': masterChunks(),
+    ...Object.fromEntries(plannedParts.map(part => [part.descriptor.filename, masterPartChunks(part.stores, () => checkResources(config))])),
     'mapping-report.json': reportChunks(),
     'mapping-report.csv': csvChunks(),
-    'README.md': `# PW1 master export\n\nExport: succeeded. Data: ${outcome.dataStatus}. Import: not_verified. Start with export-review.md for actionable groups.\n\nStart with store-summary.csv: emitted means present in master, not complete mapping. Review mappingReviewCodes, targetConstraintCodes and otherBlockerCodes; counts are diagnostics, not lost records. Collection counts are in store-summary.json. Global diagnostics and field dispositions remain in mapping-report.json/csv. Customer and Product reconciliation sidecars carry source-scoped identity evidence validated against emitted targets. Null targets are not importable crosswalks. Customer raw archive remains in the manifest-hashed CSV snapshot outside this artifact; retainedSourceRows lists its IDs, not embedded raw values. Source snapshot is retained externally; sites.pw1_source is not embedded in master. Source-csv contributions describe CSV archive retention, not operational fields imported into PW2. No DB was written. If user-actors.json is present, it is a hashed source-identity dependency registry, not pre-created PW2 Users. Import must bind each actor to a verified target User ID without granting source roles or tenant membership, then resolve Users.createdBy and prevent import hooks from overwriting it.\n\nValidate: npm run migrate:pw1:export -- --validate-only --artifact-dir <this-directory>\n\nExit 0: export succeeded, including partial data; 1: invalid artifact or failed run. Inspect outcome.dataStatus and export-review.md.\n`,
+    'README.md': `# PW1 master export\n\nExport: succeeded. Data: ${outcome.dataStatus}. Import: not_verified. Start with export-review.md for actionable groups and conflict-details.md for source IDs and before/after values.\n\nMaster data is split into the ordered masterParts listed in master-manifest.json (master-0001.json, ...), at most 300 Stores and strictly less than 200,000,000 UTF-8 bytes per file. No aggregate master.json is generated. An empty masterParts array means zero emitted Stores. Use the manifest to locate all parts.\n\nStart with store-summary.csv: emitted means present in master, not complete mapping. Review mappingReviewCodes, targetConstraintCodes and otherBlockerCodes; counts are diagnostics, not lost records. Collection counts are in store-summary.json. Global diagnostics and field dispositions remain in mapping-report.json/csv. Customer and Product reconciliation sidecars carry source-scoped identity evidence validated against emitted targets. Null targets are not importable crosswalks. Customer raw archive remains in the manifest-hashed CSV snapshot outside this artifact; retainedSourceRows lists its IDs, not embedded raw values. Source snapshot is retained externally; sites.pw1_source is not embedded in master. Source-csv contributions describe CSV archive retention, not operational fields imported into PW2. No DB was written. If user-actors.json is present, it is a hashed source-identity dependency registry, not pre-created PW2 Users. Import must bind each actor to a verified target User ID without granting source roles or tenant membership, then resolve Users.createdBy and prevent import hooks from overwriting it.\n\nValidate: npm run migrate:pw1:export -- --validate-only --artifact-dir <this-directory>\n\nExit 0: export succeeded, including partial data; 1: invalid artifact or failed run. Inspect outcome.dataStatus and export-review.md.\n`,
   }
   if (userActors) files['user-actors.json'] = json(userActors)
   checkResources(config)
@@ -384,6 +409,8 @@ export async function exportMaster(
     classificationVersion: 'source-classification-v1',
     contractSha256: MASTER_SHA256,
     sourceConfigSha256: hash(configBytes),
+    masterParts,
+    masterSetHash: masterSetHash(masterParts),
     sourceSnapshot: {
       sourceInstance: config.sourceInstance,
       sourceDatabase: config.sourceDatabase,
@@ -414,6 +441,7 @@ export async function exportMaster(
   }
   files['master-manifest.json'] = (hashes) => {
     manifest.artifacts = { ...hashes }
+    if (masterParts.some(part => hashes[part.filename] !== part.sha256)) throw new ExportError('MASTER_PART_WRITE_MISMATCH')
     if (!manifestSchema.safeParse(manifest).success)
       throw new ExportError('MANIFEST_SCHEMA_INVALID')
     return json(manifest)

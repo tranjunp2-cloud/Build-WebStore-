@@ -1,3 +1,4 @@
+import { readFixtureMasterText } from '@/__tests__/helpers/pw1-master-artifact'
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdtemp, readFile, writeFile, rm, appendFile } from 'node:fs/promises'
@@ -40,7 +41,7 @@ describe('[TC-F42-069] Hashed creator sidecar artifact', () => {
     const artifact = await fixture()
     // Act
     const registry = JSON.parse(await readFile(path.join(artifact, 'user-actors.json'), 'utf8'))
-    const master = JSON.parse(await readFile(path.join(artifact, 'master.json'), 'utf8'))
+    const master = JSON.parse(await readFixtureMasterText(artifact))
     const result = await new Promise<{ code: number; stdout: string; stderr: string }>(resolve => {
       execFile(process.execPath, ['--import', 'tsx', 'scripts/data/export-pw1-master.ts', '--validate-only', '--artifact-dir', artifact], { timeout: 15000 }, (error, stdout, stderr) => resolve({ code: error && 'code' in error ? Number(error.code) : 0, stdout, stderr }))
     })

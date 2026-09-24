@@ -88,6 +88,7 @@ export const orderDocumentSchema = z
       'completed',
       'cancelled',
       'payment_failed',
+      'refunded',
     ]),
     paymentStatus: z.enum([
       'paid',
@@ -95,8 +96,9 @@ export const orderDocumentSchema = z
       'failed',
       'payment_failed',
       'unpaid',
+      'refunded',
     ]),
-    shippingAddress: z.object(address).strict(),
+    shippingAddress: z.object({ ...address, line1: z.string().min(1).nullable(), country: z.string().min(1).nullable() }).strict(),
     locale: z.literal('en'),
     verificationSource: z.literal('manual'),
     paymentMethod: z.literal('cod').optional(),
