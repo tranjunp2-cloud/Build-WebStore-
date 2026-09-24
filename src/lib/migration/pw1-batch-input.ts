@@ -8,7 +8,7 @@ const BatchEntrySchema = z.object({
     destination: DestinationSchema.optional(),
     linkCorrections: WebsiteInputSchema.shape.linkCorrections,
     owner: z.object({ email: z.string().email().transform(v=>v.trim().toLowerCase()), firstName: z.string().min(1), lastName: z.string().optional() }).strict(),
-    source: z.object({ websiteUrl: z.string().url(), capturedAt: z.string().optional() }).strict(),
+    source: WebsiteInputSchema.shape.source.omit({storeId: true}),
     website: WebsiteInputSchema.shape.website.extend({ pages: WebsiteInputSchema.shape.pages }).strict(),
 }).strict()
 export type BatchEntry = z.infer<typeof BatchEntrySchema>
@@ -44,7 +44,7 @@ export function batchEntryHash(entry: BatchEntry) { return createHash('sha256').
 export function batchAction(state: {status:string;input_hash:string|null}|undefined, hash:string, rerun=false): 'skip'|'run' {
     if (state?.status==='completed' && !rerun) {
         if(state.input_hash===hash)return 'skip'
-        throw new Error('Completed store input changed; use --rerun to regenerate its mapped draft site')
+        throw new Error('Completed store input changed; use --rerun to regenerate its mapped site')
     }
     return 'run'
 }

@@ -1,3 +1,4 @@
+import { getPw1Industry } from './pw1-industry'
 import { verifyMigrationDestination, type MigrationDestination } from './pw1-destination'
 import { configureMigrationTransactions } from './pw1-transactions'
 import { sql } from 'drizzle-orm'
@@ -9,6 +10,7 @@ import { generateSiteSchema } from '@/lib/validations/ai'
 import type { Payload } from 'payload'
 
 export interface ApplyWebsiteOptions {
+    allowPublished?: boolean
     destination?: MigrationDestination
     onDesignUsage?: (usage: { model: string; totalTokens: number | null }) => void
     acquireWrite?: () => Promise<() => void>
@@ -68,7 +70,7 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
                 businessInfo: {
                     businessName: options.blueprint.siteName,
                     shortDescription: options.blueprint.description || options.blueprint.siteName,
-                    industry: 'ecommerce',
+                    industry: 'business',
                     products: 'Existing PW1 catalog; preserve source references, do not create sample products.',
                 },
                 language: options.blueprint.nativeContract.site.locale ?? 'en', generationLocale: options.blueprint.nativeContract.site.locale ?? 'en',
@@ -89,13 +91,14 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
                     onGenerated: async result => {
                         expectedLayouts = (result.pages ?? []).map(page => ({ slug: String(page.slug), types: (page.blocks ?? []).map(block => String(block.blockType)) }))
                         await options.save('ai-generated-before-media.json', result)
+                        await options.save('industry-selection.json', getPw1Industry(result))
                         await options.save('brand-selection.json', { evidenceStatus: options.blueprint.nativeContract.site.brandEvidence?.status ?? 'not-scanned', theme: result.theme })
                     },
                     beforeWrite: async () => {
                         options.signal?.throwIfAborted()
                         await options.onStage?.('waiting-write')
                         await beginWrite()
-                        if (options.destination) await verifyMigrationDestination(scoped, options.destination, options.account)
+                        if (options.destination) await verifyMigrationDestination(scoped, options.destination, options.account, undefined, options.allowPublished)
                         await options.onStage?.('write')
                     },
                     onFailure: error => { generationError = error },

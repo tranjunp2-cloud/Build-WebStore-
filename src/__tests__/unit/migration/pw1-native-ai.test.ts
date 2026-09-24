@@ -11,10 +11,31 @@ function fixture() {
         { sourceId: '12', position: 2, kind: 'product_listing', block: { blockType: 'content-cards', variant: 'products', headline: 'Tea', sourceContent: { capturedAt: 'now', bindingStatus: 'captured-public-content', items: [{ sourceId: '8', title: 'Green tea', image: { url: 'https://source.example/tea.jpg' }, url: 'https://source.example/8', price: 'RM 8', summary: 'Original copy' }] } } },
         { sourceId: '13', position: 3, kind: 'rich_text', block: { blockType: 'rich-text', html: '<p>Before</p><iframe src="https://www.youtube.com/embed/abc"></iframe><p>After</p>' } },
     ] }] }
-    const design = { theme: { primaryColor: '#335533', secondaryColor: '#fafafa', fontHeading: 'Inter', fontBody: 'Inter' }, navigationVariant: 'centered', footerVariant: 'simple', pages: [{ sourceId: '10', sections: [{ sourceId: '11', blockType: 'carousel', variant: 'images' }, { sourceId: '12', blockType: 'products-grid', variant: 'grid-4' }, { sourceId: '13', blockType: 'custom-html', variant: 'default' }] }] }
+    const design = { industry: { category: 'fnb', confidence: 'high', reason: 'Tea and green tea in source content' }, theme: { primaryColor: '#335533', secondaryColor: '#fafafa', fontHeading: 'Inter', fontBody: 'Inter' }, navigationVariant: 'centered', footerVariant: 'simple', pages: [{ sourceId: '10', sections: [{ sourceId: '11', blockType: 'carousel', variant: 'images' }, { sourceId: '12', blockType: 'products-grid', variant: 'grid-4' }, { sourceId: '13', blockType: 'custom-html', variant: 'default' }] }] }
     return { source, design }
 }
 describe('[TC-F35.M18] AI chooses only existing PW2 blocks', () => {
+    it('uses the business classification and retains evidence in the migration result', () => {
+        const { source, design } = fixture()
+        design.industry = { category: 'health', confidence: 'high', reason: 'Dental clinic in source name' }
+        source.site.name = 'Dental clinic'
+        const result = bindNativeDesign(source, design)
+        expect(result.siteType).toBe('health')
+        expect(result).toHaveProperty('sourceMigration.industry', design.industry)
+    })
+    it('uses generic business when classification confidence is low', () => {
+        const { source, design } = fixture()
+        design.industry.confidence = 'low'
+        const result = bindNativeDesign(source, design)
+        expect(result.siteType).toBe('business')
+        expect(result).toHaveProperty('sourceMigration.industry.category', 'business')
+    })
+    it('requires a supported industry in new structured AI responses', () => {
+        const { source, design } = fixture()
+        design.industry.category = 'invented-category'
+        expect(nativeDesignSchemaForSource(source).safeParse(design).success).toBe(false)
+    })
+
     it('binds every source slide, card and video without new block types or lost content', () => {
         const { source, design } = fixture()
         const original = JSON.stringify(source)

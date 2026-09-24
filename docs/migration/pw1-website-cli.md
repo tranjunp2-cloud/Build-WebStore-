@@ -324,3 +324,23 @@ For legacy HTTPS TLS failures, a fresh HTTP page is attempted on the same source
 CLI migration website dùng context nội bộ để bỏ qua kiểm tra subscription và quyền `website_builder`. User vẫn phải là owner đang active của tenant chứa site đích. Ngoại lệ không tạo hoặc sửa subscription; API generate trong CMS vẫn giữ nguyên hai kiểm tra và không nhận cờ bypass từ request. Chi phí AI vẫn phát sinh.
 
 Bước publish của CLI gửi grant có chữ ký server, hiệu lực 2 phút, ràng buộc user/site/tenant/source store/input hash. API chỉ miễn kiểm tra subscription cho owner active của site draft có ledger migration `completed` khớp grant. Publish CMS không có grant hợp lệ vẫn kiểm tra subscription và `website_builder`; các bước promote trang, kiểm tra dữ liệu và cache invalidation giữ nguyên.
+
+### Xác định ngành kinh doanh
+
+Migration xác định ngành từ tên store và nội dung nguồn trong chính lần gọi AI chọn thiết kế, không gọi thêm API phân loại. Ngành phải thuộc danh sách PW2 hỗ trợ; kết quả có độ tin cậy thấp dùng `business`. Ngành được dùng cho thiết kế và thông tin site khi lưu; không thay đổi nội dung nguồn hoặc luồng tạo website thông thường. Trước khi AI trả kết quả, migration dùng `business` làm giá trị trung lập thay vì gắn cứng `ecommerce`.
+
+Mỗi lần chạy lưu `industry-selection.json` trong thư mục kết quả của attempt, gồm `category`, `confidence`, `reason`; kết quả cũng nằm trong `sourceMigration.industry`. Chỉ tăng nhẹ token hướng dẫn và phản hồi của lần gọi hiện có; không phát sinh lượt gọi AI riêng. Store đã migrate không tự đổi ngành nếu chưa chạy lại generation.
+
+### Domain nguồn và liên kết nội bộ PW1
+
+Script dùng `site.domain` trong input collection làm domain nguồn PW1. BE phải map đúng domain nguồn vào trường này; script không tự đọc CSV hay suy đoán domain từ nội dung. Nếu BE cung cấp domain PW2 thay cho PW1 thì phải sửa input trước khi chạy. `store_domains` nhúng trong bundle (nếu có) chỉ bổ sung alias domain active, chưa xóa, đúng `store_id`; không thay thế `site.domain`. Input compact dùng `source.websiteUrl` và tùy chọn `source.origins`.
+
+Đường dẫn được so khớp không phân biệt hoa/thường, gộp dấu `/` lặp trong pathname và bỏ `/` cuối. Slug PW1 cũ được giữ làm alias chỉ khi trỏ duy nhất một page; URL chính có ưu tiên. Query và fragment được giữ nguyên. Link entity vẫn cần mapping ID; domain của store khác không bị đổi. Cơ chế áp dụng chung cho rich text, CTA slide, menu/footer và category cards. Audit nhận diện các domain nguồn đã xác minh. Thay đổi này không sửa dữ liệu site đã migrate.
+
+### Bố cục rich text nguồn
+
+Script không áp khung panel/viền/bo góc theo design direction lên rich text. Các figure ảnh của trình soạn thảo PW1 được chuyển thành CSS inline cục bộ để giữ căn trái/phải/giữa và giới hạn chiều rộng trên mobile. Nhóm figure căn trái liên tiếp có caption, không có width/float/display riêng, được đặt trong gallery CSS Grid responsive; đoạn văn hoặc bảng ngăn nhóm. Giữ nguyên ảnh, caption, link và thứ tự. Không suy diễn chính xác số cột PW1 khi nguồn không có CSS.
+
+### Chạy lại site đã publish
+
+`--store ID --rerun` cho phép tái tạo site đã publish trong mapping migration hiện có. Không dùng `--rerun` thì vẫn không được thay thế site published. Kiểm tra tenant, owner active và category scope giữ nguyên, được kiểm tra lại trước khi ghi. AI/media chuẩn bị trước; thay đổi site/page ghi trong transaction có kiểm tra concurrent edit. Khi generation/ghi thất bại trước commit, dữ liệu site cũ giữ nguyên. Sau commit site chuyển về draft và flow publish tự chạy; nếu publish thất bại, kết quả ghi nhận lỗi để lần chạy sau tiếp tục publish.

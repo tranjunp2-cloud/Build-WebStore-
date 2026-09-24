@@ -1,3 +1,4 @@
+import { getPw1Industry } from '@/lib/migration/pw1-industry'
 import { ContractSchema as Pw1ContractSchema } from '@/lib/migration/pw1-contract'
 import type { z } from 'zod'
 import { importPw1BlockMedia } from '@/lib/migration/pw1-media'
@@ -926,6 +927,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 ),
             )
 
+            if (migration) businessInfo.industry = getPw1Industry(result).category
             if (migration?.onGenerated) await migration.onGenerated(result)
 
             // AI-first can only know its real image demand after the model has
@@ -1907,6 +1909,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         // Pending-aware: on regeneration a stale pendingGlobalBlocks draft
         // (e.g. unpublished cart deletion) would shadow the live cart in the
         // editor, so the cart is grafted into the pending draft as well.
+        const migrationCommerce = migration ? Pw1ContractSchema.parse(migration.sourceBlueprint.nativeContract).site.features ?? {cart:false,orderTracking:false} : undefined
         const cartPatch = ensureCartGlobalBlockWithPending(
             (site as { globalBlocks?: Record<string, unknown> | null }).globalBlocks,
             (site as { pendingGlobalBlocks?: Record<string, unknown> | null }).pendingGlobalBlocks,
@@ -1914,6 +1917,14 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             generatedHeaderBlock,
             migration?.sourceBlueprint.nativeContract ? Boolean(Pw1ContractSchema.parse(migration.sourceBlueprint.nativeContract).site.features?.cart) : false,
         )
+        if (migrationCommerce) {
+            const existing = (site.globalBlocks ?? {}) as Record<string, unknown>
+            cartPatch.globalBlocks = { ...existing, ...cartPatch.globalBlocks, pw1Commerce: migrationCommerce,
+                ...(!migrationCommerce.cart ? {cartWidget:null} : {}) }
+            const pending = (site as {pendingGlobalBlocks?: Record<string, unknown> | null}).pendingGlobalBlocks
+            if (pending != null) cartPatch.pendingGlobalBlocks = { ...pending, ...cartPatch.pendingGlobalBlocks, pw1Commerce:migrationCommerce,
+                ...(!migrationCommerce.cart ? {cartWidget:null} : {}) }
+        }
         // Write sample products to DB (non-fatal — awaits the parallel promise started above)
         // Matches constraint name from Drizzle: <table>_<col>_<reftable>_<refcol>_fk
         // Combines constraint-name regex with PG code for cases where Payload wraps the

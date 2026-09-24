@@ -8,16 +8,38 @@ export const LinkCorrectionsSchema = z.array(z.object({ from: z.string().min(1),
 export type VerifiedCategoryLink = { sourceId: string; destinationId: number; sourcePath: string; destinationPath: string }
 
 export type SourceLinkFinding = { url: string; location: string; reason: 'missing-page' | 'waiting-be' | 'confirmed-broken'; action: 'retained' | 'disabled' }
-export type SourceLinkPolicy = { brokenUrls?: readonly string[]; findings?: SourceLinkFinding[] }
+export const SourceOriginsSchema = z.array(z.string().url().refine(value => {
+    try {
+        const u = new URL(value)
+        return ['http:', 'https:'].includes(u.protocol) && !u.username && !u.password && u.pathname === '/' && !u.search && !u.hash
+    } catch { return false }
+}, 'Expected source origin')).optional()
+export const normalizeSourcePath = (path: string) => path.replace(/\/+/g, '/').replace(/\/$/, '').toLowerCase() || '/'
+export function isSourceHost(target: URL, sourceUrl: string, origins: readonly string[] = []) {
+    return ['http:', 'https:'].includes(target.protocol) && !target.username && !target.password && [sourceUrl, ...origins].some(origin => new URL(origin).host === target.host)
+}
+
+export type SourceLinkPolicy = { sourceOrigins?: readonly string[]; aliases?: readonly { sourcePath: string; destinationPath: string }[]; brokenUrls?: readonly string[]; findings?: SourceLinkFinding[] }
 
 /** Resolve only pages proven to exist in this store. Never reinterpret legacy entity IDs. */
 export function createSourceLinkResolver(sourceUrl: string, pages: Array<{ sourcePath: string; destinationPath: string }>, warnings: string[], categories: readonly VerifiedCategoryLink[] = [], corrections: readonly { from: string; destinationPath: string }[] = [], policy: SourceLinkPolicy = {}) {
     const source = new URL(sourceUrl)
-    const normalize = (path: string) => path.replace(/\/+$/, '') || '/'
+    const normalize = normalizeSourcePath
     const routes = new Map<string, string>()
     for (const page of pages) {
         const path = normalize(page.sourcePath)
         if (!routes.has(path)) routes.set(path, page.destinationPath)
+    }
+    const aliases = new Map<string, Set<string>>()
+    for (const alias of policy.aliases ?? []) {
+        const path = normalize(alias.sourcePath)
+        const destinations = aliases.get(path) ?? new Set<string>()
+        destinations.add(alias.destinationPath); aliases.set(path, destinations)
+    }
+    for (const [path, destinations] of aliases) {
+        if (routes.has(path)) continue
+        if (destinations.size === 1) routes.set(path, [...destinations][0])
+        else warnings.push(`Ambiguous source page alias retained: ${path}`)
     }
     return (value: string, location = 'unknown'): string => {
         const correction = corrections.find(item => item.from.trim() === value.trim())
@@ -25,7 +47,7 @@ export function createSourceLinkResolver(sourceUrl: string, pages: Array<{ sourc
         if (!value || /^(#|mailto:|tel:|sms:|whatsapp:)/i.test(value)) return value
         let target: URL
         try { target = new URL(value, source) } catch { return value }
-        if (!['http:', 'https:'].includes(target.protocol) || target.host !== source.host) return value
+        if (!isSourceHost(target, sourceUrl, policy.sourceOrigins)) return value
         const entityKeys = [...target.searchParams.keys()].filter(key => /^(category|category_id|product|product_id|article|article_id|brand|brand_id)$/i.test(key))
         if (entityKeys.length === 1 && ['category','category_id'].includes(entityKeys[0])) {
             const category = categories.find(c => c.sourceId === target.searchParams.get(entityKeys[0]) && normalize(c.sourcePath) === normalize(target.pathname))

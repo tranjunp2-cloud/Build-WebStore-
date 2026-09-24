@@ -136,7 +136,10 @@ export async function checkMissingSourceLinks(sourceUrl: string, findings: reado
 /** Shared by the batch runner and read-only verification; never edits destination data. */
 export async function prepareSourceLinks(input: unknown, categories: MigrationDestination['productCategories'] = [], signal?: AbortSignal) {
     const initial = adaptWebsiteInput(input, categories)
-    const sourceLinkChecks = await checkMissingSourceLinks(initial.contract.source.url, initial.report.linkFindings, signal, initial.contract.source.storeId)
+    // Findings originate only from the resolver's verified same-store hosts.
+    const origins = [...new Set(initial.report.linkFindings.map(finding => new URL(finding.url).origin))]
+    const sourceLinkChecks = [] as Awaited<ReturnType<typeof checkMissingSourceLinks>>
+    for (const origin of origins) sourceLinkChecks.push(...await checkMissingSourceLinks(origin, initial.report.linkFindings.filter(finding => new URL(finding.url).origin === origin), signal, initial.contract.source.storeId))
     const adapted = adaptWebsiteInput(input, categories, sourceLinkChecks.filter(check => check.status === 'broken').map(check => check.url))
     return { adapted, sourceLinkChecks }
 }

@@ -70,3 +70,20 @@ describe('[TC-F35.M47] confirmed broken source links', () => {
         expect(findings).toContainEqual({ url: 'https://shop.example/about', location: 'page:1/component:2', reason: 'confirmed-broken', action: 'disabled' })
     })
 })
+
+ it('TC-F35.M27: maps verified source domains and normalized paths without touching other stores', () => {
+    const resolve = createSourceLinkResolver('https://new.example', [{sourcePath:'/contact-us',destinationPath:'/contact-us'}], [], [], [], {sourceOrigins:['https://old.example']})
+    expect(resolve('http://old.example//Contact-us/?utm_source=x#form')).toBe('/contact-us?utm_source=x#form')
+    expect(resolve('https://another.example/contact-us')).toBe('https://another.example/contact-us')
+ })
+ it('TC-F35.M27: resolves unique aliases and leaves ambiguous aliases unchanged', () => {
+    const warnings: string[] = []
+    const resolve = createSourceLinkResolver('https://old.example', [{sourcePath:'/about-us',destinationPath:'/about-us'}], warnings, [], [], {aliases:[
+        {sourcePath:'/New-page-1',destinationPath:'/about-us'},
+        {sourcePath:'/duplicate',destinationPath:'/about-us'},
+        {sourcePath:'/duplicate',destinationPath:'/contact-us'},
+    ]})
+    expect(resolve('https://old.example/new-page-1')).toBe('/about-us')
+    expect(resolve('https://old.example/duplicate')).toBe('https://old.example/duplicate')
+    expect(warnings.some(w => w.includes('Ambiguous'))).toBe(true)
+ })

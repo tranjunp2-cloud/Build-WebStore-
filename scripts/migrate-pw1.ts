@@ -40,7 +40,7 @@ Time limits stop at safe boundaries. Generation spacing is not a provider reques
 Design token limit is observed after responses; excludes other AI calls and may overshoot by one generation.
 BE data checks verify availability only, not source ID mapping or complete import.
 Default skips unchanged completed stores. Retry selects mapped failed/pending stores.
---rerun explicitly regenerates completed draft sites. Invalid stores are reported without blocking valid stores.
+--rerun explicitly regenerates mapped draft or published sites. Invalid stores are reported without blocking valid stores.
 SIGINT/SIGTERM stops at safe boundaries; interrupted writes roll back. Rerun input to recover.
 Status/logs are read-only and need only database configuration.`)
         return

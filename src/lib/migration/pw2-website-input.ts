@@ -1,5 +1,5 @@
 import type { MigrationDestination } from './pw1-destination'
-import { type SourceLinkFinding, LinkCorrectionsSchema, createSourceLinkResolver, rewriteSourceHtmlLinks } from './pw1-links'
+import { SourceOriginsSchema, isSourceHost, normalizeSourcePath, type SourceLinkFinding, LinkCorrectionsSchema, createSourceLinkResolver, rewriteSourceHtmlLinks } from './pw1-links'
 import { SiteSettingsSchema } from './pw1-site-settings'
 import { z } from 'zod'
 import { ContractSchema } from './pw1-contract'
@@ -10,7 +10,7 @@ type InputLink = { label: string; pageId?: string; url?: string; children?: Inpu
 const Link: z.ZodType<InputLink> = z.lazy(() => z.object({ label: z.string(), pageId: Id.optional(), url: z.string().optional(), children: z.array(Link).optional() }).strict().refine(v => Boolean(v.pageId) !== Boolean(v.url), 'Use pageId or url'))
 const Config = z.object({ aspectRatio: z.number().min(0.2).max(10).optional(), imageFit: z.enum(['cover','contain','scale-down']).optional(), slidesPerView: z.number().int().min(1).max(6).optional(), size: z.enum(['hero','small']).optional(), autoplay: z.boolean().optional(), intervalMs: z.number().min(1000).max(30000).optional(), paddingY: z.number().min(0).max(240).optional(), limit: z.number().int().min(1).max(20).optional(), showCategoryFilter: z.boolean().optional(), criteria: z.record(z.union([z.number(),z.boolean()])).optional(), sourceSettings: z.record(z.unknown()).optional() }).strict()
 const Component = z.object({ sourceId: Id, type: z.enum(['banner','rich_text','category_listing','product_listing','article_listing','product_filter','product_sort','article_filter','article_sort']), enabled: z.boolean().default(true), content: z.record(z.unknown()), config: Config.default({}), binding: z.object({ source: z.literal('pw2.database'), collection: z.enum(['products','blogs']), scope: z.enum(['site','tenant']), emptyBehavior: z.literal('native-empty-state') }).strict().optional(), mappingStatus: z.literal('pending').optional() }).strict()
-export const WebsiteInputSchema = z.object({ linkCorrections: LinkCorrectionsSchema.optional(), format: z.literal('pw2-website-input'), version: z.literal('1.0.0'), source: z.object({ storeId: Id, websiteUrl: Url, capturedAt: z.string().optional() }).strict(), website: z.object({ settings: SiteSettingsSchema.optional(), name: z.string().min(1), locale: z.enum(['en', 'ms']), branding: z.object({ logoUrl: z.string().url().refine(v => /^https?:\/\//i.test(v)).optional().catch(undefined) }).strict(), features: z.object({ cart: z.boolean(), orderTracking: z.boolean() }).strict().optional(), navigation: z.array(Link), footer: z.object({ copyright: z.string(), tagline: z.string().optional(), columns: z.array(z.object({ title: z.string(), links: z.array(Link) }).strict()) }).strict() }).strict(), pages: z.array(z.object({ sourceId: Id, title: z.string().min(1), path: z.string().regex(/^\/(?:[a-z0-9-]+)?$/), components: z.array(Component) }).strict()).min(1) }).strict()
+export const WebsiteInputSchema = z.object({ linkCorrections: LinkCorrectionsSchema.optional(), format: z.literal('pw2-website-input'), version: z.literal('1.0.0'), source: z.object({ storeId: Id, websiteUrl: Url, origins: SourceOriginsSchema, capturedAt: z.string().optional() }).strict(), website: z.object({ settings: SiteSettingsSchema.optional(), name: z.string().min(1), locale: z.enum(['en', 'ms']), branding: z.object({ logoUrl: z.string().url().refine(v => /^https?:\/\//i.test(v)).optional().catch(undefined) }).strict(), features: z.object({ cart: z.boolean(), orderTracking: z.boolean() }).strict().optional(), navigation: z.array(Link), footer: z.object({ copyright: z.string(), tagline: z.string().optional(), columns: z.array(z.object({ title: z.string(), links: z.array(Link) }).strict()) }).strict() }).strict(), pages: z.array(z.object({ sourceId: Id, title: z.string().min(1), aliases: z.array(z.string().regex(/^\/(?!\/)[^?#]*$/)).optional(), path: z.string().regex(/^\/(?:[a-z0-9-]+)?$/), components: z.array(Component) }).strict()).min(1) }).strict()
 const Slide = z.object({ imageUrl: Url, alt: z.string().default(''), heading: z.string().default(''), description: z.string().default(''), cta: z.object({ label: z.string(), url: z.string() }).nullable().optional() }).strict()
 const Categories = z.object({ heading: z.string(), items: z.array(z.object({ sourceId: Id, title: z.string(), imageUrl: Url, alt: z.string().optional(), url: Url.optional(), pageId: Id.optional(), ctaLabel: z.string().optional() }).strict()) }).strict()
 /** Adapt the compact public contract only; never read a previous export or live DB. */
@@ -60,7 +60,7 @@ export function adaptWebsiteInput(input: unknown, verifiedCategories: MigrationD
         if (!route) throw new Error(`Reviewed link correction targets missing page ${correction.pageId}`)
         linkWarnings.push(`Reviewed source link correction: ${correction.from} -> ${route.path} (${correction.reason})`)
         return { from: correction.from, destinationPath: route.path }
-    }), { brokenUrls: brokenSourceUrls, findings: linkFindings })
+    }), { brokenUrls: brokenSourceUrls, findings: linkFindings, sourceOrigins: data.source.origins, aliases: data.pages.flatMap(page => (page.aliases ?? []).map(sourcePath => ({sourcePath, destinationPath: pageRoutes.get(page.sourceId)!.path}))) })
     const link = (value: InputLink, location = 'navigation'): ResolvedLink => {
         const url = value.pageId ? pageRoutes.get(value.pageId)?.path : value.url ? resolveSourceLink(value.url, location) : undefined
         if (url === '') return { label: value.label, url: '' }
@@ -76,8 +76,8 @@ export function adaptWebsiteInput(input: unknown, verifiedCategories: MigrationD
         if (!value.url) return undefined
         try {
             const url = new URL(value.url, data.source.websiteUrl)
-            if (url.origin !== new URL(data.source.websiteUrl).origin) return undefined
-            const path = url.pathname.replace(/\/$/, '')
+            if (!isSourceHost(url, data.source.websiteUrl, data.source.origins)) return undefined
+            const path = normalizeSourcePath(url.pathname)
             return path === '/cart' ? 'cart' : path === '/order-tracking' ? 'orderTracking' : undefined
         } catch { return undefined }
     }

@@ -14,6 +14,10 @@ describe('[TC-F35.M44] explicit BE mappings', () => {
         expect(() => assertDestinationOwnership(destination,{id:9,tenant:4,status:'draft'},owner)).not.toThrow()
         expect(() => assertDestinationOwnership(destination,{id:9,tenant:5,status:'draft'},owner)).toThrow('declared tenant')
         expect(() => assertDestinationOwnership(destination,{id:9,tenant:4,status:'published'},owner)).toThrow('draft')
+        expect(() => assertDestinationOwnership(destination,{id:9,tenant:4,status:'published'},owner,true)).not.toThrow()
+        expect(() => assertDestinationOwnership(destination,{id:9,tenant:5,status:'published'},owner,true)).toThrow('declared tenant')
+        expect(() => assertDestinationOwnership(destination,{id:9,tenant:4,status:'published'},[{...owner[0],role:'editor'}],true)).toThrow('active owner')
+        expect(() => assertDestinationOwnership(destination,{id:9,tenant:4,status:'archived'},owner,true)).toThrow('draft')
         expect(() => assertDestinationOwnership(destination,{id:9,tenant:4,status:'draft'},[{...owner[0],role:'editor'}])).toThrow('active owner')
     })
     it('rejects missing, deleted and cross-site category IDs', () => {

@@ -1,3 +1,4 @@
+import { isSourceHost } from './pw1-links'
 import { writeFile, mkdir, appendFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { Client } from 'pg'
@@ -5,10 +6,10 @@ import { chromium, type Page } from '@playwright/test'
 import type { BatchEntry } from './pw1-batch-input'
 
 export type QualityFinding = { code: string; severity: 'error'|'warning'|'waiting-be'; detail: string; block?: string; viewport?: number }
-export function classifySourceLink(href: string, source: string): QualityFinding | undefined {
+export function classifySourceLink(href: string, source: string, origins: readonly string[] = []): QualityFinding | undefined {
     let target: URL
     try { target = new URL(href) } catch { return }
-    if (target.host !== new URL(source).host) return
+    if (!isSourceHost(target, source, origins)) return
     const entity = [...target.searchParams.keys()].some(k=>/^(category|category_id|product|product_id|article|article_id|brand|brand_id)$/i.test(k))
     return {code:entity?'SOURCE_ENTITY_LINK':'SOURCE_PAGE_LINK',severity:entity?'waiting-be':'warning',detail:href}
 }
@@ -91,7 +92,7 @@ export async function auditPw1Websites(entries: BatchEntry[], baseUrl: string, o
                         for(const image of snapshot.images)add({code:'BROKEN_IMAGE',severity:'error',detail:image.url,block:image.block,viewport:width})
                         for(const control of snapshot.controls)add({code:'UNNAMED_CONTROL',severity:'warning',detail:`${control.tag} has no detected accessible label; review manually`,block:control.block,viewport:width})
                         for(const link of snapshot.links){
-                            const source=classifySourceLink(link.url,entry.source.websiteUrl)
+                            const source=classifySourceLink(link.url,entry.source.websiteUrl,entry.source.origins)
                             if(source){add({...source,block:link.block});continue}
                             const target=new URL(link.url)
                             if(target.origin!==base.origin || !['http:','https:'].includes(target.protocol))continue

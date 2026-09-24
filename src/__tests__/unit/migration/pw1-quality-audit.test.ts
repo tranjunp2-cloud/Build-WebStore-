@@ -21,3 +21,8 @@ it('[TC-F35.M45] reports implementation gaps separately from BE waits',()=>{
     expect(result.presentation).toHaveLength(1)
     expect(result.links).toHaveLength(1)
 })
+
+it('TC-F35.M42: recognizes verified legacy aliases when the primary domain differs', () => {
+    expect(classifySourceLink('https://legacy.example/contact-us', 'https://new.example', ['https://legacy.example'])).toMatchObject({code:'SOURCE_PAGE_LINK'})
+    expect(classifySourceLink('https://other.example/contact-us', 'https://new.example', ['https://legacy.example'])).toBeUndefined()
+})

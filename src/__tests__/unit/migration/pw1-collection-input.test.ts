@@ -232,3 +232,41 @@ it('[TC-F35.M27] retains category cards without images using the migration place
     expect(JSON.stringify(contract)).toContain('Category without image')
     expect(JSON.stringify(contract)).toContain('https://pw1-migration.invalid/placeholder.png')
 })
+
+ it.each([['0', 1000], ['0.5', 1000], ['1', 1000], ['5', 5000]])('[TC-F35.M27] clamps banner timing %s to %s ms', (timing, expected) => {
+    const input = fixture()
+    const data = [{ ...input[0], pages: [{ ...input[0].pages[0], components: [{
+        id: '20', page_id: '10', status: '1',
+        frontend_component: { name: 'banner', default_config_values: { timing_animation: timing } },
+        banners: [{ id: '30', page_component_id: '20', store_id: '205', status: '1', image: 'https://source.example/banner.png' }],
+    }] }] }]
+    const { entries } = parseMigrationInput(data)
+    expect(entries[0].website.pages[0].components[0].config.intervalMs).toBe(expected)
+    expect(() => adaptWebsiteInput(compactInput(entries[0]))).not.toThrow()
+})
+
+ it('[TC-F35.M27] uses only active source domains belonging to this store for rich text links', () => {
+    const input = fixture()
+    input[0].pages[0].components[0].model_settings[0].value = '<a href="https://old.example/">Home</a><a href="https://other.example/">Other</a>'
+    const data = [{...input[0], store_domains:[
+        {store_id:'205',domain:'old.example',status:'1'},
+        {store_id:'999',domain:'other.example',status:'1'},
+        {store_id:'205',domain:'deleted.example',status:'1',deleted_at:'2020-01-01'},
+    ]}]
+    const {entries} = parseMigrationInput(data)
+    expect(entries[0].source.websiteUrl).toBe('https://shop.example')
+    expect(entries[0].source.origins).not.toContain('https://other.example')
+    const {contract} = adaptWebsiteInput(compactInput(entries[0]))
+    expect(contract.pages[0].components[0].block.html).toContain('href="/"')
+    expect(contract.pages[0].components[0].block.html).toContain('href="https://other.example/"')
+ })
+
+it('[TC-F35.M27] disabled commerce pages override stale header cart settings', () => {
+    const input = fixture()
+    const data = [{...input[0], sites:[{...input[0].sites[0],menus:[{...input[0].sites[0].menus[0],config:'{"cart_status":1}'}]}],pages:[...input[0].pages,
+        {id:'20',store_id:'205',name:'Cart',type:'4',slug:'cart',status:'0',components:[{id:'30',status:'1',frontend_component:{name:'cart'}}]},
+        {id:'21',store_id:'205',name:'Tracking',type:'6',slug:'order-tracking',status:'0',components:[]},
+    ]}]
+    const {entries} = parseMigrationInput(data)
+    expect(entries[0].website.features).toEqual({cart:false,orderTracking:false})
+})

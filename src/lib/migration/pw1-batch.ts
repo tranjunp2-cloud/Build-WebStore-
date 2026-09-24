@@ -142,7 +142,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             await client.query('UPDATE pw1_migration_batches SET results=results || $2::jsonb WHERE id=$1', [batchId, JSON.stringify([result])])
                             console.log(JSON.stringify(result)); return
                         }
-                        if (site.status !== 'draft') throw new MigrationError('PUBLISHED_SITE', 'Mapped site is not a draft; automatic replacement refused')
+                        if (site.status !== 'draft' && !(options.rerun && site.status === 'published')) throw new MigrationError('PUBLISHED_SITE', 'Mapped site is not a draft; automatic replacement refused')
                     } else {
                         controls.checkGenerationBudget()
                         if (options.requireBeData && !entry.destination && entry.website.pages.some(p => p.components.some(c => c.enabled !== false && c.binding))) {
@@ -168,7 +168,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                     controls.checkTime(storeStartedAt)
                     if (entry.destination) {
                         if (entry.destination.siteId !== mapping.site_id || entry.destination.tenantId !== mapping.tenant_id) throw new MigrationError('BE_MAPPING_INVALID', 'Declared destination conflicts with existing store mapping')
-                        await verifyMigrationDestination(activePayload, entry.destination, entry.owner.email)
+                        await verifyMigrationDestination(activePayload, entry.destination, entry.owner.email, undefined, options.rerun === true)
                     }
                     const readiness = await checkBeReadiness(activePayload, entry, mapping)
                     if (options.requireBeData && readiness.status === 'missing-data') throw new MigrationError('BE_DATA_MISSING', readiness.warnings.join('; '))
@@ -239,7 +239,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             await save('warnings.json', warnings)
                             await save('blueprint.json', { sourceHash: hash, ...blueprint })
                             console.log(`[${entry.sourceStoreId}] attempt ${attempt}/${maxAttempts} → site ${mapping.site_id}`)
-                            const applied = await withPw1MediaTracking(createdMedia, () => applyPw1Website({ destination: entry.destination, payload: activePayload, blueprint, account: entry.owner.email, siteId: mapping.site_id, sourceHash: hash, save, attemptId, onStage, acquireWrite: acquireMediaCreateLock, signal: controller.signal, onDesignUsage: usage => { controls.recordDesignTokens(usage.totalTokens ?? 0) } }))
+                            const applied = await withPw1MediaTracking(createdMedia, () => applyPw1Website({ allowPublished: options.rerun === true, destination: entry.destination, payload: activePayload, blueprint, account: entry.owner.email, siteId: mapping.site_id, sourceHash: hash, save, attemptId, onStage, acquireWrite: acquireMediaCreateLock, signal: controller.signal, onDesignUsage: usage => { controls.recordDesignTokens(usage.totalTokens ?? 0) } }))
                             await client.query("UPDATE pw1_migration_attempts SET status='completed',stage='completed',finished_at=now() WHERE id=$1", [attemptId])
                             await client.query("UPDATE pw1_migration_stores SET status='completed',updated_at=now() WHERE source_store_id=$1", [entry.sourceStoreId])
                             completed = { sourceStoreId: entry.sourceStoreId, status: warnings.length ? 'completed_with_warnings' : 'completed', siteId: mapping.site_id, previewUrl: applied.previewUrl, warnings, readiness, sourceLinkChecks, linkFindings: adapted.report.linkFindings, beMapping: entry.destination ? { status: 'verified-declared-mappings', productCategories: entry.destination.productCategories.length, tenantId: entry.destination.tenantId, siteId: entry.destination.siteId } : undefined, attemptId, brand: { status: blueprint.nativeContract.site.brandEvidence?.status, colors: blueprint.nativeContract.site.brandEvidence?.colors } }

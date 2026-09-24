@@ -1,3 +1,4 @@
+import { SourceOriginsSchema, isSourceHost, normalizeSourcePath } from './pw1-links'
 import { PW1_PLACEHOLDER_URL } from './pw1-placeholder'
 import { z } from 'zod'
 import { load } from 'cheerio'
@@ -51,7 +52,15 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             // PW1's unprefixed public routes use English; sourceLocale explicitly selects /ms content.
             const locale = z.enum(['en', 'ms']).parse(site.sourceLocale ?? 'en')
             const localized = (r: Row, key = 'name') => str(locale === 'ms' && r[`${key}_ms`] ? r[`${key}_ms`] : r[key])
-            const base = new URL(/^https?:\/\//.test(str(site.domain)) ? str(site.domain) : `https://${str(site.domain)}`)
+            const origins = SourceOriginsSchema.parse(rows(bundle.store_domains).filter(row => str(row.store_id) === storeId && active(row)).map(row => {
+                const domain = str(row.domain).trim()
+                const url = new URL(/^https?:\/\//i.test(domain) ? domain : `https://${domain}`)
+                if (url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error(`Store ${storeId}: invalid source domain`)
+                return url.origin
+            })) ?? []
+            const destinationBase = new URL(/^https?:\/\//.test(str(site.domain)) ? str(site.domain) : `https://${str(site.domain)}`)
+            const base = destinationBase
+            const recognizedOrigins = [...new Set([...origins, destinationBase.origin])]
             if (!site.domain) throw new Error(`Store ${storeId}: missing website domain`)
             const pageRows = ordered(bundle.pages).filter(p => str(p.store_id) === storeId)
             if (new Set(pageRows.map(p => str(p.id))).size !== pageRows.length) throw new Error('Duplicate source page ID')
@@ -86,8 +95,8 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 if (!url) return
                 const target = new URL(str(url), base)
                 if (!['https:', 'http:'].includes(target.protocol)) throw new Error(`${context}: unsupported URL protocol`)
-                if (target.origin === base.origin) {
-                    const page = pageRows.find(p => pagePath(p) === target.pathname.toLowerCase())
+                if (isSourceHost(target, base.origin, recognizedOrigins)) {
+                    const page = pageRows.find(p => normalizeSourcePath(pagePath(p)) === normalizeSourcePath(target.pathname))
                     if (page && !active(page)) { exclude(context, 'link', 'deleted-page-url'); return }
                     if (page) target.pathname = pagePath(page)
                 }
@@ -115,7 +124,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             const pages = validPages.filter(p => {
                 if (['4', '5', '6'].includes(str(p.type)) || isNativeCommercePage(p)) { exclude(p.id, 'page', 'native-commerce-runtime'); return false }
                 return true
-            }).map(p => ({ sourceId: str(p.id), title: localized(p) || str(p.title), path: pagePath(p), components: ordered(p.components).flatMap<unknown>(c => {
+            }).map(p => ({ sourceId: str(p.id), title: localized(p) || str(p.title), path: pagePath(p), ...(str(p.slug).trim() ? { aliases: ['/' + str(p.slug).replace(/^\/+/, '')] } : {}), components: ordered(p.components).flatMap<unknown>(c => {
                 if (str(c.page_id) !== str(p.id)) throw new Error('Component/page ownership mismatch')
                 if (!active(c)) { exclude(c.id, 'component', 'disabled-or-deleted'); return [] }
                 for (const row of [...rows(c.model_settings), ...rows(c.shortlist_items)]) {
@@ -142,7 +151,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                         return { imageUrl: bannerImageUrl(b.image), alt: str(b.name), heading: str(h.status) === '1' ? str(h.text) : '', description: str(sub.status) === '1' ? str(sub.text) : '', cta: str(button.status) === '1' && label && dest?.url ? { label, url: dest.url } : null }
                     })
                     if (!slides.length) { exclude(c.id, 'component', 'empty-banner'); return [] }
-                    return [{ ...common, content: { slides }, config: { size: config.size ?? 'hero', autoplay: config.animation === 'auto', intervalMs: Number(config.timing_animation ?? 5) * 1000, sourceSettings } }]
+                    return [{ ...common, content: { slides }, config: { size: config.size ?? 'hero', autoplay: config.animation === 'auto', intervalMs: Math.max(1000, Number(config.timing_animation ?? 5) * 1000), sourceSettings } }]
                 }
                 if (type === 'rich_text') {
                     const contentSetting = rows(c.model_settings).find(r => active(r) && r.key === 'content')
@@ -159,7 +168,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                         return { sourceId: str(i.id), title: str(i.name), imageUrl: str(i.image).trim() || PW1_PLACEHOLDER_URL, alt: str(i.name), ...(dest ? { ...dest, ctaLabel: str(i.cta_button_text) } : {}) }
                     })
                     if (!items.length) { exclude(c.id, 'component', 'empty-category-list'); return [] }
-                    return [{ ...common, content: { heading: str(config.header), items }, config: { autoplay: config.animation === 'auto', intervalMs: Number(config.timing_animation ?? 5) * 1000, sourceSettings } }]
+                    return [{ ...common, content: { heading: str(config.header), items }, config: { autoplay: config.animation === 'auto', intervalMs: Math.max(1000, Number(config.timing_animation ?? 5) * 1000), sourceSettings } }]
                 }
                 if (['product_listing', 'article_listing'].includes(type)) return [{ ...common, content: { heading: str(config.header) }, config: { limit: Number(config.per_page ?? (type === 'product_listing' ? 12 : 3)), sourceSettings }, binding: { source: 'pw2.database', collection: type === 'product_listing' ? 'products' : 'blogs', scope: type === 'product_listing' ? 'site' : 'tenant', emptyBehavior: 'native-empty-state' } }]
                 if (['product_filter', 'product_sort', 'article_filter', 'article_sort'].includes(type)) return [{ ...common, content: { heading: str(config.header) }, config: { sourceSettings }, mappingStatus: 'pending' }]
@@ -208,9 +217,9 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 socialLinks: pickStrings(site.socialLinks, ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok']),
                 seo: { ...pickStrings(site.seo, ['metaTitle', 'metaDescription']), ogImage: assetUrl(seo.ogImage) },
             }
-            entries.push({ ...(bundle.linkCorrections ? { linkCorrections: bundle.linkCorrections } : {}), ...(bundle.destination ? { destination: bundle.destination } : {}), sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin }, website: {
+            entries.push({ ...(bundle.linkCorrections ? { linkCorrections: bundle.linkCorrections } : {}), ...(bundle.destination ? { destination: bundle.destination } : {}), sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin, ...(origins.length ? { origins: recognizedOrigins } : {}) }, website: {
                 settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
-                features: { cart: Number(headerConfig.cart_status) === 1 || validPages.some(hasCommerceComponent), orderTracking: Number(headerConfig.cart_status) === 1 && validPages.some(p => str(p.type) === '6') },
+                features: { cart: validPages.some(p => ['4','5'].includes(str(p.type)) || hasCommerceComponent(p)), orderTracking: validPages.some(p => ['4','5'].includes(str(p.type)) || hasCommerceComponent(p)) && validPages.some(p => str(p.type) === '6' || rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'order_tracking')) },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(menuLinks),
                 footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns }, pages,
             } })
