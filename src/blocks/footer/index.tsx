@@ -70,9 +70,9 @@ const BRAND_LOGO_TEXT_SIZE = {
 } as const
 
 const BRAND_LOGO_IMG_SIZE = {
-    sm: 'h-6',
-    md: 'h-8',
-    lg: 'h-8',
+    sm: 'h-12 sm:h-14',
+    md: 'h-14 sm:h-16',
+    lg: 'h-14 sm:h-16',
 } as const
 
 function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoProps) {
@@ -82,7 +82,7 @@ function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoPro
         <div className={`font-bold ${textCls} font-heading ${className}`.trim()}>
             {logo?.url ? (
                 /* Plan 260415 Lỗi 8F — alt fallback tốt hơn cho WCAG 1.1.1 */
-                <img src={logo.url} alt={logoText ? `${logoText} logo` : 'Company logo'} className={`${imgCls} w-auto`} />
+                <img src={logo.url} alt={logoText ? `${logoText} logo` : 'Company logo'} className={`${imgCls} w-auto max-w-[min(100%,280px)] object-contain`} />
             ) : (
                 <span style={{
                     background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), ${FOOTER_BRAND_GRADIENT_STOP}))`,
@@ -204,7 +204,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     const footerStyle: React.CSSProperties = backgroundColor ? { backgroundColor } : {}
 
     const copyrightLine = copyrightText
-        ? copyrightText.replace(/\d{4}/, String(new Date().getFullYear()))
+        ? copyrightText
         : `\u00A9 ${new Date().getFullYear()} ${logoText || 'All rights reserved'}`
 
     const socialsArr = (mergedBlock.socials && Array.isArray(mergedBlock.socials) ? mergedBlock.socials : []) as { url?: string; platform?: string; label?: string }[]
