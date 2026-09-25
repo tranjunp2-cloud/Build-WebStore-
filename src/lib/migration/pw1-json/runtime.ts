@@ -68,7 +68,7 @@ export function localTarget(uri: string | undefined, apply: boolean, localDataba
 }
 
 /** Suppress only identified historical replays. Normal app config is never modified on disk. */
-function guardCollection(collection: CollectionConfig): void {
+export function guardCollection(collection: CollectionConfig): void {
   // Scope the projection's maxRows exception to this isolated importer runtime.
   // Normal app configuration retains maxRows=5 and the historical-edit validator.
   if (collection.slug === 'products') {
@@ -81,9 +81,19 @@ function guardCollection(collection: CollectionConfig): void {
   })
   const skipBeforeChange = collection.slug === 'orders' || collection.slug === 'products'
   if (hooks?.beforeChange) hooks.beforeChange = hooks.beforeChange.map((hook, index) => async args => {
-    // Product publishGate (index 1) remains enforced; only auto inventory/actor rewriting is suppressed.
-    if (isMigrationContext(args.context) && skipBeforeChange && (collection.slug !== 'products' || index === 0)) return args.data
-    return hook(args)
+    // Historical products preserve their mapped status and weight. All other publish
+    // requirements remain enforced, as do normal application requests.
+    const historical = isMigrationContext(args.context)
+    if (historical && skipBeforeChange && (collection.slug !== 'products' || index === 0)) return args.data
+    try { return await hook(args) } catch (error) {
+      if (historical && collection.slug === 'products' && index === 1 && error instanceof Error) {
+        let details: unknown
+        try { details = JSON.parse(error.message) } catch { /* Not a structured publish error. */ }
+        if (details && typeof details === 'object' && 'code' in details && details.code === 'PUBLISH_BLOCKED' &&
+          'missingFields' in details && Array.isArray(details.missingFields) && details.missingFields.length === 1 && details.missingFields[0] === 'weight') return args.data
+      }
+      throw error
+    }
   })
   if (hooks?.beforeValidate && ['discounts', 'sites'].includes(collection.slug)) {
     hooks.beforeValidate = hooks.beforeValidate.map(hook => async args => {

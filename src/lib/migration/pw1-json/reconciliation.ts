@@ -1,3 +1,4 @@
+import { ADDRESS_OVERFLOW_RULE } from './approved-source-scope'
 import { createHash } from 'node:crypto'
 import { MigrationError } from './errors'
 import type { ImportStore } from './types'
@@ -17,10 +18,11 @@ const text = (value: unknown): string => typeof value === 'string' ? value : fai
 const key = (table: string, sourceId: string) => JSON.stringify([table, sourceId])
 interface ProductTarget { ref: string; hasVariants: boolean; options: string[][]; variants: { id: string; name: string }[] }
 interface StoreTarget { customers: Map<string, number>; products: Map<string, ProductTarget> }
-export interface SourceReconciliationRow { table: string; sourceId: string; storeId: string | null; parentId?: string; parentTable?: string; ownershipRule?: string }
+export interface SourceReconciliationRow { table: string; sourceId: string; storeId: string | null; parentId?: string; parentTable?: string; ownershipRule?: string; fieldRetentionRules?: Record<string, string> }
 
 /** Mirrors exporter receipt validation using only target identity/path indexes, never whole documents. */
-export function createReconciliationIndex(policy?: { resolveDuplicateVariantTuples?: boolean; pruneInvalidVariantSkus?: boolean }, sourceInstanceToken?: string) {
+export function createReconciliationIndex(policy?: { resolveDuplicateVariantTuples?: boolean; pruneInvalidVariantSkus?: boolean; allowCustomerAddressOverflow?: boolean }, sourceInstanceToken?: string) {
+  const overflowClaims = new Set<string>(), overflowReceipts = new Set<string>()
   const parents = new Map<string, string>()
   const stores = new Map<string, StoreTarget>()
   const sources = new Map<string, string | null>()
@@ -64,6 +66,10 @@ export function createReconciliationIndex(policy?: { resolveDuplicateVariantTupl
     },
     addSourceRow(row: SourceReconciliationRow): void {
       active(); sourceStarted = true
+      if (Object.values(row.fieldRetentionRules ?? {}).includes(ADDRESS_OVERFLOW_RULE)) {
+        if (row.table !== 'addresses' || !row.storeId || !policy?.allowCustomerAddressOverflow) fail()
+        overflowClaims.add(key(row.storeId!, row.sourceId)); charge(row.sourceId)
+      }
       if (receiptStarted) fail()
       if (!SOURCE_TABLES.has(row.table)) return
       if (!row.sourceId || (row.storeId !== null && !row.storeId)) fail()
@@ -112,6 +118,7 @@ export function createReconciliationIndex(policy?: { resolveDuplicateVariantTupl
       }
       for (const entry of receipt.diagnostics.addressDispositions) {
         owned('orders', entry.sourceOrderId, receipt.storeId)
+        if (entry.disposition === 'overflow') overflowReceipts.add(key(receipt.storeId, entry.sourceAddressId))
         if (entry.disposition !== 'invalid-source-address') owned('addresses', entry.sourceAddressId, receipt.storeId)
         if (entry.targetRef && ['emitted', 'deduplicated'].includes(entry.disposition)) {
           const count = store.customers.get(entry.targetRef)!
@@ -201,6 +208,7 @@ export function createReconciliationIndex(policy?: { resolveDuplicateVariantTupl
       if (!customer.success || !product.success || !expected.success) throw new MigrationError('RECONCILIATION_SCHEMA_INVALID')
       if (canonical(customer.data.sourceSnapshot) !== canonical(expected.data) || canonical(product.data.sourceSnapshot) !== canonical(expected.data)) throw new MigrationError('RECONCILIATION_PROVENANCE_INVALID')
       if (seenStores.size !== stores.size) fail()
+      for (const claim of overflowClaims) if (!overflowReceipts.has(claim)) fail()
       for (const store of stores.values()) for (const sourceId of store.products.keys()) if (!seenProducts.has(sourceId)) fail()
       finished = true
     },

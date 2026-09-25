@@ -33,6 +33,8 @@ export interface ArtifactCoverage {
 }
 export interface ImportArtifact {
   masterParts?: import('./master-parts').MasterPart[]
+  delegateRawPageContent?: boolean
+  delegateRawModelSettings?: boolean
   preserveInvalidUserEmails?: boolean
   coverage: ArtifactCoverage
   pageExcludedRecords: number

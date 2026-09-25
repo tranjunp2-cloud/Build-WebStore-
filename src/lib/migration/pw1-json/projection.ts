@@ -39,6 +39,8 @@ export function sourceKey(ref: string, collection: CollectionName): { sourceEnti
   let sourceId = parts.slice(2).join(':')
   if (collection === 'sites' && sourceEntity === 'stores') sourceEntity = 'sites'
   if (collection === 'media' && sourceEntity === 'medias') sourceEntity = 'media'
+  // A blog row emits both a Blog and its thumbnail; ledger source keys must differ.
+  if (collection === 'media' && sourceEntity === 'blog_posts') sourceEntity = 'blog_post_thumbnail'
   if (collection === 'media' && sourceEntity === 'stores') {
     const last = parts.at(-1)
     if (last !== 'logo' && last !== 'favicon') throw new Error('MEDIA_SOURCE_NAMESPACE_UNSUPPORTED')
@@ -65,7 +67,7 @@ function stableChildId(namespace: string): string {
 }
 
 /** Select schema-declared fields, rejecting unknown business keys rather than silently discarding them. */
-export function buildEntities(store: ImportStore, collections: Record<string, SanitizedCollectionConfig>, namespace: string, externalActorRefs: ReadonlySet<string> = new Set(), preserveInvalidUserEmails = false): Entity[] {
+export function buildEntities(store: ImportStore, collections: Record<string, SanitizedCollectionConfig>, namespace: string, externalActorRefs: ReadonlySet<string> = new Set(), preserveInvalidUserEmails = false, delegateRawPageContent = false, delegateRawModelSettings = false): Entity[] {
   const entities: Entity[] = []
   const seen = new Set<string>()
   for (const [slug, records] of Object.entries(store.collections)) {
@@ -101,7 +103,7 @@ export function buildEntities(store: ImportStore, collections: Record<string, Sa
       }
       // Historical unknown payment method must remain null, never receive an app default.
       if (slug === 'orders' && !('paymentMethod' in source) && namedFields(config.fields).has('paymentMethod')) source.paymentMethod = null
-      if (slug === 'sites') { delete source.pw1_source; delete source.menus }
+      if (slug === 'sites') { delete source.pw1_source; delete source.menus; if(delegateRawPageContent)delete source.raw_frontend_template; if(delegateRawModelSettings)delete source.raw_model_settings }
       entity.data = inspectFields(source, config.fields, entity, namespace, '')
       entity.sourceChecksum = checksum(entity.data)
       entities.push(entity)

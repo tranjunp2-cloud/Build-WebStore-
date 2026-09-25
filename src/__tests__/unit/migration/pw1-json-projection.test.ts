@@ -16,6 +16,48 @@ function fixture(product: ImportDocument = {}) {
 }
 
 describe('[TC-F42-IMP-007/008/009] Mapped projection fidelity',()=>{
+  it('[TC-F42-IMP-MEDIA-001] keeps original PW1 external media URL bytes and does not invent upload metadata',()=>{
+    // Arrange
+    const {store,configs}=fixture()
+    const url='https://cdn.example.test/PW1/Photo%20A.JPG?size=Original&sig=A%2Fb'
+    store.collections.media=[{_ref:'@media:medias:1252',url,sourceUrl:url,alt:'Original PW1 media'}]
+    configs.media.fields=[{name:'url',type:'text'},{name:'sourceUrl',type:'text'},{name:'alt',type:'text',required:true}]
+    // Act
+    const entity=buildEntities(store,configs,'PW1PROD:snapshot').find(row=>row.collection==='media')!
+    // Assert
+    expect(entity.data).toMatchObject({url,sourceUrl:url,alt:'Original PW1 media'})
+    expect(entity.data).not.toHaveProperty('filename')
+    expect(entity.data).not.toHaveProperty('tenant')
+    expect(entity.storeId).toBe('205')
+    expect(entity.sourceEntity).toBe('media')
+  })
+  it.each(['Original-Shop.primeweb.my', 'custom.example.test', null, undefined])('TC-F42-IMP-SOURCE-DOMAIN: preserves original Site domain independently of tenant slug: %s', domain => {
+    // Arrange
+    const { store, configs } = fixture()
+    store.collections.tenants[0].slug = 'pw1-205-fallback'
+    configs.tenants.fields.push({ name: 'slug', type: 'text', required: true })
+    configs.sites.fields.push({ name: 'domain', type: 'text' })
+    if (domain !== undefined) store.collections.sites[0].domain = domain
+    // Act
+    const entities = buildEntities(store, configs, 'source:snapshot', new Set(), false, true, true)
+    const site = entities.find(entity => entity.collection === 'sites')!
+    // Assert
+    expect(site.data.domain).toBe(domain)
+    if (domain === undefined) expect(site.data).not.toHaveProperty('domain')
+    expect(entities.find(entity => entity.collection === 'tenants')!.data.slug).toBe('pw1-205-fallback')
+    expect(resolveData(site, new Map([['@tenants:stores:205', 10]])).data.domain).toBe(domain)
+  })
+  it('TC-F42-IMP-RAW-SETTINGS: delegates raw settings only under the restored contract', () => {
+    // Arrange
+    const { store, configs } = fixture()
+    const raw = [{ id: '1', value: '<a href="tel:011 1259 5933">Call</a>' }]
+    store.collections.sites[0].raw_model_settings = raw
+    // Act / Assert
+    expect(() => buildEntities(store, configs, 'source:snapshot', new Set(), false, true)).toThrow()
+    const entities = buildEntities(store, configs, 'source:snapshot', new Set(), false, true, true)
+    expect(entities.find(entity => entity.collection === 'sites')?.data).not.toHaveProperty('raw_model_settings')
+    expect(store.collections.sites[0].raw_model_settings).toEqual(raw)
+  })
   it('preserves zero and text @ strings, removes raw Site only and gives stable child IDs',()=>{
     // Arrange
     const {store,configs}=fixture()

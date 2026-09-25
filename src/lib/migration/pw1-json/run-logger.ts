@@ -37,6 +37,7 @@ export class RunLogger {
   private startedAt = new Date().toISOString()
   private summary: Record<string, unknown>
   private failedStoreIds = new Set<string>()
+  private passwordResetUsers = new Map<string, { storeId: string; sourceUserId: string; targetUserId: string }>()
   private entityCounts: Record<string, number> = Object.create(null)
   private destinations: Record<string, StoreDestination> = Object.create(null)
   private constructor(readonly directory: string, readonly sessionId: string, mode: string, private rotationBytes: number) {
@@ -100,6 +101,9 @@ export class RunLogger {
         this.summary.plannedCreates = Number(this.summary.plannedCreates ?? 0) + Number(event.creates ?? 0)
         this.summary.plannedReuses = Number(this.summary.plannedReuses ?? 0) + Number(event.reuses ?? 0)
       }
+      if (event.status === 'USER_PASSWORD_RESET_REQUIRED' && [event.storeId, event.sourceId, event.targetId].every(value => /^[1-9]\d*$/.test(String(value)))) {
+        this.passwordResetUsers.set(`${event.storeId}:${event.sourceId}`, { storeId: String(event.storeId), sourceUserId: String(event.sourceId), targetUserId: String(event.targetId) })
+      }
       if (event.code && event.storeId) this.failedStoreIds.add(String(event.storeId))
       if (event.status === 'ENTITY_COMMITTED') {
         const key = `${event.collection}:${event.action}`
@@ -131,7 +135,7 @@ export class RunLogger {
     try {
       const handle = await open(temp, 'wx', 0o600)
       try {
-        const summary = { ...this.summary, ...safeLogEvent(result), outcome, updatedAt: new Date().toISOString(), entityCounts: this.entityCounts, destinationsCount: Object.keys(this.destinations).length, failedStoreIds: [...this.failedStoreIds], remainingStores: Math.max(0, Number(this.summary.stores ?? 0) - (this.summary.mode === 'dry-run' ? Number(this.summary.preflightedStores ?? 0) : Number(this.summary.verifiedBefore ?? 0) + Number(this.summary.verifiedThisSession))) }
+        const summary = { ...this.summary, ...safeLogEvent(result), outcome, updatedAt: new Date().toISOString(), entityCounts: this.entityCounts, passwordResetRequiredCount: this.passwordResetUsers.size, passwordResetUsers: [...this.passwordResetUsers.values()], destinationsCount: Object.keys(this.destinations).length, failedStoreIds: [...this.failedStoreIds], remainingStores: Math.max(0, Number(this.summary.stores ?? 0) - (this.summary.mode === 'dry-run' ? Number(this.summary.preflightedStores ?? 0) : Number(this.summary.verifiedBefore ?? 0) + Number(this.summary.verifiedThisSession))) }
         await handle.writeFile(JSON.stringify(summary, null, 2) + '\n'); await handle.sync()
       } finally { await handle.close() }
       await this.events.sync(); await this.errors.sync()

@@ -267,13 +267,13 @@ export async function writeEntity(runtime: Runtime, entity: Entity, targets: Map
       validateMedia(data)
       doc = await runtime.payload.db.create({ collection: 'media', data: { ...data, filename: null }, req: req as PayloadRequest })
     } else if (entity.collection === 'users' && entity.preserveInvalidEmail) {
-      const password = await passwordFor(entity, credentials, batch.binding.executionScope === 'foundation')
+      const password = await passwordFor(entity, credentials, true)
       passwordResetRequired = password === null
       // Only the verified artifact policy sets this internal marker. App auth validation is unchanged.
       doc = await runtime.payload.db.create({ collection: 'users', data: { loginAttempts: 0, prefer_lang: 'en', has_seen_ai_wizard: false, migrationStatus: 'migrated', ...data, ...await legacyEmailAuth(password) }, req: req as PayloadRequest })
     } else {
       const auth: Doc = entity.collection === 'users' ? await (async () => {
-        const password = await passwordFor(entity, credentials, batch.binding.executionScope === 'foundation')
+        const password = await passwordFor(entity, credentials, true)
         passwordResetRequired = password === null
         return userAuth(password)
       })() : {}

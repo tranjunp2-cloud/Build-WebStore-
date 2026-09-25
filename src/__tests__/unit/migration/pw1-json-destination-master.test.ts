@@ -9,7 +9,7 @@ import { writeDestinationMasterParts, destinationPartsDirectory, writeDestinatio
 
 const directories: string[] = []
 afterEach(async () => { for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }) })
-const store = (id: string) => ({ tenants: [{ _ref: `@tenants:stores:${id}`, name: 'Original tenant' }], users: [{ _ref: '@users:users:7' }], sites: [{ _ref: `@sites:stores:${id}` }], pages: [{ html: '<p>Keep \\"quoted\\" HTML\r\n</p>' }], products: [{ inventory: 0, variants: [{ id: 'sku-1', price: 0 }] }] })
+const store = (id: string) => ({ tenants: [{ _ref: `@tenants:stores:${id}`, name: 'Cửa hàng Việt 🙂' }], users: [{ _ref: '@users:users:7' }], sites: [{ _ref: `@sites:stores:${id}` }], pages: [{ html: '<p>Keep \\"quoted\\" HTML\r\n</p>' }], products: [{ inventory: 0, variants: [{ id: 'sku-1', price: 0 }] }] })
 const destination = { tenantId: 425, siteId: 424, productCategories: [] }
 async function fixture(data: unknown = [store('636'), store('637')]) {
   const directory = await mkdtemp(join(tmpdir(), 'pw1-destination-')); directories.push(directory)
@@ -58,7 +58,7 @@ describe('[TC-F42-IMP-DESTINATION] Verified foundation master handoff', () => {
 })
 
 
-describe('[TC-F42-IMP-PARTS-002] Destination index and bounded annotated parts',()=>{
+describe('[TC-F42-IMP-PARTS-002] One destination part per input master',()=>{
   async function partFixture(count=2) {
     const directory=await mkdtemp(join(tmpdir(),'pw1-destination-parts-'));directories.push(directory)
     const records=Array.from({length:count},(_,i)=>store(String(i+1))),parts:MasterPart[]=[]
@@ -69,34 +69,43 @@ describe('[TC-F42-IMP-PARTS-002] Destination index and bounded annotated parts',
     }
     return {directory,records,parts,output:join(directory,'master-with-destination.json')}
   }
-  it('writes a small index and parts, retaining content and annotating only selected Stores',async()=>{
+  it('preserves exact input part boundaries, content and unselected Stores',async()=>{
     // Arrange / Act
     const f=await partFixture(301)
     await writeDestinationMasterParts(f.directory,f.parts,masterSetHash(f.parts),f.output,new Map([['1',destination],['301',destination]]))
     // Assert
     const index=JSON.parse(await readFile(f.output,'utf8'))
-    expect(index).toMatchObject({format:'pw1-destination-parts-v1',sourceMasterSetHash:masterSetHash(f.parts)})
-    expect(index.masterParts.map((part:MasterPart)=>part.storeIds.length)).toEqual([300,1])
+    expect(index.masterParts.map((part:MasterPart)=>({filename:part.filename,storeIds:part.storeIds}))).toEqual(f.parts.map(part=>({filename:part.filename,storeIds:part.storeIds})))
     const data=[]
-    for(const part of index.masterParts as MasterPart[]){const bytes=await readFile(join(destinationPartsDirectory(f.output),part.filename));expect(bytes.byteLength).toBe(part.bytes);expect(bytes.byteLength).toBeLessThan(200_000_000);data.push(...JSON.parse(bytes.toString()))}
-    expect(data[0]).toEqual({...f.records[0],destination});expect(data[1]).toEqual(f.records[1]);expect(data[300]).toEqual({...f.records[300],destination})
-    expect((await stat(destinationPartsDirectory(f.output))).mode&0o777).toBe(0o700)
-    expect((await stat(f.output)).size).toBeLessThan(10_000)
+    for (const part of index.masterParts as MasterPart[]) {
+      const path=join(destinationPartsDirectory(f.output),part.filename),bytes=await readFile(path)
+      expect(bytes.length).toBe(part.bytes)
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(part.sha256)
+      expect((await stat(path)).mode&0o777).toBe(0o600)
+      data.push(...JSON.parse(bytes.toString()))
+    }
+    expect(data).toEqual(f.records.map((row,i)=>i===0||i===300?{...row,destination}:row))
+    expect((await readdir(destinationPartsDirectory(f.output))).sort()).toEqual(f.parts.map(part=>part.filename))
+    expect((await stat(f.output)).mode&0o777).toBe(0o600)
+    for (const part of f.parts) expect(createHash('sha256').update(await readFile(join(f.directory,part.filename))).digest('hex')).toBe(part.sha256)
   })
-  it('repartitions after destination annotations using UTF-8 bytes and cleans oversized singleton failures',async()=>{
+  it('rejects incorrect declared Store IDs without publishing output',async()=>{
     // Arrange
-    const f=await partFixture(),singleBytes=Buffer.byteLength(JSON.stringify({...f.records[0],destination}))+5
-    // Act
-    await writeDestinationMasterParts(f.directory,f.parts,masterSetHash(f.parts),f.output,new Map([['1',destination]]),undefined,{maxBytes:singleBytes+1})
-    // Assert
-    const index=JSON.parse(await readFile(f.output,'utf8'))
-    expect(index.masterParts).toHaveLength(2)
-    for(const part of index.masterParts)expect(part.bytes).toBeLessThan(singleBytes+1)
-    const g=await partFixture()
-    await expect(writeDestinationMasterParts(g.directory,g.parts,masterSetHash(g.parts),g.output,new Map([['1',destination]]),undefined,{maxBytes:singleBytes})).rejects.toThrow('DESTINATION_STORE_SIZE_LIMIT')
-    expect((await readdir(g.directory)).sort()).toEqual(g.parts.map(part=>part.filename))
+    const f=await partFixture()
+    f.parts[0].storeIds=['1','3']
+    // Act / Assert
+    await expect(writeDestinationMasterParts(f.directory,f.parts,masterSetHash(f.parts),f.output,new Map([['1',destination]]))).rejects.toThrow('MASTER_PART_STORES_MISMATCH')
+    expect((await readdir(f.directory)).sort()).toEqual(f.parts.map(part=>part.filename))
   })
-  it('never publishes index or leftover parts after later-input hash failure',async()=>{
+  it('refuses to overwrite an existing output',async()=>{
+    // Arrange
+    const f=await partFixture()
+    await writeFile(f.output,'existing')
+    // Act / Assert
+    await expect(writeDestinationMasterParts(f.directory,f.parts,masterSetHash(f.parts),f.output,new Map([['1',destination]]))).rejects.toThrow('OUTPUT_ALREADY_EXISTS')
+    expect(await readFile(f.output,'utf8')).toBe('existing')
+  })
+  it('never publishes output or leaves temporary files after later-input hash failure',async()=>{
     // Arrange
     const f=await partFixture(301),last=f.parts[1];await writeFile(join(f.directory,last.filename),JSON.stringify([store('302')]))
     // Act / Assert

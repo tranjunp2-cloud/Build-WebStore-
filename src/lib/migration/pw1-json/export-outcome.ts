@@ -1,3 +1,6 @@
+import { RAW_SETTINGS_MARKER } from './model-settings-proof'
+import { PAGE_MENU_SCOPE_CODE, TECHNICAL_SCOPE_CODE } from './approved-source-scope'
+const MODEL_SETTINGS_SCOPE_CODE = 'MODEL_SETTINGS_OUTSIDE_SCOPE'
 import { sourceExclusionDiagnostic } from './source-exclusions'
 import { isProductExclusionDiagnostic } from './product-exclusions'
 import { z } from 'zod'
@@ -17,8 +20,12 @@ export function externalArchiveKeys(row: ArchiveRow, selected?: ReadonlySet<stri
     row.contributions.some(c => c.table !== row.table || c.sourceId !== row.sourceId || c.rule !== 'MASTER-4.1-EXTERNAL-CSV-ARCHIVE' || c.targetPath !== `source-csv.${row.table}` || (row.storeId !== null && c.storeId !== row.storeId))) return []
   return row.contributions.flatMap(c => c.storeId && (!selected || selected.has(c.storeId)) ? [archiveKey(c.storeId, row.table, row.sourceId)] : [])
 }
-export function reviewCategory(d: Diagnostic, archive: ReadonlySet<string> = new Set(), excluded: ReadonlySet<string> = new Set()): ReviewCategory {
-  if (isProductExclusionDiagnostic(d) || sourceExclusionDiagnostic(d)) return 'policy_excluded'
+export function reviewCategory(d: Diagnostic, archive: ReadonlySet<string> = new Set(), excluded: ReadonlySet<string> = new Set(), approvedScope: ReadonlySet<string> = new Set()): ReviewCategory {
+  if (d.severity === 'warning' && ((approvedScope.has(d.table ?? '') && ['SOURCE_OWNERSHIP_UNRESOLVED','RAW_OWNERSHIP_MISMATCH','RAW_COMPONENT_DEFINITION_MISSING','RAW_MENU_TYPE_MISSING','RAW_SECRET_EXCLUDED'].includes(d.code)) || (d.code === 'RAW_TEMPLATE_MISSING' && d.table === 'stores' && approvedScope.has('frontend_templates')))) return 'outside_scope'
+  if ([RAW_SETTINGS_MARKER,TECHNICAL_SCOPE_CODE,PAGE_MENU_SCOPE_CODE].includes(d.code) && d.severity === 'warning') return 'outside_scope'
+  if (d.table === 'model_settings' && d.severity === 'warning' && d.code === MODEL_SETTINGS_SCOPE_CODE) return 'outside_scope'
+  if (sourceExclusionDiagnostic(d)) return 'policy_excluded'
+  if (isProductExclusionDiagnostic(d)) return 'policy_excluded'
   if (d.storeId && excluded.has(d.storeId)) return 'policy_excluded'
   if (d.severity === 'warning' && d.storeId && d.sourceId && (
     (d.code === 'ORDER_PAYMENT_METHOD_UNVERIFIED' && d.table === 'orders' && d.field === 'payment_method_id' && !d.reason) ||
@@ -50,7 +57,8 @@ export type ExportOutcome = z.infer<typeof outcomeSchema>
 export function exportOutcome(diagnostics: readonly Diagnostic[], blockedStoreCount: number, policyExcludedStores: readonly string[], archive: ReadonlySet<string> = new Set()): ExportOutcome {
   const excluded = new Set(policyExcludedStores)
   const counts = Object.fromEntries(categories.map(category => [category, 0])) as Record<ReviewCategory, number>
-  for (const d of diagnostics) counts[reviewCategory(d, archive, excluded)]++
+  const approvedScope = new Set(diagnostics.filter(x => [RAW_SETTINGS_MARKER,TECHNICAL_SCOPE_CODE, PAGE_MENU_SCOPE_CODE].includes(x.code) && x.severity === 'warning' && x.storeId === undefined && x.sourceId === undefined && x.field === undefined && x.reason === undefined).map(x => x.table ?? ''))
+  for (const d of diagnostics) counts[reviewCategory(d, archive, excluded, approvedScope)]++
   return { exportStatus: 'succeeded', dataStatus: counts.data_issue || blockedStoreCount ? 'partial' : 'complete',
     importStatus: 'not_verified', dataIssueCount: counts.data_issue, importRequirementCount: counts.import_requirement,
     delegatedContentCount: counts.delegated_content, outsideScopeCount: counts.outside_scope, policyExcludedDiagnosticCount: counts.policy_excluded, warningCount: counts.warning,

@@ -117,7 +117,7 @@ Implementation note: server scans lightweight authorized filter/sort metadata in
 
 - [x] AUTO TC-F42-IMP-EXCLUSION-001: Exact contract 1.8.0 chỉ nhận Product thiếu giá/stock có evidence đầy đủ và không emit; reject thiếu root/sai reason/sai Store/old contract; không miễn diagnostic khác.
 
-## Foundation master destination handoff
+## Legacy users manifest destination handoff
 
 - [x] AUTO TC-F42-IMP-DESTINATION: derived master preserves every source collection/Store and adds verified tenant/site IDs plus empty productCategories only to selected Stores; reject hash mismatch, malformed/missing/duplicate identity, unsafe output and existing output; failed publication leaves no final output and source unchanged.
 - [x] AUTO TC-F42-IMP-USERS: users CLI selectors and output-master flag validation; dry-run does not publish destination output. DB foundation verification remains manual until evidenced.
@@ -132,7 +132,7 @@ Implementation note: server scans lightweight authorized filter/sort metadata in
 
 - [x] AUTO TC-F42-IMP-SYSTEM-EMAIL: Resolve approved system creator by exact email, use arbitrary actual DB ID, reject missing/ambiguous/invalid identity without granting roles.
 
-- [x] AUTO TC-F42-IMP-MISSING-CREDENTIAL: Users-only fallback accepts absent credentials, generates distinct random passwords without keyString, rejects partial/invalid credentials, and preserves strict full-import behavior.
+- [x] AUTO TC-F42-IMP-MISSING-CREDENTIAL: Users/full fallback accepts absent credentials, generates distinct random passwords without keyString, rejects partial/invalid credentials, and keeps partial/invalid credentials blocked.
 
 - [x] AUTO TC-F42-IMP-EMAIL-NORMALIZATION: User email projection follows Payload lowercase/trim, leaves source unchanged and produces the same checksum for equivalent email spelling.
 
@@ -145,4 +145,43 @@ Implementation note: server scans lightweight authorized filter/sort metadata in
 - [x] AUTO **TC-F42-IMP-POLICY-006** — 1.9.4 permits only PROD Store 43 Orders 112/132 negative-total omissions; wrong namespace/Store/ID/disabled/historical policy fails; mixed earlier Product/owner/email/raw-retention policies remain accepted.
 
 - [x] AUTO **TC-F42-IMP-PARTS-001** — 1.10.0 descriptor-set binding, streaming/selection/spooling across parts, UTF-8 bytes, missing/extra/reordered/duplicate/tampered parts, EOF hashing and empty set; inherited policies preserved.
-- [x] AUTO **TC-F42-IMP-PARTS-002** — Destination index published last with repartitioned annotated parts; count/byte caps and complete cleanup on failure.
+- [x] AUTO **TC-F42-IMP-PARTS-002** — Legacy users manifest output: exactly one destination part per input master; same filenames, Store boundaries/order and content, including unselected Stores. Verify hashes/IDs, publish index last without overwrite and clean up on failure.
+
+## One-command workflow
+
+- [x] AUTO **TC-F42-IMP-WORKFLOW** — Strict portable config and selector modes, run locking, dry-run no writes, preallocated batch identity, continuation after interruption, missing/changed batch rejection, users no-resume boundary, recovery guidance that does not prescribe output-only for incomplete users writes, and output-only retry without import.
+- [x] AUTO **TC-F42-IMP-DESTINATION-MAP** — Internal ledger mapping builder and legacy compact-report helper: verified CREATE/REUSE mappings, live target/tenant checks, partial completeness and provenance-safe atomic output retries. Config workflow consumes the mapping internally and rejects incomplete selection; it does not publish a compact report.
+
+- [x] AUTO **TC-F42-IMP-INLINE-DESTINATION** — Complete verified selection annotates each prepared master in place; source/master content preserved, same part boundaries, journal-bound original/output hashes, interrupted replace recovery and tamper rejection, sealed input guard and no repeat DB writes on finalization retry.
+
+
+- [x] AUTO TC-F42-IMP-SCOPE-001: Contract 1.10.3 accepts exact source-only markers and emitted Order proof; rejects forged contribution, unknown discount fields, missing overflow receipt/flag, historical opt-in and altered outcome counts. Raw Page/Menu remains delegated; shipping proof uses actual Sites.shippingConfig defaults.
+
+- [x] AUTO TC-F42-IMP-SCOPE-001 follow-up: accepted editor requires exact role/membership/empty permissions/source contribution; foreign tenant/custom permissions/owner role/old contract remain blocked. Historical Order coupon warning requires emitted Order/source contribution, preserved code, no operational discount FK and approved historical policy. Known promotion fields accepted, unknown fields rejected. PROD full-selection audit 0 BLOCKED after regression.
+
+- [x] AUTO TC-F42-IMP-TARGET-ENTITY: target diagnostics select the intended collection and source identity, independent of entity order; blog/product media sharing a source ID cannot satisfy the check. Missing, duplicate or unknown targets remain blocked.
+
+- [x] AUTO TC-F42-IMP-BLOG-MEDIA-IDENTITY: Blog and thumbnail from the same PW1 row use distinct normalized source keys in projection, disk registry and ledger lookups; repeat ownership stays valid, cross-Store ownership and changed source checksum remain blocked.
+
+- [x] AUTO TC-F42-IMP-FULL-CREDENTIAL: full creation uses the missing-both fallback for normal and preserved-invalid-email users; partial credentials remain blocked and reuse does not reset authentication. Full logs report ledger-backed reset evidence with source/target IDs, deduplicated per session including recovered claims.
+
+- [x] AUTO TC-F42-IMP-RAW-SETTINGS: Contract 1.10.4 preserves opaque model_settings including HTML/tel spaces in artifact; exact field/path/Store receipts required; no raw replay in runtime; missing/tampered/duplicate receipt, wrong Store and old-contract claims rejected. Unknown parent with valid direct Store is raw-only; genuinely unowned/excluded-Store rows remain documented source-only.
+
+- [x] AUTO TC-F42-IMP-CATEGORY-BREADCRUMBS: Category hook reads parent breadcrumbs for the private migration capability; anonymous app requests and forged string markers retain normal access control. Parent validation and projection matching remain enforced.
+
+- [x] AUTO TC-F42-IMP-HISTORICAL-WEIGHT: Private historical import preserves mapped Product status/weight when weight is the only publish blocker. Other publish blockers, normal app requests and forged context remain rejected; no guessed weight or status rewrite.
+
+### Full local import verified — 2026-09-24
+
+- Input: exporter 1.10.3, `pw1-prod-1103-20260924/artifact`; all 2,913 emitted Stores (5 policy-excluded Stores remain excluded).
+- Runtime: `/home/liam/migration-data/pw1/runtime-20260924-full-v3`; branch source continued independently, so this result applies to the frozen snapshot.
+- Run: `2026-09-24T06-31-32-300Z-c14163c7-e807-4f1d-8211-a9ef24a6963a`; batch `json:5776917b-945f-4072-b0c2-76ca79d986d7`.
+- Command: `npm run migrate:pw1:import -- --config /home/liam/migration-data/pw1/local.json --all`.
+- Exit 0; one VERIFIED batch; 2,913 VERIFIED Store ledger rows; no failed/remaining Stores. End-to-end duration approximately 113 minutes including prepare and destination.
+- DB: 2,913 tenants, 2,913 sites, 2,958 users including retained system user, 32,642 products, 869 orders. Summary records 28 imported users requiring password reset.
+- Destination journal complete; all 10 prepared master parts contain destination for all 2,913 Stores; no missing/invalid tenantId, siteId or productCategories containers. Original exporter artifact remains separate and unchanged by destination output.
+- Regression: 698 tests / 41 files passed; typecheck passed. Real Product 2486 transaction probe passed with rollback before the full run; full run subsequently verified every selected Store.
+- Fixes verified: Category parent breadcrumb read uses private migration capability; historical Product replay allows only the weight-only publish blocker. Ordinary/forged contexts and other publish blockers stay enforced.
+- This is an actual write/verify result for the recorded artifact and runtime, not a guarantee that arbitrary future artifacts or all Payload hooks are covered by dry-run.
+
+- [x] AUTO TC-F42-IMP-SOURCE-DOMAIN: Contract 1.10.5 inherits restored raw settings and approved policies; original Sites.domain passes projection/resolution independently of tenant slug. Source-domain receipt requires emitted Site, exact Store/source/path/fields; historical contract, missing/duplicate/forged receipt rejected. Malformed PW1 domain warning is approved only with matching selected-source receipt and graceful policy. No hostname is invented for null/absent values.

@@ -1,6 +1,6 @@
-import { masterPartsSchema, masterSetHash, validateMasterParts, MAX_MASTER_PART_BYTES, MAX_MASTER_PART_STORES, type MasterPart } from './master-parts'
+import { masterPartsSchema, masterSetHash, validateMasterParts, MAX_MASTER_PART_BYTES, type MasterPart } from './master-parts'
 import { constants, writeSync, openSync, closeSync, fsyncSync } from 'node:fs'
-import { open, lstat, realpath, link, unlink, mkdir, rm, writeFile } from 'node:fs/promises'
+import { open, lstat, realpath, link, unlink, rm, mkdir, writeFile } from 'node:fs/promises'
 import { dirname, basename, isAbsolute, resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { assertOutsideRepository, assertDiskSpace, readBoundFile } from './artifact'
@@ -83,14 +83,11 @@ export async function validateDestinationPartsOutput(outputPath: string): Promis
   await validateOutputPath(destinationPartsDirectory(outputPath))
 }
 
-/** Publish a small index last; annotated Stores are repartitioned without assembling an aggregate master. */
-export async function writeDestinationMasterParts(directory: string, inputParts: readonly MasterPart[], expectedHash: string, outputPath: string, destinations: ReadonlyMap<string, FoundationDestination>, progress?: Progress, limits: { maxBytes?: number; maxStores?: number } = {}): Promise<void> {
-  const maxBytes = limits.maxBytes ?? MAX_MASTER_PART_BYTES, maxStores = limits.maxStores ?? MAX_MASTER_PART_STORES
-  if (!Number.isInteger(maxBytes) || maxBytes < 6 || maxBytes > MAX_MASTER_PART_BYTES || !Number.isInteger(maxStores) || maxStores < 1 || maxStores > MAX_MASTER_PART_STORES) throw new MigrationError('INVALID_MASTER_PART_LIMITS')
+/** Preserve input part boundaries exactly; publish the index only after every part is verified. */
+export async function writeDestinationMasterParts(directory: string, inputParts: readonly MasterPart[], expectedHash: string, outputPath: string, destinations: ReadonlyMap<string, FoundationDestination>, progress?: Progress): Promise<void> {
   const parts = masterPartsSchema.parse(inputParts)
   validateMasterParts(parts,expectedHash,Object.fromEntries(parts.map(part => [part.filename,part.sha256])),parts.reduce((sum,part) => sum+part.storeIds.length,0))
-  const output = await validateOutputPath(outputPath), partDirectory = destinationPartsDirectory(output)
-  await validateOutputPath(partDirectory)
+  const output = await validateOutputPath(outputPath)
   if (!destinations.size) throw new MigrationError('DESTINATION_EMPTY')
   let extraBytes = 0
   for (const [id,destination] of destinations) {
@@ -98,19 +95,33 @@ export async function writeDestinationMasterParts(directory: string, inputParts:
     extraBytes += Buffer.byteLength(JSON.stringify(destination))+32
   }
   await assertDiskSpace(dirname(output),parts.reduce((sum,part) => sum+BigInt(part.bytes)+BigInt(part.storeIds.length*4),BigInt(extraBytes)+BigInt(64*1024*1024)))
-  await mkdir(partDirectory,{mode:0o700})
-  const temporaryIndex = resolve(dirname(output),`.destination-index-${randomUUID()}.tmp`)
-  const outputParts: MasterPart[] = [], seen = new Set<string>()
-  let fd: number | undefined, bytes = 0, ids: string[] = [], digest = createHash('sha256'), published = false
+  const partDirectory = destinationPartsDirectory(output)
+  await validateOutputPath(partDirectory)
+  await mkdir(partDirectory, { mode: 0o700 })
+  const temporary = resolve(dirname(output), `.destination-index-${randomUUID()}.tmp`)
+  const outputParts: MasterPart[] = []
+  let published = false, bytes = 0, digest = createHash('sha256')
+  const seen = new Set<string>()
+  let fd: number | undefined, count = 0
   const write = (text: string) => {
-    const buffer=Buffer.from(text);let offset=0
-    while(offset<buffer.length) { const n=writeSync(fd!,buffer,offset,buffer.length-offset);if(!n)throw new MigrationError('OUTPUT_WRITE_FAILED');offset+=n }
-    bytes+=buffer.length;digest.update(buffer)
+    const buffer = Buffer.from(text)
+    let offset = 0
+    while (offset < buffer.length) {
+      const written = writeSync(fd!, buffer, offset, buffer.length - offset)
+      if (!written) throw new MigrationError('OUTPUT_WRITE_FAILED')
+      offset += written
+    }
+    bytes += buffer.length
+    digest.update(buffer)
   }
-  const begin = () => { bytes=0;ids=[];digest=createHash('sha256');fd=openSync(resolve(partDirectory,`master-${String(outputParts.length+1).padStart(4,'0')}.json`),constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);write('[\n') }
-  const finish = () => { if(fd===undefined)return;write('\n]\n');fsyncSync(fd);closeSync(fd);fd=undefined;outputParts.push({filename:`master-${String(outputParts.length+1).padStart(4,'0')}.json`,sha256:digest.digest('hex'),bytes,storeIds:ids}) }
   try {
     for (const part of parts) {
+      count = 0
+      bytes = 0
+      digest = createHash('sha256')
+      fd = openSync(resolve(partDirectory, part.filename), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+      write('[\n')
+      if ((await lstat(resolve(directory,part.filename))).size !== part.bytes) throw new MigrationError('MASTER_PART_SIZE_INVALID')
       const actualIds: string[]=[]
       const result=await readBoundFile(resolve(directory,part.filename),{json:true,expectedHash:part.sha256,maxBytes:MAX_MASTER_PART_BYTES-1,onBytes:(count,totalBytes)=>progress?.({phase:'read-artifact',file:part.filename,bytes:count,totalBytes}),visit:(path,_index,value)=>{
         if(path.length)return false
@@ -124,24 +135,27 @@ export async function writeDestinationMasterParts(directory: string, inputParts:
         if(seen.size>=1_000_000)throw new MigrationError('STORE_INDEX_LIMIT')
         seen.add(id);actualIds.push(id)
         if('destination' in store)throw new MigrationError('SOURCE_DESTINATION_CONFLICT')
-        const destination=destinations.get(id),text=JSON.stringify(destination?{...store,destination}:store),size=Buffer.byteLength(text)
-        if(size+5>=maxBytes)throw new MigrationError('DESTINATION_STORE_SIZE_LIMIT')
-        if(fd!==undefined&&(ids.length>=maxStores||bytes+2+size+3>=maxBytes))finish()
-        if(fd===undefined)begin()
-        write(`${ids.length?',\n':''}${text}`);ids.push(id)
+        const destination = destinations.get(id)
+        write(`${count++ ? ',\n' : ''}${JSON.stringify(destination ? { ...store, destination } : store)}`)
         return true
       }})
       if(!Array.isArray(result.value)||JSON.stringify(actualIds)!==JSON.stringify(part.storeIds))throw new MigrationError('MASTER_PART_STORES_MISMATCH')
+      write('\n]\n')
+      fsyncSync(fd)
+      closeSync(fd)
+      fd = undefined
+      outputParts.push({ filename: part.filename, sha256: digest.digest('hex'), bytes, storeIds: actualIds })
     }
-    finish()
     if([...destinations.keys()].some(id=>!seen.has(id)))throw new MigrationError('DESTINATION_STORE_MISSING')
-    const index={version:1,format:'pw1-destination-parts-v1',sourceMasterSetHash:expectedHash,partsDirectory:basename(partDirectory),masterSetHash:masterSetHash(outputParts),masterParts:outputParts}
-    await writeFile(temporaryIndex,JSON.stringify(index,null,2)+'\n',{mode:0o600,flag:'wx'})
-    const handle=await open(temporaryIndex,'r');try{await handle.sync()}finally{await handle.close()}
-    await link(temporaryIndex,output);published=true
+    const index = { version: 1, format: 'pw1-destination-parts-v1', sourceMasterSetHash: expectedHash, partsDirectory: basename(partDirectory), masterSetHash: masterSetHash(outputParts), masterParts: outputParts }
+    await writeFile(temporary, JSON.stringify(index, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
+    const handle = await open(temporary, 'r')
+    try { await handle.sync() } finally { await handle.close() }
+    await link(temporary, output)
+    published = true
   } finally {
-    if(fd!==undefined)closeSync(fd)
-    await rm(temporaryIndex,{force:true})
-    if(!published)await rm(partDirectory,{recursive:true,force:true})
+    if (fd !== undefined) closeSync(fd)
+    await rm(temporary, { force: true })
+    if (!published) await rm(partDirectory, { recursive: true, force: true })
   }
 }

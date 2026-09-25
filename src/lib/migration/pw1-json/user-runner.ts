@@ -1,3 +1,4 @@
+import type { ImportOrchestrationOptions } from './orchestration-hooks'
 import { parseArgs } from 'node:util'
 import { resolve, dirname, isAbsolute } from 'node:path'
 import { stat, writeFile, rm } from 'node:fs/promises'
@@ -109,7 +110,7 @@ async function resolveManifestPath(inputPath: string): Promise<string> {
   return resolved
 }
 
-export async function runUserImport(args: UserArguments): Promise<MigratedUserRecord[]> {
+export async function runUserImport(args: UserArguments, options: ImportOrchestrationOptions = {}): Promise<MigratedUserRecord[]> {
   if (args.help) {
     process.stdout.write(
       'PW1 User & Tenant Migration:\n' +
@@ -137,7 +138,7 @@ export async function runUserImport(args: UserArguments): Promise<MigratedUserRe
     const manifestPath = await resolveManifestPath(args.manifest!)
     const outputMaster = resolve(args.outputMaster ?? resolve(dirname(manifestPath), 'master-with-destination.json'))
     const outputReport = resolve(args.outputFile ?? resolve(dirname(manifestPath), 'migrated-users.json'))
-    if (!args.dryRun) {
+    if (!args.dryRun && !options.compactOutput) {
       await validateOutputPath(outputMaster)
       await validateOutputPath(outputReport)
       if (outputMaster === outputReport) throw new MigrationError('OUTPUT_PATH_CONFLICT')
@@ -149,10 +150,11 @@ export async function runUserImport(args: UserArguments): Promise<MigratedUserRe
       selector: args,
     })
     spool = artifact.spoolDirectory
-    if (!args.dryRun && artifact.masterParts) {
+    if (!args.dryRun && !options.compactOutput && artifact.masterParts) {
       await validateDestinationPartsOutput(outputMaster)
       if (destinationPartsDirectory(outputMaster) === outputReport) throw new MigrationError('OUTPUT_PATH_CONFLICT')
     }
+
 
     const selected = selectStoreIds(artifact.storeIds, args)
     if (!selected.length) throw new MigrationError('NO_MATCHING_STORES')
@@ -211,7 +213,8 @@ export async function runUserImport(args: UserArguments): Promise<MigratedUserRe
         ...(artifact.manifest.credentialHash ? { ssoKeyFingerprint: checksum(process.env.SSO_ENCRYPTION_KEY ?? '') } : {}),
       }
 
-      batch = await runtime.transaction(async (_req, db) => createBatch(db, binding, selected))
+      batch = await runtime.transaction(async (_req, db) => createBatch(db, binding, selected, options.batchId))
+      await options.onBatch?.(batch)
       lease = await acquireLease(runtime.pool, batch.id)
       const currentRuntime = runtime
       const currentLease = lease
@@ -243,7 +246,7 @@ export async function runUserImport(args: UserArguments): Promise<MigratedUserRe
             users: store.collections.users ?? [],
           } as Record<CollectionName, ImportDocument[]>,
         }
-        const targetEntities = buildEntities(foundationStore, configs, namespace, actorRefs, artifact.preserveInvalidUserEmails)
+        const targetEntities = buildEntities(foundationStore, configs, namespace, actorRefs, artifact.preserveInvalidUserEmails, artifact.delegateRawPageContent, artifact.delegateRawModelSettings)
         const tenantEntity = targetEntities.find(e => e.collection === 'tenants')
         const siteEntity = targetEntities.find(e => e.collection === 'sites')
         if (!tenantEntity || !siteEntity) throw new MigrationError('FOUNDATION_TENANT_SITE_REQUIRED')
@@ -351,11 +354,11 @@ export async function runUserImport(args: UserArguments): Promise<MigratedUserRe
     process.stdout.write(`Total Users Processed: ${userResults.length} (${args.dryRun ? `Preflight: ${preflightCount}` : `Created: ${createdCount}, Reused: ${reusedCount}`})\n`)
     process.stdout.write('='.repeat(80) + '\n')
 
-    if (userResults.length <= 50) {
+    if (!options.quietUsers && userResults.length <= 50) {
       for (const r of userResults) {
         process.stdout.write(`Store #${r.storeId} -> Tenant #${r.tenantId} (${r.tenantSlug}) | Site #${r.siteId} (${r.siteName}) | User PW2 #${r.userId} (PW1 #${r.sourceUserId}) | ${r.email} | [${r.roles.join(',')}] | ${r.action}\n`)
       }
-    } else {
+    } else if (!options.quietUsers) {
       for (const r of userResults.slice(0, 10)) {
         process.stdout.write(`Store #${r.storeId} -> Tenant #${r.tenantId} (${r.tenantSlug}) | Site #${r.siteId} (${r.siteName}) | User PW2 #${r.userId} (PW1 #${r.sourceUserId}) | ${r.email} | [${r.roles.join(',')}] | ${r.action}\n`)
       }
@@ -376,10 +379,12 @@ export async function runUserImport(args: UserArguments): Promise<MigratedUserRe
     if (failedStores.length) throw failure
     if (!args.dryRun) {
       if (destinations.size !== selected.length) throw new MigrationError('DESTINATION_INCOMPLETE')
-      if (artifact.masterParts) await writeDestinationMasterParts(artifact.directory,artifact.masterParts,artifact.manifest.masterHash,outputMaster,destinations,progress.report)
-      else await writeDestinationMaster(resolve(artifact.directory, 'master.json'), artifact.manifest.masterHash, outputMaster, destinations, progress.report)
-      await writeFile(outputReport, JSON.stringify(userResults, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
-      process.stderr.write(`${artifact.masterParts ? 'Destination index + bounded parts' : 'Master with destinations'} saved to: ${outputMaster}\nUser records saved to: ${outputReport}\n`)
+      if (!options.compactOutput) {
+        if (artifact.masterParts) await writeDestinationMasterParts(artifact.directory,artifact.masterParts,artifact.manifest.masterHash,outputMaster,destinations,progress.report)
+        else await writeDestinationMaster(resolve(artifact.directory, 'master.json'), artifact.manifest.masterHash, outputMaster, destinations, progress.report)
+        await writeFile(outputReport, JSON.stringify(userResults, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
+        process.stderr.write(`${artifact.masterParts ? 'Destination index and matching parts' : 'Master with destinations'} saved to: ${outputMaster}\nUser records saved to: ${outputReport}\n`)
+      }
     }
 
     return userResults

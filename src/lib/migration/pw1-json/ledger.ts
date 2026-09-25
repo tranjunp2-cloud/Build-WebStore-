@@ -72,12 +72,12 @@ export async function assertWritableProfile(db: SqlClient): Promise<void> {
   }
 }
 
-export async function createBatch(db: SqlClient, binding: BatchBinding, storeIds: string[]): Promise<LedgerBatch> {
+export async function createBatch(db: SqlClient, binding: BatchBinding, storeIds: string[], suppliedId?: string): Promise<LedgerBatch> {
   if (!storeIds.length || storeIds.some(id => !/^\d+$/.test(id)) || new Set(storeIds).size !== storeIds.length) {
     throw new MigrationError('INVALID_STORE_SELECTION')
   }
+  const id = suppliedId === undefined ? randomUUID() : uuid(suppliedId)
   await assertWritableProfile(db)
-  const id = randomUUID()
   const profile = binding.profile ?? 'pw1-json-v1'
   if (!['pw1-json-v1','pw1-json-v2','pw1-json-v3'].includes(profile)) throw new MigrationError('UNSUPPORTED_BATCH_PROFILE')
   await db.query(`INSERT INTO migration_import_batches(batch_id,binding,selected_store_ids,profile_version)

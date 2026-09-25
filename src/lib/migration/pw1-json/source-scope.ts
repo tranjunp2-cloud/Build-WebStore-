@@ -11,7 +11,7 @@ const codes = new Set(['SOURCE_OWNERSHIP_UNRESOLVED', 'SOURCE_FIELDS_UNRESOLVED'
 /** Prove an orphan source row cannot affect the selected master dependency graph.
  * Unknown/global diagnostics without row evidence remain blocking.
  */
-export function createSelectedSourceScope(actors?: UserActors, defaultShipping = false) {
+export function createSelectedSourceScope(actors?: UserActors, defaultShipping = false, delegateRawPageContent = false, delegateRawModelSettings = false) {
   const mappedAudit = createMappedSourceAudit(defaultShipping)
   const actorParents = new Map(actors?.actors.map(actor => [actor._ref, actor.createdBy]))
   const stores = new Set<string>(), dependencies = new Set<string>()
@@ -50,6 +50,8 @@ export function createSelectedSourceScope(actors?: UserActors, defaultShipping =
           // These Site archives are also excluded by the operational projection.
           if (collection === 'sites') {
             const { pw1_source: _archive, menus: _menus, ...operational } = document
+            if(delegateRawPageContent)delete operational.raw_frontend_template
+            if(delegateRawModelSettings)delete operational.raw_model_settings
             visit(operational)
           } else visit(document)
         }

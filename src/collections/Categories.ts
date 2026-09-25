@@ -1,5 +1,6 @@
 import type { CollectionConfig, Where } from 'payload'
 import slugify from 'slugify'
+import { isMigrationContext } from '@/lib/migration/pw1-json/runtime'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 
@@ -233,7 +234,9 @@ export const Categories: CollectionConfig = {
                         collection: 'categories',
                         id: effectiveParentId,
                         user: req.user,
-                        overrideAccess: false,
+                        // Import already validates parent ownership in beforeValidate.
+                        // Its private capability allows the anonymous local replay to read that parent.
+                        overrideAccess: isMigrationContext(req.context),
                         disableErrors: true,
                     })
                     if (parentDoc?.breadcrumbs) {

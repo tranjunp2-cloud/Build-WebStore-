@@ -37,6 +37,20 @@ describe('[TC-F42-IMP-GROUPS] bounded groups and cross-group keys', () => {
   })
 })
 describe('[TC-F42-IMP-LOGS] private durable logs', () => {
+  it('[TC-F42-IMP-FULL-CREDENTIAL] deduplicates ledger reset evidence without exposing credentials', async () => {
+    // Arrange
+    const logger = await RunLogger.create(await root(), 'apply')
+    const event = { status: 'USER_PASSWORD_RESET_REQUIRED', storeId: '31', sourceId: '87', targetId: 2, password: 'SECRET_CANARY', email: 'PRIVATE_CANARY' }
+    // Act
+    await logger.event(event); await logger.event(event)
+    await logger.checkpoint(); await logger.close()
+    // Assert
+    const output = await readFile(join(logger.directory, 'summary.json'), 'utf8')
+    expect(JSON.parse(output)).toMatchObject({ passwordResetRequiredCount: 1, passwordResetUsers: [{ storeId: '31', sourceUserId: '87', targetUserId: '2' }] })
+    expect(output).not.toContain('CANARY')
+    expect(await readFile(join(logger.directory, 'events-0001.jsonl'), 'utf8')).not.toContain('CANARY')
+  })
+
   it('rotates valid JSONL, keeps counters and never serializes raw error/input', async () => {
     const path = await root(), logger = await RunLogger.create(path, 'apply', 400)
     await logger.event({ status: 'SELECTION_READY', stores: 201, verifiedBefore: 100 })

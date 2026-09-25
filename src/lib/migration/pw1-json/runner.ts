@@ -1,3 +1,4 @@
+import type { ImportOrchestrationOptions } from './orchestration-hooks'
 import { storeGroups } from './groups'
 import { DiskRegistry } from './disk-registry'
 import { RunLogger, safeLogEvent, type StoreDestination } from './run-logger'
@@ -11,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { readStoreTargetChecks, loadImportArtifact, readImportStore, readBoundFile } from './artifact'
 import { loadCredentialSidecar } from './credentials'
 import { selectStoreIds } from './selectors'
+import { targetDiagnosticEntity } from './target-diagnostic'
 import { createRuntime } from './runtime'
 import { buildEntities, canonical, checksum, creatorDiagnosticResolved } from './projection'
 import { configurations, sourceKeyRecords, preflightStore, writeEntity, finalizeEntity, verifyStore, databaseErrorCode, type PreflightEntityContext } from './writer'
@@ -96,7 +98,7 @@ export function updatePreflightContext(context: Record<string, unknown>, entity:
     context.sourceId = entity.sourceId
   }
 }
-export async function runImport(args: Arguments): Promise<void> {
+export async function runImport(args: Arguments, options: ImportOrchestrationOptions = {}): Promise<void> {
   if (args.help) {
     process.stdout.write('PW1 local import: --manifest /private/import-manifest.json (--store ID | --stores ID,ID | --from-store ID --to-store ID | --all) [--group-size 1..100] [--log-dir /private/logs] [--dry-run]\nResume: --resume json:UUID [--from-store ID]\nApply defaults to local clones pw1_import_1886_*. To use an existing local DB, pass --local-database NAME matching DATABASE_URI (also on resume). Remote/Vercel targets remain blocked.\nExit: 0 verified/preflight passed; 2 arguments; 3 blocked/conflict; 4 interrupted/retry exhausted; 5 reconcile with resume; 6 no matching Stores.\n')
     return
@@ -173,7 +175,8 @@ export async function runImport(args: Arguments): Promise<void> {
     await logger.event({ status: 'SELECTION_READY', stores: selected.length, groupSize, groupCount: groups.length, verifiedBefore: Object.values(states).filter(state => state === 'VERIFIED').length })
     if (!args.dryRun) {
       await readBoundFile(manifestPath, { expectedHash: artifact.manifestHash, maxBytes: 1024 * 1024 })
-      if (!batch) batch = await runtime.transaction(async (_req, db) => createBatch(db, binding, selected))
+      if (!batch) batch = await runtime.transaction(async (_req, db) => createBatch(db, binding, selected, options.batchId))
+      await options.onBatch?.(batch)
       context.runId = batch.id
       await emit({ status: 'BATCH_READY', runId: batch.id, stores: selected.length })
       lease = await acquireLease(runtime.pool, batch.id)
@@ -194,12 +197,12 @@ export async function runImport(args: Arguments): Promise<void> {
       for (const [offset, storeId] of ids.entries()) {
         check(); context.storeId = storeId; context.phase = 'preflight'
         progress.report({ phase: 'preflight', storeId, completed: offset, total: ids.length })
-        const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs, artifact.preserveInvalidUserEmails)
+        const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs, artifact.preserveInvalidUserEmails, artifact.delegateRawPageContent, artifact.delegateRawModelSettings)
         await registry.add(sourceKeyRecords(runtime, entities))
         const creatorContext = await resolveCreatorContext(runtime.pool, creatorInput, entities)
       for (const gate of await readStoreTargetChecks(artifact, storeId)) {
         const d = gate.diagnostic
-        const entity = entities.find(candidate => candidate.sourceEntity === d.table && candidate.sourceId === d.sourceId)
+        const entity = targetDiagnosticEntity(entities, d)
         preflightContext(entity)
         if (!entity || gate.count !== 1) throw new MigrationError('TARGET_DIAGNOSTIC_SOURCE_MISMATCH')
         if (d.code === 'TARGET_USER_CREATOR_BINDING_REQUIRED' && !creatorDiagnosticResolved(entity, creatorContext.targets)) throw new MigrationError('CREATOR_DIAGNOSTIC_UNRESOLVED')
@@ -208,7 +211,13 @@ export async function runImport(args: Arguments): Promise<void> {
         if (d.code === 'RAW_VALUE_UNVERIFIED' && (entity.collection !== 'products' || !entity.data[d.field === 'description_ms' ? 'descriptionBM' : 'description'])) throw new MigrationError('RICH_TEXT_EVIDENCE_MISSING')
         if (d.field === 'slug' && typeof entity.data.slug !== 'string') throw new MigrationError('TARGET_DIAGNOSTIC_SOURCE_MISMATCH')
       }
-        const proposal = await preflightStore(runtime, entities, binding.sourceInstance, credentials, batch, undefined, creatorContext, preflightContext)
+        const proposal = await preflightStore(runtime, entities, binding.sourceInstance, credentials, batch, undefined, creatorContext, preflightContext, true)
+        if (!args.dryRun) for (const entity of entities) {
+          const claim = proposal.claims.get(entity.ref)
+          if (entity.collection === 'users' && claim?.evidence?.passwordResetRequired === true) {
+            await logger.event({ status: 'USER_PASSWORD_RESET_REQUIRED', storeId, sourceId: entity.sourceId, targetId: claim.targetId })
+          }
+        }
         if (batch && states[storeId] === 'VERIFIED') {
           await verifyStore(runtime, entities, proposal.targets, batch, undefined, undefined, creatorContext)
           if (!args.dryRun) {
@@ -240,9 +249,9 @@ export async function runImport(args: Arguments): Promise<void> {
         if (states[storeId] === 'VERIFIED') { await emit({ status: 'STORE_REVERIFIED', storeId }); continue }
         await renewLease(runtime.pool, currentLease)
         await emit({ status: 'STORE_STARTED', storeId })
-        const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs, artifact.preserveInvalidUserEmails)
+        const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs, artifact.preserveInvalidUserEmails, artifact.delegateRawPageContent, artifact.delegateRawModelSettings)
         const creatorContext = await resolveCreatorContext(runtime.pool, creatorInput, entities)
-        const proposal = await preflightStore(runtime, entities, binding.sourceInstance, credentials, currentBatch, undefined, creatorContext, preflightContext)
+        const proposal = await preflightStore(runtime, entities, binding.sourceInstance, credentials, currentBatch, undefined, creatorContext, preflightContext, true)
         const targets = proposal.targets, remaining = [...entities]
         while (remaining.length) {
           check()
@@ -255,6 +264,13 @@ export async function runImport(args: Arguments): Promise<void> {
           check()
           const targetId = await writeEntity(runtime, entity, targets, credentials, currentBatch, currentLease, creatorContext)
           targets.set(entity.ref, targetId)
+          if (entity.collection === 'users') {
+            const committed = await findOperation(runtime.pool, currentBatch.id, storeId, entity.sourceEntity, entity.sourceId)
+            const detail = committed?.detail
+            if (detail && typeof detail === 'object' && 'passwordResetRequired' in detail && detail.passwordResetRequired === true) {
+              await logger.event({ status: 'USER_PASSWORD_RESET_REQUIRED', storeId, sourceId: entity.sourceId, targetId })
+            }
+          }
           const prior = proposal.claims.get(entity.ref)
           await logger.event({ ...context, status: 'ENTITY_COMMITTED', targetId, action: priorOperation ? 'RECONCILED' : prior ? 'REUSE' : 'CREATE', operationId: checksum([currentBatch.id, storeId, entity.sourceEntity, entity.sourceId]) })
         }

@@ -1,3 +1,5 @@
+import { SOURCE_DOMAIN_MAPPING_HASH, RESTORED_MODEL_SETTINGS_MAPPING_HASH, APPROVED_SOURCE_SCOPE_MAPPING_HASH, APPROVED_CATALOG_MAPPING_HASH } from '@/lib/migration/pw1-json/classification'
+import { MODEL_SETTINGS_MAPPING_HASH } from '@/lib/migration/pw1-json/classification'
 import { masterSetHash, type MasterPart } from '@/lib/migration/pw1-json/master-parts'
 import * as correctedOutcome from '@/lib/migration/pw1-json/export-outcome'
 import { exportOutcome, exportReview, reviewMarkdown } from '@/lib/migration/pw1-json/export-outcome-v1'
@@ -182,6 +184,16 @@ describe('[TC-F42-IMP-003/004/011] Classified retention and selected-scope fail-
     expect(artifact.blockers).toEqual([])
     expect(artifact.diagnosticSummary.buckets).toEqual(expect.arrayContaining([expect.objectContaining({ disposition: 'OUT_OF_SCOPE', diagnostic: expect.objectContaining({ code: 'SOURCE_OWNERSHIP_UNRESOLVED' }) })]))
   })
+  it.each(['page_components','menu_lines','stores'])('accepts exact historical raw setting receipts owned by %s while excluding the unresolved value',async parentTable=>{
+    // Arrange
+    const parentId=parentTable==='stores'?'205':'880'
+    const parents:Row[]=parentTable==='page_components'?[{table:'pages',sourceId:'879',storeId:'205',record:1,disposition:'mapped',fields:{id:'source-identity'},contributions:[],ownership:{storeId:'205',rule:'SOURCE_STORE_ID'}},{table:'page_components',sourceId:parentId,storeId:'205',record:1,disposition:'mapped',fields:{id:'source-identity'},contributions:[],ownership:{storeId:'205',rule:'SOURCE_PARENT_RELATION',parentTable:'pages',parentId:'879'}}]:parentTable==='menu_lines'?[{table:'menus',sourceId:'878',storeId:'205',record:1,disposition:'mapped',fields:{id:'source-identity'},contributions:[],ownership:{storeId:'205',rule:'SOURCE_STORE_ID'}},{table:'menu_items',sourceId:'879',storeId:'205',record:1,disposition:'mapped',fields:{id:'source-identity'},contributions:[],ownership:{storeId:'205',rule:'SOURCE_PARENT_RELATION',parentTable:'menus',parentId:'878'}},{table:'menu_lines',sourceId:parentId,storeId:'205',record:1,disposition:'mapped',fields:{id:'source-identity'},contributions:[],ownership:{storeId:'205',rule:'SOURCE_PARENT_RELATION',parentTable:'menu_items',parentId:'879'}}]:[]
+    const row:Row={table:'model_settings',sourceId:'901',storeId:'205',record:1,disposition:'partial',fields:{id:'mapped',model_id:'mapped',model_type:'mapped',value:'unresolved'},contributions:[{storeId:'205',table:'model_settings',sourceId:'901',fields:parentTable==='stores'?['model_type','model_id']:['id','model_id','model_type'],targetPath:parentTable==='stores'?'sites.pw1_source.model_settings':parentTable==='page_components'?'pages.components.model_settings':'sites.menus.MenuLine.model_settings',rule:parentTable==='stores'?'MASTER_RAW_STORE_MODEL_OWNERSHIP':'MASTER_RAW_ALLOWLIST'}],ownership:{storeId:'205',rule:'SOURCE_PARENT_RELATION',parentTable,parentId}}
+    const input=await fixture({rows:[...parents,row],diagnostics:[{code:'RAW_VALUE_UNVERIFIED',severity:'blocker',table:'model_settings',storeId:'205',sourceId:'901',field:'value',reason:'UNKNOWN_SETTING_KEY'}]})
+    // Act / Assert
+    const prepared=await prepare(input)
+    expect((await loadImportArtifact(prepared.manifestPath)).blockers).toEqual([])
+  })
   it.each(['wrong-store', 'missing-source'])('refuses diagnostic scope forgery before Store filtering: %s', async kind => {
     // Arrange
     const input = await fixture({ rows: [retainedUser], diagnostics: [{ code: 'UNKNOWN_SOURCE_REQUIREMENT', severity: 'blocker',
@@ -199,19 +211,49 @@ describe('[TC-F42-IMP-003/004/011] Classified retention and selected-scope fail-
     // Assert
     expect(artifact.blockers).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'SOURCE_CLASSIFICATION_INVALID' })]))
   })
-  it.each([false, true])('limits shared settings Page exclusion to proved Page owners (mixed=%s)', async mixed => {
+  it.each([false, true])('excludes all settings after verifying source ownership evidence (mixed=%s)', async mixed => {
     // Arrange
     const rows: Row[] = [{ table: 'model_settings', sourceId: '404', storeId: null, record: 1, disposition: 'unresolved',
       fields: { id: 'source-identity', value: 'unresolved' }, contributions: [], ownership: { storeId: null, rule: 'OWNERSHIP_PARENT_UNVERIFIED', parentTable: 'page_components', parentId: '999' } }]
-    if (mixed) rows.push({ ...rows[0], sourceId: '405', record: 2, contributions: [{ storeId: '205', table: 'model_settings', sourceId: '405', fields: ['value'], targetPath: 'products', rule: 'MASTER-5' }], ownership: { storeId: null, rule: 'OWNERSHIP_PARENT_UNVERIFIED', parentTable: 'products', parentId: '999' } })
+    if (mixed) rows.push({ ...rows[0], sourceId: '405', record: 2, contributions: [], ownership: { storeId: null, rule: 'OWNERSHIP_PARENT_UNVERIFIED', parentTable: 'products', parentId: '999' } })
     const diagnostics: Diagnostic[] = rows.map(row => ({ code: 'SOURCE_OWNERSHIP_UNRESOLVED', severity: 'blocker', table: 'model_settings', sourceId: row.sourceId, reason: 'OWNERSHIP_PARENT_UNVERIFIED' }))
     diagnostics.push({ code: 'SOURCE_FIELDS_UNRESOLVED', severity: 'blocker', table: 'model_settings' })
     const input = await fixture({ rows, diagnostics })
     // Act
     const prepared = await prepare(input); const artifact = await loadImportArtifact(prepared.manifestPath, { storeIds: ['205'] })
     // Assert
-    if (mixed) expect(artifact.blockers).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'SOURCE_OWNERSHIP_UNRESOLVED' })]))
-    else expect(artifact.blockers).toEqual([])
+    expect(artifact.blockers).toEqual([])
+  })
+  it.each(['UNKNOWN_SETTING_KEY','INVALID_JSON','UNSAFE_URL'])('excludes non-Page setting value diagnostics with verified source identity (%s)', async reason => {
+    // Arrange
+    const row: Row = { table:'model_settings',sourceId:'901',storeId:'205',record:1,disposition:'unresolved',fields:{id:'source-identity',value:'unresolved'},contributions:[],ownership:{storeId:'205',rule:'SOURCE_PARENT_RELATION',parentTable:'stores',parentId:'205'} }
+    const input=await fixture({rows:[row],diagnostics:[{code:'RAW_VALUE_UNVERIFIED',severity:'blocker',table:'model_settings',storeId:'205',sourceId:'901',field:'value',reason},{code:'SOURCE_FIELDS_UNRESOLVED',severity:'blocker',table:'model_settings',storeId:'205'}]})
+    // Act / Assert
+    const prepared=await prepare(input)
+    expect((await loadImportArtifact(prepared.manifestPath,{storeIds:['205']})).blockers).toEqual([])
+  })
+  it.each(['wrong-store','unknown-source','invalid-retention','forged-contribution'])('does not waive forged setting evidence (%s)',async mutation=>{
+    // Arrange
+    const row: Row = { table:'model_settings',sourceId:'901',storeId:'205',record:1,disposition:'unresolved',fields:{id:'source-identity',value:'unresolved'},contributions:[],ownership:{storeId:'205',rule:'SOURCE_PARENT_RELATION',parentTable:'stores',parentId:'205'} }
+    if(mutation==='forged-contribution')row.contributions=[{storeId:'205',table:'model_settings',sourceId:'901',fields:['value'],targetPath:'products',rule:'MASTER-5'}]
+    if(mutation==='invalid-retention'){row.fields.value='retained-source';row.fieldRetentionRules={value:'MASTER-UNKNOWN-ALLOW-ALL'}}
+    const input=await fixture({rows:[row],diagnostics:[{code:'RAW_VALUE_UNVERIFIED',severity:'blocker',table:'model_settings',storeId:mutation==='wrong-store'?'285':'205',sourceId:mutation==='unknown-source'?'902':'901',field:'value',reason:'UNKNOWN_SETTING_KEY'}]})
+    // Act / Assert
+    const prepared=await prepare(input)
+    expect((await loadImportArtifact(prepared.manifestPath)).blockers).toEqual(expect.arrayContaining([expect.objectContaining({code:'SOURCE_CLASSIFICATION_INVALID'})]))
+  })
+  it.each(['DEFAULT_DOMAIN_AMBIGUOUS','SOURCE_MAIN_DOMAIN_AMBIGUOUS'])('binds aggregate domain warning %s to its Store rather than a colliding domain ID',async code=>{
+    // Arrange
+    const row:Row={table:'store_domains',sourceId:'205',storeId:'285',record:1,disposition:'mapped',fields:{id:'source-identity'},contributions:[],ownership:{storeId:'285',rule:'SOURCE_STORE_ID'}}
+    const diagnostic:Diagnostic={code,severity:'warning',table:'store_domains',sourceId:'205',storeId:'205',reason:code==='DEFAULT_DOMAIN_AMBIGUOUS'?'PLATFORM_DOMAIN_FALLBACK':'CUSTOM_DOMAINS_PENDING'}
+    const input=await fixture({rows:[row],diagnostics:[diagnostic]})
+    // Act / Assert
+    const prepared=await prepare(input)
+    expect((await loadImportArtifact(prepared.manifestPath)).blockers.some(d=>d.code==='SOURCE_CLASSIFICATION_INVALID')).toBe(false)
+    diagnostic.reason='UNRECOGNIZED_REASON'
+    const forged=await fixture({rows:[row],diagnostics:[diagnostic]})
+    const forgedPrepared=await prepare(forged)
+    expect((await loadImportArtifact(forgedPrepared.manifestPath)).blockers.some(d=>d.code==='SOURCE_CLASSIFICATION_INVALID')).toBe(true)
   })
   it.each(['205', '285'])('rejects duplicate compressed leaf identity even when its second owner is %s', async secondOwner => {
     // Arrange
@@ -348,7 +390,7 @@ describe('[TC-F42-IMP-003/004] Exact exporter diagnostic source conventions', ()
     // Assert
     expect(artifact.blockers.some(item => item.code === 'SOURCE_OWNERSHIP_UNRESOLVED')).toBe(!known)
   })
-  it('does not classify Product-owned shared settings as Page definitions', async () => {
+  it('excludes Product-owned settings with truthful unresolved parent evidence', async () => {
     // Arrange
     const input = await fixture({ rows: [{ table: 'model_settings', sourceId: '1', storeId: null, record: 1, disposition: 'unresolved',
       fields: { id: 'source-identity', value: 'unresolved' }, contributions: [], ownership: { storeId: null, rule: 'OWNERSHIP_PARENT_UNVERIFIED', parentTable: 'products', parentId: '999' } }],
@@ -356,7 +398,7 @@ describe('[TC-F42-IMP-003/004] Exact exporter diagnostic source conventions', ()
     // Act
     const prepared = await prepare(input); const artifact = await loadImportArtifact(prepared.manifestPath, { storeIds: ['205'] })
     // Assert
-    expect(artifact.blockers.map(item => item.code)).toContain('RAW_VALUE_UNVERIFIED')
+    expect(artifact.blockers).toEqual([])
   })
   it.each([true, false])('keeps intentional Banner ownership mismatch blocked without trusting other codes (exact=%s)', async exact => {
     // Arrange
@@ -872,9 +914,10 @@ describe('[TC-F42-IMP-POLICY-006] Exact negative-total Orders and inherited poli
     expect(artifact.stores.find(store => store.storeId === '43')?.collections.orders).toEqual([])
     expect(artifact.stores.find(store => store.storeId === '43')?.collections.users[0].email).toBe('preserved-invalid-email')
   })
-  it('inherits all mixed policies and exact PROD Order exemptions in chunked 1.10.0', async () => {
+  it.each(['1.10.0','1.10.1','1.10.2','1.10.3','1.10.4','1.10.5'])('inherits all mixed policies and exact PROD Order exemptions in chunked %s', async version => {
     // Arrange / Act
     const input=await mixedFixture();await chunkify(input)
+    if(version!=='1.10.0'){Object.assign(input.manifest,{exporterVersion:version,contractSha256:version==='1.10.5'?SOURCE_DOMAIN_MAPPING_HASH:version==='1.10.4'?RESTORED_MODEL_SETTINGS_MAPPING_HASH:version==='1.10.3'?APPROVED_SOURCE_SCOPE_MAPPING_HASH:version==='1.10.2'?APPROVED_CATALOG_MAPPING_HASH:MODEL_SETTINGS_MAPPING_HASH});await input.saveManifest()}
     const prepared=await prepare(input),artifact=await loadImportArtifact(prepared.manifestPath)
     // Assert
     expect(artifact.blockers).toEqual([]);expect(artifact.preserveInvalidUserEmails).toBe(true)
@@ -933,6 +976,8 @@ describe('[TC-F42-IMP-PARTS-001] Bound master parts without aggregate',()=>{
     await expect(readFile(join(input.output,'master.json'))).rejects.toThrow()
     const foundation=await loadImportArtifact(prepared.manifestPath,{scope:'foundation',selector:{store:'285'}})
     expect(foundation.stores.map(store=>store.storeId)).toEqual(['285'])
+    await writeFile(join(input.output,'master-with-destination.json'),'{"format":"pw1-destination-parts-v1"}')
+    expect((await loadImportArtifact(prepared.manifestPath,{scope:'foundation',selector:{store:'285'}})).stores.map(store=>store.storeId)).toEqual(['285'])
   })
   it.each(['missing','extra','reordered','duplicate-id','wrong-ids','wrong-size','wrong-hash','wrong-set-hash','aggregate','utf8-char-count','too-many-stores','size-limit','path'])('rejects %s part metadata or files',async mutation=>{
     // Arrange
@@ -970,5 +1015,168 @@ describe('[TC-F42-IMP-PARTS-001] Bound master parts without aggregate',()=>{
     // Act / Assert
     const artifact=await loadImportArtifact(prepared.manifestPath,{storeIds:[]})
     expect(parts).toEqual([]);expect(artifact.storeIds).toEqual([]);expect(artifact.manifest.masterHash).toBe(masterSetHash([]))
+  })
+})
+
+
+describe('[TC-F42-IMP-SCOPE-001] 1.10.1 model settings source-only contract',()=>{
+  async function setup(mutation='') {
+    const row:Row={table:'model_settings',sourceId:'901',storeId:null,record:1,disposition:'retained-source',fields:{id:'retained-source',custom_setting:'retained-source',api_token:'security-excluded'},fieldRetentionRules:{id:'MASTER-2.2-MODEL-SETTINGS-OUTSIDE-SCOPE',custom_setting:'MASTER-2.2-MODEL-SETTINGS-OUTSIDE-SCOPE'},contributions:[],ownership:{storeId:null,rule:'OWNERSHIP_PARENT_UNVERIFIED',parentTable:'products',parentId:'999'}}
+    if(mutation==='contribution')row.contributions=[{storeId:'205',table:'model_settings',sourceId:'901',fields:['custom_setting'],targetPath:'products',rule:'MASTER-5'}]
+    if(mutation==='secret') {row.fields.api_token='retained-source';row.fieldRetentionRules!.api_token='MASTER-2.2-MODEL-SETTINGS-OUTSIDE-SCOPE'}
+    if(mutation==='table')row.table='users'
+    if(mutation==='ownership')row.ownership={storeId:null,rule:'SOURCE_GLOBAL_SCOPE'}
+    const input=await fixture({rows:[row],diagnostics:[{code:'MODEL_SETTINGS_OUTSIDE_SCOPE',severity:'warning',table:'model_settings'},{code:'SOURCE_OWNERSHIP_UNRESOLVED',severity:'warning',table:'model_settings',sourceId:'901',reason:'OWNERSHIP_PARENT_UNVERIFIED'}]})
+    await chunkify(input)
+    if(mutation!=='historical')Object.assign(input.manifest,{exporterVersion:'1.10.1',contractSha256:MODEL_SETTINGS_MAPPING_HASH})
+    await input.saveManifest()
+    return input
+  }
+  it('prepares and loads source-only settings with unknown fields and truthful failed ownership',async()=>{
+    // Arrange / Act
+    const input=await setup(),prepared=await prepare(input),artifact=await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers).toEqual([])
+    expect(artifact.diagnosticSummary?.buckets.filter(b=>b.diagnostic.table==='model_settings').every(b=>b.disposition==='OUT_OF_SCOPE')).toBe(true)
+  })
+  it('requires the exact global source-only marker',async()=>{
+    // Arrange
+    const input=await setup()
+    const report=JSON.parse(input.files['mapping-report.json'])
+    report.diagnostics=report.diagnostics.filter((d:Diagnostic)=>d.code!=='MODEL_SETTINGS_OUTSIDE_SCOPE')
+    const text=JSON.stringify(report)
+    await writeFile(join(input.source,'mapping-report.json'),text)
+    input.manifest.artifacts['mapping-report.json']=digest(text)
+    await input.saveManifest()
+    // Act / Assert
+    await expect(prepare(input)).rejects.toThrow('MODEL_SETTINGS_SCOPE_EVIDENCE_INVALID')
+  })
+  it.each(['historical','contribution','secret','table','ownership'])('does not waive unsupported source-only evidence (%s)',async mutation=>{
+    // Arrange / Act
+    const input=await setup(mutation),prepared=await prepare(input),artifact=await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers.some(d=>d.code==='SOURCE_CLASSIFICATION_INVALID')).toBe(true)
+  })
+})
+
+
+describe('[TC-F42-IMP-APPROVED-102] Four approved decisions share an exact artifact contract',()=>{
+  const policy = {"decisionEvidence": "User decisions 2026-09-17: active Category/SKU only; existing SKU tuples; defer Email; siteType ecommerce with Store overrides; preserve creator in Users only; shipping follows PW2. Incompatible shipping uses explicit PW2 defaults as stated in implementation update. User follow-up 2026-09-17 approves active child promotion, preserving all images/short descriptions, deferring Store 323 and optional history. User decision 2026-09-23: temporarily defer PROD Stores 54 and 161 because original backend owners 118 and 343 are soft-deleted; preserve source data, omit these Stores from master JSON, report policy exclusion without blocking other Stores.", "activeCatalogOnly": true, "deferEmailTemplates": true, "allowSparseVariants": true, "preserveUserCreators": true, "siteTypeDefault": "ecommerce", "siteTypeOverrides": {}, "shippingPolicy": "pw2-defaults", "promoteActiveCategoriesToRoot": true, "deferredStoreIds": ["54", "161", "323"], "preserveHistoricalOrders": true, "gracefulTenantResolution": true, "resolveDuplicateSkus": true, "resolveDuplicateVariantTuples": true, "treatSingleSkuWithoutSelectionsAsSimple": true, "pruneUnreferencedTiers": true, "allowInactiveSkusForInactiveProduct": true, "resolveDuplicateCategorySlugs": true, "resolveDuplicateCategoryNames": true, "flattenBlogCategoriesToRoot": true, "resolveDuplicateBlogCategorySlugs": true, "resolveDuplicateBlogSlugs": true, "allowCustomerAddressOverflow": true, "allowInvalidCustomerAddresses": true, "allowHistoricalDiscountEligibilityGap": true, "preserveRefundedOrdersWithoutEvidence": true, "skipInvalidDiscountCodes": true, "allowUnresolvedBlogMedia": true, "fallbackBlogAuthorToOwner": true, "allowContactStructureGap": true, "allowBracketedProductNames": true, "pruneInvalidVariantSkus": true, "selectOldestOwner": true, "preserveInvalidUserEmails": true, "excludeDuplicateProductSlugs": true, "excludeProductsWithoutValidVariants": true}
+  async function setup(mode='valid') {
+    const storeId='1327',catalogRule='MASTER-5.2-PRODUCT-CATALOG-POLICY',mediaRule='MASTER-10-MEDIA-SOURCE-METADATA'
+    const root=(table:string,id:string):Row=>({table,sourceId:id,storeId,record:1,disposition:'mapped',fields:{id:'source-identity'},contributions:[],ownership:{storeId,rule:'SOURCE_STORE_ID'}})
+    const product:Row={...root('products','10'),disposition:'retained-source',fields:{id:'retained-source'},fieldRetentionRules:{id:catalogRule},productExclusion:{productId:'10',reason:'INACTIVE_CATEGORY'}}
+    const sku:Row={...root('product_skus','20'),disposition:'retained-source',fields:{id:'retained-source'},fieldRetentionRules:{id:catalogRule},productExclusion:{productId:'10',reason:'INACTIVE_CATEGORY'},ownership:{storeId,rule:'SOURCE_PARENT_RELATION',parentTable:'products',parentId:mode==='foreign-family'?'11':'10'}}
+    const media:Row={...root('medias','1252'),fields:{id:'retained-source',name:'mapped',url:'mapped'},fieldRetentionRules:{id:mediaRule},contributions:[{storeId,table:'medias',sourceId:'1252',fields:['name','url'],targetPath:'media[]',rule:'MASTER-10-EXTERNAL-LIBRARY-MEDIA'}]}
+    const rows=[product,sku,{...root('users','2696'),record:1},{...root('users','2697'),record:2},...(mode==='missing-media-receipt'?[]:[media])]
+    const diagnostics:Diagnostic[]=[{code:'PRODUCT_CATALOG_POLICY_EXCLUDED',severity:'warning',table:'products',sourceId:'10',storeId,reason:'INACTIVE_CATEGORY'},{code:'OWNER_SECONDARY_MAPPED_EDITOR',severity:'warning',table:'users',sourceId:'2697',storeId,field:'is_store_owner',reason:'PRIMARY_OWNER_SELECTED'},{code:'USER_PERMISSION_RUNTIME_PARITY_UNVERIFIED',severity:'warning',table:'users',sourceId:'2697',storeId},{code:'SOCIAL_CHANNEL_METADATA_OMITTED',severity:'warning',table:'stores',sourceId:storeId,storeId,field:'social_channel',reason:'PW2_SUPPORTED_FIELDS_ONLY'}]
+    if(mode==='missing-editor-receipt')diagnostics.splice(1,1)
+    const users=[{_ref:'@users:users:2696',roles:['tenant-owner'],tenants:[{tenant:'@tenants:stores:1327',role:'owner',permissions:[]}]},{_ref:'@users:users:2697',roles:[mode==='owner-escalation'?'tenant-owner':'editor'],tenants:[{tenant:'@tenants:stores:1327',role:mode==='owner-escalation'?'owner':'editor',permissions:[]}]}]
+    const url='https://cdn.example.test/PW1/Media%20Original.JPG?sig=A%2Fb'
+    const input=await fixture({storeIds:[storeId],sourceSnapshot:{...snapshot,sourceInstance:'PW1PROD',sourceInstanceToken:mode==='wrong-namespace'?'SYNTHETIC':'PW1PROD'},rows,diagnostics,documents:[{storeId,collection:'users',documents:users},{storeId,collection:'sites',documents:[{_ref:'@sites:stores:1327',tenant:'@tenants:stores:1327',socialLinks:mode==='unsafe-social'?{facebook:'javascript:bad'}:mode==='raw-social'?{facebook:'https://facebook.com/example',icon:'raw'}:{facebook:'https://facebook.com/example'}}]},{storeId,collection:'media',documents:[{_ref:'@media:medias:1252',url:mode==='unsafe-media'?'javascript:bad':url,sourceUrl:url,alt:'PW1 original'}]},...(mode==='emitted-product'?[{storeId,collection:'products',documents:[{_ref:'@products:products:10'}]}]:[])],products:[{storeId,sourceProductId:'10',emitted:false,targetRef:null,eligibleSkuCount:0,tiers:[],skus:[],errors:['PRODUCT_NOT_EMITTED']}],override:{counts:{sourceStoreCount:1,selectedStoreCount:1,policyExcludedStoreCount:0,emittedStoreCount:1,blockedStoreCount:0,blockers:0},migrationPolicy:{...policy,excludeProductsInInactiveCategories:mode!=='disabled'}}})
+    const report=JSON.parse(input.files['mapping-report.json'])
+    report.rows[0].fields.social_channel='mapped'
+    input.manifest.files.find(file=>file.table==='stores')!.headers.push('social_channel')
+    report.rows[0].contributions.push({storeId,table:'stores',sourceId:storeId,fields:['social_channel'],targetPath:'sites[].socialLinks',rule:'MASTER-4-SOCIAL-SUPPORTED-FIELDS'})
+    const text=JSON.stringify(report);input.files['mapping-report.json']=text;await writeFile(join(input.source,'mapping-report.json'),text);input.manifest.artifacts['mapping-report.json']=digest(text)
+    await chunkify(input)
+    Object.assign(input.manifest,{exporterVersion:mode==='historical'?'1.10.1':'1.10.2',contractSha256:mode==='historical'?MODEL_SETTINGS_MAPPING_HASH:APPROVED_CATALOG_MAPPING_HASH})
+    if(mode==='historical')delete (input.manifest.migrationPolicy as Record<string,unknown>).excludeProductsInInactiveCategories
+    await input.saveManifest();return input
+  }
+  it('loads all four decisions while excluding Product family and preserving media URL bytes',async()=>{
+    // Arrange / Act
+    const input=await setup(),prepared=await prepare(input),artifact=await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers).toEqual([])
+    expect(artifact.stores[0].collections.products).toEqual([])
+    expect(artifact.stores[0].collections.media[0].url).toBe('https://cdn.example.test/PW1/Media%20Original.JPG?sig=A%2Fb')
+    expect(artifact.diagnosticSummary?.buckets.find(b=>b.diagnostic.code==='USER_PERMISSION_RUNTIME_PARITY_UNVERIFIED')?.disposition).toBe('APPROVED_POLICY')
+  })
+  it.each(['disabled','historical','emitted-product','foreign-family','missing-media-receipt','unsafe-media','unsafe-social','raw-social'])('rejects invalid or unsupported artifact evidence (%s)',async mode=>{
+    // Arrange / Act / Assert
+    await expect(prepare(await setup(mode))).rejects.toThrow()
+  })
+  it.each(['missing-editor-receipt','owner-escalation','wrong-namespace'])('keeps the generic permission warning blocked without approved editor evidence (%s)',async mode=>{
+    // Arrange / Act
+    const input=await setup(mode),prepared=await prepare(input),artifact=await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.diagnosticSummary?.buckets.find(b=>b.diagnostic.code==='USER_PERMISSION_RUNTIME_PARITY_UNVERIFIED')?.disposition).toBe('BLOCKED')
+  })
+})
+
+
+describe('[TC-F42-IMP-SCOPE-001] Approved scope artifact roundtrip', () => {
+  it.each([false, true])('validates technical scope and detects tampered outcome=%s', async tampered => {
+    // Arrange
+    const diagnostics: Diagnostic[] = [{ code: 'SOURCE_TABLE_OUTSIDE_SCOPE', table: 'queue_sync', severity: 'warning' }]
+    const input = await fixture({ diagnostics, rows: [{ table: 'queue_sync', sourceId: '1', storeId: null, record: 1, disposition: 'retained-source', fields: { payload: 'retained-source' }, fieldRetentionRules: { payload: 'MASTER-2.2-TECHNICAL-OUTSIDE-SCOPE' }, contributions: [], ownership: { storeId: null, rule: 'SOURCE_GLOBAL_SCOPE' } }] })
+    await chunkify(input)
+    const outcome = correctedOutcome.exportOutcome(diagnostics, 0, [])
+    Object.assign(input.manifest, { exporterVersion: '1.10.3', contractSha256: APPROVED_SOURCE_SCOPE_MAPPING_HASH, outcome: tampered ? { ...outcome, outsideScopeCount: 0 } : outcome })
+    const review = correctedOutcome.exportReview(diagnostics, [], [])
+    for (const [name, bytes] of Object.entries({ 'export-review.json': JSON.stringify(review), 'export-review.md': correctedOutcome.reviewMarkdown(review) })) { await writeFile(join(input.source, name), bytes); input.manifest.artifacts[name] = digest(bytes) }
+    await input.saveManifest()
+    // Act / Assert
+    if (tampered) await expect(prepare(input)).rejects.toThrow('EXPORT_OUTCOME_INCONSISTENT')
+    else { const prepared = await prepare(input); expect((await loadImportArtifact(prepared.manifestPath)).blockers).toEqual([]) }
+  })
+})
+
+
+describe('[TC-F42-IMP-RAW-SETTINGS] Restored settings streaming contract', () => {
+  it.each(['valid', 'source-domain-contract', 'missing-value', 'historical', 'legacy-marker'])('verifies actual Page content and Site fallback: %s', async mutation => {
+    // Arrange
+    const content = '<p><a href="tel:011 1259 5933">Call</a></p>{invalid json'
+    const raw = { id: '901', store_id: '205', model_type: 'App\\Models\\PageComponent', model_id: '700', key: 'content', value: content }
+    const fallback = { ...raw, id: '902', model_id: 'missing-parent' }
+    const fields = Object.fromEntries(Object.keys(raw).map(field => [field, 'mapped']))
+    const rows: Row[] = [
+      { table: 'pages', sourceId: '600', storeId: '205', record: 1, disposition: 'mapped', fields: { id: 'mapped' }, contributions: [], ownership: { storeId: '205', rule: 'SOURCE_STORE_ID' } },
+      { table: 'page_components', sourceId: '700', storeId: '205', record: 1, disposition: 'mapped', fields: { id: 'mapped' }, contributions: [], ownership: { storeId: '205', rule: 'SOURCE_PARENT_RELATION', parentTable: 'pages', parentId: '600' } },
+      { table: 'model_settings', sourceId: '901', storeId: '205', record: 1, disposition: 'mapped', fields, contributions: [{ table: 'model_settings', sourceId: '901', storeId: '205', fields: Object.keys(raw), targetPath: 'pages.components.model_settings', rule: 'MASTER_RAW_MODEL_SETTINGS' }], ownership: { storeId: '205', rule: 'SOURCE_PARENT_RELATION', parentTable: 'page_components', parentId: '700' } },
+      { table: 'model_settings', sourceId: '902', storeId: '205', record: 2, disposition: 'mapped', fields, contributions: [{ table: 'model_settings', sourceId: '902', storeId: '205', fields: Object.keys(raw), targetPath: 'sites.raw_model_settings', rule: 'MASTER_RAW_MODEL_SETTINGS' }], ownership: { storeId: '205', rule: 'SOURCE_SETTING_STORE_ID' } },
+    ]
+    const input = await fixture({ rows, diagnostics: [
+      { code: mutation === 'legacy-marker' ? 'MODEL_SETTINGS_OUTSIDE_SCOPE' : 'MODEL_SETTINGS_RAW_PRESERVED', table: 'model_settings', severity: 'warning' },
+      ...['pages', 'page_components'].map(table => ({ code: 'PAGE_MENU_RAW_SOURCE_ONLY', table, severity: 'warning' as const })),
+    ], documents: [
+      { storeId: '205', collection: 'pages', documents: [{ id: '600', model_settings: [], components: [{ id: '700', model_settings: [mutation === 'missing-value' ? { ...raw, value: undefined } : raw] }] }] },
+      { storeId: '205', collection: 'sites', documents: [{ _ref: '@sites:stores:205', tenant: '@tenants:stores:205', raw_model_settings: [fallback] }] },
+    ] })
+    await chunkify(input)
+    Object.assign(input.manifest, { exporterVersion: mutation === 'historical' ? '1.10.3' : mutation === 'source-domain-contract' ? '1.10.5' : '1.10.4', contractSha256: mutation === 'historical' ? APPROVED_SOURCE_SCOPE_MAPPING_HASH : mutation === 'source-domain-contract' ? SOURCE_DOMAIN_MAPPING_HASH : RESTORED_MODEL_SETTINGS_MAPPING_HASH })
+    await input.saveManifest()
+    // Act / Assert
+    if (!['valid','source-domain-contract'].includes(mutation)) { await expect((async () => { const prepared = await prepare(input); return loadImportArtifact(prepared.manifestPath) })()).rejects.toThrow(); return }
+    const prepared = await prepare(input)
+    const artifact = await loadImportArtifact(prepared.manifestPath)
+    expect(artifact.blockers).toEqual([])
+    expect(artifact.delegateRawModelSettings).toBe(true)
+    expect((input.manifest as unknown as { outcome: { outsideScopeCount: number } }).outcome.outsideScopeCount).toBe(3)
+    expect(artifact.pageExcludedRecords).toBe(1)
+    expect(artifact.stores[0].collections.sites[0].raw_model_settings).toEqual([fallback])
+    const master = JSON.parse(await readFile(join(input.output, 'master-0001.json'), 'utf8'))
+    expect(master[0].pages[0].components[0].model_settings[0].value).toBe(content)
+  })
+})
+
+describe('[TC-F42-IMP-SOURCE-DOMAIN] Source-domain artifact handoff', () => {
+  it.each(['current', 'historical'])('binds original Site domain receipt under %s contract', async version => {
+    // Arrange
+    const domain = 'original malformed PW1 hostname'
+    const input = await fixture({ rows: [{ table: 'store_domains', sourceId: '4000', storeId: '205', record: 1, disposition: 'mapped', fields: { id: 'mapped', store_id: 'mapped', domain: 'mapped', is_default: 'mapped', deleted_at: 'mapped' }, ownership: { storeId: '205', rule: 'SOURCE_STORE_ID' }, contributions: [{ table: 'store_domains', sourceId: '4000', storeId: '205', fields: ['id','store_id','domain','is_default','deleted_at'], targetPath: 'sites[].domain', rule: 'MASTER-4.1-SOURCE-SITE-DOMAIN' }] }],
+      diagnostics: [{ code: 'SOURCE_SITE_DOMAIN_FORMAT_PRESERVED', severity: 'warning', table: 'store_domains', storeId: '205', sourceId: '4000', field: 'domain', reason: 'ORIGINAL_PW1_VALUE' }],
+      documents: [{ storeId: '205', collection: 'sites', documents: [{ _ref: '@sites:stores:205', tenant: '@tenants:stores:205', domain }] }] })
+    await chunkify(input)
+    Object.assign(input.manifest, { exporterVersion: version === 'current' ? '1.10.5' : '1.10.4', contractSha256: version === 'current' ? SOURCE_DOMAIN_MAPPING_HASH : RESTORED_MODEL_SETTINGS_MAPPING_HASH,
+      migrationPolicy: { ...input.manifest.migrationPolicy, gracefulTenantResolution: true } })
+    await input.saveManifest()
+    // Act / Assert
+    if (version === 'historical') { await expect(prepare(input)).rejects.toThrow('SOURCE_SITE_DOMAIN_EVIDENCE_INVALID'); return }
+    const prepared = await prepare(input), artifact = await loadImportArtifact(prepared.manifestPath)
+    expect(artifact.blockers).toEqual([])
+    expect(artifact.stores[0].collections.sites[0].domain).toBe(domain)
+    expect(artifact.diagnosticSummary?.buckets.find(bucket => bucket.diagnostic.code === 'SOURCE_SITE_DOMAIN_FORMAT_PRESERVED')?.disposition).toBe('APPROVED_POLICY')
   })
 })
