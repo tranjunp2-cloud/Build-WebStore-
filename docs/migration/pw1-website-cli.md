@@ -344,3 +344,5 @@ Script không áp khung panel/viền/bo góc theo design direction lên rich tex
 ### Chạy lại site đã publish
 
 `--store ID --rerun` cho phép tái tạo site đã publish trong mapping migration hiện có. Không dùng `--rerun` thì vẫn không được thay thế site published. Kiểm tra tenant, owner active và category scope giữ nguyên, được kiểm tra lại trước khi ghi. AI/media chuẩn bị trước; thay đổi site/page ghi trong transaction có kiểm tra concurrent edit. Khi generation/ghi thất bại trước commit, dữ liệu site cũ giữ nguyên. Sau commit site chuyển về draft và flow publish tự chạy; nếu publish thất bại, kết quả ghi nhận lỗi để lần chạy sau tiếp tục publish.
+
+Cấu hình hiển thị cart PW1: `header.config.cart_status` bằng `0`, `"0"` hoặc `false` luôn tắt cart và tracking, kể cả các page hệ thống vẫn active. Giá trị thiếu/null/rỗng không được coi là tắt. Các trường hợp còn lại vẫn yêu cầu page/component commerce hoạt động; `cart_status: 1` không tự bật cart khi tất cả page commerce đã tắt. Quy tắc chỉ áp dụng migration.

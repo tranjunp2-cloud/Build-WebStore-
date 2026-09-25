@@ -270,3 +270,15 @@ it('[TC-F35.M27] disabled commerce pages override stale header cart settings', (
     const {entries} = parseMigrationInput(data)
     expect(entries[0].website.features).toEqual({cart:false,orderTracking:false})
 })
+
+it.each([0, '0', false, 1, '1', undefined, null, ''])('[TC-F35.M27] honors explicit header cart visibility %s over active system pages', (cartStatus) => {
+    const input = fixture()
+    const data = [{...input[0], sites:[{...input[0].sites[0],menus:[{...input[0].sites[0].menus[0],config:JSON.stringify({cart_status:cartStatus})}]}],pages:[...input[0].pages,
+        {id:'20',store_id:'205',name:'Cart',type:'4',slug:'cart',status:'1',components:[{id:'30',status:'1',frontend_component:{name:'cart'}}]},
+        {id:'21',store_id:'205',name:'Tracking',type:'6',slug:'order-tracking',status:'1',components:[]},
+    ]}]
+    const {entries} = parseMigrationInput(data)
+    const enabled = ![0, '0', false].includes(cartStatus as string | number | boolean)
+    expect(entries[0].website.features).toEqual({cart:enabled,orderTracking:enabled})
+    expect(adaptWebsiteInput(compactInput(entries[0])).contract.site.features).toEqual({cart:enabled,orderTracking:enabled})
+})

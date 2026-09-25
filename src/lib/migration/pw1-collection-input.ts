@@ -120,6 +120,10 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             }
             const header = menus.find(m => str(m.type) === '1'), footer = menus.find(m => str(m.type) === '2')
             const headerConfig = object(header?.config)
+            // Explicit visibility takes priority over PW1's pre-created system pages.
+            // Do not coerce null/empty/missing values to zero.
+            const cartHidden = headerConfig.cart_status === 0 || headerConfig.cart_status === '0' || headerConfig.cart_status === false
+            const cartEnabled = !cartHidden && validPages.some(p => ['4','5'].includes(str(p.type)) || hasCommerceComponent(p))
             if (Number(headerConfig.search_status) === 1) report.warnings.push('Header product search setting is retained in source only; native navigation search mapping is pending')
             const pages = validPages.filter(p => {
                 if (['4', '5', '6'].includes(str(p.type)) || isNativeCommercePage(p)) { exclude(p.id, 'page', 'native-commerce-runtime'); return false }
@@ -219,7 +223,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             }
             entries.push({ ...(bundle.linkCorrections ? { linkCorrections: bundle.linkCorrections } : {}), ...(bundle.destination ? { destination: bundle.destination } : {}), sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin, ...(origins.length ? { origins: recognizedOrigins } : {}) }, website: {
                 settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
-                features: { cart: validPages.some(p => ['4','5'].includes(str(p.type)) || hasCommerceComponent(p)), orderTracking: validPages.some(p => ['4','5'].includes(str(p.type)) || hasCommerceComponent(p)) && validPages.some(p => str(p.type) === '6' || rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'order_tracking')) },
+                features: { cart: cartEnabled, orderTracking: cartEnabled && validPages.some(p => str(p.type) === '6' || rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'order_tracking')) },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(menuLinks),
                 footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns }, pages,
             } })
