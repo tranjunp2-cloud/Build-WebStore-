@@ -3,9 +3,9 @@
 ## Đầu vào
 
 - Artifact cũ: `prepared-v3-local`, mapping hash `27fbef7ec0fc73e58029295c8fbbe7d276c4d6095e358fe57e3058e1eb4f4567`.
-- Publication mới: `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/.migration/runs/pw1-outcome-fix-20260918/artifact`.
+- Publication mới: `<worktree-2>/.migration/runs/pw1-outcome-fix-20260918/artifact`.
 - Exporter1.5.1, mapping hash `049053c41684d888d1d213b029c026666e060afbae09c815f17dd6523870db9c`, khớp master mapping hiện tại.
-- Prepare đã thành công tại `/home/liam/migration-data/pw1/local-20260917/prepared-outcome-151-local/import-manifest.json`, có encrypted credential sidecar và binding system user local đã xác minh. Giữ nguyên artifact cũ.
+- Prepare đã thành công tại `$PW1_ROOT/local-20260917/prepared-outcome-151-local/import-manifest.json`, có encrypted credential sidecar và binding system user local đã xác minh. Giữ nguyên artifact cũ.
 
 ## Điều chỉnh importer
 
@@ -21,7 +21,7 @@
 - Independent review EAV và policy warning không có finding mở.
 - Store205 thực: dry-run PREFLIGHT_PASSED, creates4/reuses0/writes0. Evidence `/tmp/pw1-outcome-151-store205.{stdout,stderr}.log`.
 - Full dry-run trước hai policy warning: nhóm1/28 có3539occurrences/54Stores, so với5789occurrences/55Stores của lần dùng artifact cũ. Đây là tổng hiệu quả đổi artifact và sửa EAV, không quy toàn bộ chênh lệch cho một nguyên nhân.
-- Final full dry-run: GROUP_BLOCKED nhóm1/28, 3121 occurrences/54 Stores, exit3 sau186.6s. Logs `/home/liam/migration-data/pw1/logs/20260918T064213191Z-31c39c4e-c874-48f4-84f7-5f77dc0ecd71`. Không apply vào DB trong lượt này.
+- Final full dry-run: GROUP_BLOCKED nhóm1/28, 3121 occurrences/54 Stores, exit3 sau186.6s. Logs `$PW1_ROOT/logs/20260918T064213191Z-31c39c4e-c874-48f4-84f7-5f77dc0ecd71`. Không apply vào DB trong lượt này.
 
 ## Các nhóm cần đối soát tiếp ở exporter/nguồn
 

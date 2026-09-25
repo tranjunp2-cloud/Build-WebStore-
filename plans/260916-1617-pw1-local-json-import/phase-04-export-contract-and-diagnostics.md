@@ -60,14 +60,14 @@ Các bảng raw dùng chung như model_settings chỉ Page-out-of-scope khi có 
 
 | Absolute path | Action | Nội dung |
 |---|---|---|
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/artifact.ts` | Modify | Registry schemas, streamed diagnostics, actor file hashing |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/types.ts` | Modify | Versioned manifest, summary/readiness types |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/diagnostics.ts` | Create | Pure evidence-backed classifier, bounded counters/samples |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/runner.ts` | Modify | Selected/global readiness; không pass trước target gates |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/credentials.ts` | Modify | Prepare full publication/version binding, giữ sourceCSV provenance |
-| `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/src/lib/migration/pw1-export/{artifact-schemas,source-config,user-actors,master-version}.ts` | Read/port selected schema | Upstream evidence, không chỉnh exporter ở phase này |
-| `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/migration/pw1-json-artifact-credentials.test.ts` | Modify sau QA mapping | Contract compatibility, hash/coverage, diagnostic budgets |
-| `/home/liam/data/ech-prime-web-v2/docs/qa/F42-pw1-local-json-import.md` | Update traceability | Testcases cần duyệt AUTO trước sinh test mới |
+| `./src/lib/migration/pw1-json/artifact.ts` | Modify | Registry schemas, streamed diagnostics, actor file hashing |
+| `./src/lib/migration/pw1-json/types.ts` | Modify | Versioned manifest, summary/readiness types |
+| `./src/lib/migration/pw1-json/diagnostics.ts` | Create | Pure evidence-backed classifier, bounded counters/samples |
+| `./src/lib/migration/pw1-json/runner.ts` | Modify | Selected/global readiness; không pass trước target gates |
+| `./src/lib/migration/pw1-json/credentials.ts` | Modify | Prepare full publication/version binding, giữ sourceCSV provenance |
+| `<worktree-2>/src/lib/migration/pw1-export/{artifact-schemas,source-config,user-actors,master-version}.ts` | Read/port selected schema | Upstream evidence, không chỉnh exporter ở phase này |
+| `./src/__tests__/unit/migration/pw1-json-artifact-credentials.test.ts` | Modify sau QA mapping | Contract compatibility, hash/coverage, diagnostic budgets |
+| `./docs/qa/F42-pw1-local-json-import.md` | Update traceability | Testcases cần duyệt AUTO trước sinh test mới |
 
 ## Kiểm chứng / G4
 

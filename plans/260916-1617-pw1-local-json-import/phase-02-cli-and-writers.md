@@ -44,24 +44,24 @@ Các tên file mới là đề xuất; dùng module sẵn có tương đương n
 
 | Absolute path | Action | Nội dung |
 |---|---|---|
-| `/home/liam/data/ech-prime-web-v2/package.json` | Modify | `migrate:pw1:import` và `migrate:pw1:prepare`, runner TS tương thích repo |
-| `/home/liam/data/ech-prime-web-v2/scripts/prepare-pw1-import.ts` | Create | Đóng gói credential encrypted sidecar và manifest từ nguồn private; không operator hand-encryption |
-| `/home/liam/data/ech-prime-web-v2/scripts/migrate-pw1-import.ts` | Create | Thin CLI, cleanup kết nối/SIGINT, masked errors |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/contract.ts` | Create | Artifact/selector/disposition validation |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/preflight.ts` | Create | Baseline, conflicts, source namespace adapter |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/runner.ts` | Create | Sequential scheduling, state/retry/resume |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/writers/` | Create | Explicit collection writers, no generic raw spread |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/verify.ts` | Create | Projection/relationship/coverage validation |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-pw2/` | Selective port | Shared transaction/lease/context/credential/security; retain legacy semantics |
-| `/home/liam/data/ech-prime-web-v2/scripts/pw1-migration-schema.js` | Port/adapt | Legacy-compatible ledger schema/profile bindings |
-| `/home/liam/data/ech-prime-web-v2/scripts/db-setup.js` | Modify | Wire idempotent DDL/assertions, no DROP TABLE |
-| `/home/liam/data/ech-prime-web-v2/src/payload.config.ts` | Inspect/minimal modify | Importer disables auto schema push before initialization |
-| `/home/liam/data/ech-prime-web-v2/src/collections/Products.ts` | Modify guards only as needed | Preserve slug/history, suppress external effects, retain integrity |
-| `/home/liam/data/ech-prime-web-v2/src/collections/Orders.ts` | Modify guards only as needed | Suppress ORDER_NEW and historical replay |
-| `/home/liam/data/ech-prime-web-v2/src/collections/orders-hooks/` | Modify targeted guards | auto-link/customer snapshot/payment normalization |
-| `/home/liam/data/ech-prime-web-v2/src/collections/{Tenants,Users,Sites,Customers,Categories,Discounts,Media}.ts` | Inspect/targeted modify | Port necessary migration handling only; no unrelated schema redesign |
-| `/home/liam/data/ech-prime-web-v2/.env.staging.example` | Modify if new env introduced | Placeholder docs; no Vercel execution implied |
-| `/home/liam/data/ech-prime-web-v2/.env.production.example` | Modify if new env introduced | Same env declarations, no secrets |
+| `./package.json` | Modify | `migrate:pw1:import` và `migrate:pw1:prepare`, runner TS tương thích repo |
+| `./scripts/prepare-pw1-import.ts` | Create | Đóng gói credential encrypted sidecar và manifest từ nguồn private; không operator hand-encryption |
+| `./scripts/migrate-pw1-import.ts` | Create | Thin CLI, cleanup kết nối/SIGINT, masked errors |
+| `./src/lib/migration/pw1-json/contract.ts` | Create | Artifact/selector/disposition validation |
+| `./src/lib/migration/pw1-json/preflight.ts` | Create | Baseline, conflicts, source namespace adapter |
+| `./src/lib/migration/pw1-json/runner.ts` | Create | Sequential scheduling, state/retry/resume |
+| `./src/lib/migration/pw1-json/writers/` | Create | Explicit collection writers, no generic raw spread |
+| `./src/lib/migration/pw1-json/verify.ts` | Create | Projection/relationship/coverage validation |
+| `./src/lib/migration/pw1-pw2/` | Selective port | Shared transaction/lease/context/credential/security; retain legacy semantics |
+| `./scripts/pw1-migration-schema.js` | Port/adapt | Legacy-compatible ledger schema/profile bindings |
+| `./scripts/db-setup.js` | Modify | Wire idempotent DDL/assertions, no DROP TABLE |
+| `./src/payload.config.ts` | Inspect/minimal modify | Importer disables auto schema push before initialization |
+| `./src/collections/Products.ts` | Modify guards only as needed | Preserve slug/history, suppress external effects, retain integrity |
+| `./src/collections/Orders.ts` | Modify guards only as needed | Suppress ORDER_NEW and historical replay |
+| `./src/collections/orders-hooks/` | Modify targeted guards | auto-link/customer snapshot/payment normalization |
+| `./src/collections/{Tenants,Users,Sites,Customers,Categories,Discounts,Media}.ts` | Inspect/targeted modify | Port necessary migration handling only; no unrelated schema redesign |
+| `./.env.staging.example` | Modify if new env introduced | Placeholder docs; no Vercel execution implied |
+| `./.env.production.example` | Modify if new env introduced | Same env declarations, no secrets |
 
 If adding collection fields, matching SQL in db-setup required; arrays need varchar id/_uuid plus _order/_parent_id. Do not silently add public migration bypass fields. Existing changes in db-setup/docker are not owned by this task.
 

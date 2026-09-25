@@ -119,4 +119,4 @@ Execution order: `Phase 1 red/green contract → Phase 2 implementation → Phas
 
 ## Handoff
 
-Implementation command: `/ck:cook --auto /home/liam/data/worktrees/ech-prime-web-v2-worktree-1/plans/260810-1030-gh-1757-local-business-ui-fixes/plan.md`
+Implementation command: `/ck:cook --auto <worktree-1>/plans/260810-1030-gh-1757-local-business-ui-fixes/plan.md`

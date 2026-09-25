@@ -1,6 +1,6 @@
 # PW1 runtime code handoff — 2026-09-17
 
-Destination: `/home/liam/data/ech-prime-web-v2` (importer worktree). Source: `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2`.
+Destination: `.` (importer worktree). Source: `<worktree-2>`.
 
 ## Moved
 

@@ -96,7 +96,7 @@ Generator hiện có phụ thuộc JSON trung gian và Store cố định. Có t
 
 ### 3.2. Runner tại worktree tham khảo
 
-Đường dẫn thực tế: `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1`.
+Đường dẫn thực tế: `<worktree-1>`.
 
 Các phần đã đọc cho thấy runner Sprint 1 có preflight, kiểm tra target baseline, lease/fencing, bảng đối chiếu ID, checksum, các lệnh resume/verify/rollback và batch. Đây là nền tảng để đánh giá tái sử dụng, chưa chứng minh đủ cho 20 collection.
 

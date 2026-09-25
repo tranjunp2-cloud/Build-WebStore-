@@ -50,8 +50,8 @@ Phát hiện ảnh hưởng trực tiếp quyết định: DB local không trố
 
 ### 2.1 Những gì đã kiểm tra
 
-- Current checkout `/home/liam/data/ech-prime-web-v2`, HEAD `8ddb2b4e9`, có thay đổi chưa commit từ trước.
-- Worktree thực tế `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1`, HEAD `dff794979`, nhiều module migration và thay đổi collection chưa commit.
+- Current checkout `.`, HEAD `8ddb2b4e9`, có thay đổi chưa commit từ trước.
+- Worktree thực tế `<worktree-1>`, HEAD `dff794979`, nhiều module migration và thay đổi collection chưa commit.
 - [Master mapping](../../docs/migration/pw1-pw2-master-field-mapping.md), [JSON mẫu](../../docs/migration/stores-205-285-pw2-current-schema-collection-only.json), Sprint 1 và F42 architecture/QA.
 - Runner, transaction, claims, lease, batch, verifier, rollback và các test liên quan ở worktree.
 - Collection/hook hiện tại và mã thư viện Payload/PostgreSQL adapter đang cài, version Payload `3.79.0`.
@@ -129,19 +129,19 @@ Các đường dẫn worktree trong phần này trỏ tới working tree đang c
 
 | Thành phần | Bằng chứng | Quyết định đề xuất |
 |---|---|---|
-| Transaction chung business + ledger | [transaction.ts:39](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/transaction.ts:39) | Giữ pattern, pin Payload 3.79.0 và test lỗi/rollback |
-| Active source claims | [schema:261](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/scripts/pw1-migration-schema.js:261) | Giữ uniqueness; bổ sung lookup/reuse có verify |
-| Active Store exclusivity | [schema:241](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/scripts/pw1-migration-schema.js:241) | Giữ phối hợp với lease/fencing |
-| Lease/fence | [lease.ts:14](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/lease.ts:14), [runner:128](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/runner.ts:128) | Giữ nếu tiếp tục checkpoint từng entity |
-| Run-local resume | [runner:209](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/runner.ts:209) | Sửa binding sang master hash và mapping version; không tạo claim thứ hai |
-| Existing User protection | [runner:1061](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/runner.ts:1061) | Giữ nguyên tắc không sửa credential/membership tùy tiện; đối chiếu policy master |
-| Branded migration context | [migration-context.ts](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/migration-context.ts) | Tái sử dụng capability nội bộ, mở rộng cho hook thực sự cần |
-| CSV/preflight/credential | [preflight:533](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/preflight.ts:533), [runner:1197](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/runner.ts:1197) | Thay bằng JSON reader; không đọc/decrypt credential PW1 |
-| Canonical defaults Sprint 1 v3 | [canonical.ts](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/contracts/canonical.ts) | Không áp dụng lên master đã map |
-| Media S3 pipeline | [media.ts](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/media.ts) | Thay bằng external metadata writer; không tạo storage objects mới |
-| Verify | [reconcile.ts:4](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/reconcile.ts:4) | Mở rộng projection/invariants/counts đủ phạm vi; cũ chỉ bốn collection |
-| Rollback | [rollback.ts:72](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/rollback.ts:72) | Giữ nguyên tắc chỉ CREATE-owned, chống external edit; mở rộng dependency graph |
-| Selector | [config.ts:302](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/config.ts:302) | Bổ sung one/list/range/all, sort/dedupe ổn định |
+| Transaction chung business + ledger | [transaction.ts:39](<worktree-1>/src/lib/migration/pw1-pw2/transaction.ts:39) | Giữ pattern, pin Payload 3.79.0 và test lỗi/rollback |
+| Active source claims | [schema:261](<worktree-1>/scripts/pw1-migration-schema.js:261) | Giữ uniqueness; bổ sung lookup/reuse có verify |
+| Active Store exclusivity | [schema:241](<worktree-1>/scripts/pw1-migration-schema.js:241) | Giữ phối hợp với lease/fencing |
+| Lease/fence | [lease.ts:14](<worktree-1>/src/lib/migration/pw1-pw2/lease.ts:14), [runner:128](<worktree-1>/src/lib/migration/pw1-pw2/runner.ts:128) | Giữ nếu tiếp tục checkpoint từng entity |
+| Run-local resume | [runner:209](<worktree-1>/src/lib/migration/pw1-pw2/runner.ts:209) | Sửa binding sang master hash và mapping version; không tạo claim thứ hai |
+| Existing User protection | [runner:1061](<worktree-1>/src/lib/migration/pw1-pw2/runner.ts:1061) | Giữ nguyên tắc không sửa credential/membership tùy tiện; đối chiếu policy master |
+| Branded migration context | [migration-context.ts](<worktree-1>/src/lib/migration/pw1-pw2/migration-context.ts) | Tái sử dụng capability nội bộ, mở rộng cho hook thực sự cần |
+| CSV/preflight/credential | [preflight:533](<worktree-1>/src/lib/migration/pw1-pw2/preflight.ts:533), [runner:1197](<worktree-1>/src/lib/migration/pw1-pw2/runner.ts:1197) | Thay bằng JSON reader; không đọc/decrypt credential PW1 |
+| Canonical defaults Sprint 1 v3 | [canonical.ts](<worktree-1>/src/lib/migration/pw1-pw2/contracts/canonical.ts) | Không áp dụng lên master đã map |
+| Media S3 pipeline | [media.ts](<worktree-1>/src/lib/migration/pw1-pw2/media.ts) | Thay bằng external metadata writer; không tạo storage objects mới |
+| Verify | [reconcile.ts:4](<worktree-1>/src/lib/migration/pw1-pw2/reconcile.ts:4) | Mở rộng projection/invariants/counts đủ phạm vi; cũ chỉ bốn collection |
+| Rollback | [rollback.ts:72](<worktree-1>/src/lib/migration/pw1-pw2/rollback.ts:72) | Giữ nguyên tắc chỉ CREATE-owned, chống external edit; mở rộng dependency graph |
+| Selector | [config.ts:302](<worktree-1>/src/lib/migration/pw1-pw2/config.ts:302) | Bổ sung one/list/range/all, sort/dedupe ổn định |
 
 Transaction cũ theo **entity**, không phải toàn Store. Resume có ích vì Store có thể dở. Đổi sang whole-store transaction là thiết kế mới, chưa có đo thời gian/khóa/connection để bảo đảm phù hợp Store lớn.
 
@@ -223,7 +223,7 @@ Không chọn adapter-only cho tất cả collection chỉ để kịp một ng�
 - Create của adapter chỉ tự đặt createdAt khi thiếu; supplied timestamp có đường đi tới DB. Chưa có test round-trip mới xác nhận cho mọi collection.
 - [Payload update](../../node_modules/payload/dist/collections/operations/utilities/update.js:245) gán updatedAt bằng hiện tại. Update lượt hai để gắn createdBy/relations có thể phá timestamp nguồn.
 - Ngoại lệ thích hợp: update relationship qua Local API rồi restore timestamp bằng SQL giới hạn cùng transaction; hoặc adapter writer đã kiểm chứng cho bước đó. Không restore ở transaction khác sau khi ledger đã commit.
-- [Worktree transaction helper](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/transaction.ts:39) đăng ký Drizzle transaction vào Payload sessions để business rows và ledger commit cùng nhau.
+- [Worktree transaction helper](<worktree-1>/src/lib/migration/pw1-pw2/transaction.ts:39) đăng ký Drizzle transaction vào Payload sessions để business rows và ledger commit cùng nhau.
 - Installed [commitTransaction](../../node_modules/@payloadcms/drizzle/dist/transactions/commitTransaction.js:12) catch resolve failure rồi reject mà không rethrow; helper hiện dùng Drizzle callback để tránh dựa vào đường commit đó.
 - [getTransaction](../../node_modules/@payloadcms/drizzle/dist/utilities/getTransaction.js:6) fallback sang DB thường nếu session không còn. Phải truyền req và await mọi DB write; không để thao tác chạy sau khi callback kết thúc. [Payload Transactions](https://payloadcms.com/docs/database/transactions) mô tả cùng yêu cầu truyền req.
 

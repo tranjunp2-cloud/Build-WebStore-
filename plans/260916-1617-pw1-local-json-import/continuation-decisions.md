@@ -2,7 +2,7 @@
 
 ## Bằng chứng, scope và ngân sách
 
-Nguồn sự thật: [readiness](reports/260917-exporter-readiness.md), working tree exporter `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2`, branch importer hiện tại. Không lấy HEAD worktree-2 làm inventory vì phần lớn code exporter chưa commit. Không triển khai app/DB trong lượt plan này.
+Nguồn sự thật: [readiness](reports/260917-exporter-readiness.md), working tree exporter `<worktree-2>`, branch importer hiện tại. Không lấy HEAD worktree-2 làm inventory vì phần lớn code exporter chưa commit. Không triển khai app/DB trong lượt plan này.
 
 Giữ nguyên phạm vi local và tối đa một ngày theo yêu cầu. Core đã có nên không xây queue/service/UI mới. Phần tiếp nối cần khoảng2h contract/report +3h schema/actor +3h rehearsal có điều kiện; đây không phải tổng thời gian từ đầu dự án. Nếu quỹ thực còn ít hơn, làm theo thứ tự này và báo mốc dừng, không bớt assertion. Missing secrets/actor identity/business decisions không có thời lượng đảm bảo.
 

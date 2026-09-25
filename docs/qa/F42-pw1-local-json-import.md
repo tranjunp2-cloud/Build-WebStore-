@@ -174,9 +174,9 @@ Implementation note: server scans lightweight authorized filter/sort metadata in
 ### Full local import verified — 2026-09-24
 
 - Input: exporter 1.10.3, `pw1-prod-1103-20260924/artifact`; all 2,913 emitted Stores (5 policy-excluded Stores remain excluded).
-- Runtime: `/home/liam/migration-data/pw1/runtime-20260924-full-v3`; branch source continued independently, so this result applies to the frozen snapshot.
+- Runtime: `$PW1_ROOT/runtime-20260924-full-v3`; branch source continued independently, so this result applies to the frozen snapshot.
 - Run: `2026-09-24T06-31-32-300Z-c14163c7-e807-4f1d-8211-a9ef24a6963a`; batch `json:5776917b-945f-4072-b0c2-76ca79d986d7`.
-- Command: `npm run migrate:pw1:import -- --config /home/liam/migration-data/pw1/local.json --all`.
+- Command: `npm run migrate:pw1:import -- --config "$PW1_ROOT/local.json" --all`.
 - Exit 0; one VERIFIED batch; 2,913 VERIFIED Store ledger rows; no failed/remaining Stores. End-to-end duration approximately 113 minutes including prepare and destination.
 - DB: 2,913 tenants, 2,913 sites, 2,958 users including retained system user, 32,642 products, 869 orders. Summary records 28 imported users requiring password reset.
 - Destination journal complete; all 10 prepared master parts contain destination for all 2,913 Stores; no missing/invalid tenantId, siteId or productCategories containers. Original exporter artifact remains separate and unchanged by destination output.

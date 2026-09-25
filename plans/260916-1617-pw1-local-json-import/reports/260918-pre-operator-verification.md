@@ -12,7 +12,7 @@
 
 ## Actual artifact scope
 
-Prepared artifact: /home/liam/migration-data/pw1/local-20260917/prepared-v3-local/import-manifest.json. No artifact bytes or hashes modified.
+Prepared artifact: $PW1_ROOT/local-20260917/prepared-v3-local/import-manifest.json. No artifact bytes or hashes modified.
 
 CLI dry-run --stores205,636 verifies the full artifact. Store205 reports STORE_PREFLIGHT_PASSED, creates4/reuses0. Store636 stops the overall command with exit3 TARGET_PROJECTION_CONFLICT; no batch or business write. Tenant1282 still stores object dashboard preferences, while current target projection normalizes non-array preferences to a block list. App runtime handles the existing object safely without changing DB. Do not silently edit ledger or overwrite existing target to bypass this guard.
 
@@ -30,7 +30,7 @@ From repository root, using local .env.local (do not source clone.env), start wi
 
 ```bash
 npm run migrate:pw1:import -- \
-  --manifest /home/liam/migration-data/pw1/local-20260917/prepared-v3-local/import-manifest.json \
+  --manifest $PW1_ROOT/local-20260917/prepared-v3-local/import-manifest.json \
   --store 205 --local-database primeweb --dry-run
 ```
 

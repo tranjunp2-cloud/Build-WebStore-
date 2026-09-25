@@ -64,17 +64,17 @@ Forward-reference updates chỉ hoàn thiện relation thuộc CREATE của đú
 
 | Absolute path | Action | Nội dung |
 |---|---|---|
-| `/home/liam/data/ech-prime-web-v2/src/collections/Products.ts` | Modify selected hunks | Tenant slug, preservation limits, req-safe normal hook |
-| `/home/liam/data/ech-prime-web-v2/src/collections/Blogs.ts` | Modify selected hunks | Tenant slug; giữ req fixes |
-| `/home/liam/data/ech-prime-web-v2/src/collections/BlogCategories.ts` | Modify | Tenant slug contract |
-| `/home/liam/data/ech-prime-web-v2/src/collections/Orders.ts` | Modify selected field | Optional historical catalog link; name/qty/price vẫn required |
-| `/home/liam/data/ech-prime-web-v2/scripts/db-setup.js` | Modify selected SQL | Constraints/field DDL đúng collection changes; preserve unrelated dirty hunks |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/creator-bindings.ts` | Create | Strict binding parser, target provenance verifier, external xref |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/{artifact,types,credentials}.ts` | Modify | Binding/actor checksum vào manifest; private prepare |
-| `/home/liam/data/ech-prime-web-v2/scripts/prepare-pw1-import.ts` | Modify | `--creator-bindings` explicit argument |
-| `/home/liam/data/ech-prime-web-v2/src/lib/migration/pw1-json/{projection,writer,runner,ledger,runtime}.ts` | Modify targeted | Actor createdBy exception, schema gate, tx recheck, ownership evidence |
-| `/home/liam/data/ech-prime-web-v2/scripts/pw1-json-migration-schema.js` | Modify | Profilev2 metadata check tương thíchv1/legacy; activeSKIP semantics giữ shared ledger |
-| `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/src/lib/migration/pw1-export/user-actors.ts` | Read/selected schema reuse | Actor contract only, no whole exporter dependency |
+| `./src/collections/Products.ts` | Modify selected hunks | Tenant slug, preservation limits, req-safe normal hook |
+| `./src/collections/Blogs.ts` | Modify selected hunks | Tenant slug; giữ req fixes |
+| `./src/collections/BlogCategories.ts` | Modify | Tenant slug contract |
+| `./src/collections/Orders.ts` | Modify selected field | Optional historical catalog link; name/qty/price vẫn required |
+| `./scripts/db-setup.js` | Modify selected SQL | Constraints/field DDL đúng collection changes; preserve unrelated dirty hunks |
+| `./src/lib/migration/pw1-json/creator-bindings.ts` | Create | Strict binding parser, target provenance verifier, external xref |
+| `./src/lib/migration/pw1-json/{artifact,types,credentials}.ts` | Modify | Binding/actor checksum vào manifest; private prepare |
+| `./scripts/prepare-pw1-import.ts` | Modify | `--creator-bindings` explicit argument |
+| `./src/lib/migration/pw1-json/{projection,writer,runner,ledger,runtime}.ts` | Modify targeted | Actor createdBy exception, schema gate, tx recheck, ownership evidence |
+| `./scripts/pw1-json-migration-schema.js` | Modify | Profilev2 metadata check tương thíchv1/legacy; activeSKIP semantics giữ shared ledger |
+| `<worktree-2>/src/lib/migration/pw1-export/user-actors.ts` | Read/selected schema reuse | Actor contract only, no whole exporter dependency |
 
 ## Kiểm chứng / G5
 

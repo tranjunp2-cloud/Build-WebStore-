@@ -24,15 +24,15 @@ Biến các điều kiện chưa rõ thành manifest/preflight có thể kiểm 
 
 ## Related files / action map
 
-Root `/home/liam/data/ech-prime-web-v2`; worktree `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1`.
+Root `.`; worktree `<worktree-1>`.
 
 | Path | Action lúc implementation | Mục đích |
 |---|---|---|
-| `/home/liam/data/ech-prime-web-v2/docs/migration/pw1-pw2-master-field-mapping.md` | Read; sửa chỉ khi rule đã được chốt | Thống nhất slug/timestamp/disposition, không remap business ngầm |
-| `/home/liam/data/ech-prime-web-v2/docs/migration/stores-205-285-pw2-current-schema-collection-only.json` | Read-only | Fixture snapshot; không sửa để che lỗi writer |
-| `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/` | Read/inventory | Chọn primitives và dependencies, tránh copy runner/default cũ |
-| `/home/liam/migration-data/pw1/<snapshot-id>/` | Create khi được triển khai, ngoài Git | Artifact0700/file0600; cần quyền filesystem riêng |
-| `/home/liam/data/ech-prime-web-v2/docs/qa/F42-pw1-pw2-layer1.md` | Read | TC traceability; không tự tuyên bố AUTO/pass |
+| `./docs/migration/pw1-pw2-master-field-mapping.md` | Read; sửa chỉ khi rule đã được chốt | Thống nhất slug/timestamp/disposition, không remap business ngầm |
+| `./docs/migration/stores-205-285-pw2-current-schema-collection-only.json` | Read-only | Fixture snapshot; không sửa để che lỗi writer |
+| `<worktree-1>/src/lib/migration/pw1-pw2/` | Read/inventory | Chọn primitives và dependencies, tránh copy runner/default cũ |
+| `$PW1_ROOT/<snapshot-id>/` | Create khi được triển khai, ngoài Git | Artifact0700/file0600; cần quyền filesystem riêng |
+| `./docs/qa/F42-pw1-pw2-layer1.md` | Read | TC traceability; không tự tuyên bố AUTO/pass |
 
 ## Quyết định đường nghiệm thu trước khi vào Phase 02
 

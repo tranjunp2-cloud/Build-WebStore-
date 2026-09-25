@@ -4,7 +4,7 @@
 
 DB local cần có schema hiện tại và system user `sso-service@primeweb.app`. Lệnh không tự reset DB hay cài schema. Giữ artifact exporter đầy đủ ở ngoài source; credentials CSV phải cùng snapshot. Khai báo DATABASE_URI và các key cần thiết trong `.env.local`; không đặt key/password vào config.
 
-Tạo `/home/liam/migration-data/pw1/local.json` một lần (mẫu: `configs/migration/pw1-import-local.example.json`):
+Đặt `PW1_ROOT` tới thư mục riêng bên ngoài source/Git, rồi tạo `$PW1_ROOT/local.json` một lần (mẫu: `configs/migration/pw1-import-local.example.json`):
 
 ```json
 {
@@ -20,12 +20,13 @@ Tạo `/home/liam/migration-data/pw1/local.json` một lần (mẫu: `configs/mi
 Đường dẫn bên trong config tính từ thư mục chứa config. `sourceRef` là actor PW1 đã xác minh cho snapshot, không phải ID user PW2. Có thể dùng `creatorBindings` trỏ binding hiện có thay cho `systemCreator`, giữ nguyên các file bằng chứng binding phụ thuộc.
 
 ```bash
+export PW1_ROOT="${PW1_ROOT:-$HOME/migration-data/pw1}"
 # Thử users, không ghi DB
-npm run migrate:pw1:users -- --config /home/liam/migration-data/pw1/local.json --all --dry-run
+npm run migrate:pw1:users -- --config "$PW1_ROOT/local.json" --all --dry-run
 # Import users/tenant/site
-npm run migrate:pw1:users -- --config /home/liam/migration-data/pw1/local.json --all
+npm run migrate:pw1:users -- --config "$PW1_ROOT/local.json" --all
 # Import toàn bộ phạm vi importer hỗ trợ (không cần chạy users trước)
-npm run migrate:pw1:import -- --config /home/liam/migration-data/pw1/local.json --all
+npm run migrate:pw1:import -- --config "$PW1_ROOT/local.json" --all
 ```
 
 Dry-run vẫn tạo thư mục run/prepared; muốn ghi DB sau dry-run thì chạy lệnh `--config` mới.
@@ -36,10 +37,10 @@ Lệnh tự binding → prepare → import → thêm `destination` trực tiếp
 
 ```bash
 # Tiếp tục đúng full run khi bị ngắt (thay RUN_ID bằng đường dẫn terminal in ra)
-npm run migrate:pw1:import -- --run /home/liam/migration-data/pw1/runs/RUN_ID --continue
+npm run migrate:pw1:import -- --run "$PW1_ROOT/runs/RUN_ID" --continue
 # Chỉ xuất lại destination từ ledger, không chạy import
-npm run migrate:pw1:import -- --run /home/liam/migration-data/pw1/runs/RUN_ID --export-only
-npm run migrate:pw1:users -- --run /home/liam/migration-data/pw1/runs/RUN_ID --export-only
+npm run migrate:pw1:import -- --run "$PW1_ROOT/runs/RUN_ID" --export-only
+npm run migrate:pw1:users -- --run "$PW1_ROOT/runs/RUN_ID" --export-only
 ```
 
 `prepared/destination-manifest.json` ghi hash gốc/hash kết quả, batch và trạng thái hoàn tất. Import/export manifests cũ giữ nguyên để đối soát ledger/credentials; dùng destination-manifest để kiểm tra master sau khi thêm destination. Từ lúc bắt đầu ghi destination, prepared là kết quả bàn giao, không còn dùng trực tiếp làm input importer. `--export-only` phục hồi bước ghi file bị ngắt, không ghi business DB; nếu chưa đủ store VERIFIED thì báo lỗi và giữ master nguyên vẹn. Muốn import mới, dùng artifact exporter gốc. Khi code/artifact/DB thay đổi, resume có thể bị chặn; không reset/bind lại run cũ để ép chạy. Prepare dở dang cần tạo run mới. Lệnh hỗ trợ local Linux (cần `flock`); remote/Vercel chưa hỗ trợ.
@@ -55,8 +56,8 @@ Copy mỗi lệnh trên **một dòng**, không chèn khoảng trắng vào tên
 ## 1. Khai báo đường dẫn
 
 ```bash
-cd /home/liam/data/ech-prime-web-v2
-export PW1_ROOT=/home/liam/migration-data/pw1
+cd "$(git rev-parse --show-toplevel)"
+export PW1_ROOT="${PW1_ROOT:-$HOME/migration-data/pw1}"
 export PW1_RUN=$(date +%Y%m%d-%H%M%S)
 export PW1_IMPORT_MANIFEST="$PW1_ROOT/prepared-$PW1_RUN/import-manifest.json"
 ```
@@ -68,7 +69,7 @@ Chỉ đặt `PW1_RUN` một lần cho cả lượt bind → prepare → import.
 ## 2. Chuẩn bị file đầu vào
 
 ```text
-/home/liam/migration-data/pw1/
+<PW1_ROOT>/
 ├── artifact/                  # Nguyên bộ output exporter, gồm master-manifest.json
 ├── users.csv                  # CSV users đúng snapshot, có credential nguồn
 ├── system-binding-<PW1_RUN>/  # bind-system tạo
@@ -152,7 +153,7 @@ npm run migrate:pw1:import -- --manifest "$PW1_IMPORT_MANIFEST" --all --group-si
 
 Chỉ chạy lệnh ghi sau khi dry-run đạt. Mỗi nhóm được kiểm tra trước khi ghi/verify từng store. `--group-size` nhận 1..100, mặc định 100. Các selector giống bảng trên.
 
-Terminal in đường dẫn log; mặc định `/home/liam/migration-data/pw1/logs/<timestamp-session>/` gồm `events-*.jsonl`, `errors.jsonl`, `summary.json`. Có thể đổi bằng `--log-dir /absolute/private/logs`. Ledger là căn cứ xác nhận commit.
+Terminal in đường dẫn log; mặc định `$PW1_ROOT/logs/<timestamp-session>/` gồm `events-*.jsonl`, `errors.jsonl`, `summary.json`. Có thể đổi bằng `--log-dir <private-log-directory>`. Ledger là căn cứ xác nhận commit.
 
 Resume full importer với runId từ `BATCH_READY` hoặc `summary.json`:
 
@@ -214,13 +215,13 @@ Full `logs/<session>/summary.json` có `passwordResetRequiredCount` và `passwor
 
 ### Chạy khi source đang được chỉnh sửa song song
 
-Bản code cố định cho lượt test hiện tại: `/home/liam/migration-data/pw1/runtime-20260924-full-v3`. Snapshot chứa source/scripts/config và môi trường local; dependency `node_modules` dùng chung, nên không chạy npm install/update trong lúc import hoặc trước resume. Source chính thay đổi không làm đổi code của snapshot. Không copy code mới chồng vào snapshot đang có batch.
+Bản code cố định cho lượt test hiện tại nằm tại `$PW1_ROOT/runtime-20260924-full-v3`. Snapshot chứa source/scripts/config và môi trường local; dependency `node_modules` dùng chung, nên không chạy npm install/update trong lúc import hoặc trước resume. Source chính thay đổi không làm đổi code của snapshot. Không copy code mới chồng vào snapshot đang có batch.
 
 ```bash
-cd /home/liam/migration-data/pw1/runtime-20260924-full-v3
-npm run migrate:pw1:import -- --config /home/liam/migration-data/pw1/local.json --all
+cd "$PW1_ROOT/runtime-20260924-full-v3"
+npm run migrate:pw1:import -- --config "$PW1_ROOT/local.json" --all
 # Resume từ chính thư mục runtime này, thay RUN_ID bằng run đã tạo
-npm run migrate:pw1:import -- --run /home/liam/migration-data/pw1/runs/RUN_ID --continue
+npm run migrate:pw1:import -- --run "$PW1_ROOT/runs/RUN_ID" --continue
 ```
 
 Giữ nguyên snapshot, dependencies, env/keys và DB khi resume. Không thay writerHash trong ledger. Nếu dọn DB local rồi khôi phục system user bằng SQL, cần đồng bộ sequence của cả `users` và `users_roles` với ID đã giữ lại; chỉ đồng bộ users sẽ gây trùng `users_roles_pkey`.

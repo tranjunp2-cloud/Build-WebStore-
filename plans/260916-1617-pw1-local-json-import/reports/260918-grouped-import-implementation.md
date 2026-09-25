@@ -27,7 +27,7 @@
 ## Real master — dry-run only
 
 - Artifact2799stores,28groups of at most100.
-- Logs: `/home/liam/migration-data/pw1/logs/20260918T045521157Z-4117b05f-ec0e-4cb4-b739-b077b95978f0`.
+- Logs: `$PW1_ROOT/logs/20260918T045521157Z-4117b05f-ec0e-4cb4-b739-b077b95978f0`.
 - Reached GROUP_PREFLIGHT_STARTED group1/28; stopped GROUP_BLOCKED, exit3,5986occurrences in first group (57store IDs in summary), approximately191s including whole-artifact validation.
 - No DIAGNOSTIC_BUCKET_LIMIT or SOURCE_SCOPE_MEMORY_LIMIT.
 - No actual-source apply in this work. Main DB still1migration_import_batch, store636/tenant1282 still307products.

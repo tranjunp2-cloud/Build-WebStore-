@@ -81,22 +81,22 @@ authorized site + eligible records
 
 ## Related Code Files
 
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/seo/local-seo-score.ts` — atomic pure aggregate and exact sub-breakdowns.
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/seo/local-seo-evaluation.ts` — server-only signal collection/orchestration and root issue derivation.
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/seo/local-seo-score-contract.ts` — runtime score/detail schemas.
-- **Create/Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/seo/public-discovery-facts.ts` and public discovery routes — shared typed AI facts.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/app/api/sites/[siteId]/local-seo-score/route.ts` — thin authenticated/rate-limited/tenant-scoped endpoint.
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/dashboard/revamp/seo-health-client.tsx` — fetch, retry, semantic routing, AI modal state.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/dashboard/revamp/seo-health.tsx` — sole runtime wrapper around the Phase 1 card.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/app/(dashboard)/dashboard/page.tsx` — pass `siteId`; remove legacy server SEO fetch.
-- **Retire after consumer check:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/dashboard/seo-data.ts` — remove duplicated legacy score path or reduce to shared metadata helpers.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/app/(editor)/editor/[siteId]/page.tsx` — parse `settingsTab`, `section`, `focus`, and existing `pageId`/`publish`.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/editor/SettingsPanel.tsx` — activate tab, expand section, scroll, and focus the target.
-- **Modify only as required:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/editor/local-business/**` — stable focus targets.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/unit/seo/local-seo-score.test.ts`.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/api/local-seo-score.test.ts`.
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/unit/dashboard/seo-health-client.test.tsx`.
-- **Modify/Create as required:** focused Editor requested-tab/deep-link tests under `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/unit/editor/`.
+- **Modify:** `<worktree-1>/src/lib/seo/local-seo-score.ts` — atomic pure aggregate and exact sub-breakdowns.
+- **Create:** `<worktree-1>/src/lib/seo/local-seo-evaluation.ts` — server-only signal collection/orchestration and root issue derivation.
+- **Create:** `<worktree-1>/src/lib/seo/local-seo-score-contract.ts` — runtime score/detail schemas.
+- **Create/Modify:** `<worktree-1>/src/lib/seo/public-discovery-facts.ts` and public discovery routes — shared typed AI facts.
+- **Modify:** `<worktree-1>/src/app/api/sites/[siteId]/local-seo-score/route.ts` — thin authenticated/rate-limited/tenant-scoped endpoint.
+- **Create:** `<worktree-1>/src/components/dashboard/revamp/seo-health-client.tsx` — fetch, retry, semantic routing, AI modal state.
+- **Modify:** `<worktree-1>/src/components/dashboard/revamp/seo-health.tsx` — sole runtime wrapper around the Phase 1 card.
+- **Modify:** `<worktree-1>/src/app/(dashboard)/dashboard/page.tsx` — pass `siteId`; remove legacy server SEO fetch.
+- **Retire after consumer check:** `<worktree-1>/src/lib/dashboard/seo-data.ts` — remove duplicated legacy score path or reduce to shared metadata helpers.
+- **Modify:** `<worktree-1>/src/app/(editor)/editor/[siteId]/page.tsx` — parse `settingsTab`, `section`, `focus`, and existing `pageId`/`publish`.
+- **Modify:** `<worktree-1>/src/components/editor/SettingsPanel.tsx` — activate tab, expand section, scroll, and focus the target.
+- **Modify only as required:** `<worktree-1>/src/components/editor/local-business/**` — stable focus targets.
+- **Modify:** `<worktree-1>/src/__tests__/unit/seo/local-seo-score.test.ts`.
+- **Modify:** `<worktree-1>/src/__tests__/api/local-seo-score.test.ts`.
+- **Create:** `<worktree-1>/src/__tests__/unit/dashboard/seo-health-client.test.tsx`.
+- **Modify/Create as required:** focused Editor requested-tab/deep-link tests under `<worktree-1>/src/__tests__/unit/editor/`.
 
 ## Implementation Steps
 

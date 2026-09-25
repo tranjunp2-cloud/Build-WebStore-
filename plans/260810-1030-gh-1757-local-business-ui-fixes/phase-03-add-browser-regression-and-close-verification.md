@@ -61,11 +61,11 @@ Use a small test-only `rgb(...) → hex` adapter, then import the production `ch
 
 ## Related Code Files
 
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/tests/gh-1757-local-business-settings.spec.ts` — real-browser regression.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/playwright.config.ts` — add a clearly commented manual/local-only `gh-1757-local-business` project/testMatch with setup dependency and auth state.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/editor/local-business/geo-link-input.tsx` — harden coordinate input and contrast states after browser findings.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/editor/local-business/opening-hours-edit-modal.tsx` and `opening-hours-time-range-row.tsx` — make modal states and native time controls theme-readable.
-- **Prohibited:** every path under `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/.github/workflows/`.
+- **Create:** `<worktree-1>/tests/gh-1757-local-business-settings.spec.ts` — real-browser regression.
+- **Modify:** `<worktree-1>/playwright.config.ts` — add a clearly commented manual/local-only `gh-1757-local-business` project/testMatch with setup dependency and auth state.
+- **Modify:** `<worktree-1>/src/components/editor/local-business/geo-link-input.tsx` — harden coordinate input and contrast states after browser findings.
+- **Modify:** `<worktree-1>/src/components/editor/local-business/opening-hours-edit-modal.tsx` and `opening-hours-time-range-row.tsx` — make modal states and native time controls theme-readable.
+- **Prohibited:** every path under `<worktree-1>/.github/workflows/`.
 - **Create/Delete:** none else.
 
 ## Implementation Steps

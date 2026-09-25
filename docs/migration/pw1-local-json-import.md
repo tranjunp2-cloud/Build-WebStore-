@@ -18,13 +18,13 @@ Lần chạy trước dừng trước batch/business writes ở TARGET_DIAGNOSTI
 
 ## Import vào DB local hiện hữu
 
-Operator đã cho phép import trực tiếp `primeweb` tại `localhost:5433` từ `.env.local`. Backup trước migration schema: `/tmp/pw1-local-before-636-20260917.dump` **bên trong container `primeweb-db`**. Ba schema helper và target schema verifier đã chạy thành công. Creator binding riêng cho DB này giữ tại `/home/liam/migration-data/pw1/local-20260917/creator-bindings-local-51.json`; không dùng binding của clone.
+Operator đã cho phép import trực tiếp `primeweb` tại `localhost:5433` từ `.env.local`. Backup trước migration schema: `/tmp/pw1-local-before-636-20260917.dump` **bên trong container `primeweb-db`**. Ba schema helper và target schema verifier đã chạy thành công. Creator binding riêng cho DB này giữ tại `$PW1_ROOT/local-20260917/creator-bindings-local-51.json`; không dùng binding của clone.
 
-Artifact chuẩn bị thành công: `/home/liam/migration-data/pw1/local-20260917/prepared-v3-local/import-manifest.json`. Chạy từ shell dùng `.env.local` của ứng dụng, không nạp `clone.env`:
+Artifact chuẩn bị thành công: `$PW1_ROOT/local-20260917/prepared-v3-local/import-manifest.json`. Chạy từ shell dùng `.env.local` của ứng dụng, không nạp `clone.env`:
 
 ```bash
 npm run migrate:pw1:import -- \
-  --manifest /home/liam/migration-data/pw1/local-20260917/prepared-v3-local/import-manifest.json \
+  --manifest "$PW1_ROOT/local-20260917/prepared-v3-local/import-manifest.json" \
   --store 636 --local-database primeweb
 ```
 
@@ -36,7 +36,7 @@ Importer phân biệt field đã mapping với field chỉ lưu trong source arc
 
 Operator xác định PW2 system user là `sso-service@primeweb.app`. Đã lookup chính xác trên clone và tạo binding PW1User51→PW2User7; không hardcode creator trong master/code và không map các actor khác tự động. Binding/evidence giữ private ngoài Git, khóa theo actor artifact, snapshot, DB identity và target User identity.
 
-Prepare mới **exit0 PREPARED**: `/home/liam/migration-data/pw1/local-20260917/prepared-v3-system/import-manifest.json`. Actual CLI `--store 205` **exit0 VERIFIED** trên clone `pw1_import_1886_real_20260917`, batch `json:2d61fef5-3689-4d03-80da-265823fd1540`. Preflightcreates4/reuses0, STORE_VERIFIEDentities4: Tenant, User, Site, PlanSubscription. Creator và subscription target checks đã qua.
+Prepare mới **exit0 PREPARED**: `$PW1_ROOT/local-20260917/prepared-v3-system/import-manifest.json`. Actual CLI `--store 205` **exit0 VERIFIED** trên clone `pw1_import_1886_real_20260917`, batch `json:2d61fef5-3689-4d03-80da-265823fd1540`. Preflightcreates4/reuses0, STORE_VERIFIEDentities4: Tenant, User, Site, PlanSubscription. Creator và subscription target checks đã qua.
 
 SQL đối chiếu độc lập: tenants1212→1213, users1279→1280, sites1203→1204, plan_subscriptions1266→1267, importbatches0→1. PW1User432 được tạo thành PW2User1354, `created_by_id=7`. Fingerprint toàn bộ system User row không đổi; role/membership/permissions child-table fingerprints không đổi. Không có cập nhật DB gốc hoặc live deployment.
 
@@ -45,7 +45,7 @@ SQL đối chiếu độc lập: tenants1212→1213, users1279→1280, sites1203
 Lệnh đã chạy, sau khi nạp private clone.env:
 
 ```bash
-npm run migrate:pw1:import -- --manifest /home/liam/migration-data/pw1/local-20260917/prepared-v3-system/import-manifest.json --store 205
+npm run migrate:pw1:import -- --manifest "$PW1_ROOT/local-20260917/prepared-v3-system/import-manifest.json" --store 205
 ```
 
 ## Sửa phạm vi theo master — lịch sử trước creator binding 2026-09-17
@@ -64,7 +64,7 @@ Exact exporter1.2 contract27fbef7ec0fc73e58029295c8fbbe7d276c4d6095e358fe57e3058
 
 Loader xác định selected inventory trước spool. Master→report→receipts không phụ thuộc thứ tự artifacts; report diagnostics/rows đọc hai lượt cùng hash để không phụ thuộc JSON key order. Classifier được duyệt nâng estimated metadata budget lên256MiB theo đo đạc thực tế; accounting bao gồm cả diagnostic ownership checks đã được review; actual structural revalidation đã qua; semantic preflight vẫn blocked. Diagnostic collector giữ budget128MiB riêng; source-count cap1triệu không đổi. Duplicate leaf source identities vẫn bị từ chối sau compression. Đây không phải cam kết256MiB RSS cho toàn pipeline.
 
-Publication classification-001 đã qua whole-master coverage/hash, typed classification và cả hai receipts trên fresh real clone; không còn memory/classification structural failure. Lệnh prepare ban đầu từng exit2 `CLASSIFICATION_MEMORY_LIMIT`; kết quả loader/CLI sau đó mới xác minh được bản copy tại `/home/liam/migration-data/pw1/local-20260917/prepared-v3-preflight/import-manifest.json`. Không đổi exit lịch sử thành prepare exit0.
+Publication classification-001 đã qua whole-master coverage/hash, typed classification và cả hai receipts trên fresh real clone; không còn memory/classification structural failure. Lệnh prepare ban đầu từng exit2 `CLASSIFICATION_MEMORY_LIMIT`; kết quả loader/CLI sau đó mới xác minh được bản copy tại `$PW1_ROOT/local-20260917/prepared-v3-preflight/import-manifest.json`. Không đổi exit lịch sử thành prepare exit0.
 
 **Dry-run trước bản sửa scope: exit3 `ARTIFACT_BLOCKED`, blockerCount3**, đều thuộc một orphan `model_has_roles` sourceId`record:5753`, parent`users:5753`: `SOURCE_OWNERSHIP_UNRESOLVED`, `SOURCE_FIELDS_UNRESOLVED`, `REPORT_ROW_UNRESOLVED`. CSV5893Users đã kiểm tra không có parent5753. **5753 là ID, không phải số lỗi/Store**. Không còn Page blocker, artificial classification failure hay memory-limit error. Hai target checks vẫn pending: subscription no-cancellation warning và creator binding; chưa chạy đến target verification vì source gate dừng trước.
 
@@ -72,11 +72,11 @@ Fresh real clone `migration_import_batches` count0 sau dry-run; không actual-so
 
 Đo classifier riêng trên922580rows: estimated metadata245398940byte (~234MiB), peakRSS526864KiB (~515MiB). Đây không phải số đo toàn loader/prepare/import. Bounded256MiB metadata không đồng nghĩa tiến trình chỉ dùng256MiB RAM.
 
-Fresh real-source clone hiện tại là `pw1_import_1886_real_20260917`; đã restore baseline và chạy3schemahelpers hai lần PASS. Clone này tách khỏi synthetic v3 fixture. File `/home/liam/migration-data/pw1/local-20260917/clone.env` chỉ chứa DATABASE_URI, mode0600, parent0700. Nạp nó trước lệnh npm để override target từ `.env.local` mà không in URI:
+Fresh real-source clone hiện tại là `pw1_import_1886_real_20260917`; đã restore baseline và chạy3schemahelpers hai lần PASS. Clone này tách khỏi synthetic v3 fixture. File `$PW1_ROOT/local-20260917/clone.env` chỉ chứa DATABASE_URI, mode0600, parent0700. Nạp nó trước lệnh npm để override target từ `.env.local` mà không in URI:
 
 ```bash
 set -a
-. /home/liam/migration-data/pw1/local-20260917/clone.env
+. "$PW1_ROOT/local-20260917/clone.env"
 set +a
 ```
 

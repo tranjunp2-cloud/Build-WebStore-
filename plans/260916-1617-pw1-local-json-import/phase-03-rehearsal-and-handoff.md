@@ -21,11 +21,11 @@
 
 ## Related files
 
-- `/home/liam/data/ech-prime-web-v2/docs/TEST_CONVENTION.md`: read.
-- `/home/liam/data/ech-prime-web-v2/docs/qa/F42-pw1-pw2-layer1.md`: read; cập nhật evidence đúng case nếu được chạy, không tự biến reserved TC thành approved automation.
-- `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/migration/`: run existing regression; chỉnh pure helper tests chỉ khi đã mapping AUTO hợp lệ.
-- `/home/liam/data/ech-prime-web-v2/docs/migration/pw1-local-json-import-runbook.md`: create lúc implementation, public-safe hướng dẫn, không source secrets.
-- `/home/liam/migration-data/pw1/<snapshot-id>/runs/<run-id>/`: create evidence restricted ngoài Git.
+- `./docs/TEST_CONVENTION.md`: read.
+- `./docs/qa/F42-pw1-pw2-layer1.md`: read; cập nhật evidence đúng case nếu được chạy, không tự biến reserved TC thành approved automation.
+- `./src/__tests__/unit/migration/`: run existing regression; chỉnh pure helper tests chỉ khi đã mapping AUTO hợp lệ.
+- `./docs/migration/pw1-local-json-import-runbook.md`: create lúc implementation, public-safe hướng dẫn, không source secrets.
+- `$PW1_ROOT/<snapshot-id>/runs/<run-id>/`: create evidence restricted ngoài Git.
 
 ## Gate G3 và định nghĩa hoàn thành
 

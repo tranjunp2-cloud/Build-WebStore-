@@ -22,7 +22,7 @@ Executed current `inspectExportArtifact` against real artifact: **EXPORT_MANIFES
 
 - Existing rehearsal clone `pw1_import_1886_20260916095934` reachable localhost5433; JSON batch and shared legacy ledger tables present. It contains previous synthetic experiments: use a fresh disposable clone of the existing DB for real-source acceptance.
 - Loaded local environment has DATABASE_URI, PAYLOAD_SECRET, SSO_ENCRYPTION_KEY. PW1_APP_KEY and PW2_MIGRATION_SECRET absent. Presence alone does not verify correct key values. Keep target SSO key unchanged.
-- Selected Users CSV exists under `/home/liam/Documents/DB_PROD`; streamed hash matches users inventory in this artifact. Current file permissions are not private enough for prepare. Copy exact bytes to a private directory/file0700/0600 rather than modifying source CSV. Do not put keys/passwords in chat or command arguments.
+- Selected Users CSV exists under `<source-export-directory>/DB_PROD`; streamed hash matches users inventory in this artifact. Current file permissions are not private enough for prepare. Copy exact bytes to a private directory/file0700/0600 rather than modifying source CSV. Do not put keys/passwords in chat or command arguments.
 - Snapshot differs from earlier sample: real followup Store205 and285 each contains Tenant1/User1/Site1/PlanSubscription1, no Product/Order/Media. Both have creator-binding blocker. They can become foundation smoke candidates, not business coverage proof.
 
 ## Required sequence

@@ -6,10 +6,10 @@
 
 ## Chuẩn bị không thay nguồn
 
-- [x] Xác minh durable archive `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/.migration/exports/pw1-prod-20260917-followup-001.tar.gz` bằng hash readiness. `/dev/shm/pw1-followup-review/...` chỉ workspace tạm, không durable handoff.
+- [x] Xác minh durable archive `<worktree-2>/.migration/exports/pw1-prod-20260917-followup-001.tar.gz` bằng hash readiness. `/dev/shm/pw1-followup-review/...` chỉ workspace tạm, không durable handoff.
 - [x] Extract publication đầy đủ vào thư mục private mới ngoài Git; không dùng tar path traversal/symlink entries. Đối chiếu checksum tất cả7artifact files. Không sửa archive hoặc master để làm hết blocker.
 - [x] Tính dung lượng từ bytes thật: khoảng2.60GB artifact + tối thiểu2×master+64MiB spool (~2.19GB), thêm prepared copy, DB clone và margin. Prepare hiện giữ gate conservative hơn; không bypass nếu disk thiếu. Master gần3GB phải tính lại toàn publication, không lấy compressed archive168MB làm size.
-- [ ] Copy exact same-snapshot full Users CSV từ `/home/liam/Documents/DB_PROD` vào private0700/file0600; đối chiếu SHA/headers/rowCount với inventory. Không chmod hoặc sửa file nguồn.
+- [ ] Copy exact same-snapshot full Users CSV từ `<source-export-directory>/DB_PROD` vào private0700/file0600; đối chiếu SHA/headers/rowCount với inventory. Không chmod hoặc sửa file nguồn.
 - [ ] Nạp PW1_APP_KEY và PW2_MIGRATION_SECRET qua env private; cả hai absent ở readiness trước. Verify key bằng MAC/decrypt/hash synthetic rồi actual scoped readiness, không chỉ kiểm tra presence. Giữ SSO_ENCRYPTION_KEY target hiện hữu; không đưa secret vào CLI/log/chat.
 - [ ] Chọn freshclone G5; xác nhận cron/app/webhook/provider không nối vào clone và outbound thật không chạy. Freeze writer/schema/policy/actor bindings trước apply. Code/schema/binding thay đổi sau partial commit → dừng, lưu evidence, restore disposable clone từ baseline rồi new batch. Chỉ resume khi toàn bộ bindings vẫn khớp.
 
@@ -65,13 +65,13 @@ Output phải tách ba mức:
 
 | Absolute path | Action lúc implementation | Nội dung |
 |---|---|---|
-| `/home/liam/data/ech-prime-web-v2/src/__tests__/integration/pw1-json-clone-rehearsal.ts` | Reuse/extend theo approved QA | Clone-only failure/replay harness, source refs import thật |
-| `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/migration/pw1-json-*.test.ts` | Reuse/targeted extend |63core tests + newcontract/classifier/binding regressions |
-| `/home/liam/data/ech-prime-web-v2/docs/TEST_CONVENTION.md` | Read | AAA/source imports/test generation rules |
-| `/home/liam/data/ech-prime-web-v2/docs/qa/F42-pw1-local-json-import.md` | Update evidence | Per-case actual status, không mass-check pass |
-| `/home/liam/data/ech-prime-web-v2/docs/migration/pw1-local-json-import.md` | Update | Supported contracts, prepare binding flag, error/recovery procedure |
-| `/home/liam/data/ech-prime-web-v2/plans/260916-1617-pw1-local-json-import/reports/` | Create sanitized final report | G4/G5/G6 results, open blockers, measured limits |
-| `/home/liam/migration-data/pw1/<snapshot-id>/runs/<run-id>/` | Private evidence only | Immutable input/binding references, detailed audit protected |
+| `./src/__tests__/integration/pw1-json-clone-rehearsal.ts` | Reuse/extend theo approved QA | Clone-only failure/replay harness, source refs import thật |
+| `./src/__tests__/unit/migration/pw1-json-*.test.ts` | Reuse/targeted extend |63core tests + newcontract/classifier/binding regressions |
+| `./docs/TEST_CONVENTION.md` | Read | AAA/source imports/test generation rules |
+| `./docs/qa/F42-pw1-local-json-import.md` | Update evidence | Per-case actual status, không mass-check pass |
+| `./docs/migration/pw1-local-json-import.md` | Update | Supported contracts, prepare binding flag, error/recovery procedure |
+| `./plans/260916-1617-pw1-local-json-import/reports/` | Create sanitized final report | G4/G5/G6 results, open blockers, measured limits |
+| `$PW1_ROOT/<snapshot-id>/runs/<run-id>/` | Private evidence only | Immutable input/binding references, detailed audit protected |
 
 ## Timebox và điều kiện kết thúc
 

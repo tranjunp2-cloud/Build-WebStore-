@@ -27,16 +27,16 @@ local-business-constants.ts (versioned map + pure helpers)
 
 ## Related files and actions
 
-- `/home/liam/data/ech-prime-web-v2/src/lib/seo/local-business-constants.ts` — add snapshot version, typed category→subtype map, union options, `getCompatibleSchemaSubtypes`, `isCompatibleSchemaSubtype`, and pure preserve/auto-select/clear reconciliation.
-- `/home/liam/data/ech-prime-web-v2/src/collections/Sites.ts:378` — insert `schemaSubtype` select after `businessCategory`; reuse the shared option union. Extend the collection validation/hook to validate effective state using `originalDoc + data` for Admin, REST, GraphQL, Local API, hooks, and seeds without weakening the opening-hours hook at `:390`.
-- `/home/liam/data/ech-prime-web-v2/scripts/db-setup.js:259` — add `{ name: 'sites.local_business_schema_subtype', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_schema_subtype varchar;' }`; do not touch the compliant array table at `:452`.
-- `/home/liam/data/ech-prime-web-v2/src/lib/validations/sites.ts:45` — add optional subtype union and `.superRefine()` pair check. The authorized save path must unconditionally load the tenant-owned existing site, deep-merge defined group semantics, validate the complete resulting pair, and persist that validated group.
-- `/home/liam/data/ech-prime-web-v2/src/components/editor/local-business/types.ts:2` — add nullable/optional subtype matching Zod/Payload.
-- `/home/liam/data/ech-prime-web-v2/src/components/editor/SettingsPanel.tsx:491` and `:814` — render subtype directly below category and save category plus reconciled subtype in one `handleLocalBusinessChange` call.
-- `/home/liam/data/ech-prime-web-v2/src/app/(editor)/editor/[siteId]/page.tsx:749` — verify parent merge/rollback propagates the full pair; preserve #1708 mutex semantics.
-- `/home/liam/data/ech-prime-web-v2/src/app/api/sites/[siteId]/save/route.ts:140` — no new route; verify parse/auth/tenant checks precede `payload.update`, and rejected data produces zero writes.
-- `/home/liam/data/ech-prime-web-v2/src/i18n/locales/en.json` and `/home/liam/data/ech-prime-web-v2/src/i18n/locales/ms.json` — subtype label, placeholder, disabled hint, and validation feedback.
-- `/home/liam/data/ech-prime-web-v2/src/components/editor/local-business/completion-checklist.tsx` — keep broad category completion separate; do not silently require or award subtype here.
+- `./src/lib/seo/local-business-constants.ts` — add snapshot version, typed category→subtype map, union options, `getCompatibleSchemaSubtypes`, `isCompatibleSchemaSubtype`, and pure preserve/auto-select/clear reconciliation.
+- `./src/collections/Sites.ts:378` — insert `schemaSubtype` select after `businessCategory`; reuse the shared option union. Extend the collection validation/hook to validate effective state using `originalDoc + data` for Admin, REST, GraphQL, Local API, hooks, and seeds without weakening the opening-hours hook at `:390`.
+- `./scripts/db-setup.js:259` — add `{ name: 'sites.local_business_schema_subtype', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_schema_subtype varchar;' }`; do not touch the compliant array table at `:452`.
+- `./src/lib/validations/sites.ts:45` — add optional subtype union and `.superRefine()` pair check. The authorized save path must unconditionally load the tenant-owned existing site, deep-merge defined group semantics, validate the complete resulting pair, and persist that validated group.
+- `./src/components/editor/local-business/types.ts:2` — add nullable/optional subtype matching Zod/Payload.
+- `./src/components/editor/SettingsPanel.tsx:491` and `:814` — render subtype directly below category and save category plus reconciled subtype in one `handleLocalBusinessChange` call.
+- `./src/app/(editor)/editor/[siteId]/page.tsx:749` — verify parent merge/rollback propagates the full pair; preserve #1708 mutex semantics.
+- `./src/app/api/sites/[siteId]/save/route.ts:140` — no new route; verify parse/auth/tenant checks precede `payload.update`, and rejected data produces zero writes.
+- `./src/i18n/locales/en.json` and `./src/i18n/locales/ms.json` — subtype label, placeholder, disabled hint, and validation feedback.
+- `./src/components/editor/local-business/completion-checklist.tsx` — keep broad category completion separate; do not silently require or award subtype here.
 
 ## Test files and TC ownership
 

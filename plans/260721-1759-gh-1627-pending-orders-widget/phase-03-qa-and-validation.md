@@ -42,14 +42,14 @@
 
 | Action | Absolute path | Change |
 |---|---|---|
-| Modify | `/home/liam/data/ech-prime-web-v2/docs/qa/F03-dashboard.md` | Correct TC-F03.03/.04; add TC-F03.72–76 `[x] AUTO`; update count/date. |
-| Create | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/pending-orders.test.tsx` | Component behavior for TC-F03.03/.04/.72/.74 and AC06 semantics. |
-| Create | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/dashboard-page-orders.test.tsx` | DashboardRoot gates, RBAC suppression, success, and isolated failure. |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/dashboard-blocks.test.ts` | Assert Orders is not Soon and remains default OFF. |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/api-summary.test.ts` | Retag no-tenant 403 from conflicting TC-F03.03 to TC-F03.17. |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/dashboard-components.test.tsx` | Retag legacy Pending Orders assertions from .09/.10 to canonical .03/.04. |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/f03-dashboard-components-extended.test.tsx` | Retag greeting/site-grid cases to new .75/.76 rows. |
-| Modify | `/home/liam/data/ech-prime-web-v2/e2e/dashboard.spec.ts` | Remove obsolete single-column-incompatible “tab navigation” test using TC-F03.03. |
+| Modify | `./docs/qa/F03-dashboard.md` | Correct TC-F03.03/.04; add TC-F03.72–76 `[x] AUTO`; update count/date. |
+| Create | `./src/__tests__/unit/dashboard/pending-orders.test.tsx` | Component behavior for TC-F03.03/.04/.72/.74 and AC06 semantics. |
+| Create | `./src/__tests__/unit/dashboard/dashboard-page-orders.test.tsx` | DashboardRoot gates, RBAC suppression, success, and isolated failure. |
+| Modify | `./src/__tests__/unit/dashboard/dashboard-blocks.test.ts` | Assert Orders is not Soon and remains default OFF. |
+| Modify | `./src/__tests__/unit/dashboard/api-summary.test.ts` | Retag no-tenant 403 from conflicting TC-F03.03 to TC-F03.17. |
+| Modify | `./src/__tests__/unit/dashboard/dashboard-components.test.tsx` | Retag legacy Pending Orders assertions from .09/.10 to canonical .03/.04. |
+| Modify | `./src/__tests__/unit/dashboard/f03-dashboard-components-extended.test.tsx` | Retag greeting/site-grid cases to new .75/.76 rows. |
+| Modify | `./e2e/dashboard.spec.ts` | Remove obsolete single-column-incompatible “tab navigation” test using TC-F03.03. |
 | Validate | Phase 01 test files | Run predicate and loader suites together with UI tests. |
 
 ## Implementation Steps

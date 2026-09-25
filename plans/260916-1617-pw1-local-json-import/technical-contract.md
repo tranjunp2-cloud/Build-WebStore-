@@ -4,7 +4,7 @@ Status: implemented local profile; real-master acceptance còn mở. Contract n�
 
 ## Artifact và secret
 
-Thư mục ngoài repo `/home/liam/migration-data/pw1/<snapshot-id>/`: `master.json`, `master-manifest.json`, `import-manifest.json`, `credentials.enc` nếu có; CLI xuất JSON lines sanitized; operator có thể lưu riêng trong `runs/<run-id>/`, không có report-file authority tự động. Directory0700/file0600, không đưa vào Git, public Media bucket hoặc API response. Master/raw cũng chứa PII và có thể dns_token; không coi là public.
+Thư mục ngoài repo `$PW1_ROOT/<snapshot-id>/`: `master.json`, `master-manifest.json`, `import-manifest.json`, `credentials.enc` nếu có; CLI xuất JSON lines sanitized; operator có thể lưu riêng trong `runs/<run-id>/`, không có report-file authority tự động. Directory0700/file0600, không đưa vào Git, public Media bucket hoặc API response. Master/raw cũng chứa PII và có thể dns_token; không coi là public.
 
 Import manifest hiện dùng version/profile, sourceInstance/sourceDatabase, snapshotId/asOf, mappingHash/masterHash, credentialHash và exporterManifestHash. Exporter manifest/report giữ inventory/dispositions và chứng cứ nguồn. Bind authenticated metadata vào AEAD sidecar; hash không thay authenticity. Đọc/hash/validate cùng immutable snapshot bằng strict streaming hoặc cơ chế phù hợp file lớn, giới hạn per-Store/index/RAM, reject duplicate keys/symlink replacement; không ghép toàn file thành UTF8 string. Xem [handoff exporter](reports/exporter-handoff.md). Không tự tìm file mới nhất.
 

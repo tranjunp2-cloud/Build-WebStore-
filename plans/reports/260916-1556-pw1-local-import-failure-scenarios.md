@@ -195,12 +195,12 @@ Sequence có khoảng trống sau rollback là bình thường vì nextval khôn
 - [Customer normalization và address limit](../../src/collections/Customers.ts:59).
 - [Category tree/ownership validation](../../src/collections/Categories.ts:113).
 - [Payload schema auto-push](../../src/payload.config.ts:77).
-- [Worktree transaction](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/transaction.ts:39).
-- [Worktree lease](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/lease.ts:14).
-- [Worktree active source uniqueness](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/scripts/pw1-migration-schema.js:261).
-- [Worktree rollback ownership/dependencies](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/rollback.ts:510).
-- [Worktree encrypted snapshot](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/snapshot-workspace.ts:235).
-- [Worktree credential recovery](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/migration/pw1-pw2/laravel6-credential.ts:69).
+- [Worktree transaction](<worktree-1>/src/lib/migration/pw1-pw2/transaction.ts:39).
+- [Worktree lease](<worktree-1>/src/lib/migration/pw1-pw2/lease.ts:14).
+- [Worktree active source uniqueness](<worktree-1>/scripts/pw1-migration-schema.js:261).
+- [Worktree rollback ownership/dependencies](<worktree-1>/src/lib/migration/pw1-pw2/rollback.ts:510).
+- [Worktree encrypted snapshot](<worktree-1>/src/lib/migration/pw1-pw2/snapshot-workspace.ts:235).
+- [Worktree credential recovery](<worktree-1>/src/lib/migration/pw1-pw2/laravel6-credential.ts:69).
 - [Master mapping](../../docs/migration/pw1-pw2-master-field-mapping.md).
 
 ## 19. Câu hỏi/policy chưa được chốt

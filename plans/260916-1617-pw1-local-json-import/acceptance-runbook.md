@@ -61,8 +61,8 @@ Chạy baseline guard khi target bị sửa sau dry-run; before-image/audit atom
 ## Cách chạy/resume sau khi CLI có thật
 
 ```bash
-npm run migrate:pw1:import -- --manifest /home/liam/migration-data/pw1/SNAPSHOT/import-manifest.json --store 205 --dry-run
-npm run migrate:pw1:import -- --manifest /home/liam/migration-data/pw1/SNAPSHOT/import-manifest.json --store 205
+npm run migrate:pw1:import -- --manifest $PW1_ROOT/SNAPSHOT/import-manifest.json --store 205 --dry-run
+npm run migrate:pw1:import -- --manifest $PW1_ROOT/SNAPSHOT/import-manifest.json --store 205
 npm run migrate:pw1:import -- --resume RUN_ID
 ```
 

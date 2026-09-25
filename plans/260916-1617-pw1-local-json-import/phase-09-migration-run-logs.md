@@ -10,7 +10,7 @@ Không thêm UI, API, dịch vụ logging hoặc bảng DB mới trong phạm vi
 
 ## 2. Vị trí và cấu trúc
 
-Mặc định `<homedir>/migration-data/pw1/logs/`; trên máy hiện tại là `/home/liam/migration-data/pw1/logs/`. Thêm tùy chọn `--log-dir /absolute/private/path`, dùng được cả import/dry-run/resume. Log directory không nằm trong artifact immutable hoặc spool bị cleanup và không tham gia batch binding.
+Mặc định `<homedir>/migration-data/pw1/logs/`; trên máy hiện tại là `$PW1_ROOT/logs/`. Thêm tùy chọn `--log-dir /absolute/private/path`, dùng được cả import/dry-run/resume. Log directory không nằm trong artifact immutable hoặc spool bị cleanup và không tham gia batch binding.
 
 ```text
 logs/20260918T043000Z-<session-uuid>/
