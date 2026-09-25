@@ -86,14 +86,14 @@ Organization, crawler access, and indexability never become seller rows. The act
 
 ## Related Code Files
 
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/dashboard/revamp/seo-health-card.tsx` — pure card and state rendering.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/dashboard/dashboard-types.ts` — additive target view model; preserve legacy `SeoData` until Phase 2.
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/lib/dashboard/seo-health-view-model.ts` — clamped progress and the sole tested `good >= 80` mapper.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/app/(dashboard)/dashboard/dashboard-revamp.css` — four-bar grid, ownership badge, skeleton/error, responsive actions.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/i18n/locales/en.json` — target labels/states.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/i18n/locales/ms.json` — Malay parity.
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/unit/dashboard/seo-health-card.test.tsx` — direct component contract tests.
-- **Modify before code:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/docs/stories/F37-local-seo-stories.md` and `docs/qa/F37-local-seo.md` — canonical story and Phase 1 TC mapping.
+- **Create:** `<worktree-1>/src/components/dashboard/revamp/seo-health-card.tsx` — pure card and state rendering.
+- **Modify:** `<worktree-1>/src/lib/dashboard/dashboard-types.ts` — additive target view model; preserve legacy `SeoData` until Phase 2.
+- **Create:** `<worktree-1>/src/lib/dashboard/seo-health-view-model.ts` — clamped progress and the sole tested `good >= 80` mapper.
+- **Modify:** `<worktree-1>/src/app/(dashboard)/dashboard/dashboard-revamp.css` — four-bar grid, ownership badge, skeleton/error, responsive actions.
+- **Modify:** `<worktree-1>/src/i18n/locales/en.json` — target labels/states.
+- **Modify:** `<worktree-1>/src/i18n/locales/ms.json` — Malay parity.
+- **Create:** `<worktree-1>/src/__tests__/unit/dashboard/seo-health-card.test.tsx` — direct component contract tests.
+- **Modify before code:** `<worktree-1>/docs/stories/F37-local-seo-stories.md` and `docs/qa/F37-local-seo.md` — canonical story and Phase 1 TC mapping.
 
 ## Runtime Exclusion
 

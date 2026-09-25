@@ -19,6 +19,11 @@
 const { spawn } = require('child_process');
 const { bootstrapSeed } = require('./bootstrap-seed');
 const { seedMalaysiaGeo } = require('./seed-malaysia-geo-boot');
+const { runPw1MigrationSchema } = require('./pw1-migration-schema');
+const { runPw1JsonMigrationSchema } = require('./pw1-json-migration-schema');
+const { runContentSlugTenantMigration } = require('./pw1-content-schema');
+// Matching collection DDL (atomic helper): ALTER TABLE products ALTER COLUMN short_description TYPE varchar;
+// ALTER TABLE orders_items ALTER COLUMN product_id DROP NOT NULL;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -1378,10 +1383,6 @@ const MIGRATIONS = [
   {
     name: 'users.has_seen_ai_wizard',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_ai_wizard boolean DEFAULT false;`,
-  },
-  {
-    name: 'users.has_seen_ai_wizard.backfill_legacy',
-    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id FROM users_tenants WHERE _parent_id IS NOT NULL);`,
   },
   // ── Payload locked documents rels: FK columns for new collections ──
   {
@@ -5625,6 +5626,9 @@ async function runMigrations(pool) {
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
   }
+  // Import ledger failures must abort setup: claims and fencing are safety boundaries.
+  await runPw1MigrationSchema(pool);
+  await runPw1JsonMigrationSchema(pool);
 
   console.log(
     `[db-setup] Migration summary: skipped=${skipped}, applied=${ran}, always-run=${alwaysRan}, failed=${failed}, total=${MIGRATIONS.length}`,
@@ -6170,7 +6174,7 @@ const COLLECTION_SLUGS = [
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
   'seo_meta_jobs', 'notifications', 'subscribers',
-  'contact_submissions',
+  'contact_submissions', 'push-subscriptions',
   'ai_usage_logs',
   'template_quality_scores',
   'block_catalog_entries',
@@ -6297,6 +6301,7 @@ async function checkDB() {
       await runMigrations(pool);
       await cleanupApprovedDuplicateIndexes(pool);
       await runCategorySlugTenantMigration(pool);
+      await runContentSlugTenantMigration(pool);
       await ensureRuntimeIssueUniqueIndex(pool);
       await syncPayloadRelsTables(pool);
       await runBootstrapSeed(pool);
@@ -6511,6 +6516,7 @@ async function main() {
         await runMigrations(pool);
         await cleanupApprovedDuplicateIndexes(pool);
         await runCategorySlugTenantMigration(pool);
+        await runContentSlugTenantMigration(pool);
         await ensureRuntimeIssueUniqueIndex(pool);
         await verifyCriticalIndexes(pool);
         await syncPayloadRelsTables(pool);
@@ -6694,6 +6700,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  runContentSlugTenantMigration,
   MIGRATIONS,
   APPROVED_DUPLICATE_INDEX_PAIRS,
   buildDuplicateIndexCleanupPlan,

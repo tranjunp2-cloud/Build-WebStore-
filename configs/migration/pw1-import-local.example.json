@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "exportArtifact": "./artifact",
+  "credentials": "./users.csv",
+  "localDatabase": "primeweb",
+  "systemCreator": {
+    "sourceRef": "@users:users:51",
+    "approvedBy": "YOUR_NAME"
+  },
+  "outputRoot": "./runs"
+}

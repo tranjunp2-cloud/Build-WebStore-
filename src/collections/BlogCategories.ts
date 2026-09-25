@@ -33,6 +33,7 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
 
 export const BlogCategories: CollectionConfig = {
     slug: 'blog_categories',
+    indexes: [{ fields: ['tenant', 'slug'], unique: true }],
     hooks: {
         beforeChange: [beforeChangeHook],
     },
@@ -93,7 +94,6 @@ export const BlogCategories: CollectionConfig = {
             name: 'slug',
             type: 'text',
             required: true,
-            unique: true,
             index: true,
         },
         {

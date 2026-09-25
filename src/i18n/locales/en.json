@@ -1888,6 +1888,7 @@
           "productNamePlaceholder": "Enter product name",
           "category": "Category",
           "images": "Images (up to 5, each under 5MB)",
+          "imagesLegacyHint": "Existing extra images are preserved. You can reorder, edit alt text or remove them. Reduce to fewer than 5 before adding a new image.",
           "imagesAltHint": "Adding Alt text improves SEO and buyer reachability.",
           "variants": "Variants & inventory",
           "hasVariants": "This product has multiple options or variants",

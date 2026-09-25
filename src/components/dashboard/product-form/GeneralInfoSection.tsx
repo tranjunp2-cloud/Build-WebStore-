@@ -87,6 +87,9 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
                     maxSizeMB={5}
                     showAltInput={true}
                 />
+                {(images?.length ?? 0) > 5 && (
+                    <p className="text-xs text-muted-foreground">{t.dashboard.products.form.sections.imagesLegacyHint}</p>
+                )}
                 {errors.images && (
                     <p className="text-xs text-destructive mt-1">{errors.images.message}</p>
                 )}
