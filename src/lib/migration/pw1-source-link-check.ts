@@ -1,5 +1,5 @@
 import { adaptWebsiteInput } from './pw2-website-input'
-import type { MigrationDestination } from './pw1-destination'
+import type { VerifiedCategoryMapping } from './pw1-destination'
 import { lookup } from 'node:dns/promises'
 import { publicBrandAddress } from './pw1-brand-scan'
 import type { SourceLinkFinding } from './pw1-links'
@@ -134,7 +134,7 @@ export async function checkMissingSourceLinks(sourceUrl: string, findings: reado
 }
 
 /** Shared by the batch runner and read-only verification; never edits destination data. */
-export async function prepareSourceLinks(input: unknown, categories: MigrationDestination['productCategories'] = [], signal?: AbortSignal) {
+export async function prepareSourceLinks(input: unknown, categories: VerifiedCategoryMapping[] = [], signal?: AbortSignal) {
     const initial = adaptWebsiteInput(input, categories)
     // Findings originate only from the resolver's verified same-store hosts.
     const origins = [...new Set(initial.report.linkFindings.map(finding => new URL(finding.url).origin))]

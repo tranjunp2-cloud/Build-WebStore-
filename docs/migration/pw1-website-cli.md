@@ -225,12 +225,12 @@ An optional `destination` on each batch entry (or collection bundle) attaches mi
   "destination": {
     "tenantId": 100,
     "siteId": 200,
-    "productCategories": [
-      { "sourceId": "32589", "destinationId": 300, "listingPageId": "12251", "sourcePath": "/products" }
-    ]
+    "productCategories": [300, 301]
   }
 }
 ```
+
+`productCategories` accepts bare destination category IDs (the F42 prepared-master format) or explicit mapping objects `{ "sourceId": "32589", "destinationId": 300, "listingPageId": "12251", "sourcePath": "/products" }`. Bare IDs resolve their source category through the BE import's `migration_entity_map` (`VERIFIED` `categories` → `categories` rows) and apply to every source page containing an enabled product listing; IDs without a verified pair produce a warning and their `?category=` links remain unresolved. Never guess the source side.
 
 The importing operator supplies the source-to-destination identities. Runtime checks require an existing account matching the input email, active owner membership, the declared site belonging to that tenant and still in draft, and every destination category undeleted in that exact tenant/site. Existing migration mappings cannot be redirected. Two stores cannot claim the same destination. Attaching does not create/change accounts, memberships, subscriptions or commerce records; website content is regenerated using the existing atomic replacement and backup mechanism. Do not point this at a published site.
 

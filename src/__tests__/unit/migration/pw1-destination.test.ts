@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DestinationSchema, assertDestinationOwnership, assertCategoryScope } from '@/lib/migration/pw1-destination'
+import { DestinationSchema, assertDestinationOwnership, assertCategoryScope, resolveDeclaredCategories } from '@/lib/migration/pw1-destination'
 import { createSourceLinkResolver } from '@/lib/migration/pw1-links'
 import { adaptWebsiteInput } from '@/lib/migration/pw2-website-input'
 
@@ -29,6 +29,18 @@ describe('[TC-F35.M44] explicit BE mappings', () => {
         expect(resolve('https://old.example/products?category=32589&utm_source=old#list')).toBe('/catalog?utm_source=old&categoryId=70#list')
         expect(resolve('http://old.example/products?category_id=32589')).toBe('/catalog?categoryId=70')
         for (const url of ['https://other.example/products?category=32589','https://old.example/products?category=123','https://old.example/products?category=32589&brand=2','https://old.example/products?category=32589&category=12']) expect(resolve(url)).toBe(url)
+    })
+    it('resolves bare destination IDs through the verified entity map', async () => {
+        const parsed = DestinationSchema.parse({tenantId:4,siteId:9,productCategories:[70,71]})
+        expect(parsed.productCategories).toEqual([70,71])
+        const query = async () => ({rows:[{source_id:'32589',target_id:'70'}]})
+        const pages = [{sourceId:'2',path:'/products'}]
+        const resolved = await resolveDeclaredCategories(query,parsed.productCategories,pages)
+        expect(resolved.unresolved).toEqual([71])
+        expect(resolved.mappings).toEqual([{sourceId:'32589',destinationId:70,listingPageId:'2',sourcePath:'/products'}])
+        const withObjects = await resolveDeclaredCategories(query,[{sourceId:'32589',destinationId:70,listingPageId:'2',sourcePath:'/products'},70,72],pages)
+        expect(withObjects.mappings).toHaveLength(1)
+        expect(withObjects.unresolved).toEqual([72])
     })
     it('enables native filters on the mapped listing and rewrites source card links', () => {
         const input={format:'pw2-website-input',version:'1.0.0',source:{storeId:'1',websiteUrl:'https://old.example'},website:{name:'Store',locale:'en',branding:{logoUrl:'https://old.example/logo.png'},navigation:[],footer:{copyright:'',columns:[]}},pages:[

@@ -28,6 +28,8 @@ export function parseBatchInput(input: unknown): BatchEntry[] {
         if (emails.has(entry.owner.email) && emails.get(entry.owner.email)!==entry.sourceUserId) throw new Error('Different source users cannot share one destination email')
         users.set(entry.sourceUserId,identity); emails.set(entry.owner.email,entry.sourceUserId)
         for (const mapping of entry.destination?.productCategories ?? []) {
+            // Bare destination IDs are resolved through migration_entity_map at runtime.
+            if (typeof mapping === 'number') continue
             const page = entry.website.pages.find(p => p.sourceId === mapping.listingPageId)
             if (!page?.components.some(c => c.enabled !== false && c.type === 'product_listing')) throw new Error(`Category mapping requires a product listing page: ${mapping.listingPageId}`)
         }

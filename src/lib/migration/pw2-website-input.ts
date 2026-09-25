@@ -1,4 +1,4 @@
-import type { MigrationDestination } from './pw1-destination'
+import type { VerifiedCategoryMapping } from './pw1-destination'
 import { SourceOriginsSchema, isSourceHost, normalizeSourcePath, type SourceLinkFinding, LinkCorrectionsSchema, createSourceLinkResolver, rewriteSourceHtmlLinks } from './pw1-links'
 import { SiteSettingsSchema } from './pw1-site-settings'
 import { z } from 'zod'
@@ -14,7 +14,7 @@ export const WebsiteInputSchema = z.object({ linkCorrections: LinkCorrectionsSch
 const Slide = z.object({ imageUrl: Url, alt: z.string().default(''), heading: z.string().default(''), description: z.string().default(''), cta: z.object({ label: z.string(), url: z.string() }).nullable().optional() }).strict()
 const Categories = z.object({ heading: z.string(), items: z.array(z.object({ sourceId: Id, title: z.string(), imageUrl: Url, alt: z.string().optional(), url: Url.optional(), pageId: Id.optional(), ctaLabel: z.string().optional() }).strict()) }).strict()
 /** Adapt the compact public contract only; never read a previous export or live DB. */
-export function adaptWebsiteInput(input: unknown, verifiedCategories: MigrationDestination['productCategories'] = [], brokenSourceUrls: readonly string[] = []) {
+export function adaptWebsiteInput(input: unknown, verifiedCategories: VerifiedCategoryMapping[] = [], brokenSourceUrls: readonly string[] = []) {
     const data = WebsiteInputSchema.parse(input)
     const ids = new Set<string>(), paths = new Set<string>(), componentIds = new Set<string>()
     for (const page of data.pages) {

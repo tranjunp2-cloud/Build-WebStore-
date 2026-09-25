@@ -2,7 +2,7 @@ import { scanPw1Carousels, type CarouselScan } from './pw1-carousel-scan'
 import { publishMigratedStore, publishOrigin } from './pw1-publish'
 import { prepareSourceLinks } from './pw1-source-link-check'
 import { applyCarouselEvidence } from './pw1-carousel-evidence'
-import { verifyMigrationDestination } from './pw1-destination'
+import { verifyMigrationDestination, resolveDeclaredCategories } from './pw1-destination'
 import { analyzePw1Brand } from './pw1-brand-analysis'
 import { selectPw1TenantSlug } from './pw1-tenant-slug'
 import { scanPw1Brand } from './pw1-brand-scan'
@@ -172,11 +172,17 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                     }
                     const readiness = await checkBeReadiness(activePayload, entry, mapping)
                     if (options.requireBeData && readiness.status === 'missing-data') throw new MigrationError('BE_DATA_MISSING', readiness.warnings.join('; '))
-                    const { adapted, sourceLinkChecks } = await prepareSourceLinks(compactInput(entry), entry.destination?.productCategories, controller.signal)
+                    const listingPages = entry.website.pages
+                        .filter(p => p.components.some(c => c.enabled !== false && c.type === 'product_listing'))
+                        .map(p => ({ sourceId: p.sourceId, path: p.path }))
+                    const { mappings: categoryMappings, unresolved: unresolvedCategories } = await resolveDeclaredCategories(
+                        (text, params) => client.query(text, params), entry.destination?.productCategories ?? [], listingPages)
+                    const { adapted, sourceLinkChecks } = await prepareSourceLinks(compactInput(entry), categoryMappings, controller.signal)
                     controls.checkTime(storeStartedAt)
                     const blueprint = createNativeBlueprint(adapted.contract)
                     const inputReport = options.inputReports?.find(r => r.sourceStoreId === entry.sourceStoreId)
                     const warnings = [...new Set([...readiness.warnings, ...(inputReport?.warnings ?? []).filter(w => !w.includes('category CTA retains source URL')), ...adapted.report.warnings, ...adapted.report.pending.map(p => `${p.sourceId}: ${p.reason}`)])]
+                    if (unresolvedCategories.length) warnings.push(`Declared categories have no verified source mapping in migration_entity_map: ${unresolvedCategories.join(',')}`)
                     if (entry.website.pages.some(p => p.components.some(c => c.binding))) warnings.push('Product/blog data is provided by the separate BE import; database bindings were not imported by this batch')
                     await client.query('UPDATE pw1_migration_stores SET warning_count=$2 WHERE source_store_id=$1', [entry.sourceStoreId, warnings.length])
                     let carouselScan: CarouselScan | undefined
