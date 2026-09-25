@@ -4,6 +4,7 @@ import { open, lstat, realpath, link, unlink, rm, mkdir, writeFile } from 'node:
 import { dirname, basename, isAbsolute, resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { assertOutsideRepository, assertDiskSpace, readBoundFile } from './artifact'
+import { isPrivateRepoWorkspace } from './repo-workspace'
 import { MigrationError } from './errors'
 import type { Progress } from './progress'
 
@@ -15,9 +16,13 @@ export async function validateOutputPath(path: string): Promise<string> {
   const output = resolve(path), parent = dirname(output)
   await assertOutsideRepository(output)
   if (await realpath(parent) !== parent) throw new MigrationError('OUTPUT_PARENT_UNSAFE')
-  // Reject other worktrees/repositories too, not just the current checkout.
+  // Reject other worktrees/repositories too, except their private .migration workspace.
   for (let directory = parent;; directory = dirname(directory)) {
-    try { await lstat(resolve(directory, '.git')); throw new MigrationError('PRIVATE_ARTIFACT_INSIDE_REPOSITORY') }
+    try {
+      await lstat(resolve(directory, '.git'))
+      if (await isPrivateRepoWorkspace(await realpath(directory), output)) break
+      throw new MigrationError('PRIVATE_ARTIFACT_INSIDE_REPOSITORY')
+    }
     catch (error) { if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')) throw error }
     if (dirname(directory) === directory) break
   }

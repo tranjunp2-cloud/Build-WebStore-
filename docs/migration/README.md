@@ -19,6 +19,8 @@ DB local cần có schema hiện tại và system user `sso-service@primeweb.app
 
 Đường dẫn bên trong config tính từ thư mục chứa config. `sourceRef` là actor PW1 đã xác minh cho snapshot, không phải ID user PW2. Có thể dùng `creatorBindings` trỏ binding hiện có thay cho `systemCreator`, giữ nguyên các file bằng chứng binding phụ thuộc.
 
+Nếu muốn giữ artifact/run ngay trong checkout, `<checkout>/.migration/` là vị trí duy nhất trong repo được phép: thư mục phải tồn tại với mode `0700`, không được là symlink, và phải có entry trong `.gitignore` của repo đó. Mọi path khác trong repo vẫn bị `PRIVATE_ARTIFACT_INSIDE_REPOSITORY` chặn.
+
 ```bash
 export PW1_ROOT="${PW1_ROOT:-$HOME/migration-data/pw1}"
 # Thử users, không ghi DB

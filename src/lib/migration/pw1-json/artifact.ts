@@ -13,6 +13,7 @@ import { parseJsonChunks, type ArrayItemVisitor } from './stream-json'
 import { MigrationError } from './errors'
 import { checksum } from './projection'
 import { migrationPolicySchema, conflictMigrationPolicySchema, ownerEmailMigrationPolicySchema, productCatalogMigrationPolicySchema, sourceOmissionMigrationPolicySchema, negativeOrderMigrationPolicySchema, approvedCatalogMigrationPolicySchema, createDiagnosticCollector, approvedPolicyHash, APPROVED_POLICY } from './diagnostics'
+import { isPrivateRepoWorkspace } from './repo-workspace'
 import { validateUserActors, loadCreatorBindings } from './creator-bindings'
 import { COLLECTIONS, type ImportArtifact, type ImportDiagnostic, type ImportManifest, type ImportStore, type ImportDocument, type StoreSelector } from './types'
 import { createReconciliationIndex } from './reconciliation'
@@ -452,8 +453,11 @@ export async function assertOutsideRepository(filename: string): Promise<void> {
   for (;;) {
     try {
       await access(resolve(candidate, '.git'))
-      const path = relative(await realpath(candidate), resolve(filename))
-      if (path === '' || (!path.startsWith('..' + '/') && path !== '..' && !isAbsolute(path))) throw new MigrationError('PRIVATE_ARTIFACT_INSIDE_REPOSITORY')
+      const repoRoot = await realpath(candidate)
+      const path = relative(repoRoot, resolve(filename))
+      if (path === '' || (!path.startsWith('..' + '/') && path !== '..' && !isAbsolute(path))) {
+        if (!(await isPrivateRepoWorkspace(repoRoot, filename))) throw new MigrationError('PRIVATE_ARTIFACT_INSIDE_REPOSITORY')
+      }
       return
     } catch (error) {
       if (error instanceof MigrationError) throw error

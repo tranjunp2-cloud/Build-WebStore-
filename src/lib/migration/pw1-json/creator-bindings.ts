@@ -5,6 +5,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { z } from 'zod'
 import { checksum, type Entity } from './projection'
 import { MigrationError } from './errors'
+import { isPrivateRepoWorkspace } from './repo-workspace'
 import { parseJsonChunks } from './stream-json'
 import { bindExternalActor, findClaim, findOperation, type LedgerBatch, type LedgerLease, type SqlClient } from './ledger'
 
@@ -69,13 +70,14 @@ export function validateUserActors(value: unknown, provenance: {sourceInstanceTo
 
 async function privateBytes(path:string,maxBytes:number):Promise<Buffer>{
   if(!isAbsolute(path)||await realpath(path)!==resolve(path))throw new MigrationError('CREATOR_BINDING_PATH_INVALID')
-  const fromRepo=relative(await realpath(process.cwd()),path)
-  if(fromRepo!=='..'&&!fromRepo.startsWith(`..${sep}`)&&!isAbsolute(fromRepo))throw new MigrationError('CREATOR_BINDINGS_OUTSIDE_REPOSITORY_REQUIRED')
-  // Also reject another checkout/worktree, not just the current working directory.
+  const cwd=await realpath(process.cwd()),fromRepo=relative(cwd,path)
+  if(fromRepo!=='..'&&!fromRepo.startsWith(`..${sep}`)&&!isAbsolute(fromRepo)&&!(await isPrivateRepoWorkspace(cwd,path)))throw new MigrationError('CREATOR_BINDINGS_OUTSIDE_REPOSITORY_REQUIRED')
+  // Also reject another checkout/worktree, not just the current working directory — except its private .migration workspace.
   let ancestor=dirname(path)
   for(;;){
     try{
       await access(resolve(ancestor,'.git'))
+      if(await isPrivateRepoWorkspace(await realpath(ancestor),path))break
       throw new MigrationError('CREATOR_BINDINGS_OUTSIDE_REPOSITORY_REQUIRED')
     }catch(error){
       if(error instanceof MigrationError)throw error

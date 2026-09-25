@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util'
-import { mkdir, realpath, lstat, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, readFile, realpath, lstat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { createSnapshotConfig } from '../../src/lib/migration/pw1-export/snapshot-config'
@@ -51,6 +51,25 @@ async function main() {
   await createSnapshotConfig({ inputDir: input, profile: v.profile ?? 'configs/migration/pw1-prod-profile.json',
     snapshotId: v['snapshot-id'] ?? runId, asOf: v['as-of'], output: config })
   const result = await exportMaster(input, config, path.join(output, 'artifact'), false, progressLogger(line => process.stderr.write(line)))
+  const usersFile = (JSON.parse(await readFile(config, 'utf8')) as { tables?: Record<string, string> }).tables?.users
+  if (usersFile) {
+    const usersDest = path.join(output, 'users.csv')
+    await copyFile(path.join(input, usersFile), usersDest)
+    await chmod(usersDest, 0o600)
+  }
+  const importConfigPath = path.join(output, 'import-config.json')
+  const importConfig = {
+    version: 1,
+    exportArtifact: './artifact',
+    ...(usersFile ? { credentials: './users.csv' } : {}),
+    localDatabase: 'primeweb',
+    systemCreator: { sourceRef: '@users:users:51', approvedBy: process.env.USER || 'operator' },
+    outputRoot: './import-runs',
+  }
+  await writeFile(importConfigPath, JSON.stringify(importConfig, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
+  process.stderr.write(`Import config: ${importConfigPath}\n`)
+  process.stderr.write(`Import dry-run: npm run migrate:pw1:import -- --config ${importConfigPath} --all --dry-run\n`)
+  process.stderr.write(`Import:         npm run migrate:pw1:import -- --config ${importConfigPath} --all\n`)
   const handoffPath = path.join(output, 'handoff.json')
   if (result.handoff) {
     await writeFile(handoffPath, JSON.stringify(result.handoff, null, 2) + '\n', { flag: 'wx', mode: 0o600 })

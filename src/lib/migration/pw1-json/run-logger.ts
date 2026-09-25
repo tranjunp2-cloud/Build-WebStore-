@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, resolve, dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { MigrationError } from './errors'
+import { isPrivateRepoWorkspace } from './repo-workspace'
 import type { ImportDiagnostic } from './types'
 
 const textFields = new Set(['status','mode','runId','phase','storeId','collection','sourceEntity','sourceId','targetId','action','code','nextAction','operationId','manifestHash','masterHash'])
@@ -52,7 +53,10 @@ export class RunLogger {
         try {
           const stat = await lstat(current)
           if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('invalid')
-          try { await access(join(current, '.git')); throw new Error('repository') } catch (e) { if (!(e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT')) throw e }
+          try {
+            await access(join(current, '.git'))
+            if (!(await isPrivateRepoWorkspace(await realpath(current), root))) throw new Error('repository')
+          } catch (e) { if (!(e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT')) throw e }
         } catch (e) { if (!(e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT')) throw e }
         const parent = dirname(current); if (parent === current) break; current = parent
       }
