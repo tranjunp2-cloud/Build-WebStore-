@@ -1,5 +1,19 @@
 # PW1 website migration CLI
 
+## Automatic prepared input
+
+```sh
+npm run migrate:pw1
+npm run migrate:pw1 -- --dry-run
+npm run migrate:pw1 -- --store 205
+# Optional explicit input: process only this file
+npm run migrate:pw1 -- /external/prepared/master-0001.json
+```
+
+Without a file, the CLI searches `.migration/runs` (including nested `import-runs`) and selects the completed BE run whose `run.json` was modified most recently. It prints that run and reads its completed `prepared/destination-manifest.json`. All listed master parts are checked against their destination output hashes before any migration starts, then processed sequentially in manifest order. Exporter artifacts and incomplete BE runs are not selected. An invalid newest completed handoff fails rather than silently falling back to an older run.
+
+Each part runs in a fresh process with the existing migration/publish/audit flow; audit reports remain beside each input file. Concurrency, retry and operational budgets apply per part. Failed parts are recorded while later parts continue. After the first pass, only failed parts are retried once, using ledger skip semantics (without `--rerun`) so successful stores are not regenerated. Remaining failures produce a nonzero exit. Each invocation writes `parts.jsonl` and `summary.json` under the selected BE run’s `website-runs/<session>/`, including file, pass and exit code. Integrity errors stop execution immediately; Ctrl+C does not trigger retries. Rerunning the command reuses the database ledger. If a newer BE run has completed since then, automatic selection changes; pass an explicit file to pin an older part. `--store` selects its containing part. A shared `--audit-output` is rejected when multiple parts are selected to prevent reports overwriting each other. Ctrl+C stops the current process and prevents subsequent parts from starting.
+
 ## Current batch command
 
 ```sh
@@ -64,7 +78,7 @@ The same command drains active jobs before shutting down Payload. Automatic orph
 
 `migrate-pw1.ts` → validate the complete array → `runPw1Batch` → adapt website input → `createNativeBlueprint` → `applyPw1Website` → shared `generateSiteService` → native AI design/binder → media import and page persistence.
 
-Only the positional batch CLI remains. The old raw-dump/single-store arguments, artifact-only generation, source-layout generation and file-based resume have been removed. Retry uses the same array and database ledger; each retry of a failed store calls AI again. Extraction/conversion from SQL stays outside this flow.
+The batch CLI accepts an optional positional file; omitting it selects the latest completed BE prepared handoff. The old raw-dump/single-store arguments, artifact-only generation, source-layout generation and file-based resume have been removed. Retry uses the same array and database ledger; each retry of a failed store calls AI again. Extraction/conversion from SQL stays outside this flow.
 
 Native outputs: Hero, Carousel, Products Grid, Blog List, Custom HTML, Video, Navigation and Footer. Image-backed category listings use Carousel `cards` or Portfolio Grid variants. Category items retain source content; verified destination category mappings can replace legacy links (see below).
 
@@ -346,3 +360,9 @@ Script không áp khung panel/viền/bo góc theo design direction lên rich tex
 `--store ID --rerun` cho phép tái tạo site đã publish trong mapping migration hiện có. Không dùng `--rerun` thì vẫn không được thay thế site published. Kiểm tra tenant, owner active và category scope giữ nguyên, được kiểm tra lại trước khi ghi. AI/media chuẩn bị trước; thay đổi site/page ghi trong transaction có kiểm tra concurrent edit. Khi generation/ghi thất bại trước commit, dữ liệu site cũ giữ nguyên. Sau commit site chuyển về draft và flow publish tự chạy; nếu publish thất bại, kết quả ghi nhận lỗi để lần chạy sau tiếp tục publish.
 
 Cấu hình hiển thị cart PW1: `header.config.cart_status` bằng `0`, `"0"` hoặc `false` luôn tắt cart và tracking, kể cả các page hệ thống vẫn active. Giá trị thiếu/null/rỗng không được coi là tắt. Các trường hợp còn lại vẫn yêu cầu page/component commerce hoạt động; `cart_status: 1` không tự bật cart khi tất cả page commerce đã tắt. Quy tắc chỉ áp dụng migration.
+
+### Legacy page URL normalization
+
+Website migration normalizes source paths (spaces, percent escapes, accents and punctuation) into PW2 slugs while retaining page IDs, titles and component content. Internal links use source paths and resolve to the normalized destination with query/fragment preserved. Collisions receive a source-page-ID suffix. Same-store absolute URLs use their pathname; external URLs or homepage anchors stored on non-home pages fall back to that page’s source slug. Input files are not modified. A missing active homepage still fails validation rather than inventing content.
+
+When PW1 has no active homepage but has an undeleted homepage with status `0`, migration preserves its content and keeps the destination website and generated pages as drafts. Publication reports `kept-draft` (not a failure) and does not call the publish API. PW2 currently promotes all page drafts when publishing a website, so manually publishing that website later will also activate the homepage. Deleted or absent homepages are not synthesized. Source master files remain unchanged.

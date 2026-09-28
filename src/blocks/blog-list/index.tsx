@@ -1,5 +1,6 @@
 'use client'
 
+import { blogExcerpt } from '@/lib/blog/excerpt'
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { FileText } from 'lucide-react'
@@ -26,13 +27,6 @@ interface BlogPost {
     slug: string
 }
 
-/** Strip HTML tags and extract first ~160 chars as excerpt */
-function extractExcerpt(content: unknown): string {
-    if (!content || typeof content !== 'string') return ''
-    const text = content.replace(/<[^>]*>/g, '').trim()
-    return text.length > 160 ? text.substring(0, 157) + '...' : text
-}
-
 function formatBlogDate(value: unknown, locale: string): string {
     if (!value) return ''
     const date = new Date(String(value))
@@ -57,7 +51,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         subheadline,
         limit = 3,
         variant = 'cards',
-        readArticleLabel = 'Read Article',
+        readArticleLabel,
         uncategorizedLabel = 'Uncategorized',
         emptyStateLabel,
     } = block
@@ -77,6 +71,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         (typeof siteRec?.generationLocale === 'string' && siteRec.generationLocale)
         || (typeof siteRec?.locale === 'string' && siteRec.locale)
         || 'en'
+    const readMoreLabel = readArticleLabel?.trim() || (siteLocale.toLowerCase().split('-')[0] === 'ms' ? ms : en).storefront.blog.readMore
     const emptyMessage = emptyStateLabel?.trim() || (siteLocale.toLowerCase().split('-')[0] === 'ms' ? ms : en).storefront.blog.noPosts
     const blogPreviewPath = typeof siteRec?.blogPreviewPath === 'string' ? (siteRec.blogPreviewPath as string) : null
     const explicitBase = typeof siteRec?.siteBasePath === 'string' ? (siteRec.siteBasePath as string) : null
@@ -110,7 +105,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                     return {
                         id: String(doc.id),
                         title: doc.title || headline,
-                        excerpt: extractExcerpt(doc.content),
+                        excerpt: blogExcerpt(doc.content),
                         date: formatBlogDate(publishDate, siteLocale),
                         category: catName || uncategorizedLabel,
                         image: thumbUrl,
@@ -245,7 +240,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                             <Body size="small" className="opacity-60 mb-6 flex-1 leading-relaxed">{post.excerpt}</Body>
 
                                             <div className="mt-auto flex items-center text-sm font-semibold tracking-wide" style={{ color: 'var(--brand-primary)' }}>
-                                                {readArticleLabel}
+                                                {readMoreLabel}
                                                 <span className="ml-2 transform group-hover:translate-x-1 transition-transform">→</span>
                                             </div>
                                             <div className="mt-6 h-0.5 w-0 group-hover:w-16 transition-all duration-500 rounded-full"

@@ -31,6 +31,7 @@ export function buildBatchReport(batch: { id: string; status: string; results: R
         limits: batch.limits ?? {}, stores, attempts,
         totals: { stores: stores.length,
             published: results.filter(r => ['published','already-published'].includes((r.publish as {status?:string}|undefined)?.status ?? '')).length,
+            keptDraft: results.filter(r => (r.publish as {status?:string}|undefined)?.status === 'kept-draft').length,
             publishFailed: results.filter(r => ['failed','deferred'].includes((r.publish as {status?:string}|undefined)?.status ?? '')).length, completed: stores.filter(s => String(s.status).startsWith('completed')).length,
             failed: stores.filter(s => s.status === 'failed').length, skipped: stores.filter(s => s.status === 'skipped').length,
             running: stores.filter(s => s.status === 'running').length, deferred: stores.filter(s => s.status === 'deferred').length, attempts: attempts.length,

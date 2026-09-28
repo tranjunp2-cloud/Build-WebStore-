@@ -130,3 +130,23 @@ describe('[TC-F35.M47] broken link presentation', () => {
         expect(adapted.report.linkFindings).toContainEqual({url,location:'page:10/component:91/slide:0',reason:'confirmed-broken',action:'disabled'})
     })
 })
+
+describe('[TC-F35.M52] Source path normalization preserves page data', () => {
+    it('normalizes spaces, encoded paths and collisions while preserving content and links', () => {
+        const input = fixture()
+        const html = '<h2>Exact source copy</h2><a href="/About%20us?q=1#team">Read</a>'
+        const pages = [input.pages[0],
+            { sourceId: '21', title: 'About us', path: '/About us', components: [{ sourceId: '90', type: 'rich_text', content: { html }, config: {} }] },
+            { sourceId: '22', title: 'Other', path: '/about-us', components: [] },
+            { sourceId: '23', title: 'Contact', path: '/Li%C3%AAn%20h%E1%BB%87', components: [] },
+        ]
+        const source = { ...input, pages, website: { ...input.website, navigation: [{ label: 'About', url: '/About us' }, { label: 'Other', pageId: '22' }] } }
+        const before = JSON.stringify(source)
+        const { contract, report } = adaptWebsiteInput(source)
+        expect(contract.pages.map(p => [p.sourceId, p.slug])).toEqual([['10', 'home'], ['21', 'about-us'], ['22', 'about-us-pw1-22'], ['23', 'lien-he']])
+        expect(contract.pages[1].components[0].block.html).toBe('<h2>Exact source copy</h2><a href="/about-us?q=1#team">Read</a>')
+        expect(contract.site.navigation.links).toEqual([{ label: 'About', url: '/about-us' }, { label: 'Other', url: '/about-us-pw1-22' }])
+        expect(report.routeChanges).toContainEqual({ sourceId: '21', sourcePath: '/About us', destinationPath: '/about-us' })
+        expect(JSON.stringify(source)).toBe(before)
+    })
+})

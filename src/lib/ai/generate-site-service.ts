@@ -1351,6 +1351,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 if (page.blocks.some(block => !block.blockType || !blockRegistry.has(block.blockType))) throw new Error('Unknown migration block type')
             }
         }
+        const keepMigrationDraft = migration?.sourceBlueprint.nativeContract.site.publication === 'keep-draft'
         if (migration?.beforeWrite) await migration.beforeWrite()
         if (existingSites.docs.length > 0) {
             const previousSite = existingSites.docs[0] as Record<string, unknown>
@@ -1649,7 +1650,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                                     slug: pageDefinition.slug,
                                     site: site.id,
                                     isHomepage: pageDefinition.isHomepage,
-                                    _status: 'published',
+                                    _status: keepMigrationDraft ? 'draft' : 'published',
                                     layout: normalizedLayout,
                                     seo: pageDefinition.seo,
                                 },
@@ -1705,7 +1706,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                                 slug: pageDefinition.slug,
                                 site: site.id,
                                 isHomepage: pageDefinition.isHomepage,
-                                _status: 'published',
+                                _status: keepMigrationDraft ? 'draft' : 'published',
                                 layout: normalizedLayout,
                                 seo: pageDefinition.seo,
                             },
@@ -1870,7 +1871,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                     site: site.id,
                     tenant: resolvedTenantId,
                     isHomepage: false,
-                    _status: 'published',
+                    _status: keepMigrationDraft ? 'draft' : 'published',
                     layout: [
                         { blockType: 'hero', variant: 'centered', headline: '404', subheadline: 'Page Not Found — The page you are looking for does not exist or has been moved.' },
                     ],

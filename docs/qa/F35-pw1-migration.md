@@ -125,3 +125,24 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — Complete single-store page inventory can confirm an absent path; partial pagination, wrong tenant and unreadable responses cannot.
 - [x] AUTO — Same-source HTTP200 rendered not-found can disable a CTA; HTTP errors/timeouts alone cannot; valid pages and working redirects survive.
 - [x] AUTO — Browser rendering requires a visible not-found heading and Back to Home control, not merely a footer/link mentioning 404.
+
+### TC-F35.M51 — Automatic prepared master parts
+- [x] AUTO — Select the newest completed BE run, including nested import-runs; use destination manifest order and verify all part hashes before execution. Reject incomplete handoffs, duplicate/path-traversal entries and modified/missing files; run all parts sequentially, log failures, retry failed parts once after the first pass, and stop immediately on cancellation. Explicit file input remains supported.
+
+### TC-F35.M52 — Normalize legacy page URLs
+- [x] AUTO — Normalize spaces, accents and escaped legacy paths to PW2 slugs; preserve source page IDs, titles and content, remap internal links with query/fragment, suffix collisions by source page ID without dropping pages.
+
+### TC-F35.M53 — Disabled homepage preservation
+- [x] AUTO — Preserve an undeleted disabled homepage when no active homepage exists; retain content and carry keep-draft policy into generation. Deleted homepages remain excluded; active homepages retain automatic publication.
+
+### TC-F35.M54 — Imported blog detail content
+- [x] AUTO — Render HTML strings, PW1 HTML wrapped in Lexical, and native Lexical content; sanitize unsafe HTML.
+
+### TC-F35.M55 — Blog detail listing links
+- [x] AUTO — Back link and breadcrumb resolve to an existing published blog-list page, prefer a dedicated listing over homepage, and fall back to homepage when no listing exists.
+
+### TC-F35.M56 — Blog excerpts
+- [x] AUTO — Extract plain text excerpts from HTML and Lexical including imported HTML wrappers, preserve paragraph spacing, and truncate consistently.
+
+### TC-F35.M57 — Blog card CTA locale
+- [x] AUTO — Empty or whitespace CTA labels fall back to the store language (English/Malay); custom labels are preserved.

@@ -64,7 +64,12 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             if (!site.domain) throw new Error(`Store ${storeId}: missing website domain`)
             const pageRows = ordered(bundle.pages).filter(p => str(p.store_id) === storeId)
             if (new Set(pageRows.map(p => str(p.id))).size !== pageRows.length) throw new Error('Duplicate source page ID')
+            const disabledHomepage = !pageRows.some(p => str(p.type) === '1' && active(p))
+                ? pageRows.find(p => str(p.type) === '1' && !p.deleted_at && str(p.status) === '0')
+                : undefined
+            if (disabledHomepage) report.warnings.push(`Homepage ${str(disabledHomepage.id)} is disabled in PW1; preserve content as draft and do not auto-publish this website`)
             const validPages = pageRows.filter(p => {
+                if (p === disabledHomepage) return true
                 if (!active(p)) { exclude(p.id, 'page', 'disabled-or-deleted'); return false }
                 return true
             })
@@ -72,7 +77,17 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             const hasCommerceComponent = (p: Row) => rows(p.components).some(c => active(c) && ['cart', 'checkout'].includes(str(object(c.frontend_component).name)))
             const isNativeCommercePage = (p: Row) => ['/cart', '/checkout'].includes(pagePath(p)) && hasCommerceComponent(p)
             const pageById = new Map(pageRows.map(p => [str(p.id), p]))
-            const pagePath = (p: Row) => str(p.type) === '1' ? '/' : (str(p.url).trim() || '/' + str(p.slug).replace(/^\/+/, '')).toLowerCase()
+            const pagePath = (p: Row) => {
+                if (str(p.type) === '1') return '/'
+                const fallback = '/' + (str(p.slug).replace(/^\/+/, '') || `page-pw1-${str(p.id)}`)
+                const raw = str(p.url).trim()
+                if (!raw) return fallback.toLowerCase()
+                const url = new URL(raw, base)
+                // Some PW1 page records use an external destination or homepage
+                // anchor as their URL. Keep the page content under its own slug.
+                if (!isSourceHost(url, base.origin, recognizedOrigins) || url.pathname === '/') return fallback.toLowerCase()
+                return url.pathname.toLowerCase()
+            }
             const resolveTarget = (model: unknown, id: unknown, url: unknown, context: string): Omit<Link, 'label'> | undefined => {
                 if (model) {
                     const kind = str(model).split('\\').filter(Boolean).at(-1)
@@ -222,7 +237,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 seo: { ...pickStrings(site.seo, ['metaTitle', 'metaDescription']), ogImage: assetUrl(seo.ogImage) },
             }
             entries.push({ ...(bundle.linkCorrections ? { linkCorrections: bundle.linkCorrections } : {}), ...(bundle.destination ? { destination: bundle.destination } : {}), sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin, ...(origins.length ? { origins: recognizedOrigins } : {}) }, website: {
-                settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
+                ...(disabledHomepage ? { publication: 'keep-draft' } : {}), settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
                 features: { cart: cartEnabled, orderTracking: cartEnabled && validPages.some(p => str(p.type) === '6' || rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'order_tracking')) },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(menuLinks),
                 footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns }, pages,

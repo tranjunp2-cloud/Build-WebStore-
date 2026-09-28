@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
-import { publishOrigin } from '@/lib/migration/pw1-publish'
+import { describe, expect, it, vi } from 'vitest'
+import { publishOrigin, publishMigratedStore } from '@/lib/migration/pw1-publish'
 import { buildBatchReport, batchReportCsv } from '@/lib/migration/pw1-batch-report'
 
 describe('[TC-F35.M48] Automatic CLI publication', () => {
@@ -43,4 +43,30 @@ describe('[TC-F35.M48] Scoped CLI publication credentials', () => {
         const login = await new SignJWT({id:'5',collection:'users'}).setProtectedHeader({alg:'HS256'}).setIssuedAt().setExpirationTime('2m').sign(new TextEncoder().encode(secret))
         expect(await verifyPw1PublishGrant(login, secret, grant)).toBeNull()
     })
+})
+
+import type { Payload } from 'payload'
+import type { Client } from 'pg'
+import { batchEntryHash, type BatchEntry } from '@/lib/migration/pw1-batch-input'
+
+it('[TC-F35.M53] keeps disabled-homepage sites draft without calling publication', async () => {
+    // Arrange — only fields consumed by publication are needed here.
+    const entry = { sourceStoreId: '2650', sourceUserId: '1', owner: { email: 'owner@example.com' }, website: { publication: 'keep-draft' } } as BatchEntry
+    const client = { query: vi.fn().mockResolvedValue({ rows: [{ site_id: 2, tenant_id: 3, source_user_id: '1', status: 'completed', input_hash: batchEntryHash(entry) }] }) } as unknown as Client
+    const payload = {
+        find: vi.fn().mockResolvedValue({ docs: [{ id: 1, tenants: [{ tenant: 3, role: 'owner', status: 'active' }] }] }),
+        findByID: vi.fn().mockResolvedValue({ tenant: 3, status: 'draft' }),
+    } as unknown as Payload
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+        // Act
+        const result = await publishMigratedStore(payload, client, entry, 'http://localhost:3000', 3)
+        // Assert
+        expect(result).toMatchObject({ status: 'kept-draft', attempts: 0 })
+        expect(fetchSpy).not.toHaveBeenCalled()
+        const report = buildBatchReport({ id: 'batch', status: 'completed', results: [{ sourceStoreId: '2650', status: 'completed', publish: result }] }, [])
+        expect(report.totals).toMatchObject({ keptDraft: 1, publishFailed: 0, published: 0 })
+    } finally {
+        fetchSpy.mockRestore()
+    }
 })

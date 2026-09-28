@@ -6,7 +6,7 @@ import type { Client } from 'pg'
 import { batchEntryHash, type BatchEntry } from './pw1-batch-input'
 import { retryDelayMs } from './pw1-errors'
 
-export type PublishResult = { status: 'published' | 'already-published' | 'failed' | 'deferred'; attempts: number; error?: string }
+export type PublishResult = { status: 'published' | 'already-published' | 'failed' | 'deferred' | 'kept-draft'; attempts: number; error?: string; reason?: string }
 export function publishOrigin(value: string | undefined): string {
     if (!value) throw new Error('Automatic publication requires NEXT_PUBLIC_SERVER_URL')
     const url = new URL(value)
@@ -28,6 +28,10 @@ export async function publishMigratedStore(payload: Payload, client: Client, ent
         if (!(user.tenants as Array<{tenant:unknown;role?:string;status?:string}> | undefined)?.some(m => id(m.tenant) === String(mapping.tenant_id) && m.role === 'owner' && m.status === 'active')) throw new Error('Publish owner membership mismatch')
         const site = await payload.findByID({collection:'sites',id:mapping.site_id,depth:0})
         if (id(site.tenant) !== String(mapping.tenant_id)) throw new Error('Publish tenant mismatch')
+        if (entry.website.publication === 'keep-draft') {
+            if (site.status !== 'draft') throw new Error('Disabled source homepage requires a draft destination site')
+            return {status:'kept-draft',attempts:0,reason:'Source homepage is disabled; website retained as draft'}
+        }
         if (site.status === 'published') return {status:'already-published',attempts:0}
         if (site.status !== 'draft') throw new Error('Only migrated draft sites may be published')
         const secret = process.env.PAYLOAD_SECRET

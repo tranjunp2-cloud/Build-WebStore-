@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import payloadConfig from '@payload-config'
 import Image from 'next/image'
 import Link from 'next/link'
-import DOMPurify from 'isomorphic-dompurify'
+import { renderBlogContent } from '@/lib/blog/render-content'
 import { getCurrentUser } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { PreviewAccessDenied } from '../../PreviewErrors'
@@ -296,7 +296,7 @@ export default async function PreviewBlogDetailPage({ params, searchParams }: Pr
                         prose-code:px-1 prose-code:rounded
                         prose-img:rounded-xl"
                     dangerouslySetInnerHTML={{
-                        __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : ''),
+                        __html: renderBlogContent(post.content),
                     }}
                 />
 

@@ -27,12 +27,12 @@ export function createSourceLinkResolver(sourceUrl: string, pages: Array<{ sourc
     const normalize = normalizeSourcePath
     const routes = new Map<string, string>()
     for (const page of pages) {
-        const path = normalize(page.sourcePath)
+        const path = normalize(new URL(page.sourcePath, source).pathname)
         if (!routes.has(path)) routes.set(path, page.destinationPath)
     }
     const aliases = new Map<string, Set<string>>()
     for (const alias of policy.aliases ?? []) {
-        const path = normalize(alias.sourcePath)
+        const path = normalize(new URL(alias.sourcePath, source).pathname)
         const destinations = aliases.get(path) ?? new Set<string>()
         destinations.add(alias.destinationPath); aliases.set(path, destinations)
     }

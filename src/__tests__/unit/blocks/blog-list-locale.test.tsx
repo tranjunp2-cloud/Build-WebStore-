@@ -109,3 +109,17 @@ describe('BlogListBlock locale rendering', () => {
         expect(screen.queryByText('Uncategorized')).not.toBeInTheDocument()
     })
 })
+
+it.each([['en', 'Read more'], ['ms-MY', 'Baca lagi']])('[TC-F35.M57] supplies empty CTA label in store locale %s', async (locale, expected) => {
+    // Arrange
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ docs: [{ id: 1, title: 'News', slug: 'news', content: 'Body' }] }) }))
+    const props = { block: { blockType: 'blog-list', variant: 'cards', readArticleLabel: ' ' }, theme: {}, site: { tenant: 7, generationLocale: locale } } as unknown as React.ComponentProps<typeof BlogListBlock>
+    try {
+        // Act
+        render(<BlogListBlock {...props} />)
+        // Assert
+        expect(await screen.findByText(expected)).toBeInTheDocument()
+    } finally {
+        vi.unstubAllGlobals()
+    }
+})

@@ -282,3 +282,52 @@ it.each([0, '0', false, 1, '1', undefined, null, ''])('[TC-F35.M27] honors expli
     expect(entries[0].website.features).toEqual({cart:enabled,orderTracking:enabled})
     expect(adaptWebsiteInput(compactInput(entries[0])).contract.site.features).toEqual({cart:enabled,orderTracking:enabled})
 })
+
+describe('[TC-F35.M52] Collection page URL normalization', () => {
+    it.each([
+        ['/About us', '/about%20us'],
+        ['https://source.example/SEAFOOD', '/new-page'],
+        ['https://tiktok.com/@shop', '/new-page'],
+        ['/#id_about', '/new-page'],
+    ])('retains page content for %s', (url, path) => {
+        const input = fixture()
+        input[0].pages.push({ ...input[0].pages[0], id: '90', type: '7', slug: 'new-page', components: [] , ...{ url } })
+        const { entries } = parseMigrationInput(input)
+        expect(entries[0].website.pages.find(p => p.sourceId === '90')).toMatchObject({ path, title: 'Home' })
+    })
+})
+
+describe('[TC-F35.M53] Disabled homepage preservation', () => {
+    it('preserves source content and carries the draft policy into the generation contract', () => {
+        // Arrange
+        const input = fixture()
+        input[0].pages[0].status = '0'
+        const original = JSON.stringify(input)
+        // Act
+        const { entries, reports } = parseMigrationInput(input)
+        const { contract } = adaptWebsiteInput(compactInput(entries[0]))
+        // Assert
+        expect(entries[0].website.publication).toBe('keep-draft')
+        expect(contract.site.publication).toBe('keep-draft')
+        expect(contract.pages[0]).toMatchObject({ sourceId: '10', isHomepage: true })
+        expect(JSON.stringify(contract.pages)).toContain('<p>Keep</p>')
+        expect(reports[0].warnings.join(' ')).toContain('do not auto-publish')
+        expect(JSON.stringify(input)).toBe(original)
+    })
+    it('does not restore deleted homepages', () => {
+        // Arrange
+        const input = fixture()
+        input[0].pages[0].status = '0'
+        Object.assign(input[0].pages[0], { deleted_at: '2026-01-01' })
+        // Act / Assert
+        expect(() => parseMigrationInput(input)).toThrow('no active pages')
+    })
+    it('keeps automatic publication for active homepages', () => {
+        // Arrange
+        const input = fixture()
+        // Act
+        const { entries } = parseMigrationInput(input)
+        // Assert
+        expect(entries[0].website.publication).toBeUndefined()
+    })
+})

@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { blogListingPath } from '@/lib/blog/listing-path'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -6,7 +7,7 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
-import DOMPurify from 'isomorphic-dompurify'
+import { renderBlogContent } from '@/lib/blog/render-content'
 import { getServerI18n } from '@/i18n/server'
 import { getSiteBasePath } from '@/lib/site-base-path'
 import { getCurrentUser } from '@/lib/auth'
@@ -112,6 +113,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
         title,
         description,
+        icons: { icon: (data.site.branding as { favicon?: string } | undefined)?.favicon || '/favicon.ico' },
         ...(origin ? { alternates: { canonical: `${origin}/blog/${blogSlug}` } } : {}),
         openGraph: {
             title: (seo?.metaTitle as string) || (data.post.title as string),
@@ -139,6 +141,8 @@ export default async function BlogDetailPage({ params }: Props) {
     const { t } = await getServerI18n()
     const base = await getSiteBasePath(slug)
     const { tenant, site, post, pages } = data
+    const listingPath = blogListingPath(pages as unknown as Parameters<typeof blogListingPath>[0])
+    const listingHref = `${base}${listingPath}` || '/'
 
     const primaryColor = (site.theme as { primaryColor?: string } | undefined)?.primaryColor || '#0ea5e9'
     const thumbnail = typeof post.thumbnail === 'object' && post.thumbnail
@@ -182,7 +186,7 @@ export default async function BlogDetailPage({ params }: Props) {
         '@type': 'BreadcrumbList',
         itemListElement: [
             { '@type': 'ListItem', position: 1, name: 'Home', item: origin },
-            { '@type': 'ListItem', position: 2, name: 'Blog', item: `${origin}/blogs` },
+            { '@type': 'ListItem', position: 2, name: 'Blog', item: `${origin}${listingPath || '/'}` },
             { '@type': 'ListItem', position: 3, name: post.title as string, item: `${origin}/blog/${blogSlug}` },
         ],
     } : null
@@ -203,7 +207,7 @@ export default async function BlogDetailPage({ params }: Props) {
                         {t.storefront.products.home}
                     </Link>
                     <span>/</span>
-                    <Link href={`${base}/blog`} className="hover:opacity-100 transition-opacity">
+                    <Link href={listingHref} className="hover:opacity-100 transition-opacity">
                         {t.storefront.blog.title}
                     </Link>
                     <span>/</span>
@@ -255,13 +259,13 @@ export default async function BlogDetailPage({ params }: Props) {
                         prose-code:px-1 prose-code:rounded
                         prose-img:rounded-xl"
                     style={proseThemeVars}
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
+                    dangerouslySetInnerHTML={{ __html: renderBlogContent(post.content) }}
                 />
 
                 {/* Back to Blog */}
                 <div className="mt-12 pt-8 border-t border-current/10">
                     <Link
-                        href={`${base}/blog`}
+                        href={listingHref}
                         className="text-sm font-medium hover:opacity-80 transition-opacity"
                         style={{ color: primaryColor }}
                     >

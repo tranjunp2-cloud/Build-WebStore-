@@ -82,7 +82,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
     if (options.dryRun) {
         console.log(JSON.stringify({ status: 'dry-run', concurrency, limits: controls.limits, requireBeData: Boolean(options.requireBeData), invalidStores: invalid, stores: entries.map(entry => {
             const { report } = adaptWebsiteInput(compactInput(entry))
-            return { sourceStoreId: entry.sourceStoreId, pages: entry.website.pages.length, components: report.sourceComponents, pending: report.pending.length }
+            return { sourceStoreId: entry.sourceStoreId, ...(entry.website.publication ? { publication: entry.website.publication } : {}), pages: entry.website.pages.length, components: report.sourceComponents, pending: report.pending.length }
         }) }, null, 2))
         if (invalid.length) throw new Error(`${invalid.length} invalid store(s)`)
         return

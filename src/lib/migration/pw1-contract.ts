@@ -10,7 +10,7 @@ const ComponentSchema = z.object({
 export const ContractSchema = z.object({
     format: z.literal('pw2-reconstruction-contract'), version: z.literal('1.0.0'),
     source: z.object({ url: z.string().url(), storeId: z.string().regex(/^\d+$/), capturedAt: z.string(), dumpHash: z.string() }).strict(),
-    site: z.object({ brandEvidence: BrandEvidenceSchema.optional(), settings: SiteSettingsSchema.optional(), name: z.string(), locale: z.enum(['en', 'ms']).optional(), features: z.object({ cart: z.boolean(), orderTracking: z.boolean() }).strict().optional(), navigation: z.record(z.unknown()), footer: z.record(z.unknown()) }).strict(),
+    site: z.object({ publication: z.literal('keep-draft').optional(), brandEvidence: BrandEvidenceSchema.optional(), settings: SiteSettingsSchema.optional(), name: z.string(), locale: z.enum(['en', 'ms']).optional(), features: z.object({ cart: z.boolean(), orderTracking: z.boolean() }).strict().optional(), navigation: z.record(z.unknown()), footer: z.record(z.unknown()) }).strict(),
     pages: z.array(z.object({ sourceId: z.string().regex(/^\d+$/), title: z.string(), slug: z.string().regex(/^[a-z0-9-]+$/), isHomepage: z.boolean(), components: z.array(ComponentSchema) }).strict()).min(1),
     reconciliation: z.array(z.string()),
 }).strict()
