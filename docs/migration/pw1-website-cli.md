@@ -45,7 +45,7 @@ The positional file is **one JSON array**, with one object per PW1 store. The co
 ]
 ```
 
-This is a structural illustration; supply the actual validated page/component configuration in `website.pages`. The updated external Amelina input retains 3 source pages and 18 components, with one filter component explicitly pending. Multiple stores belonging to one user repeat the same owner identity and use distinct source store IDs. There is no fixed input file size limit. The CLI reads and parses the complete JSON file in memory; each store is validated before processing, and malformed stores are recorded without blocking unrelated valid stores.
+This is a structural illustration; supply the actual validated page/component configuration in `website.pages`. Multiple stores belonging to one user repeat the same owner identity and use distinct source store IDs. There is no fixed input file size limit. The CLI reads and parses the complete JSON file in memory; each store is validated before processing, and malformed stores are recorded without blocking unrelated valid stores.
 
 The preload reads `.env.local` / `.env` from the working directory; existing process environment takes precedence. Configure the destination database, Payload secret, OpenAI and media storage there once. No `--env-file`, account, site ID, output directory or `--apply` argument is required for the batch command.
 
@@ -56,9 +56,9 @@ The preload reads `.env.local` / `.env` from the working directory; existing pro
 - Rerun the same command to retry failed stores. Completed stores with unchanged input are skipped. Changed completed input requires `--rerun`; this also explicitly regenerates unchanged completed stores. Replacement requires a draft site.
 - Progress, mappings and generation/backup artifacts are stored in `pw1_migration_accounts`, `pw1_migration_stores`, `pw1_migration_attempts` and `pw1_migration_batches`. No per-store JSON files are generated. These tables are installed by `db-setup.js` and bootstrapped idempotently by the command.
 
-A database-wide advisory lock prevents overlapping batch commands. Retries reuse the mapped account/tenant/site and tenant-keyed source media cache. Site/page replacement and its commit receipt are atomic; media preparation remains outside the transaction for reuse. The website adapter supports English/Malay and single-segment paths. Product/blog blocks read PW2 database records and show their native empty states when no records exist. Product filters and source-specific sorting remain pending. The command does not import products, blogs or orders. Successful stores are automatically published after migration and cleanup.
+A database-wide advisory lock prevents overlapping batch commands. Retries reuse the mapped account/tenant/site and tenant-keyed source media cache. Site/page replacement and its commit receipt are atomic; media preparation remains outside the transaction for reuse. The website adapter supports English/Malay and single-segment paths. Product/blog blocks read PW2 database records and show their native empty states when no records exist. Product category/price filters map to matching listings; brand/variant filters and fixed/random article selection are unsupported. Sorting remains outside the migration scope. The command does not import products, blogs or orders. Successful stores are automatically published after migration and cleanup.
 
-Local verification: the Amelina array reused user 1847 and provisioned tenant 1821/site 3659. After one rejected AI design, the same command succeeded using that mapping; a subsequent identical run skipped the completed store. Production execution across 1,300+ users has **not** been load-tested.
+Production execution across 1,300+ users has **not** been load-tested.
 
 ### In-process concurrency
 
