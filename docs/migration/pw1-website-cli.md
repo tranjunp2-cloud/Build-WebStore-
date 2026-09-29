@@ -3,12 +3,12 @@
 ## Automatic prepared input
 
 ```sh
-npm run migrate:pw1
-npm run migrate:pw1 -- --dry-run
-npm run migrate:pw1 -- --store 205
-npm run migrate:pw1 -- --runs-root /path/to/be-runs --dry-run
+npm run migrate:pw1:website
+npm run migrate:pw1:website -- --dry-run
+npm run migrate:pw1:website -- --store 205
+npm run migrate:pw1:website -- --runs-root /path/to/be-runs --dry-run
 # Optional explicit input: process only this file
-npm run migrate:pw1 -- /external/prepared/master-0001.json
+npm run migrate:pw1:website -- /external/prepared/master-0001.json
 ```
 
 Without a file, the CLI searches `.migration/runs` by default, or the directory supplied with `--runs-root` (including nested `import-runs`), and selects the completed BE run whose `run.json` was modified most recently. It prints that run and reads its completed `prepared/destination-manifest.json`. All listed master parts are checked against their destination output hashes before any migration starts, then processed sequentially in manifest order. Exporter artifacts and incomplete BE runs are not selected. An invalid newest completed handoff fails rather than silently falling back to an older run. This lets CI download/unpack the BE handoff anywhere and pass that directory explicitly.
@@ -119,14 +119,14 @@ Site settings from collection inputs now pass through the native contract indepe
 ## Reliable batch operations
 
 ```sh
-npm run migrate:pw1 -- input.json --dry-run
-npm run migrate:pw1 -- input.json --max-attempts 3
-npm run migrate:pw1 -- status
-npm run migrate:pw1 -- status --store 205
-npm run migrate:pw1 -- logs --store 205
-npm run migrate:pw1 -- retry input.json
-npm run migrate:pw1 -- retry input.json --store 205
-npm run migrate:pw1 -- input.json --store 205 --rerun
+npm run migrate:pw1:website -- input.json --dry-run
+npm run migrate:pw1:website -- input.json --max-attempts 3
+npm run migrate:pw1:website -- status
+npm run migrate:pw1:website -- status --store 205
+npm run migrate:pw1:website -- logs --store 205
+npm run migrate:pw1:website -- retry input.json
+npm run migrate:pw1:website -- retry input.json --store 205
+npm run migrate:pw1:website -- input.json --store 205 --rerun
 ```
 
 - File JSON/array failures remain fatal. Per-store errors are saved in batch results, including failures before a destination account exists. Duplicate store identities and conflicting valid owner identities quarantine all conflicting entries.
@@ -148,10 +148,10 @@ Preparation uses a bounded in-process Promise pool; website persistence remains 
 ### P1: operational controls and reports
 
 ```sh
-npm run migrate:pw1 -- input.json --max-generation-attempts 20 --max-batch-seconds 3600 --max-store-seconds 300 --min-generation-interval-seconds 5 --max-design-tokens 100000
-npm run migrate:pw1 -- input.json --require-be-data
-npm run --silent migrate:pw1 -- report --batch BATCH_UUID --format json > batch.json
-npm run --silent migrate:pw1 -- report --batch BATCH_UUID --format csv > batch.csv
+npm run migrate:pw1:website -- input.json --max-generation-attempts 20 --max-batch-seconds 3600 --max-store-seconds 300 --min-generation-interval-seconds 5 --max-design-tokens 100000
+npm run migrate:pw1:website -- input.json --require-be-data
+npm run --silent migrate:pw1:website -- report --batch BATCH_UUID --format json > batch.json
+npm run --silent migrate:pw1:website -- report --batch BATCH_UUID --format csv > batch.csv
 ```
 
 Limits are optional, positive integers (seconds ≤ 86400). `--max-generation-attempts` counts generation attempts across all stores/retries, not individual provider requests. `--min-generation-interval-seconds` spaces generation starts across the whole pool; shared-service requests within one generation may be more frequent. Start reservations and attempt budgets are serialized. Limit configuration is retained on the batch. Re-running a command starts a new budget.
@@ -172,11 +172,11 @@ Apply the SQL migrations with the normal `scripts/db-setup.js --migrate-only` de
 
 ```sh
 # List candidates only (default retention: 7 days since import/last reuse).
-npm run migrate:pw1 -- cleanup-media --store 205
+npm run migrate:pw1:website -- cleanup-media --store 205
 # Delete eligible orphan files through Payload's configured storage hooks.
-npm run migrate:pw1 -- cleanup-media --store 205 --apply
+npm run migrate:pw1:website -- cleanup-media --store 205 --apply
 # Bounded scan; use nextAfterId from the report to continue past retained items.
-npm run migrate:pw1 -- cleanup-media --store 205 --limit 20 --after-id 12345
+npm run migrate:pw1:website -- cleanup-media --store 205 --limit 20 --after-id 12345
 ```
 
 The standalone command is for older leftover assets. The runner now also cleans newly created orphan media automatically after a terminal store failure, as described below. Recently reused existing assets are never selected by that automatic path. `--older-than-hours` is 1–87600 (default 168); `--limit` is 1–100 (default 20). `nextAfterId` lets an operator advance the scan without repeatedly scanning the same referenced records. Dry-run is advisory; apply rechecks each candidate.
@@ -192,7 +192,7 @@ Local integration: `npx tsx --require ./scripts/seed-preload.cjs scripts/tests/p
 
 ### Automatic cleanup in the single migration command
 
-`npm run migrate:pw1 -- input.json` now handles: failed attempt → rollback → retry when allowed → failed-attempt media (whether the store eventually succeeds or fails) → queue cleanup → finish/drain all store work → clean queued orphan media → final report. No second command or seven-day wait is required for this path.
+`npm run migrate:pw1:website -- input.json` now handles: failed attempt → rollback → retry when allowed → failed-attempt media (whether the store eventually succeeds or fails) → queue cleanup → finish/drain all store work → clean queued orphan media → final report. No second command or seven-day wait is required for this path.
 
 An async store scope tracks IDs returned by actual new imports across all attempts. Cache hits and existing uploaded files recovered by filename are not included. Cleanup runs after all preparation and website writes have drained, uses the runner's existing batch lock, and refuses committed or unresolved attempts. It reuses the reference/storage deletion checks; website, versions, other tenants and `site-before.json` backups remain protected. Temporary generated artifacts from this store's failed attempts are diagnostic, not live references, and do not keep new orphan uploads alive.
 

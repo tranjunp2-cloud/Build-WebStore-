@@ -22,17 +22,17 @@ async function main() {
     }, strict: true, allowPositionals: true })
     if (values.help) {
         console.log(`PW1 migration (bounded preparation; serialized writes; one batch/database)
-  npm run migrate:pw1 [-- --dry-run]
-  npm run migrate:pw1 -- --runs-root /path/to/be-runs [--dry-run]
-  npm run migrate:pw1 -- FILE [--dry-run] [--store ID] [--max-attempts 3] [--concurrency 5]
-  npm run migrate:pw1 -- FILE --rerun
-  npm run migrate:pw1 -- retry FILE [--store ID]
-  npm run migrate:pw1 -- status [--store ID]
-  npm run migrate:pw1 -- logs [--store ID]
-  npm run migrate:pw1 -- audit FILE --audit-base-url http://localhost:3000 --audit-output /tmp/pw1-quality.json (local development only)
-  npm run migrate:pw1 -- FILE --audit-base-url ORIGIN --audit-output REPORT.json
-  npm run migrate:pw1 -- report --batch UUID [--format json|csv]
-  npm run migrate:pw1 -- cleanup-media --store ID [--older-than-hours 168] [--limit 20] [--after-id ID] [--apply]
+  npm run migrate:pw1:website [-- --dry-run]
+  npm run migrate:pw1:website -- --runs-root /path/to/be-runs [--dry-run]
+  npm run migrate:pw1:website -- FILE [--dry-run] [--store ID] [--max-attempts 3] [--concurrency 5]
+  npm run migrate:pw1:website -- FILE --rerun
+  npm run migrate:pw1:website -- retry FILE [--store ID]
+  npm run migrate:pw1:website -- status [--store ID]
+  npm run migrate:pw1:website -- logs [--store ID]
+  npm run migrate:pw1:website -- audit FILE --audit-base-url http://localhost:3000 --audit-output /tmp/pw1-quality.json (local development only)
+  npm run migrate:pw1:website -- FILE --audit-base-url ORIGIN --audit-output REPORT.json
+  npm run migrate:pw1:website -- report --batch UUID [--format json|csv]
+  npm run migrate:pw1:website -- cleanup-media --store ID [--older-than-hours 168] [--limit 20] [--after-id ID] [--apply]
 Without FILE: use the newest completed BE run in .migration/runs (override with --runs-root); process its prepared master parts sequentially.
 Each part uses a fresh process; limits apply per part. Finish all parts, then retry failed parts once; failures are logged.
 Default: 5 active stores, 3 total attempts/store, automatic cleanup, publication and public audit.
