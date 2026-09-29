@@ -6,11 +6,12 @@
 npm run migrate:pw1
 npm run migrate:pw1 -- --dry-run
 npm run migrate:pw1 -- --store 205
+npm run migrate:pw1 -- --runs-root /path/to/be-runs --dry-run
 # Optional explicit input: process only this file
 npm run migrate:pw1 -- /external/prepared/master-0001.json
 ```
 
-Without a file, the CLI searches `.migration/runs` (including nested `import-runs`) and selects the completed BE run whose `run.json` was modified most recently. It prints that run and reads its completed `prepared/destination-manifest.json`. All listed master parts are checked against their destination output hashes before any migration starts, then processed sequentially in manifest order. Exporter artifacts and incomplete BE runs are not selected. An invalid newest completed handoff fails rather than silently falling back to an older run.
+Without a file, the CLI searches `.migration/runs` by default, or the directory supplied with `--runs-root` (including nested `import-runs`), and selects the completed BE run whose `run.json` was modified most recently. It prints that run and reads its completed `prepared/destination-manifest.json`. All listed master parts are checked against their destination output hashes before any migration starts, then processed sequentially in manifest order. Exporter artifacts and incomplete BE runs are not selected. An invalid newest completed handoff fails rather than silently falling back to an older run. This lets CI download/unpack the BE handoff anywhere and pass that directory explicitly.
 
 Each part runs in a fresh process with the existing migration/publish/audit flow; audit reports remain beside each input file. Concurrency, retry and operational budgets apply per part. Failed parts are recorded while later parts continue. After the first pass, only failed parts are retried once, using ledger skip semantics (without `--rerun`) so successful stores are not regenerated. Remaining failures produce a nonzero exit. Each invocation writes `parts.jsonl` and `summary.json` under the selected BE run’s `website-runs/<session>/`, including file, pass and exit code. Integrity errors stop execution immediately; Ctrl+C does not trigger retries. Rerunning the command reuses the database ledger. If a newer BE run has completed since then, automatic selection changes; pass an explicit file to pin an older part. `--store` selects its containing part. A shared `--audit-output` is rejected when multiple parts are selected to prevent reports overwriting each other. Ctrl+C stops the current process and prevents subsequent parts from starting.
 
@@ -255,7 +256,7 @@ This implements product-category link mapping only. It does not certify complete
 ### Public quality audit (no BE dependency)
 
 ```sh
-npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts audit input.json --audit-base-url http://localhost:3000 --audit-output /tmp/pw1-quality.json
+npx tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts audit input.json --audit-base-url http://localhost:3000 --audit-output /tmp/pw1-quality.json # local development only
 ```
 
 Reads mapped sites/pages from DB and visits published `/sites/{tenantSlug}` routes anonymously at 1440px and 390px, using two browser contexts. Never publishes sites, submits forms, clicks controls or follows PW1/external links. Checks HTTP/runtime errors, loaded broken images, horizontal overflow, unnamed controls and internal links. PW1 entity-filter links are grouped as `waiting-be`; other PW1 page links need review. This classification is based on URL shape, not a verification of BE mapping. Not a visual parity or commerce correctness certification.

@@ -1,4 +1,5 @@
 import { verifyProductSelectionScope } from './pw1-product-selection'
+import { publishOrigin } from './pw1-publish'
 import { getPw1Industry } from './pw1-industry'
 import { verifyMigrationDestination, type MigrationDestination } from './pw1-destination'
 import { configureMigrationTransactions } from './pw1-transactions'
@@ -29,6 +30,7 @@ export interface ApplyWebsiteOptions {
 /** CLI entry into the same generation/media/persistence service used by the API.
  * Destination credentials are supplied by the deployment environment. */
 export async function applyPw1Website(options: ApplyWebsiteOptions) {
+    const appUrl = publishOrigin(process.env.NEXT_PUBLIC_SERVER_URL)
     const connectionString = process.env.DATABASE_URI || process.env.DATABASE_URL
     if (!connectionString) throw new Error('DATABASE_URI or DATABASE_URL is required')
     const databaseUrl = new URL(connectionString)
@@ -155,7 +157,6 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
             const expectedPages = options.blueprint.pages.filter(page => page.kind === 'content')
             const missingPages = expectedPages.filter(page => !actualSlugs.has(page.isHomepage ? '' : page.slug) && !actualSlugs.has(page.slug))
             if (missingPages.length || productsBefore.totalDocs !== productsAfter.totalDocs) throw new Error('Post-write verification failed: missing source pages or catalog count changed')
-            const appUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
             const summary = {
                 status: 'persisted', sourceHash: options.sourceHash, siteId: options.siteId, userId: user.id, tenantId,
                 siteStatus: persistedSite.status, generationStatus: persistedSite.generationStatus,

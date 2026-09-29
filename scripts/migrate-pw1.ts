@@ -16,22 +16,24 @@ async function main() {
         'max-generation-attempts': { type: 'string' }, 'max-batch-seconds': { type: 'string' },
         'max-store-seconds': { type: 'string' }, 'min-generation-interval-seconds': { type: 'string' },
         'max-design-tokens': { type: 'string' }, 'require-be-data': { type: 'boolean' },
+        'runs-root': { type: 'string' },
         apply: { type: 'boolean' }, 'older-than-hours': { type: 'string' }, limit: { type: 'string' }, 'after-id': { type: 'string' },
         batch: { type: 'string' }, format: { type: 'string' },
     }, strict: true, allowPositionals: true })
     if (values.help) {
         console.log(`PW1 migration (bounded preparation; serialized writes; one batch/database)
   npm run migrate:pw1 [-- --dry-run]
+  npm run migrate:pw1 -- --runs-root /path/to/be-runs [--dry-run]
   npm run migrate:pw1 -- FILE [--dry-run] [--store ID] [--max-attempts 3] [--concurrency 5]
   npm run migrate:pw1 -- FILE --rerun
   npm run migrate:pw1 -- retry FILE [--store ID]
   npm run migrate:pw1 -- status [--store ID]
   npm run migrate:pw1 -- logs [--store ID]
-  npm run migrate:pw1 -- audit FILE --audit-base-url http://localhost:3000 --audit-output /tmp/pw1-quality.json
+  npm run migrate:pw1 -- audit FILE --audit-base-url http://localhost:3000 --audit-output /tmp/pw1-quality.json (local development only)
   npm run migrate:pw1 -- FILE --audit-base-url ORIGIN --audit-output REPORT.json
   npm run migrate:pw1 -- report --batch UUID [--format json|csv]
   npm run migrate:pw1 -- cleanup-media --store ID [--older-than-hours 168] [--limit 20] [--after-id ID] [--apply]
-Without FILE: use the newest completed BE run in .migration/runs; process its prepared master parts sequentially.
+Without FILE: use the newest completed BE run in .migration/runs (override with --runs-root); process its prepared master parts sequentially.
 Each part uses a fresh process; limits apply per part. Finish all parts, then retry failed parts once; failures are logged.
 Default: 5 active stores, 3 total attempts/store, automatic cleanup, publication and public audit.
 Run FILE again to resume; no separate retry command is required.
@@ -53,8 +55,9 @@ Status/logs are read-only and need only database configuration.`)
     }
     if (values.store && !/^\d+$/.test(values.store)) throw new Error('store must be a numeric PW1 store ID')
     const command = ['status','logs','retry','report','cleanup-media','audit'].includes(positionals[0]) ? positionals.shift() : 'run'
+    if (values['runs-root'] && positionals.length > 0) throw new Error('--runs-root is only available when using automatic prepared-input discovery')
     if (['run', 'retry', 'audit'].includes(command) && positionals.length === 0) {
-        const selected = await discoverPreparedInput()
+        const selected = await discoverPreparedInput(resolve(values['runs-root'] ?? '.migration/runs'))
         const parts = values.store ? selected.parts.filter(part => part.storeIds.includes(values.store!)) : selected.parts
         if (!parts.length) throw new Error('No matching source store in the completed BE run')
         if (parts.length > 1 && values['audit-output']) throw new Error('Custom --audit-output requires an explicit file or a single --store; automatic mode writes one report per part')
@@ -75,6 +78,10 @@ Status/logs are read-only and need only database configuration.`)
                 await appendFile(resolve(logDirectory, 'parts.jsonl'), JSON.stringify({ event: 'started', path: part.path, index, pass, time: new Date().toISOString() }) + '\n', { mode: 0o600 })
                 // Retry uses normal ledger skip semantics, even if the initial pass requested --rerun.
                 const forwarded = process.argv.slice(2).filter(arg => pass === 1 || arg !== '--rerun')
+                for (let i = 0; i < forwarded.length; i++) {
+                    if (forwarded[i] === '--runs-root') { forwarded.splice(i, 2); i-- }
+                    else if (forwarded[i].startsWith('--runs-root=')) { forwarded.splice(i, 1); i-- }
+                }
                 return new Promise<number>((resolve) => {
                     child = spawn(process.execPath, [...process.execArgv, process.argv[1], ...forwarded, part.path], { stdio: 'inherit' })
                     child.once('error', error => { console.error(`Could not start part: ${error.message}`); resolve(1) })
