@@ -16,7 +16,9 @@ describe('[TC-F35.M21] Compact website input adapter',()=>{
         const {contract,report}=adaptWebsiteInput(input)
         expect(contract.site.navigation.links).toEqual([{label:'Home',url:'/'}])
         expect(contract.pages[0].components.map(c=>c.sourceId)).toEqual(['1','2'])
-        expect(report.pending).toMatchObject([{sourceId:'3',type:'product_filter'}])
+        expect(report.pending).toEqual([])
+        expect(report.filterMappings).toMatchObject([{sourceId:'3',type:'product_filter',status:'mapped',targetIds:['1']}])
+        expect(contract.pages[0].components[0].block).toMatchObject({showCategoryFilter:true,filterControls:{category:true,price:false,search:false,attributes:false}})
         expect(report.excluded).toEqual(['4'])
         expect(JSON.stringify(input)).toBe(original)
         const result=bindNativeDesign(contract,{theme:{primaryColor:'#335533',secondaryColor:'#fafafa',fontHeading:'Inter',fontBody:'Inter'},navigationVariant:'centered',footerVariant:'simple',pages:[{sourceId:'10',sections:[{sourceId:'1',blockType:'products-grid',variant:'grid-4'},{sourceId:'2',blockType:'blog-list',variant:'cards'}]}]})
@@ -149,4 +151,10 @@ describe('[TC-F35.M52] Source path normalization preserves page data', () => {
         expect(report.routeChanges).toContainEqual({ sourceId: '21', sourcePath: '/About us', destinationPath: '/about-us' })
         expect(JSON.stringify(source)).toBe(before)
     })
+})
+
+it('[TC-F35.M21] supplies inherited branding and social links to the footer design contract', () => {
+    const input = fixture()
+    const { contract } = adaptWebsiteInput({ ...input, website: { ...input.website, settings: { branding: {}, contactInfo: {}, seo: {}, socialLinks: { facebook: 'https://facebook.com/shop' } } } })
+    expect(contract.site.footer).toMatchObject({ logo: { url: 'https://source.example/logo.png' }, socials: [{ platform: 'facebook', url: 'https://facebook.com/shop' }] })
 })

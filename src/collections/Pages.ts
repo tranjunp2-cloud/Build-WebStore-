@@ -780,6 +780,7 @@ const BlogListBlock = {
     slug: 'blog-list',
     labels: { singular: 'Blog List', plural: 'Blog Lists' },
     fields: [
+        { name: 'showCategoryFilter', type: 'checkbox', defaultValue: false },
         {
             name: 'variant', type: 'select', defaultValue: 'cards',
             options: [
@@ -801,6 +802,7 @@ const ProductsGridBlock = {
     slug: 'products-grid',
     labels: { singular: 'Products Grid', plural: 'Products Grids' },
     fields: [
+        { name: 'filterControls', type: 'json', validate: (value: unknown) => value == null || (typeof value === 'object' && !Array.isArray(value) && ['category', 'price', 'search', 'attributes'].every(key => typeof (value as Record<string, unknown>)[key] === 'boolean')) || 'Expected category, price, search and attributes booleans' },
         {
             name: 'variant', type: 'select', defaultValue: 'grid-3',
             options: [
@@ -813,6 +815,11 @@ const ProductsGridBlock = {
         { name: 'subheadline', type: 'textarea' },
         { name: 'limit', type: 'number', defaultValue: 6 },
         { name: 'category', type: 'text' },
+        { name: 'selectionMode', type: 'select', defaultValue: 'all', options: [
+            { label: 'All products', value: 'all' }, { label: 'Selected products', value: 'fixed' }, { label: 'Random products', value: 'random' },
+        ] },
+        { name: 'selectedProductIds', type: 'json', defaultValue: [], validate: (value: unknown) => value == null || (Array.isArray(value) && value.every(id => typeof id === 'string' && /^[1-9]\d*$/.test(id))) || 'Expected an array of product IDs' },
+        { name: 'includeOutOfStock', type: 'checkbox', defaultValue: true },
         { name: 'showCategoryFilter', type: 'checkbox', defaultValue: false },
     ],
 }

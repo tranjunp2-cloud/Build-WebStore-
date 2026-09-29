@@ -1,3 +1,4 @@
+import { verifyProductSelectionScope } from './pw1-product-selection'
 import { getPw1Industry } from './pw1-industry'
 import { verifyMigrationDestination, type MigrationDestination } from './pw1-destination'
 import { configureMigrationTransactions } from './pw1-transactions'
@@ -44,6 +45,10 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
         // including Payload's version table used by draft writes.
         await lock.query('SELECT slides FROM pages_blocks_hero LIMIT 0')
         await lock.query('SELECT slides FROM _pages_v_blocks_hero LIMIT 0')
+        await lock.query('SELECT filter_controls FROM pages_blocks_products_grid LIMIT 0')
+        await lock.query('SELECT filter_controls FROM _pages_v_blocks_products_grid LIMIT 0')
+        await lock.query('SELECT show_category_filter FROM pages_blocks_blog_list LIMIT 0')
+        await lock.query('SELECT show_category_filter FROM _pages_v_blocks_blog_list LIMIT 0')
         const { getPayload } = await import('payload')
         const { default: config } = await import('@payload-config')
         payload = options.payload ?? await getPayload({ config })
@@ -99,6 +104,7 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
                         await options.onStage?.('waiting-write')
                         await beginWrite()
                         if (options.destination) await verifyMigrationDestination(scoped, options.destination, options.account, undefined, options.allowPublished)
+                        await verifyProductSelectionScope(scoped, options.blueprint, options.siteId, Number(tenantId))
                         await options.onStage?.('write')
                     },
                     onFailure: error => { generationError = error },

@@ -151,7 +151,7 @@ it.each(FooterConfigSchema.shape.variant.removeDefault().options)('[TC-F35.M18] 
     const {source, design} = fixture()
     const footer = {...source.site.footer, tagline:'Source tagline', copyrightText:'Source copyright', columns:[{title:'Links',links:[{label:'Contact',url:'/contact'}]}]}
     const result = bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant})
-    for (const page of result.pages!) expect(page.blocks.at(-1)).toMatchObject({...footer,variant})
+    for (const page of result.pages!) expect(page.blocks.at(-1)).toMatchObject({...footer,variant: ['minimal', 'simple'].includes(variant) ? 'centered-stack' : variant})
 })
 
 it.each(NavigationConfigSchema.shape.variant.removeDefault().options)('[TC-F35.M18] preserves navigation content with native %s variant', variant => {
@@ -228,4 +228,11 @@ describe('[TC-F35.M49] verified carousel survives native binding',()=>{
             expect(result.pages![0].blocks[1]).toMatchObject({blockType:'carousel',variant,aspectRatio:2.5,imageFit:'contain',slidesPerView:3,items:[{image:{url:'https://source.example/verified-large.jpg'}},{}]})
         }
     })
+})
+
+it('[TC-F35.M59] binds verified product settings without letting AI replace selected IDs', () => {
+    const { source, design } = fixture()
+    Object.assign(source.pages[0].components[1].block, { selectionMode: 'fixed', selectedProductIds: ['30', '10'], category: '7', includeOutOfStock: false, limit: 4 })
+    const result = bindNativeDesign(source, design)
+    expect(result.blocks.find(block => block.blockType === 'products-grid')).toMatchObject({ selectionMode: 'fixed', selectedProductIds: ['30', '10'], category: '7', includeOutOfStock: false, limit: 4 })
 })

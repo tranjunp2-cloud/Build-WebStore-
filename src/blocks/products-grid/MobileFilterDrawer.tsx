@@ -10,6 +10,7 @@ import { Dialog, DialogClose, DialogOverlay, DialogPortal, DialogTitle } from '@
 import type { ActiveProductFilters, ProductFilterBounds, SidebarCategory } from './filter-types'
 
 interface MobileFilterDrawerProps {
+    controls?: { category: boolean; price: boolean; search: boolean; attributes: boolean }
     activeFilters: ActiveProductFilters
     bounds: ProductFilterBounds
     categories: SidebarCategory[]
@@ -95,6 +96,7 @@ function removeExpandedSubtree(expandedIds: Set<string>, node: CategoryTreeNode)
 }
 
 export function MobileFilterDrawer({
+    controls,
     activeFilters,
     bounds,
     categories,
@@ -305,7 +307,7 @@ export function MobileFilterDrawer({
                     </div>
 
                     <div className="space-y-5">
-                        <section className="space-y-2.5">
+                        {controls?.search !== false && <section className="space-y-2.5">
                             <h4 className="text-[13px] font-bold text-[var(--text-secondary)]">{sections.search}</h4>
                             <div
                                 className="flex items-center gap-2 rounded-[8px] border px-3 py-2.5"
@@ -334,9 +336,9 @@ export function MobileFilterDrawer({
                                     </button>
                                 ) : null}
                             </div>
-                        </section>
+                        </section>}
 
-                        {categoryTree.length > 0 ? (
+                        {controls?.category !== false && categoryTree.length > 0 ? (
                             <section className="space-y-3">
                                 <h4 className="text-[13px] font-bold text-[var(--text-secondary)]">{sections.categories}</h4>
                                 <div
@@ -347,7 +349,7 @@ export function MobileFilterDrawer({
                             </section>
                         ) : null}
 
-                        {bounds.attributes.map((attribute) => (
+                        {controls?.attributes !== false && bounds.attributes.map((attribute) => (
                             <section key={attribute.key} className="space-y-3">
                                 <h4 className="text-[13px] font-bold text-[var(--text-secondary)]">{formatAttributeLabel(attribute.key)}</h4>
                                 <div className="space-y-3">
@@ -370,7 +372,7 @@ export function MobileFilterDrawer({
                             </section>
                         ))}
 
-                        {maxBound > minBound ? (
+                        {controls?.price !== false && maxBound > minBound ? (
                             <section className="space-y-3">
                                 <div className="flex items-center justify-between gap-4 text-[13px] font-bold">
                                     <h4 className="text-[var(--text-secondary)]">{sections.price}</h4>

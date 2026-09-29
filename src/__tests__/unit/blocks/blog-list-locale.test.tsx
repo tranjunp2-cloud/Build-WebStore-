@@ -2,6 +2,8 @@ import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }), usePathname: () => '/sites/example', useSearchParams: () => new URLSearchParams() }))
+
 vi.mock('next/image', () => ({
     default: ({ alt }: { alt: string }) => <span>{alt}</span>,
 }))

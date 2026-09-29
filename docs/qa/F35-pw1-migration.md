@@ -146,3 +146,23 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 
 ### TC-F35.M57 — Blog card CTA locale
 - [x] AUTO — Empty or whitespace CTA labels fall back to the store language (English/Malay); custom labels are preserved.
+
+### TC-F35.M58 — Per-block product category
+- [x] AUTO — Settings loads only site categories and changes the existing category field. A fixed block category is sent to the product query with or without sidebar filters and cannot be overridden by URL category selection.
+
+### TC-F35.M59 — Product listing modes and PW1 identity mapping
+- [x] AUTO — Fixed selections preserve order, reject invalid IDs and remain scoped to the destination; random ordering is stable per seed without duplicates across pages; empty fixed lists do not fall back to all products.
+- [x] AUTO — Source product selections, stock visibility and category are resolved using verified BE IDs; missing mappings fail before generation. Page size uses the configured limit on all viewports (supersedes TC-F09.239a's 9/10 defaults).
+- [x] AUTO — Local browser fixture verifies fixed/category/stock filtering, random pagination and independent listing blocks without AI.
+
+### Product listing filter compatibility (TC-F35.M59)
+- [x] AUTO — All reads URL filters; fixed ignores configured category and URL filters; random uses configured category only. Fixed/random use local pagination. URL updates do not trigger global scrolling (supersedes prior F09 scroll-reposition expectations).
+
+- [x] AUTO — PW2 extension: fixed/random accept block-local category, price, search and attribute filters when enabled; never read/write page URL filters. Category options are derived from the eligible source products. All retains URL filtering.
+
+### TC-F35.M60 — PW1 page filter mapping
+- [x] AUTO: Map same-page product criteria to listings, union multiple controls, preserve explicit disabled criteria; never infer proximity.
+- [x] AUTO: Article category mapping, malformed criteria, orphan filters, unsupported brand, intentional sorting exclusions.
+- [x] AUTO: Browser verifies migrated product filter controls on desktop/mobile and blog category filtering without scroll navigation.
+
+- [x] AUTO (TC-F35.M60): Active price chips use store currency; unrelated blog/view URL parameters do not refetch products.

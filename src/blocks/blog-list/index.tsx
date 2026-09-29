@@ -1,5 +1,7 @@
 'use client'
 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { blogExcerpt } from '@/lib/blog/excerpt'
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
@@ -56,6 +58,12 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         emptyStateLabel,
     } = block
     const headline = block.headline || block.sectionLabel || ''
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
+    const [editorCategory, setEditorCategory] = useState('')
+    const [categories, setCategories] = useState<Array<{ slug: string; name: string }>>([])
+    const category = block.showCategoryFilter ? (pathname?.startsWith('/editor') ? editorCategory : searchParams.get('blogCategory') || '') : ''
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -93,7 +101,8 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
             return
         }
 
-        fetch(`/api/storefront/blogs?tenant=${tenantId}&limit=${limit}&sort=-createdAt`)
+        const controller = new AbortController()
+        fetch(`/api/storefront/blogs?tenant=${tenantId}&limit=${limit}&sort=-createdAt${block.showCategoryFilter ? '&includeCategories=1' : ''}${category ? `&category=${encodeURIComponent(category)}` : ''}`, { signal: controller.signal })
             .then(res => res.ok ? res.json() : Promise.reject(res))
             .then(json => {
                 const docs = json.data || json.docs || []
@@ -112,18 +121,38 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                         slug: doc.slug || '',
                     }
                 })
+                if (controller.signal.aborted) return
+                setCategories(json.categories ?? [])
                 setPosts(mapped)
             })
             .catch(err => {
+                if (controller.signal.aborted) return
                 console.error('[BlogListBlock] Failed to fetch blogs:', err)
             })
-            .finally(() => setLoading(false))
-    }, [headline, limit, site, siteLocale, uncategorizedLabel])
+            .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+        return () => controller.abort()
+    }, [headline, limit, site, siteLocale, uncategorizedLabel, category, block.showCategoryFilter])
+
+    const categoryFilter = block.showCategoryFilter && categories.length > 0 ? (
+        <div className="mb-8 max-w-xs">
+            <Select value={category || '__all__'} onValueChange={value => {
+                const next = value === '__all__' ? '' : value
+                if (pathname?.startsWith('/editor')) { setEditorCategory(next); return }
+                const params = new URLSearchParams(searchParams.toString())
+                if (next) params.set('blogCategory', next); else params.delete('blogCategory')
+                router.replace(`${pathname}${params.size ? `?${params}` : ''}`, { scroll: false })
+            }}>
+                <SelectTrigger aria-label={siteLocale.toLowerCase().split('-')[0] === 'ms' ? 'Kategori artikel' : 'Article category'}><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="__all__">{siteLocale.toLowerCase().split('-')[0] === 'ms' ? 'Semua kategori' : 'All categories'}</SelectItem>{categories.map(cat => <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>)}</SelectContent>
+            </Select>
+        </div>
+    ) : null
 
     if (loading) {
         return (
             <AnimatedSection className="relative overflow-hidden">
                 <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                    {categoryFilter}
                     <div className="text-center">
                         <div className="animate-pulse flex flex-col items-center gap-4">
                             <div className="h-8 w-64 bg-white/10 rounded" />
@@ -139,6 +168,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         return (
             <AnimatedSection className="relative overflow-hidden">
                 <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                    {categoryFilter}
                     {(block.sectionLabel || headline || subheadline) && (
                         <div className="text-center max-w-2xl mx-auto mb-10">
                             {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
@@ -172,6 +202,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
             <GradientBlob color={CSS_VARS.primary} className="bottom-0 left-1/4" size={400} opacity={0.05} />
 
             <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
+                {categoryFilter}
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                     <Heading level={2} className="mb-4">

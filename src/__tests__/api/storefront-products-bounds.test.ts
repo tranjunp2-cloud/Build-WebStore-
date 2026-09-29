@@ -35,7 +35,7 @@ describe('GET /api/storefront/products/bounds [TC-F09.251]', () => {
         // Assert
         expect(res.status).toBe(200)
         expect(body).toEqual({
-            minPrice: 10,
+            categoryIds: [],            minPrice: 10,
             maxPrice: 70,
             attributes: [
                 { key: 'color', values: ['blue', 'red'] },
@@ -52,7 +52,7 @@ describe('GET /api/storefront/products/bounds [TC-F09.251]', () => {
                     { deletedAt: { exists: false } },
                 ]),
             }),
-            select: { price: true, attributes: true },
+            select: { price: true, attributes: true, currency: true, category: true },
             overrideAccess: true,
         }))
     })
@@ -83,7 +83,7 @@ describe('GET /api/storefront/products/bounds [TC-F09.251]', () => {
         // Assert
         expect(res.status).toBe(200)
         expect(body).toEqual({
-            minPrice: 5,
+            categoryIds: [],            minPrice: 5,
             maxPrice: 45,
             attributes: [
                 { key: 'color', values: ['green', 'red'] },
@@ -105,7 +105,7 @@ describe('GET /api/storefront/products/bounds [TC-F09.251]', () => {
 
         // Assert
         expect(res.status).toBe(200)
-        expect(body).toEqual({ minPrice: 0, maxPrice: 0, attributes: [] })
+        expect(body).toEqual({ minPrice: 0, maxPrice: 0, attributes: [], categoryIds: [] })
     })
 
     it('[TC-F09.252] missing site returns zeros without calling Payload', async () => {

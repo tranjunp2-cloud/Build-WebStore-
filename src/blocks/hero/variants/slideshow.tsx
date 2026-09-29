@@ -14,6 +14,11 @@ void _CSS_VARS
 import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
 
+// Keep slide opacity on Motion's JS renderer. The accelerated WAAPI path in
+// our Motion version cancels its effect before the final inline style is painted,
+// briefly exposing the old slide again. An onUpdate subscriber disables that path.
+const keepSlideAnimationOnMainThread = () => {}
+
 export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
     const { badge, image, images = [], slides: contentSlides = [] } = block
     const category = (site?.siteType as string) || 'business'
@@ -103,6 +108,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
         <div ref={rootRef}><AnimatedSection className="relative aspect-[16/9] w-full overflow-hidden">
             <AnimatePresence initial={false} custom={direction}>
                 <motion.div key={currentIndex} className="absolute inset-0" custom={direction}
+                    onUpdate={keepSlideAnimationOnMainThread}
                     variants={{ enter: (travel: number) => offset(travel), exit: (travel: number) => offset(-travel) }}
                     initial="enter" animate={{ x: '0%', y: '0%', opacity: 1 }} exit="exit"
                     transition={{ duration: transition === 'none' ? 0 : 0.6, ease: 'easeInOut' }}>

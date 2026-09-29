@@ -225,7 +225,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                     <div className="text-center">
                         <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4 flex justify-center" />
                         {tagline && (
-                            <Body size="small" data-footer-field="tagline" className="opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
+                            <Body size="small" data-footer-field="tagline" className="whitespace-pre-line opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
                         )}
 
                         {/* Link columns as horizontal lists */}
@@ -294,7 +294,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                         <div className="lg:max-w-xs">
                             <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-3" />
                             {tagline && (
-                                <Body size="small" data-footer-field="tagline" className="opacity-40 leading-relaxed">{tagline}</Body>
+                                <Body size="small" data-footer-field="tagline" className="whitespace-pre-line opacity-40 leading-relaxed">{tagline}</Body>
                             )}
                         </div>
 

@@ -1,4 +1,5 @@
 import { scanPw1Carousels, type CarouselScan } from './pw1-carousel-scan'
+import { resolveProductSelections } from './pw1-product-selection'
 import { publishMigratedStore, publishOrigin } from './pw1-publish'
 import { prepareSourceLinks } from './pw1-source-link-check'
 import { applyCarouselEvidence } from './pw1-carousel-evidence'
@@ -82,7 +83,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
     if (options.dryRun) {
         console.log(JSON.stringify({ status: 'dry-run', concurrency, limits: controls.limits, requireBeData: Boolean(options.requireBeData), invalidStores: invalid, stores: entries.map(entry => {
             const { report } = adaptWebsiteInput(compactInput(entry))
-            return { sourceStoreId: entry.sourceStoreId, ...(entry.website.publication ? { publication: entry.website.publication } : {}), pages: entry.website.pages.length, components: report.sourceComponents, pending: report.pending.length }
+            return { sourceStoreId: entry.sourceStoreId, ...(entry.website.publication ? { publication: entry.website.publication } : {}), pages: entry.website.pages.length, components: report.sourceComponents, pending: report.pending.length, filterMappings: report.filterMappings }
         }) }, null, 2))
         if (invalid.length) throw new Error(`${invalid.length} invalid store(s)`)
         return
@@ -180,6 +181,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                     const { adapted, sourceLinkChecks } = await prepareSourceLinks(compactInput(entry), categoryMappings, controller.signal)
                     controls.checkTime(storeStartedAt)
                     const blueprint = createNativeBlueprint(adapted.contract)
+                    await resolveProductSelections((text, params) => client.query(text, params), activePayload, blueprint, mapping.site_id, mapping.tenant_id)
                     const inputReport = options.inputReports?.find(r => r.sourceStoreId === entry.sourceStoreId)
                     const warnings = [...new Set([...readiness.warnings, ...(inputReport?.warnings ?? []).filter(w => !w.includes('category CTA retains source URL')), ...adapted.report.warnings, ...adapted.report.pending.map(p => `${p.sourceId}: ${p.reason}`)])]
                     if (unresolvedCategories.length) warnings.push(`Declared categories have no verified source mapping in migration_entity_map: ${unresolvedCategories.join(',')}`)
@@ -248,7 +250,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             const applied = await withPw1MediaTracking(createdMedia, () => applyPw1Website({ allowPublished: options.rerun === true, destination: entry.destination, payload: activePayload, blueprint, account: entry.owner.email, siteId: mapping.site_id, sourceHash: hash, save, attemptId, onStage, acquireWrite: acquireMediaCreateLock, signal: controller.signal, onDesignUsage: usage => { controls.recordDesignTokens(usage.totalTokens ?? 0) } }))
                             await client.query("UPDATE pw1_migration_attempts SET status='completed',stage='completed',finished_at=now() WHERE id=$1", [attemptId])
                             await client.query("UPDATE pw1_migration_stores SET status='completed',updated_at=now() WHERE source_store_id=$1", [entry.sourceStoreId])
-                            completed = { sourceStoreId: entry.sourceStoreId, status: warnings.length ? 'completed_with_warnings' : 'completed', siteId: mapping.site_id, previewUrl: applied.previewUrl, warnings, readiness, sourceLinkChecks, linkFindings: adapted.report.linkFindings, beMapping: entry.destination ? { status: 'verified-declared-mappings', productCategories: entry.destination.productCategories.length, tenantId: entry.destination.tenantId, siteId: entry.destination.siteId } : undefined, attemptId, brand: { status: blueprint.nativeContract.site.brandEvidence?.status, colors: blueprint.nativeContract.site.brandEvidence?.colors } }
+                            completed = { sourceStoreId: entry.sourceStoreId, status: warnings.length ? 'completed_with_warnings' : 'completed', siteId: mapping.site_id, previewUrl: applied.previewUrl, warnings, filterMappings: adapted.report.filterMappings, readiness, sourceLinkChecks, linkFindings: adapted.report.linkFindings, beMapping: entry.destination ? { status: 'verified-declared-mappings', productCategories: entry.destination.productCategories.length, tenantId: entry.destination.tenantId, siteId: entry.destination.siteId } : undefined, attemptId, brand: { status: blueprint.nativeContract.site.brandEvidence?.status, colors: blueprint.nativeContract.site.brandEvidence?.colors } }
                         } catch (error) {
                             // If commit succeeded but ledger update failed, leave running for receipt-based recovery.
                             const committed = await client.query('SELECT 1 FROM pw1_migration_commits WHERE attempt_id=$1', [attemptId])

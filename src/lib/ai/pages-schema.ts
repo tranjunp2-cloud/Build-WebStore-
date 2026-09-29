@@ -124,7 +124,7 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     newsletter: ['variant', 'headline', 'subheadline', 'buttonLabel', 'placeholder'],
     video: ['variant', 'headline', 'subheadline', 'videoUrl'],
     'logo-cloud': ['variant', 'headline', 'logos'],
-    'products-grid': ['variant', 'headline', 'subheadline', 'limit', 'category'],
+    'products-grid': ['filterControls', 'variant', 'headline', 'subheadline', 'limit', 'category', 'showCategoryFilter', 'selectionMode', 'selectedProductIds', 'includeOutOfStock'],
     'products-featured': ['variant', 'headline', 'subheadline'],
     'service-cards': ['variant', 'headline', 'subheadline', 'services'],
     carousel: ['variant', 'headline', 'autoplay', 'interval', 'items', 'aspectRatio', 'imageFit', 'maxImageWidth', 'slidesPerView'],
@@ -140,6 +140,7 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     'countdown-timer': ['variant', 'headline', 'targetDate', 'expiredMessage', 'showDays', 'showHours', 'showMinutes', 'showSeconds'],
     'custom-html': ['html'],
     'blog-list': [
+        'showCategoryFilter',
         'variant',
         'headline',
         'subheadline',

@@ -331,3 +331,17 @@ describe('[TC-F35.M53] Disabled homepage preservation', () => {
         expect(entries[0].website.publication).toBeUndefined()
     })
 })
+
+it('[TC-F35.M59] projects selected products in source position order and stock/category settings', () => {
+    // Arrange
+    const input = fixture()
+    Object.assign(input[0].pages[0].components[0], {
+        frontend_component: { name: 'product_listing', default_config_values: '{}' },
+        model_settings: [{ key: 'list_type', value: 'fixed' }, { key: 'product_category', value: '7' }, { key: 'others', value: '{"display_out_of_stock":0}' }],
+        shortlist_items: [{ model_type: 'App\\Models\\Product', model_id: '30', position: 2 }, { model_type: 'App\\Models\\Product', model_id: '10', position: 1 }],
+    })
+    // Act
+    const { entries } = parseMigrationInput(input)
+    // Assert
+    expect(entries[0].website.pages[0].components[0].config.productSelection).toEqual({ mode: 'fixed', sourceCategoryId: '7', sourceProductIds: ['10', '30'], includeOutOfStock: false })
+})

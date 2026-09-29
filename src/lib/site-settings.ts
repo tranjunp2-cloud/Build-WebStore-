@@ -74,7 +74,7 @@ export function mergeFooterSocialsWithSite<T extends { socials?: Array<{ platfor
         ...block,
         logoText: block.logoText || site?.name || '',
         logo: (block as Record<string, unknown>).logo || (site?.branding?.logo ? { url: site.branding.logo, alt: site?.name || 'Logo' } : undefined),
-        socials,
+        socials: socials.filter(social => Boolean(social.url?.trim())),
     }
 }
 

@@ -189,14 +189,28 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                     if (!items.length) { exclude(c.id, 'component', 'empty-category-list'); return [] }
                     return [{ ...common, content: { heading: str(config.header), items }, config: { autoplay: config.animation === 'auto', intervalMs: Math.max(1000, Number(config.timing_animation ?? 5) * 1000), sourceSettings } }]
                 }
-                if (['product_listing', 'article_listing'].includes(type)) return [{ ...common, content: { heading: str(config.header) }, config: { limit: Number(config.per_page ?? (type === 'product_listing' ? 12 : 3)), sourceSettings }, binding: { source: 'pw2.database', collection: type === 'product_listing' ? 'products' : 'blogs', scope: type === 'product_listing' ? 'site' : 'tenant', emptyBehavior: 'native-empty-state' } }]
+                if (['product_listing', 'article_listing'].includes(type)) return [{ ...common, content: { heading: str(config.header) }, config: { limit: Number(config.per_page ?? (type === 'product_listing' ? 12 : 3)), sourceSettings,
+                    ...(type === 'product_listing' ? { productSelection: {
+                        mode: str(config.list_type || 'all'),
+                        ...(config.product_category && str(config.product_category) !== '0' ? { sourceCategoryId: str(config.product_category) } : {}),
+                        sourceProductIds: ordered(c.shortlist_items).filter(active).map(item => {
+                            if (!str(item.model_type).endsWith('\\Product')) throw new Error(`Component ${str(c.id)}: unsupported product selection model`)
+                            return str(item.model_id)
+                        }),
+                        includeOutOfStock: ![0, '0', false].includes(object(config.others).display_out_of_stock as string | number | boolean),
+                    } } : {}),
+                }, binding: { source: 'pw2.database', collection: type === 'product_listing' ? 'products' : 'blogs', scope: type === 'product_listing' ? 'site' : 'tenant', emptyBehavior: 'native-empty-state' } }]
                 if (['product_filter', 'product_sort', 'article_filter', 'article_sort'].includes(type)) return [{ ...common, content: { heading: str(config.header) }, config: { sourceSettings }, mappingStatus: 'pending' }]
                 throw new Error(`Component ${str(c.id)}: unsupported type ${type}`)
             }) }))
             const footerItems = ordered(footer?.menu_items).filter(active)
             const tagline = footerItems.flatMap(i => ordered(i.menu_lines).filter(active).map(l => {
                 const v = settings(l.model_settings), html = str(locale === 'ms' ? v.content_ms || v.content : v.content)
-                return html ? load(html).text() : ''
+                if (!html) return ''
+                const document = load(html)
+                document('br').replaceWith('\n')
+                document('p, div, li, h1, h2, h3, h4, h5, h6').append('\n')
+                return document.root().text().replace(/\n{3,}/g, '\n\n').trim()
             })).filter(Boolean).join('\n')
             const columns = footerItems.map(i => ({ title: localized(i), links: menuLinks(i) })).filter(c => c.links.length > 0)
             if (columns.length > 4) throw new Error(`Store ${storeId}: native footer supports at most 4 nonempty link columns`)

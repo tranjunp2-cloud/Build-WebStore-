@@ -4108,6 +4108,22 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   { name: 'pages_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "pages_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  // PW1 listing selection: apply to live pages and draft/version snapshots.
+  ...['pages_blocks_products_grid', '_pages_v_blocks_products_grid'].map(table => ({
+    name: `${table}.product_selection`,
+    sql: `DO $$ BEGIN
+      CREATE TYPE "enum_${table}_selection_mode" AS ENUM ('all', 'fixed', 'random');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS selection_mode "enum_${table}_selection_mode" DEFAULT 'all';
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS selected_product_ids jsonb DEFAULT '[]'::jsonb;
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS include_out_of_stock boolean DEFAULT true;`,
+  })),
+  // PW1 page-wide filter controls, live and versioned blocks.
+  { name: 'pages_blocks_products_grid.filter_controls', sql: `ALTER TABLE pages_blocks_products_grid ADD COLUMN IF NOT EXISTS filter_controls jsonb;` },
+  { name: '_pages_v_blocks_products_grid.filter_controls', sql: `ALTER TABLE _pages_v_blocks_products_grid ADD COLUMN IF NOT EXISTS filter_controls jsonb;` },
+  { name: 'pages_blocks_blog_list.category_filter', sql: `ALTER TABLE pages_blocks_blog_list ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
+  { name: '_pages_v_blocks_blog_list.category_filter', sql: `ALTER TABLE _pages_v_blocks_blog_list ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
   // GH-1588: showCategoryFilter opt-in toggle (F08 storefront category filter)
   { name: 'pages_blocks_products_grid.show_category_filter', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
   { name: 'pages_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
