@@ -7,40 +7,8 @@ import { ProductForm } from '@/components/dashboard/product-form/ProductForm'
 import { ProductFormValues } from '@/components/dashboard/product-form/schema'
 import { useI18n } from '@/i18n'
 import { getProductAction, saveProductAction, deleteProductAction } from '../actions'
+import { lexicalToText, descriptionEditPatch } from '@/lib/products/description-edit'
 import { parseServerError } from '@/lib/products/server-errors'
-
-const lexicalToText = (data: any): string => {
-    if (!data || !data.root || !data.root.children) return typeof data === 'string' ? data : '';
-    let text = '';
-    const traverse = (node: any) => {
-        if (node.type === 'text') text += node.text;
-        else if (node.type === 'paragraph') {
-            node.children?.forEach(traverse);
-            text += '\n\n';
-        } else if (node.children) node.children.forEach(traverse);
-    };
-    traverse(data.root);
-    return text.trim();
-}
-
-const textToLexical = (text: string) => {
-    if (!text) return undefined;
-    return {
-        root: {
-            type: 'root',
-            format: '',
-            indent: 0,
-            version: 1,
-            children: text.split('\n\n').map(p => ({
-                type: 'paragraph',
-                format: '',
-                indent: 0,
-                version: 1,
-                children: p ? [{ type: 'text', text: p, mode: 'normal', style: '', detail: 0, format: 0, version: 1 }] : []
-            }))
-        }
-    };
-}
 
 function slugify(text: string) {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -136,7 +104,7 @@ export default function ProductEditPage() {
             const body = {
                 name: data.name,
                 slug: data.urlSlug || slugify(data.name),
-                description: data.description ? textToLexical(data.description) : undefined,
+                ...descriptionEditPatch(data.description, initialData?.description, isNew),
                 price: data.basePrice ?? 0,
                 compareAtPrice: data.compareAtPrice != null && data.compareAtPrice > 0 ? data.compareAtPrice : null,
                 category: data.categoryIds,

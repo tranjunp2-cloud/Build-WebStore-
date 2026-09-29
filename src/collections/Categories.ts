@@ -1,5 +1,6 @@
 import type { CollectionConfig, Where } from 'payload'
 import slugify from 'slugify'
+import { isMigrationContext } from '@/lib/migration/pw1-json/runtime'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 
@@ -124,6 +125,7 @@ export const Categories: CollectionConfig = {
                         }
                         depth++
                         const candidateDoc = await req.payload.findByID({
+                            req,
                             collection: 'categories',
                             id: candidateId,
                             user: req.user,
@@ -156,6 +158,7 @@ export const Categories: CollectionConfig = {
 
                 if (data?.tenant && data?.site) {
                     const siteDoc = await req.payload.findByID({
+                        req,
                         collection: 'sites',
                         id: data.site,
                         overrideAccess: true,
@@ -187,6 +190,7 @@ export const Categories: CollectionConfig = {
                         : undefined
                     if (data.site != null && String(data.site) !== String(originalSiteId ?? '')) {
                         const siteCheck = await req.payload.find({
+                            req,
                             collection: 'sites',
                             where: { id: { equals: data.site }, tenant: { equals: safeTenantId } },
                             limit: 1,
@@ -203,6 +207,7 @@ export const Categories: CollectionConfig = {
                     }
                     if (!data.site && data.tenant && req.payload) {
                         const siteRes = await req.payload.find({
+                            req,
                             collection: 'sites',
                             where: { tenant: { equals: data.tenant } },
                             limit: 1,
@@ -225,10 +230,13 @@ export const Categories: CollectionConfig = {
                 const effectiveParentId = unwrapRelationId(rawParent)
                 if (effectiveParentId) {
                     const parentDoc = await req.payload.findByID({
+                        req,
                         collection: 'categories',
                         id: effectiveParentId,
                         user: req.user,
-                        overrideAccess: false,
+                        // Import already validates parent ownership in beforeValidate.
+                        // Its private capability allows the anonymous local replay to read that parent.
+                        overrideAccess: isMigrationContext(req.context),
                         disableErrors: true,
                     })
                     if (parentDoc?.breadcrumbs) {

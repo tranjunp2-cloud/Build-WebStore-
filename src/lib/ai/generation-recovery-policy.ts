@@ -1,9 +1,10 @@
 /** Server-owned recovery policy and safe list serialization for F41 Operations. */
 import { sanitizeGenerationEvidence, SERVER_INCIDENT_CODES } from './generation-outcome'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 export type GenerationRecoveryStatus =
     | 'none' | 'eligible' | 'retrying' | 'exhausted'
-    | 'ticket_required' | 'ticket_created' | 'stale_running' | null | undefined
+    | 'ticket_required' | 'ticket_created' | 'ticket_verification_required' | 'operator_verifying' | 'operator_resolved' | 'stale_running' | null | undefined
 
 export type GenerationLifecycle = 'queued' | 'running' | 'terminal' | null | undefined
 export type GenerationOutcome = 'succeeded' | 'partial_failed' | 'failed' | 'cancelled' | null | undefined
@@ -31,6 +32,7 @@ export type GenerationListSource = {
     lifecycle?: GenerationLifecycle
     outcome?: GenerationOutcome
     recoveryStatus?: GenerationRecoveryStatus
+    retryRootGeneration?: { id: string | number } | string | number | null
     pageSummary?: { expected?: number | null; persisted?: number | null; failed?: number | null } | null
     generationErrors?: Array<{
         code?: string | null
@@ -101,6 +103,8 @@ export function summarizeGenerationIncident(errors: GenerationListSource['genera
 export function resolveGenerationRecoveryPolicy(record: Pick<GenerationListSource, 'lifecycle' | 'outcome' | 'recoveryStatus'>): RecoveryPolicy {
     switch (record.recoveryStatus) {
         case 'ticket_created': return { action: 'open_ticket', retryable: false, reasonCode: 'TICKET_CREATED' }
+        case 'ticket_verification_required': return { action: 'open_ticket', retryable: false, reasonCode: 'TICKET_VERIFICATION_REQUIRED' }
+        case 'operator_verifying': return { action: 'open_ticket', retryable: false, reasonCode: 'OPERATOR_VERIFYING' }
         case 'ticket_required':
         case 'exhausted': return { action: 'create_ticket', retryable: false, reasonCode: 'TICKET_REQUIRED' }
         case 'retrying': return { action: 'monitor', retryable: false, reasonCode: 'RETRY_IN_PROGRESS' }
@@ -112,6 +116,7 @@ export function resolveGenerationRecoveryPolicy(record: Pick<GenerationListSourc
 
 export function resolveGenerationPriority(record: Pick<GenerationListSource, 'lifecycle' | 'outcome' | 'recoveryStatus'>): GenerationPriority {
     if (record.recoveryStatus === 'ticket_required') return 'cannot_recover'
+    if (record.recoveryStatus === 'ticket_verification_required' || record.recoveryStatus === 'operator_verifying') return 'cannot_recover'
     if (record.recoveryStatus === 'exhausted') return record.outcome === 'failed' || record.outcome === 'partial_failed' ? 'retry_failed' : 'cannot_recover'
     if (record.recoveryStatus === 'eligible') return 'retryable'
     if (record.recoveryStatus === 'retrying') return 'retrying'
@@ -128,7 +133,12 @@ function relationLabel(value: GenerationListSource['user'] | GenerationListSourc
     if (typeof value === 'string' || typeof value === 'number') return { id: String(value), label: `#${value}`, missing: false }
     if (kind === 'user' && 'email' in value) {
         const name = [value.firstName, value.lastName].filter(Boolean).join(' ')
-        return { id: String(value.id), label: name || value.email || `#${value.id}`, missing: false }
+        return {
+            id: String(value.id),
+            label: name || value.email || `#${value.id}`,
+            email: typeof value.email === 'string' ? value.email : null,
+            missing: false,
+        }
     }
     if ('name' in value) return { id: String(value.id), label: value.name || value.slug || `#${value.id}`, missing: false }
     return { id: String(value.id), label: `#${value.id}`, missing: false }
@@ -141,6 +151,10 @@ export function serializeAdminGeneration(record: GenerationListSource) {
         user: relationLabel(record.user, 'user'), site: relationLabel(record.site, 'site'),
         lifecycle: record.lifecycle ?? 'running', outcome: record.outcome ?? null,
         recoveryStatus: record.recoveryStatus ?? 'none', priority: resolveGenerationPriority(record),
+        // Every retry in a lineage escalates to one ticket. This stable root
+        // identifier lets a reloaded list open that ticket without exposing
+        // any raw generation evidence.
+        ticketRelatedGenerationId: relationId(record.retryRootGeneration) ?? String(record.id),
         recoveryPolicy: resolveGenerationRecoveryPolicy(record),
         pageSummary: { expected: record.pageSummary?.expected ?? null, persisted: record.pageSummary?.persisted ?? 0, failed: record.pageSummary?.failed ?? 0 },
         incidentSummary: summarizeGenerationIncident(record.generationErrors),
@@ -175,7 +189,8 @@ export type GenerationDetailSource = GenerationListSource & {
     parentGeneration?: { id: string | number } | string | number | null
     retryRootGeneration?: { id: string | number } | string | number | null
     recoveredSite?: { id: string | number; name?: string | null; domain?: string | null; status?: string | null } | string | number | null
-    site?: { id: string | number; name?: string | null; slug?: string | null; domain?: string | null; status?: string | null } | string | number | null
+    site?: { id: string | number; name?: string | null; slug?: string | null; domain?: string | null; status?: string | null; tenant?: { id: string | number; slug?: string | null } | string | number | null } | string | number | null
+    tenant?: { id: string | number; slug?: string | null } | string | number | null
     user?: { id: string | number; email?: string | null; firstName?: string | null; lastName?: string | null } | string | number | null
     pageOutcomes?: Array<{ pageKey?: string | null; title?: string | null; slug?: string | null; pageId?: string | null; status?: string | null; blockCount?: number | null; errorCode?: string | null; errorSummary?: string | null }> | null
     generationErrors?: Array<{ phase?: string | null; locationType?: string | null; locationKey?: string | null; locationLabel?: string | null; validationRule?: string | null; observedState?: string | null; code?: string | null; category?: string | null; retryabilityReason?: string | null; userSafeMessage?: string | null; sanitizedTechnicalMessage?: string | null }> | null
@@ -294,12 +309,14 @@ function siteDetail(value: GenerationDetailSource['site'] | GenerationDetailSour
     return { id: String(value.id), name: value.name ?? `#${value.id}`, domain: value.domain ?? null, status: value.status ?? null }
 }
 
-function siteUrls(site: ReturnType<typeof siteDetail>) {
+function siteUrls(site: ReturnType<typeof siteDetail>, tenantSlug?: string | null) {
+    const isPublished = site.status === 'published' || site.status === 'live'
+    const liveUrl = site.domain || (isPublished && tenantSlug ? buildStorefrontUrl(tenantSlug) : null)
     return {
         // This is an internal, operator-only preview route; it is derived from
         // the database id rather than accepting an arbitrary stored URL.
         preview: site.id ? `/preview/${encodeURIComponent(site.id)}` : null,
-        live: site.domain,
+        live: liveUrl,
     }
 }
 
@@ -342,6 +359,7 @@ export function serializeAdminGenerationDetail(
     record: GenerationDetailSource,
     retryHistory: GenerationDetailSource[] = [],
     recoveryJobs: GenerationRecoveryJobDetailSource[] = [],
+    tenantSlug?: string | null,
 ) {
     const summary = serializeAdminGeneration(record)
     const capturedSite = siteDetail(record.site)
@@ -350,6 +368,9 @@ export function serializeAdminGenerationDetail(
     // linked to it. Prefer the original relation, but do not hide the recovery
     // website in that transitional state.
     const site = capturedSite.id ? capturedSite : recoveredSite
+    const siteTenantSlug = record.site && typeof record.site === 'object' && 'tenant' in record.site && typeof (record.site as Record<string, unknown>).tenant === 'object' && typeof ((record.site as Record<string, unknown>).tenant as Record<string, unknown>)?.slug === 'string' ? ((record.site as Record<string, unknown>).tenant as Record<string, unknown>).slug as string : null
+    const recordTenantSlug = record.tenant && typeof record.tenant === 'object' && 'slug' in record.tenant && typeof record.tenant.slug === 'string' ? record.tenant.slug : null
+    const resolvedTenantSlug = tenantSlug ?? recordTenantSlug ?? siteTenantSlug
     const boundedRawErrors = recordItems(record.generationErrors).slice(0, 20)
     const pages = recordItems(record.pageOutcomes).slice(0, 100).map((page) => ({
         pageKey: safeDiagnostic(page.pageKey, 160), title: safeDiagnostic(page.title, 240) ?? safeDiagnostic(page.slug, 160) ?? 'Trang chưa đặt tên', slug: safeDiagnostic(page.slug, 160),
@@ -397,7 +418,7 @@ export function serializeAdminGenerationDetail(
             type: primary?.locationType ?? 'unknown', key: primary?.locationKey ?? null,
             label: primary?.locationLabel ?? 'Chưa xác định', known: primary?.locationKnown ?? false,
         },
-        cause: { ...incidentCause(incidentSummary.kind, primary?.code ?? 'UNKNOWN'), validationRule: primary?.validationRule ?? null, observedState: primary?.observedState ?? null },
+        cause: { ...incidentCause(incidentSummary.kind, primary?.code ?? 'UNKNOWN'), phase: primary?.phase ?? 'unknown', validationRule: primary?.validationRule ?? null, observedState: primary?.observedState ?? null },
         impact: { expected: summary.pageSummary.expected, persisted: summary.pageSummary.persisted, failed: summary.pageSummary.failed, summary: summary.pageSummary.expected === null ? 'Chưa ghi nhận tổng số trang.' : `${summary.pageSummary.failed}/${summary.pageSummary.expected} trang chưa tạo, ${summary.pageSummary.persisted} trang đã lưu.` },
         recovery: { retryable: summary.recoveryPolicy.retryable, scope: summary.recoveryPolicy.retryable ? 'website' : 'none', reasonCode: summary.recoveryPolicy.reasonCode },
         owner: inputIncident ? { kind: 'user', label: 'Người dùng cần điều chỉnh form' } : summary.recoveryPolicy.action === 'create_ticket' || summary.recoveryPolicy.action === 'open_ticket' ? { kind: 'dev', label: 'Team Dev' } : { kind: 'operator', label: 'Người trực tracking' },
@@ -405,12 +426,12 @@ export function serializeAdminGenerationDetail(
         developerEvidence: primary?.technicalMessage ? { phase: primary.phase, technicalMessage: primary.technicalMessage } : null,
         legacy: false, relatedErrorCount: errors.length,
     }
-    const legacyIncident = isLegacy ? { kind: 'unknown' as const, label: 'Chưa xác định lỗi', location: { type: 'unknown', key: null, label: 'Chưa xác định', known: false }, cause: { ...incidentCause('unknown', 'UNKNOWN'), validationRule: null, observedState: null }, impact: { expected: summary.pageSummary.expected, persisted: summary.pageSummary.persisted, failed: summary.pageSummary.failed, summary: summary.pageSummary.expected === null ? 'Chưa ghi nhận tổng số trang.' : `${summary.pageSummary.failed}/${summary.pageSummary.expected} trang chưa tạo, ${summary.pageSummary.persisted} trang đã lưu.` }, recovery: { retryable: summary.recoveryPolicy.retryable, scope: summary.recoveryPolicy.retryable ? 'website' : 'none', reasonCode: summary.recoveryPolicy.reasonCode }, owner: { kind: 'operator', label: 'Người trực tracking' }, nextAction: { kind: 'monitor', label: 'Kiểm tra timeline hoặc lần gen lại để tiếp tục điều tra.' }, developerEvidence: null, legacy: true, relatedErrorCount: 0 } : null
+    const legacyIncident = isLegacy ? { kind: 'unknown' as const, label: 'Chưa xác định lỗi', location: { type: 'unknown', key: null, label: 'Chưa xác định', known: false }, cause: { ...incidentCause('unknown', 'UNKNOWN'), phase: 'unknown', validationRule: null, observedState: null }, impact: { expected: summary.pageSummary.expected, persisted: summary.pageSummary.persisted, failed: summary.pageSummary.failed, summary: summary.pageSummary.expected === null ? 'Chưa ghi nhận tổng số trang.' : `${summary.pageSummary.failed}/${summary.pageSummary.expected} trang chưa tạo, ${summary.pageSummary.persisted} trang đã lưu.` }, recovery: { retryable: summary.recoveryPolicy.retryable, scope: summary.recoveryPolicy.retryable ? 'website' : 'none', reasonCode: summary.recoveryPolicy.reasonCode }, owner: { kind: 'operator', label: 'Người trực tracking' }, nextAction: { kind: 'monitor', label: 'Kiểm tra timeline hoặc lần gen lại để tiếp tục điều tra.' }, developerEvidence: null, legacy: true, relatedErrorCount: 0 } : null
     return {
         ...summary,
         endpoint: record.endpoint ?? 'site-generator', category: record.category ?? null,
-        website: { ...site, urls: siteUrls(site) },
-        recoveredWebsite: record.recoveredSite && recoveredSite.id !== site.id ? { ...recoveredSite, urls: siteUrls(recoveredSite) } : null,
+        website: { ...site, urls: siteUrls(site, resolvedTenantSlug) },
+        recoveredWebsite: record.recoveredSite && recoveredSite.id !== site.id ? { ...recoveredSite, urls: siteUrls(recoveredSite, resolvedTenantSlug) } : null,
         user: userDetail(record.user),
         traceId: safeTraceId(record.traceId),
         input: safeInput(record.inputSnapshot), inputSchemaVersion: record.inputSchemaVersion ?? null,
@@ -424,5 +445,33 @@ export function serializeAdminGenerationDetail(
 /** Pure, sanitized handoff for US-F41-05. It deliberately performs no mutation. */
 export function buildGenerationTicketIncidentSnapshot(detail: ReturnType<typeof serializeAdminGenerationDetail>) {
     if (!detail.incident) return null
-    return { generationId: detail.id, traceId: safeTraceId(detail.traceId), incident: detail.incident, website: { id: detail.website.id }, user: { id: detail.user.id }, lineage: detail.lineage }
+    // The issue is an internal, Super Admin-only handoff. Keep enough
+    // relationship and execution context for Dev to find the affected user,
+    // then reproduce by inspection; do not copy form values, prompts or raw
+    // provider output into a durable ticket.
+    return {
+        generationId: detail.id,
+        generationDetailHref: `/studio/generations/${encodeURIComponent(detail.id)}`,
+        traceId: safeTraceId(detail.traceId),
+        incident: detail.incident,
+        website: {
+            id: detail.website.id,
+            name: detail.website.name,
+            previewHref: detail.website.urls.preview,
+        },
+        user: {
+            id: detail.user.id,
+            name: detail.user.name,
+            email: detail.user.email,
+        },
+        execution: {
+            endpoint: detail.endpoint,
+            source: detail.lineage.source,
+            inputSchemaVersion: detail.inputSchemaVersion,
+            inputHash: detail.inputHash,
+            submittedAt: detail.submittedAt,
+            terminalAt: detail.timeline.find((item) => item.event === 'terminal')?.at ?? null,
+        },
+        lineage: detail.lineage,
+    }
 }

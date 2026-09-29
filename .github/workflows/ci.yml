@@ -329,7 +329,7 @@ jobs:
     # merge commit was already CI-validated on its source PR.
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     concurrency:
       group: vercel-deploy-staging
       cancel-in-progress: false
@@ -509,7 +509,7 @@ jobs:
     # No `needs` — see deploy-staging rationale above.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     concurrency:
       group: vercel-deploy-production
       cancel-in-progress: false
@@ -662,7 +662,7 @@ jobs:
     # by sync-staging-to-qc-test.yml after auto-merging staging into qc-test).
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     concurrency:
       group: vercel-deploy-qc-test
       cancel-in-progress: false

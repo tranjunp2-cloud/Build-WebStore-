@@ -12,6 +12,14 @@ import {
 } from '@/lib/dashboard-utils'
 
 describe('normalizeDashboardBlocks', () => {
+    it.each([{}, { widgets: ['orders'] }, 'seo', 1, true])('[TC-F42-IMP-PREFS] defaults safely for non-array JSON: %j', raw => {
+        // Arrange / Act
+        const result = normalizeDashboardBlocks(raw)
+        // Assert
+        expect(result).toEqual(DEFAULT_DASHBOARD_BLOCKS)
+        expect(result).not.toBe(DEFAULT_DASHBOARD_BLOCKS)
+    })
+
     it('returns defaults for null/empty input', () => {
         expect(normalizeDashboardBlocks(null)).toEqual(DEFAULT_DASHBOARD_BLOCKS)
         expect(normalizeDashboardBlocks(undefined)).toEqual(DEFAULT_DASHBOARD_BLOCKS)

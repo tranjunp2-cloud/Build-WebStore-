@@ -29,6 +29,35 @@ type RecoveryStatus =
 type TicketStatus = 'none' | 'open' | 'resolved'
 ```
 
+### 2.1 Operational-status mapping (source of truth)
+
+`outcome` is immutable history of the original generation. The two Studio
+screens use separate operational workflows; a Dev ticket can never by itself
+complete the affected user's support flow.
+
+| Screen | Stored status | Owner | Meaning / permitted next action |
+|---|---|---|---|
+| Issues & Feedback | `backlog` | Dev team | New report has not been accepted. Move freely to any ticket column. |
+| Issues & Feedback | `reopen` | QA/operator | Retest failed; return work to Dev. |
+| Issues & Feedback | `in_progress` | Dev team | Dev is investigating or implementing a fix. |
+| Issues & Feedback | `dev_fixed` | Dev team | Code fix is ready for verification. |
+| Issues & Feedback | `testing` | QA/operator | The fix is being verified. |
+| Issues & Feedback | `done` | QA/operator | Ticket work is accepted. A related generation enters operator verification; this is not user completion. |
+| User Generations | `eligible` | Operator | Safe automatic recovery is available; operator can enqueue retry. |
+| User Generations | `retrying` | System | Recovery child is queued/running; operator monitors only. |
+| User Generations | `ticket_required` / `exhausted` | Dev team | Automatic recovery is unavailable; create or work the Dev ticket. |
+| User Generations | `ticket_created` | Dev team | Related Dev ticket exists and is not yet accepted by the operator. |
+| User Generations | `ticket_verification_required` | Operator | Dev/QA marked the ticket Done; operator must start a user-facing verification. |
+| User Generations | `operator_verifying` | Operator | Operator is testing the repaired website/generation. Choose completion or report failure. |
+| User Generations | `operator_resolved` | Operator | Operator confirmed the user can use the repaired website. Excluded from Needs Attention but retained in history/audit. |
+
+Transition rules: operator starts verification from `ticket_verification_required`;
+pass sets `operator_resolved` and keeps the original failure outcome immutable;
+failure returns the generation to `ticket_created` and moves the related issue
+to `reopen`, so the UI reopens the existing ticket rather than offering a duplicate.
+No workflow-order restriction applies to the Issue board, but only
+the operator completion action can resolve a user generation.
+
 `outcome` chỉ có giá trị khi `lifecycle='terminal'`. `succeeded` chỉ được set sau khi site và mọi page persistence đã terminal, không phải khi AI compose xong.
 
 | Điều kiện | Lifecycle / outcome | Recovery | Owner chuyển state |

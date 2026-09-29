@@ -72,4 +72,39 @@ describe('GenerationsLiveFeed error state', () => {
         settleSearch?.(new Response(JSON.stringify({ error: { code: 'SEARCH_TOO_BROAD', message: 'Có quá nhiều user hoặc website khớp.' } }), { status: 400 }))
         await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Có quá nhiều user hoặc website khớp'))
     })
+
+    it('defaults to All Generations tab and displays global overview statistics', async () => {
+        // Arrange
+        const dataWithOverview: GenerationsListResponse = {
+            ...staleData,
+            overview: {
+                total: 529,
+                needsAttention: 0,
+                retryable: 0,
+                retrying: 0,
+                ticketRequired: 0,
+                succeeded: 480,
+                running: 49,
+            },
+        }
+        const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(dataWithOverview), { status: 200 }))
+        vi.stubGlobal('fetch', fetchMock)
+
+        // Act
+        render(<GenerationsLiveFeed initialData={dataWithOverview} />)
+
+        // Assert — All Generations is active by default
+        const allTab = await screen.findByRole('button', { name: /all generations/i })
+        expect(allTab).toHaveAttribute('aria-pressed', 'true')
+        expect(allTab).toHaveTextContent('All Generations · 529')
+
+        // Needs Attention shows its own 0 count, NOT 529
+        const attentionTab = screen.getByRole('button', { name: /needs attention/i })
+        expect(attentionTab).toHaveAttribute('aria-pressed', 'false')
+        expect(attentionTab).toHaveTextContent('Needs Attention · 0')
+
+        // Top KPIs reflect overview
+        expect(screen.getByText('480')).toBeVisible() // Đã hoàn tất
+        expect(screen.getByText('49')).toBeVisible() // Đang tạo website
+    })
 })

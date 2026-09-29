@@ -20,15 +20,18 @@ import {
 
 const LIMIT = 50
 
-const StandardIssueSchema = z.object({
+const ManualIssueSchema = z.object({
     title: z.string().min(1).max(300),
     description: z.string().max(10000).optional(),
     severity: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
-    category: z.enum(['accessibility', 'performance', 'content', 'ui', 'ai-quality', 'other']),
+    status: z.enum(['backlog', 'reopen', 'in_progress', 'dev_fixed', 'testing', 'done']).default('backlog'),
+    assignmentTarget: z.enum(['unassigned', 'dev']).default('unassigned'),
+    reportedBy: z.union([z.string(), z.number()]).optional(),
+}).strict()
+
+const LinkedIssueSchema = ManualIssueSchema.extend({
     relatedType: z.enum(['template', 'generation', 'block']),
     relatedId: z.string().min(1),
-    assignedTo: z.union([z.string(), z.number()]).optional(),
-    reportedBy: z.union([z.string(), z.number()]).optional(),
 })
 
 const RuntimeIssueSchema = z.object({
@@ -42,10 +45,10 @@ const RuntimeIssueSchema = z.object({
     severity: z.enum(['critical', 'high', 'medium', 'low']).optional(),
 })
 
-const CreateIssueSchema = z.discriminatedUnion('relatedType', [
-    StandardIssueSchema,
-    RuntimeIssueSchema,
-])
+// The discriminator must be considered before the manual shape. Zod strips
+// unknown object keys by default, so putting ManualIssueSchema first would
+// silently turn a linked generation ticket into an unrelated manual ticket.
+const CreateIssueSchema = z.union([RuntimeIssueSchema, LinkedIssueSchema, ManualIssueSchema])
 
 function formatRuntimeDescription(error: LiveError, related: LiveError | null): string {
     const evidence = [
@@ -157,7 +160,7 @@ export const GET = withSuperAdmin(async (req) => {
     if (severity) where.severity = { equals: severity }
     if (status) where.status = { equals: status }
     if (category) where.category = { equals: category }
-    if (assignee) where['assignedTo.id'] = { equals: assignee }
+    if (assignee === 'dev' || assignee === 'unassigned') where.assignmentTarget = { equals: assignee }
     if (relatedType) where.relatedType = { equals: relatedType }
     if (relatedId) where.relatedId = { equals: relatedId }
     if (search) where.title = { contains: search }
@@ -184,7 +187,7 @@ export const POST = withSuperAdmin(async (req) => {
 
     const payload = await getPayload({ config })
 
-    if (parsed.data.relatedType === 'runtime') {
+    if ('relatedType' in parsed.data && parsed.data.relatedType === 'runtime') {
         let primaryResult
         try {
             primaryResult = await fetchProviderEvidence(
@@ -217,7 +220,7 @@ export const POST = withSuperAdmin(async (req) => {
                     description: formatRuntimeDescription(primary, null),
                     severity: parsed.data.severity ?? primary.severity,
                     category: 'other',
-                    status: 'open',
+                    status: 'backlog',
                     relatedType: 'runtime',
                     relatedId: runtimeRelatedId,
                 },
@@ -231,27 +234,47 @@ export const POST = withSuperAdmin(async (req) => {
         }
     }
 
-    // Soft-validate relatedId exists
-    const valid = await validateRelatedId(payload, parsed.data.relatedType, parsed.data.relatedId)
-    if (!valid) {
-        return NextResponse.json(
-            { error: `relatedId "${parsed.data.relatedId}" not found for type "${parsed.data.relatedType}"` },
-            { status: 422 },
-        )
+    if ('relatedType' in parsed.data) {
+        const valid = await validateRelatedId(payload, parsed.data.relatedType, parsed.data.relatedId)
+        if (!valid) {
+            return NextResponse.json(
+                { error: `relatedId "${parsed.data.relatedId}" not found for type "${parsed.data.relatedType}"` },
+                { status: 422 },
+            )
+        }
+        const linkedDoc = await payload.create({
+            collection: 'template-issues',
+            data: {
+                title: parsed.data.title,
+                description: parsed.data.description,
+                severity: parsed.data.severity,
+                category: 'other',
+                status: parsed.data.status,
+                relatedType: parsed.data.relatedType,
+                relatedId: parsed.data.relatedId,
+                assignmentTarget: parsed.data.assignmentTarget,
+                ...(parsed.data.reportedBy ? { reportedBy: parsed.data.reportedBy } : {}),
+            },
+        })
+        return NextResponse.json({ data: linkedDoc }, { status: 201 })
     }
 
+    const manual = parsed.data
     const doc = await payload.create({
         collection: 'template-issues',
         data: {
-            title: parsed.data.title,
-            description: parsed.data.description,
-            severity: parsed.data.severity,
-            category: parsed.data.category,
-            status: 'open',
-            relatedType: parsed.data.relatedType,
-            relatedId: parsed.data.relatedId,
-            ...(parsed.data.assignedTo ? { assignedTo: parsed.data.assignedTo } : {}),
-            ...(parsed.data.reportedBy ? { reportedBy: parsed.data.reportedBy } : {}),
+            title: manual.title,
+            description: manual.description,
+            severity: manual.severity,
+            category: 'other',
+            status: manual.status,
+            // A manually reported bug may not yet be tied to a specific
+            // template/generation. Keep a stable internal relation so the
+            // collection's audit and filtering contracts remain intact.
+            relatedType: 'manual',
+            relatedId: `manual-${crypto.randomUUID()}`,
+            assignmentTarget: manual.assignmentTarget,
+            ...(manual.reportedBy ? { reportedBy: manual.reportedBy } : {}),
         },
     })
 

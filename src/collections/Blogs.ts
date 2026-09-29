@@ -32,6 +32,7 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
         const requestedSiteId = unwrapRelationId(data.site)
         if (requestedSiteId != null && String(requestedSiteId) !== String(originalSiteId ?? '')) {
             const siteCheck = await req.payload.find({
+                req,
                 collection: 'sites',
                 where: { id: { equals: requestedSiteId }, tenant: { equals: safeTenantId } },
                 limit: 1,
@@ -56,6 +57,7 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
         (categoryWasProvided || tenantWasProvided || operation === 'create')
     ) {
         const categoryDoc = await req.payload.findByID({
+            req,
             collection: 'blog_categories',
             id: finalCategoryId,
             overrideAccess: true,
@@ -76,6 +78,7 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
         }
         if (!data.site && data.tenant) {
             const siteRes = await req.payload.find({
+                req,
                 collection: 'sites',
                 where: { tenant: { equals: data.tenant } },
                 limit: 1,
@@ -99,6 +102,7 @@ export function validateBlogSlug(value: unknown): true | string {
 
 export const Blogs: CollectionConfig = {
     slug: 'blogs',
+    indexes: [{ fields: ['tenant', 'slug'], unique: true }],
     hooks: {
         beforeChange: [beforeChangeHook],
         afterChange: [
@@ -193,7 +197,6 @@ export const Blogs: CollectionConfig = {
             name: 'slug',
             type: 'text',
             required: true,
-            unique: true,
             index: true,
             validate: validateBlogSlug,
         },

@@ -2,8 +2,8 @@
 
 ## Context Links
 
-- Generate-site API tests: [src/__tests__/api/ai.test.ts](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/api/ai.test.ts:196)
-- Existing products-grid tests: [src/__tests__/unit/blocks/products-grid.test.tsx](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/unit/blocks/products-grid.test.tsx:186)
+- Generate-site API tests: [src/__tests__/api/ai.test.ts](<worktree-1>/src/__tests__/api/ai.test.ts:196)
+- Existing products-grid tests: [src/__tests__/unit/blocks/products-grid.test.tsx](<worktree-1>/src/__tests__/unit/blocks/products-grid.test.tsx:186)
 
 ## Overview
 

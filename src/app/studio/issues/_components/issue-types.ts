@@ -4,9 +4,10 @@
  */
 
 export type IssueSeverity = 'critical' | 'high' | 'medium' | 'low'
-export type IssueStatus = 'open' | 'in-review' | 'fixed' | 'wont-fix'
+export type IssueStatus = 'backlog' | 'reopen' | 'in_progress' | 'dev_fixed' | 'testing' | 'done'
 export type IssueCategory = 'accessibility' | 'performance' | 'content' | 'ui' | 'ai-quality' | 'other'
-export type IssueRelatedType = 'template' | 'generation' | 'block' | 'runtime'
+export type IssueRelatedType = 'template' | 'generation' | 'block' | 'runtime' | 'manual'
+export type IssueAssignmentTarget = 'unassigned' | 'dev'
 export type LiveErrorSource = 'sentry' | 'vercel'
 
 export interface LiveErrorTenantMatch {
@@ -90,6 +91,7 @@ export interface IssueRecord {
     relatedId: string
     reportedBy?: { id: number; email?: string } | number | null
     assignedTo?: { id: number; email?: string } | number | null
+    assignmentTarget?: IssueAssignmentTarget
     comments?: IssueComment[]
     timeline?: IssueTimelineEntry[]
     resolvedAt?: string

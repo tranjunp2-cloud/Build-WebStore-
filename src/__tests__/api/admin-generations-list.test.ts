@@ -81,6 +81,32 @@ describe('GET /api/admin/generations', () => {
         }
     })
 
+    it('TC-F41-monitoring: excludes internal SEO captures from the website-generation queue', async () => {
+        findSpy.mockResolvedValue({ docs: [fixture('site', 'eligible', '2026-09-15T10:00:00.000Z')] })
+
+        const response = await GET(request('?view=all'))
+
+        expect(response.status).toBe(200)
+        expect(JSON.stringify(findSpy.mock.calls[0]?.[0].where)).toContain('"endpoint":{"equals":"site-generator"}')
+    })
+
+    it('TC-F41-06: keeps a Done ticket in Needs Attention for operator verification', async () => {
+        // Arrange — Done means Dev has finished, not that the operator has
+        // verified the repaired website. This record must not disappear.
+        findSpy.mockResolvedValue({ docs: [
+            fixture('verification', 'ticket_verification_required', '2026-09-15T12:00:00.000Z'),
+        ] })
+
+        // Act
+        const response = await GET(request())
+        const body = await response.json()
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(body.items.map((item: { id: string }) => item.id)).toEqual(['verification'])
+        expect(JSON.stringify(findSpy.mock.calls[0]?.[0].where)).toContain('ticket_verification_required')
+    })
+
     it('TC-F41-07: returns only safe list fields, including for a document with raw legacy fields', async () => {
         // Arrange
         findSpy.mockResolvedValue({ docs: [fixture('safe', 'eligible', '2026-09-15T10:00:00.000Z', {
@@ -280,6 +306,31 @@ describe('GET /api/admin/generations', () => {
         expect(body.items[0]).toMatchObject({
             user: { id: null, label: 'Unknown', missing: true },
             site: { id: null, label: 'Unknown', missing: true },
+        })
+    })
+
+    it('returns global overview statistics in response', async () => {
+        // Arrange
+        findSpy.mockResolvedValue({ docs: [
+            fixture('1', 'none', '2026-09-15T10:00:00.000Z', { outcome: 'succeeded', lifecycle: 'terminal' }),
+            fixture('2', null, '2026-09-15T11:00:00.000Z', { lifecycle: 'running', outcome: null }),
+        ] })
+
+        // Act
+        const response = await GET(request('?view=all'))
+        const body = await response.json()
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(body).toHaveProperty('overview')
+        expect(body.overview).toMatchObject({
+            total: expect.any(Number),
+            needsAttention: expect.any(Number),
+            retryable: expect.any(Number),
+            retrying: expect.any(Number),
+            ticketRequired: expect.any(Number),
+            succeeded: expect.any(Number),
+            running: expect.any(Number),
         })
     })
 })

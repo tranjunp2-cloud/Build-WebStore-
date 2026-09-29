@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasValidImageSignature } from '@/lib/media/image-signature'
+import { hasValidEvidenceVideoSignature, hasValidImageSignature } from '@/lib/media/image-signature'
 
 describe('hasValidImageSignature', () => {
     it.each([
@@ -13,5 +13,17 @@ describe('hasValidImageSignature', () => {
 
     it('rejects content without a supported image signature', () => {
         expect(hasValidImageSignature(Uint8Array.from([1, 2, 3, 4]))).toBe(false)
+    })
+})
+
+describe('hasValidEvidenceVideoSignature', () => {
+    it('accepts MP4 and WebM container headers', () => {
+        expect(hasValidEvidenceVideoSignature(Uint8Array.from([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70]), 'video/mp4')).toBe(true)
+        expect(hasValidEvidenceVideoSignature(Uint8Array.from([0x1A, 0x45, 0xDF, 0xA3]), 'video/webm')).toBe(true)
+    })
+
+    it('rejects non-video content presented as video evidence', () => {
+        expect(hasValidEvidenceVideoSignature(Uint8Array.from([0x89, 0x50, 0x4E, 0x47]), 'video/mp4')).toBe(false)
+        expect(hasValidEvidenceVideoSignature(Uint8Array.from([1, 2, 3, 4]), 'video/webm')).toBe(false)
     })
 })

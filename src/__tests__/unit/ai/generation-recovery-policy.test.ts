@@ -97,6 +97,21 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
         expect(JSON.stringify(serialized)).not.toContain('raw provider stack / secret')
     })
 
+    it('TC-F41-07: includes the affected user email in the safe listing contract', () => {
+        // Arrange
+        const source = record({
+            user: { id: 3, firstName: 'F41', lastName: 'UI Operator', email: 'operator@example.test' },
+        })
+
+        // Act
+        const serialized = serializeAdminGeneration(source)
+
+        // Assert
+        expect(serialized.user).toEqual({
+            id: '3', label: 'F41 UI Operator', email: 'operator@example.test', missing: false,
+        })
+    })
+
     it('TC-F41-08: selects the most blocking incident across all captured errors', () => {
         // Arrange: the first error is component-scoped, but quota blocks the entire website.
         const errors: NonNullable<GenerationListSource['generationErrors']> = [
@@ -205,12 +220,13 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
 
         // Assert
         expect(snapshot).toMatchObject({
-            generationId: 'gen-1', traceId: 'f41-ui-fixture-incident-9', website: { id: 'site-9' }, user: { id: 'user-9' },
+            generationId: 'gen-1', traceId: 'f41-ui-fixture-incident-9', website: { id: 'site-9' },
+            // Ticket nội bộ cần email để Dev/QA xác định chính xác user bị ảnh hưởng.
+            user: { id: 'user-9', email: 'private@example.test' },
             incident: { location: { key: 'contact', label: 'Liên hệ', known: true }, cause: { code: 'PAGE_PERSISTENCE_FAILED' } },
         })
         expect(snapshot?.incident).toEqual(detail.incident)
         expect(JSON.stringify(snapshot)).not.toContain('never copy this prompt')
-        expect(JSON.stringify(snapshot)).not.toContain('private@example.test')
     })
 
     it('TC-F41-28: resolves a component from captured stable page and component keys only', () => {
@@ -295,5 +311,50 @@ describe('[TC-F41-06/08] generation recovery policy', () => {
         // Assert
         expect(details.map((detail) => detail.incident?.cause.code)).toEqual(['AI_QUOTA_EXCEEDED', 'INVALID_TEMPLATE_CONTRACT', 'INVALID_COMPONENT_CONTRACT'])
         expect(details.map((detail) => detail.incident?.developerEvidence)).toEqual([null, null, null])
+    })
+
+    it('TC-F41-28: resolves public live URL for published sites via tenant slug when custom domain is not set', () => {
+        // Arrange
+        const source = record({
+            site: { id: 'site-526', name: 'Ice Cube Store', domain: null, status: 'published' },
+            tenant: { id: 'tenant-1', slug: 'hello-guy' },
+        }) as GenerationDetailSource
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.website.urls.preview).toBe('/preview/site-526')
+        expect(detail.website.urls.live).toBeTruthy()
+        expect(detail.website.urls.live).toContain('hello-guy')
+    })
+
+    it('TC-F41-28: keeps live URL null for draft sites without custom domain', () => {
+        // Arrange
+        const source = record({
+            site: { id: 'site-526', name: 'Ice Cube Store', domain: null, status: 'draft' },
+            tenant: { id: 'tenant-1', slug: 'hello-guy' },
+        }) as GenerationDetailSource
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.website.urls.preview).toBe('/preview/site-526')
+        expect(detail.website.urls.live).toBeNull()
+    })
+
+    it('TC-F41-28: prioritizes custom domain when present regardless of tenant slug', () => {
+        // Arrange
+        const source = record({
+            site: { id: 'site-526', name: 'Ice Cube Store', domain: 'https://sharulicecube.my', status: 'published' },
+            tenant: { id: 'tenant-1', slug: 'hello-guy' },
+        }) as GenerationDetailSource
+
+        // Act
+        const detail = serializeAdminGenerationDetail(source)
+
+        // Assert
+        expect(detail.website.urls.live).toBe('https://sharulicecube.my')
     })
 })

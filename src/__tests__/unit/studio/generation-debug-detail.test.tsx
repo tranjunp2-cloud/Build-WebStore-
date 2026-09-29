@@ -71,6 +71,19 @@ describe('[TC-F41-15/16] GenerationDebugDetail', () => {
         expect(screen.queryByText('Thông tin kỹ thuật phục vụ Dev debug')).not.toBeInTheDocument()
     })
 
+    it('keeps rendering a legacy page when its component snapshot is omitted', async () => {
+        // Arrange: captures created before F41 do not contain the components field.
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: detail }), { status: 200 })))
+
+        // Act
+        render(<GenerationDebugDetail generationId="41" />)
+
+        // Assert
+        await screen.findByRole('heading', { name: 'Trang và component' })
+        fireEvent.click(document.querySelector('.f41-page-disclosure summary')!)
+        expect(screen.getByText('Trang chưa được lưu nên chưa có component để hiển thị.')).toBeVisible()
+    })
+
     it('shows technical evidence only when the generation contains useful debug data', async () => {
         // Arrange
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { ...detail, durationMs: 1250, incident: { ...detail.incident, developerEvidence: { phase: 'page_persist', technicalMessage: 'Normalized diagnostic: PAGE_FAILED (timeout).' } } } }), { status: 200 })))
@@ -127,7 +140,7 @@ describe('[TC-F41-15/16] GenerationDebugDetail', () => {
 
         // Assert
         expect((await screen.findAllByText('Cần Dev xử lý'))[0]).toBeVisible()
-        expect(screen.getByRole('link', { name: 'Mở Issues & feedback' })).toHaveAttribute('href', '/studio/issues')
+        expect(screen.getByRole('button', { name: 'Tạo ticket Dev cho generation #41' })).toBeVisible()
     })
 
     it('TC-F41-20: displays one generation-level impact summary for heterogeneous errors', async () => {
@@ -210,6 +223,28 @@ describe('[TC-F41-15/16] GenerationDebugDetail', () => {
         expect(await screen.findByText('Chưa có URL public')).toBeVisible()
         expect(screen.queryByRole('link', { name: /mở website/i })).not.toBeInTheDocument()
         expect(document.body).not.toHaveTextContent('ops-secret')
+    })
+
+    it('TC-F41-14: renders public live website link when valid public live URL is present', async () => {
+        // Arrange
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: {
+            ...detail,
+            website: {
+                ...detail.website,
+                status: 'published',
+                urls: { ...detail.website.urls, live: 'https://hello-guy.web-v2.dev.ecommercehub.my' },
+            },
+        } }), { status: 200 })))
+
+        // Act
+        render(<GenerationDebugDetail generationId="41" />)
+
+        // Assert
+        const liveLink = await screen.findByRole('link', { name: /mở website/i })
+        expect(liveLink).toBeVisible()
+        expect(liveLink).toHaveAttribute('href', 'https://hello-guy.web-v2.dev.ecommercehub.my/')
+        expect(liveLink).toHaveAttribute('target', '_blank')
+        expect(screen.queryByText('Chưa có URL public')).not.toBeInTheDocument()
     })
 
     it('TC-F41-20: ignores a stale detail response after the operator changes generation', async () => {

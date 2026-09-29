@@ -8,6 +8,7 @@ export type GenerationRecord = {
     lifecycle: 'queued' | 'running' | 'terminal'
     outcome: 'succeeded' | 'partial_failed' | 'failed' | 'cancelled' | null
     recoveryStatus: string
+    ticketRelatedGenerationId: string
     priority: string
     recoveryPolicy: { action: RecoveryAction; retryable: boolean; reasonCode: string }
     pageSummary: { expected: number | null; persisted: number; failed: number }
@@ -17,6 +18,15 @@ export type GenerationRecord = {
     // keep their compile contract without being returned by the F41-02 list API.
     status?: 'running' | 'success' | 'failed'; endpoint?: string; category?: string | null; durationMs?: number | null; costUsd?: number | null; createdAt?: string; completedAt?: string | null; promptMode?: string; promptHash?: string | null; errorLog?: string | null; outputSnapshot?: Record<string, unknown> | null; selectedBlocks?: Array<{ id: string; value?: string | null }> | null
 }
+export type GenerationOverview = {
+    total: number
+    needsAttention: number
+    retryable: number
+    retrying: number
+    ticketRequired: number
+    succeeded: number
+    running: number
+}
 export type GenerationsListMeta = { totalDocs: number; totalPages?: number; page?: number; limit: number; hasNextPage: boolean; hasPrevPage: boolean }
-export type GenerationsListResponse = { items: GenerationRecord[]; nextCursor?: string | null; meta: GenerationsListMeta }
+export type GenerationsListResponse = { items: GenerationRecord[]; nextCursor?: string | null; meta: GenerationsListMeta; overview?: GenerationOverview }
 export type GenerationsFilters = { view: 'needs_attention' | 'all'; status: string; recoveryStatus: string; search: string; userId: string; siteId: string; dateFrom: string; dateTo: string; cursor: string; limit: number }

@@ -101,6 +101,38 @@ describe('PreviewPage — Security & Authorization', () => {
         expect(screen.getByText('Access Denied')).toBeInTheDocument()
     })
 
+    it('allows access to preview for super-admin even if site tenant does not match user tenants', async () => {
+        // Arrange
+        mockedGetCurrentUser.mockResolvedValue({
+            id: 'admin-user',
+            roles: ['super-admin'],
+            tenants: [], // Super admin has platform-wide access
+        } as Partial<PlatformUser> as PlatformUser)
+
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+            id: siteId,
+            tenant: 'tenant-other',
+        })
+        .mockResolvedValueOnce({
+            id: 'page-456',
+            site: siteId,
+            layout: [],
+        })
+
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({
+            docs: [],
+        })
+
+        // Act
+        const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        render(Component as React.ReactElement)
+
+        // Assert
+        expect(screen.queryByText('Access Denied')).not.toBeInTheDocument()
+        expect(screen.getByTestId('site-renderer')).toBeInTheDocument()
+    })
+
     // ── TC-F05-SEC-03: Authorized Access ──────────────────────────────
     it('renders SiteRenderer when user is authorized for the site tenant', async () => {
         // Arrange

@@ -38,7 +38,7 @@ export function ProductForm({ initialData, isEdit, onSubmitForm, showLegacyPrice
     const [isSaving, setIsSaving] = useState(false)
     const [categories, setCategories] = useState<import('../CategorySelect').Category[]>([])
 
-    const schema = useMemo(() => getProductFormSchema(t), [t])
+    const schema = useMemo(() => getProductFormSchema(t, isEdit ? initialData?.images : undefined), [t, isEdit, initialData?.images])
 
     const methods = useForm<ProductFormValues>({
         resolver: async (values, context, options) => {

@@ -315,7 +315,7 @@ export async function persistBlogPosts(
         try {
             const slugCheck = await payload.find({
                 collection: 'blogs',
-                where: { slug: { equals: finalSlug } },
+                where: { slug: { equals: finalSlug }, tenant: { equals: tenantId } },
                 limit: 1,
             })
             if (slugCheck.totalDocs > 0) finalSlug = `${finalSlug}-${Math.random().toString(36).slice(2, 8)}`

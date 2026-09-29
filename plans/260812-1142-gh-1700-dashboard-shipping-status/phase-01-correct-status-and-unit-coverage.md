@@ -3,10 +3,10 @@
 ## Context Links
 
 - Issue: https://github.com/primeproduction/ech-prime-web-v2/issues/1700
-- Source: `/home/liam/data/ech-prime-web-v2/src/app/(dashboard)/dashboard/page.tsx`
-- Existing orchestration tests: `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/dashboard-page-orders.test.tsx`
-- QA matrix: `/home/liam/data/ech-prime-web-v2/docs/qa/F03-dashboard.md`
-- Test rules: `/home/liam/data/ech-prime-web-v2/docs/TEST_CONVENTION.md`
+- Source: `./src/app/(dashboard)/dashboard/page.tsx`
+- Existing orchestration tests: `./src/__tests__/unit/dashboard/dashboard-page-orders.test.tsx`
+- QA matrix: `./docs/qa/F03-dashboard.md`
+- Test rules: `./docs/TEST_CONVENTION.md`
 
 ## Overview
 
@@ -61,13 +61,13 @@ unchanged.
 
 | Action | Absolute path | Change |
 |---|---|---|
-| Modify | `/home/liam/data/ech-prime-web-v2/src/app/(dashboard)/dashboard/page.tsx` | Combine Self Delivery and EasyParcel flags |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/dashboard-page-orders.test.tsx` | Expose `OnboardingCard.steps` and add truth-table tests |
-| Modify | `/home/liam/data/ech-prime-web-v2/docs/qa/F03-dashboard.md` | Add TC-F03.78–80 as AUTO scenarios |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/app/api/e2e/dashboard-fixture/route.ts` | Add guarded EasyParcel-only preparation action |
-| Create | `/home/liam/data/ech-prime-web-v2/src/lib/e2e/dashboard-shipping-fixture.ts` | Prepare the dedicated tenant without changing EasyParcel activation or credentials |
-| Create | `/home/liam/data/ech-prime-web-v2/e2e/helpers/dashboard-shipping-fixture.ts` | Idempotent Playwright preparation client |
-| Modify | `/home/liam/data/ech-prime-web-v2/tests/gh-1734-self-delivery-complete.spec.ts` | Add independent GH-1700 Shipping row/tick coverage in the governed shipping spec |
+| Modify | `./src/app/(dashboard)/dashboard/page.tsx` | Combine Self Delivery and EasyParcel flags |
+| Modify | `./src/__tests__/unit/dashboard/dashboard-page-orders.test.tsx` | Expose `OnboardingCard.steps` and add truth-table tests |
+| Modify | `./docs/qa/F03-dashboard.md` | Add TC-F03.78–80 as AUTO scenarios |
+| Modify | `./src/app/api/e2e/dashboard-fixture/route.ts` | Add guarded EasyParcel-only preparation action |
+| Create | `./src/lib/e2e/dashboard-shipping-fixture.ts` | Prepare the dedicated tenant without changing EasyParcel activation or credentials |
+| Create | `./e2e/helpers/dashboard-shipping-fixture.ts` | Idempotent Playwright preparation client |
+| Modify | `./tests/gh-1734-self-delivery-complete.spec.ts` | Add independent GH-1700 Shipping row/tick coverage in the governed shipping spec |
 
 No schema, migration, environment variable, OAuth, i18n, or workflow file changes.
 

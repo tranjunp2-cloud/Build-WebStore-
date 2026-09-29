@@ -45,10 +45,19 @@ vi.mock('@/hooks/use-auto-resize-textarea', () => ({
     useAutoResizeTextarea: vi.fn(),
 }))
 
-vi.mock('@/app/(dashboard)/products/actions', () => ({
-    getProductsAction: vi.fn(),
-    updateProductFieldAction: vi.fn(),
-}))
+vi.mock('@/app/(dashboard)/products/actions', async () => {
+    const { selectProductPage, productPageInputSchema } = await import('@/lib/products/dashboard-product-pagination')
+    const getProductsAction = vi.fn()
+    return {
+        getProductsAction,
+        getProductsPageAction: async (input: unknown) => {
+            const docs = await getProductsAction() as Array<{ id: string; name: string; status: string; createdAt: string }>
+            const selected = selectProductPage(docs.map((doc, index) => ({ ...doc, id: index + 1 })), productPageInputSchema.parse(input))
+            return { ...selected, docs: selected.ids.map(id => docs[id - 1]) }
+        },
+        updateProductFieldAction: vi.fn(),
+    }
+})
 
 vi.mock('@/app/(dashboard)/products/categories/actions', () => ({
     getCategoriesAction: vi.fn(),
