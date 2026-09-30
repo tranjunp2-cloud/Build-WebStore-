@@ -14,7 +14,7 @@ export function serializeAttributeFilters(attributeFilters: Record<string, strin
         .join('|')
 }
 
-export function getActiveProductFilters(searchParams: ReadonlyURLSearchParams): ActiveProductFilters {
+export function getActiveProductFilters(searchParams: Pick<ReadonlyURLSearchParams, 'forEach' | 'getAll' | 'get'>): ActiveProductFilters {
     const attributeFilters: Record<string, string[]> = {}
 
     searchParams.forEach((_value, key) => {

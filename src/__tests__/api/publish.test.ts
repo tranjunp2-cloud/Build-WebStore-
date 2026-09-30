@@ -1,3 +1,5 @@
+import { hasCompletedPw1PublishGrant } from '@/lib/migration/pw1-publish-grant'
+vi.mock('@/lib/migration/pw1-publish-grant', () => ({ PW1_PUBLISH_HEADER: 'x-pw1-publish-grant', hasCompletedPw1PublishGrant: vi.fn().mockResolvedValue(false) }))
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { PATCH as PublishPATCH, DELETE as UnpublishDELETE } from '@/app/api/sites/[siteId]/publish/route'
 import { NextRequest } from 'next/server'
@@ -98,6 +100,26 @@ const makeDeleteReq = (siteId: string) =>
 
 // ── TC-F01-publish: /api/sites/[siteId]/publish ───────────────────────────────
 describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
+
+    it('[TC-F35.M48] completed CLI grant publishes without subscription; CMS still requires one', async () => {
+        const { getActivePlanSubscription, canUse } = await import('@/lib/subscriptions/plan-subscription')
+        const original = vi.mocked(getActivePlanSubscription).getMockImplementation()!
+        vi.mocked(getActivePlanSubscription).mockResolvedValue(null)
+        mockAuthUser.tenants = [{ tenant: 'tenant-1', role: 'owner', status: 'active' }]
+        try {
+            const denied = await PublishPATCH(makePatchReq('site-123'), { params: Promise.resolve({ siteId: 'site-123' }) })
+            expect(denied.status).toBe(403)
+            expect((await denied.json()).error.code).toBe('SUBSCRIPTION_EXPIRED')
+            vi.mocked(getActivePlanSubscription).mockClear()
+            vi.mocked(hasCompletedPw1PublishGrant).mockResolvedValueOnce(true)
+            const allowed = await PublishPATCH(makePatchReq('site-123'), { params: Promise.resolve({ siteId: 'site-123' }) })
+            expect(allowed.status).toBe(200)
+            expect(getActivePlanSubscription).not.toHaveBeenCalled()
+            expect(canUse).not.toHaveBeenCalled()
+        } finally {
+            vi.mocked(getActivePlanSubscription).mockImplementation(original)
+        }
+    })
 
     beforeEach(() => {
         vi.clearAllMocks()

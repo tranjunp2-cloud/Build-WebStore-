@@ -25,6 +25,9 @@ const HeroBlock = {
                 { label: 'Split Video', value: 'split-video' },
             ],
         },
+        // Ordered slide content is JSON, preserving per-slide copy/CTA and resolved image URLs.
+        { name: 'slides', type: 'json' },
+        { name: 'sourceLayout', type: 'json' },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
@@ -777,6 +780,7 @@ const BlogListBlock = {
     slug: 'blog-list',
     labels: { singular: 'Blog List', plural: 'Blog Lists' },
     fields: [
+        { name: 'showCategoryFilter', type: 'checkbox', defaultValue: false },
         {
             name: 'variant', type: 'select', defaultValue: 'cards',
             options: [
@@ -798,6 +802,7 @@ const ProductsGridBlock = {
     slug: 'products-grid',
     labels: { singular: 'Products Grid', plural: 'Products Grids' },
     fields: [
+        { name: 'filterControls', type: 'json', validate: (value: unknown) => value == null || (typeof value === 'object' && !Array.isArray(value) && ['category', 'price', 'search', 'attributes'].every(key => typeof (value as Record<string, unknown>)[key] === 'boolean')) || 'Expected category, price, search and attributes booleans' },
         {
             name: 'variant', type: 'select', defaultValue: 'grid-3',
             options: [
@@ -810,6 +815,11 @@ const ProductsGridBlock = {
         { name: 'subheadline', type: 'textarea' },
         { name: 'limit', type: 'number', defaultValue: 6 },
         { name: 'category', type: 'text' },
+        { name: 'selectionMode', type: 'select', defaultValue: 'all', options: [
+            { label: 'All products', value: 'all' }, { label: 'Selected products', value: 'fixed' }, { label: 'Random products', value: 'random' },
+        ] },
+        { name: 'selectedProductIds', type: 'json', defaultValue: [], validate: (value: unknown) => value == null || (Array.isArray(value) && value.every(id => typeof id === 'string' && /^[1-9]\d*$/.test(id))) || 'Expected an array of product IDs' },
+        { name: 'includeOutOfStock', type: 'checkbox', defaultValue: true },
         { name: 'showCategoryFilter', type: 'checkbox', defaultValue: false },
     ],
 }
@@ -830,9 +840,25 @@ const ProductsFeaturedBlock = {
     ],
 }
 
+const RichTextBlock = {
+    slug: 'rich-text', labels: { singular: 'Rich Text', plural: 'Rich Text' },
+    fields: [
+        { name: 'html', type: 'code', admin: { language: 'html' } },
+        { name: 'sourceComponentId', type: 'text' },
+        { name: 'paddingY', type: 'number', defaultValue: 64 },
+    ],
+}
+const ContentCardsBlock = {
+    slug: 'content-cards', labels: { singular: 'Content Cards', plural: 'Content Cards' },
+    fields: [
+        { name: 'variant', type: 'text' }, { name: 'headline', type: 'text' },
+        { name: 'sourceComponentId', type: 'text' }, { name: 'sourceContent', type: 'json' },
+    ],
+}
+
 const CustomHtmlBlock = {
     slug: 'custom-html',
-    labels: { singular: 'Custom HTML', plural: 'Custom HTML Blocks' },
+    labels: { singular: 'Rich text', plural: 'Rich text Blocks' },
     fields: [
         { name: 'html', type: 'code', required: true, admin: { language: 'html' } },
     ],
@@ -878,6 +904,10 @@ const CarouselBlock = {
                 { label: 'Testimonials', value: 'testimonials' },
             ],
         },
+        { name: 'aspectRatio', type: 'number', min: 0.2, max: 10 },
+        { name: 'imageFit', type: 'select', options: ['cover', 'contain', 'scale-down'] },
+        { name: 'maxImageWidth', type: 'number', min: 1, max: 10000 },
+        { name: 'slidesPerView', type: 'number', min: 1, max: 6 },
         { name: 'headline', type: 'text' },
         { name: 'autoplay', type: 'checkbox', defaultValue: true },
         { name: 'interval', type: 'number', defaultValue: 5000 },
@@ -1594,6 +1624,8 @@ export const Pages: CollectionConfig = {
                 ProductsGridBlock,
                 ProductsFeaturedBlock,
                 CustomHtmlBlock,
+                RichTextBlock,
+                ContentCardsBlock,
                 ServiceCardsBlock,
                 CarouselBlock,
                 StepProcessBlock,

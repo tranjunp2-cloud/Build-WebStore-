@@ -1,63 +1,13 @@
+import { getCategoryDescendantIds } from '@/lib/products/category-descendants'
+import { ListingSelectionSchema, orderListingIds } from '@/lib/products/listing-selection'
 import { NextResponse } from 'next/server'
-import { getPayload, type Where, type Payload } from 'payload'
+import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 import { checkRateLimit } from '@/lib/rateLimit'
 
 export const maxDuration = 60
 
 const ALLOWED_SORT = new Set(['-createdAt', 'createdAt', '-price', 'price', '-name', 'name'])
-const CATEGORY_PAGE_SIZE = 500
-
-type CategoryLookupRow = {
-    id: number | string
-    parent?: number | string | { id?: number | string } | null
-}
-
-async function getCategoryDescendantIds(payload: Payload, siteId: number, categoryIds: number[]): Promise<number[] | null> {
-    const idToParent = new Map<number, number | null>()
-    let currentPage = 1
-    let totalPages = 1
-
-    while (currentPage <= totalPages) {
-        const categoriesResult = await payload.find({
-            collection: 'categories',
-            where: { and: [{ site: { equals: siteId } }, { deletedAt: { exists: false } }] },
-            limit: CATEGORY_PAGE_SIZE,
-            page: currentPage,
-            depth: 0,
-            overrideAccess: true,
-            select: { id: true, parent: true },
-        })
-
-        totalPages = categoriesResult.totalPages || 1
-        categoriesResult.docs.forEach((doc) => {
-            const row = doc as unknown as CategoryLookupRow
-            const parentRaw = row.parent
-            const parentId = typeof parentRaw === 'object' && parentRaw !== null ? parentRaw.id : parentRaw
-            idToParent.set(Number(row.id), parentId ? Number(parentId) : null)
-        })
-        currentPage += 1
-    }
-
-    const validSeedIds = Array.from(new Set(categoryIds.filter((id) => idToParent.has(id))))
-    if (validSeedIds.length === 0) return null
-
-    const descendantIds = new Set<number>(validSeedIds)
-    let changed = true
-
-    while (changed) {
-        changed = false
-        idToParent.forEach((parentId, id) => {
-            if (parentId !== null && descendantIds.has(parentId) && !descendantIds.has(id)) {
-                descendantIds.add(id)
-                changed = true
-            }
-        })
-    }
-
-    return Array.from(descendantIds)
-}
-
 /**
  * GET /api/storefront/products — Public endpoint for storefront product listing.
  * Returns only active, non-deleted products. No auth required.
@@ -92,6 +42,15 @@ export async function GET(req: Request) {
             return NextResponse.json({ docs: [], totalDocs: 0 })
         }
 
+        const selectionResult = ListingSelectionSchema.safeParse({
+            mode: url.searchParams.get('selectionMode') ?? undefined,
+            ids: url.searchParams.getAll('productId'),
+            includeOutOfStock: url.searchParams.get('includeOutOfStock') ?? undefined,
+            seed: url.searchParams.get('seed') ?? undefined,
+            category: url.searchParams.get('fixedCategoryId') ?? undefined,
+        })
+        if (!selectionResult.success) return NextResponse.json({ error: 'Invalid listing selection' }, { status: 400 })
+        const selection = selectionResult.data
         const payload = await getPayload({ config })
 
         const where: Where = {
@@ -119,6 +78,22 @@ export async function GET(req: Request) {
                 return NextResponse.json({ docs: [], totalDocs: 0, page, totalPages: 1 })
             }
             ;(where.and as Where[]).push({ category: { in: descendantIds } })
+        }
+
+        if (selection.category) {
+            const ids = await getCategoryDescendantIds(payload, siteIdNum, [Number(selection.category)])
+            if (!ids) return NextResponse.json({ docs: [], totalDocs: 0, page, totalPages: 1 })
+            ;(where.and as Where[]).push({ category: { in: ids } })
+        }
+        if (selection.mode === 'fixed') {
+            if (!selection.ids.length) return NextResponse.json({ docs: [], totalDocs: 0, page, totalPages: 1 })
+            ;(where.and as Where[]).push({ id: { in: selection.ids.map(Number) } })
+        }
+        if (selection.includeOutOfStock === 'false') {
+            ;(where.and as Where[]).push({ or: [
+                { and: [{ hasVariants: { not_equals: true } }, { inventory: { greater_than: 0 } }] },
+                { and: [{ hasVariants: { equals: true } }, { 'variants.stock': { greater_than: 0 } }] },
+            ] })
         }
 
         const minPriceRaw = url.searchParams.get('minPrice')
@@ -156,16 +131,37 @@ export async function GET(req: Request) {
             }
         })
 
+        let orderedPageIds: string[] | undefined
+        let selectionTotal = 0
+        if (selection.mode !== 'all') {
+            const ids: string[] = []
+            // Fetch IDs only before ordering; hydrate just the requested page below.
+            let scanPage = 1
+            let scanPages = 1
+            do {
+                const batch = await payload.find({ collection: 'products', where, limit: 500, page: scanPage,
+                    sort: 'id', depth: 0, overrideAccess: true, select: { id: true } })
+                ids.push(...batch.docs.map(doc => String(doc.id)))
+                scanPages = batch.totalPages
+                scanPage++
+            } while (scanPage <= scanPages)
+            const ordered = orderListingIds(ids, selection.mode, selection.ids, selection.seed)
+            selectionTotal = ordered.length
+            orderedPageIds = ordered.slice((page - 1) * limit, page * limit)
+            if (!orderedPageIds.length) return NextResponse.json({ docs: [], totalDocs: selectionTotal, page, totalPages: Math.max(1, Math.ceil(selectionTotal / limit)) })
+            ;(where.and as Where[]).push({ id: { in: orderedPageIds.map(Number) } })
+        }
         const result = await payload.find({
             collection: 'products',
             where,
             limit,
-            page,
+            page: orderedPageIds ? 1 : page,
             sort,
             depth: 2,
             overrideAccess: true,
         })
 
+        if (orderedPageIds) result.docs.sort((a, b) => orderedPageIds!.indexOf(String(a.id)) - orderedPageIds!.indexOf(String(b.id)))
         const docs = result.docs.map((doc) => ({
             id: doc.id,
             name: doc.name,
@@ -197,9 +193,9 @@ export async function GET(req: Request) {
 
         return NextResponse.json({
             docs,
-            totalDocs: result.totalDocs,
-            page: result.page,
-            totalPages: result.totalPages,
+            totalDocs: orderedPageIds ? selectionTotal : result.totalDocs,
+            page,
+            totalPages: orderedPageIds ? Math.max(1, Math.ceil(selectionTotal / limit)) : result.totalPages,
         })
     } catch (error) {
         console.error('[Storefront Products API]', error)

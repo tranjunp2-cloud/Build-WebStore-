@@ -20,37 +20,12 @@ import { ProductsPagination } from './ProductsPagination'
 import { hasActiveProductFilters } from './filter-utils'
 import { useProductsGridData } from './use-products-grid-data'
 
-const MOBILE_PRODUCTS_GRID_BREAKPOINT = 1024
-const SINGLE_VALUE_RESULTS_NAVIGATION_KEYS = ['minPrice', 'maxPrice', 'page', 'search'] as const
 type GridNavigationIntent = 'filter' | 'pagination' | 'view'
 
-function buildResultsNavigationSignature(searchParams: {
-    forEach: (callbackfn: (value: string, key: string) => void) => void
-    get: (key: string) => string | null
-}) {
-    const entries: Array<[string, string]> = []
-
-    SINGLE_VALUE_RESULTS_NAVIGATION_KEYS.forEach((key) => {
-        const value = searchParams.get(key)
-        if (value !== null) entries.push([key, value])
-    })
-
-    searchParams.forEach((value, key) => {
-        if (key === 'categoryId' || key.startsWith('attr_')) entries.push([key, value])
-    })
-
-    entries.sort(([leftKey, leftValue], [rightKey, rightValue]) => (
-        leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue)
-    ))
-    const canonicalParams = new URLSearchParams()
-    entries.forEach(([key, value]) => canonicalParams.append(key, value))
-    return canonicalParams.toString()
-}
-
-function formatPriceChipLabel(minPrice: string | null, maxPrice: string | null, fallbackMin: number, fallbackMax: number, heading: string) {
+function formatPriceChipLabel(minPrice: string | null, maxPrice: string | null, fallbackMin: number, fallbackMax: number, heading: string, prefix: string) {
     const resolvedMin = minPrice ?? String(Math.floor(fallbackMin))
     const resolvedMax = maxPrice ?? String(Math.max(Math.ceil(fallbackMax), Math.floor(fallbackMin) + 1))
-    return `${heading}: $${resolvedMin} - $${resolvedMax}`
+    return `${heading}: ${prefix}${resolvedMin} - ${prefix}${resolvedMax}`
 }
 
 export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGridConfig>) {
@@ -61,37 +36,27 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
     const { t } = useI18n()
     const previewMode = isInEditorPreview()
     const productText = t.storefront.products as Record<string, string | undefined>
+    const selectionMode = block.selectionMode ?? 'all'
     const filtersEnabled = block.showCategoryFilter === true
-    const [isMobileViewport, setIsMobileViewport] = useState(() => (
-        typeof window !== 'undefined' ? window.innerWidth < MOBILE_PRODUCTS_GRID_BREAKPOINT : false
-    ))
-    const productsPerPage = filtersEnabled ? (isMobileViewport ? 10 : 9) : block.limit
+    const [localFilters, setLocalFilters] = useState('')
+    const [localPage, setLocalPage] = useState(1)
+    const [localView, setLocalView] = useState('grid-3')
+    const productsPerPage = block.limit ?? 6
     const siteId = site?.id ? String(site.id) : null
     const resultsTopRef = useRef<HTMLDivElement>(null)
-    const previousResultsNavigationSignatureRef = useRef<string | null>(null)
-    // Reposition lifecycle: idle -> requested -> observed -> settled.
-    const pendingRepositionRef = useRef(false)
-    const observedRequestStartRef = useRef(false)
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return
-
-        const syncViewport = () => {
-            setIsMobileViewport(window.innerWidth < MOBILE_PRODUCTS_GRID_BREAKPOINT)
-        }
-
-        syncViewport()
-        window.addEventListener('resize', syncViewport)
-        return () => window.removeEventListener('resize', syncViewport)
-    }, [])
-
     const { bounds, categories, currentPage, displayFilters, filtersLoading, loading, refreshing, products, totalPages } = useProductsGridData({
         filtersEnabled,
+        localPage,
+        localFilters,
+        category: block.category,
+        selectionMode: block.selectionMode,
+        selectedProductIds: block.selectedProductIds,
+        includeOutOfStock: block.includeOutOfStock,
         limit: productsPerPage,
         siteId,
     })
-    const resultsNavigationSignature = useMemo(() => buildResultsNavigationSignature(searchParams), [searchParams])
-    const requestedView = searchParams.get('view')
+    useEffect(() => setLocalPage(1), [selectionMode, block.category, block.selectedProductIds, productsPerPage])
+    const requestedView = selectionMode === 'all' ? searchParams.get('view') : localView
     const viewMode: ProductsGridConfig['variant'] = requestedView === 'list' ? 'list' : 'grid-3'
     const cardVariant = viewMode
     const hasActiveFilters = hasActiveProductFilters(displayFilters)
@@ -99,32 +64,6 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
     const showSidebar = filtersEnabled
     const showViewToggle = !loading && products.length > 0
     const showMobileFilterButton = showSidebar && !filtersLoading
-
-    useEffect(() => {
-        const previousSignature = previousResultsNavigationSignatureRef.current
-        previousResultsNavigationSignatureRef.current = resultsNavigationSignature
-
-        if (previousSignature === null || previousSignature === resultsNavigationSignature) return
-
-        pendingRepositionRef.current = true
-        observedRequestStartRef.current = loading || refreshing
-        resultsTopRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' })
-    }, [loading, refreshing, resultsNavigationSignature])
-
-    useEffect(() => {
-        if (!pendingRepositionRef.current) return
-
-        if (loading || refreshing) {
-            observedRequestStartRef.current = true
-            return
-        }
-
-        if (!observedRequestStartRef.current) return
-
-        resultsTopRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' })
-        pendingRepositionRef.current = false
-        observedRequestStartRef.current = false
-    }, [loading, refreshing])
 
     const gridCols = {
         'grid-3': 'grid-cols-2 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-3 lg:gap-8',
@@ -138,12 +77,12 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
         : (siteRec?.tenantSlug ? `/sites/${String(siteRec.tenantSlug)}` : '')
     const categoryLookup = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories])
     const pricePrefix = useMemo(() => {
-        const currency = products[0]?.currency
+        const currency = bounds.currency || products[0]?.currency
         if (currency === 'MYR') return 'RM '
         if (currency === 'SGD') return 'S$ '
         if (currency === 'USD') return '$ '
-        return '$ '
-    }, [products])
+        return currency ? `${currency} ` : ''
+    }, [products, bounds.currency])
     const gridAnimationSeed = useMemo(() => (
         products.map((product) => `${product.id}:${product.slug}`).join('|') || `empty-${currentPage}-${viewMode}`
     ), [currentPage, products, viewMode])
@@ -159,8 +98,10 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
             return
         }
 
-        const params = new URLSearchParams(searchParams.toString())
+        const params = new URLSearchParams(selectionMode === 'all' ? searchParams.toString() : localFilters)
         mutate(params)
+        if (selectionMode !== 'all' && intent === 'view') { setLocalView(params.get('view') || 'grid-3'); return }
+        if (selectionMode !== 'all') { setLocalFilters(params.toString()); setLocalPage(1); return }
         const nextHref = `${pathname}?${params.toString()}`
         if (historyMode === 'replace') router.replace(nextHref, { scroll: false })
         else router.push(nextHref, { scroll: false })
@@ -203,7 +144,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
         })),
         ...((displayFilters.minPrice || displayFilters.maxPrice) ? [{
             key: 'price',
-            label: formatPriceChipLabel(displayFilters.minPrice, displayFilters.maxPrice, bounds.minPrice, bounds.maxPrice, t.storefront.products.priceHeading),
+            label: formatPriceChipLabel(displayFilters.minPrice, displayFilters.maxPrice, bounds.minPrice, bounds.maxPrice, t.storefront.products.priceHeading, pricePrefix),
             onRemove: (event: React.MouseEvent<HTMLButtonElement>) => removePriceFilter(event),
         }] : []),
     ]
@@ -259,6 +200,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                     {showMobileFilterButton ? (
                         <div className="lg:hidden">
                             <MobileFilterDrawer
+                                controls={block.filterControls}
                                 activeFilters={displayFilters}
                                 bounds={bounds}
                                 categories={categories}
@@ -313,6 +255,11 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
     ) : null
 
     const handlePageChange = (page: number, event: React.MouseEvent<HTMLButtonElement>) => {
+        if (selectionMode !== 'all') {
+            if (previewMode) { handleCartClick(event); return }
+            setLocalPage(page)
+            return
+        }
         navigateParams((params) => {
             if (page <= 1) params.delete('page')
             else params.set('page', String(page))
@@ -442,6 +389,10 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                 <div className="grid items-start gap-8 lg:grid-cols-[260px_1fr]">
                     <div className="hidden lg:block">
                         <ProductFilterSidebar
+                            controls={block.filterControls}
+                            localSearchParams={selectionMode === 'all' ? undefined : localFilters}
+                            onLocalFilterChange={selectionMode === 'all' ? undefined : params => { setLocalFilters(params.toString()); setLocalPage(1) }}
+                            pricePrefix={pricePrefix}
                             categories={categories}
                             bounds={bounds}
                             activeFilters={displayFilters}

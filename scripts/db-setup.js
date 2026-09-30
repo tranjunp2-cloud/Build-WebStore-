@@ -68,6 +68,7 @@ async function getTableCount(pool) {
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
+  { name: 'pw1_migration.batch_ledger', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-batch.sql'), 'utf8') },
   // ── Users: Auth tables (Payload Drizzle schema) ──
   // Payload 3.14 uses VARCHAR id (UUID), mixed column naming:
   //   roles: parent_id, order (no underscore)
@@ -847,6 +848,20 @@ const MIGRATIONS = [
     );`,
   },
   // Hero CTA buttons
+  {
+    name: 'pw1_reconstruction.native_blocks',
+    sql: `ALTER TABLE pages_blocks_hero ADD COLUMN IF NOT EXISTS source_layout jsonb;
+ALTER TABLE IF EXISTS _pages_v_blocks_hero ADD COLUMN IF NOT EXISTS source_layout jsonb;
+CREATE TABLE IF NOT EXISTS pages_blocks_rich_text (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, html text, source_component_id varchar, padding_y numeric DEFAULT 64);
+CREATE TABLE IF NOT EXISTS _pages_v_blocks_rich_text (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, html text, source_component_id varchar, padding_y numeric DEFAULT 64);
+CREATE TABLE IF NOT EXISTS pages_blocks_content_cards (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, variant varchar, headline varchar, source_component_id varchar, source_content jsonb);
+CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, variant varchar, headline varchar, source_component_id varchar, source_content jsonb);`,
+  },
+  {
+    name: 'pages_blocks_hero.slides',
+    sql: `ALTER TABLE "pages_blocks_hero" ADD COLUMN IF NOT EXISTS "slides" jsonb;
+      ALTER TABLE IF EXISTS "_pages_v_blocks_hero" ADD COLUMN IF NOT EXISTS "slides" jsonb;`,
+  },
   {
     name: 'pages_blocks_hero_cta_buttons.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_hero_cta_buttons" (
@@ -2254,6 +2269,12 @@ const MIGRATIONS = [
       variant varchar, headline varchar, autoplay boolean, "interval" integer
     );`,
   },
+  {
+    name: 'carousel.source_image_layout',
+    sql: `ALTER TABLE IF EXISTS pages_blocks_carousel ADD COLUMN IF NOT EXISTS aspect_ratio numeric, ADD COLUMN IF NOT EXISTS image_fit varchar, ADD COLUMN IF NOT EXISTS max_image_width numeric, ADD COLUMN IF NOT EXISTS slides_per_view numeric;
+    ALTER TABLE IF EXISTS _pages_v_blocks_carousel ADD COLUMN IF NOT EXISTS aspect_ratio numeric, ADD COLUMN IF NOT EXISTS image_fit varchar, ADD COLUMN IF NOT EXISTS max_image_width numeric, ADD COLUMN IF NOT EXISTS slides_per_view numeric;`,
+  },
+
   {
     name: '_pages_v_blocks_carousel_items.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_carousel_items" (
@@ -4166,6 +4187,22 @@ const MIGRATIONS = [
   { name: 'pages_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "pages_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  // PW1 listing selection: apply to live pages and draft/version snapshots.
+  ...['pages_blocks_products_grid', '_pages_v_blocks_products_grid'].map(table => ({
+    name: `${table}.product_selection`,
+    sql: `DO $$ BEGIN
+      CREATE TYPE "enum_${table}_selection_mode" AS ENUM ('all', 'fixed', 'random');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS selection_mode "enum_${table}_selection_mode" DEFAULT 'all';
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS selected_product_ids jsonb DEFAULT '[]'::jsonb;
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS include_out_of_stock boolean DEFAULT true;`,
+  })),
+  // PW1 page-wide filter controls, live and versioned blocks.
+  { name: 'pages_blocks_products_grid.filter_controls', sql: `ALTER TABLE pages_blocks_products_grid ADD COLUMN IF NOT EXISTS filter_controls jsonb;` },
+  { name: '_pages_v_blocks_products_grid.filter_controls', sql: `ALTER TABLE _pages_v_blocks_products_grid ADD COLUMN IF NOT EXISTS filter_controls jsonb;` },
+  { name: 'pages_blocks_blog_list.category_filter', sql: `ALTER TABLE pages_blocks_blog_list ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
+  { name: '_pages_v_blocks_blog_list.category_filter', sql: `ALTER TABLE _pages_v_blocks_blog_list ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
   // GH-1588: showCategoryFilter opt-in toggle (F08 storefront category filter)
   { name: 'pages_blocks_products_grid.show_category_filter', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
   { name: 'pages_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },

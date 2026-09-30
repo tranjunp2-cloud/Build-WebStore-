@@ -61,7 +61,8 @@
     "migrate:pw1:prepare": "tsx --require ./scripts/seed-preload.cjs scripts/prepare-pw1-import.ts",
     "migrate:pw1:import": "tsx --require ./scripts/seed-preload.cjs scripts/import-pw1-json.ts",
     "migrate:pw1:users": "tsx --require ./scripts/seed-preload.cjs scripts/import-pw1-users.ts",
-    "migrate:pw1:test:local": "tsx --require ./scripts/seed-preload.cjs src/__tests__/integration/pw1-json-clone-rehearsal.ts"
+    "migrate:pw1:test:local": "tsx --require ./scripts/seed-preload.cjs src/__tests__/integration/pw1-json-clone-rehearsal.ts",
+    "migrate:pw1:website": "tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.1.0",
@@ -95,6 +96,10 @@
     "@tiptap/extension-image": "^3.22.1",
     "@tiptap/extension-link": "^3.22.1",
     "@tiptap/extension-placeholder": "^3.22.1",
+    "@tiptap/extension-table": "3.22.1",
+    "@tiptap/extension-text-align": "3.22.1",
+    "@tiptap/extension-text-style": "3.22.1",
+    "@tiptap/extension-typography": "3.22.1",
     "@tiptap/extension-underline": "^3.22.1",
     "@tiptap/pm": "^3.22.1",
     "@tiptap/react": "^3.22.1",

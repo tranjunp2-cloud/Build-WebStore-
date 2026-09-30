@@ -36,7 +36,8 @@ export function PreviewScripts() {
         // Only whatsapp-button and cartWidget suppress BLOCK_HOVERED — socialWidget hover is intentionally allowed
         const noHoverHintBlockTypes = new Set(['whatsapp-button', 'cartWidget'])
         // Blocks whose images come from external product catalog — image editing not supported
-        const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
+        // Rich text owns image selection/replacement through its inline editor.
+        const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid', 'custom-html', 'rich-text'])
         // Mobile/tablet compact chrome (PreviewFrame sets ?compact=1 when disableDragDrop is
         // on) — inline WYSIWYG text editing is desktop-only per F05-v2; text on mobile/tablet
         // is edited via the block-settings sheet's fields instead. Image edit stays enabled.

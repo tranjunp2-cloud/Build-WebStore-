@@ -1,7 +1,13 @@
 'use client'
 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { blogExcerpt } from '@/lib/blog/excerpt'
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { FileText } from 'lucide-react'
+import en from '@/i18n/locales/en.json'
+import ms from '@/i18n/locales/ms.json'
 import type { BlockProps } from '../types'
 import { SmartLink } from '@/blocks/_shared/smart-link'
 import type { BlogListConfig } from './config'
@@ -21,13 +27,6 @@ interface BlogPost {
     category: string
     image: string | null
     slug: string
-}
-
-/** Strip HTML tags and extract first ~160 chars as excerpt */
-function extractExcerpt(content: unknown): string {
-    if (!content || typeof content !== 'string') return ''
-    const text = content.replace(/<[^>]*>/g, '').trim()
-    return text.length > 160 ? text.substring(0, 157) + '...' : text
 }
 
 function formatBlogDate(value: unknown, locale: string): string {
@@ -54,11 +53,17 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         subheadline,
         limit = 3,
         variant = 'cards',
-        readArticleLabel = 'Read Article',
+        readArticleLabel,
         uncategorizedLabel = 'Uncategorized',
-        emptyStateLabel = 'No published posts yet. Check back soon!',
+        emptyStateLabel,
     } = block
     const headline = block.headline || block.sectionLabel || ''
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
+    const [editorCategory, setEditorCategory] = useState('')
+    const [categories, setCategories] = useState<Array<{ slug: string; name: string }>>([])
+    const category = block.showCategoryFilter ? (pathname?.startsWith('/editor') ? editorCategory : searchParams.get('blogCategory') || '') : ''
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -74,6 +79,8 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         (typeof siteRec?.generationLocale === 'string' && siteRec.generationLocale)
         || (typeof siteRec?.locale === 'string' && siteRec.locale)
         || 'en'
+    const readMoreLabel = readArticleLabel?.trim() || (siteLocale.toLowerCase().split('-')[0] === 'ms' ? ms : en).storefront.blog.readMore
+    const emptyMessage = emptyStateLabel?.trim() || (siteLocale.toLowerCase().split('-')[0] === 'ms' ? ms : en).storefront.blog.noPosts
     const blogPreviewPath = typeof siteRec?.blogPreviewPath === 'string' ? (siteRec.blogPreviewPath as string) : null
     const explicitBase = typeof siteRec?.siteBasePath === 'string' ? (siteRec.siteBasePath as string) : null
     const tenantSlugRaw =
@@ -94,7 +101,8 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
             return
         }
 
-        fetch(`/api/storefront/blogs?tenant=${tenantId}&limit=${limit}&sort=-createdAt`)
+        const controller = new AbortController()
+        fetch(`/api/storefront/blogs?tenant=${tenantId}&limit=${limit}&sort=-createdAt${block.showCategoryFilter ? '&includeCategories=1' : ''}${category ? `&category=${encodeURIComponent(category)}` : ''}`, { signal: controller.signal })
             .then(res => res.ok ? res.json() : Promise.reject(res))
             .then(json => {
                 const docs = json.data || json.docs || []
@@ -106,25 +114,45 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                     return {
                         id: String(doc.id),
                         title: doc.title || headline,
-                        excerpt: extractExcerpt(doc.content),
+                        excerpt: blogExcerpt(doc.content),
                         date: formatBlogDate(publishDate, siteLocale),
                         category: catName || uncategorizedLabel,
                         image: thumbUrl,
                         slug: doc.slug || '',
                     }
                 })
+                if (controller.signal.aborted) return
+                setCategories(json.categories ?? [])
                 setPosts(mapped)
             })
             .catch(err => {
+                if (controller.signal.aborted) return
                 console.error('[BlogListBlock] Failed to fetch blogs:', err)
             })
-            .finally(() => setLoading(false))
-    }, [headline, limit, site, siteLocale, uncategorizedLabel])
+            .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+        return () => controller.abort()
+    }, [headline, limit, site, siteLocale, uncategorizedLabel, category, block.showCategoryFilter])
+
+    const categoryFilter = block.showCategoryFilter && categories.length > 0 ? (
+        <div className="mb-8 max-w-xs">
+            <Select value={category || '__all__'} onValueChange={value => {
+                const next = value === '__all__' ? '' : value
+                if (pathname?.startsWith('/editor')) { setEditorCategory(next); return }
+                const params = new URLSearchParams(searchParams.toString())
+                if (next) params.set('blogCategory', next); else params.delete('blogCategory')
+                router.replace(`${pathname}${params.size ? `?${params}` : ''}`, { scroll: false })
+            }}>
+                <SelectTrigger aria-label={siteLocale.toLowerCase().split('-')[0] === 'ms' ? 'Kategori artikel' : 'Article category'}><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="__all__">{siteLocale.toLowerCase().split('-')[0] === 'ms' ? 'Semua kategori' : 'All categories'}</SelectItem>{categories.map(cat => <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>)}</SelectContent>
+            </Select>
+        </div>
+    ) : null
 
     if (loading) {
         return (
             <AnimatedSection className="relative overflow-hidden">
                 <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                    {categoryFilter}
                     <div className="text-center">
                         <div className="animate-pulse flex flex-col items-center gap-4">
                             <div className="h-8 w-64 bg-white/10 rounded" />
@@ -140,10 +168,29 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         return (
             <AnimatedSection className="relative overflow-hidden">
                 <SectionWrapper as="div" padding="default" container="default" background="transparent">
-                    <div className="text-center">
-                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                        <p className="opacity-60 text-lg">{emptyStateLabel}</p>
+                    {categoryFilter}
+                    {(block.sectionLabel || headline || subheadline) && (
+                        <div className="text-center max-w-2xl mx-auto mb-10">
+                            {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+                            {headline && (
+                                <Heading level={2} className="mb-4">
+                                    <RichText text={headline} as="span" />
+                                </Heading>
+                            )}
+                            {subheadline && (
+                                <Body size="lg" className="opacity-60">
+                                    <RichText text={subheadline} as="span" />
+                                </Body>
+                            )}
+                        </div>
+                    )}
+                    <div
+                        role="status"
+                        data-testid="blog-list-empty"
+                        className="rounded-2xl border border-[var(--divider)] bg-[var(--surface-secondary)] px-6 py-14 text-center"
+                    >
+                        <FileText aria-hidden="true" className="mx-auto mb-4 h-10 w-10 opacity-40" />
+                        <Body size="lg" className="opacity-75">{emptyMessage}</Body>
                     </div>
                 </SectionWrapper>
             </AnimatedSection>
@@ -155,6 +202,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
             <GradientBlob color={CSS_VARS.primary} className="bottom-0 left-1/4" size={400} opacity={0.05} />
 
             <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
+                {categoryFilter}
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                     <Heading level={2} className="mb-4">
@@ -223,7 +271,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                             <Body size="small" className="opacity-60 mb-6 flex-1 leading-relaxed">{post.excerpt}</Body>
 
                                             <div className="mt-auto flex items-center text-sm font-semibold tracking-wide" style={{ color: 'var(--brand-primary)' }}>
-                                                {readArticleLabel}
+                                                {readMoreLabel}
                                                 <span className="ml-2 transform group-hover:translate-x-1 transition-transform">→</span>
                                             </div>
                                             <div className="mt-6 h-0.5 w-0 group-hover:w-16 transition-all duration-500 rounded-full"

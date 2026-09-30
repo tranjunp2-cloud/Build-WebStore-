@@ -11,6 +11,7 @@ import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
 import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 void _CSS_VARS
 
@@ -43,9 +44,15 @@ type ProjectCardProps = {
 }
 
 function ProjectCard({ project, className = '', imageIndex, uploadField }: ProjectCardProps) {
-    const Wrapper = project.linkUrl ? 'a' : 'div'
-    const linkProps = project.linkUrl
-        ? { href: project.linkUrl, target: '_blank' as const, rel: 'noopener noreferrer' }
+    // Internal (/path, #anchor, mailto:, tel:) → same tab, resolved via useLocalHref so
+    // /products?... hits /sites/{slug}/products?... in local dev (custom domains keep it as-is).
+    // External http(s) / protocol-relative → new tab + noopener (same rule as cta/getLinkAttrs).
+    const resolveHref = useLocalHref()
+    const linkUrl = project.linkUrl
+    const isExternal = !!linkUrl && (/^https?:\/\//.test(linkUrl) || linkUrl.startsWith('//'))
+    const Wrapper = linkUrl ? 'a' : 'div'
+    const linkProps = linkUrl
+        ? { href: resolveHref(linkUrl), ...(isExternal ? { target: '_blank' as const, rel: 'noopener noreferrer' } : {}) }
         : {}
     return (
         <Wrapper {...linkProps} className={`group relative overflow-hidden rounded-2xl block ${className}`}>
@@ -95,24 +102,24 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
     const projects = Array.from({ length: projectCount }, (_, i) => {
         const p = rawProjects[i]
         const imgSrc = (p?.image as { url?: string } | undefined)?.url || p?.imageUrl
-        const cat = stripHtml(p?.category || '')
+        const cat = stripHtml(p?.category || '').trim()
         if (imgSrc) return { ...p, imageUrl: imgSrc, category: cat }
         return { ...p, imageUrl: fallbackUrls[i % fallbackUrls.length] ?? fallbackUrls[0], title: p?.title || '', category: cat, description: p?.description || '' }
     })
 
     const categories = useMemo(() => {
-        const cats = Array.from(new Set(projects.map((p) => p.category)))
-        return ['All', ...cats]
+        return Array.from(new Set(projects.map((p) => p.category).filter(Boolean)))
     }, [projects])
 
-    const [activeCategory, setActiveCategory] = useState('All')
+    const [activeCategory, setActiveCategory] = useState<string | null>(null)
+    const selectedCategory = activeCategory && categories.includes(activeCategory) ? activeCategory : null
 
     // Track original index through filter so imageIndex always maps to the correct projects[] slot
     const filtered = useMemo(() =>
         projects
             .map((project, index) => ({ project, index }))
-            .filter(({ project }) => activeCategory === 'All' || project.category === activeCategory),
-        [projects, activeCategory]
+            .filter(({ project }) => selectedCategory === null || project.category === selectedCategory),
+        [projects, selectedCategory]
     )
 
     return (
@@ -124,22 +131,27 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
             </div>
 
             {/* Category filter */}
-            <div className="flex flex-wrap justify-center gap-3 mb-12">
-                {categories.map((cat) => (
+            {categories.length > 0 && <div className="flex flex-wrap justify-center gap-3 mb-12" role="group" aria-label="Filter projects by category">
+                {[null, ...categories].map((cat) => (
                     <button
-                        key={cat}
+                        key={cat === null ? 'all-projects' : `category:${cat}`}
+                        aria-pressed={selectedCategory === cat}
                         type="button"
+                        // Filter pills are derived UI — "All" is hardcoded, category labels come from
+                        // projects[].category. Inline-editing them would no-op ("All") or silently
+                        // rewrite only the first matching project's category. Edit via settings panel.
+                        data-no-text-edit
                         onClick={() => setActiveCategory(cat)}
                         className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${TOUCH_TARGET.min}`}
-                        style={activeCategory === cat
+                        style={selectedCategory === cat
                             ? { background: 'var(--brand-primary)', color: '#fff' }
                             : { background: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'inherit', border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }
                         }
                     >
-                        {cat}
+                        {cat ?? 'All'}
                     </button>
                 ))}
-            </div>
+            </div>}
 
             {/* Showcase variant: first item large */}
             {variant === 'showcase' && filtered.length > 0 && (

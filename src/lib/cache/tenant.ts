@@ -137,7 +137,7 @@ export function getCachedVisitorPage(siteId: string, pageSlug: string) {
                 where: {
                     and: [
                         { site: { equals: siteId } },
-                        { slug: { equals: pageSlug } },
+                        { slug: { in: [pageSlug, pageSlug.replace(/^\//, '')] } },
                         { isVisible: { not_equals: false } },
                         { deletedAt: { exists: false } },
                     ],
@@ -147,7 +147,7 @@ export function getCachedVisitorPage(siteId: string, pageSlug: string) {
             })
             return result.docs[0] ?? null
         },
-        [`visitor-page-${siteId}-${pageSlug}`],
+        [`visitor-page-v2-${siteId}-${pageSlug}`],
         { revalidate: CACHE_TTL, tags: [`site-${siteId}`] }
     )()
 }

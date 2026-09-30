@@ -1,0 +1,38 @@
+/* CKEditor document styles, shared by migrated and newly edited content. */
+.custom-html-block .image { display: table; clear: both; margin: 1em auto; max-width: 100%; }
+.custom-html-block .image img { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+.custom-html-block .image > figcaption { display: table-caption; caption-side: bottom; padding: .5em; font-size: .85em; text-align: center; }
+.custom-html-block .image-style-align-left { float: left; margin-right: 1.5em; }
+.custom-html-block .image-style-align-right { float: right; margin-left: 1.5em; }
+.custom-html-block .image-style-side { float: right; max-width: 50%; margin-left: 1.5em; }
+.custom-html-block .image-inline { display: inline-flex; max-width: 100%; vertical-align: middle; }
+.custom-html-block .image-inline img { max-width: 100%; }
+.custom-html-block .table { display: table; margin: 1em auto; max-width: 100%; }
+.custom-html-block .table table { border-collapse: collapse; width: 100%; }
+.custom-html-block .table td, .custom-html-block .table th { border: 1px solid #bfbfbf; padding: .4em; min-width: 2em; }
+.custom-html-block .table th { background: rgb(128 128 128 / 10%); font-weight: bold; }
+.custom-html-block > div::after { content: ''; display: block; clear: both; }
+/* Draw the active boundary inside the iframe, independent of parent overlays. */
+.custom-html-block.rich-text-inline-active::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid #3b82f6;
+    pointer-events: none;
+    z-index: 40;
+}
+.custom-html-block table { border-collapse: collapse; }
+.custom-html-block td, .custom-html-block th { border: 1px solid #bfbfbf; padding: .4em; }
+/* Keep floated images within the Rich text document in the public renderer too. */
+.custom-html-block [data-editor-control="rich-text"] > div { display: flow-root; }
+.custom-html-block img[data-image-layout="standalone"] { clear: both; }
+.custom-html-block .text-tiny { font-size: .7em; }
+.custom-html-block .text-small { font-size: .85em; }
+.custom-html-block .text-big { font-size: 1.4em; }
+.custom-html-block .text-huge { font-size: 1.8em; }
+.custom-html-block [data-image-caption] { display: block; padding: .5em; font-size: .85em; line-height: 1.5; text-align: center; background: #f7f7f7; color: #333; }
+.custom-html-block figure.media { margin: 1em auto; }
+.custom-html-block figure.media > iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; }
+.custom-html-block video { max-width: 100%; height: auto; }
+.custom-html-block audio { max-width: 100%; }
+.custom-html-block .image-style-align-center { margin-left: auto; margin-right: auto; }

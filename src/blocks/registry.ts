@@ -1,3 +1,7 @@
+import { RichTextBlock } from './rich-text'
+import { RichTextConfigSchema, richTextMeta } from './rich-text/config'
+import { ContentCardsBlock } from './content-cards'
+import { ContentCardsConfigSchema, contentCardsMeta } from './content-cards/config'
 import type { BlockMeta, BlockType } from './types'
 import type { ZodSchema } from 'zod'
 
@@ -138,6 +142,8 @@ const REGISTRY: Record<string, BlockRegistryEntry> = {
     'blog-list': { component: BlogListBlock, schema: BlogListConfigSchema, meta: blogListMeta },
     'products-grid': { component: ProductsGridBlock, schema: ProductsGridConfigSchema, meta: productsGridMeta },
     'products-featured': { component: ProductsFeaturedBlock, schema: ProductsFeaturedConfigSchema, meta: productsFeaturedMeta },
+    'rich-text': { component: RichTextBlock, schema: RichTextConfigSchema, meta: richTextMeta },
+    'content-cards': { component: ContentCardsBlock, schema: ContentCardsConfigSchema, meta: contentCardsMeta },
     'custom-html': { component: CustomHtmlBlock, schema: CustomHtmlConfigSchema, meta: customHtmlMeta },
     socialWidget: { component: SocialWidgetBlock, schema: SocialWidgetConfigSchema, meta: socialWidgetMeta },
     cartWidget: { component: CartWidgetBlock, schema: CartWidgetConfigSchema, meta: cartWidgetMeta },

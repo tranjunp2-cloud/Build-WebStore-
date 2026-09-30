@@ -1,3 +1,4 @@
+import { PW1_PUBLISH_HEADER, hasCompletedPw1PublishGrant } from '@/lib/migration/pw1-publish-grant'
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
@@ -183,19 +184,27 @@ export async function PATCH(
             )
         }
 
-        const sub = await getActivePlanSubscription(payload, siteTenantId)
-        if (!sub) {
-            return NextResponse.json(
-                { success: false, error: { code: 'SUBSCRIPTION_EXPIRED', message: 'Subscription expired or not found' } },
-                { status: 403 }
-            )
-        }
-        const builderAllowed = await canUse(payload, sub.plan as PlanCode, 'website_builder')
-        if (!builderAllowed) {
-            return NextResponse.json(
-                { success: false, error: { code: 'FEATURE_LOCKED', message: 'Feature not available on your current plan' } },
-                { status: 403 }
-            )
+        const migrationOwner = (user as unknown as { tenants?: Array<{ tenant: TenantRef; role?: string; status?: string }> }).tenants?.some(
+            membership => resolveTenantId(membership.tenant) === siteTenantId && membership.role === 'owner' && membership.status === 'active',
+        )
+        const migrationPublication = existing.status === 'draft' && migrationOwner && await hasCompletedPw1PublishGrant(
+            payload, req.headers.get(PW1_PUBLISH_HEADER), { userId: String(user.id), siteId: String(siteId), tenantId: siteTenantId },
+        )
+        if (!migrationPublication) {
+            const sub = await getActivePlanSubscription(payload, siteTenantId)
+            if (!sub) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'SUBSCRIPTION_EXPIRED', message: 'Subscription expired or not found' } },
+                    { status: 403 }
+                )
+            }
+            const builderAllowed = await canUse(payload, sub.plan as PlanCode, 'website_builder')
+            if (!builderAllowed) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'FEATURE_LOCKED', message: 'Feature not available on your current plan' } },
+                    { status: 403 }
+                )
+            }
         }
 
         // Re-publish is allowed — user may have edited content after initial publish.

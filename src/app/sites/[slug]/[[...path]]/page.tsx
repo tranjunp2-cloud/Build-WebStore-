@@ -1,3 +1,4 @@
+import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
@@ -109,7 +110,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
         const ownerDraft = site.status !== 'published'
         const pagesResult = await payload.find({
             collection: 'pages',
-            where: { and: [{ site: { equals: site.id } }, { slug: { equals: pageSlug } }, ...deletedFilter] },
+            where: { and: [{ site: { equals: site.id } }, { slug: { in: [pageSlug, pageSlug.replace(/^\//, '')] } }, ...deletedFilter] },
             limit: 1,
             depth: 3,
             draft: ownerDraft,
@@ -358,6 +359,8 @@ export default async function TenantSitePage({ params }: Props) {
     const origin = resolveStorefrontOrigin(data.tenant as unknown as TenantLike, { fallbackHostname: tenantHostname, slug })
 
     return (
+        <>
+        <ScrollToTop />
         <SiteRenderer
             site={{ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
             page={page as unknown as PageData}
@@ -365,5 +368,6 @@ export default async function TenantSitePage({ params }: Props) {
             siteId={String(site.id)}
             isOwner={isOwner}
         />
+        </>
     )
 }
