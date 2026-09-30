@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Database, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Database, ShieldCheck } from "lucide-react";
 import type {
+  ReconciliationIssue,
   ReconciliationRecord,
+  ReconciliationRun,
   ReconciliationScope,
   ReconciliationSnapshot,
   ReconciliationStatus,
@@ -70,6 +72,17 @@ export function ReconciliationInspector({
   error,
   isDemo,
   onToggleDemo,
+  sourceStoreId,
+  onSourceStoreChange,
+  runId,
+  runs,
+  runsTruncated,
+  runsLoading,
+  runsError,
+  onRunChange,
+  issues,
+  issuesLoading,
+  issuesError,
 }: {
   scope: ReconciliationScope;
   snapshot: ReconciliationSnapshot | null;
@@ -77,6 +90,17 @@ export function ReconciliationInspector({
   error: string | null;
   isDemo: boolean;
   onToggleDemo: (value: boolean) => void;
+  sourceStoreId: string;
+  onSourceStoreChange: (storeId: string) => void;
+  runId: string | null;
+  runs: ReconciliationRun[];
+  runsTruncated: boolean;
+  runsLoading: boolean;
+  runsError: string | null;
+  onRunChange: (runId: string | null) => void;
+  issues: ReconciliationIssue[];
+  issuesLoading: boolean;
+  issuesError: string | null;
 }) {
   const [feature, setFeature] = useState("overview");
   const [status, setStatus] = useState<"all" | ReconciliationStatus>("all");
@@ -127,7 +151,25 @@ export function ReconciliationInspector({
   const totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const visibleRecords = records.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const issueTotal = (snapshot?.records ?? []).filter((record) => record.status !== "match").length;
+  const selectedRunIsCurrent = runs.some(
+    (run) => run.runId === runId && run.storeId === sourceStoreId,
+  );
+  const recordsNeedingReview = (snapshot?.records ?? []).filter((record) => record.status !== "match").length;
+  const openIssueTotal = selectedRunIsCurrent ? issues.length : 0;
+  const isLedgerEvidence = !isDemo && snapshot?.evidence.mode === "verified";
+  const selectedFeatureIsNotCoveredByLedger = isLedgerEvidence
+    && scope === "settings"
+    && ["payments", "delivery", "web_address", "app_integrations"].includes(feature);
+  const statusMeta = (value: ReconciliationStatus) => {
+    if (isLedgerEvidence && value === "match") {
+      return {
+        ...META.match,
+        label: "Mapping 1–1 đã xác nhận",
+        copy: "Đã có 1 mapping định danh PW1 → PW2; chưa đối soát giá trị field.",
+      };
+    }
+    return META[value];
+  };
   const sections = useMemo(() => {
     const grouped = new Map<string, ReconciliationRecord["fields"]>();
     selected?.fields.forEach((field) => {
@@ -176,12 +218,91 @@ export function ReconciliationInspector({
             {snapshot?.evidence.message ?? "Chưa có mapping định danh."}
           </p>
         ) : null}
+        {!isDemo ? (
+          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+            <label className="block text-xs font-semibold text-slate-200" htmlFor="migration-source-store">
+              ID store nguồn PW1
+            </label>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Nhập đúng ID số trong ledger F42. Mã store trên bảng F40 không được tự suy diễn sang PW1.
+            </p>
+            <input
+              id="migration-source-store"
+              aria-label="ID store nguồn PW1"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={sourceStoreId}
+              onChange={(event) => onSourceStoreChange(event.target.value.replace(/\D/g, ""))}
+              placeholder="Ví dụ: 205"
+              className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100"
+            />
+            <label className="block text-xs font-semibold text-slate-200" htmlFor="migration-ledger-run">
+              <span className="mt-3 block">Migration run F42 đã xác nhận</span>
+            </label>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Chọn đúng run của store này. Hệ thống không tự chọn run gần nhất.
+            </p>
+            <select
+              id="migration-ledger-run"
+              aria-label="Chọn migration run F42"
+              value={runId ?? ""}
+              disabled={runsLoading || !sourceStoreId}
+              onChange={(event) => onRunChange(event.target.value || null)}
+              className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 disabled:cursor-wait disabled:opacity-60"
+            >
+              <option value="">{runsLoading ? "Đang tải run..." : "Chọn migration run đã VERIFIED"}</option>
+              {runs.map((run) => (
+                <option key={run.runId} value={run.runId}>
+                  {new Date(run.updatedAt).toLocaleString("vi-VN")} · {run.runId.slice(0, 8)}…
+                </option>
+              ))}
+            </select>
+            {runsError ? <p className="mt-2 text-xs text-rose-300" role="alert">Không tải được run: {runsError}</p> : null}
+            {runsTruncated ? (
+              <p className="mt-2 text-xs text-amber-200" role="status" aria-live="polite">
+                Chỉ hiển thị 50 run VERIFIED mới nhất. Cần migration owner cung cấp run cũ nếu cần đối soát lịch sử.
+              </p>
+            ) : null}
+            {!runsLoading && !runsError && !runs.length ? (
+              <p className="mt-2 text-xs text-amber-200" role="status" aria-live="polite">Store này chưa có run F42 ở trạng thái VERIFIED.</p>
+            ) : null}
+            {!runId && runs.length > 0 ? (
+              <p className="mt-2 text-xs text-amber-200" role="status" aria-live="polite">Hãy chọn một run để xem kết quả ledger thật.</p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
-      <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      {!isDemo && selectedRunIsCurrent ? (
+        <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4" data-testid="migration-ledger-issues">
+          <div className="flex items-center gap-2 text-sm font-bold text-white">
+            <AlertTriangle className="size-4 text-amber-300" />
+            Issue đang mở của migration run
+          </div>
+          <p className="mt-1 text-xs text-slate-400">Không hiển thị source ID, dữ liệu cá nhân hoặc chi tiết exception.</p>
+          {issuesLoading ? <p className="mt-3 text-xs text-slate-400" role="status" aria-live="polite">Đang tải issue…</p> : null}
+          {issuesError ? <p className="mt-3 text-xs text-rose-300" role="alert">Không tải được issue: {issuesError}</p> : null}
+          {!issuesLoading && !issuesError && !issues.length ? <p className="mt-3 text-xs text-emerald-300" role="status" aria-live="polite">Không có issue mở.</p> : null}
+          {!issuesLoading && !issuesError && issues.length ? (
+            <ul className="mt-3 space-y-2">
+              {issues.map((issue) => (
+                <li key={issue.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs">
+                  <span className={`rounded border px-1.5 py-0.5 font-semibold ${issue.severity === "BLOCKER" ? "border-rose-500/40 bg-rose-500/10 text-rose-200" : "border-amber-500/40 bg-amber-500/10 text-amber-100"}`}>
+                    {issue.severity}
+                  </span>
+                  <span className="font-mono text-slate-200">{issue.errorCode}</span>
+                  <span className="text-slate-400">{issue.isRunLevel ? "Áp dụng toàn run" : `Nhóm: ${issue.sourceEntity}`}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
+      <section className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {[
           ["Tổng PW1", snapshot?.summary.pw1Total ?? 0, "text-white"],
           ["Đã map PW2", snapshot?.summary.pw2Total ?? 0, "text-sky-200"],
-          ["Cần kiểm tra", issueTotal, "text-amber-200"],
+          ["Bản ghi cần kiểm tra", recordsNeedingReview, "text-amber-200"],
+          ["Issue mở", openIssueTotal, "text-rose-200"],
           ["Chưa có mapping", snapshot?.summary.unverified ?? 0, "text-slate-300"],
         ].map(([label, count, className]) => (
           <div key={String(label)} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
@@ -205,6 +326,11 @@ export function ReconciliationInspector({
           </button>
         ))}
       </nav>
+      {selectedFeatureIsNotCoveredByLedger ? (
+        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100" role="status">
+          F42 ledger hiện chưa có evidence cho nhóm Settings này. Danh sách trống không đồng nghĩa dữ liệu đã được migrate hoặc đã khớp.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-1.5">
         {(
           [
@@ -219,14 +345,14 @@ export function ReconciliationInspector({
         ).map((item) => (
           <button
             key={item}
-            title={item === "all" ? "Tất cả" : META[item].copy}
+            title={item === "all" ? "Tất cả" : statusMeta(item).copy}
             onClick={() => {
               setStatus(item);
               setPage(1);
             }}
             className={`rounded-lg border px-2.5 py-1.5 text-xs ${status === item ? "border-blue-500 bg-blue-600 text-white" : "border-slate-800 bg-slate-950 text-slate-300"}`}
           >
-            {item === "all" ? "Tất cả" : META[item].label}
+            {item === "all" ? "Tất cả" : statusMeta(item).label}
           </button>
         ))}
         <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-300">
@@ -257,9 +383,9 @@ export function ReconciliationInspector({
           Danh sách dữ liệu
         </div>
         {loading ? (
-          <p className="p-8 text-center text-sm text-slate-400">Đang tải…</p>
+          <p className="p-8 text-center text-sm text-slate-400" role="status" aria-live="polite">Đang tải…</p>
         ) : records.length === 0 ? (
-          <p className="p-8 text-center text-sm text-slate-400">
+          <p className="p-8 text-center text-sm text-slate-400" role="status" aria-live="polite">
             Chưa có record có evidence để đối soát.
           </p>
         ) : (
@@ -275,9 +401,9 @@ export function ReconciliationInspector({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {visibleRecords.map((record) => (
+                {visibleRecords.map((record, index) => (
                   <tr
-                    key={`${record.sourceEntity}-${record.sourceId}`}
+                    key={`${record.sourceEntity}-${(currentPage - 1) * PAGE_SIZE + index}`}
                     onClick={() => setSelected(record)}
                     className="cursor-pointer hover:bg-slate-900/70"
                   >
@@ -295,13 +421,13 @@ export function ReconciliationInspector({
                     </td>
                     <td className="p-3">
                       <span
-                        title={META[record.status].copy}
-                        className={`rounded-full border px-2 py-1 font-semibold ${META[record.status].className}`}
+                        title={statusMeta(record.status).copy}
+                        className={`rounded-full border px-2 py-1 font-semibold ${statusMeta(record.status).className}`}
                       >
-                        {META[record.status].label}
+                        {statusMeta(record.status).label}
                       </span>
                       <p className="mt-1 text-[10px] text-slate-500">
-                        {META[record.status].copy}
+                        {statusMeta(record.status).copy}
                       </p>
                     </td>
                     <td className="p-3 text-slate-400">{record.reason}</td>
@@ -334,10 +460,10 @@ export function ReconciliationInspector({
             <strong className="text-slate-200">Tóm tắt đối soát</strong>
             <p className="mt-2 text-slate-300">
               PW1 {selected.sourceId} → PW2 {selected.targetIds.length ? selected.targetIds.join(", ") : "Chưa có"} ·{" "}
-              {META[selected.status].label}
+              {statusMeta(selected.status).label}
             </p>
             <p className="mt-1 text-slate-400">
-              {META[selected.status].copy} — {selected.reason}
+              {statusMeta(selected.status).copy} — {selected.reason}
             </p>
           </div>
           {selected.relations?.length ? (
@@ -371,9 +497,9 @@ export function ReconciliationInspector({
                       <td className="p-2 text-sky-200">{relation.pw2Total}</td>
                       <td className="p-2">
                         <span
-                          className={`rounded-full border px-2 py-1 ${META[relation.status].className}`}
+                          className={`rounded-full border px-2 py-1 ${statusMeta(relation.status).className}`}
                         >
-                          {META[relation.status].label}
+                          {statusMeta(relation.status).label}
                         </span>
                       </td>
                       <td className="p-2 text-slate-500">

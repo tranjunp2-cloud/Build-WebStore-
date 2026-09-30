@@ -78,10 +78,31 @@ export type ReconciliationSnapshot = {
   records: ReconciliationRecord[];
 };
 
+/** Safe run selector DTO. It is intentionally free of source provenance. */
+export type ReconciliationRun = {
+  runId: string;
+  storeId: string;
+  updatedAt: string;
+};
+
+/** Safe issue DTO. Source identifiers and exception detail never reach the UI. */
+export type ReconciliationIssue = {
+  id: string;
+  sourceEntity: string;
+  isRunLevel: boolean;
+  severity: "WARNING" | "BLOCKER";
+  errorCode: string;
+};
+
 export type MigrationEvidenceProvider = {
   getSnapshot(input: {
     scope: ReconciliationScope;
     storeId: string | null;
+    /**
+     * F42 ledger run selected explicitly by an authorised operator. Never use
+     * a "latest run" fallback: different runs can belong to the same store.
+     */
+    runId?: string | null;
   }): Promise<ReconciliationSnapshot>;
 };
 
@@ -125,7 +146,7 @@ const ENTITY_TARGET_COLLECTIONS: Record<ReconciliationEntity, readonly string[]>
   customers: ["customers"],
   account_profile: ["sites"],
   team_members: ["users"],
-  email_templates: ["email_templates"],
+  email_templates: ["email-template-settings"],
   payments: ["payments"],
   delivery: ["sites"],
   web_address: ["domains"],
@@ -482,6 +503,7 @@ export function registerMigrationEvidenceProvider(provider: MigrationEvidencePro
 export async function getReconciliationSnapshot(input: {
   scope: ReconciliationScope;
   storeId: string | null;
+  runId?: string | null;
   demo?: boolean;
 }): Promise<ReconciliationSnapshot> {
   if (input.demo) {

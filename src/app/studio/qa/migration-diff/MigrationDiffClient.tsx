@@ -4,7 +4,12 @@ import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import { ReconciliationInspector } from "./ReconciliationInspector";
-import { type ReconciliationScope, type ReconciliationSnapshot } from "@/lib/admin/qa/migration-reconciliation";
+import {
+  type ReconciliationIssue,
+  type ReconciliationRun,
+  type ReconciliationScope,
+  type ReconciliationSnapshot,
+} from "@/lib/admin/qa/migration-reconciliation";
 import {
   generateReconciliationCatalog,
   getFieldDiffRecordsForPage,
@@ -841,10 +846,21 @@ export function MigrationDiffClient() {
   const [reconciliationLoading, setReconciliationLoading] = useState(false);
   const [reconciliationError, setReconciliationError] = useState<string | null>(null);
   const [reconciliationDemo, setReconciliationDemo] = useState(false);
+  const [reconciliationSourceStoreId, setReconciliationSourceStoreId] = useState("");
+  const [reconciliationRunId, setReconciliationRunId] = useState<string | null>(null);
+  const [reconciliationRuns, setReconciliationRuns] = useState<ReconciliationRun[]>([]);
+  const [reconciliationRunsTruncated, setReconciliationRunsTruncated] = useState(false);
+  const [reconciliationRunsLoading, setReconciliationRunsLoading] = useState(false);
+  const [reconciliationRunsError, setReconciliationRunsError] = useState<string | null>(null);
+  const [reconciliationIssues, setReconciliationIssues] = useState<ReconciliationIssue[]>([]);
+  const [reconciliationIssuesLoading, setReconciliationIssuesLoading] = useState(false);
+  const [reconciliationIssuesError, setReconciliationIssuesError] = useState<string | null>(null);
   const [previewSource, setPreviewSource] = useState<"template" | "live_domain">("template");
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const pw1DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
   const reconciliationRequestRef = React.useRef(0);
+  const reconciliationRunsRequestRef = React.useRef(0);
+  const reconciliationIssuesRequestRef = React.useRef(0);
   const pw2DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
   const pw1MobIframeRef = React.useRef<HTMLIFrameElement>(null);
   const pw2MobIframeRef = React.useRef<HTMLIFrameElement>(null);
@@ -996,13 +1012,105 @@ export function MigrationDiffClient() {
   }, [activeStoreId, fieldDiffUiDemo]);
 
   useEffect(() => {
+    setReconciliationRunId(null);
+  }, [activeStoreId, reconciliationSourceStoreId]);
+
+  useEffect(() => {
+    const isReconciliationTab = activeViewTab === "commerce_reconciliation" || activeViewTab === "settings_reconciliation";
+    if (!activeStoreId || !isReconciliationTab || reconciliationDemo || !reconciliationSourceStoreId) {
+      setReconciliationRuns([]);
+      setReconciliationRunsTruncated(false);
+      setReconciliationRunsLoading(false);
+      setReconciliationRunsError(null);
+      return;
+    }
+    const controller = new AbortController();
+    const requestId = ++reconciliationRunsRequestRef.current;
+    const load = async () => {
+      setReconciliationRunsLoading(true);
+      setReconciliationRunsError(null);
+      try {
+        const response = await fetch(`/api/qa/migration-reconciliation/runs?store_id=${encodeURIComponent(reconciliationSourceStoreId)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload: { data?: ReconciliationRun[]; meta?: { truncated?: boolean } } = await response.json();
+        const runs = Array.isArray(payload.data) ? payload.data.filter((run) => run.storeId === reconciliationSourceStoreId) : [];
+        if (!controller.signal.aborted && requestId === reconciliationRunsRequestRef.current) {
+          setReconciliationRuns(runs);
+          setReconciliationRunsTruncated(payload.meta?.truncated === true);
+        }
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationRunsRequestRef.current) {
+          setReconciliationRuns([]);
+          setReconciliationRunsTruncated(false);
+          setReconciliationRunsError("Kiểm tra ID store nguồn PW1 hoặc quyền truy cập rồi thử lại.");
+        }
+      } finally {
+        if (!controller.signal.aborted && requestId === reconciliationRunsRequestRef.current) setReconciliationRunsLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [activeStoreId, activeViewTab, reconciliationDemo, reconciliationSourceStoreId]);
+
+  useEffect(() => {
     const scope: ReconciliationScope | null = activeViewTab === "commerce_reconciliation" ? "commerce" : activeViewTab === "settings_reconciliation" ? "settings" : null;
-    if (!scope || !activeStoreId) return;
+    const selectedRunIsForActiveStore = reconciliationRuns.some(
+      (run) => run.runId === reconciliationRunId && run.storeId === reconciliationSourceStoreId,
+    );
+    if (!scope || !activeStoreId || (!reconciliationDemo && (!reconciliationSourceStoreId || !selectedRunIsForActiveStore))) {
+      setReconciliationSnapshot(null);
+      setReconciliationLoading(false);
+      setReconciliationError(null);
+      return;
+    }
     const controller = new AbortController();
     const requestId = ++reconciliationRequestRef.current;
-    const load = async () => { setReconciliationSnapshot(null); setReconciliationLoading(true); setReconciliationError(null); try { const response = await fetch(`/api/qa/migration-reconciliation?scope=${scope}&store_id=${encodeURIComponent(activeStoreId)}${reconciliationDemo ? "&demo=1" : ""}`, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload: { data?: ReconciliationSnapshot } = await response.json(); if (payload.data?.scope !== scope || payload.data.storeId !== activeStoreId) throw new Error("Phản hồi đối soát không khớp store hoặc phạm vi đang chọn"); if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationSnapshot(payload.data); } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationRequestRef.current) { setReconciliationSnapshot(null); setReconciliationError(error instanceof Error ? error.message : "Lỗi không xác định"); } } finally { if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationLoading(false); } };
+    const runParam = reconciliationDemo ? "" : `&run_id=${encodeURIComponent(reconciliationRunId ?? "")}`;
+    const selectedStoreId = reconciliationDemo ? activeStoreId : reconciliationSourceStoreId;
+    const load = async () => { setReconciliationSnapshot(null); setReconciliationLoading(true); setReconciliationError(null); try { const response = await fetch(`/api/qa/migration-reconciliation?scope=${scope}&store_id=${encodeURIComponent(selectedStoreId)}${runParam}${reconciliationDemo ? "&demo=1" : ""}`, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload: { data?: ReconciliationSnapshot } = await response.json(); if (payload.data?.scope !== scope || payload.data.storeId !== selectedStoreId) throw new Error("Phản hồi đối soát không khớp store hoặc phạm vi đang chọn"); if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationSnapshot(payload.data); } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationRequestRef.current) { setReconciliationSnapshot(null); setReconciliationError("Không thể tải đối soát. Kiểm tra run đã chọn và quyền truy cập rồi thử lại."); } } finally { if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationLoading(false); } };
     void load(); return () => controller.abort();
-  }, [activeStoreId, activeViewTab, reconciliationDemo]);
+  }, [activeStoreId, activeViewTab, reconciliationDemo, reconciliationRunId, reconciliationRuns, reconciliationSourceStoreId]);
+
+  useEffect(() => {
+    const selectedRunIsForActiveStore = reconciliationRuns.some(
+      (run) => run.runId === reconciliationRunId && run.storeId === reconciliationSourceStoreId,
+    );
+    if (!activeStoreId || !selectedRunIsForActiveStore || reconciliationDemo) {
+      setReconciliationIssues([]);
+      setReconciliationIssuesLoading(false);
+      setReconciliationIssuesError(null);
+      return;
+    }
+    const controller = new AbortController();
+    const requestId = ++reconciliationIssuesRequestRef.current;
+    const load = async () => {
+      setReconciliationIssuesLoading(true);
+      setReconciliationIssuesError(null);
+      try {
+        const response = await fetch(`/api/qa/migration-reconciliation/issues?store_id=${encodeURIComponent(reconciliationSourceStoreId)}&run_id=${encodeURIComponent(reconciliationRunId ?? "")}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload: { data?: ReconciliationIssue[] } = await response.json();
+        if (!controller.signal.aborted && requestId === reconciliationIssuesRequestRef.current) {
+          setReconciliationIssues(Array.isArray(payload.data) ? payload.data : []);
+        }
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationIssuesRequestRef.current) {
+          setReconciliationIssues([]);
+          setReconciliationIssuesError("Kiểm tra migration run đã chọn rồi thử lại.");
+        }
+      } finally {
+        if (!controller.signal.aborted && requestId === reconciliationIssuesRequestRef.current) setReconciliationIssuesLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [activeStoreId, reconciliationDemo, reconciliationRunId, reconciliationRuns, reconciliationSourceStoreId]);
 
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
     if (!activeStoreId) return null;
@@ -2072,7 +2180,36 @@ export function MigrationDiffClient() {
 
             {/* Modal Body Area */}
             {activeViewTab === "commerce_reconciliation" || activeViewTab === "settings_reconciliation" ? (
-              <ReconciliationInspector scope={activeViewTab === "commerce_reconciliation" ? "commerce" : "settings"} snapshot={reconciliationSnapshot} loading={reconciliationLoading} error={reconciliationError} isDemo={reconciliationDemo} onToggleDemo={setReconciliationDemo} />
+              <ReconciliationInspector
+                scope={activeViewTab === "commerce_reconciliation" ? "commerce" : "settings"}
+                snapshot={reconciliationSnapshot}
+                loading={reconciliationLoading}
+                error={reconciliationError}
+                isDemo={reconciliationDemo}
+                onToggleDemo={setReconciliationDemo}
+                sourceStoreId={reconciliationSourceStoreId}
+                onSourceStoreChange={(storeId) => {
+                  setReconciliationSourceStoreId(storeId);
+                  setReconciliationRunId(null);
+                  setReconciliationRuns([]);
+                  setReconciliationRunsTruncated(false);
+                  setReconciliationSnapshot(null);
+                  setReconciliationIssues([]);
+                }}
+                runId={reconciliationRunId}
+                runs={reconciliationRuns}
+                runsTruncated={reconciliationRunsTruncated}
+                runsLoading={reconciliationRunsLoading}
+                runsError={reconciliationRunsError}
+                onRunChange={(runId) => {
+                  setReconciliationRunId(runId);
+                  setReconciliationSnapshot(null);
+                  setReconciliationIssues([]);
+                }}
+                issues={reconciliationIssues}
+                issuesLoading={reconciliationIssuesLoading}
+                issuesError={reconciliationIssuesError}
+              />
             ) : activeViewTab === "visual_stream" ? (
               /* ========================================================================= */
               /* 1. THE CLASSIC DUAL BROWSER PARITY STREAM VIEW (PW1 VS PW2) */

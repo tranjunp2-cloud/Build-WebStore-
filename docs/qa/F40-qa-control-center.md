@@ -139,6 +139,7 @@ The stateful test intentionally skips when its fixture variables are absent. Bef
 
 | TC-ID | Type | Priority | Scenario | Status | Automated by |
 | --- | --- | --- | --- | --- | --- |
-| TC-F40-14-01 | Unit | Critical | Khi chưa có mapping evidence, snapshot chỉ là `Chưa xác minh`; không được suy đoán bản ghi khớp từ SKU/email/order number. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts` |
+| TC-F40-14-01 | Unit | Critical | Khi chưa có mapping evidence, snapshot chỉ là `Chưa xác minh`; không được suy đoán bản ghi khớp từ SKU/email/order number; exception mở hoặc dữ liệu bị cắt cũng không được báo pass. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts`, `src/__tests__/unit/qa/f40-f42-ledger-evidence-provider.test.ts` |
 | TC-F40-14-02 | E2E | Critical | Super Admin mở Đối soát Commerce, bật dữ liệu mẫu và lọc theo Products. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
-| TC-F40-14-03 | Unit | High | Adapter evidence versioned có thể được đăng ký mà không thay đổi contract UI. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts` |
+| TC-F40-14-03 | Unit/API | High | Adapter evidence versioned có thể được đăng ký mà không thay đổi contract UI; run và issue chỉ đọc được khi Super Admin chọn đúng ID store PW1 số và child run đã VERIFIED. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts`, `src/__tests__/api/f40-migration-reconciliation-ledger-routes.test.ts` |
+| TC-F40-14-04 | Manual | Critical | Staging có schema F42 và một child run VERIFIED: nhập đúng ID store PW1 → chọn run → kiểm tra mapping/issue; không dùng mã F40 `SITE-xxxx` làm crosswalk. | [ ] MANUAL | Migration owner cung cấp child run ID + source store ID |
