@@ -16,9 +16,10 @@ export interface PrepareSystemCreatorInput {
   approvedBy: string
   output: string
   localDatabase?: string
+  targetHost?: string
 }
 
-/** Prepare approval evidence against a read-only local DB connection; never creates users. */
+/** Prepare approval evidence against a read-only target DB connection; never creates users. */
 export async function prepareSystemCreator(input: PrepareSystemCreatorInput): Promise<{ bindingPath: string; targetUserId: number }> {
   if (!input.exportArtifact || !input.output || !isAbsolute(input.output) || !/^@users:users:[1-9]\d*$/.test(input.sourceRef) || !input.approvedBy?.trim()) throw new MigrationError('SYSTEM_BINDING_ARGUMENTS_REQUIRED')
   const output = await validateOutputPath(input.output)
@@ -28,8 +29,8 @@ export async function prepareSystemCreator(input: PrepareSystemCreatorInput): Pr
   if (!actorHash) throw new MigrationError('ACTOR_ARTIFACT_REQUIRED')
   const actors = validateUserActors((await readBoundFile(resolve(directory, 'user-actors.json'), { json: true, expectedHash: actorHash, maxBytes: 16 * 1024 * 1024 })).value, exported.manifest.sourceSnapshot)
   if (!actors.actors.some(actor => actor._ref === input.sourceRef)) throw new MigrationError('SOURCE_ACTOR_NOT_FOUND')
-  const target = localTarget(process.env.DATABASE_URI, false, input.localDatabase)
-  const pool = new Pool({ connectionString: target.uri, connectionTimeoutMillis: 10000, options: '-c default_transaction_read_only=on -c statement_timeout=10000' })
+  const target = localTarget(process.env.DATABASE_URI, false, input.localDatabase, input.targetHost)
+  const pool = new Pool({ connectionString: target.uri, ...(target.ssl ? { ssl: target.ssl } : {}), ...(target.enableChannelBinding ? { enableChannelBinding: true } : {}), connectionTimeoutMillis: 10000, options: '-c default_transaction_read_only=on -c statement_timeout=10000' })
   try {
     const identity = await lookupSystemCreator(pool)
     const { sourceInstance, sourceDatabase, sourceInstanceToken, snapshotId } = exported.manifest.sourceSnapshot

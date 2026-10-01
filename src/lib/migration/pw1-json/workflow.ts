@@ -24,7 +24,7 @@ export type WorkflowMode = 'users' | 'full'
 const selectionSchema = z.object({ all: z.boolean().optional(), store: z.string().optional(), stores: z.string().optional(), fromStore: z.string().optional(), toStore: z.string().optional(), groupSize: z.number().int().min(1).max(100).optional(), dryRun: z.boolean().optional() }).strict()
 const stateSchema = z.object({
   version: z.literal(1), mode: z.enum(['users', 'full']), batchId: z.string().uuid(),
-  targetHash: z.string().regex(/^[a-f0-9]{64}$/), localDatabase: z.string().regex(/^[a-zA-Z0-9_]+$/), selection: selectionSchema,
+  targetHash: z.string().regex(/^[a-f0-9]{64}$/), localDatabase: z.string().regex(/^[a-zA-Z0-9_]+$/), targetHost: z.string().regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+neon\.tech$/i).optional(), selection: selectionSchema,
   stage: z.enum(['CREATED', 'BOUND', 'PREPARED', 'IMPORTING', 'IMPORTED', 'FINALIZING', 'COMPLETED', 'DRY_RUN_PASSED']),
   batchObserved: z.boolean(), manifestHash: z.string().optional(), error: z.string().optional(),
 }).strict()
@@ -38,7 +38,7 @@ export async function runWorkflow(argv: string[], mode: WorkflowMode): Promise<v
   let directory: string, state: RunState
   const config = args.config ? await loadWorkflowConfig(args.config) : undefined
   if (config) {
-    const target = localTarget(process.env.DATABASE_URI, !args.selection.dryRun, config.localDatabase)
+    const target = localTarget(process.env.DATABASE_URI, !args.selection.dryRun, config.localDatabase, config.targetHost)
     // Validate the existing parent before creating only the explicitly configured output root.
     try { if (await realpath(config.outputRoot) !== config.outputRoot) throw new MigrationError('OUTPUT_PARENT_UNSAFE') }
     catch (error) {
@@ -49,7 +49,7 @@ export async function runWorkflow(argv: string[], mode: WorkflowMode): Promise<v
     directory = resolve(config.outputRoot, `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}`)
     await validateOutputPath(directory)
     await mkdir(directory, { mode: 0o700 })
-    state = { version: 1, mode, batchId: randomUUID(), targetHash: target.identity, localDatabase: config.localDatabase, selection: args.selection, stage: 'CREATED', batchObserved: false }
+    state = { version: 1, mode, batchId: randomUUID(), targetHash: target.identity, localDatabase: config.localDatabase, ...(config.targetHost ? { targetHost: config.targetHost } : {}), selection: args.selection, stage: 'CREATED', batchObserved: false }
   } else {
     directory = args.run!
     // Read again under lock below; this initial read only locates the expected target.
@@ -74,16 +74,22 @@ export async function runWorkflow(argv: string[], mode: WorkflowMode): Promise<v
   try {
     if (!config) state = await readState(directory)
     if (state.mode !== mode) throw new MigrationError('WORKFLOW_SCOPE_MISMATCH')
-    const target = localTarget(process.env.DATABASE_URI, !state.selection.dryRun, state.localDatabase)
+    const target = localTarget(process.env.DATABASE_URI, !state.selection.dryRun, state.localDatabase, state.targetHost)
     if (target.identity !== state.targetHash) throw new MigrationError('WORKFLOW_TARGET_CHANGED')
-    pool = new Pool({ connectionString: target.uri, connectionTimeoutMillis: 10000, options: '-c default_transaction_read_only=on -c statement_timeout=10000' })
-    await assertWritableProfile(pool)
-    await assertTargetSchema(pool)
+    pool = new Pool({ connectionString: target.uri, ...(target.ssl ? { ssl: target.ssl } : {}), ...(target.enableChannelBinding ? { enableChannelBinding: true } : {}), connectionTimeoutMillis: 10000, options: '-c default_transaction_read_only=on -c statement_timeout=10000' })
+    try {
+      await assertWritableProfile(pool)
+      await assertTargetSchema(pool)
+    } catch (error) {
+      // No batch, binding, or business write can have started at this point.
+      if (safeError(error).code === 'OUTCOME_REQUIRES_RESUME_RECONCILIATION') throw new MigrationError('TARGET_DATABASE_UNREACHABLE')
+      throw error
+    }
     if (config) {
       maySaveFailure = true
       await save()
       step('binding')
-      const bindingPath = config.creatorBindings ?? (await prepareSystemCreator({ exportArtifact: config.exportArtifact, ...config.systemCreator!, output: resolve(directory, 'binding'), localDatabase: config.localDatabase })).bindingPath
+      const bindingPath = config.creatorBindings ?? (await prepareSystemCreator({ exportArtifact: config.exportArtifact, ...config.systemCreator!, output: resolve(directory, 'binding'), localDatabase: config.localDatabase, targetHost: config.targetHost })).bindingPath
       state.stage = 'BOUND'; await save()
       step('prepare')
       await prepareImportArtifact({ exportArtifact: config.exportArtifact, credentials: config.credentials, creatorBindings: bindingPath, output: resolve(directory, 'prepared') })
@@ -118,9 +124,9 @@ export async function runWorkflow(argv: string[], mode: WorkflowMode): Promise<v
           assertBatch(created)
           state.batchObserved = true; await save()
         } }
-        if (mode === 'users') await runUserImport({ ...state.selection, manifest, localDatabase: state.localDatabase }, options)
+        if (mode === 'users') await runUserImport({ ...state.selection, manifest, localDatabase: state.localDatabase, targetHost: state.targetHost }, options)
         else {
-          const input: Arguments = batch ? { resume: batch.id, localDatabase: state.localDatabase } : { ...state.selection, manifest, localDatabase: state.localDatabase }
+          const input: Arguments = batch ? { resume: batch.id, localDatabase: state.localDatabase, targetHost: state.targetHost } : { ...state.selection, manifest, localDatabase: state.localDatabase, targetHost: state.targetHost }
           await runImport({ ...input, logDir: resolve(directory, 'logs') }, options)
         }
         state.stage = state.selection.dryRun ? 'DRY_RUN_PASSED' : 'IMPORTED'; await save()

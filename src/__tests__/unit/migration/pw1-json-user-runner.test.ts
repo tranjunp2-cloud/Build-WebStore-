@@ -13,8 +13,9 @@ describe('[TC-F42-IMP-USERS] User migration CLI contract', () => {
     const range = argumentsForUsers(['--manifest', '/path/to/import-manifest.json', '--from-store', '100', '--to-store', '200', '--output-file', '/private/users.json', '--output-master', '/private/master-with-destination.json'])
     expect(range).toMatchObject({ fromStore: '100', toStore: '200', outputFile: '/private/users.json', outputMaster: '/private/master-with-destination.json' })
 
-    const all = argumentsForUsers(['--manifest', '/path/to/import-manifest.json', '--all', '--local-database', 'primeweb'])
-    expect(all).toMatchObject({ all: true, localDatabase: 'primeweb' })
+    const host = 'ep-test.c-6.us-east-2.aws.neon.tech'
+    const all = argumentsForUsers(['--manifest', '/path/to/import-manifest.json', '--all', '--local-database', 'primeweb', '--target-host', host])
+    expect(all).toMatchObject({ all: true, localDatabase: 'primeweb', targetHost: host })
   })
 
   it('handles help option cleanly', async () => {

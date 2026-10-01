@@ -29,7 +29,7 @@ beforeEach(async () => {
   h.load.mockResolvedValue({ directory, manifest: { sourceInstance: 'PW1', masterHash: createHash('sha256').update(bytes).digest('hex') }, storeIds: ['636'], blockers: [] })
   h.create.mockResolvedValue({ id: 'json:batch' })
   h.verify.mockResolvedValue(undefined)
-  h.write.mockImplementation(async (_runtime, entity) => entity.collection === 'tenants' ? 425 : 424)
+  h.write.mockImplementation(async (_runtime, entity) => ({ targetId: entity.collection === 'tenants' ? 425 : 424, action: 'CREATE' }))
 })
 afterEach(async () => { vi.restoreAllMocks(); await rm(directory, { recursive: true, force: true }) })
 

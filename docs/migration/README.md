@@ -1,8 +1,8 @@
-# Chạy migrate PW1 trên local
+# Chạy migrate PW1 từ máy local
 
 ## Cách chạy chính — một lệnh
 
-DB local cần có schema hiện tại và system user `sso-service@primeweb.app`. Lệnh không tự reset DB hay cài schema. Giữ artifact exporter đầy đủ ở ngoài source; credentials CSV phải cùng snapshot. Khai báo DATABASE_URI và các key cần thiết trong `.env.local`; không đặt key/password vào config.
+DB đích cần có schema hiện tại và system user `sso-service@primeweb.app`. Lệnh không tự reset DB hay cài schema. Giữ artifact exporter đầy đủ ở ngoài source; credentials CSV phải cùng snapshot. Khai báo `DATABASE_URI` của DB PW2 và các key cần thiết trong `.env.local`; không đặt key/password vào config.
 
 Đặt `PW1_ROOT` tới thư mục riêng bên ngoài source/Git, rồi tạo `$PW1_ROOT/local.json` một lần (mẫu: `configs/migration/pw1-import-local.example.json`):
 
@@ -18,6 +18,10 @@ DB local cần có schema hiện tại và system user `sso-service@primeweb.app
 ```
 
 Đường dẫn bên trong config tính từ thư mục chứa config. `sourceRef` là actor PW1 đã xác minh cho snapshot, không phải ID user PW2. Có thể dùng `creatorBindings` trỏ binding hiện có thay cho `systemCreator`, giữ nguyên các file bằng chứng binding phụ thuộc.
+
+Để import vào Neon từ máy local, giữ `DATABASE_URI` trỏ đúng DB Neon và thêm `targetHost` bằng **đúng hostname** trong URL; `localDatabase` phải bằng tên DB trong URL. Ví dụ: `"targetHost": "ep-example.c-6.us-east-2.aws.neon.tech"`. Đây là xác nhận đích ghi, không phải URL thứ hai; password chỉ nằm trong `DATABASE_URI`. Neon dùng TLS có xác thực chứng thư. Nếu thiếu/sai `targetHost`, importer từ chối remote trước khi kết nối. Config không có `targetHost` tiếp tục chỉ cho DB local.
+Các lệnh `migrate:pw1:import`, `migrate:pw1:users` và `migrate:pw1:bind-system` tự ưu tiên IPv4 khi kết nối; không cần đặt `NODE_OPTIONS` thủ công. Nếu DB không kết nối được trước binding, lệnh báo `TARGET_DATABASE_UNREACHABLE`; sửa kết nối rồi chạy lại bằng `--config`, không dùng `--continue` cho run chỉ có `.lock`.
+Nếu tạo artifact bằng lệnh `npm run migrate:pw1`, script tự đọc `DATABASE_URI` từ `.env.local`/môi trường và ghi tên DB cùng Neon host vào `import-config.json`; không cần truyền lại hai giá trị này. Có thể dùng `--target-database` và `--target-host` khi export offline, nhưng chúng phải khớp URI nếu đã khai báo. File đã export trước thay đổi này cần bổ sung `targetHost` thủ công; không cần export lại master chỉ để đổi DB đích.
 
 Nếu muốn giữ artifact/run ngay trong checkout, `<checkout>/.migration/` là vị trí duy nhất trong repo được phép: thư mục phải tồn tại với mode `0700`, không được là symlink, và phải có entry trong `.gitignore` của repo đó. Mọi path khác trong repo vẫn bị `PRIVATE_ARTIFACT_INSIDE_REPOSITORY` chặn.
 
@@ -45,9 +49,11 @@ npm run migrate:pw1:import -- --run "$PW1_ROOT/runs/RUN_ID" --export-only
 npm run migrate:pw1:users -- --run "$PW1_ROOT/runs/RUN_ID" --export-only
 ```
 
-`prepared/destination-manifest.json` ghi hash gốc/hash kết quả, batch và trạng thái hoàn tất. Import/export manifests cũ giữ nguyên để đối soát ledger/credentials; dùng destination-manifest để kiểm tra master sau khi thêm destination. Từ lúc bắt đầu ghi destination, prepared là kết quả bàn giao, không còn dùng trực tiếp làm input importer. `--export-only` phục hồi bước ghi file bị ngắt, không ghi business DB; nếu chưa đủ store VERIFIED thì báo lỗi và giữ master nguyên vẹn. Muốn import mới, dùng artifact exporter gốc. Khi code/artifact/DB thay đổi, resume có thể bị chặn; không reset/bind lại run cũ để ép chạy. Prepare dở dang cần tạo run mới. Lệnh hỗ trợ local Linux (cần `flock`); remote/Vercel chưa hỗ trợ.
+`prepared/destination-manifest.json` ghi hash gốc/hash kết quả, batch và trạng thái hoàn tất. Import/export manifests cũ giữ nguyên để đối soát ledger/credentials; dùng destination-manifest để kiểm tra master sau khi thêm destination. Từ lúc bắt đầu ghi destination, prepared là kết quả bàn giao, không còn dùng trực tiếp làm input importer. `--export-only` phục hồi bước ghi file bị ngắt, không ghi business DB; nếu chưa đủ store VERIFIED thì báo lỗi và giữ master nguyên vẹn. Muốn import mới, dùng artifact exporter gốc. Khi code/artifact/DB thay đổi, resume có thể bị chặn; không reset/bind lại run cũ để ép chạy. Prepare dở dang cần tạo run mới. CLI chạy trên Linux local (cần `flock`), có thể kết nối Neon; chưa chạy CLI trên Vercel.
 
 Terminal in đường dẫn run. `run.json` lưu trạng thái/mã lỗi, `events.ndjson` lưu các bước workflow; full có thêm `logs/` để xem lỗi từng store. Prepare vẫn tạo một bản sao artifact; cần đủ dung lượng cho bản sao và file tạm.
+
+Full importer ghi `durationMs` tại `ARTIFACT_CHECKED` và `STORE_PREFLIGHT_PASSED`; `STORE_VERIFIED` có thêm `preflightMs`, `writeMs`, `finalizeMs`, `verifyMs`, `destinationMs`. `preflightLookups` chỉ đếm các lượt đọc target trực tiếp trong preflight, không phải tổng truy vấn nội bộ của Payload. Dùng cùng một nhóm store để so local/Neon; dry-run không đo được thời gian ghi. Preflight gom claim tối đa 128 identity/truy vấn và kiểm tra unique theo lô tối đa 32 điều kiện; nếu thấy dữ liệu đích, importer vẫn kiểm tra từng entity để xác định conflict.
 
 ## Nâng cao — các lệnh cũ
 
@@ -66,7 +72,7 @@ export PW1_IMPORT_MANIFEST="$PW1_ROOT/prepared-$PW1_RUN/import-manifest.json"
 
 Chỉ đặt `PW1_RUN` một lần cho cả lượt bind → prepare → import. Mở terminal khác thì khai báo lại đúng giá trị cũ nếu muốn dùng lại bộ đã prepare.
 
-`.env.local` cần có `DATABASE_URI` trỏ DB local, `PW1_APP_KEY`, `PW2_MIGRATION_SECRET`, `SSO_ENCRYPTION_KEY`. DB phải có schema migration và system user `sso-service@primeweb.app`. Bind-system chỉ tìm tài khoản theo email, không tạo user hoặc gán ID cố định.
+`.env.local` cần có `DATABASE_URI` trỏ DB đích, `PW1_APP_KEY`, `PW2_MIGRATION_SECRET`, `SSO_ENCRYPTION_KEY`. DB phải có schema migration và system user `sso-service@primeweb.app`. Bind-system chỉ tìm tài khoản theo email, không tạo user hoặc gán ID cố định.
 
 ## 2. Chuẩn bị file đầu vào
 
@@ -98,6 +104,8 @@ npm run migrate:pw1:bind-system -- --export-artifact "$PW1_ROOT/artifact" --sour
 ```
 
 `@users:users:51` là actor PW1 đã được xác nhận mapping tới system user PW2 trong luồng hiện tại. Với snapshot khác phải xác nhận actor trước, không tự map mọi actor về system user. Thay `liam` bằng tên người thực sự duyệt mapping.
+
+Với các lệnh nâng cao kết nối Neon (`bind-system`, `users`, `import` và `--resume`), thêm `--local-database <tên DB trong DATABASE_URI> --target-host <hostname Neon chính xác>`. Lệnh `prepare` chỉ đọc file nên không cần các tham số DB. Luồng `--config` ở đầu tài liệu tự truyền `targetHost` qua binding, import và resume.
 
 Output phải chưa tồn tại. Thư mục cha không bắt buộc quyền 700; thư mục binding mới có quyền 700, file có quyền 600. Kiểm tra symlink và ngoài Git vẫn áp dụng.
 

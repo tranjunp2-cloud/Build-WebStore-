@@ -48,23 +48,41 @@ export function transactionClient(transaction: Transaction): QueryClient {
   } }
 }
 
-export function localTarget(uri: string | undefined, apply: boolean, localDatabase?: string): { uri: string; identity: string } {
+export interface MigrationTarget {
+  uri: string
+  identity: string
+  ssl?: { rejectUnauthorized: true }
+  enableChannelBinding?: true
+}
+
+/** Local targets remain the default. Neon is writable only when its exact host is declared by the operator. */
+export function localTarget(uri: string | undefined, apply: boolean, localDatabase?: string, expectedNeonHost?: string): MigrationTarget {
   if (!uri) throw new Error('DATABASE_URI_REQUIRED')
   let url: URL
   try { url = new URL(uri) } catch { throw new Error('DATABASE_URI_INVALID') }
-  if (!['postgres:', 'postgresql:'].includes(url.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
-    throw new Error('LOCAL_DATABASE_REQUIRED')
-  }
+  if (!['postgres:', 'postgresql:'].includes(url.protocol)) throw new Error('DATABASE_PROTOCOL_INVALID')
+  const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+  const isNeon = !isLocal && Boolean(expectedNeonHost) && url.hostname.toLowerCase() === expectedNeonHost!.toLowerCase() && url.hostname.toLowerCase().endsWith('.neon.tech')
+  if (expectedNeonHost && !isNeon) throw new Error('NEON_TARGET_HOST_MISMATCH')
+  if (!isLocal && !isNeon) throw new Error('LOCAL_DATABASE_REQUIRED')
   const database = decodeURIComponent(url.pathname.slice(1))
   if (localDatabase !== undefined && (!/^[a-zA-Z0-9_]+$/.test(localDatabase) || database !== localDatabase)) throw new Error('LOCAL_DATABASE_NAME_MISMATCH')
-  if (!database || (apply && localDatabase === undefined && !/^pw1_import_1886_[a-z0-9_]+$/.test(database))) {
+  if (!database || (isNeon && localDatabase === undefined) || (apply && isLocal && localDatabase === undefined && !/^pw1_import_1886_[a-z0-9_]+$/.test(database))) {
     throw new Error('ISOLATED_CLONE_REQUIRED')
   }
+  const sslmode = url.searchParams.get('sslmode')?.toLowerCase()
+  if (isNeon && sslmode !== undefined && !['require', 'verify-full'].includes(sslmode)) throw new Error('NEON_SSL_REQUIRED')
   // libpq service/options can override the intended connection or readonly setting.
   for (const key of url.searchParams.keys()) {
-    if (!['sslmode', 'application_name', 'connect_timeout'].includes(key)) throw new Error('DATABASE_OPTION_NOT_ALLOWED')
+    if (!['sslmode', 'application_name', 'connect_timeout', 'channel_binding'].includes(key)) throw new Error('DATABASE_OPTION_NOT_ALLOWED')
   }
-  return { uri, identity: createHash('sha256').update(`${url.hostname}:${url.port || '5432'}/${database}/public`).digest('hex') }
+  if (url.searchParams.has('channel_binding') && url.searchParams.get('channel_binding') !== 'require') throw new Error('DATABASE_OPTION_NOT_ALLOWED')
+  if (url.searchParams.has('connect_timeout') && !/^[1-9]\d{0,2}$/.test(url.searchParams.get('connect_timeout')!)) throw new Error('DATABASE_OPTION_NOT_ALLOWED')
+  // node-postgres does not map channel_binding=require to enableChannelBinding,
+  // and URL sslmode can override explicit TLS options. Set both on the pool.
+  const enableChannelBinding = isNeon && url.searchParams.get('channel_binding') === 'require'
+  if (isNeon) { url.searchParams.delete('sslmode'); url.searchParams.delete('channel_binding') }
+  return { uri: isNeon ? url.toString() : uri, ...(isNeon ? { ssl: { rejectUnauthorized: true as const } } : {}), ...(enableChannelBinding ? { enableChannelBinding: true as const } : {}), identity: createHash('sha256').update(`${url.hostname}:${url.port || '5432'}/${database}/public`).digest('hex') }
 }
 
 /** Suppress only identified historical replays. Normal app config is never modified on disk. */
@@ -128,8 +146,8 @@ export interface Runtime {
   transaction<T>(operation: (req: Partial<PayloadRequest>, client: QueryClient) => Promise<T>): Promise<T>
 }
 
-export async function createRuntime(uri: string, apply = false, localDatabase?: string): Promise<Runtime> {
-  const target = localTarget(uri, apply, localDatabase)
+export async function createRuntime(uri: string, apply = false, localDatabase?: string, expectedNeonHost?: string): Promise<Runtime> {
+  const target = localTarget(uri, apply, localDatabase, expectedNeonHost)
   process.env.PAYLOAD_PUSH_SCHEMA = 'false'
   process.env.DATABASE_URI = uri
   const { default: configPromise } = await import('../../../payload.config')
@@ -147,7 +165,7 @@ export async function createRuntime(uri: string, apply = false, localDatabase?: 
   }
   const { BasePayload: PayloadClass } = await import('payload')
   const payload = await new PayloadClass().init({ config, disableDBConnect: true, disableOnInit: true })
-  const pool = new Pool({ connectionString: uri, max: 3, connectionTimeoutMillis: 10000,
+  const pool = new Pool({ connectionString: target.uri, ...(target.ssl ? { ssl: target.ssl } : {}), ...(target.enableChannelBinding ? { enableChannelBinding: true } : {}), max: 3, connectionTimeoutMillis: 10000,
     options: apply ? '-c statement_timeout=45000 -c lock_timeout=5000' : '-c default_transaction_read_only=on -c statement_timeout=45000' })
   const adapter = payload.db as unknown as Adapter
   // Match installed @payloadcms/db-postgres 3.79 connect without CREATE EXTENSION/schema push/auto database creation.

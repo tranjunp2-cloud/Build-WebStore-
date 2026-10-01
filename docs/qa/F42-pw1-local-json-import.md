@@ -1,6 +1,6 @@
 # F42 — PW1 local JSON importer (#1886)
 
-Status: test design only, 2026-09-16. AUTO marks planned automation, not a passing result or QA signoff. Scope: existing local DB clone, selected non-Page data, no live cutover. Requirements trace to [approved technical contract](../../plans/260916-1617-pw1-local-json-import/technical-contract.md) and [acceptance runbook](../../plans/260916-1617-pw1-local-json-import/acceptance-runbook.md); requirement labels below are descriptive, not invented issue AC numbers.
+Status: test design only, 2026-09-16. AUTO marks planned automation, not a passing result or QA signoff. Scope: existing local DB clone or explicitly declared Neon target, selected non-Page data, no live cutover. Requirements trace to [approved technical contract](../../plans/260916-1617-pw1-local-json-import/technical-contract.md) and [acceptance runbook](../../plans/260916-1617-pw1-local-json-import/acceptance-runbook.md); requirement labels below are descriptive, not invented issue AC numbers.
 
 Read docs/TEST_CONVENTION.md before implementing. Import actual source, use AAA and TC-ID names. Pure helpers use Vitest; CLI cases use real subprocesses. DB cases remain manual until separately automated and evidenced. No test below has been executed.
 
@@ -13,7 +13,7 @@ Read docs/TEST_CONVENTION.md before implementing. Import actual source, use AAA 
 | TC-F42-IMP-003 | [x] AUTO | Export handoff | Missing publication manifest, wrong hash/version/schema, inconsistent partitions or global unknown blocker rejects before writes; importReady=false alone is not corruption. |
 | TC-F42-IMP-004 | [x] AUTO | Scope dispositions | Pages excluded; raw removed only from write projection and retained in artifact; verified-empty, quarantined and source-unverified remain distinct; unknown required nonempty collection blocks. |
 | TC-F42-IMP-005 | [x] AUTO | Strict resource-bound reader | Invalid UTF8/grammar/duplicate keys/symlink/input drift rejected; selected Store extraction discards unselected array items; no full-file UTF8 parse. |
-| TC-F42-IMP-006 | [x] AUTO | Target guard | Nonlocal/unexpected database/schema rejected, including misleading hostname or database names; errors omit URI credentials. |
+| TC-F42-IMP-006 | [x] AUTO | Target guard | Local target remains default; Neon requires an explicitly matching host and database, verified TLS, and safe URL options. Other remote targets reject without exposing URI credentials. |
 | TC-F42-IMP-007 | [x] AUTO | Exact mapped values | Zero stock survives; null is not zero; nonzero minor-unit discount not converted twice; fractional quantities/nonfinite/unsafe magnitudes rejected; ISO instants preserved. |
 | TC-F42-IMP-008 | [x] AUTO | Identity and relations | Resolve typed relationship fields and Lexical upload values only; raw/text @ strings untouched; absent/cross-tenant/required unresolved references reject. |
 | TC-F42-IMP-009 | [x] AUTO | Stable nested records | Existing valid variant IDs preserved; missing child IDs deterministically derived within pinned snapshot; duplicate IDs rejected; projection/checksum deterministic. |

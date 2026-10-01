@@ -182,6 +182,36 @@ export async function findClaim(db: SqlClient, sourceInstance: string, sourceEnt
   }
 }
 
+/** Read-only preflight lookup. Keep write-time claims locked and checked by findClaim. */
+export async function findClaims(db: SqlClient, sourceInstance: string, keys: readonly { sourceEntity: string; sourceId: string }[]): Promise<Map<string, EntityClaim>> {
+  const claims = new Map<string, EntityClaim>()
+  const distinct = [...new Map(keys.map(key => [`${key.sourceEntity}\0${key.sourceId}`, key])).values()]
+  for (let offset = 0; offset < distinct.length; offset += 128) {
+    const chunk = distinct.slice(offset, offset + 128)
+    const result = await db.query(`SELECT m.*,r.batch_id,r.source_store_id,r.importer_profile
+      FROM unnest($2::text[],$3::text[]) AS input(source_entity,source_id)
+      JOIN migration_entity_map m ON m.source_entity=input.source_entity AND m.source_id=input.source_id
+      JOIN migration_runs r ON r.run_id=m.run_id
+      WHERE m.source_system='pw1' AND m.source_instance_id=$1 AND m.claim_active=true`,
+    [sourceInstance, chunk.map(key => key.sourceEntity), chunk.map(key => key.sourceId)])
+    for (const row of result.rows) {
+      const sourceEntity = String(row.source_entity), sourceId = String(row.source_id)
+      const key = `${sourceEntity}\0${sourceId}`
+      if (claims.has(key)) throw new MigrationError('SOURCE_CLAIM_UNRESOLVED')
+      if (!row.target_id || !row.target_collection || !['CREATED','VERIFIED','SKIPPED'].includes(String(row.state))) throw new MigrationError('SOURCE_CLAIM_UNRESOLVED')
+      claims.set(key, {
+        ownerMapId: String(row.id), ownerProfile: String(row.importer_profile),
+        batchId: row.batch_id ? `json:${String(row.batch_id)}` : `legacy:${String(row.run_id)}`,
+        storeId: String(row.source_store_id), sourceInstance, sourceEntity, sourceId,
+        targetCollection: String(row.target_collection), targetId: String(row.target_id),
+        sourceChecksum: String(row.source_checksum), targetChecksum: String(row.target_checksum),
+        evidence: row.detail as Record<string, unknown>,
+      })
+    }
+  }
+  return claims
+}
+
 /** Insert conflicts MUST roll back the entire business transaction, never swallow. */
 export async function recordEntity(db: SqlClient, lease: LedgerLease, claim: EntityClaim): Promise<void> {
   if (uuid(claim.batchId) !== uuid(lease.batchId)) throw new MigrationError('CLAIM_BATCH_MISMATCH')
@@ -234,6 +264,39 @@ export async function findOperation(db: SqlClient, batchId: string, storeId: str
     WHERE s.batch_id=$1 AND s.source_store_id=$2 AND m.source_entity=$3 AND m.source_id=$4`,
   [uuid(batchId),storeId,sourceEntity,sourceId])
   return result.rows[0] ?? null
+}
+
+/** Return the durable deferred-reference set for exactly the entities in this store. */
+export async function pendingReferenceKeys(
+  db: SqlClient,
+  batchId: string,
+  storeId: string,
+  entities: readonly { sourceEntity: string; sourceId: string }[],
+): Promise<Set<string>> {
+  const distinct = [...new Map(entities.map(entity => [JSON.stringify([entity.sourceEntity, entity.sourceId]), entity])).values()]
+  if (!distinct.length) return new Set()
+  const result = await db.query(`SELECT input.source_entity,input.source_id,m.id,m.action,m.claim_active,
+      m.detail->>'pendingReferences' AS pending_references
+    FROM migration_import_stores s
+    CROSS JOIN unnest($3::text[],$4::text[]) AS input(source_entity,source_id)
+    LEFT JOIN migration_entity_map m ON m.run_id=s.run_id
+      AND m.source_entity=input.source_entity AND m.source_id=input.source_id
+    WHERE s.batch_id=$1 AND s.source_store_id=$2`,
+  [uuid(batchId), storeId, distinct.map(entity => entity.sourceEntity), distinct.map(entity => entity.sourceId)])
+  if (result.rows.length !== distinct.length) throw new MigrationError('FINALIZE_SELECTION_INCOMPLETE')
+  const pending = new Set<string>()
+  for (const row of result.rows) {
+    if (row.id == null) throw new MigrationError('OPERATION_EVIDENCE_MISSING')
+    const key = `${String(row.source_entity)}\0${String(row.source_id)}`
+    if (row.pending_references === 'true') {
+      if (row.action !== 'CREATE' || row.claim_active !== true) throw new MigrationError('DEFERRED_UPDATE_NOT_OWNED')
+      pending.add(key)
+    } else if (row.pending_references !== 'false') {
+      // Older/incomplete evidence cannot prove that the entity is safe to skip.
+      throw new MigrationError('FINALIZE_PENDING_STATE_UNKNOWN')
+    }
+  }
+  return pending
 }
 
 /** Complete staged references only for this run's CREATE, inside the business transaction. */

@@ -24,16 +24,38 @@ async function ensurePrivateDirectory(directory: string): Promise<void> {
   }
 }
 
+function importTarget(values: { 'target-database'?: string; 'target-host'?: string }): { database: string; host?: string } {
+  let uri: URL | undefined
+  if (process.env.DATABASE_URI) {
+    try { uri = new URL(process.env.DATABASE_URI) } catch { throw new ExportError('IMPORT_TARGET_URI_INVALID') }
+    if (!['postgres:', 'postgresql:'].includes(uri.protocol)) throw new ExportError('IMPORT_TARGET_URI_INVALID')
+  }
+  const uriDatabase = uri ? decodeURIComponent(uri.pathname.slice(1)) : undefined
+  const database = values['target-database'] ?? uriDatabase ?? 'primeweb'
+  if (!/^[a-zA-Z0-9_]+$/.test(database)) throw new ExportError('INVALID_TARGET_DATABASE')
+  if (uriDatabase && database !== uriDatabase) throw new ExportError('IMPORT_TARGET_DATABASE_MISMATCH')
+  const uriHost = uri?.hostname
+  const local = uriHost && ['localhost', '127.0.0.1', '[::1]'].includes(uriHost)
+  if (uriHost && !local && !uriHost.toLowerCase().endsWith('.neon.tech')) throw new ExportError('IMPORT_TARGET_HOST_UNSUPPORTED')
+  const host = values['target-host'] ?? (local ? undefined : uriHost)
+  if (host !== undefined && !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+neon\.tech$/i.test(host)) throw new ExportError('INVALID_TARGET_HOST')
+  if (uriHost && host && host.toLowerCase() !== uriHost.toLowerCase()) throw new ExportError('IMPORT_TARGET_HOST_MISMATCH')
+  if (local && host) throw new ExportError('IMPORT_TARGET_HOST_MISMATCH')
+  return { database, ...(host ? { host } : {}) }
+}
+
 async function main() {
   const { values: v, positionals } = parseArgs({ options: {
     help: { type: 'boolean' }, 'as-of': { type: 'string' }, profile: { type: 'string' },
     'snapshot-id': { type: 'string' }, 'output-dir': { type: 'string' },
+    'target-database': { type: 'string' }, 'target-host': { type: 'string' },
   }, strict: true, allowPositionals: true })
   if (v.help) {
-    process.stdout.write('PW1 export (offline; no DB writes)\n\nnpm run migrate:pw1 -- /path/to/csv --as-of 2026-09-18T00:00:00Z\n\nDefaults: configs/migration/pw1-prod-profile.json; new private .migration/runs/<run-id>/ with source-config.json and artifact/. Snapshot ID is generated per run unless --snapshot-id is provided.\nOptional: --profile <file> --snapshot-id <id> --output-dir <new-run-directory>. Output parent must exist. as-of is required; never inferred from filename dates. Default profile inherits UTC, dev target suffix and approved production policies; review these for a different source.\n')
+    process.stdout.write('PW1 export (offline; no DB writes)\n\nnpm run migrate:pw1 -- /path/to/csv --as-of 2026-09-18T00:00:00Z\n\nDefaults: configs/migration/pw1-prod-profile.json; new private .migration/runs/<run-id>/ with source-config.json and artifact/. Snapshot ID is generated per run unless --snapshot-id is provided.\nImport target is inferred from DATABASE_URI (.env.local via npm script); without it, local primeweb is used. Optional --target-database and --target-host must match DATABASE_URI when set. Other options: --profile <file> --snapshot-id <id> --output-dir <new-run-directory>. Output parent must exist. as-of is required; never inferred from filename dates. Default profile inherits UTC, dev target suffix and approved production policies; review these for a different source.\n')
     return
   }
   if (positionals.length !== 1 || !v['as-of']) throw new ExportError('INVALID_CLI_ARGUMENTS')
+  const target = importTarget(v)
   if ((await lstat(positionals[0])).isSymbolicLink()) throw new ExportError('SYMLINK_SOURCE')
   const input = await realpath(positionals[0])
   const runId = `pw1-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`
@@ -62,7 +84,8 @@ async function main() {
     version: 1,
     exportArtifact: './artifact',
     ...(usersFile ? { credentials: './users.csv' } : {}),
-    localDatabase: 'primeweb',
+    localDatabase: target.database,
+    ...(target.host ? { targetHost: target.host } : {}),
     systemCreator: { sourceRef: '@users:users:51', approvedBy: process.env.USER || 'operator' },
     outputRoot: './import-runs',
   }

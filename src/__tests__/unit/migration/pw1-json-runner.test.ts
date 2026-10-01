@@ -25,6 +25,17 @@ describe('[TC-F42-IMP-002/012] CLI and resume contract',()=>{
   expect(apply.localDatabase).toBe('primeweb');expect(resume.localDatabase).toBe('primeweb')
   expect(()=>argumentsFor(['--manifest','/m','--store','636','--local-database',''])).toThrow('LOCAL_DATABASE_ARGUMENT_INVALID')
  })
+ it('passes an explicit Neon host through apply and resume parsing',()=>{
+  // Arrange
+  const host='ep-test.c-6.us-east-2.aws.neon.tech'
+  const batch='json:12345678-1234-1234-1234-123456789abc'
+  // Act
+  const apply=argumentsFor(['--manifest','/m','--store','636','--local-database','primeweb','--target-host',host])
+  const resume=argumentsFor(['--resume',batch,'--local-database','primeweb','--target-host',host])
+  // Assert
+  expect(apply.targetHost).toBe(host)
+  expect(resume.targetHost).toBe(host)
+ })
  it('prevents cursor from skipping unfinished Store but permits already verified prefix',()=>{
   // Arrange
   const ids=['205','285','300'];const states={'205':'VERIFIED','285':'APPLYING'}

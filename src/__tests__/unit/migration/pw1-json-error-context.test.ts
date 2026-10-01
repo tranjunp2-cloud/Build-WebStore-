@@ -47,6 +47,7 @@ describe('[TC-F42-IMP-LOGS] diagnostic identity and preflight error context', ()
     // Assert
     expect(result).toEqual({})
     expect(safeLogEvent({ field: 'variants[0].sku', reason: 'UNSAFE_URL', samplesTruncated: false })).toEqual({ field: 'variants[0].sku', reason: 'UNSAFE_URL', samplesTruncated: false })
+    expect(safeLogEvent({ durationMs: 123, preflightLookups: 5, writeMs: 80, password: 'SECRET_CANARY' })).toEqual({ durationMs: 123, preflightLookups: 5, writeMs: 80 })
   })
 
   it.each(['projection', 'credential', 'unique', 'network'])('identifies the second failing entity for %s without exposing raw data', async kind => {
@@ -56,8 +57,10 @@ describe('[TC-F42-IMP-LOGS] diagnostic identity and preflight error context', ()
     entities[1].data.privateCanary = 'SECRET_CANARY'
     const runtime = {
       pool: { query: async (_sql: string, params: unknown[]) => {
-        if (kind === 'network' && params[2] === '2') throw Object.assign(new Error('URI password=SECRET_CANARY'), { code: 'ECONNRESET' })
-        return { rows: kind === 'projection' ? [{ target_id: params[2], target_collection: 'products', state: 'VERIFIED', source_store_id: '205', source_checksum: 'fixture' }] : [] }
+        if (kind === 'network') throw Object.assign(new Error('URI password=SECRET_CANARY'), { code: 'ECONNRESET' })
+        return { rows: kind === 'projection' ? (Array.isArray(params[2]) ? params[2] : [params[2]]).map(id => ({
+          source_entity: 'products', source_id: id, target_id: id, target_collection: 'products', state: 'VERIFIED', source_store_id: '205', source_checksum: 'fixture',
+        })) : [] }
       } },
       payload: {
         collections: { products: { config: { fields: kind === 'unique' ? [{ name: 'title', unique: true }] : [], indexes: [] } } },
@@ -71,16 +74,23 @@ describe('[TC-F42-IMP-LOGS] diagnostic identity and preflight error context', ()
     const error = await preflightStore(runtime, entities, 'fixture', new Map(), undefined, undefined, undefined,
       value => { context = value; seen.push(value) }).then(() => { throw new Error('Expected preflight failure') }, error => error)
     const result = safeError(error)
-    await log.event({ ...context, status: 'SESSION_FAILED', ...result })
-    await log.checkpoint('FAILED', { ...context, ...result }); await log.close()
+    await log.event({ storeId: '205', ...context, status: 'SESSION_FAILED', ...result })
+    await log.checkpoint('FAILED', { storeId: '205', ...context, ...result }); await log.close()
     const contents = await readFile(join(log.directory, 'errors.jsonl'), 'utf8')
     const event = JSON.parse(contents.trim())
     // Assert
     const codes = { projection: 'TARGET_PROJECTION_CONFLICT', credential: 'VERIFIABLE_CREDENTIAL_REQUIRED', unique: 'DUPLICATE_SOURCE_UNIQUE_KEY', network: 'OUTCOME_REQUIRES_RESUME_RECONCILIATION' }
-    expect(event).toMatchObject({ sourceId: '2', storeId: '205', collection: entities[1].collection, sourceEntity: entities[1].sourceEntity, code: codes[kind as keyof typeof codes] })
-    expect(JSON.parse(await readFile(join(log.directory, 'summary.json'), 'utf8'))).toMatchObject({ sourceId: '2', code: result.code })
+    if (kind === 'network') {
+      // A failed batch query has no reliable per-row identity; report the store rather than a false source ID.
+      expect(event).toMatchObject({ storeId: '205', code: codes.network })
+      expect(event.sourceId).toBeUndefined()
+    } else expect(event).toMatchObject({ sourceId: '2', storeId: '205', collection: entities[1].collection, sourceEntity: entities[1].sourceEntity, code: codes[kind as keyof typeof codes] })
+    expect(JSON.parse(await readFile(join(log.directory, 'summary.json'), 'utf8'))).toMatchObject(kind === 'network'
+      ? { storeId: '205', code: result.code }
+      : { sourceId: '2', code: result.code })
     expect(contents + JSON.stringify(seen)).not.toContain('SECRET_CANARY')
-    expect(Object.keys(context!).sort()).toEqual(['collection', 'sourceEntity', 'sourceId', 'storeId'])
+    if (kind === 'network') expect(context).toBeUndefined()
+    else expect(Object.keys(context!).sort()).toEqual(['collection', 'sourceEntity', 'sourceId', 'storeId'])
   })
 
   it('never copies raw Entity data into runner context or subsequent group output', () => {

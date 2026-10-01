@@ -67,6 +67,33 @@ beforeEach(async () => {
 afterEach(async () => { vi.restoreAllMocks(); vi.unstubAllEnvs(); await rm(root, { recursive: true, force: true }) })
 
 describe('[TC-F42-IMP-WORKFLOW] One-command migration recovery', () => {
+  it('reports an unreachable target before binding without suggesting resume', async () => {
+    // Arrange
+    const config = await configFile()
+    adapters.profile.mockRejectedValueOnce(Object.assign(new Error('connect ETIMEDOUT'), { code: 'ETIMEDOUT' }))
+
+    // Act / Assert
+    await expect(runWorkflow(['--config', config, '--all', '--dry-run'], 'full')).rejects.toThrow('TARGET_DATABASE_UNREACHABLE')
+    expect(adapters.binding).not.toHaveBeenCalled()
+    expect(adapters.prepare).not.toHaveBeenCalled()
+    const directory = await runDirectory()
+    expect(await readdir(directory)).toEqual(['.lock'])
+  })
+  it('persists an explicitly approved Neon host and passes it to the importer', async () => {
+    // Arrange
+    const host = 'ep-test.c-6.us-east-2.aws.neon.tech'
+    vi.stubEnv('DATABASE_URI', `postgresql://owner:secret@${host}/primeweb?sslmode=require&channel_binding=require`)
+    const config = await configFile()
+    await writeFile(config, JSON.stringify({ ...JSON.parse(await readFile(config, 'utf8')), targetHost: host }), { mode: 0o600 })
+
+    // Act
+    await runWorkflow(['--config', config, '--all', '--dry-run'], 'full')
+
+    // Assert
+    expect(await state(await runDirectory())).toMatchObject({ targetHost: host, stage: 'DRY_RUN_PASSED' })
+    expect(adapters.binding).toHaveBeenCalledWith(expect.objectContaining({ targetHost: host }))
+    expect(adapters.full).toHaveBeenCalledWith(expect.objectContaining({ targetHost: host }), expect.anything())
+  })
   it('persists batch intent before invoking importer and dry-run never exports destinations', async () => {
     // Arrange
     const config = await configFile()

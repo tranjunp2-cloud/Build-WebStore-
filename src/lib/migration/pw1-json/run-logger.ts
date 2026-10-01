@@ -8,7 +8,7 @@ import { isPrivateRepoWorkspace } from './repo-workspace'
 import type { ImportDiagnostic } from './types'
 
 const textFields = new Set(['status','mode','runId','phase','storeId','collection','sourceEntity','sourceId','targetId','action','code','nextAction','operationId','manifestHash','masterHash'])
-const numberFields = new Set(['exitCode','groupIndex','groupCount','groupSize','stores','entities','creates','reuses','completed','total','writes','blockerCount','count','bytes','totalBytes','verifiedBefore','verifiedThisSession'])
+const numberFields = new Set(['exitCode','groupIndex','groupCount','groupSize','stores','entities','creates','reuses','completed','total','writes','blockerCount','count','bytes','totalBytes','verifiedBefore','verifiedThisSession','durationMs','preflightLookups','preflightMs','writeMs','finalizeMs','verifyMs','destinationMs','pendingReferenceCount'])
 /** No arbitrary strings, payloads, errors or projections cross this boundary. */
 export function safeLogEvent(event: Record<string, unknown>): Record<string, string | number | boolean> {
   const safe: Record<string, string | number | boolean> = {}

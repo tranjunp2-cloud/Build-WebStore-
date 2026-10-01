@@ -18,6 +18,22 @@ hoặc `--output-dir <new-run-directory>` (thư mục cha có sẵn). Không ghi
 Nếu export thất bại, thư mục lần chạy/config có thể còn để kiểm tra; không coi là
 artifact hoàn tất. Lệnh này chỉ export offline, không nhập DB.
 
+Lệnh cũng tạo `import-config.json` cạnh `source-config.json`. Nó đọc `DATABASE_URI`
+từ môi trường hoặc `.env.local`, tự lấy tên database và, nếu là Neon, hostname để
+file import dùng được ngay. Ví dụ khi `.env.local` chứa URL PW2 Neon:
+
+```sh
+npm run migrate:pw1 -- /path/to/csv --as-of 2026-09-18T00:00:00Z
+```
+
+URL và password chỉ lưu trong `.env.local`, không ghi vào `import-config.json`.
+Nếu không có `DATABASE_URI`, file tự sinh mặc định cho DB local `primeweb`.
+Có thể truyền `--target-database` và `--target-host` khi export offline; nếu URI
+đã có thì các giá trị này phải khớp URI. URI trỏ tới host không phải local/Neon
+sẽ bị từ chối trước khi export để tránh tạo config sai đích. Export chỉ đọc URI,
+không thử kết nối DB; importer sẽ đối chiếu lại trước khi chạy. Kiểm tra thêm
+`systemCreator.sourceRef` trong file tự sinh có đúng actor của snapshot.
+
 
 ## Đọc master được chia theo Store từ 1.10.0
 

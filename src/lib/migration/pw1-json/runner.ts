@@ -16,19 +16,19 @@ import { targetDiagnosticEntity } from './target-diagnostic'
 import { createRuntime } from './runtime'
 import { buildEntities, canonical, checksum, creatorDiagnosticResolved } from './projection'
 import { configurations, sourceKeyRecords, preflightStore, writeEntity, finalizeEntity, verifyStore, databaseErrorCode, type PreflightEntityContext } from './writer'
-import { findOperation, registerPreflightedStores, completeBatch, assertWritableProfile, getBatch, createBatch, acquireLease, releaseLease, renewLease, markStoreVerified, listStoreStates, lockStore, type BatchBinding, type LedgerBatch, type LedgerLease } from './ledger'
+import { pendingReferenceKeys, registerPreflightedStores, completeBatch, assertWritableProfile, getBatch, createBatch, acquireLease, releaseLease, renewLease, markStoreVerified, listStoreStates, lockStore, type BatchBinding, type LedgerBatch, type LedgerLease } from './ledger'
 import { MigrationError } from './errors'
 import { assertTargetSchema } from './target-schema'
 import { resolveCreatorContext } from './creator-bindings'
 import type { Runtime } from './runtime'
 
-export interface Arguments { manifest?: string; store?: string; stores?: string; fromStore?: string; toStore?: string; all?: boolean; dryRun?: boolean; resume?: string; help?: boolean; localDatabase?: string; groupSize?: number; logDir?: string }
+export interface Arguments { manifest?: string; store?: string; stores?: string; fromStore?: string; toStore?: string; all?: boolean; dryRun?: boolean; resume?: string; help?: boolean; localDatabase?: string; targetHost?: string; groupSize?: number; logDir?: string }
 export function argumentsFor(args: string[]): Arguments {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     manifest: { type: 'string' }, store: { type: 'string' }, stores: { type: 'string' }, 'from-store': { type: 'string' }, 'to-store': { type: 'string' },
-    'group-size': { type: 'string' }, 'log-dir': { type: 'string' }, 'local-database': { type: 'string' }, all: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, resume: { type: 'string' }, help: { type: 'boolean' },
+    'group-size': { type: 'string' }, 'log-dir': { type: 'string' }, 'local-database': { type: 'string' }, 'target-host': { type: 'string' }, all: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, resume: { type: 'string' }, help: { type: 'boolean' },
   } })
-  const result = { manifest: values.manifest, store: values.store, stores: values.stores, fromStore: values['from-store'], toStore: values['to-store'], all: values.all, dryRun: values['dry-run'], resume: values.resume, help: values.help, localDatabase: values['local-database'], groupSize: values['group-size'] === undefined ? undefined : Number(values['group-size']), logDir: values['log-dir'] }
+  const result = { manifest: values.manifest, store: values.store, stores: values.stores, fromStore: values['from-store'], toStore: values['to-store'], all: values.all, dryRun: values['dry-run'], resume: values.resume, help: values.help, localDatabase: values['local-database'], targetHost: values['target-host'], groupSize: values['group-size'] === undefined ? undefined : Number(values['group-size']), logDir: values['log-dir'] }
   if (result.help) return result
   if (result.groupSize !== undefined) storeGroups([], result.groupSize)
   if (result.localDatabase !== undefined && !/^[a-zA-Z0-9_]+$/.test(result.localDatabase)) throw new MigrationError('LOCAL_DATABASE_ARGUMENT_INVALID')
@@ -100,7 +100,7 @@ export function updatePreflightContext(context: Record<string, unknown>, entity:
 }
 export async function runImport(args: Arguments, options: ImportOrchestrationOptions = {}): Promise<void> {
   if (args.help) {
-    process.stdout.write('PW1 local import: --manifest /private/import-manifest.json (--store ID | --stores ID,ID | --from-store ID --to-store ID | --all) [--group-size 1..100] [--log-dir /private/logs] [--dry-run]\nResume: --resume json:UUID [--from-store ID]\nApply defaults to local clones pw1_import_1886_*. To use an existing local DB, pass --local-database NAME matching DATABASE_URI (also on resume). Remote/Vercel targets remain blocked.\nExit: 0 verified/preflight passed; 2 arguments; 3 blocked/conflict; 4 interrupted/retry exhausted; 5 reconcile with resume; 6 no matching Stores.\n')
+    process.stdout.write('PW1 import: --manifest /private/import-manifest.json (--store ID | --stores ID,ID | --from-store ID --to-store ID | --all) [--group-size 1..100] [--log-dir /private/logs] [--dry-run]\nResume: --resume json:UUID [--from-store ID]\nLocal applies default to clones pw1_import_1886_*. Existing local DBs require --local-database NAME. Neon requires --local-database NAME --target-host EXACT_NEON_HOST on every direct invocation.\nExit: 0 verified/preflight passed; 2 arguments; 3 blocked/conflict; 4 interrupted/retry exhausted; 5 reconcile with resume; 6 no matching Stores.\n')
     return
   }
   const logger = await RunLogger.create(args.logDir, args.dryRun ? 'dry-run' : args.resume ? 'resume' : 'apply')
@@ -118,7 +118,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
   const stop = () => { interrupted = true }
   process.on('SIGINT', stop); process.on('SIGTERM', stop)
   try {
-    runtime = await createRuntime(process.env.DATABASE_URI ?? '', !args.dryRun, args.localDatabase)
+    runtime = await createRuntime(process.env.DATABASE_URI ?? '', !args.dryRun, args.localDatabase, args.targetHost)
     await assertWritableProfile(runtime.pool)
     let batch: LedgerBatch | undefined = args.resume ? await getBatch(runtime.pool, args.resume) : undefined
     if (batch) { context.runId = batch.id; await logger.event({ status: 'BATCH_RESUMED', runId: batch.id }) }
@@ -127,6 +127,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
     const groupSize = batch?.binding.groupSize ?? args.groupSize ?? 100
     storeGroups([], groupSize)
     const manifestPath = batch?.binding.manifestPath ?? resolve(args.manifest!)
+    const artifactStarted = Date.now()
     const artifact = await loadImportArtifact(manifestPath, { progress: progress.report, spoolDirectory: tmpdir(), ...(batch ? { storeIds: batch.storeIds } : { selector: args }) })
     spool = artifact.spoolDirectory
     if (artifact.creatorBindings && artifact.creatorBindings.targetIdentityHash !== runtime.identity) throw new MigrationError('CREATOR_BINDING_TARGET_MISMATCH')
@@ -134,7 +135,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
     if (!selected.length) throw new MigrationError('NO_MATCHING_STORES')
     if (selected.some(id => !artifact.storeIds.includes(id))) throw new MigrationError('BATCH_STORE_MISSING')
     await logger.event({ status: 'SELECTION_READY', stores: selected.length, groupSize, groupCount: Math.ceil(selected.length / groupSize) })
-    await emit({ status: 'ARTIFACT_CHECKED', manifestHash: artifact.manifestHash, masterHash: artifact.manifest.masterHash, scope: 'selected-emitted-stores', ...artifact.coverage, requestedStoreCount: selected.length, pageDisposition: 'OUT_OF_SCOPE', pageExcludedRecords: artifact.pageExcludedRecords, optionalDispositions: artifact.optionalDispositions })
+    await emit({ status: 'ARTIFACT_CHECKED', manifestHash: artifact.manifestHash, masterHash: artifact.manifest.masterHash, durationMs: Date.now() - artifactStarted, scope: 'selected-emitted-stores', ...artifact.coverage, requestedStoreCount: selected.length, pageDisposition: 'OUT_OF_SCOPE', pageExcludedRecords: artifact.pageExcludedRecords, optionalDispositions: artifact.optionalDispositions })
     const pending = artifact.diagnosticSummary?.buckets.filter(bucket => bucket.disposition === 'TARGET_CHECK_REQUIRED' && (!bucket.diagnostic.storeId || selected.includes(bucket.diagnostic.storeId))) ?? []
     const blockers = (artifact.diagnosticSummary ? artifact.diagnosticSummary.buckets.filter(bucket => bucket.disposition === 'BLOCKED').map(bucket => ({ ...bucket.diagnostic, count: bucket.count, samples: bucket.samples })) : artifact.blockers.map(row => ({ ...row, samples: [row] }))).filter(row => !row.storeId || selected.includes(row.storeId))
     if (pending.length) await emit({ status: 'TARGET_CHECKS_PENDING', count: pending.reduce((sum, bucket) => sum + bucket.count, 0), codes: [...new Set(pending.map(bucket => bucket.diagnostic.code))] })
@@ -196,6 +197,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
       if (groupBlockers.length) { await reportBlockers(groupBlockers); throw new MigrationError('GROUP_BLOCKED') }
       for (const [offset, storeId] of ids.entries()) {
         check(); context.storeId = storeId; context.phase = 'preflight'
+        const preflightStarted = Date.now()
         progress.report({ phase: 'preflight', storeId, completed: offset, total: ids.length })
         const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs, artifact.preserveInvalidUserEmails, artifact.delegateRawPageContent, artifact.delegateRawModelSettings)
         await registry.add(sourceKeyRecords(runtime, entities))
@@ -235,7 +237,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
           }
         }
         creates += proposal.creates; reuses += proposal.reuses
-        await emit({ status: 'STORE_PREFLIGHT_PASSED', storeId, creates: proposal.creates, reuses: proposal.reuses })
+        await emit({ status: 'STORE_PREFLIGHT_PASSED', storeId, creates: proposal.creates, reuses: proposal.reuses, durationMs: Date.now() - preflightStarted, preflightLookups: proposal.preflightLookups })
       }
       context.phase = 'cross-group-check'; delete context.storeId
       await registry.commitGroup()
@@ -246,12 +248,14 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
       await runtime.transaction(async (_req, db) => registerPreflightedStores(db, currentLease, ids))
       for (const storeId of ids) {
         check(); context.storeId = storeId; context.phase = 'apply'
+        const applyStarted = Date.now()
         if (states[storeId] === 'VERIFIED') { await emit({ status: 'STORE_REVERIFIED', storeId }); continue }
         await renewLease(runtime.pool, currentLease)
         await emit({ status: 'STORE_STARTED', storeId })
         const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs, artifact.preserveInvalidUserEmails, artifact.delegateRawPageContent, artifact.delegateRawModelSettings)
         const creatorContext = await resolveCreatorContext(runtime.pool, creatorInput, entities)
         const proposal = await preflightStore(runtime, entities, binding.sourceInstance, credentials, currentBatch, undefined, creatorContext, preflightContext, true)
+        const preflightMs = Date.now() - applyStarted
         const targets = proposal.targets, remaining = [...entities]
         while (remaining.length) {
           check()
@@ -260,23 +264,26 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
           const entity = remaining.splice(index, 1)[0]
           context = { ...context, collection: entity.collection, sourceEntity: entity.sourceEntity, sourceId: entity.sourceId }
           progress.report({ phase: 'write-entities', storeId, collection: entity.collection, completed: entities.length - remaining.length - 1, total: entities.length })
-          const priorOperation = await findOperation(runtime.pool, currentBatch.id, storeId, entity.sourceEntity, entity.sourceId)
           check()
-          const targetId = await writeEntity(runtime, entity, targets, credentials, currentBatch, currentLease, creatorContext)
-          targets.set(entity.ref, targetId)
-          if (entity.collection === 'users') {
-            const committed = await findOperation(runtime.pool, currentBatch.id, storeId, entity.sourceEntity, entity.sourceId)
-            const detail = committed?.detail
-            if (detail && typeof detail === 'object' && 'passwordResetRequired' in detail && detail.passwordResetRequired === true) {
-              await logger.event({ status: 'USER_PASSWORD_RESET_REQUIRED', storeId, sourceId: entity.sourceId, targetId })
-            }
+          const outcome = await writeEntity(runtime, entity, targets, credentials, currentBatch, currentLease, creatorContext)
+          targets.set(entity.ref, outcome.targetId)
+          if (entity.collection === 'users' && outcome.passwordResetRequired) {
+            await logger.event({ status: 'USER_PASSWORD_RESET_REQUIRED', storeId, sourceId: entity.sourceId, targetId: outcome.targetId })
           }
-          const prior = proposal.claims.get(entity.ref)
-          await logger.event({ ...context, status: 'ENTITY_COMMITTED', targetId, action: priorOperation ? 'RECONCILED' : prior ? 'REUSE' : 'CREATE', operationId: checksum([currentBatch.id, storeId, entity.sourceEntity, entity.sourceId]) })
+          await logger.event({ ...context, status: 'ENTITY_COMMITTED', targetId: outcome.targetId, action: outcome.action, operationId: checksum([currentBatch.id, storeId, entity.sourceEntity, entity.sourceId]) })
         }
+        const writeMs = Date.now() - applyStarted - preflightMs
         context.phase = 'finalize-relations'
+        delete context.collection; delete context.sourceEntity; delete context.sourceId
         progress.report({ phase: 'finalize-relations', storeId })
-        for (const entity of entities) { check(); context.collection = entity.collection; context.sourceEntity = entity.sourceEntity; context.sourceId = entity.sourceId; await finalizeEntity(runtime, entity, targets, currentBatch, currentLease, creatorContext) }
+        const pending = await pendingReferenceKeys(runtime.pool, currentBatch.id, storeId, entities)
+        await emit({ status: 'FINALIZE_SELECTION_READY', storeId, entities: entities.length, pendingReferenceCount: pending.size })
+        for (const entity of entities) {
+          if (!pending.has(`${entity.sourceEntity}\0${entity.sourceId}`)) continue
+          check(); context.collection = entity.collection; context.sourceEntity = entity.sourceEntity; context.sourceId = entity.sourceId
+          await finalizeEntity(runtime, entity, targets, currentBatch, currentLease, creatorContext)
+        }
+        const finalizeMs = Date.now() - applyStarted - preflightMs - writeMs
         check(); context.phase = 'verify-store'; delete context.collection; delete context.sourceId; delete context.sourceEntity
         progress.report({ phase: 'verify-store', storeId })
         await runtime.transaction(async (req, db) => {
@@ -284,6 +291,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
           await verifyStore(currentRuntime, entities, targets, currentBatch, req, db, creatorContext)
           await markStoreVerified(db, currentLease, storeId)
         })
+        const verifyMs = Date.now() - applyStarted - preflightMs - writeMs - finalizeMs
         states[storeId] = 'VERIFIED'
         const tenantEntity = entities.find(e => e.collection === 'tenants')
         const siteEntity = entities.find(e => e.collection === 'sites')
@@ -297,7 +305,8 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
             .sort((a, b) => a - b),
         }
         await logger.recordDestination(storeId, destination)
-        await emit({ status: 'STORE_VERIFIED', runId: currentBatch.id, storeId, entities: entities.length, destination })
+        const durationMs = Date.now() - applyStarted
+        await emit({ status: 'STORE_VERIFIED', runId: currentBatch.id, storeId, entities: entities.length, destination, durationMs, preflightMs, writeMs, finalizeMs, verifyMs, destinationMs: durationMs - preflightMs - writeMs - finalizeMs - verifyMs, preflightLookups: proposal.preflightLookups, pendingReferenceCount: pending.size })
       }
       delete context.storeId
       await emit({ status: 'GROUP_VERIFIED', ...context, stores: ids.length })

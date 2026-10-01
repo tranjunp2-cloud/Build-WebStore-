@@ -25,9 +25,10 @@ describe('[TC-F42-IMP-FULL-CREDENTIAL] Full missing credential policy', () => {
     const f = fixture(invalid)
     // Act
     await preflightStore(f.runtime, [f.entity], 'PW1PROD', new Map(), f.batch, undefined, undefined, undefined, true)
-    await writeEntity(f.runtime, f.entity, new Map(), new Map(), f.batch, f.lease)
+    const outcome = await writeEntity(f.runtime, f.entity, new Map(), new Map(), f.batch, f.lease)
     // Assert
     expect(f.create).toHaveBeenCalledOnce()
+    expect(outcome).toEqual({ targetId: 2, action: 'CREATE', passwordResetRequired: true })
     const call = vi.mocked(f.runtime.payload.create).mock.calls[0][0]
     expect(call.data).toMatchObject({ keyString: null })
     expect(h.record).toHaveBeenCalledWith(expect.anything(), f.lease, expect.objectContaining({ action: 'CREATE', evidence: expect.objectContaining({ passwordResetRequired: true }) }))
@@ -45,9 +46,17 @@ describe('[TC-F42-IMP-FULL-CREDENTIAL] Full missing credential policy', () => {
     const f = fixture()
     h.claim.mockResolvedValue({ targetCollection: 'users', storeId: '31', targetId: '2', evidence: {} })
     // Act
-    await writeEntity(f.runtime, f.entity, new Map(), new Map(), f.batch, f.lease)
+    const outcome = await writeEntity(f.runtime, f.entity, new Map(), new Map(), f.batch, f.lease)
     // Assert
     expect(f.create).not.toHaveBeenCalled()
+    expect(outcome).toEqual({ targetId: 2, action: 'REUSE' })
     expect(h.record).toHaveBeenCalledWith(expect.anything(), f.lease, expect.objectContaining({ action: 'REUSE' }))
+  })
+  it('returns a reconciled outcome with the durable user reset marker', async () => {
+    const f = fixture()
+    h.operation.mockResolvedValue({ source_checksum: 'source', target_id: '2', action: 'CREATE', detail: { projection: f.entity.data, passwordResetRequired: true } })
+    const outcome = await writeEntity(f.runtime, f.entity, new Map(), new Map(), f.batch, f.lease)
+    expect(outcome).toEqual({ targetId: 2, action: 'RECONCILED', passwordResetRequired: true })
+    expect(f.create).not.toHaveBeenCalled()
   })
 })

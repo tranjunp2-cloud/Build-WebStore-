@@ -49,6 +49,35 @@ describe('[TC-F42-IMP-006] Local clone target and unforgeable migration context'
     expect(() => localTarget(uri + '?options=anything', true, 'primeweb')).toThrow('DATABASE_OPTION_NOT_ALLOWED')
     expect(localTarget(uri, true, 'primeweb').identity).toBe(localTarget(uri, false).identity)
   })
+  it('requires an exact Neon host and database and verifies TLS for the target pool', () => {
+    // Arrange
+    const host = 'ep-test.c-6.us-east-2.aws.neon.tech'
+    const uri = `postgresql://owner:secret@${host}/primeweb?sslmode=require&channel_binding=require`
+
+    // Act
+    const target = localTarget(uri, true, 'primeweb', host)
+
+    // Assert
+    expect(target.uri).not.toContain('sslmode=')
+    expect(target.uri).not.toContain('channel_binding=')
+    expect(target.ssl).toEqual({ rejectUnauthorized: true })
+    expect(target.enableChannelBinding).toBe(true)
+    expect(() => localTarget(uri, true, 'primeweb')).toThrow('LOCAL_DATABASE_REQUIRED')
+    expect(() => localTarget(uri, true, 'other', host)).toThrow('LOCAL_DATABASE_NAME_MISMATCH')
+    expect(() => localTarget(uri, true, undefined, host)).toThrow('ISOLATED_CLONE_REQUIRED')
+  })
+  it('rejects a mismatched Neon host, disabled TLS and connection overrides', () => {
+    // Arrange
+    const host = 'ep-test.c-6.us-east-2.aws.neon.tech'
+    const base = `postgresql://owner:secret@${host}/primeweb`
+
+    // Act / Assert
+    expect(() => localTarget(base, true, 'primeweb', 'ep-other.c-6.us-east-2.aws.neon.tech')).toThrow('NEON_TARGET_HOST_MISMATCH')
+    expect(() => localTarget(base, true, 'primeweb', `${host}.evil.example`)).toThrow('NEON_TARGET_HOST_MISMATCH')
+    expect(() => localTarget(`${base}?sslmode=disable`, true, 'primeweb', host)).toThrow('NEON_SSL_REQUIRED')
+    expect(() => localTarget(`${base}?host=localhost`, true, 'primeweb', host)).toThrow('DATABASE_OPTION_NOT_ALLOWED')
+    expect(() => localTarget(`${base}?channel_binding=disable`, true, 'primeweb', host)).toThrow('DATABASE_OPTION_NOT_ALLOWED')
+  })
   it('preserves private capability through actual Payload local request normalization',async()=>{
     // Arrange — skip localization/dataloader services, exercise actual request context merge.
     const payload={config:{localization:false,serverURL:'http://localhost'}} as unknown as Payload

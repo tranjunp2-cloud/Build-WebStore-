@@ -1,7 +1,7 @@
 import type { CollectionSlug, PayloadRequest, SanitizedCollectionConfig, Where } from 'payload'
 import { passwordFor, userAuth, legacyEmailAuth } from './user-auth'
 import { checksum, object, projectionMatches, targetProjectionMatches, resolveData, type Entity } from './projection'
-import { findClaim, findOperation, recordEntity, lockStore, assertFence, type LedgerBatch, type LedgerLease, type EntityClaim, type SqlClient } from './ledger'
+import { findClaim, findClaims, findOperation, recordEntity, lockStore, assertFence, type LedgerBatch, type LedgerLease, type EntityClaim, type SqlClient } from './ledger'
 import { MigrationError } from './errors'
 import type { Runtime } from './runtime'
 import type { SourceCredential } from './types'
@@ -59,7 +59,7 @@ function registerSourceKeys(runtime: Runtime, entities: Entity[], registry: Pref
   }
 }
 
-export interface StoreProposal { targets: Map<string, number>; claims: Map<string, EntityClaim>; creates: number; reuses: number }
+export interface StoreProposal { targets: Map<string, number>; claims: Map<string, EntityClaim>; creates: number; reuses: number; preflightLookups: number }
 export type PreflightEntityContext = Pick<Entity, 'storeId' | 'collection' | 'sourceEntity' | 'sourceId'>
 type PreflightObserver = (entity: PreflightEntityContext | undefined) => void
 function reportPreflightEntity(observer: PreflightObserver | undefined, entity: Entity): void {
@@ -117,8 +117,42 @@ function evidence(data: Doc, deferred: boolean, entity: Entity): Doc {
 }
 
 /** Check known unique business keys before any business write; DB constraints remain the final arbiter. */
-async function uniqueChecks(runtime: Runtime, entities: Entity[], targets: Map<string, number>, claims: Map<string, EntityClaim>, req?: Partial<PayloadRequest>, db: SqlClient = runtime.pool, observer?: PreflightObserver): Promise<void> {
+async function uniqueChecks(runtime: Runtime, entities: Entity[], targets: Map<string, number>, claims: Map<string, EntityClaim>, req?: Partial<PayloadRequest>, db: SqlClient = runtime.pool, observer?: PreflightObserver): Promise<number> {
   const keys = new Set<string>()
+  let lookups = 0
+  const covered = new Set<string>()
+  if (entities.length > 1) {
+    const groups = new Map<string, { key: string; where: Where }[]>()
+    for (const entity of entities) {
+      // Claimed targets already exist, so their keys would make the negative
+      // batch query positive and force a second lookup for every new entity.
+      if (claims.has(entity.ref)) continue
+      const config = runtime.payload.collections[entity.collection as CollectionSlug].config
+      for (const paths of uniqueGroups(config, entity.collection)) {
+        const values = paths.map(path => path.split('.').reduce<unknown>((value, key) => object(value) ? value[key] : undefined, entity.data))
+        if (values.some(value => value == null || value === '')) continue
+        const resolved = values.map(value => typeof value === 'string' && value.startsWith('@') ? targets.get(value) : value)
+        if (resolved.some(value => value === undefined)) continue
+        const key = checksum([entity.collection, paths, resolved])
+        const rows = groups.get(entity.collection) ?? []
+        rows.push({ key, where: { and: paths.map((path, i) => ({ [path]: { equals: resolved[i] } })) } })
+        groups.set(entity.collection, rows)
+      }
+    }
+    // A negative OR lookup proves every condition in its chunk absent. A positive
+    // result falls back to the original per-entity checks for exact owner attribution.
+    observer?.(undefined)
+    for (const [collection, rows] of groups) {
+      for (let offset = 0; offset < rows.length; offset += 32) {
+        const chunk = rows.slice(offset, offset + 32)
+        if (chunk.length < 2) continue
+        lookups++
+        const found = await runtime.payload.find({ collection: collection as CollectionSlug,
+          where: { or: chunk.map(row => row.where) }, limit: 1, depth: 0, overrideAccess: true, req })
+        if (!found.docs.length) for (const row of chunk) covered.add(row.key)
+      }
+    }
+  }
   for (const entity of entities) {
     reportPreflightEntity(observer, entity)
     const config = runtime.payload.collections[entity.collection as CollectionSlug].config
@@ -127,6 +161,7 @@ async function uniqueChecks(runtime: Runtime, entities: Entity[], targets: Map<s
       const tenant = typeof entity.data.tenant === 'string' ? targets.get(entity.data.tenant) : undefined
       const skus = [entity.data.sku, ...(Array.isArray(entity.data.variants) ? entity.data.variants.filter(object).map(row => row.sku) : [])].filter((value): value is string => typeof value === 'string' && Boolean(value.trim())).map(value => value.trim().toLowerCase())
       if (tenant !== undefined && skus.length) {
+        lookups++
         const matches = await db.query(`SELECT p.id FROM products p WHERE p.tenant_id=$1 AND lower(btrim(p.sku))=ANY($2::text[])
           UNION SELECT p.id FROM products_variants v JOIN products p ON p.id=v._parent_id
           WHERE p.tenant_id=$1 AND lower(btrim(v.sku))=ANY($2::text[])`, [tenant, skus])
@@ -136,6 +171,7 @@ async function uniqueChecks(runtime: Runtime, entities: Entity[], targets: Map<s
     }
     if (entity.collection === 'users' && typeof entity.data.email === 'string' && entity.data.email.trim()) {
       // PW1 invalid email is preserved byte-for-byte, but uniqueness uses the same canonical account identity.
+      lookups++
       const matches = await db.query(`SELECT id FROM ${table(runtime, entity)} WHERE lower(btrim(email))=lower(btrim($1))`, [entity.data.email])
       const owner = claims.get(entity.ref)
       if (matches.rows.some(row => !owner || String(row.id) !== owner.targetId)) throw new MigrationError('UNCLAIMED_TARGET_COLLISION')
@@ -148,12 +184,15 @@ async function uniqueChecks(runtime: Runtime, entities: Entity[], targets: Map<s
       keys.add(key)
       const resolved = values.map(value => typeof value === 'string' && value.startsWith('@') ? targets.get(value) : value)
       if (resolved.some(value => value === undefined)) continue
+      if (covered.has(checksum([entity.collection, paths, resolved]))) continue
       const where: Where = { and: paths.map((path, i) => ({ [path]: { equals: resolved[i] } })) }
+      lookups++
       const found = await runtime.payload.find({ collection: entity.collection as CollectionSlug, where, limit: 2, depth: 0, overrideAccess: true, req })
       const owner = claims.get(entity.ref)
       if (found.docs.some(doc => !owner || String(doc.id) !== owner.targetId)) throw new MigrationError('UNCLAIMED_TARGET_COLLISION')
     }
   }
+  return lookups
 }
 export async function preflightStore(runtime: Runtime, entities: Entity[], sourceInstance: string, credentials: Map<string, SourceCredential>, batch?: LedgerBatch, registry?: PreflightRegistry, creatorContext?: CreatorContext, observer?: PreflightObserver, allowMissingCredentials = false): Promise<StoreProposal> {
   observer?.(undefined)
@@ -164,9 +203,18 @@ export async function preflightStore(runtime: Runtime, entities: Entity[], sourc
     if (!target || creatorContext?.sourceInstance !== sourceInstance) throw new MigrationError('CREATOR_CONTEXT_MISSING')
     targets.set(ref, target)
   }
+  // One bounded lookup per 128 source identities avoids a remote round trip per entity.
+  // The write transaction still takes the original locked claim path.
+  observer?.(undefined)
+  const existingClaims = entities.length > 1
+    ? await findClaims(runtime.pool, sourceInstance, entities)
+    : undefined
+  const claimLookups = entities.length > 1 ? Math.ceil(new Set(entities.map(entity => `${entity.sourceEntity}\0${entity.sourceId}`)).size / 128) : entities.length
   for (const entity of entities) {
     reportPreflightEntity(observer, entity)
-    const claim = await findClaim(runtime.pool, sourceInstance, entity.sourceEntity, entity.sourceId)
+    const claim = existingClaims
+      ? existingClaims.get(`${entity.sourceEntity}\0${entity.sourceId}`) ?? null
+      : await findClaim(runtime.pool, sourceInstance, entity.sourceEntity, entity.sourceId)
     if (claim) {
       if (claim.targetCollection !== entity.collection) throw new MigrationError('CLAIM_COLLECTION_CONFLICT')
       if (claim.storeId !== entity.storeId) throw new MigrationError('CLAIM_STORE_OWNERSHIP_CONFLICT')
@@ -194,7 +242,7 @@ export async function preflightStore(runtime: Runtime, entities: Entity[], sourc
       if (entity.collection === 'media') validateMedia(entity.data)
     }
   }
-  await uniqueChecks(runtime, entities, targets, claims, undefined, runtime.pool, observer)
+  const uniqueLookups = await uniqueChecks(runtime, entities, targets, claims, undefined, runtime.pool, observer)
   observer?.(undefined)
   // Prove required dependency graph can be completed without nulling a mandatory relationship.
   const ready = new Set(targets.keys()), remaining = entities.filter(entity => !ready.has(entity.ref))
@@ -203,7 +251,7 @@ export async function preflightStore(runtime: Runtime, entities: Entity[], sourc
     if (index < 0) throw new MigrationError('REQUIRED_REFERENCE_CYCLE')
     ready.add(remaining.splice(index, 1)[0].ref)
   }
-  return { targets, claims, creates: entities.length - claims.size, reuses: claims.size }
+  return { targets, claims, creates: entities.length - claims.size, reuses: claims.size, preflightLookups: claimLookups + claims.size + uniqueLookups }
 }
 function validateMedia(data: Doc): void {
   if (typeof data.alt !== 'string' || !data.alt.trim() || data.filename != null) throw new MigrationError('MEDIA_METADATA_INVALID')
@@ -230,8 +278,14 @@ function assertCreatorTargets(entity: Entity, targets: Map<string, number>, cont
   }
 }
 
+export interface EntityWriteResult {
+  targetId: number
+  action: 'CREATE' | 'REUSE' | 'RECONCILED'
+  passwordResetRequired?: boolean
+}
+
 /** One record + all nested rows + its durable operation commit in the same transaction. */
-export async function writeEntity(runtime: Runtime, entity: Entity, targets: Map<string, number>, credentials: Map<string, SourceCredential>, batch: LedgerBatch, lease: LedgerLease, creatorContext?: CreatorContext): Promise<number> {
+export async function writeEntity(runtime: Runtime, entity: Entity, targets: Map<string, number>, credentials: Map<string, SourceCredential>, batch: LedgerBatch, lease: LedgerLease, creatorContext?: CreatorContext): Promise<EntityWriteResult> {
   return retryTransaction(() => runtime.transaction(async (req, db) => {
     assertSession(runtime, req)
     await lockStore(db, lease, entity.storeId)
@@ -244,7 +298,7 @@ export async function writeEntity(runtime: Runtime, entity: Entity, targets: Map
       await db.query(`SELECT id FROM ${table(runtime, entity)} WHERE id=$1 FOR UPDATE`, [id])
       match(prior.detail.projection, await read(runtime, entity, id, req))
       await assertFence(db, lease)
-      return id
+      return { targetId: id, action: 'RECONCILED', ...(prior.detail.passwordResetRequired === true ? { passwordResetRequired: true } : {}) }
     }
     const claim = await findClaim(db, batch.binding.sourceInstance, entity.sourceEntity, entity.sourceId, { lock: true })
     if (claim) {
@@ -255,7 +309,7 @@ export async function writeEntity(runtime: Runtime, entity: Entity, targets: Map
       const data = expected(entity, targets)
       match(data, await read(runtime, entity, id, req))
       await recordEntity(db, lease, { ...claim, batchId: batch.id, storeId: entity.storeId, action: 'REUSE', sourceChecksum: entity.sourceChecksum, targetChecksum: checksum(data), evidence: evidence(data, false, entity) })
-      return id
+      return { targetId: id, action: 'REUSE' }
     }
     const result = resolveData(entity, targets, true)
     const data = expected(entity, targets, batch.startedAt, true)
@@ -285,7 +339,7 @@ export async function writeEntity(runtime: Runtime, entity: Entity, targets: Map
     match(data, await read(runtime, entity, id, req))
     await recordEntity(db, lease, { batchId: batch.id, storeId: entity.storeId, sourceInstance: batch.binding.sourceInstance, sourceEntity: entity.sourceEntity, sourceId: entity.sourceId, targetCollection: entity.collection, targetId: String(id), sourceChecksum: entity.sourceChecksum, targetChecksum: checksum(data), evidence: { ...evidence(data, result.deferred, entity), ...(entity.collection === 'users' ? { passwordResetRequired } : {}) }, action: 'CREATE' })
     await assertFence(db, lease)
-    return id
+    return { targetId: id, action: 'CREATE', ...(entity.collection === 'users' ? { passwordResetRequired } : {}) }
   }))
 }
 

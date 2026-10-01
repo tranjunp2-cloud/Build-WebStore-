@@ -28,6 +28,7 @@ export interface UserArguments {
   all?: boolean
   dryRun?: boolean
   localDatabase?: string
+  targetHost?: string
   outputMaster?: string
   outputFile?: string
   help?: boolean
@@ -59,6 +60,7 @@ export function argumentsForUsers(args: string[]): UserArguments {
       'from-store': { type: 'string' },
       'to-store': { type: 'string' },
       'local-database': { type: 'string' },
+      'target-host': { type: 'string' },
       'output-file': { type: 'string' },
       'output-master': { type: 'string' },
       all: { type: 'boolean' },
@@ -73,6 +75,7 @@ export function argumentsForUsers(args: string[]): UserArguments {
     fromStore: values['from-store'],
     toStore: values['to-store'],
     localDatabase: values['local-database'],
+    targetHost: values['target-host'],
     outputFile: values['output-file'],
     outputMaster: values['output-master'],
     all: values.all,
@@ -114,7 +117,7 @@ export async function runUserImport(args: UserArguments, options: ImportOrchestr
   if (args.help) {
     process.stdout.write(
       'PW1 User & Tenant Migration:\n' +
-      '  npm run migrate:pw1:users -- --manifest <path> (--store ID | --stores ID,ID | --from-store ID --to-store ID | --all) [--local-database NAME] [--dry-run] [--output-file PATH] [--output-master /private/master-with-destination.json]\n'
+      '  npm run migrate:pw1:users -- --manifest <path> (--store ID | --stores ID,ID | --from-store ID --to-store ID | --all) [--local-database NAME] [--target-host <exact-neon-host>] [--dry-run] [--output-file PATH] [--output-master /private/master-with-destination.json]\n'
     )
     return []
   }
@@ -131,7 +134,7 @@ export async function runUserImport(args: UserArguments, options: ImportOrchestr
   const destinations = new Map<string, FoundationDestination>()
 
   try {
-    runtime = await createRuntime(process.env.DATABASE_URI ?? '', !args.dryRun, args.localDatabase)
+    runtime = await createRuntime(process.env.DATABASE_URI ?? '', !args.dryRun, args.localDatabase, args.targetHost)
     await assertWritableProfile(runtime.pool)
     await assertTargetSchema(runtime.pool)
 
@@ -298,8 +301,8 @@ export async function runUserImport(args: UserArguments, options: ImportOrchestr
           const index = remaining.findIndex(entity => targets.has(entity.ref) || entity.refs.every(ref => !ref.required || targets.has(ref.ref)))
           if (index < 0) throw new MigrationError('REQUIRED_REFERENCE_CYCLE')
           const entity = remaining.splice(index, 1)[0]
-          const targetId = await writeEntity(currentRuntime, entity, targets, credentials, currentBatch, currentLease, creatorContext)
-          targets.set(entity.ref, targetId)
+          const outcome = await writeEntity(currentRuntime, entity, targets, credentials, currentBatch, currentLease, creatorContext)
+          targets.set(entity.ref, outcome.targetId)
         }
 
         for (const entity of targetEntities) {

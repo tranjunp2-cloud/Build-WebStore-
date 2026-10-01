@@ -9,7 +9,7 @@ import { normalizeStoreId, compareStoreIds } from './selectors'
 const path = z.string().min(1)
 export const workflowConfigSchema = z.object({
   version: z.literal(1), exportArtifact: path, credentials: path.optional(),
-  localDatabase: z.string().regex(/^[a-zA-Z0-9_]+$/), outputRoot: path,
+  localDatabase: z.string().regex(/^[a-zA-Z0-9_]+$/), targetHost: z.string().regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+neon\.tech$/i).optional(), outputRoot: path,
   systemCreator: z.object({ sourceRef: z.string().regex(/^@users:users:[1-9]\d*$/), approvedBy: z.string().trim().min(1) }).strict().optional(),
   creatorBindings: path.optional(),
 }).strict().refine(value => Boolean(value.systemCreator) !== Boolean(value.creatorBindings), 'Exactly one creator binding mode required')
