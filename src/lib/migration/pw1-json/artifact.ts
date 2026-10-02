@@ -160,7 +160,7 @@ export async function inspectExportArtifact(directory: string) {
   const manifestFile = await readBoundFile(resolve(directory, 'master-manifest.json'), { json: true, maxBytes: 16 * 1024 * 1024 })
   const manifest = validate(z.union([exporterSchema, exporterV2, exporterV3, exporterV4, exporterV5, exporterV6, exporterV7, exporterV8, exporterV9, exporterV10, exporterV11, exporterV12, exporterV13, exporterV14, exporterV15, exporterV16, exporterV17, exporterV18, exporterV19, exporterV20, exporterV21, exporterV22, exporterV23, exporterV24, exporterV25]), manifestFile.value, 'EXPORT_MANIFEST_INVALID')
   if ('masterParts' in manifest) {
-    const known = new Set(Object.keys(exporterV19.shape.artifacts.shape).filter(name => name !== 'master.json'))
+    const known = new Set([...Object.keys(exporterV19.shape.artifacts.shape).filter(name => name !== 'master.json'), 'source-evidence.ndjson'])
     const parts = new Set(manifest.masterParts.map(part => part.filename))
     if (Object.keys(manifest.artifacts).some(name => !known.has(name) && !parts.has(name))) throw new MigrationError('MASTER_PART_INDEX_INVALID')
     validateMasterParts(manifest.masterParts,manifest.masterSetHash,manifest.artifacts,manifest.counts.emittedStoreCount)

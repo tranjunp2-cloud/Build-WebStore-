@@ -6,6 +6,7 @@ export interface SqlClient {
   query(text: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[]; rowCount?: number | null }>
 }
 export interface BatchBinding {
+  targetEnvironment?: 'staging_qc'
   executionVersion?: 'grouped-v1'
   executionScope?: 'foundation'
   groupSize?: number
@@ -87,9 +88,9 @@ export async function createBatch(db: SqlClient, binding: BatchBinding, storeIds
     await db.query(`INSERT INTO migration_runs(run_id,source_instance_id,source_database,source_store_id,
       source_snapshot_id,source_snapshot_checksum,source_schema_fingerprint,mapping_version,
       target_environment,target_instance_id,pw1_app_key_fingerprint,state,importer_profile,batch_id)
-      VALUES($1,$2,$3,$4,$10,$6,NULL,$7,'local',$8,$9,'PREFLIGHT_PASSED',$11,$5::uuid)`,
+      VALUES($1,$2,$3,$4,$10,$6,NULL,$7,$12,$8,$9,'PREFLIGHT_PASSED',$11,$5::uuid)`,
     [childId,binding.sourceInstance,binding.sourceDatabase ?? null,storeId,id,binding.masterHash,
-      binding.mappingHash,binding.targetHash,binding.pw1AppKeyFingerprint ?? null,binding.snapshotId,profile])
+      binding.mappingHash,binding.targetHash,binding.pw1AppKeyFingerprint ?? null,binding.snapshotId,profile,binding.targetEnvironment ?? 'local'])
     await db.query(`INSERT INTO migration_import_stores(batch_id,source_store_id,run_id) VALUES($1,$2,$3)`, [id,storeId,childId])
   }
   return getBatch(db, `json:${id}`)
@@ -146,10 +147,20 @@ export async function releaseLease(db: SqlClient, lease: LedgerLease): Promise<v
 export async function lockStore(db: SqlClient, lease: LedgerLease, storeId: string): Promise<void> {
   await assertFence(db, lease)
   await assertWritableProfile(db)
-  const result = await db.query(`SELECT b.binding->>'sourceInstance' AS source_instance
+  const result = await db.query(`SELECT b.binding->>'sourceInstance' AS source_instance,
+    b.binding->>'targetHash' AS target_hash,
+    b.binding->>'targetEnvironment' AS target_environment
     FROM migration_import_stores s JOIN migration_import_batches b USING(batch_id)
     WHERE s.batch_id=$1 AND s.source_store_id=$2`, [uuid(lease.batchId), storeId])
   if (!result.rows[0]) throw new MigrationError('STORE_OUTSIDE_BATCH')
+  if (result.rows[0].target_environment === 'staging_qc') {
+    const approval = await db.query(`SELECT 1 FROM migration_qc_import_authorizations a
+      JOIN migration_target_guard g ON g.singleton=true AND g.target_instance_id=a.target_instance_id
+      WHERE a.target_hash=$1 AND a.expires_at>clock_timestamp()
+        AND a.allowed_store_ids @> $2::jsonb FOR SHARE OF a,g`,
+    [result.rows[0].target_hash,JSON.stringify([storeId])])
+    if (!approval.rows.length) throw new MigrationError('STAGING_QC_IMPORT_NOT_AUTHORIZED')
+  }
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
     [JSON.stringify(['pw1-json', result.rows[0].source_instance, storeId])])
   const active = await db.query(`SELECT run_id FROM migration_runs
@@ -246,7 +257,9 @@ export async function markStoreVerified(db: SqlClient, lease: LedgerLease, store
   await db.query(`UPDATE migration_entity_map SET state='VERIFIED' WHERE run_id IN
     (SELECT run_id FROM migration_import_stores WHERE batch_id=$1 AND source_store_id=$2)
     AND action='CREATE' AND state='CREATED'`, [uuid(lease.batchId),storeId])
-  await db.query(`UPDATE migration_runs SET state='VERIFIED' WHERE batch_id=$1 AND source_store_id=$2`, [uuid(lease.batchId),storeId])
+  await db.query(`UPDATE migration_runs SET state='VERIFIED',
+    evidence_verified_at=COALESCE(evidence_verified_at,clock_timestamp())
+    WHERE batch_id=$1 AND source_store_id=$2`, [uuid(lease.batchId),storeId])
   await db.query(`UPDATE migration_import_stores SET state='VERIFIED'  WHERE batch_id=$1 AND source_store_id=$2`, [uuid(lease.batchId), storeId])
   await completeBatch(db, lease)
   await assertFence(db, lease)
@@ -376,7 +389,7 @@ export async function registerPreflightedStores(db: SqlClient, lease: LedgerLeas
     }
     const child = randomUUID(), b = batch.binding
     await db.query(`INSERT INTO migration_runs(run_id,source_instance_id,source_database,source_store_id,source_snapshot_id,source_snapshot_checksum,source_schema_fingerprint,mapping_version,target_environment,target_instance_id,pw1_app_key_fingerprint,state,importer_profile,batch_id)
-      VALUES($1,$2,$3,$4,$5,$6,NULL,$7,'local',$8,$9,'PREFLIGHT_PASSED',$10,$11)`, [child,b.sourceInstance,b.sourceDatabase ?? null,id,b.snapshotId,b.masterHash,b.mappingHash,b.targetHash,b.pw1AppKeyFingerprint,b.profile ?? 'pw1-json-v1',uuid(batch.id)])
+      VALUES($1,$2,$3,$4,$5,$6,NULL,$7,$12,$8,$9,'PREFLIGHT_PASSED',$10,$11)`, [child,b.sourceInstance,b.sourceDatabase ?? null,id,b.snapshotId,b.masterHash,b.mappingHash,b.targetHash,b.pw1AppKeyFingerprint,b.profile ?? 'pw1-json-v1',uuid(batch.id),b.targetEnvironment ?? 'local'])
     await db.query('INSERT INTO migration_import_stores(batch_id,source_store_id,run_id) VALUES($1,$2,$3)', [uuid(batch.id),id,child])
   }
   await assertFence(db, lease)

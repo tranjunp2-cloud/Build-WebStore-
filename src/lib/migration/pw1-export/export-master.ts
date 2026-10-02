@@ -54,6 +54,7 @@ import {
   type ArtifactContent,
 } from './artifact-writer'
 import { MASTER_SHA256, EXPORT_VERSION } from './master-version'
+import { evidenceHmacKey, sourceEvidenceChunks } from './source-evidence'
 
 const json = (value: unknown) =>
   JSON.stringify(value, null, 2)
@@ -388,6 +389,7 @@ export async function exportMaster(
   const plannedParts = planMasterParts(valid, { checkResources: () => checkResources(config) })
   const masterParts = plannedParts.map(part => part.descriptor)
   const files: Record<string, ArtifactContent> = {
+    'source-evidence.ndjson': sourceEvidenceChunks(source, rows, evidenceHmacKey(process.env.PW2_MIGRATION_SECRET)),
     'conflict-details.json': json(conflicts),
     'conflict-details.md': conflictDetailsMarkdown(conflicts),
     'export-review.json': json(review),

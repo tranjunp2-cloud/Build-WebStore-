@@ -51,12 +51,13 @@ export function transactionClient(transaction: Transaction): QueryClient {
 export interface MigrationTarget {
   uri: string
   identity: string
+  database: string
   ssl?: { rejectUnauthorized: true }
   enableChannelBinding?: true
 }
 
 /** Local targets remain the default. Neon is writable only when its exact host is declared by the operator. */
-export function localTarget(uri: string | undefined, apply: boolean, localDatabase?: string, expectedNeonHost?: string): MigrationTarget {
+export function localTarget(uri: string | undefined, apply: boolean, localDatabase?: string, expectedNeonHost?: string, stagingQcTargetId?: string): MigrationTarget {
   if (!uri) throw new Error('DATABASE_URI_REQUIRED')
   let url: URL
   try { url = new URL(uri) } catch { throw new Error('DATABASE_URI_INVALID') }
@@ -65,7 +66,9 @@ export function localTarget(uri: string | undefined, apply: boolean, localDataba
   const isNeon = !isLocal && Boolean(expectedNeonHost) && url.hostname.toLowerCase() === expectedNeonHost!.toLowerCase() && url.hostname.toLowerCase().endsWith('.neon.tech')
   if (expectedNeonHost && !isNeon) throw new Error('NEON_TARGET_HOST_MISMATCH')
   if (!isLocal && !isNeon) throw new Error('LOCAL_DATABASE_REQUIRED')
+  if (isLocal && stagingQcTargetId) throw new Error('STAGING_QC_REMOTE_DATABASE_REQUIRED')
   const database = decodeURIComponent(url.pathname.slice(1))
+  if (stagingQcTargetId && !/^[a-zA-Z0-9_-]{8,128}$/.test(stagingQcTargetId)) throw new Error('STAGING_QC_TARGET_CONFIG_INVALID')
   if (localDatabase !== undefined && (!/^[a-zA-Z0-9_]+$/.test(localDatabase) || database !== localDatabase)) throw new Error('LOCAL_DATABASE_NAME_MISMATCH')
   if (!database || (isNeon && localDatabase === undefined) || (apply && isLocal && localDatabase === undefined && !/^pw1_import_1886_[a-z0-9_]+$/.test(database))) {
     throw new Error('ISOLATED_CLONE_REQUIRED')
@@ -82,7 +85,18 @@ export function localTarget(uri: string | undefined, apply: boolean, localDataba
   // and URL sslmode can override explicit TLS options. Set both on the pool.
   const enableChannelBinding = isNeon && url.searchParams.get('channel_binding') === 'require'
   if (isNeon) { url.searchParams.delete('sslmode'); url.searchParams.delete('channel_binding') }
-  return { uri: isNeon ? url.toString() : uri, ...(isNeon ? { ssl: { rejectUnauthorized: true as const } } : {}), ...(enableChannelBinding ? { enableChannelBinding: true as const } : {}), identity: createHash('sha256').update(`${url.hostname}:${url.port || '5432'}/${database}/public`).digest('hex') }
+  return { uri: isNeon ? url.toString() : uri, database, ...(isNeon ? { ssl: { rejectUnauthorized: true as const } } : {}), ...(enableChannelBinding ? { enableChannelBinding: true as const } : {}), identity: createHash('sha256').update(`${url.hostname}:${url.port || '5432'}/${database}/public`).digest('hex') }
+}
+
+export async function assertStagingQcAuthorization(pool: Pool, targetId: string, targetHash: string, database: string, storeIds?: string[]): Promise<void> {
+  const result = await pool.query<{ allowed_store_ids: unknown }>(`SELECT a.allowed_store_ids
+    FROM migration_qc_import_authorizations a
+    JOIN migration_target_guard g ON g.singleton=true AND g.target_instance_id=a.target_instance_id
+    WHERE a.target_instance_id=$1 AND a.target_hash=$2 AND a.database_name=$3
+      AND a.expires_at>clock_timestamp()`, [targetId,targetHash,database])
+  const allowed = result.rows[0]?.allowed_store_ids
+  if (!Array.isArray(allowed) || !allowed.every(id => typeof id === 'string' && /^[1-9]\d*$/.test(id)) ||
+    (storeIds && storeIds.some(id => !allowed.includes(id)))) throw new Error('STAGING_QC_IMPORT_NOT_AUTHORIZED')
 }
 
 /** Suppress only identified historical replays. Normal app config is never modified on disk. */
@@ -146,8 +160,8 @@ export interface Runtime {
   transaction<T>(operation: (req: Partial<PayloadRequest>, client: QueryClient) => Promise<T>): Promise<T>
 }
 
-export async function createRuntime(uri: string, apply = false, localDatabase?: string, expectedNeonHost?: string): Promise<Runtime> {
-  const target = localTarget(uri, apply, localDatabase, expectedNeonHost)
+export async function createRuntime(uri: string, apply = false, localDatabase?: string, expectedNeonHost?: string, stagingQcTargetId?: string): Promise<Runtime> {
+  const target = localTarget(uri, apply, localDatabase, expectedNeonHost, stagingQcTargetId)
   process.env.PAYLOAD_PUSH_SCHEMA = 'false'
   process.env.DATABASE_URI = uri
   const { default: configPromise } = await import('../../../payload.config')
@@ -173,7 +187,10 @@ export async function createRuntime(uri: string, apply = false, localDatabase?: 
   adapter.drizzle = drizzle({ client: pool, schema: adapter.schema })
   adapter.resolveInitializing()
   payload.sendEmail = async () => { throw new Error('MIGRATION_EMAIL_FORBIDDEN') }
-  try { await pool.query('SELECT 1') } catch (error) { await pool.end(); throw error }
+  try {
+    await pool.query('SELECT 1')
+    if (stagingQcTargetId) await assertStagingQcAuthorization(pool, stagingQcTargetId, target.identity, target.database)
+  } catch (error) { await pool.end(); throw error }
   return {
     payload, pool, identity: target.identity,
     async close() { await pool.end() },

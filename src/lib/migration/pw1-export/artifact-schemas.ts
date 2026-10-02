@@ -188,9 +188,10 @@ export const manifestSchema = z
         'user-actors.json': digest.optional(),
         'customer-reconciliation.json': digest.optional(),
         'product-reconciliation.json': digest.optional(),
+        'source-evidence.ndjson': digest.optional(),
       })
       .catchall(digest)
-      .refine(artifacts => Object.keys(artifacts).every(name => ['conflict-details.json', 'conflict-details.md', 'export-review.json', 'export-review.md', 'master.json', 'mapping-report.json', 'mapping-report.csv', 'README.md', 'store-summary.json', 'store-summary.csv', 'user-actors.json', 'customer-reconciliation.json', 'product-reconciliation.json'].includes(name) || /^master-\d{4,}\.json$/.test(name))),
+      .refine(artifacts => Object.keys(artifacts).every(name => ['conflict-details.json', 'conflict-details.md', 'export-review.json', 'export-review.md', 'master.json', 'mapping-report.json', 'mapping-report.csv', 'README.md', 'store-summary.json', 'store-summary.csv', 'user-actors.json', 'customer-reconciliation.json', 'product-reconciliation.json', 'source-evidence.ndjson'].includes(name) || /^master-\d{4,}\.json$/.test(name))),
     acceptedExclusions: z.array(exclusionSchema).optional(),
     migrationPolicy: migrationPolicySchema.optional(),
     status: z.enum(['complete', 'needs_review', 'exported']),

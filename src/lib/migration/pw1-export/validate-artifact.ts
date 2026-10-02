@@ -23,6 +23,7 @@ import { operationalIssues } from './validate-master'
 import { checkedFile } from './csv-loader'
 import { RAW_SETTINGS_MASTER_SHA256, APPROVED_SCOPE_MASTER_SHA256, CATALOG_SOCIAL_MEDIA_MASTER_SHA256, MODEL_SETTINGS_MASTER_SHA256, MULTIPART_MASTER_SHA256, NEGATIVE_ORDER_MASTER_SHA256, SOURCE_OMISSION_MASTER_SHA256, PRODUCT_CATALOG_MASTER_SHA256, OWNER_EMAIL_MASTER_SHA256, CONFLICT_MASTER_SHA256, POLICY_BOUNDARY_MASTER_SHA256, BLOG_CATEGORY_MASTER_SHA256, PRODUCT_EXCLUSION_MASTER_SHA256, VARIANT_MASTER_SHA256, BLOG_CONTENT_MASTER_SHA256, BLOG_OWNER_MASTER_SHA256, DESCRIPTION_MASTER_SHA256, CORRECTED_OUTCOME_MASTER_SHA256, MASTER_SHA256, OUTCOME_MASTER_SHA256, ARCHIVE_MASTER_SHA256, STATUS_MASTER_SHA256, PREVIOUS_MASTER_SHA256, LEGACY_MASTER_SHA256, EXPORT_VERSION } from './master-version'
 import { ExportError } from './primitives'
+import { validateSourceEvidence } from './source-evidence'
 export async function validateArtifact(directory: string) {
   if ((await lstat(directory)).isSymbolicLink())
     throw new ExportError('SYMLINK_ARTIFACT')
@@ -80,6 +81,7 @@ export async function validateArtifact(directory: string) {
   if (!['1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion) && master.some(store => !legacyRawContentValid(store) || store.sites.some(site => site.raw_frontend_template !== undefined))) throw new ExportError('UNSUPPORTED_MAPPING_CONTRACT')
   if (!['1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion) && master.some(store => !legacyModelSettingsValid(store))) throw new ExportError('UNSUPPORTED_MAPPING_CONTRACT')
   const archive = new Set<string>()
+  const sourceEvidenceReportRows: Array<import('zod').infer<typeof reportSchema>['rows'][number]> = []
   const reportValue = await parse(
     'mapping-report.json',
     (itemPath, _index, item) => {
@@ -87,6 +89,7 @@ export async function validateArtifact(directory: string) {
         if (!reportSchema.shape.rows.element.safeParse(item).success)
           throw new ExportError('REPORT_SCHEMA_INVALID')
         const row = item as import('zod').infer<typeof reportSchema>['rows'][number]
+        if (manifest.artifacts['source-evidence.ndjson']) sourceEvidenceReportRows.push({ ...row, contributions: [...row.contributions] })
         if (manifest.classificationVersion && (!row.ownership || row.ownership.storeId !== row.storeId ||
           Object.entries(row.fieldRetentionRules ?? {}).some(([field]) => row.fields[field] !== 'retained-source')))
           throw new ExportError('CLASSIFICATION_EVIDENCE_INVALID')
@@ -110,6 +113,14 @@ export async function validateArtifact(directory: string) {
   )
     throw new ExportError('REPORT_SCHEMA_INVALID')
   const report = reportValue as import('zod').infer<typeof reportSchema>
+  if (manifest.artifacts['source-evidence.ndjson']) {
+    try {
+      await validateSourceEvidence(await checkedFile(root, 'source-evidence.ndjson'), manifest, sourceEvidenceReportRows)
+    } catch (cause) {
+      if (cause instanceof Error && /^SOURCE_EVIDENCE_[A-Z_]+$/.test(cause.message)) throw new ExportError(cause.message)
+      throw new ExportError('SOURCE_EVIDENCE_INVALID')
+    }
+  }
   if (
     !Array.isArray(report.rows) ||
     !Array.isArray(report.diagnostics) ||
