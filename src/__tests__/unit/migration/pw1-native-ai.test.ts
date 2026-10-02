@@ -236,3 +236,26 @@ it('[TC-F35.M59] binds verified product settings without letting AI replace sele
     const result = bindNativeDesign(source, design)
     expect(result.blocks.find(block => block.blockType === 'products-grid')).toMatchObject({ selectionMode: 'fixed', selectedProductIds: ['30', '10'], category: '7', includeOutOfStock: false, limit: 4 })
 })
+
+import { nativeBannerChoices } from '@/lib/migration/pw1-native-ai'
+import { heroHeadlineForPersistence } from '@/lib/migration/pw1-hero-content'
+it('[TC-F35.M22] restricts image-only heroes and retains an empty migration headline', () => {
+    const banner={blockType:'hero',headline:'',slides:[{image:{url:'https://source.example/banner.png'},headline:'',subheadline:'',ctaButtons:[]}]}
+    expect(nativeBannerChoices(banner)).toEqual(['hero:slideshow'])
+    expect(nativeBannerChoices({...banner,slides:[{...banner.slides[0],headline:'Real source text'}]})).toContain('hero:split-right')
+    expect(heroHeadlineForPersistence({headline:''},true)).toBe('')
+    expect(heroHeadlineForPersistence({},true)).toBe('')
+    expect(heroHeadlineForPersistence({headline:'Source'},true)).toBe('Source')
+    expect(heroHeadlineForPersistence({},false)).toBe('Welcome')
+});
+it('[TC-F35.M22] binds an image-only banner to the existing slideshow renderer with contain and no overlay', () => {
+    const {source,design}=fixture()
+    const banner=source.pages[0].components[0].block
+    banner.sourceLayout!.size='hero'
+    banner.slides=[{...banner.slides![0],headline:'',ctaButtons:[]}]
+    design.pages[0].sections[0]={sourceId:'11',blockType:'hero',variant:'slideshow'}
+    const bound=bindNativeDesign(source,design).pages![0].blocks[1]
+    expect(bound).toMatchObject({blockType:'hero',variant:'slideshow',headline:'',overlayOpacity:0,sourceLayout:{imageFit:'contain',autoplay:false}})
+    design.pages[0].sections[0].variant='split-right'
+    expect(()=>bindNativeDesign(source,design)).toThrow('Banner block must match')
+});

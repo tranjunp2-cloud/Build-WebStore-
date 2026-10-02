@@ -1,3 +1,4 @@
+import { extractFooterSocials } from './pw1-footer-socials'
 import { SourceOriginsSchema, isSourceHost, normalizeSourcePath } from './pw1-links'
 import { PW1_PLACEHOLDER_URL } from './pw1-placeholder'
 import { z } from 'zod'
@@ -204,6 +205,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 throw new Error(`Component ${str(c.id)}: unsupported type ${type}`)
             }) }))
             const footerItems = ordered(footer?.menu_items).filter(active)
+            const footerSocials = extractFooterSocials(footerItems.flatMap(i => ordered(i.menu_lines).filter(active)), message => report.warnings.push(message))
             const tagline = footerItems.flatMap(i => ordered(i.menu_lines).filter(active).map(l => {
                 const v = settings(l.model_settings), html = str(locale === 'ms' ? v.content_ms || v.content : v.content)
                 if (!html) return ''
@@ -254,7 +256,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 ...(disabledHomepage ? { publication: 'keep-draft' } : {}), settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
                 features: { cart: cartEnabled, orderTracking: cartEnabled && validPages.some(p => str(p.type) === '6' || rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'order_tracking')) },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(menuLinks),
-                footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns }, pages,
+                footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns, ...(footerSocials.length ? { socials: footerSocials } : {}) }, pages,
             } })
         }
     }

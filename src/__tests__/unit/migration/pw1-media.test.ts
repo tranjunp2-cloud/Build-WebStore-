@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { validatePw1MediaUrl } from '@/lib/migration/pw1-media'
+import { describe, expect, it, vi } from 'vitest'
+import type { Payload } from 'payload'
+import { importPw1BlockMedia, validatePw1MediaUrl } from '@/lib/migration/pw1-media'
 
 describe('[TC-F35.M12] Source media URL boundary', () => {
     it.each([
@@ -22,5 +23,14 @@ describe('[TC-F35.M12] Source media URL boundary', () => {
     })
     it('rejects a malformed URL', () => {
         expect(() => validatePw1MediaUrl('not a URL')).toThrow()
+    })
+    it('[TC-F35.M22] retains actual uploaded dimensions for JSON slides', async () => {
+        const payload = {
+            db: { drizzle: { execute: vi.fn().mockResolvedValue({ rows: [{ media_id: 74156 }] }) } },
+            findByID: vi.fn().mockResolvedValue({ url: 'https://destination.example/banner.png', alt: 'Banner', width: 1893, height: 560 }),
+        } as unknown as Payload
+        const block = { slides: [{ image: { url: 'https://source.example/banner.png', width: 800, height: 600 } }] }
+        await importPw1BlockMedia([[block]], 830, payload)
+        expect(block.slides[0].image).toEqual({ url: 'https://destination.example/banner.png', alt: 'Banner', width: 1893, height: 560 })
     })
 })

@@ -1,11 +1,10 @@
 'use client'
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { blogExcerpt } from '@/lib/blog/excerpt'
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { FileText } from 'lucide-react'
+import { ChevronDown, FileText } from 'lucide-react'
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 import type { BlockProps } from '../types'
@@ -134,17 +133,33 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
     }, [headline, limit, site, siteLocale, uncategorizedLabel, category, block.showCategoryFilter])
 
     const categoryFilter = block.showCategoryFilter && categories.length > 0 ? (
-        <div className="mb-8 max-w-xs">
-            <Select value={category || '__all__'} onValueChange={value => {
+        <label className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+            <span className="text-sm font-medium" style={{ color: CSS_VARS.textPrimary }}>{siteLocale.toLowerCase().split('-')[0] === 'ms' ? 'Kategori' : 'Category'}</span>
+            <div className="relative w-full sm:w-56">
+            <select aria-label={siteLocale.toLowerCase().split('-')[0] === 'ms' ? 'Kategori artikel' : 'Article category'} value={category || '__all__'} className="h-11 w-full appearance-none cursor-pointer rounded-lg border border-solid pl-3 pr-10 text-sm transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]" style={{ backgroundColor: CSS_VARS.surfacePrimary, color: CSS_VARS.textPrimary, borderColor: 'var(--divider)', colorScheme: theme.colorMode === 'dark' ? 'dark' : 'light' }} onChange={event => {
+                const value = event.target.value
                 const next = value === '__all__' ? '' : value
                 if (pathname?.startsWith('/editor')) { setEditorCategory(next); return }
                 const params = new URLSearchParams(searchParams.toString())
                 if (next) params.set('blogCategory', next); else params.delete('blogCategory')
                 router.replace(`${pathname}${params.size ? `?${params}` : ''}`, { scroll: false })
             }}>
-                <SelectTrigger aria-label={siteLocale.toLowerCase().split('-')[0] === 'ms' ? 'Kategori artikel' : 'Article category'}><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="__all__">{siteLocale.toLowerCase().split('-')[0] === 'ms' ? 'Semua kategori' : 'All categories'}</SelectItem>{categories.map(cat => <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>)}</SelectContent>
-            </Select>
+                <option value="__all__">{siteLocale.toLowerCase().split('-')[0] === 'ms' ? 'Semua kategori' : 'All categories'}</option>
+                {categories.map(cat => <option key={cat.slug} value={cat.slug}>{cat.name}</option>)}
+            </select>
+            <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: CSS_VARS.textPrimary }} />
+            </div>
+        </label>
+    ) : null
+
+    const sectionHeader = (headline || block.sectionLabel || subheadline || categoryFilter) ? (
+        <div className={categoryFilter ? 'mb-6' : 'mb-12'}>
+            <div className="mx-auto max-w-2xl text-center">
+                {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+                {headline && <Heading level={2} className={subheadline ? 'mb-3' : 'mb-0'}><RichText text={headline} as="span" /></Heading>}
+                {subheadline && <Body size="lg" className="opacity-60"><RichText text={subheadline} as="span" /></Body>}
+            </div>
+            {categoryFilter && <div className="mt-7 flex justify-start">{categoryFilter}</div>}
         </div>
     ) : null
 
@@ -152,7 +167,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         return (
             <AnimatedSection className="relative overflow-hidden">
                 <SectionWrapper as="div" padding="default" container="default" background="transparent">
-                    {categoryFilter}
+                    {sectionHeader}
                     <div className="text-center">
                         <div className="animate-pulse flex flex-col items-center gap-4">
                             <div className="h-8 w-64 bg-white/10 rounded" />
@@ -168,22 +183,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
         return (
             <AnimatedSection className="relative overflow-hidden">
                 <SectionWrapper as="div" padding="default" container="default" background="transparent">
-                    {categoryFilter}
-                    {(block.sectionLabel || headline || subheadline) && (
-                        <div className="text-center max-w-2xl mx-auto mb-10">
-                            {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                            {headline && (
-                                <Heading level={2} className="mb-4">
-                                    <RichText text={headline} as="span" />
-                                </Heading>
-                            )}
-                            {subheadline && (
-                                <Body size="lg" className="opacity-60">
-                                    <RichText text={subheadline} as="span" />
-                                </Body>
-                            )}
-                        </div>
-                    )}
+                    {sectionHeader}
                     <div
                         role="status"
                         data-testid="blog-list-empty"
@@ -202,18 +202,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
             <GradientBlob color={CSS_VARS.primary} className="bottom-0 left-1/4" size={400} opacity={0.05} />
 
             <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
-                {categoryFilter}
-                <div className="text-center max-w-2xl mx-auto mb-16">
-                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                    <Heading level={2} className="mb-4">
-                        <RichText text={headline} as="span" />
-                    </Heading>
-                    {subheadline && (
-                        <Body size="lg" className="opacity-60">
-                            <RichText text={subheadline} as="span" />
-                        </Body>
-                    )}
-                </div>
+                {sectionHeader}
 
                 {variant === 'list' ? (
                     <div className="max-w-4xl mx-auto flex flex-col gap-10">

@@ -23,7 +23,7 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — Resolve page links; preserve static content and listing limits; reject duplicate identities/paths and invalid database bindings; report pending controls and exclude disabled components; run through the native AI binder.
 
 ### TC-F35.M22 — Preserve hero role
-- [x] AUTO — Source hero banners use a native Hero; multiple slides stay in one slideshow Hero; single-image heroes retain copy/image/CTA; reject Carousel for hero banners and reject single-slide variants that would lose slides. Small banners remain Carousel.
+- [x] AUTO — Source hero banners use a native Hero; multiple slides stay in one slideshow Hero; single-image heroes retain copy/image/CTA; reject Carousel for hero banners and reject single-slide variants that would lose slides. Small banners remain Carousel. Single-image heroes without separate headline/subheadline/CTA allow only slideshow and use the existing slideshow renderer with imageFit=contain, overlay=0 and natural aspect ratio; migration persistence never invents a Welcome headline. Browser coverage checks migrated store 834 when present.
 
 ### TC-F35.M23 — Batch input, retry and isolation
 - [x] AUTO — Validate the whole array and owner/store uniqueness before processing; support multiple stores per owner; stable input hashing; skip unchanged completed stores; require rerun for changed completed stores; continue after individual failures and record each result.

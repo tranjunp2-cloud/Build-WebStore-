@@ -345,3 +345,14 @@ it('[TC-F35.M59] projects selected products in source position order and stock/c
     // Assert
     expect(entries[0].website.pages[0].components[0].config.productSelection).toEqual({ mode: 'fixed', sourceCategoryId: '7', sourceProductIds: ['10', '30'], includeOutOfStock: false })
 })
+
+it('[TC-F42-WEB-INPUT] retains footer hyperlink icons separately from empty site socials', () => {
+  const input = fixture();
+  const site = input[0].sites[0];
+  const enhanced = [{...input[0],sites:[{...site,socialLinks:{},menus:[...site.menus,{id:'footer',type:'2',status:'1',menu_items:[{id:'social',name:'INTRODUCE',position:'1',menu_lines:[{id:'icons',type_id:'3',menu_line_type:{name:'hyperlink_icon'},model_settings:[{key:'items.0.url',value:'https://www.instagram.com/'},{key:'items.1.url',value:'https://www.facebook.com/'},{key:'items.2.url',value:'javascript:alert(1)'}]}]}]}]}]}];
+  const parsed = parseMigrationInput(enhanced);
+  const {contract} = adaptWebsiteInput(compactInput(parsed.entries[0]));
+  expect(contract.site.footer.socials).toEqual([{platform:'instagram',url:'https://www.instagram.com/'},{platform:'facebook',url:'https://www.facebook.com/'}]);
+  expect(contract.site.settings?.socialLinks).toEqual({});
+  expect(parsed.reports[0].warnings).toContain('menu-line:icons: unsafe footer social URL');
+});

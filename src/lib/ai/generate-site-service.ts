@@ -1,3 +1,4 @@
+import { heroHeadlineForPersistence } from '@/lib/migration/pw1-hero-content'
 import { getPw1Industry } from '@/lib/migration/pw1-industry'
 import { ContractSchema as Pw1ContractSchema } from '@/lib/migration/pw1-contract'
 import type { z } from 'zod'
@@ -1429,7 +1430,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         )
 
         // Sanitize blocks for Payload CMS compatibility
-        const sanitizedBlocks = migration ? sanitizeBlocksForPayload(result.blocks) : applyGeneratedSiteNavigation(
+        const sanitizedBlocks = migration ? sanitizeBlocksForPayload(result.blocks, true) : applyGeneratedSiteNavigation(
             sanitizeBlocksForPayload(result.blocks),
             result.siteName,
             aiPageLinks,
@@ -1604,7 +1605,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 ? normalizeBlocksForPersistence(
                     stripArrayItemIds(
                         stripNavOffset(
-                            sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                            sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b)), Boolean(migration)) as PageBlockShape[]
                         ) as Record<string, unknown>[]
                     ) as Record<string, unknown>[]
                   ) as AIBlock[]
@@ -3001,7 +3002,7 @@ function normalizeGeneratedProductsGridBlocks(
  *
  * This function normalizes ALL block types to match the Pages collection schema.
  */
-function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
+function sanitizeBlocksForPayload(blocks: AIBlock[], migration = false): AIBlock[] {
     return blocks.map(block => {
         const sanitized = { ...block }
 
@@ -3058,9 +3059,7 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                 })
             }
             // Ensure headline exists
-            if (!sanitized.headline) {
-                sanitized.headline = sanitized.title || sanitized.heading || 'Welcome'
-            }
+            sanitized.headline = heroHeadlineForPersistence(sanitized, migration)
         }
 
         // ── Contact/Form: formFields[] requires { fieldName, label, fieldType } ──

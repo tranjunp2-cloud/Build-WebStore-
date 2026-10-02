@@ -90,7 +90,7 @@ export async function importPw1BlockMedia(buckets: Record<string, unknown>[][], 
                 if (jsonField) {
                     const media = await payload.findByID({ collection: 'media', id: mediaId, depth: 0 })
                     if (!media.url) throw new Error('Imported slide image has no public URL')
-                    record[key] = { url: media.url, alt: media.alt || '' }
+                    record[key] = { url: media.url, alt: media.alt || '', ...(media.width && media.height ? { width: media.width, height: media.height } : {}) }
                 } else record[key] = mediaId
             } else if (key === 'html' && typeof child === 'string' && child.includes('<img')) {
                 record.html = await rehostHtmlImages(child, tenantId, payload, cache)

@@ -20,7 +20,9 @@ import { RichText } from '../../shared/RichText'
 const keepSlideAnimationOnMainThread = () => {}
 
 export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
-    const { badge, image, images = [], slides: contentSlides = [] } = block
+    const { badge, image } = block
+    const images = block.images ?? []
+    const contentSlides = block.slides ?? []
     const category = (site?.siteType as string) || 'business'
     const fallbackHeroUrl = getHeroImage(category, 0, site?.imageLibraryS3 as Record<string, string> | undefined)
 
@@ -97,6 +99,13 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
         }
     }, [currentIndex, slides])
 
+    const fit = block.sourceLayout?.imageFit ?? 'cover'
+    const currentImage = slides[currentIndex]
+    // Upload metadata is authoritative when JSON slides retain legacy/default dimensions.
+    const dimensionImage = image?.url === currentImage?.url && image?.width && image?.height ? image : currentImage
+    const naturalRatio = dimensionImage?.width && dimensionImage?.height ? dimensionImage.width / dimensionImage.height : undefined
+    const aspectRatio = block.sourceLayout?.aspectRatio ?? (fit !== 'cover' ? naturalRatio : undefined) ?? 16 / 9
+
     const slideField = contentSlides.length ? `slides.${currentIndex}.image.url` : images.length ? `images.${currentIndex}.url` : 'image.url'
     const offset = (travel: number) => transition === 'slide-horizontal'
         ? { x: `${travel * 100}%`, y: '0%', opacity: 1 }
@@ -105,7 +114,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
             : { x: '0%', y: '0%', opacity: transition === 'none' ? 1 : 0 }
 
     return (
-        <div ref={rootRef}><AnimatedSection className="relative aspect-[16/9] w-full overflow-hidden">
+        <div ref={rootRef} data-hero-variant="slideshow"><AnimatedSection className="relative w-full overflow-hidden" style={{ aspectRatio }}>
             <AnimatePresence initial={false} custom={direction}>
                 <motion.div key={currentIndex} className="absolute inset-0" custom={direction}
                     onUpdate={keepSlideAnimationOnMainThread}
@@ -114,20 +123,20 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
                     transition={{ duration: transition === 'none' ? 0 : 0.6, ease: 'easeInOut' }}>
                     <HeroMediaOverlay field={slideField} altText={slides[currentIndex]?.alt ?? ''} positionClass="absolute inset-0">
                         <div className="absolute inset-0 bg-cover bg-center"
-                            style={{ backgroundImage: slides[currentIndex]?.url ? `url(${slides[currentIndex]?.url})` : undefined }} />
+                            style={{ backgroundImage: slides[currentIndex]?.url ? `url(${slides[currentIndex]?.url})` : undefined, backgroundSize: fit === 'cover' ? 'cover' : 'contain', backgroundRepeat: 'no-repeat' }} />
                     </HeroMediaOverlay>
-                    <div className="absolute inset-0 bg-black" style={{ opacity: block.overlayOpacity ?? 0.5 }} />
+                    <div className="absolute inset-0 bg-black" style={{ opacity: block.overlayOpacity ?? (headline?.trim() || subheadline?.trim() || ctaButtons.length || badge?.show ? 0.5 : 0) }} />
                     <div className={`${HERO_CONTAINER} z-10 text-center max-w-3xl absolute inset-0 flex flex-col justify-center overflow-y-auto px-14 pt-3 pb-12 md:px-16 md:pt-8 md:pb-16`}>
                         {badge?.show && (
                             <div>
                                 <HeroBadge text={badge.text} />
                             </div>
                         )}
-                        <h1
+                        {headline && <h1
                             className="text-xl sm:text-3xl md:text-5xl lg:text-7xl font-bold font-heading leading-[1.05] mb-2 md:mb-6 text-white"
                         >
                             <RichText text={headline} as="span" />
-                        </h1>
+                        </h1>}
                         {subheadline && (
                             <p
                                 className="text-sm md:text-xl text-white/70 mb-3 md:mb-10 max-w-2xl mx-auto leading-relaxed"

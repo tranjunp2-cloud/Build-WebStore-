@@ -29,6 +29,8 @@ export const NativeDesignSchema = z.object({
 export function nativeBannerChoices(block: Record<string, unknown>): string[] {
     const banner = HeroConfigSchema.parse(block)
     if (banner.sourceLayout?.size === 'small') return ['carousel:images', 'carousel:cards']
+    const only = banner.slides?.length === 1 ? banner.slides[0] : banner
+    if ((banner.slides?.length ?? 0) <= 1 && only.image?.url && !only.headline?.trim() && !only.subheadline?.trim() && !only.ctaButtons?.length) return ['hero:slideshow']
     if ((banner.slides?.length ?? 0) > 1) return ['hero:slideshow']
     return ['hero:centered', 'hero:split-left', 'hero:split-right', 'hero:fullscreen', 'hero:magazine', 'hero:cards-overlay', 'hero:parallax', 'hero:slideshow']
 }
@@ -115,7 +117,8 @@ export function bindNativeDesign(input: unknown, designInput: unknown): Generati
                 const slides = banner.slides?.length ? banner.slides : [banner]
                 if (choice.blockType === 'hero') {
                     const first = slides[0]
-                    output = [{ blockType: 'hero', variant: choice.variant, headline: first.headline, subheadline: first.subheadline, image: first.image, ctaButtons: first.ctaButtons, ...(choice.variant === 'slideshow' ? { slides } : {}) }]
+                    const imageOnly = slides.length === 1 && first.image?.url && !first.headline?.trim() && !first.subheadline?.trim() && !first.ctaButtons.length
+                    output = [{ blockType: 'hero', variant: choice.variant, headline: first.headline, subheadline: first.subheadline, image: first.image, ctaButtons: first.ctaButtons, ...(imageOnly ? { overlayOpacity: 0, sourceLayout: { ...banner.sourceLayout, size: 'hero', autoplay: false, interval: banner.sourceLayout?.interval ?? 5000, sourceComponentId: component.sourceId, imageFit: 'contain' } } : {}), ...(choice.variant === 'slideshow' ? { slides } : {}) }]
                 } else output = [{ blockType: 'carousel', variant: choice.variant, ...(banner.sourceLayout?.aspectRatio ? { aspectRatio: banner.sourceLayout.aspectRatio } : {}), ...(banner.sourceLayout?.imageFit ? { imageFit: banner.sourceLayout.imageFit } : {}), ...(banner.sourceLayout?.slidesPerView ? { slidesPerView: banner.sourceLayout.slidesPerView } : {}), autoplay: banner.sourceLayout?.autoplay ?? false, interval: banner.sourceLayout?.interval ?? 5000,
                     items: slides.map(slide => {
                         if (slide.ctaButtons.length > 1) throw new Error('Native carousel cannot preserve multiple CTAs per slide')

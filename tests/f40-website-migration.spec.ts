@@ -404,3 +404,31 @@ test("[TC-F40-MIG-LIVE-02] real website migration catalog and evidence", async (
     ),
   ).toBeVisible();
 });
+
+test("[TC-F35.M22] migrated image-only banner retains full image without invented headline", async ({
+  page,
+}) => {
+  const response = await page.goto(
+    "/sites/superior-janitorial-supplies-sdn-bhd/about-us",
+  );
+  test.skip(
+    response?.status() === 404,
+    "Requires migrated PW1 store 834 in the destination DB",
+  );
+  const banner = page.locator('[data-hero-variant="slideshow"]').first();
+  await expect(banner).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Welcome", exact: true }),
+  ).toHaveCount(0);
+  const image = banner.locator('[style*="background-image"]').first();
+  await expect(image).toHaveCSS('background-size','contain');
+  await expect(banner.locator('.bg-black')).toHaveCSS('opacity', '0');
+  const ratios = await image.evaluate(async element => {
+    const raw = (element as HTMLElement).style.backgroundImage;
+    const url = raw.slice(4,-1).replace(/^"|"$/g,'');
+    const img = new Image(); img.src = url; await img.decode();
+    const rect = element.getBoundingClientRect();
+    return {natural:img.naturalWidth/img.naturalHeight,rendered:rect.width/rect.height};
+  });
+  expect(ratios.rendered).toBeCloseTo(ratios.natural,2);
+});
