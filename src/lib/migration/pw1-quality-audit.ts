@@ -1,3 +1,4 @@
+import { persistWebsiteAudits } from './pw1-qa-audit-store'
 import { isSourceHost } from './pw1-links'
 import { writeFile, mkdir, appendFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
@@ -40,11 +41,12 @@ export async function auditPw1Websites(entries: BatchEntry[], baseUrl: string, o
     if (!['http:','https:'].includes(base.protocol) || base.username || base.password || base.pathname!=='/' || base.search || base.hash) throw Error('Audit base URL must be an HTTP(S) origin without credentials/path/query')
     const client = new Client({connectionString:process.env.DATABASE_URI||process.env.DATABASE_URL})
     await client.connect()
-    type Row = {source_store_id:string;site_id:number;site_status:string;tenant_slug:string;id:number;slug:string;is_homepage:boolean}
+    type Row = {source_store_id:string;site_id:number;site_status:string;tenant_slug:string;id:number;slug:string;is_homepage:boolean;updated_at:Date;attempt_id:string}
     let rows:Row[]
     try {
-        rows=(await client.query<Row>(`SELECT m.source_store_id,m.site_id,s.status site_status,t.slug tenant_slug,p.id,p.slug,p.is_homepage
+        rows=(await client.query<Row>(`SELECT m.source_store_id,m.site_id,s.status site_status,t.slug tenant_slug,p.id,p.slug,p.is_homepage,p.updated_at,c.attempt_id
             FROM pw1_migration_stores m JOIN sites s ON s.id=m.site_id JOIN tenants t ON t.id=m.tenant_id
+            LEFT JOIN LATERAL (SELECT attempt_id FROM pw1_migration_commits WHERE source_store_id=m.source_store_id AND input_hash=m.input_hash ORDER BY committed_at DESC LIMIT 1) c ON true
             LEFT JOIN pages p ON p.site_id=s.id AND p.deleted_at IS NULL AND p.slug<>'404'
             WHERE m.source_store_id=ANY($1::text[]) ORDER BY m.source_store_id,p.id`,[entries.map(e=>e.sourceStoreId)])).rows
     } finally { await client.end() }
@@ -124,6 +126,7 @@ export async function auditPw1Websites(entries: BatchEntry[], baseUrl: string, o
     const report={status:'completed',stores,createdAt:new Date().toISOString(),baseUrl:base.origin,summary:{stores:entries.length,pages:jobs.length,checked:pages.filter(p=>p.status==='checked').length,skipped:pages.filter(p=>p.status==='skipped').length,failed:pages.filter(p=>p.status==='failed').length,errors:findings.filter(f=>f.severity==='error').length,warnings:findings.filter(f=>f.severity==='warning').length,waitingBe:findings.filter(f=>f.severity==='waiting-be').length},pages}
     await mkdir(dirname(output),{recursive:true})
     await writeFile(output,JSON.stringify(report,null,2),{mode:0o600})
+    await persistWebsiteAudits(entries, report, Object.fromEntries(rows.filter(row => row.id).map(row => [String(row.id), row.updated_at?.toISOString() ?? null])), Object.fromEntries(rows.filter(row => row.attempt_id).map(row => [row.source_store_id, row.attempt_id])))
     const escape=(s:string)=>s.replaceAll('|','\\|').replaceAll('\n',' ')
     await writeFile(output+'.md',`# PW1 migration quality report\n\n${JSON.stringify(report.summary)}\n\n| Store | Page | Severity | Check | Block | Detail |\n|---|---|---|---|---|---|\n`+pages.flatMap(p=>p.findings.map(f=>`| ${p.storeId} | ${p.url ? `[${p.pageId??'-'}](${p.url})` : '-'} | ${f.severity} | ${f.code} | ${f.block??'-'} | ${escape(f.detail)} |`)).join('\n')+'\n',{mode:0o600})
     return report.summary

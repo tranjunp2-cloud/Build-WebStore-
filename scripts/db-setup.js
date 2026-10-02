@@ -69,6 +69,10 @@ async function getTableCount(pool) {
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
   { name: 'pw1_migration.batch_ledger', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-batch.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_audits', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-qa.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_reviews', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-qa-reviews.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_image_reviews', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-image-reviews.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_image_checks', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-image-checks.sql'), 'utf8') },
   // ── Users: Auth tables (Payload Drizzle schema) ──
   // Payload 3.14 uses VARCHAR id (UUID), mixed column naming:
   //   roles: parent_id, order (no underscore)

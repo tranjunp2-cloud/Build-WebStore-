@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,7 @@ import { RunLogger } from '@/lib/migration/pw1-json/run-logger'
 
 let root: string | undefined
 async function fakeRepo(options: { workspaceMode?: number; gitignore?: boolean; symlinkWorkspace?: boolean } = {}) {
-  const repo = await mkdtemp(join(tmpdir(), 'pw1-repo-workspace-'))
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'pw1-repo-workspace-')))
   await writeFile(join(repo, '.git'), 'gitdir: /nonexistent\n')
   if (options.gitignore !== false) await writeFile(join(repo, '.gitignore'), 'node_modules/\n.migration/\n')
   if (options.symlinkWorkspace) {
@@ -78,5 +78,20 @@ describe('[TC-F42-IMP-WORKFLOW] Sanctioned .migration workspace inside a reposit
     const logger = await RunLogger.create(resolve(root, '.migration/runs/run-1/logs'), 'apply')
     await logger.close()
     await expect(RunLogger.create(resolve(root, 'logs'), 'apply')).rejects.toThrow('LOG_INIT_FAILED')
+  })
+  it('accepts private logs in a nested worktree while rejecting logs outside its workspace', async () => {
+    // Arrange
+    root = await fakeRepo()
+    const worktree = resolve(root, '.claude/worktrees/test')
+    await mkdir(resolve(worktree, '.migration'), { recursive: true, mode: 0o700 })
+    await writeFile(join(worktree, '.git'), 'gitdir: /nonexistent\n')
+    await writeFile(join(worktree, '.gitignore'), '.migration/\n')
+    // Act
+    const logger = await RunLogger.create(resolve(worktree, '.migration/runs/test/logs'), 'dry-run')
+    await logger.close()
+    // Assert
+    await expect(RunLogger.create(resolve(worktree, 'logs'))).rejects.toThrow('LOG_INIT_FAILED')
+    await chmod(resolve(worktree, '.migration'), 0o755)
+    await expect(RunLogger.create(resolve(worktree, '.migration/runs/test/logs'))).rejects.toThrow('LOG_INIT_FAILED')
   })
 })

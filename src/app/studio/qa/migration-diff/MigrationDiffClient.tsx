@@ -3,6 +3,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
+import { WebsiteMigrationInspector } from "./WebsiteMigrationInspector";
+import type { MigrationStore } from "@/lib/admin/qa/website-migration-compare";
 import { ReconciliationInspector } from "./ReconciliationInspector";
 import { type ReconciliationScope, type ReconciliationSnapshot } from "@/lib/admin/qa/migration-reconciliation";
 import {
@@ -787,17 +789,40 @@ function SwipeSliderBlockRenderer({
   );
 }
 
-export function MigrationDiffClient() {
+function websiteStoreSummary(store: MigrationStore): StoreSummary {
+  return {
+    id: store.storeId, name: store.name, ownerEmail: store.name, domain: store.url,
+    templateCode: "—", templateName: "Chưa có evidence template", sector: "",
+    legacyDomain: "", migratedDomain: store.url, score: "Chưa đo",
+    status: store.qcStatus === "unverified" ? "warning" : store.qcStatus,
+    failedBlocks: [`Migrate: ${store.migration}`, `Publish: ${store.publish}`, `Audit: ${store.auditStatus}`, `${store.errors} lỗi / ${store.warnings} cảnh báo`],
+    subdomain1: "", subdomain2: "", pageCount: store.pageCount,
+    textScore: "Chưa đo", mediaScore: "Chưa đo", commerceScore: "Chưa đo", blockScore: "Chưa đo",
+  };
+}
+
+export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const [catalog, setCatalog] = useState<StoreSummary[]>(() => generateReconciliationCatalog(2000));
-  const metrics = useMemo(() => getDashboardMetrics(catalog), [catalog]);
+  const [catalog, setCatalog] = useState<StoreSummary[]>(() => live ? [] : generateReconciliationCatalog(2000));
+  const [liveStores,setLiveStores] = useState<MigrationStore[]>([]);
+  const [catalogError,setCatalogError] = useState("");
+  const [catalogLoading,setCatalogLoading] = useState(false);
+  const liveCatalogRequestRef=React.useRef(0);
+  const liveStoreById = useMemo(() => new Map(liveStores.map(store => [store.storeId, store])), [liveStores]);
+  const metrics = useMemo(() => live ? {
+    ...getDashboardMetrics([]), totalStores: catalog.length,
+    passedStores: liveStores.filter(store => store.qcStatus === "passed").length,
+    warningStores: liveStores.filter(store => store.qcStatus === "warning").length,
+    failedStores: liveStores.filter(store => store.qcStatus === "failed").length,
+    avgScore: "Chưa đo",
+  } : getDashboardMetrics(catalog), [catalog, live, liveStores]);
 
   // Overview Table Filters
-  const [filterStatus, setFilterStatus] = useState<"all" | "passed" | "warning" | "failed">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "passed" | "warning" | "failed" | "unverified">("all");
   const [filterTemplate, setFilterTemplate] = useState<string>("all");
   const selectedTemplateObj = useMemo(() => {
     if (filterTemplate === "all") return null;
@@ -894,7 +919,7 @@ export function MigrationDiffClient() {
   };
 
   useEffect(() => {
-    void checkLiveDbStatus();
+    if (!live) void checkLiveDbStatus();
   }, []);
 
   const handleTestDbConnection = async () => {
@@ -940,6 +965,24 @@ export function MigrationDiffClient() {
   const fieldDiffRequestRef = React.useRef(0);
 
   const loadLiveCatalog = async () => {
+    if (live) {
+      const requestId=++liveCatalogRequestRef.current;
+      setCatalogLoading(true);setCatalogError("");
+      try {
+        const stores: MigrationStore[]=[];
+        for(let page=1;;page++) {
+          const response=await fetch(`/api/admin/qa/website-migrations?limit=100&page=${page}`,{cache:"no-store"});
+          if(!response.ok) throw new Error(`HTTP ${response.status}`);
+          const body=await response.json();stores.push(...body.data.stores);
+          if(stores.length>=body.data.total || !body.data.stores.length) break;
+        }
+        if(requestId!==liveCatalogRequestRef.current)return;
+        setLiveStores(stores);
+        setCatalog(stores.map(websiteStoreSummary));
+      } catch(error) {if(requestId!==liveCatalogRequestRef.current)return;setCatalogError(error instanceof Error?error.message:"Không đọc được catalog");setCatalog([]);setLiveStores([])}
+      finally {if(requestId===liveCatalogRequestRef.current)setCatalogLoading(false)}
+      return;
+    }
     try {
       const res = await fetch(`/api/qa/migration-diff?limit=2000&_t=${Date.now()}`, {
         cache: "no-store",
@@ -958,7 +1001,7 @@ export function MigrationDiffClient() {
   }, []);
 
   useEffect(() => {
-    if (!activeStoreId) {
+    if (live || !activeStoreId) {
       setLoadedFieldDiff(null);
       return;
     }
@@ -1005,7 +1048,7 @@ export function MigrationDiffClient() {
   }, [activeStoreId, activeViewTab, reconciliationDemo]);
 
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
-    if (!activeStoreId) return null;
+    if (live || !activeStoreId) return null;
     if (loadedFieldDiff?.data.id === activeStoreId) return loadedFieldDiff.data;
     const isResolved = resolvedStoreIds.has(activeStoreId);
     const catalogStore = catalog.find((s) => s.id === activeStoreId);
@@ -1020,7 +1063,7 @@ export function MigrationDiffClient() {
       };
     }
     return diff;
-  }, [activeStoreId, resolvedStoreIds, loadedFieldDiff, catalog]);
+  }, [activeStoreId, resolvedStoreIds, loadedFieldDiff, catalog, live]);
 
   const fieldDiffSource: FieldDiffSource = loadedFieldDiff?.data.id === activeStoreId
     ? loadedFieldDiff.source
@@ -1134,7 +1177,7 @@ export function MigrationDiffClient() {
     const cleanQ = rawQ.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "");
 
     return catalog.filter((s) => {
-      const matchStatus = filterStatus === "all" || s.status === filterStatus;
+      const matchStatus = filterStatus === "all" || (live ? liveStoreById.get(s.id)?.qcStatus : s.status) === filterStatus;
       const matchTpl = filterTemplate === "all" || s.templateCode === filterTemplate;
 
       const matchSearch =
@@ -1150,7 +1193,7 @@ export function MigrationDiffClient() {
 
       return matchStatus && matchTpl && matchSearch;
     });
-  }, [catalog, filterStatus, filterTemplate, searchQuery]);
+  }, [catalog, filterStatus, filterTemplate, searchQuery, live, liveStoreById]);
 
   const totalPages = Math.ceil(filteredStores.length / pageSize) || 1;
   const paginatedStores = useMemo(() => {
@@ -1394,7 +1437,9 @@ export function MigrationDiffClient() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans">
+    <div data-testid={live ? "website-migration-live" : undefined} className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans">
+      {live && <><p className="rounded-xl border border-sky-800 bg-sky-950/30 p-3 text-sm text-sky-200">Dữ liệu migrate thật. QC Pass / Cần xem lại / P0 là đánh giá của tester theo phiên bản website; chưa có phép đo % text, ảnh, layout. Audit tự động không thay thế QC.</p>{catalogLoading && <p>Đang đọc danh sách migrate…</p>}{catalogError && <p role="alert">Không tải được dữ liệu: {catalogError}</p>}</>}
+      {live && activeStoreId && <WebsiteMigrationInspector storeId={activeStoreId} onClose={()=>setActiveStoreId(null)} onReviewed={()=>{void loadLiveCatalog()}} />}
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-400/40 animate-bounce">
@@ -1425,7 +1470,7 @@ export function MigrationDiffClient() {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => setDbModalOpen(true)}
+            onClick={() => !live && setDbModalOpen(true)}
             className={`flex items-center gap-2 border rounded-xl px-3 py-1.5 text-xs font-semibold shadow-sm transition ${
               dbStatus?.connected
                 ? "bg-emerald-950/60 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/60"
@@ -1438,7 +1483,7 @@ export function MigrationDiffClient() {
               }`}
             />
             <span className="text-slate-400">
-              {dbStatus?.connected ? (
+              {live ? <strong className="text-sky-300">Migration DB / audit</strong> : dbStatus?.connected ? (
                 <>
                   PW1:{" "}
                   <strong className="text-emerald-400 font-mono font-medium">
@@ -1466,7 +1511,7 @@ export function MigrationDiffClient() {
           <button
             type="button"
             onClick={() => {
-              void checkLiveDbStatus();
+              if (!live) void checkLiveDbStatus();
               void loadLiveCatalog();
               showToast("Đã làm mới dữ liệu đối soát cho toàn bộ website!");
             }}
@@ -1491,7 +1536,7 @@ export function MigrationDiffClient() {
           <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Tổng Số Website</div>
           <div className="text-2xl font-bold text-white mt-1">{metrics.totalStores.toLocaleString()}</div>
           <div className="text-[11px] text-blue-400 mt-1 flex items-center gap-1 font-medium">
-            <Sparkles className="size-3" /> 2.000 Website
+            <Sparkles className="size-3" /> {live ? `${catalog.length} Website` : "2.000 Website"}
           </div>
         </div>
 
@@ -1503,9 +1548,9 @@ export function MigrationDiffClient() {
               : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">Khớp Chuẩn (≥95%)</div>
+          <div className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">{live ? "QC Pass (tester)" : "Khớp Chuẩn (≥95%)"}</div>
           <div className="text-2xl font-bold text-emerald-400 mt-1">{metrics.passedStores}</div>
-          <div className="text-[11px] text-emerald-400/80 mt-1 font-medium">Đủ điều kiện Cutover</div>
+          <div className="text-[11px] text-emerald-400/80 mt-1 font-medium">{live ? "Đã kiểm tra phiên bản hiện tại" : "Đủ điều kiện Cutover"}</div>
         </div>
 
         <div
@@ -1516,7 +1561,7 @@ export function MigrationDiffClient() {
               : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider">Cần Xem Lại (85-94%)</div>
+          <div className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider">{live ? "Cần Xem Lại (tester)" : "Cần Xem Lại (85-94%)"}</div>
           <div className="text-2xl font-bold text-amber-400 mt-1">{metrics.warningStores}</div>
           <div className="text-[11px] text-amber-400/80 mt-1 font-medium">Lệch ảnh / Map / Text</div>
         </div>
@@ -1529,7 +1574,7 @@ export function MigrationDiffClient() {
               : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-[11px] text-rose-400 font-semibold uppercase tracking-wider">Lỗi Dữ Liệu P0 (&lt;85%)</div>
+          <div className="text-[11px] text-rose-400 font-semibold uppercase tracking-wider">{live ? "P0 (tester xác nhận)" : "Lỗi Dữ Liệu P0 (<85%)"}</div>
           <div className="text-2xl font-bold text-rose-400 mt-1">{metrics.failedStores}</div>
           <div className="text-[11px] text-rose-400/80 mt-1 font-medium">Chặn Cutover</div>
         </div>
@@ -1545,7 +1590,7 @@ export function MigrationDiffClient() {
       <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800/80 shadow-sm">
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800">
-            {(["all", "passed", "warning", "failed"] as const).map((st) => (
+            {((live ? ["all", "passed", "warning", "failed", "unverified"] : ["all", "passed", "warning", "failed"]) as Array<typeof filterStatus>).map((st) => (
               <button
                 key={st}
                 onClick={() => {
@@ -1558,13 +1603,13 @@ export function MigrationDiffClient() {
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                {st === "all" ? "Tất Cả" : st === "passed" ? "QC Pass" : st === "warning" ? "Cần Xem Lại" : "Lỗi P0"}
+                {st === "all" ? "Tất Cả" : st === "passed" ? "QC Pass" : st === "warning" ? "Cần Xem Lại" : st === "unverified" ? "Chưa kiểm chứng" : "Lỗi P0"}
               </button>
             ))}
           </div>
 
           {/* Custom Template Filter Dropdown Popover */}
-          <div className="relative" ref={templateDropdownRef}>
+          {!live && <div className="relative" ref={templateDropdownRef}>
             <button
               type="button"
               onClick={() => setIsTemplateDropdownOpen((prev) => !prev)}
@@ -1647,14 +1692,15 @@ export function MigrationDiffClient() {
                 })}
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         <div className="relative w-full md:w-96">
           <Search className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Tìm theo Email khách hàng, Domain, Mã Site..."
+            aria-label={live ? "Tìm store" : undefined}
+            placeholder={live ? "Tìm tên store, đường dẫn, ID PW1…" : "Tìm theo Email khách hàng, Domain, Mã Site..."}
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -1683,7 +1729,7 @@ export function MigrationDiffClient() {
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900/90 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800 tracking-wider">
               <tr>
-                <th className="py-3.5 px-4 whitespace-nowrap">Email Khách Hàng / Domain</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{live ? "Store / Đường dẫn PW2" : "Email Khách Hàng / Domain"}</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Giao Diện Mẫu</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Độ Khớp Dữ Liệu</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Trạng Thái QC</th>
@@ -1722,7 +1768,7 @@ export function MigrationDiffClient() {
                               ? "bg-amber-400"
                               : "bg-rose-500"
                           }`}
-                          style={{ width: store.score }}
+                          style={{ width: live ? "0%" : store.score }}
                         />
                       </div>
                     </div>
@@ -1733,10 +1779,11 @@ export function MigrationDiffClient() {
                   <td className="py-4 px-4 whitespace-nowrap">
                     {store.status === "passed" && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
-                        <CheckCircle2 className="size-3.5" /> Khớp Chuẩn
+                        <CheckCircle2 className="size-3.5" /> {live ? "QC Pass (tester)" : "Khớp Chuẩn"}
                       </span>
                     )}
-                    {store.status === "warning" && (
+                    {live && liveStoreById.get(store.id)?.qcStatus === "unverified" && <span className="text-xs text-slate-400">Chưa kiểm chứng</span>}
+                    {store.status === "warning" && (!live || liveStoreById.get(store.id)?.qcStatus !== "unverified") && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
                         <AlertTriangle className="size-3.5" /> Cần Xem Lại
                       </span>
@@ -1802,7 +1849,7 @@ export function MigrationDiffClient() {
                 <Search className="size-6" />
               </div>
               <div className="text-sm font-semibold text-white">
-                Không tìm thấy website nào khớp với từ khóa &ldquo;{searchQuery}&rdquo;
+                {live ? "Chưa có store migration phù hợp. Không dùng dữ liệu mẫu thay thế." : <>Không tìm thấy website nào khớp với từ khóa &ldquo;{searchQuery}&rdquo;</>}
               </div>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
                 Vui lòng kiểm tra lại Email khách hàng, Domain hoặc chuyển bộ lọc trạng thái sang &ldquo;Tất Cả&rdquo;.

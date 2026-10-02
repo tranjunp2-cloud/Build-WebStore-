@@ -49,13 +49,19 @@ export class RunLogger {
       if (!isAbsolute(root)) throw new Error('invalid')
       // Check existing ancestry before mkdir, so symlinks/repositories are not followed.
       let current = resolve(root)
+      let repositoryValidated = false
       for (;;) {
         try {
           const stat = await lstat(current)
           if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('invalid')
           try {
-            await access(join(current, '.git'))
-            if (!(await isPrivateRepoWorkspace(await realpath(current), root))) throw new Error('repository')
+            if (!repositoryValidated) {
+              await access(join(current, '.git'))
+              if (!(await isPrivateRepoWorkspace(await realpath(current), root))) throw new Error('repository')
+              // The nearest repository owns this workspace. A nested worktree's
+              // parent checkout must not override it; keep checking ancestry for symlinks.
+              repositoryValidated = true
+            }
           } catch (e) { if (!(e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT')) throw e }
         } catch (e) { if (!(e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT')) throw e }
         const parent = dirname(current); if (parent === current) break; current = parent

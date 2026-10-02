@@ -27,6 +27,12 @@ export default defineConfig({
         actionTimeout: isStaging ? 20_000 : 15_000,
     },
     projects: [
+        {
+            name: 'f40-website-migration',
+            testDir: './tests',
+            testMatch: /f40-website-migration\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], storageState: undefined, trace: 'off', screenshot: 'off', video: 'off' },
+        },
         // Smoke tests — no auth needed, run independently
         {
             name: 'smoke',

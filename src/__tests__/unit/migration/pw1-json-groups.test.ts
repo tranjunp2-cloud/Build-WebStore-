@@ -1,7 +1,7 @@
 import type { FileHandle } from 'node:fs/promises'
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, rm, readFile, readdir, stat, writeFile, symlink } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, readFile, readdir, stat, writeFile, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { checksum } from '@/lib/migration/pw1-json/projection'
@@ -10,7 +10,7 @@ import { DiskRegistry } from '@/lib/migration/pw1-json/disk-registry'
 import { RunLogger, safeLogEvent } from '@/lib/migration/pw1-json/run-logger'
 import { leaseHeartbeat } from '@/lib/migration/pw1-json/lease-heartbeat'
 const roots: string[] = []
-async function root() { const path = await mkdtemp(join(tmpdir(), 'pw1-groups-test-')); roots.push(path); return path }
+async function root() { const path = await realpath(await mkdtemp(join(tmpdir(), 'pw1-groups-test-'))); roots.push(path); return path }
 afterEach(async () => { vi.useRealTimers(); await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true }))) })
 describe('[TC-F42-IMP-GROUPS] bounded groups and cross-group keys', () => {
   it.each([0,1,99,100,101,201])('partitions %i sparse sorted IDs without losing/repeating a store', count => {

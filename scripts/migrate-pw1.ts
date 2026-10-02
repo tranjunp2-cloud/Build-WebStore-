@@ -4,7 +4,7 @@ import { discoverPreparedInput, runPreparedParts } from '../src/lib/migration/pw
 import { runMigrationWithAudit } from '../src/lib/migration/pw1-run-audit'
 import { parseArgs } from 'node:util'
 import { readFile, stat, realpath, mkdir, appendFile, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { resolve, basename, dirname } from 'node:path'
 import { validateBatchLimits } from '../src/lib/migration/pw1-batch-controls'
 import { validateMigrationBatch } from '../src/lib/migration/pw1-batch-validation'
 
@@ -98,7 +98,15 @@ Status/logs are read-only and need only database configuration.`)
             })
             const latest = new Map(attempts.map(attempt => [attempt.path, attempt]))
             const failedParts = [...latest.values()].filter(attempt => attempt.exitCode !== 0)
-            await writeFile(resolve(logDirectory, 'summary.json'), JSON.stringify({ input: selected.directory, exitCode: process.exitCode, attempts, failedParts }, null, 2), { mode: 0o600 })
+            const summary = { input: selected.directory, exitCode: process.exitCode, attempts, failedParts }
+            // Preserve execution evidence even if the final DB read fails.
+            await writeFile(resolve(logDirectory, 'summary.json'), JSON.stringify(summary, null, 2), { mode: 0o600 })
+            if (!values['dry-run']) {
+                const { readFinalMigrationSummary } = await import('../src/lib/migration/pw1-final-summary')
+                const finalResult = await readFinalMigrationSummary(parts, values.store)
+                await writeFile(resolve(logDirectory, 'summary.json'), JSON.stringify({ ...summary, finalResult }, null, 2), { mode: 0o600 })
+                console.log(`Final: ${finalResult.totals.migrated}/${finalResult.totals.stores} migrated; ${finalResult.totals.published} published; successful store list included in summary.json`)
+            }
             console.log(`Finished: ${failedParts.length} failed part(s); summary: ${resolve(logDirectory, 'summary.json')}`)
         } finally { process.removeListener('SIGINT', sigint); process.removeListener('SIGTERM', sigterm) }
         return
@@ -175,7 +183,7 @@ Status/logs are read-only and need only database configuration.`)
     process.once('SIGINT', stop); process.once('SIGTERM', stop)
     try {
         const { runPw1Batch } = await import('../src/lib/migration/pw1-batch')
-        await runMigrationWithAudit(() => runPw1Batch(entries, { concurrency: numeric('concurrency'), limits, requireBeData: values['require-be-data'], dryRun: values['dry-run'], rerun: values.rerun, retryOnly: command === 'retry', maxAttempts, signal: controller.signal, inputReports: parsed.reports, invalidStores: errors }), auditRequested ? runAudit : undefined)
+        await runMigrationWithAudit(() => runPw1Batch(entries, { qaInput: { runId: basename(dirname(path)) === 'prepared' ? basename(dirname(dirname(path))) : 'standalone', part: basename(path) }, concurrency: numeric('concurrency'), limits, requireBeData: values['require-be-data'], dryRun: values['dry-run'], rerun: values.rerun, retryOnly: command === 'retry', maxAttempts, signal: controller.signal, inputReports: parsed.reports, invalidStores: errors }), auditRequested ? runAudit : undefined)
     } finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop) }
 }
 main().then(() => process.exit(process.exitCode ?? 0)).catch(error => {

@@ -369,3 +369,50 @@ Website migration normalizes source paths (spaces, percent escapes, accents and 
 When PW1 has no active homepage but has an undeleted homepage with status `0`, migration preserves its content and keeps the destination website and generated pages as drafts. Publication reports `kept-draft` (not a failure) and does not call the publish API. PW2 currently promotes all page drafts when publishing a website, so manually publishing that website later will also activate the homepage. Deleted or absent homepages are not synthesized. Source master files remain unchanged.
 
 Product listings now map `list_type` (`all`, `fixed`, `random`), selected product identities/order, `product_category`, and `others.display_out_of_stock` to native product-grid settings. Product/category identities must resolve uniquely through VERIFIED BE mappings within the destination site and tenant; missing mappings fail before AI generation, and destination scope is checked again before writing. Fixed empty lists stay empty. Legacy `order_by` remains unmapped. The configured `limit` is respected with and without the existing category-filter sidebar on all viewports. Random order uses a browser-component seed that stays stable during pagination; a new page visit may shuffle it again. Already migrated stores need an explicit settings backfill or rerun; input changes are not silently applied to completed ledgers.
+
+### F40: real migration evidence
+
+`/studio/qa/migration-diff` now reads the destination migration ledger. It shows
+migration, current publication and audit separately; it does not generate a
+percentage from layout similarity. Choose a migration run/part, search a PW1
+store ID, then open its mapped PW2 pages and source-bound content comparisons.
+The legacy demo is explicit at `?demo=1` and does not certify real migrations.
+
+Before running this version on another destination, run `npm run db:migrate`
+to create `pw1_migration_qa_audits`. Website audits automatically persist one
+report per store/input hash/committed attempt, including page versions captured
+before the scan. A report is not attached if the committed attempt changed
+during the scan. Publish failures remain separate from completed generation.
+
+To load completed reports from an existing local handoff:
+
+```bash
+npm run migrate:pw1:website:qa-backfill
+npm run migrate:pw1:website:qa-backfill -- /path/to/be-runs
+```
+
+Backfill reads completed `*.migration-audit.json` with their adjacent source
+master and labels batches from `parts.jsonl`. It never generates or publishes.
+Files must be copied together to the backfill machine; F40 itself subsequently
+needs only the destination DB, not those local files. Incomplete reports are
+skipped. Repeated backfill cannot overwrite newer evidence. Older reports do
+not contain page versions, so F40 labels them historical rather than certifying
+current data. Run `audit FILE --store ID --audit-base-url ORIGIN --audit-output
+REPORT.json` to refresh evidence without AI generation.
+
+Content comparisons use the committed source-bound generated snapshot and the
+current PW2 layout. Style choices are excluded. Uploaded media URLs may differ;
+those differences require review rather than an inferred image match. The
+website comparison opens the known PW1 homepage and the selected PW2 page;
+unknown PW1 page routes are not invented. Browser page audit is not proof that
+every individual block rendered. This integration covers website evidence;
+it does not certify every BE commerce entity or manually approve cutover.
+# Final result in automatic mode
+
+F40's default overview now uses the existing migration screen with real ledger data. Open **So Sánh** to inspect the websites, content/mapping/settings and audit, then record a manual QC verdict. Apply `npm run db:migrate` to install the durable QA review table. A verdict applies only to its recorded evidence revision; edits/reruns/new audits require renewed review. Percentage scores are unmeasured in real mode. `?demo=1` remains the explicit prototype.
+
+The inspector automatically shows SHA-256/pixel checks inline in each image field’s comparison-result cell, with **Kiểm tra lại ảnh** to refresh results and a durable cache (`pw1_migration_qa_image_checks`, installed by `npm run db:migrate`). No AI API is used and websites are not modified. Similarity and unavailable images require review; storage uses the existing S3 configuration or local media directory. Source-host coverage and cache freshness are described in the F40 QA convention.
+
+After all prepared parts and retries finish, `website-runs/<run>/summary.json` contains `finalResult.totals`, `finalResult.successfulStores`, and `finalResult.stores`. These describe the current destination DB for the selected input, including earlier successful migrations skipped during this invocation. A store is successful only when its completed ledger input hash matches the input. Publication status and `/sites` paths come from the current site/tenant records. Draft sites remain in the successful migration list. Invalid or excluded input is listed with a reason. Existing `attempts`, `failedParts`, and `exitCode` still describe this invocation, including audit failures. Dry runs do not produce a final DB result. This aggregate applies to automatic prepared-part mode; an explicit file keeps its existing per-batch report.
+
+F40 supports per-image manual confirmation and cancellation, stored in `pw1_migration_qa_image_reviews` (installed by `npm run db:migrate`). Confirmations include reviewer/time and are scoped to the current evidence version; they do not modify migrated websites or automatically pass store QC.

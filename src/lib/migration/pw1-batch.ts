@@ -68,6 +68,7 @@ export async function provisionMigrationStore(payload:Payload, entry:BatchEntry)
 export type BatchOptions = {
     dryRun?: boolean; rerun?: boolean; retryOnly?: boolean; maxAttempts?: number; signal?: AbortSignal
     concurrency?: number
+    qaInput?: { runId: string; part: string }
     limits?: BatchLimits; requireBeData?: boolean
     inputReports?: import('./pw1-collection-input').CollectionReport[]; invalidStores?: InvalidStore[]
 }
@@ -113,7 +114,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
         configureMigrationTransactions(payload)
         const activePayload = payload
         batchId = randomUUID()
-        await client.query('INSERT INTO pw1_migration_batches(id,results,limits) VALUES($1,$2::jsonb,$3::jsonb)', [batchId, JSON.stringify(invalid), JSON.stringify({ ...controls.limits, requireBeData: Boolean(options.requireBeData), publish: true, concurrency })])
+        await client.query('INSERT INTO pw1_migration_batches(id,results,limits) VALUES($1,$2::jsonb,$3::jsonb)', [batchId, JSON.stringify(invalid), JSON.stringify({ ...controls.limits, requireBeData: Boolean(options.requireBeData), publish: true, concurrency, qaInput: options.qaInput ?? null })])
         const results: Array<Record<string, unknown>> = [...invalid]
         console.log(`Batch ${batchId}: ${entries.length} valid, ${invalid.length} invalid stores; prepare concurrency=${concurrency}, writes serialized, up to ${maxAttempts} attempts/store.`)
         await runStorePool(entries, concurrency, entry => entry.sourceUserId, async entry => {
