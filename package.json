@@ -60,6 +60,8 @@
     "migrate:pw1:bind-system": "node --no-network-family-autoselection --dns-result-order=ipv4first --require ./scripts/seed-preload.cjs --import tsx scripts/prepare-pw1-system-creator.ts",
     "migrate:pw1:prepare": "tsx --require ./scripts/seed-preload.cjs scripts/prepare-pw1-import.ts",
     "migrate:pw1:import": "node --no-network-family-autoselection --dns-result-order=ipv4first --require ./scripts/seed-preload.cjs --import tsx scripts/import-pw1-json.ts",
+    "migrate:pw1:evidence:ingest": "tsx --require ./scripts/seed-preload.cjs scripts/import-pw1-evidence.ts",
+    "migrate:pw1:evidence:build": "tsx --require ./scripts/seed-preload.cjs scripts/build-pw1-field-evidence.ts",
     "migrate:pw1:users": "node --no-network-family-autoselection --dns-result-order=ipv4first --require ./scripts/seed-preload.cjs --import tsx scripts/import-pw1-users.ts",
     "migrate:pw1:test:local": "tsx --require ./scripts/seed-preload.cjs src/__tests__/integration/pw1-json-clone-rehearsal.ts",
     "migrate:pw1:website:qa-backfill": "tsx --require ./scripts/seed-preload.cjs scripts/backfill-pw1-qa.ts",

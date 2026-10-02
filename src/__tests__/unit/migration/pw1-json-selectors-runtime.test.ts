@@ -3,7 +3,32 @@ import { describe, expect, it } from 'vitest'
 import {createLocalReq,type Payload,type PayloadRequest} from 'payload'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { selectStoreIds } from '@/lib/migration/pw1-json/selectors'
-import { isMigrationContext, localTarget, migrationContext, transactionClient } from '@/lib/migration/pw1-json/runtime'
+import { assertStagingQcAuthorization, isMigrationContext, localTarget, migrationContext, transactionClient } from '@/lib/migration/pw1-json/runtime'
+
+describe('[TC-F42-EVD-002] staging QC target authorization', () => {
+  it('requires explicit staging mode and blocks local or malformed remote targets', () => {
+    // Arrange
+    const host = 'ep-example.c-6.us-east-2.aws.neon.tech'
+    const remote = `postgres://user:secret@${host}/qc_db`
+
+    // Act / Assert
+    expect(() => localTarget(remote, true)).toThrow('LOCAL_DATABASE_REQUIRED')
+    expect(() => localTarget(remote, true, 'qc_db', host, 'wrong target')).toThrow('STAGING_QC_TARGET_CONFIG_INVALID')
+    expect(() => localTarget('postgres://user:secret@localhost/qc_db', true, 'qc_db', undefined, 'qc-target-001')).toThrow('STAGING_QC_REMOTE_DATABASE_REQUIRED')
+    expect(localTarget(remote, true, 'qc_db', host, 'qc-target-001').database).toBe('qc_db')
+  })
+
+  it('rejects an expired/missing authorization or Store outside the allowlist', async () => {
+    // Arrange
+    const pool = { query: async () => ({ rows: [{ allowed_store_ids: ['205'] }] }) }
+    const missing = { query: async () => ({ rows: [] }) }
+
+    // Act / Assert
+    await expect(assertStagingQcAuthorization(pool as never, 'qc-target-001', 'a'.repeat(64), 'qc_db', ['205'])).resolves.toBeUndefined()
+    await expect(assertStagingQcAuthorization(pool as never, 'qc-target-001', 'a'.repeat(64), 'qc_db', ['206'])).rejects.toThrow('STAGING_QC_IMPORT_NOT_AUTHORIZED')
+    await expect(assertStagingQcAuthorization(missing as never, 'qc-target-001', 'a'.repeat(64), 'qc_db')).rejects.toThrow('STAGING_QC_IMPORT_NOT_AUTHORIZED')
+  })
+})
 
 describe('[TC-F42-IMP-001] Store selector preserves source identity', () => {
   it('sorts and deduplicates IDs beyond JS safe integer range', () => {

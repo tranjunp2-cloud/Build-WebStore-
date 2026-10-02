@@ -31,7 +31,7 @@ async function main(){
   store.sites[0].seo={ogImage:media}
   store.media=[{_ref:media,alt:'Synthetic external image',url:'https://example.invalid/synthetic.png',sourceUrl:'https://example.invalid/synthetic.png',...dates}]
   store.categories=[{_ref:category,tenant,site,name:'Synthetic category',slug:`category-${stamp}`,...dates}]
-  store.products=[{_ref:product,tenant,site,name:'Synthetic product',slug:`product-${stamp}`,price:10,currency:'MYR',inventory:0,sku:`SKU-${stamp}`,status:'draft',hasVariants:false,images:[{image:media}],category:[category],...dates}]
+  store.products=[{_ref:product,tenant,site,name:'Synthetic product',slug:`product-${stamp}`,price:10,currency:'MYR',inventory:0,sku:`SKU-${stamp}`,status:'draft',hasVariants:false,weight:0.5,dimensions:{length:12.5,width:8,height:4},images:[{image:media}],category:[category],...dates}]
   store.customers=[{_ref:customer,tenant,name:'Synthetic customer',phone:`601${stamp.slice(-8)}`,email:'synthetic@example.invalid',addresses:[{line1:'Synthetic line'}],...dates}]
   store.discounts=[{_ref:discount,tenant,site,code:`TEST${stamp}`,type:'fixed',value:100,status:'inactive',usageCount:1,...dates}]
   store.orders=[{_ref:order,tenant,site,orderNumber:`TEST-${stamp}`,customer,customerName:'Historical synthetic',customerEmail:'synthetic@example.invalid',customerPhone:`601${stamp.slice(-8)}`,items:[{product,productName:'Historical product',quantity:1,unitPrice:10}],subtotal:10,shippingFee:0,tax:0,total:9,discount,discountCode:`TEST${stamp}`,discountAmount:100,currency:'MYR',status:'completed',paymentStatus:'unpaid',paymentMethod:'cod',...dates}]

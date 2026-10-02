@@ -9,29 +9,32 @@ import { createHash } from 'node:crypto'
 import { readdir, readFile, rm } from 'node:fs/promises'
 import { resolve, relative } from 'node:path'
 import { tmpdir } from 'node:os'
-import { readStoreTargetChecks, loadImportArtifact, readImportStore, readBoundFile } from './artifact'
+import { readStoreTargetChecks, loadImportArtifact, readImportStore, readBoundFile, inspectExportArtifact } from './artifact'
 import { loadCredentialSidecar } from './credentials'
 import { selectStoreIds } from './selectors'
 import { targetDiagnosticEntity } from './target-diagnostic'
-import { createRuntime } from './runtime'
+import { assertStagingQcAuthorization, createRuntime, localTarget } from './runtime'
 import { buildEntities, canonical, checksum, creatorDiagnosticResolved } from './projection'
 import { configurations, sourceKeyRecords, preflightStore, writeEntity, finalizeEntity, verifyStore, databaseErrorCode, type PreflightEntityContext } from './writer'
 import { pendingReferenceKeys, registerPreflightedStores, completeBatch, assertWritableProfile, getBatch, createBatch, acquireLease, releaseLease, renewLease, markStoreVerified, listStoreStates, lockStore, type BatchBinding, type LedgerBatch, type LedgerLease } from './ledger'
 import { MigrationError } from './errors'
 import { assertTargetSchema } from './target-schema'
 import { resolveCreatorContext } from './creator-bindings'
+import { evidenceAfterVerifiedImport } from '../pw1-evidence/after-import'
+import { ingestSourceEvidence } from '../pw1-evidence/ingest'
 import type { Runtime } from './runtime'
 
-export interface Arguments { manifest?: string; store?: string; stores?: string; fromStore?: string; toStore?: string; all?: boolean; dryRun?: boolean; resume?: string; help?: boolean; localDatabase?: string; targetHost?: string; groupSize?: number; logDir?: string }
+export interface Arguments { manifest?: string; store?: string; stores?: string; fromStore?: string; toStore?: string; all?: boolean; dryRun?: boolean; resume?: string; help?: boolean; localDatabase?: string; targetHost?: string; stagingQcTargetId?: string; groupSize?: number; logDir?: string }
 export function argumentsFor(args: string[]): Arguments {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     manifest: { type: 'string' }, store: { type: 'string' }, stores: { type: 'string' }, 'from-store': { type: 'string' }, 'to-store': { type: 'string' },
-    'group-size': { type: 'string' }, 'log-dir': { type: 'string' }, 'local-database': { type: 'string' }, 'target-host': { type: 'string' }, all: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, resume: { type: 'string' }, help: { type: 'boolean' },
+    'group-size': { type: 'string' }, 'log-dir': { type: 'string' }, 'local-database': { type: 'string' }, 'target-host': { type: 'string' }, 'staging-qc-target-id': { type: 'string' }, all: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, resume: { type: 'string' }, help: { type: 'boolean' },
   } })
-  const result = { manifest: values.manifest, store: values.store, stores: values.stores, fromStore: values['from-store'], toStore: values['to-store'], all: values.all, dryRun: values['dry-run'], resume: values.resume, help: values.help, localDatabase: values['local-database'], targetHost: values['target-host'], groupSize: values['group-size'] === undefined ? undefined : Number(values['group-size']), logDir: values['log-dir'] }
+  const result = { manifest: values.manifest, store: values.store, stores: values.stores, fromStore: values['from-store'], toStore: values['to-store'], all: values.all, dryRun: values['dry-run'], resume: values.resume, help: values.help, localDatabase: values['local-database'], targetHost: values['target-host'], stagingQcTargetId: values['staging-qc-target-id'], groupSize: values['group-size'] === undefined ? undefined : Number(values['group-size']), logDir: values['log-dir'] }
   if (result.help) return result
   if (result.groupSize !== undefined) storeGroups([], result.groupSize)
   if (result.localDatabase !== undefined && !/^[a-zA-Z0-9_]+$/.test(result.localDatabase)) throw new MigrationError('LOCAL_DATABASE_ARGUMENT_INVALID')
+  if (result.stagingQcTargetId && (!result.localDatabase || !result.targetHost)) throw new MigrationError('STAGING_QC_TARGET_CONFIG_INVALID')
   if (result.resume) {
     if (!/^json:[a-f0-9-]{36}$/.test(result.resume) || [result.manifest, result.store, result.stores, result.toStore, result.all, result.dryRun, result.groupSize].some(value => value !== undefined)) throw new MigrationError('RESUME_FLAGS_INVALID')
   } else {
@@ -100,7 +103,7 @@ export function updatePreflightContext(context: Record<string, unknown>, entity:
 }
 export async function runImport(args: Arguments, options: ImportOrchestrationOptions = {}): Promise<void> {
   if (args.help) {
-    process.stdout.write('PW1 import: --manifest /private/import-manifest.json (--store ID | --stores ID,ID | --from-store ID --to-store ID | --all) [--group-size 1..100] [--log-dir /private/logs] [--dry-run]\nResume: --resume json:UUID [--from-store ID]\nLocal applies default to clones pw1_import_1886_*. Existing local DBs require --local-database NAME. Neon requires --local-database NAME --target-host EXACT_NEON_HOST on every direct invocation.\nExit: 0 verified/preflight passed; 2 arguments; 3 blocked/conflict; 4 interrupted/retry exhausted; 5 reconcile with resume; 6 no matching Stores.\n')
+    process.stdout.write('PW1 import: --manifest /private/import-manifest.json (--store ID | --stores ID,ID | --from-store ID --to-store ID | --all) [--group-size 1..100] [--log-dir /private/logs] [--dry-run]\nResume: --resume json:UUID [--from-store ID]\nLocal applies default to clones pw1_import_1886_*. Existing local DBs require --local-database NAME. Neon requires --local-database NAME --target-host EXACT_NEON_HOST. Staging QC direct CLI also requires --staging-qc-target-id ID and a matching DB authorization.\nExit: 0 verified/preflight passed; 2 arguments; 3 blocked/conflict; 4 interrupted/retry exhausted; 5 reconcile with resume; 6 no matching Stores.\n')
     return
   }
   const logger = await RunLogger.create(args.logDir, args.dryRun ? 'dry-run' : args.resume ? 'resume' : 'apply')
@@ -118,7 +121,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
   const stop = () => { interrupted = true }
   process.on('SIGINT', stop); process.on('SIGTERM', stop)
   try {
-    runtime = await createRuntime(process.env.DATABASE_URI ?? '', !args.dryRun, args.localDatabase, args.targetHost)
+    runtime = await createRuntime(process.env.DATABASE_URI ?? '', !args.dryRun, args.localDatabase, args.targetHost, args.stagingQcTargetId)
     await assertWritableProfile(runtime.pool)
     let batch: LedgerBatch | undefined = args.resume ? await getBatch(runtime.pool, args.resume) : undefined
     if (batch) { context.runId = batch.id; await logger.event({ status: 'BATCH_RESUMED', runId: batch.id }) }
@@ -134,6 +137,10 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
     const selected = batch?.storeIds ?? selectStoreIds(artifact.storeIds, args)
     if (!selected.length) throw new MigrationError('NO_MATCHING_STORES')
     if (selected.some(id => !artifact.storeIds.includes(id))) throw new MigrationError('BATCH_STORE_MISSING')
+    if (args.stagingQcTargetId) {
+      const target = localTarget(process.env.DATABASE_URI, !args.dryRun, args.localDatabase, args.targetHost, args.stagingQcTargetId)
+      await assertStagingQcAuthorization(runtime.pool, args.stagingQcTargetId, runtime.identity, target.database, selected)
+    }
     await logger.event({ status: 'SELECTION_READY', stores: selected.length, groupSize, groupCount: Math.ceil(selected.length / groupSize) })
     await emit({ status: 'ARTIFACT_CHECKED', manifestHash: artifact.manifestHash, masterHash: artifact.manifest.masterHash, durationMs: Date.now() - artifactStarted, scope: 'selected-emitted-stores', ...artifact.coverage, requestedStoreCount: selected.length, pageDisposition: 'OUT_OF_SCOPE', pageExcludedRecords: artifact.pageExcludedRecords, optionalDispositions: artifact.optionalDispositions })
     const pending = artifact.diagnosticSummary?.buckets.filter(bucket => bucket.disposition === 'TARGET_CHECK_REQUIRED' && (!bucket.diagnostic.storeId || selected.includes(bucket.diagnostic.storeId))) ?? []
@@ -152,6 +159,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
     const credentials = await loadCredentialSidecar(artifact)
     const binding: BatchBinding = {
       executionVersion: 'grouped-v1', groupSize,
+      ...(args.stagingQcTargetId ? { targetEnvironment: 'staging_qc' as const } : {}),
       ...(artifact.manifest.version >= 2 ? { profile: artifact.manifest.profile, sourceInstanceToken: artifact.manifest.sourceInstanceToken, migrationPolicyHash: artifact.manifest.migrationPolicyHash, actorArtifactHash: artifact.manifest.actorArtifactHash, creatorBindingsHash: artifact.manifest.creatorBindingsHash, classifierVersion: artifact.manifest.classifierVersion, ...(artifact.manifest.version === 3 ? { classificationVersion: artifact.manifest.classificationVersion, customerReconciliationHash: artifact.manifest.customerReconciliationHash, productReconciliationHash: artifact.manifest.productReconciliationHash } : {}) } : {}),
       sourceInstance: artifact.manifest.sourceInstance, sourceDatabase: artifact.manifest.sourceDatabase, snapshotId: artifact.manifest.snapshotId,
       targetHash: runtime.identity, manifestHash: artifact.manifestHash,
@@ -164,6 +172,36 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
     const states = batch ? await listStoreStates(runtime.pool, batch.id) : {}
     validateResumeCursor(selected, states, args.fromStore && args.resume ? args.fromStore : undefined)
     const configs = configurations(runtime)
+    const exported = await inspectExportArtifact(artifact.directory)
+    const sidecarHash = 'source-evidence.ndjson' in exported.manifest.artifacts
+      ? exported.manifest.artifacts['source-evidence.ndjson'] : undefined
+    let evidenceSnapshot: { snapshotId: string } | undefined
+    const writeFieldEvidence = async (storeId: string) => {
+      if (!sidecarHash) { await emit({ status: 'EVIDENCE_SKIPPED_LEGACY_ARTIFACT', storeId }); return }
+      if (args.targetHost && !args.stagingQcTargetId) {
+        await emit({ status: 'EVIDENCE_SKIPPED_NON_QC_REMOTE', storeId }); return
+      }
+      const guard = await runtime!.pool.query<{ target_instance_id: string }>(
+        'SELECT target_instance_id FROM migration_target_guard WHERE singleton=true',
+      )
+      const targetId = guard.rows[0]?.target_instance_id
+      if (!targetId || (args.stagingQcTargetId && targetId !== args.stagingQcTargetId)) {
+        throw new MigrationError('EVIDENCE_TARGET_GUARD_MISMATCH')
+      }
+      if (!evidenceSnapshot) {
+        evidenceSnapshot = await ingestSourceEvidence({
+          pool: runtime!.pool, artifactDir: artifact.directory, expectedTargetInstanceId: targetId,
+          ...(args.targetHost ? { remoteTarget: { targetHash: runtime!.identity, database: args.localDatabase!, approvedStoreIds: selected } } : {}),
+        })
+        await emit({ status: 'SOURCE_EVIDENCE_INGESTED', snapshotId: evidenceSnapshot.snapshotId })
+      }
+      const result = await evidenceAfterVerifiedImport({
+        pool: runtime!.pool, importManifestPath: manifestPath, batchId: batch!.id,
+        sourceStoreId: storeId, sourceSnapshotId: evidenceSnapshot.snapshotId,
+        sourceSidecarSha256: sidecarHash, targetId, targetHash: runtime!.identity,
+      })
+      await emit({ status: 'EVIDENCE_COMPLETE', storeId, snapshotId: evidenceSnapshot.snapshotId, ...result })
+    }
     const namespace = `${artifact.manifest.sourceInstance}:${artifact.manifest.snapshotId}`
     const actorRefs = new Set(artifact.actors?.actors.map(actor => actor._ref) ?? [])
     const creatorInput = { actors: artifact.actors, bindings: artifact.creatorBindings, sourceInstance: artifact.manifest.sourceInstance,
@@ -249,7 +287,11 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
       for (const storeId of ids) {
         check(); context.storeId = storeId; context.phase = 'apply'
         const applyStarted = Date.now()
-        if (states[storeId] === 'VERIFIED') { await emit({ status: 'STORE_REVERIFIED', storeId }); continue }
+        if (states[storeId] === 'VERIFIED') {
+          await emit({ status: 'STORE_REVERIFIED', storeId })
+          await writeFieldEvidence(storeId)
+          continue
+        }
         await renewLease(runtime.pool, currentLease)
         await emit({ status: 'STORE_STARTED', storeId })
         const entities = buildEntities(await readImportStore(artifact, storeId), configs, namespace, actorRefs, artifact.preserveInvalidUserEmails, artifact.delegateRawPageContent, artifact.delegateRawModelSettings)
@@ -307,6 +349,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
         await logger.recordDestination(storeId, destination)
         const durationMs = Date.now() - applyStarted
         await emit({ status: 'STORE_VERIFIED', runId: currentBatch.id, storeId, entities: entities.length, destination, durationMs, preflightMs, writeMs, finalizeMs, verifyMs, destinationMs: durationMs - preflightMs - writeMs - finalizeMs - verifyMs, preflightLookups: proposal.preflightLookups, pendingReferenceCount: pending.size })
+        await writeFieldEvidence(storeId)
       }
       delete context.storeId
       await emit({ status: 'GROUP_VERIFIED', ...context, stores: ids.length })
