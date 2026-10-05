@@ -9,7 +9,7 @@ on:
       base_url:
         description: Staging URL to test
         required: false
-        default: https://web-cms-v2.dev.ecommercehub.my
+        default: https://web-v2.dev.ecommercehub.my
 
 permissions:
   contents: read
@@ -35,7 +35,7 @@ jobs:
             -H "Authorization: Bearer $E2E_SETUP_SECRET" -H 'Content-Type: application/json' \
             --data "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}"
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
           E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
@@ -49,7 +49,7 @@ jobs:
             --project=smoke --project=setup --project=chromium --project=storefront-regression \
             --project=gh-1734-self-delivery --project=f40-qa-ingest --project=f07-template-search
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
