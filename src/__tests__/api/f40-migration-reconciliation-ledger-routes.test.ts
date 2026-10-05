@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   sanitize: vi.fn(),
   listRuns: vi.fn(),
   listIssues: vi.fn(),
+  readFieldEvidence: vi.fn(),
+  assertF42SourceReady: vi.fn(),
 }));
 
 vi.mock("@/lib/admin/api-utils", () => ({
@@ -21,6 +23,12 @@ vi.mock("@/lib/admin/qa/f42-ledger-evidence-provider", () => ({
   f42LedgerEvidenceProvider: {},
   listVerifiedF42LedgerRuns: mocks.listRuns,
   listOpenF42LedgerIssues: mocks.listIssues,
+}));
+vi.mock("@/lib/admin/qa/f42-field-evidence-reader", () => ({
+  readFieldEvidence: mocks.readFieldEvidence,
+}));
+vi.mock("@/lib/admin/qa/f42-source-readiness", () => ({
+  assertF42SourceReady: mocks.assertF42SourceReady,
 }));
 
 import { NextRequest } from "next/server";
@@ -57,6 +65,8 @@ describe("[TC-F40-14-03] F42 ledger reconciliation API", () => {
       runId: RUN_ID,
       demo: false,
     });
+    expect(mocks.readFieldEvidence).not.toHaveBeenCalled();
+    expect(mocks.assertF42SourceReady).not.toHaveBeenCalled();
   });
 
   it("TC-F40-14-01: rejects a selected run without its store boundary", async () => {

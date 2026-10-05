@@ -35,8 +35,16 @@ Review cuối bản tách không còn blocker; test F35 không liên quan đã �
 - TypeScript đạt; 58/58 unit test đạt.
 - TC12 trên trình duyệt thật với DB schema-only chưa có F42: đạt (6,2 giây).
 - TC09 trên trình duyệt thật với DB hiện có, chỉ đọc qua ứng dụng bản tách tại port 3105: đạt (33,8 giây).
-- Lint: 0 lỗi, 8 cảnh báo Hook; diff check đạt.
+- Lint theo phạm vi file đã kiểm tra: 0 lỗi, 8 cảnh báo Hook; diff check đạt. Lần kiểm tra này chưa bao phủ entry page (xem CI follow-up).
 
 Đã push nhánh `fix/F40-1907-standalone-report` và mở [PR #1919](https://github.com/primeproduction/ech-prime-web-v2/pull/1919) vào `staging`; head được xác nhận là `9157d2769`, commit implementation `597e31d6f`. PR chỉ thuộc phạm vi F40. Chưa merge hoặc xác nhận deployment; bước tiếp theo là review/CI của PR.
 
 Sau khi F42 triển khai nguồn phù hợp, cần xác nhận lại dữ liệu thực và phạm vi nghiệm thu đầy đủ. Phân trang inventory toàn nguồn và recheck dữ liệu PW2 hiện tại vẫn là các hạng mục riêng, chưa được coi là hoàn tất.
+
+## CI follow-up
+
+CI run `37295649278` thất bại ở rule `@next/next/no-html-link-for-pages`, tại `src/app/studio/qa/migration-diff/page.tsx:23`. Scoped lint trước đó bỏ sót entry page. Đã thay anchor nội bộ bằng `next/link`, không đổi contract chức năng.
+
+Lần chạy API/unit bổ sung phát hiện mock API ledger thiếu export mà field reader sử dụng. Đã thêm top-level mock/spies cho field reader/readiness và kiểm tra nhánh ledger không gọi hai phụ thuộc field này. Lệnh `npx vitest run src/__tests__/api/f40-migration-reconciliation-ledger-routes.test.ts src/__tests__/unit/qa` chạy lại đạt **31 file / 242 test** (exit 0).
+
+Toàn bộ `npm run lint` và `npx tsc --noEmit` chạy lại sau cả sửa `next/link` và test mock đều đạt (exit 0; lint còn cảnh báo hiện có, không có lỗi). Kết quả CI remote sau push chưa được xác nhận.
