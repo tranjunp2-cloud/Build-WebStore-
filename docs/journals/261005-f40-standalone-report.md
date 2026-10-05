@@ -1,7 +1,7 @@
 ---
 date: 2026-10-05
 topic: f40-standalone-report
-status: verified-shipping-pending
+status: verified-pr-open
 ---
 
 # F40 report — tách triển khai độc lập F42
@@ -37,6 +37,6 @@ Review cuối bản tách không còn blocker; test F35 không liên quan đã �
 - TC09 trên trình duyệt thật với DB hiện có, chỉ đọc qua ứng dụng bản tách tại port 3105: đạt (33,8 giây).
 - Lint: 0 lỗi, 8 cảnh báo Hook; diff check đạt.
 
-Chưa ghi nhận push, merge hoặc deployment thành công.
+Đã push nhánh `fix/F40-1907-standalone-report` và mở [PR #1919](https://github.com/primeproduction/ech-prime-web-v2/pull/1919) vào `staging`; head được xác nhận là `9157d2769`, commit implementation `597e31d6f`. PR chỉ thuộc phạm vi F40. Chưa merge hoặc xác nhận deployment; bước tiếp theo là review/CI của PR.
 
 Sau khi F42 triển khai nguồn phù hợp, cần xác nhận lại dữ liệu thực và phạm vi nghiệm thu đầy đủ. Phân trang inventory toàn nguồn và recheck dữ liệu PW2 hiện tại vẫn là các hạng mục riêng, chưa được coi là hoàn tất.
