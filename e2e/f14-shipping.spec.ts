@@ -60,8 +60,10 @@ test.describe('F14 Shipping — settings page and API routes', () => {
     // ── PATCH /api/sites/[siteId]/shipping-config — auth guard ──────────────
 
     test('[TC-F14 E2E] shipping-config PATCH without auth returns 401', async ({ playwright }) => {
+        // playwright.request.newContext() inherits the project's storageState (logged-in cookies); clear it.
         const unauthRequest = await playwright.request.newContext({
             baseURL: process.env.BASE_URL || 'http://localhost:3000',
+            storageState: { cookies: [], origins: [] },
         })
 
         const res = await unauthRequest.patch('/api/sites/test-site/shipping-config', {
