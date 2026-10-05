@@ -215,62 +215,22 @@ export function ReconciliationInspector({
           </p>
         ) : !snapshot?.evidence.available ? (
           <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200">
-            {snapshot?.evidence.message ?? "Chưa có mapping định danh."}
+            {snapshot?.evidence.message ?? "Chưa có kết quả đối soát."}
           </p>
         ) : null}
-        {!isDemo ? (
-          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
-            <label className="block text-xs font-semibold text-slate-200" htmlFor="migration-source-store">
-              ID store nguồn PW1
-            </label>
-            <p className="mt-1 text-[11px] text-slate-400">
-              Nhập đúng ID số trong ledger F42. Mã store trên bảng F40 không được tự suy diễn sang PW1.
-            </p>
-            <input
-              id="migration-source-store"
-              aria-label="ID store nguồn PW1"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={sourceStoreId}
-              onChange={(event) => onSourceStoreChange(event.target.value.replace(/\D/g, ""))}
-              placeholder="Ví dụ: 205"
-              className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100"
-            />
-            <label className="block text-xs font-semibold text-slate-200" htmlFor="migration-ledger-run">
-              <span className="mt-3 block">Migration run F42 đã xác nhận</span>
-            </label>
-            <p className="mt-1 text-[11px] text-slate-400">
-              Chọn đúng run của store này. Hệ thống không tự chọn run gần nhất.
-            </p>
-            <select
-              id="migration-ledger-run"
-              aria-label="Chọn migration run F42"
-              value={runId ?? ""}
-              disabled={runsLoading || !sourceStoreId}
-              onChange={(event) => onRunChange(event.target.value || null)}
-              className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 disabled:cursor-wait disabled:opacity-60"
-            >
-              <option value="">{runsLoading ? "Đang tải run..." : "Chọn migration run đã VERIFIED"}</option>
-              {runs.map((run) => (
-                <option key={run.runId} value={run.runId}>
-                  {new Date(run.updatedAt).toLocaleString("vi-VN")} · {run.runId.slice(0, 8)}…
-                </option>
-              ))}
-            </select>
-            {runsError ? <p className="mt-2 text-xs text-rose-300" role="alert">Không tải được run: {runsError}</p> : null}
-            {runsTruncated ? (
-              <p className="mt-2 text-xs text-amber-200" role="status" aria-live="polite">
-                Chỉ hiển thị 50 run VERIFIED mới nhất. Cần migration owner cung cấp run cũ nếu cần đối soát lịch sử.
-              </p>
-            ) : null}
-            {!runsLoading && !runsError && !runs.length ? (
-              <p className="mt-2 text-xs text-amber-200" role="status" aria-live="polite">Store này chưa có run F42 ở trạng thái VERIFIED.</p>
-            ) : null}
-            {!runId && runs.length > 0 ? (
-              <p className="mt-2 text-xs text-amber-200" role="status" aria-live="polite">Hãy chọn một run để xem kết quả ledger thật.</p>
-            ) : null}
-          </div>
-        ) : null}
+        {!isDemo && (
+          <p className="mt-3 text-xs text-slate-400" role="status">
+            {runsLoading || loading
+              ? "Đang tải dữ liệu đối soát…"
+              : runsError
+                ? "Không tải được dữ liệu migration. Bấm Quét lại dữ liệu để thử lại."
+                : !sourceStoreId
+                  ? "Chưa có định danh nguồn F42 cho website này."
+                  : !runs.length
+                    ? "Website này chưa có đợt migration đã xác nhận để đối soát."
+                    : "Tự động đối soát theo đợt migration đã xác nhận mới nhất của website."}
+          </p>
+        )}
       </section>
       {!isDemo && selectedRunIsCurrent ? (
         <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4" data-testid="migration-ledger-issues">
@@ -307,7 +267,7 @@ export function ReconciliationInspector({
         ].map(([label, count, className]) => (
           <div key={String(label)} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
             <p className="text-[11px] text-slate-500">{label}</p>
-            <p className={`mt-1 text-xl font-bold ${className}`}>{count}</p>
+            <p className={`mt-1 text-xl font-bold ${className}`}>{snapshot ? count : "—"}</p>
           </div>
         ))}
       </section>

@@ -94,7 +94,7 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     );
 
     // Arrange
-    await page.goto("/studio/qa/migration-diff");
+    await page.goto("/studio/qa/migration-diff?demo=1");
     await page.getByPlaceholder("Tìm theo Email khách hàng, Domain, Mã Site...").fill("SITE-0001");
     await page.getByTestId("migration-store-compare-SITE-0001").click();
     await page.getByRole("button", { name: "Soi CSDL 1-to-1" }).click();
@@ -125,7 +125,7 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
       "Requires the super-admin E2E account configured by the f40-migration-diff project.",
     );
 
-    await page.goto("/studio/qa/migration-diff");
+    await page.goto("/studio/qa/migration-diff?demo=1");
     await page.getByPlaceholder("Tìm theo Email khách hàng, Domain, Mã Site...").fill("SITE-0001");
     await page.getByTestId("migration-store-compare-SITE-0001").click();
     await page.getByRole("button", { name: "Soi CSDL 1-to-1" }).click();
@@ -156,7 +156,7 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
       "Requires the super-admin E2E account configured by the f40-migration-diff project.",
     );
 
-    await page.goto("/studio/qa/migration-diff");
+    await page.goto("/studio/qa/migration-diff?demo=1");
     await page.getByRole("button", { name: "So Sánh Khối" }).click();
     await page.getByLabel("Xem dữ liệu mẫu để duyệt UI").check();
 
@@ -172,7 +172,7 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     );
 
     // Arrange
-    await page.goto("/studio/qa/migration-diff");
+    await page.goto("/studio/qa/migration-diff?demo=1");
 
     // Act
     await page.getByRole("button", { name: "Đối soát Commerce" }).click();

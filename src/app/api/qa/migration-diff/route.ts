@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withSuperAdmin } from "@/lib/admin/api-utils";
+import { parsePw1ConnectionInput } from "@/lib/admin/qa/pw1-connection-input";
 import {
   generateReconciliationCatalog,
   getStoreDeepDiff,
@@ -166,8 +167,15 @@ export const POST = withSuperAdmin(async (request: NextRequest, { user }) => {
     const action = body?.action;
 
     if (action === "test_db_connection") {
-      // Security: Strictly test server-configured PW1_DATABASE_URL to prevent SSRF
-      const result = await testPw1Connection();
+      let config;
+      if (body.config !== undefined) {
+        try {
+          config = parsePw1ConnectionInput(body.config, process.env.PW1_DATABASE_URL);
+        } catch (error) {
+          return NextResponse.json({ error: error instanceof Error ? error.message : "Thông tin kết nối không hợp lệ." }, { status: 400 });
+        }
+      }
+      const result = await testPw1Connection(config);
       return NextResponse.json({
         success: result.connected,
         data: result,
