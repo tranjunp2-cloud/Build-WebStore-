@@ -146,7 +146,9 @@ export async function POST(req: NextRequest) {
       TARGETED_SMOKE_PACKS,
       new Set(coverageMap.rules.flatMap((rule) => rule.targets)),
     );
-  } catch {
+  } catch (error) {
+    // Fail closed, but log the validation reason so the 503 is diagnosable from runtime logs.
+    console.error("[targeted-dispatch] Targeted Smoke registry is invalid:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Targeted Smoke registry is invalid" }, { status: 503 });
   }
   const impact = resolveChangeImpact(event.data.changedPaths, coverageMap);
