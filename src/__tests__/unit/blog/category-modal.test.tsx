@@ -274,6 +274,14 @@ describe('[TC-F17-05-01] CategoryModal — Create new category', () => {
 
         // Assert
         expect(actions.createBlogCategoryAction).toHaveBeenCalledWith({ name: 'Tech Tips' })
+
+        // handleCreate reloads categories without awaiting it; wait for that reload
+        // inside act so it never sets state after jsdom is torn down.
+        await waitFor(() => expect(actions.getBlogCategoriesAction).toHaveBeenCalledTimes(2))
+        const reload = vi.mocked(actions.getBlogCategoriesAction).mock.results[1]?.value
+        await act(async () => {
+            await reload
+        })
     })
 
     it('does not call createBlogCategoryAction when name is only whitespace', async () => {
