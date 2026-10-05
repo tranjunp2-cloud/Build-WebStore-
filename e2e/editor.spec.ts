@@ -43,13 +43,10 @@ test.describe('Editor & Storefront', () => {
         )
         await expect(editorContent.first()).toBeVisible({ timeout: 20_000 })
 
-        // Toolbar should be visible (save, publish buttons)
-        const toolbar = page.locator(
-            'button:has-text("Save"), button:has-text("Publish"), ' +
-            'button:has-text("Preview"), [data-testid*="toolbar"]'
-        )
-        const toolbarCount = await toolbar.count()
-        expect(toolbarCount).toBeGreaterThan(0)
+        // Toolbar exposes the publish control: "Publish" for a draft site, "Update" / "View live"
+        // once the site is live. Auto-save replaced the old explicit "Save" button.
+        const publishControl = page.locator('header').getByRole('button', { name: /^(Publish|Update|View live)$/i })
+        await expect(publishControl.first()).toBeVisible()
     })
 
     test('[GH-1715] Auto SEO uses a styled overwrite confirmation dialog', async ({ page }) => {
@@ -106,6 +103,11 @@ test.describe('Editor & Storefront', () => {
             })
         })
 
+        // This test covers Auto SEO, not the independently tested first-visit coach marks,
+        // whose overlay would otherwise intercept the SEO tab click.
+        await page.addInitScript(() => {
+            window.localStorage.setItem('editor:coach-marks:v1:seen', 'true')
+        })
         await page.goto(`/editor/${siteId}`)
         await page.waitForLoadState('networkidle')
         await expectNoServerError(page)
