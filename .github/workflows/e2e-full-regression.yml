@@ -17,7 +17,8 @@ permissions:
 jobs:
   full-regression:
     name: Full regression on staging
-    runs-on: ubuntu-latest
+    # Playwright run; follows CI_HEAVY_RUNNER like the heavy CI jobs.
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4

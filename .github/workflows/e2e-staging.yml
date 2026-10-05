@@ -25,7 +25,8 @@ concurrency:
 jobs:
   e2e:
     name: "E2E: Playwright on Staging"
-    runs-on: ubuntu-latest
+    # Playwright run; follows CI_HEAVY_RUNNER like the heavy CI jobs.
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: read

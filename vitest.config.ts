@@ -6,10 +6,31 @@ import path from 'path'
 export default defineConfig({
     plugins: [react()],
     test: {
-        environment: 'jsdom',
         globals: true,
         setupFiles: ['./src/__tests__/helpers/setup.ts'],
-        include: ['src/__tests__/**/*.{test,spec}.{ts,tsx}'],
+        // Most specs are plain logic (.ts) and never touch the DOM, yet running
+        // them under jsdom pays a full window bootstrap per file — that made
+        // the unit suite the slowest CI step. Component specs (.tsx) keep
+        // jsdom; a .ts spec that does need the DOM opts in per file with a
+        // `// @vitest-environment jsdom` docblock.
+        projects: [
+            {
+                extends: true,
+                test: {
+                    name: 'node',
+                    environment: 'node',
+                    include: ['src/__tests__/**/*.{test,spec}.ts'],
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    name: 'dom',
+                    environment: 'jsdom',
+                    include: ['src/__tests__/**/*.{test,spec}.tsx'],
+                },
+            },
+        ],
         exclude: ['node_modules', 'e2e'],
         coverage: {
             reporter: ['text', 'json', 'json-summary', 'html'],
