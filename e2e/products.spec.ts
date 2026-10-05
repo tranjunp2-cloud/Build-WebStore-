@@ -39,8 +39,10 @@ test.describe('Products Management', () => {
 
     test('[TC-GH1432-PERF-03] canonical dashboard products endpoint rejects unauthenticated requests', async ({ playwright }) => {
         // Arrange
+        // playwright.request.newContext() inherits the project's storageState (logged-in cookies); clear it.
         const unauthenticatedRequest = await playwright.request.newContext({
             baseURL: process.env.BASE_URL || 'http://localhost:3000',
+            storageState: { cookies: [], origins: [] },
         })
 
         // Act
