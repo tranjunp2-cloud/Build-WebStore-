@@ -181,13 +181,13 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
             status: 'ready',
             categories: [excludedCategory],
         })
-        vi.mocked(getProductsAction)
-            .mockResolvedValueOnce([
-                makeProduct('existing', 'Existing draft'),
-            ] as unknown as Awaited<ReturnType<typeof getProductsAction>>)
-            .mockResolvedValueOnce([
-                visibleDraft,
-            ] as unknown as Awaited<ReturnType<typeof getProductsAction>>)
+        // Answer by state, not by call order: the 250ms search debounce can fire a
+        // filtered reload before onSuccess on a busy machine, which would consume a
+        // second mockResolvedValueOnce and leave the post-create refresh empty.
+        let draftCreated = false
+        vi.mocked(getProductsAction).mockImplementation(async () => (
+            draftCreated ? [visibleDraft] : [makeProduct('existing', 'Existing draft')]
+        ) as unknown as Awaited<ReturnType<typeof getProductsAction>>)
         renderPage()
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
@@ -211,12 +211,14 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         await waitFor(() => expect(screen.getByTestId('bulk-create-modal')).toBeInTheDocument())
 
         // Act
+        const callsBeforeSuccess = vi.mocked(getProductsAction).mock.calls.length
         act(() => {
+            draftCreated = true
             bulkCreateProps.at(-1)?.onSuccess()
         })
 
         // Assert
-        await waitFor(() => expect(getProductsAction).toHaveBeenCalledTimes(2))
+        await waitFor(() => expect(vi.mocked(getProductsAction).mock.calls.length).toBeGreaterThan(callsBeforeSuccess))
         await waitFor(() => expect(screen.getAllByText('Visible AI draft').length).toBeGreaterThan(0))
         for (const searchInput of screen.getAllByPlaceholderText(/search by name or sku/i)) {
             expect(searchInput).toHaveValue('')
