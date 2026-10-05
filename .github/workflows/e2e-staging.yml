@@ -15,7 +15,7 @@ on:
     inputs:
       base_url:
         description: "Staging URL to test"
-        default: "https://web-cms-v2.dev.ecommercehub.my"
+        default: "https://web-v2.dev.ecommercehub.my"
         required: false
 
 concurrency:
@@ -53,7 +53,7 @@ jobs:
       - name: Wait for NEW staging deploy to be ready
         id: staging_deploy
         run: |
-          URL="${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}"
+          URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
           echo "Waiting for Vercel deploy: $URL"
           # The staging alias can point to the prior deployment while Vercel builds.
           # Poll the deployed commit identity; route existence/status alone cannot
@@ -76,7 +76,7 @@ jobs:
 
       - name: Ensure E2E test user exists
         run: |
-          BASE_URL="${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}"
+          BASE_URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
           if [ -z "${{ secrets.E2E_SETUP_SECRET }}" ]; then
             echo "::warning::E2E_SETUP_SECRET not set — skipping user provisioning"
             exit 0
@@ -137,7 +137,7 @@ jobs:
           echo "=== Stats: $PASSED passed, $FAILED failed, $SKIPPED skipped, $DID_NOT_RUN did not run (total $TOTAL) ==="
           exit $EXIT_CODE
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
@@ -174,7 +174,7 @@ jobs:
       - name: Dispatch allow-listed targeted Smoke packs
         if: always() && steps.staging_deploy.outcome == 'success' && steps.qa_context.outcome == 'success' && steps.qa_impact.outcome == 'success'
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
           QA_TARGETED_DISPATCH_SECRET: ${{ secrets.QA_TARGETED_DISPATCH_SECRET || secrets.QA_INGEST_SECRET }}
           F40_TARGETED_SMOKE_ENABLED: ${{ vars.F40_TARGETED_SMOKE_ENABLED || 'false' }}
           QA_PULL_REQUEST: ${{ steps.qa_context.outputs.pull_request }}
@@ -208,7 +208,7 @@ jobs:
 
       - name: Verify targeted Smoke API security boundaries
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
         run: npx playwright test tests/f40-targeted-smoke-api.spec.ts --project=f40-targeted-smoke-api
 
       - name: Prepare notification info

@@ -710,7 +710,7 @@ jobs:
             echo 'cancelled=false' >> "$GITHUB_OUTPUT"
           fi
         env:
-          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-v2.dev.ecommercehub.my' }}
           QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
           DISPATCH_ID: ${{ inputs.dispatch_id }}
           WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
@@ -724,7 +724,7 @@ jobs:
             -H 'Content-Type: application/json' \
             --data "{\"email\":\"${TEST_EMAIL}\",\"password\":\"${TEST_PASSWORD}\",\"tenantSlug\":\"e2e-targeted-smoke\",\"tenantName\":\"Targeted Smoke QA\"}"
         env:
-          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-v2.dev.ecommercehub.my' }}
           E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
@@ -815,7 +815,7 @@ jobs:
           if [ "$?" != '0' ]; then EXIT_CODE=1; fi
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
         env:
-          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-v2.dev.ecommercehub.my' }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
@@ -866,7 +866,7 @@ jobs:
             -H "x-qa-signature: sha256=$QA_SIGNATURE" \
             --data-binary @/tmp/targeted-ingest-body.json
         env:
-          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-v2.dev.ecommercehub.my' }}
           QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
           DISPATCH_ID: ${{ inputs.dispatch_id }}
           WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
