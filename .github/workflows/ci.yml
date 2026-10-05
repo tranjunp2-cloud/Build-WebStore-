@@ -140,8 +140,11 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
+        # Random host port: several self-hosted runners share one machine
+        # (CI_HEAVY_RUNNER), so a fixed 5432:5432 makes concurrent Test jobs
+        # collide. Steps read the mapped port from job.services below.
         ports:
-          - 5432:5432
+          - 5432/tcp
     permissions:
       contents: read
     steps:
@@ -159,7 +162,7 @@ jobs:
 
       - name: Verify F41 migrations are idempotent on an isolated schema
         env:
-          DATABASE_URI: postgresql://primeweb:primeweb@localhost:5432/primeweb?sslmode=disable
+          DATABASE_URI: postgresql://primeweb:primeweb@localhost:${{ job.services.postgres.ports['5432'] }}/primeweb?sslmode=disable
         run: npm run test:f41-migrations
 
       - name: Test
