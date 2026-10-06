@@ -41,7 +41,7 @@ export interface MigrationPolicy {
   deferEmailTemplates: boolean
   allowSparseVariants: boolean
   preserveUserCreators: boolean
-  approvedNegativeTotalOrders?: { storeId: '43'; orderId: '112' | '132' }[]
+  approvedNegativeTotalOrders?: { storeId: string; orderId: string }[]
   excludeInvalidProducts?: boolean
   excludeInvalidBlogs?: boolean
   omitUnmappablePayments?: boolean

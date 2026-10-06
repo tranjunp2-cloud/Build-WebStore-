@@ -14,7 +14,7 @@ export function approvedSourceExclusionReason(table: string, reason: string): bo
 export const sourceExclusionSchema = z.object({ table: z.enum(['products','orders','blog_posts','blog_categories','store_payments']), sourceId: z.string().regex(/^[1-9]\d*$/), storeId: z.string().regex(/^[1-9]\d*$/), reason: z.string() }).strict().refine(v => approvedSourceExclusionReason(v.table,v.reason))
 export type SourceExclusion = z.infer<typeof sourceExclusionSchema>
 export function sourceExclusionEnabled(ex: SourceExclusion, policy?: MigrationPolicy): boolean {
-  if (ex.table === 'orders' && ex.reason === 'APPROVED_NEGATIVE_TOTAL') return ex.storeId === '43' && ['112','132'].includes(ex.sourceId) && policy?.approvedNegativeTotalOrders?.some(row => row.storeId === ex.storeId && row.orderId === ex.sourceId) === true
+  if (ex.table === 'orders' && ex.reason === 'APPROVED_NEGATIVE_TOTAL') return policy?.approvedNegativeTotalOrders?.some(row => row.storeId === ex.storeId && row.orderId === ex.sourceId) === true
   return ex.table === 'products' ? policy?.excludeInvalidProducts === true : ex.table === 'orders' ? policy?.skipUnverifiedOrders === true : ex.table === 'store_payments' ? policy?.omitUnmappablePayments === true : policy?.excludeInvalidBlogs === true
 }
 export function sourceExclusionDiagnostic(d: Diagnostic): SourceExclusion | undefined {

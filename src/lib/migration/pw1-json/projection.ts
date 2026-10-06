@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { normalizeDashboardBlocks } from '../../dashboard-utils'
 import type { Field, SanitizedCollectionConfig } from 'payload'
 import type { ImportStore, ImportDocument, CollectionName } from './types'
+import { NULLIFIED_ROOT_CREATOR_REF } from './creator-policy'
 
 export const WRITABLE = new Set<CollectionName>(['tenants', 'users', 'sites', 'media', 'categories', 'products', 'customers', 'discounts', 'orders', 'discount_usage_history', 'blog_categories', 'blogs', 'email-template-settings', 'plan-subscriptions', 'plan-subscription-usages'])
 const FORBIDDEN = new Set(['password', 'hash', 'salt', 'keyString', 'key_string', 'resetPasswordToken', 'resetPasswordExpiration', '_verified', 'apiKey', 'enableAPIKey'])
@@ -18,7 +19,7 @@ export interface Entity {
   sourceChecksum: string
   /** Operator-approved source creator policy; never read from caller-provided fields. */
   preserveInvalidEmail?: true
-  nullifiedCreatorRef?: '@users:users:1'
+  nullifiedCreatorRef?: typeof NULLIFIED_ROOT_CREATOR_REF
 }
 export function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -92,9 +93,9 @@ export function buildEntities(store: ImportStore, collections: Record<string, Sa
       }
       // PW1 root creator has no corresponding PW2 account. Preserve the source
       // artifact, but persist an explicit null (not an omitted field/default).
-      if (slug === 'users' && source.createdBy === '@users:users:1') {
+      if (slug === 'users' && source.createdBy === NULLIFIED_ROOT_CREATOR_REF) {
         source.createdBy = null
-        entity.nullifiedCreatorRef = '@users:users:1'
+        entity.nullifiedCreatorRef = NULLIFIED_ROOT_CREATOR_REF
       }
       // Legacy JSON objects are not a PW2 block list. Preserve valid lists and
       // leave the source artifact untouched; normalize only the target projection.
@@ -310,7 +311,7 @@ export function projectionMatches(expected: unknown, actual: unknown): boolean {
 /** Discharge only a proven root-creator normalization or a resolved actor binding. */
 export function creatorDiagnosticResolved(entity: Entity, targets: ReadonlyMap<string, number>): boolean {
   if (entity.collection !== 'users') return false
-  if (entity.nullifiedCreatorRef === '@users:users:1' && entity.data.createdBy === null) return true
+  if (entity.nullifiedCreatorRef === NULLIFIED_ROOT_CREATOR_REF && entity.data.createdBy === null) return true
   return entity.refs.some(ref => ref.path === 'createdBy' && ref.externalActor && targets.has(ref.ref))
 }
 

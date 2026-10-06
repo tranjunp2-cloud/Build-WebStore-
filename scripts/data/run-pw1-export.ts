@@ -6,6 +6,35 @@ import { createSnapshotConfig } from '../../src/lib/migration/pw1-export/snapsho
 import { exportMaster } from '../../src/lib/migration/pw1-export/export-master'
 import { progressLogger } from '../../src/lib/migration/pw1-export/progress'
 import { ExportError } from '../../src/lib/migration/pw1-export/primitives'
+import { NULLIFIED_ROOT_CREATOR_REF } from '../../src/lib/migration/pw1-json/creator-policy'
+
+/** Derive the binding candidate from emitted Users, never from a snapshot-specific ID. */
+async function externalCreatorRefs(artifactDir: string): Promise<string[]> {
+  const manifest = JSON.parse(await readFile(path.join(artifactDir, 'master-manifest.json'), 'utf8')) as {
+    masterParts?: { filename: string }[]
+  }
+  const localRefs = new Set<string>()
+  const creatorRefs = new Set<string>()
+  for (const part of manifest.masterParts ?? []) {
+    const stores = JSON.parse(await readFile(path.join(artifactDir, part.filename), 'utf8')) as {
+      users?: { _ref: string; createdBy?: string }[]
+    }[]
+    for (const store of stores) for (const user of store.users ?? []) {
+      localRefs.add(user._ref)
+      if (user.createdBy && user.createdBy !== NULLIFIED_ROOT_CREATOR_REF) creatorRefs.add(user.createdBy)
+    }
+  }
+  const external = [...creatorRefs].filter(ref => !localRefs.has(ref)).sort((a, b) =>
+    BigInt(a.slice('@users:users:'.length)) < BigInt(b.slice('@users:users:'.length)) ? -1 : 1)
+  if (external.length) {
+    const actors = JSON.parse(await readFile(path.join(artifactDir, 'user-actors.json'), 'utf8')) as {
+      actors: { _ref: string }[]
+    }
+    const known = new Set(actors.actors.map(actor => actor._ref))
+    if (external.some(ref => !known.has(ref))) throw new ExportError('USER_ACTORS_SOURCE_INVALID')
+  }
+  return external
+}
 
 // Create each default-output ancestor only after rejecting symlink ancestors.
 async function ensurePrivateDirectory(directory: string): Promise<void> {
@@ -51,7 +80,7 @@ async function main() {
     'target-database': { type: 'string' }, 'target-host': { type: 'string' },
   }, strict: true, allowPositionals: true })
   if (v.help) {
-    process.stdout.write('PW1 export (offline; no DB writes)\n\nnpm run migrate:pw1 -- /path/to/csv --as-of 2026-09-18T00:00:00Z\n\nDefaults: configs/migration/pw1-prod-profile.json; new private .migration/runs/<run-id>/ with source-config.json and artifact/. Snapshot ID is generated per run unless --snapshot-id is provided.\nImport target is inferred from DATABASE_URI (.env.local via npm script); without it, local primeweb is used. Optional --target-database and --target-host must match DATABASE_URI when set. Other options: --profile <file> --snapshot-id <id> --output-dir <new-run-directory>. Output parent must exist. as-of is required; never inferred from filename dates. Default profile inherits UTC, dev target suffix and approved production policies; review these for a different source.\n')
+    process.stdout.write('PW1 export (offline; no DB writes)\n\nnpm run migrate:pw1 -- /path/to/csv --as-of 2026-09-18T00:00:00Z\n\nDefaults: configs/migration/pw1-prod-profile.json; new private .migration/runs/<run-id>/ with source-config.json and artifact/. Snapshot ID is generated per run unless --snapshot-id is provided.\nImport target is inferred from DATABASE_URI (.env.local via npm script); without it, local primeweb is used. Optional --target-database and --target-host must match DATABASE_URI when set. Other options: --profile <file> --snapshot-id <id> --output-dir <new-run-directory>. Output parent must exist. as-of is required; never inferred from filename dates. Default profile inherits UTC, dev target suffix and approved production policies; review these for a different source. The import config derives a single external creator from emitted data; multiple external creators require explicit creatorBindings.\n')
     return
   }
   if (positionals.length !== 1 || !v['as-of']) throw new ExportError('INVALID_CLI_ARGUMENTS')
@@ -73,6 +102,7 @@ async function main() {
   await createSnapshotConfig({ inputDir: input, profile: v.profile ?? 'configs/migration/pw1-prod-profile.json',
     snapshotId: v['snapshot-id'] ?? runId, asOf: v['as-of'], output: config })
   const result = await exportMaster(input, config, path.join(output, 'artifact'), false, progressLogger(line => process.stderr.write(line)))
+  const creatorRefs = await externalCreatorRefs(path.join(output, 'artifact'))
   const usersFile = (JSON.parse(await readFile(config, 'utf8')) as { tables?: Record<string, string> }).tables?.users
   if (usersFile) {
     const usersDest = path.join(output, 'users.csv')
@@ -86,13 +116,17 @@ async function main() {
     ...(usersFile ? { credentials: './users.csv' } : {}),
     localDatabase: target.database,
     ...(target.host ? { targetHost: target.host } : {}),
-    systemCreator: { sourceRef: '@users:users:51', approvedBy: process.env.USER || 'operator' },
+    ...(creatorRefs.length === 1 ? { systemCreator: { sourceRef: creatorRefs[0], approvedBy: process.env.USER || 'operator' } } : {}),
     outputRoot: './import-runs',
   }
   await writeFile(importConfigPath, JSON.stringify(importConfig, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
   process.stderr.write(`Import config: ${importConfigPath}\n`)
-  process.stderr.write(`Import dry-run: npm run migrate:pw1:import -- --config ${importConfigPath} --all --dry-run\n`)
-  process.stderr.write(`Import:         npm run migrate:pw1:import -- --config ${importConfigPath} --all\n`)
+  if (creatorRefs.length > 1) {
+    process.stderr.write(`Import config needs creatorBindings for ${creatorRefs.length} external source actors: ${creatorRefs.join(', ')}. Map them to distinct verified PW2 users before import.\n`)
+  } else {
+    process.stderr.write(`Import dry-run: npm run migrate:pw1:import -- --config ${importConfigPath} --all --dry-run\n`)
+    process.stderr.write(`Import:         npm run migrate:pw1:import -- --config ${importConfigPath} --all\n`)
+  }
   const handoffPath = path.join(output, 'handoff.json')
   if (result.handoff) {
     await writeFile(handoffPath, JSON.stringify(result.handoff, null, 2) + '\n', { flag: 'wx', mode: 0o600 })

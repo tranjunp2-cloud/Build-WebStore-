@@ -27,7 +27,7 @@ export const migrationPolicySchema = z.object({
   deferEmailTemplates: z.boolean().default(false),
   allowSparseVariants: z.boolean().default(false),
   preserveUserCreators: z.boolean().default(false),
-  approvedNegativeTotalOrders: z.array(z.object({ storeId: z.literal('43'), orderId: z.enum(['112', '132']) }).strict()).max(2).refine(entries => new Set(entries.map(e => e.orderId)).size === entries.length).optional(),
+  approvedNegativeTotalOrders: z.array(z.object({ storeId: z.string().regex(/^[1-9]\d*$/), orderId: z.string().regex(/^[1-9]\d*$/) }).strict()).max(1000).refine(entries => new Set(entries.map(e => `${e.storeId}:${e.orderId}`)).size === entries.length).optional(),
   excludeInvalidProducts: z.boolean().optional(),
   excludeInvalidBlogs: z.boolean().optional(),
   omitUnmappablePayments: z.boolean().optional(),
@@ -148,7 +148,6 @@ export function parseConfig(bytes: Buffer): SourceConfig {
   }
   const result = sourceConfigSchema.safeParse(data)
   if (!result.success) throw new ExportError('INVALID_SOURCE_CONFIG')
-  if (result.data.migrationPolicy?.approvedNegativeTotalOrders?.length && (result.data.sourceInstance !== 'PW1PROD' || result.data.sourceInstanceToken !== 'PW1PROD')) throw new ExportError('NEGATIVE_ORDER_POLICY_SOURCE_SCOPE_INVALID')
   if (
     new Set(Object.values(result.data.tables)).size !==
     Object.values(result.data.tables).length

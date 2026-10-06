@@ -4,7 +4,7 @@
   "credentials": "./users.csv",
   "localDatabase": "primeweb",
   "systemCreator": {
-    "sourceRef": "@users:users:51",
+    "sourceRef": "@users:users:<SOURCE_USER_ID>",
     "approvedBy": "YOUR_NAME"
   },
   "outputRoot": "./runs"

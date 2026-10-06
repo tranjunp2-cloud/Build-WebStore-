@@ -89,10 +89,12 @@ export async function runWorkflow(argv: string[], mode: WorkflowMode): Promise<v
       maySaveFailure = true
       await save()
       step('binding')
-      const bindingPath = config.creatorBindings ?? (await prepareSystemCreator({ exportArtifact: config.exportArtifact, ...config.systemCreator!, output: resolve(directory, 'binding'), localDatabase: config.localDatabase, targetHost: config.targetHost })).bindingPath
+      const bindingPath = config.creatorBindings ?? (config.systemCreator
+        ? (await prepareSystemCreator({ exportArtifact: config.exportArtifact, ...config.systemCreator, output: resolve(directory, 'binding'), localDatabase: config.localDatabase, targetHost: config.targetHost })).bindingPath
+        : undefined)
       state.stage = 'BOUND'; await save()
       step('prepare')
-      await prepareImportArtifact({ exportArtifact: config.exportArtifact, credentials: config.credentials, creatorBindings: bindingPath, output: resolve(directory, 'prepared') })
+      await prepareImportArtifact({ exportArtifact: config.exportArtifact, credentials: config.credentials, ...(bindingPath ? { creatorBindings: bindingPath } : {}), output: resolve(directory, 'prepared') })
       state.manifestHash = (await readBoundFile(manifest, { maxBytes: 1024 * 1024 })).hash
       state.stage = 'PREPARED'; await save()
     } else {

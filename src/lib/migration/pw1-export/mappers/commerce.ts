@@ -286,8 +286,7 @@ export function mapCommerce(ctx: MappingContext): void {
 
   mapDiscounts(ctx, tenant, site)
   for (const row of ctx.rows('orders').filter(live)) {
-    if (ctx.config.sourceInstance === 'PW1PROD' && ctx.config.sourceInstanceToken === 'PW1PROD' &&
-      ctx.config.migrationPolicy?.approvedNegativeTotalOrders?.some(entry => entry.storeId === ctx.storeId && entry.orderId === row.id) &&
+    if (ctx.config.migrationPolicy?.approvedNegativeTotalOrders?.some(entry => entry.storeId === ctx.storeId && entry.orderId === row.id) &&
       row.store_id === ctx.storeId && /^-\d+(?:\.\d{1,2})?$/.test(row.total ?? '') && Number(row.total) < 0) {
       ctx.issue('SOURCE_ENTITY_EXCLUDED', 'orders', row.id, undefined, 'warning', 'APPROVED_NEGATIVE_TOTAL')
       continue

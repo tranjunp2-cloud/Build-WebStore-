@@ -40,7 +40,6 @@ export async function validateArtifact(directory: string) {
   if (!parsed.success) throw new ExportError('MANIFEST_SCHEMA_INVALID')
   const manifest = parsed.data
   assertApprovedMigrationPolicy(manifest.migrationPolicy, !['1.9.0', '1.9.1', '1.9.2', '1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.9.1', '1.9.2', '1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.9.2', '1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.9.3', '1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.9.4', '1.10.0', '1.10.1', '1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion), ['1.10.2', '1.10.3', '1.10.4', EXPORT_VERSION].includes(manifest.exporterVersion))
-  if (manifest.migrationPolicy?.approvedNegativeTotalOrders?.length && (manifest.sourceSnapshot.sourceInstance !== 'PW1PROD' || manifest.sourceSnapshot.sourceInstanceToken !== 'PW1PROD')) throw new ExportError('NEGATIVE_ORDER_POLICY_SOURCE_SCOPE_INVALID')
   const legacy = manifest.contractSha256 === LEGACY_MASTER_SHA256 && manifest.exporterVersion === '1.0.0'
   const previous = manifest.contractSha256 === PREVIOUS_MASTER_SHA256 && ['1.1.0', '1.2.0'].includes(manifest.exporterVersion)
   const archiveVersion = manifest.contractSha256 === ARCHIVE_MASTER_SHA256 && manifest.exporterVersion === '1.4.0'
