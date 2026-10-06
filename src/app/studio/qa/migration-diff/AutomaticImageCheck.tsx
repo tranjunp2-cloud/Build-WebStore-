@@ -85,7 +85,7 @@ export function AutomaticImageCheck({
     >
       <span>
         {total === null
-          ? "Đang tải kiểm tra ảnh…"
+          ? running ? "Đang tải kiểm tra ảnh…" : "Chưa có kết quả kiểm tra ảnh"
           : `${results.length}/${total} cặp ảnh${running ? " — đang kiểm tra…" : " — kết quả tại từng field"}`}
       </span>
       <Button

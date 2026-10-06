@@ -30,8 +30,8 @@ export default defineConfig({
         {
             name: 'f40-website-migration',
             testDir: './tests',
+            use: { ...devices['Desktop Chrome'] },
             testMatch: /f40-website-migration\.spec\.ts/,
-            use: { ...devices['Desktop Chrome'], storageState: undefined, trace: 'off', screenshot: 'off', video: 'off' },
         },
         // Smoke tests — no auth needed, run independently
         {
@@ -52,7 +52,7 @@ export default defineConfig({
                 storageState: './e2e/.auth/user.json',
             },
             dependencies: ['setup'],
-            testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/],
+            testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/, /f40-website-migration\.spec\.ts/],
         },
         // GH-1725 exercises a token-bearing SSO callback with real browser/API
         // boundaries. Disable retained artifacts so v2_token never lands in a

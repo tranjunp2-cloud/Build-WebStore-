@@ -7,7 +7,7 @@ effort: 18-24h
 issue: 1839
 branch: feat/F40-1839-commerce-settings-reconciliation-shell
 tags: [f40, migration, commerce, settings, qa, pw1, pw2]
-blockedBy: []
+blockedBy: [260930-f40-f42-ledger-evidence-adapter]
 blocks: []
 created: 2026-09-10
 ---
@@ -20,6 +20,11 @@ Mở rộng Migration Inspector để Tester đối soát toàn bộ lịch sử
 
 1. **Commerce:** Product, Order, Discount, Customer.
 2. **Settings:** Account profile, Team members/roles, Email templates, Payment, Delivery, Web address/domain, App integrations.
+
+> Giai đoạn nền bắt buộc hiện được tách thành
+> [F40–F42 Ledger Evidence Adapter](../260930-f40-f42-ledger-evidence-adapter/plan.md).
+> Plan đó dùng evidence run/mapping/exception từ F42; plan này tiếp tục với đối soát
+> giá trị field khi source artifact và rule so sánh runtime đã sẵn sàng.
 
 UI không dùng thuật ngữ kỹ thuật làm kết luận chính. Mỗi record/hạng mục chỉ có: **Đúng**, **Thiếu**, **Lệch**, **Trùng**, **Chưa xác minh**. Chi tiết PW1/PW2 chỉ hiện khi Tester mở dòng.
 

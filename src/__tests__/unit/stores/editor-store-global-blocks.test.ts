@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Unit Tests — EditorStore globalBlocks actions
  * Coverage Map:

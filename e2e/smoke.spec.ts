@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Smoke Tests', () => {
     test('[TC-F02.01] login page loads', async ({ page }) => {
         await page.goto('/login')
-        await expect(page).toHaveTitle(/PrimeWeb|Login/i)
+        await expect(page).toHaveTitle(/Web Store|Login/i)
         await expect(page.locator('input[type="email"], input[name="email"]')).toBeVisible()
         await expect(page.locator('#password')).toHaveAttribute('placeholder', 'Enter your password')
     })

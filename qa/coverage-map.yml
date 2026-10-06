@@ -169,6 +169,21 @@ rules:
       targets: [media-library-upload],
       evidence: [docs/qa/F14-media.md],
     }
+  - {
+      source: "src/i18n/**",
+      targets: [project-content-localization, locale-switching-routing],
+      evidence: [docs/qa/F21-localization.md, docs/qa/F26-project-content-localization.md],
+    }
+  - {
+      source: "src/app/api/ai/translate/**",
+      targets: [ai-translate-workflow],
+      evidence: [docs/qa/F21-localization.md],
+    }
+  - {
+      source: "src/lib/payload/tenant-row-lock.ts",
+      targets: [tenant-row-locking],
+      evidence: [docs/qa/F36-easyparcel-delivery.md, docs/qa/F08-product-crud.md],
+    }
 governance:
   precedence: most_specific_source_glob
   exclusionsRequire: [reason, owner, expiry]

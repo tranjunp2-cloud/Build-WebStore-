@@ -39,12 +39,23 @@ jobs:
     steps:
       - name: Validate immutable dispatch inputs
         shell: bash
+        # Inputs are passed through env instead of being interpolated into the
+        # script: GitHub treats any string containing an expression as one
+        # expression capped at 21,000 characters, and this script is longer
+        # than that, so inline interpolation made the whole workflow fail to
+        # load. Env vars also keep raw input out of the shell source.
+        env:
+          DISPATCH_ID: ${{ inputs.dispatch_id }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
+          RUN_PROFILE: ${{ inputs.run_profile }}
+          PACK_ID: ${{ inputs.pack_id }}
         run: |
-          [[ '${{ inputs.dispatch_id }}' =~ ^[0-9]+$ ]] || { echo 'Invalid dispatch ID'; exit 1; }
-          [[ '${{ inputs.commit_sha }}' =~ ^[a-fA-F0-9]{7,64}$ ]] || { echo 'Invalid commit SHA'; exit 1; }
-          [[ '${{ inputs.workflow_nonce }}' =~ ^[A-Za-z0-9_-]{32}$ ]] || { echo 'Invalid workflow nonce'; exit 1; }
-          [[ '${{ inputs.run_profile }}' =~ ^(targeted-smoke|manual-retest|manual-smoke)$ ]] || { echo 'Invalid run profile for a Smoke contract'; exit 1; }
-          case '${{ inputs.pack_id }}' in
+          [[ "$DISPATCH_ID" =~ ^[0-9]+$ ]] || { echo 'Invalid dispatch ID'; exit 1; }
+          [[ "$COMMIT_SHA" =~ ^[a-fA-F0-9]{7,64}$ ]] || { echo 'Invalid commit SHA'; exit 1; }
+          [[ "$WORKFLOW_NONCE" =~ ^[A-Za-z0-9_-]{32}$ ]] || { echo 'Invalid workflow nonce'; exit 1; }
+          [[ "$RUN_PROFILE" =~ ^(targeted-smoke|manual-retest|manual-smoke)$ ]] || { echo 'Invalid run profile for a Smoke contract'; exit 1; }
+          case "$PACK_ID" in
             identity-login-otp-contract)
               echo 'runner=unit' >> "$GITHUB_OUTPUT"
               echo 'target_id=identity-login-otp' >> "$GITHUB_OUTPUT"
@@ -699,7 +710,7 @@ jobs:
             echo 'cancelled=false' >> "$GITHUB_OUTPUT"
           fi
         env:
-          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-v2.dev.ecommercehub.my' }}
           QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
           DISPATCH_ID: ${{ inputs.dispatch_id }}
           WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}
@@ -713,7 +724,7 @@ jobs:
             -H 'Content-Type: application/json' \
             --data "{\"email\":\"${TEST_EMAIL}\",\"password\":\"${TEST_PASSWORD}\",\"tenantSlug\":\"e2e-targeted-smoke\",\"tenantName\":\"Targeted Smoke QA\"}"
         env:
-          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-v2.dev.ecommercehub.my' }}
           E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
@@ -804,7 +815,7 @@ jobs:
           if [ "$?" != '0' ]; then EXIT_CODE=1; fi
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
         env:
-          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-v2.dev.ecommercehub.my' }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
@@ -855,7 +866,7 @@ jobs:
             -H "x-qa-signature: sha256=$QA_SIGNATURE" \
             --data-binary @/tmp/targeted-ingest-body.json
         env:
-          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ vars.STAGING_BASE_URL || 'https://web-v2.dev.ecommercehub.my' }}
           QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
           DISPATCH_ID: ${{ inputs.dispatch_id }}
           WORKFLOW_NONCE: ${{ inputs.workflow_nonce }}

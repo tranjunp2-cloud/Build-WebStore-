@@ -29,7 +29,11 @@ function requireTemplates(body: unknown): Array<{
 
 test.describe.serial('[US-F07-04] authenticated template search', () => {
     test('[TC_F07_037-AUTH] rejects an anonymous request with the standard error envelope', async ({ playwright, baseURL }) => {
-        const anonymous = await playwright.request.newContext({ baseURL })
+        // playwright.request.newContext() inherits the project's storageState (logged-in cookies); clear it.
+        const anonymous = await playwright.request.newContext({
+            baseURL,
+            storageState: { cookies: [], origins: [] },
+        })
 
         try {
             const response = await anonymous.post('/api/templates/search', {

@@ -21,6 +21,8 @@ import {
   type MigrationPage,
   type MigrationStore,
 } from "./website-migration-compare";
+import { sanitizeMigrationSourceUrl } from "./website-migration-url";
+import { readFieldSummaries } from './f42-field-evidence-reader';
 export type {
   MigrationField,
   MigrationBlock,
@@ -36,6 +38,7 @@ async function execute<T>(
   };
   return (await db.execute(query)).rows;
 }
+
 export async function readWebsiteMigrations(input: {
   batch?: string;
   run?: string;
@@ -43,6 +46,7 @@ export async function readWebsiteMigrations(input: {
   limit: number;
   search: string;
   status: string;
+  qc: string;
 }) {
   const payload = await getPayload({ config });
   const batches = await execute<{
@@ -64,7 +68,10 @@ export async function readWebsiteMigrations(input: {
       total: number;
       completed: number;
       published: number;
-      needsAudit: number;
+      migrationIncomplete: number;
+      unpublished: number;
+      needsAttention: number;
+      unverifiedQc: number;
     }
   >(
     payload,
@@ -81,18 +88,35 @@ export async function readWebsiteMigrations(input: {
           LEFT JOIN pw1_migration_qa_audits q ON q.source_store_id=m.source_store_id AND q.input_hash=m.input_hash AND q.attempt_id=c.attempt_id
           LEFT JOIN LATERAL(SELECT * FROM pw1_migration_qa_reviews WHERE source_store_id=m.source_store_id ORDER BY reviewed_at DESC,id DESC LIMIT 1)r ON true
           WHERE ${where}
-        ) SELECT *,count(*) OVER()::integer AS total, count(*) FILTER (WHERE migration='completed') OVER()::integer AS completed, count(*) FILTER (WHERE publish='published') OVER()::integer AS published, count(*) FILTER (WHERE "auditStatus" IN ('not-checked','historical','stale')) OVER()::integer AS "needsAudit" FROM catalog WHERE
-          (${input.status}='all' OR ${input.status}='unpublished' AND publish<>'published' OR ${input.status}='failed' AND migration='failed' OR ${input.status}='attention' AND errors+warnings>0 OR ${input.status}='unaudited' AND "auditStatus" IN ('not-checked','historical','stale'))
-        ORDER BY "storeId"::bigint LIMIT ${input.limit} OFFSET ${(input.page - 1) * input.limit}`,
+        ), stats AS (
+          SELECT count(*)::integer AS "allTotal", count(*) FILTER (WHERE migration='completed')::integer AS completed, count(*) FILTER (WHERE publish='published')::integer AS published, count(*) FILTER (WHERE migration<>'completed')::integer AS "migrationIncomplete", count(*) FILTER (WHERE publish<>'published')::integer AS unpublished, count(*) FILTER (WHERE "auditStatus" IN ('not-checked','historical','stale') OR errors+warnings>0)::integer AS "needsAttention", count(*) FILTER (WHERE "qcStatus"='unverified')::integer AS "unverifiedQc" FROM catalog
+        ), filtered AS (
+          SELECT * FROM catalog WHERE
+            (${input.status}='all' OR ${input.status}='incomplete' AND migration<>'completed' OR ${input.status}='unpublished' AND publish<>'published' OR ${input.status}='failed' AND migration='failed' OR ${input.status}='attention' AND (errors+warnings>0 OR "auditStatus" IN ('not-checked','historical','stale')) OR ${input.status}='unaudited' AND "auditStatus" IN ('not-checked','historical','stale'))
+            AND (${input.qc}='all' OR "qcStatus"=${input.qc})
+        ), filtered_stats AS (
+          SELECT count(*)::integer AS total FROM filtered
+        ) SELECT page.*,filtered_stats.total,stats.completed,stats.published,stats."migrationIncomplete",stats.unpublished,stats."needsAttention",stats."unverifiedQc"
+        FROM stats CROSS JOIN filtered_stats
+        LEFT JOIN LATERAL (
+          SELECT filtered.*
+          FROM filtered
+          ORDER BY "storeId"::bigint LIMIT ${input.limit} OFFSET ${(input.page - 1) * input.limit}
+        ) page ON true`,
   );
+  const stores = rows.filter((row) => Boolean(row.storeId));
+  const fieldSummaries = await readFieldSummaries(stores.map(store => store.storeId));
   return {
     batches,
     summary: {
       completed: rows[0]?.completed ?? 0,
       published: rows[0]?.published ?? 0,
-      needsAudit: rows[0]?.needsAudit ?? 0,
+      migrationIncomplete: rows[0]?.migrationIncomplete ?? 0,
+      unpublished: rows[0]?.unpublished ?? 0,
+      needsAttention: rows[0]?.needsAttention ?? 0,
+      unverifiedQc: rows[0]?.unverifiedQc ?? 0,
     },
-    stores: rows,
+    stores: stores.map(store => ({ ...store, fieldEvidence: fieldSummaries.get(store.storeId) ?? null })),
     total: rows[0]?.total ?? 0,
     page: input.page,
     limit: input.limit,
@@ -111,11 +135,13 @@ export async function readWebsiteMigrationDetail(storeId: string) {
     report: unknown;
     checkedAt: string | null;
     baseUrl: string | null;
+    migration: string;
+    publish: string;
   }>(
     payload,
     sql`
-      SELECT m.site_id AS "siteId",m.tenant_id AS "tenantId",m.input_hash AS "inputHash",c.attempt_id AS "attemptId",c.committed_at AS "committedAt",a.artifacts,q.report,q.checked_at AS "checkedAt",q.base_url AS "baseUrl"
-      FROM pw1_migration_stores m LEFT JOIN LATERAL (SELECT attempt_id,committed_at FROM pw1_migration_commits WHERE source_store_id=m.source_store_id AND input_hash=m.input_hash ORDER BY committed_at DESC LIMIT 1) c ON true
+      SELECT m.site_id AS "siteId",m.tenant_id AS "tenantId",m.input_hash AS "inputHash",m.status AS migration,s.status AS publish,c.attempt_id AS "attemptId",c.committed_at AS "committedAt",a.artifacts,q.report,q.checked_at AS "checkedAt",q.base_url AS "baseUrl"
+      FROM pw1_migration_stores m JOIN sites s ON s.id=m.site_id LEFT JOIN LATERAL (SELECT attempt_id,committed_at FROM pw1_migration_commits WHERE source_store_id=m.source_store_id AND input_hash=m.input_hash ORDER BY committed_at DESC LIMIT 1) c ON true
       LEFT JOIN pw1_migration_attempts a ON a.id=c.attempt_id LEFT JOIN pw1_migration_qa_audits q ON q.source_store_id=m.source_store_id AND q.input_hash=m.input_hash AND q.attempt_id=c.attempt_id WHERE m.source_store_id=${storeId}`,
   );
   const row = rows[0];
@@ -171,6 +197,32 @@ export async function readWebsiteMigrationDetail(storeId: string) {
   const mappings = asArray(asRecord(applied.sourceMigration).pageMappings);
   const report = asRecord(row.report),
     auditPages = asArray(report.pages);
+  const auditStatus = !row.report
+    ? "not-checked"
+    : (() => {
+        const checkedAt = row.checkedAt;
+        if (!checkedAt) return String(report.status ?? "not-checked");
+        const isStale = Boolean(
+          new Date(site.updatedAt).getTime() > new Date(checkedAt).getTime() ||
+              currentPages.docs.some((page) => {
+                if (page.slug === "404") return false;
+                const auditPage = asRecord(
+                  auditPages.find((item) => asRecord(item).pageId === page.id),
+                );
+                return Boolean(
+                  new Date(page.updatedAt).getTime() >
+                    new Date(checkedAt).getTime() ||
+                    (auditPage.updatedAt &&
+                      new Date(String(auditPage.updatedAt)).getTime() !==
+                        new Date(page.updatedAt).getTime()),
+                );
+              }),
+        );
+        if (isStale) return "stale";
+        if (!auditPages.some((page) => asRecord(page).updatedAt))
+          return "historical";
+        return String(report.status ?? "checked");
+      })();
   const pages: MigrationPage[] = asArray(contract.pages).map((value) => {
     const source = asRecord(value),
       mapping = asRecord(
@@ -304,9 +356,19 @@ export async function readWebsiteMigrationDetail(storeId: string) {
       current?.updatedAt &&
       new Date(String(pageAudit.updatedAt)).getTime() !==
         new Date(current.updatedAt).getTime();
+    const targetPath = current ? (current.isHomepage ? '/' : `/${current.slug}`) : null;
+    const menuLabels = targetPath ? asArray(asRecord(site.headerBlock).links)
+      .map(asRecord)
+      .filter(link => link.url === targetPath || link.url === `/sites/${tenant.slug}${targetPath === '/' ? '' : targetPath}`)
+      .map(link => typeof link.label === 'string' ? link.label.trim() : '')
+      .filter(Boolean) : [];
+    const menuLabel = new Set(menuLabels).size === 1 ? menuLabels[0] : null;
     return {
       sourceId: String(source.sourceId),
-      title: String(source.title),
+      // Use the published PW2 menu label only for an exact target path match.
+      title: current
+        ? String(menuLabel || current.title || current.slug || 'Trang PW2')
+        : 'Chưa có trang PW2',
       destinationId: current ? Number(current.id) : null,
       url: current
         ? `/sites/${encodeURIComponent(tenant.slug)}${current.isHomepage ? "" : "/" + current.slug}`
@@ -395,7 +457,7 @@ export async function readWebsiteMigrationDetail(storeId: string) {
     attemptId: row.attemptId,
     committedAt: row.committedAt,
     checkedAt: row.checkedAt,
-    sourceUrl: asRecord(contract.source).url ?? null,
+    sourceUrl: sanitizeMigrationSourceUrl(asRecord(contract.source).url),
     url: `/sites/${encodeURIComponent(tenant.slug)}`,
     pages,
     settings,
@@ -403,6 +465,9 @@ export async function readWebsiteMigrationDetail(storeId: string) {
       (v): v is string => typeof v === "string",
     ),
     evidence: row.attemptId ? "available" : "unverified",
+    migration: row.migration,
+    publish: row.publish,
+    auditStatus,
     review,
   };
 }

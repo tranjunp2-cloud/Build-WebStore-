@@ -37,6 +37,9 @@ on:
       - 'LICENSE'
   pull_request:
     branches: [main, staging]
+    # ready_for_review re-runs CI when a draft is marked ready; drafts
+    # themselves are skipped at job level below to save Actions minutes.
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore:
       - 'docs/**'
       - '.github/ISSUE_TEMPLATE/**'
@@ -65,8 +68,8 @@ jobs:
     # validated by the PR's own CI run. GitHub branch protection blocks
     # direct push, so every code change passes through this job at
     # least once before it can land.
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:
@@ -123,8 +126,8 @@ jobs:
     name: "Test"
     # pull_request only — see quality-check rationale above.
     needs: quality-check
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     services:
       postgres:
         image: postgres:16
@@ -137,8 +140,11 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
+        # Random host port: several self-hosted runners share one machine
+        # (CI_HEAVY_RUNNER), so a fixed 5432:5432 makes concurrent Test jobs
+        # collide. Steps read the mapped port from job.services below.
         ports:
-          - 5432:5432
+          - 5432/tcp
     permissions:
       contents: read
     steps:
@@ -156,14 +162,16 @@ jobs:
 
       - name: Verify F41 migrations are idempotent on an isolated schema
         env:
-          DATABASE_URI: postgresql://primeweb:primeweb@localhost:5432/primeweb?sslmode=disable
+          DATABASE_URI: postgresql://primeweb:primeweb@localhost:${{ job.services.postgres.ports['5432'] }}/primeweb?sslmode=disable
         run: npm run test:f41-migrations
 
       - name: Test
         id: test
         run: |
           set -o pipefail
-          npm run test -- --coverage 2>&1 | tee test-output.log
+          # PR Metrics only reads coverage-summary.json; skip the html/lcov/json
+          # reporters from vitest.config.ts so CI does not build and upload them.
+          npm run test -- --coverage --coverage.reporter=json-summary --coverage.reporter=text-summary 2>&1 | tee test-output.log
           PASSED=$(grep 'Tests' test-output.log | grep -oE '[0-9]+ passed' | grep -oE '^[0-9]+' | head -1 || echo "0")
           FAILED=$(grep 'Tests' test-output.log | grep -oE '[0-9]+ failed' | grep -oE '^[0-9]+' | head -1 || echo "0")
           TOTAL=$((${PASSED:-0} + ${FAILED:-0}))
@@ -328,7 +336,7 @@ jobs:
     # permanently skipped. GitHub branch protection guarantees every
     # merge commit was already CI-validated on its source PR.
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 25
     concurrency:
       group: vercel-deploy-staging
@@ -508,7 +516,7 @@ jobs:
     name: "Deploy: Vercel (production)"
     # No `needs` — see deploy-staging rationale above.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 25
     concurrency:
       group: vercel-deploy-production
@@ -661,7 +669,7 @@ jobs:
     # Accepts both push (normal branch push) and workflow_dispatch (invoked
     # by sync-staging-to-qc-test.yml after auto-merging staging into qc-test).
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 25
     concurrency:
       group: vercel-deploy-qc-test

@@ -9,7 +9,6 @@ import {
   useManualImageReviews,
 } from "./ManualImageConfirmation";
 import { useState } from "react";
-import Link from "next/link";
 import { imageCheckLabels, type ImageCheckResult } from "./AutomaticImageCheck";
 import { FieldEvidence } from "./ImageEvidence";
 import { imagePreviews } from "@/lib/admin/qa/website-image-preview";
@@ -40,6 +39,9 @@ export type Detail = {
   settings: MigrationField[];
   warnings: string[];
   evidence: string;
+  migration: string;
+  publish: string;
+  auditStatus: string;
 };
 const inputClass =
   "rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100";
@@ -241,72 +243,188 @@ function SafeLink({
   );
 }
 export function WebsiteComparison({ detail }: { detail: Detail }) {
-  const [open, setOpen] = useState(false),
-    [selected, setSelected] = useState(detail.pages[0]?.sourceId ?? ""),
-    [width, setWidth] = useState("desktop");
+  const [selected, setSelected] = useState(detail.pages[0]?.sourceId ?? ""),
+    [width, setWidth] = useState<"desktop" | "mobile">("desktop"),
+    [mode, setMode] = useState<"dual" | "swipe">("dual"),
+    [split, setSplit] = useState(50);
   const target = detail.pages.find((page) => page.sourceId === selected);
+  const frameWidth = width === "mobile" ? 390 : 1440;
+  const frameClass = width === "mobile" ? "mx-auto max-w-[390px]" : "w-full";
+  const pw1Url = detail.sourceUrl;
+  const pw2Url = target?.url ?? null;
+  const browserHeader = (
+    label: string,
+    url: string | null,
+    color: "amber" | "sky",
+  ) => (
+    <div
+      className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 ${
+        color === "amber"
+          ? "border-amber-500/30 bg-amber-950/15"
+          : "border-sky-500/30 bg-sky-950/15"
+      }`}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="flex gap-1" aria-hidden="true">
+          <i className="size-2 rounded-full bg-rose-400" />
+          <i className="size-2 rounded-full bg-amber-300" />
+          <i className="size-2 rounded-full bg-emerald-400" />
+        </span>
+        <span
+          className={`truncate text-xs font-bold ${
+            color === "amber" ? "text-amber-300" : "text-sky-300"
+          }`}
+        >
+          {label}
+        </span>
+      </div>
+      <SafeLink href={url}>Mở tab mới</SafeLink>
+    </div>
+  );
+  const frame = (
+    label: string,
+    url: string | null,
+    side: "pw1" | "pw2",
+  ) => (
+    <div className="min-w-0 space-y-2">
+      {browserHeader(label, url, side === "pw1" ? "amber" : "sky")}
+      <div className="overflow-auto rounded-xl border border-slate-700 bg-white shadow-inner">
+        {url && /^(https?:\/\/|\/sites\/)/i.test(url) ? (
+          <iframe
+            title={label}
+            src={url}
+            width={frameWidth}
+            height={700}
+            className={frameClass}
+            sandbox="allow-scripts allow-same-origin"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="flex h-[700px] items-center justify-center p-6 text-center text-sm text-slate-600">
+            Chưa có URL {side === "pw1" ? "PW1" : "PW2"} đã xác nhận.
+          </div>
+        )}
+      </div>
+    </div>
+  );
   return (
-    <section className="space-y-3 rounded-lg border border-slate-800 p-4">
-      <button className={inputClass} onClick={() => setOpen((v) => !v)}>
-        {open ? "Ẩn" : "Mở"} so sánh website
-      </button>
-      {open && (
-        <>
-          <p className="text-sm text-slate-400">
-            PW1 mở URL nguồn đã lưu (homepage); chọn page tương ứng trong
-            website PW1 nếu cần. Website có thể chặn iframe — dùng link mở tab ở
-            trên.
+    <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/30 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        <div>
+          <h3 className="text-sm font-bold text-white">So sánh trực quan PW1 ↔ PW2</h3>
+          <p className="mt-1 text-xs text-slate-400">
+            Dùng link nguồn đã lưu trong F42; không tự suy diễn URL PW1 tương ứng với trang PW2.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <select
-              aria-label="Trang PW2 để so sánh"
-              className={inputClass}
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-            >
-              {detail.pages.map((page) => (
-                <option key={page.sourceId} value={page.sourceId}>
-                  {page.title}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label="Kích thước so sánh"
-              className={inputClass}
-              value={width}
-              onChange={(e) => setWidth(e.target.value)}
-            >
-              <option value="desktop">Desktop 1440px</option>
-              <option value="mobile">Mobile 390px</option>
-            </select>
-          </div>
+        </div>
+        <div className="flex rounded-xl border border-slate-700 bg-slate-950 p-1 text-xs">
+          <button
+            type="button"
+            aria-pressed={mode === "dual"}
+            onClick={() => setMode("dual")}
+            className={`rounded-lg px-3 py-1.5 font-semibold transition ${mode === "dual" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+          >
+            Song song
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "swipe"}
+            onClick={() => setMode("swipe")}
+            className={`rounded-lg px-3 py-1.5 font-semibold transition ${mode === "swipe" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+          >
+            Kéo trượt
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <select
+          aria-label="Trang PW2 để so sánh"
+          className={inputClass}
+          value={selected}
+          onChange={(event) => setSelected(event.target.value)}
+        >
+          {detail.pages.map((page) => (
+            <option key={page.sourceId} value={page.sourceId}>
+              {page.title}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Kích thước so sánh"
+          className={inputClass}
+          value={width}
+          onChange={(event) => setWidth(event.target.value as "desktop" | "mobile")}
+        >
+          <option value="desktop">Desktop 1440px</option>
+          <option value="mobile">Mobile 390px</option>
+        </select>
+        {mode === "swipe" && (
+          <label className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 text-xs text-slate-300">
+            Vị trí: <strong className="text-sky-300">{split}%</strong>
+            <input
+              aria-label="Vị trí kéo trượt"
+              type="range"
+              min="0"
+              max="100"
+              value={split}
+              onChange={(event) => setSplit(Number(event.target.value))}
+              className="w-24 accent-blue-500"
+            />
+          </label>
+        )}
+      </div>
+
+      {!pw1Url && (
+        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+          F42 chưa lưu URL PW1 cho website này, nên chỉ có thể kiểm tra PW2 và evidence dữ liệu.
+        </p>
+      )}
+
+      {mode === "dual" ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {frame("BẢN CŨ PW1 (website nguồn)", pw1Url, "pw1")}
+          {frame("BẢN MỚI PW2 (Next.js)", pw2Url, "pw2")}
+        </div>
+      ) : (
+        <div className="space-y-2">
           <div className="grid gap-4 lg:grid-cols-2">
-            {[
-              ["PW1 website", detail.sourceUrl],
-              ["PW2 page hiện tại", target?.url ?? null],
-            ].map(([label, url]) => (
-              <div key={label} className="space-y-2">
-                <h4 className="font-medium">{label}</h4>
-                <div className="overflow-auto rounded border border-slate-700 bg-white">
-                  {url && /^(https?:\/\/|\/sites\/)/i.test(url) ? (
-                    <iframe
-                      title={label ?? ""}
-                      src={url}
-                      width={width === "mobile" ? 390 : 1440}
-                      height={700}
-                      sandbox="allow-scripts allow-same-origin"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <p className="p-4 text-slate-800">
-                      Chưa có URL đã xác nhận.
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
+            {browserHeader("BẢN CŨ PW1 (website nguồn)", pw1Url, "amber")}
+            {browserHeader("BẢN MỚI PW2 (Next.js)", pw2Url, "sky")}
           </div>
-        </>
+          <div className="relative h-[704px] overflow-hidden rounded-xl border border-slate-700 bg-white">
+            {pw2Url && /^(https?:\/\/|\/sites\/)/i.test(pw2Url) ? (
+              <iframe
+                title="PW2 so sánh kéo trượt"
+                src={pw2Url}
+                width={frameWidth}
+                height={700}
+                className={frameClass}
+                sandbox="allow-scripts allow-same-origin"
+                referrerPolicy="no-referrer"
+              />
+            ) : null}
+            <div
+              className="absolute inset-y-0 left-0 overflow-hidden border-r-2 border-amber-400 bg-white"
+              style={{ width: `${split}%` }}
+            >
+              {pw1Url && /^(https?:\/\/|\/sites\/)/i.test(pw1Url) ? (
+                <iframe
+                  title="PW1 so sánh kéo trượt"
+                  src={pw1Url}
+                  width={frameWidth}
+                  height={700}
+                  className={frameClass}
+                  sandbox="allow-scripts allow-same-origin"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center p-6 text-center text-sm text-slate-600">
+                  Chưa có URL PW1 đã xác nhận.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

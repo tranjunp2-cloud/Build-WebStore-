@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/admin/auth-guard";
 import { MigrationDiffClient } from "./MigrationDiffClient";
 
@@ -20,9 +21,9 @@ export default async function QaMigrationDiffPage({
       <div className="bg-amber-950 px-6 py-3 text-sm text-amber-200">
         Giao diện demo / snapshot chưa xác minh. Không dùng số liệu này để duyệt
         kết quả migrate.{" "}
-        <a href="/studio/qa/migration-diff" className="underline">
+        <Link href="/studio/qa/migration-diff" className="underline">
           Mở dữ liệu migration thật
-        </a>
+        </Link>
       </div>
       <MigrationDiffClient />
     </>

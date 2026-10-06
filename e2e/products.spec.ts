@@ -39,8 +39,10 @@ test.describe('Products Management', () => {
 
     test('[TC-GH1432-PERF-03] canonical dashboard products endpoint rejects unauthenticated requests', async ({ playwright }) => {
         // Arrange
+        // playwright.request.newContext() inherits the project's storageState (logged-in cookies); clear it.
         const unauthenticatedRequest = await playwright.request.newContext({
             baseURL: process.env.BASE_URL || 'http://localhost:3000',
+            storageState: { cookies: [], origins: [] },
         })
 
         // Act
@@ -177,7 +179,9 @@ test.describe('Products Management', () => {
             name: 'Color',
             options: [{ value: 'White' }, { value: 'Red' }, { value: 'Grey' }],
         })
-        await expect(page.locator('.fixed.inset-0 input[type="text"]').first()).toHaveValue('T-Shirt')
+        // The draft name is an auto-growing <textarea> labelled "Name" inside the review dialog.
+        const reviewDialog = page.getByRole('dialog', { name: 'Review AI drafts' })
+        await expect(reviewDialog.getByLabel('Name', { exact: true }).first()).toHaveValue('T-Shirt')
         await expect(page.getByText('White, Red, Grey', { exact: true })).toBeVisible()
     })
 
@@ -245,7 +249,7 @@ async function deleteProductViaUi(page: Page, name: string) {
         await row.getByRole('button', { name: /delete/i }).click()
         const dialog = page.getByRole('dialog')
         await expect(dialog).toContainText(name)
-        await dialog.getByRole('button', { name: /confirm delete/i }).click()
+        await dialog.getByRole('button', { name: /^delete product$/i }).click()
         await expect(dialog).toBeHidden()
         remaining--
         await expect(rows).toHaveCount(remaining)
@@ -444,7 +448,8 @@ test.describe('GH-1733 — verified AI Product persistence on staging', () => {
             })
             await expect(row).toHaveCount(1)
             await row.getByTitle(/edit/i).click()
-            await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+            // The edit page heading is the generic "Edit product"; the name lives in its form field.
+            await expect(page.locator('input[name="name"]')).toHaveValue(name)
             await expect(page.getByText(fixtureCategoryName, { exact: true }).last()).toBeVisible()
             await navigateTo(page, '/products')
         }
@@ -771,9 +776,9 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
     test('[TC-F08-04-115] stacks editable draft fields without horizontal overflow at 375px', async ({ page }) => {
         // Arrange
         const { panel } = await openDeterministicDrafts(page, { width: 375, height: 812 })
-        const nameInput = page.getByLabel('Product name').first()
-        const priceInput = page.getByLabel('Price (RM)').first()
-        const stockInput = page.getByLabel('Stock').first()
+        const nameInput = panel.getByLabel('Name', { exact: true }).first()
+        const priceInput = panel.getByLabel('Price (RM)', { exact: true }).first()
+        const stockInput = panel.getByLabel('Stock', { exact: true }).first()
         const removeButton = page.getByRole('button', { name: 'Remove draft' }).first()
         const card = draftCardFor(nameInput)
 
@@ -828,7 +833,7 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
     test('[TC-F08-04-116] keeps read-only variants wrapping at 430px and restores the desktop row', async ({ page }) => {
         // Arrange
         const { panel } = await openDeterministicDrafts(page, { width: 430, height: 932 })
-        const nameInput = page.getByLabel('Product name').first()
+        const nameInput = panel.getByLabel('Name', { exact: true }).first()
         const card = draftCardFor(nameInput)
         const variantsLabel = card.getByText('Variants', { exact: true })
         const variantsField = variantsLabel.locator('xpath=following-sibling::div[1]')
@@ -848,8 +853,8 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
         // Act — cross the md breakpoint using the same DOM and state.
         await page.setViewportSize({ width: 768, height: 932 })
         await expectTextContentFullyVisible(nameInput)
-        const priceInput = page.getByLabel('Price (RM)').first()
-        const stockInput = page.getByLabel('Stock').first()
+        const priceInput = panel.getByLabel('Price (RM)', { exact: true }).first()
+        const stockInput = panel.getByLabel('Stock', { exact: true }).first()
         const [desktopNameBox, desktopPriceBox, desktopStockBox, desktopVariantBox, desktopCardBox] = await Promise.all([
             nameInput.boundingBox(),
             priceInput.boundingBox(),
@@ -899,15 +904,15 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
             }
         })
         const body = panel.locator('.overflow-y-auto').first()
-        const nameInput = page.getByLabel('Product name').first()
-        const priceInput = page.getByLabel('Price (RM)').first()
-        const stockInput = page.getByLabel('Stock').first()
+        const nameInput = panel.getByLabel('Name', { exact: true }).first()
+        const priceInput = panel.getByLabel('Price (RM)', { exact: true }).first()
+        const stockInput = panel.getByLabel('Stock', { exact: true }).first()
         const removeButtons = page.getByRole('button', { name: 'Remove draft' })
         const cancelButton = panel.getByRole('button', { name: 'Cancel', exact: true })
         const discardButton = panel.getByRole('button', { name: 'Discard', exact: true })
         const approveButton = panel.getByRole('button', { name: 'Approve All', exact: true })
         const reviewHeading = page.getByRole('heading', { name: 'Review AI drafts', exact: true })
-        const unsavedWarning = 'You have unsaved data. Closing will discard all changes. Are you sure?'
+        const unsavedWarning = "You have unsaved changes. Close now and you'll lose them. Close anyway?"
 
         // Act
         await nameInput.fill('Edited mobile draft')
@@ -952,10 +957,11 @@ test.describe('GH-1663 — responsive Review AI drafts modal', () => {
 
         // Act — cancel the first exit attempt.
         await cancelButton.click()
-        const exitDialog = page.getByRole('dialog')
+        // The review drawer is itself a dialog now, so target the confirmation by its title.
+        const exitDialog = page.getByRole('dialog', { name: 'Exit?' })
         await expect(exitDialog.getByRole('heading', { name: 'Exit?', exact: true })).toBeVisible()
         await expect(exitDialog.getByText(unsavedWarning, { exact: true })).toBeVisible()
-        await exitDialog.getByRole('button', { name: 'Stay', exact: true }).click()
+        await exitDialog.getByRole('button', { name: 'Keep editing', exact: true }).click()
 
         // Assert — the modal and edited state remain intact.
         await expect(exitDialog).toBeHidden()

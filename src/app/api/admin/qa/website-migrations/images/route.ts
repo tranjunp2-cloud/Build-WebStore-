@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withSuperAdmin } from "@/lib/admin/api-utils";
 import { auditWebsiteImages } from "@/lib/admin/qa/website-image-audit";
+import { assertF42SourceReady } from "@/lib/admin/qa/f42-source-readiness";
+import { F42_SOURCE_UNAVAILABLE, F42_IMAGE_CHECK_SCHEMA, F42_IMAGE_REVIEW_SCHEMA, isF42SourceUnavailable } from "@/lib/admin/qa/f42-source-contract";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 export const POST = withSuperAdmin(async (request) => {
@@ -20,6 +22,7 @@ export const POST = withSuperAdmin(async (request) => {
       { status: 400 },
     );
   try {
+    await assertF42SourceReady(F42_IMAGE_CHECK_SCHEMA);
     return NextResponse.json({
       data: await auditWebsiteImages(
         input.data.store,
@@ -29,6 +32,7 @@ export const POST = withSuperAdmin(async (request) => {
       ),
     });
   } catch (error) {
+    if (isF42SourceUnavailable(error)) return NextResponse.json(F42_SOURCE_UNAVAILABLE, { status: 503 });
     console.error(
       "[F40 image check]",
       error instanceof Error ? error.message : "Unknown error",
@@ -96,6 +100,7 @@ async function imageReviewsResponse(
   reviewerId?: number,
 ) {
   try {
+    await assertF42SourceReady(F42_IMAGE_REVIEW_SCHEMA);
     const { websiteImageReviews } =
       await import("@/lib/admin/qa/website-image-review");
     const identity =
@@ -121,6 +126,7 @@ async function imageReviewsResponse(
       ),
     });
   } catch (error) {
+    if (isF42SourceUnavailable(error)) return NextResponse.json(F42_SOURCE_UNAVAILABLE, { status: 503 });
     const message = error instanceof Error ? error.message : "";
     return NextResponse.json(
       {

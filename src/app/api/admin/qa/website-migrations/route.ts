@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withSuperAdmin } from "@/lib/admin/api-utils";
 import { saveWebsiteReview } from "@/lib/admin/qa/website-migration-review";
+import { assertF42SourceReady } from "@/lib/admin/qa/f42-source-readiness";
+import { F42_SOURCE_UNAVAILABLE, F42_WEBSITE_SCHEMA, isF42SourceUnavailable } from "@/lib/admin/qa/f42-source-contract";
 import {
   readWebsiteMigrations,
   readWebsiteMigrationDetail,
@@ -20,7 +22,10 @@ const querySchema = z
     limit: z.coerce.number().int().min(1).max(100).default(25),
     search: z.string().trim().max(200).default(""),
     status: z
-      .enum(["all", "unpublished", "failed", "attention", "unaudited"])
+      .enum(["all", "incomplete", "unpublished", "failed", "attention", "unaudited"])
+      .default("all"),
+    qc: z
+      .enum(["all", "passed", "warning", "failed", "unverified"])
       .default("all"),
   })
   .strict();
@@ -34,12 +39,14 @@ export const GET = withSuperAdmin(async (request) => {
       { status: 400 },
     );
   try {
+    await assertF42SourceReady(F42_WEBSITE_SCHEMA);
     if (query.data.store) {
       const data = await readWebsiteMigrationDetail(query.data.store);
       return NextResponse.json({ data }, { status: data ? 200 : 404 });
     }
     return NextResponse.json({ data: await readWebsiteMigrations(query.data) });
   } catch (error) {
+    if (isF42SourceUnavailable(error)) return NextResponse.json(F42_SOURCE_UNAVAILABLE, { status: 503 });
     console.error(
       "[F40 migration data]",
       error instanceof Error ? error.message : "Unknown error",
@@ -55,7 +62,7 @@ export const GET = withSuperAdmin(async (request) => {
 });
 
 export const POST = withSuperAdmin(async (request, { user }) => {
-  const parsed = z
+  const legacyReview = z
     .object({
       store: z.string().regex(/^\d+$/).max(20),
       version: z.string().regex(/^[a-f0-9]{32}$/),
@@ -71,15 +78,22 @@ export const POST = withSuperAdmin(async (request, { user }) => {
         })
         .strict(),
     })
-    .strict()
+    .strict();
+  const quickReview = z.object({
+    mode: z.literal("quick"),
+    store: z.string().regex(/^\d+$/).max(20),
+    version: z.string().regex(/^[a-f0-9]{32}$/),
+    verdict: z.enum(["passed", "failed"]),
+  }).strict();
+  const parsed = z.union([quickReview, legacyReview])
     .safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return NextResponse.json(
-      { error: "Invalid review; a note is required" },
+      { error: "Invalid review request" },
       { status: 400 },
     );
   if (
-    parsed.data.verdict === "passed" &&
+    !("mode" in parsed.data) && parsed.data.verdict === "passed" &&
     !Object.values(parsed.data.checks).every(Boolean)
   )
     return NextResponse.json(
@@ -90,7 +104,17 @@ export const POST = withSuperAdmin(async (request, { user }) => {
       { status: 400 },
     );
   try {
-    const saved = await saveWebsiteReview(parsed.data, Number(user.id));
+    await assertF42SourceReady(F42_WEBSITE_SCHEMA);
+    // Quick verdicts record the tester's decision only. Do not invent the
+    // five detailed check confirmations or interpret Failed as severity P0.
+    const input = "mode" in parsed.data ? {
+      store: parsed.data.store,
+      version: parsed.data.version,
+      verdict: parsed.data.verdict,
+      note: `Đánh giá thủ công: ${parsed.data.verdict === "passed" ? "Pass" : "Failed"}`,
+      checks: { content: false, media: false, mapping: false, visual: false, audit: false },
+    } : parsed.data;
+    const saved = await saveWebsiteReview(input, Number(user.id));
     return NextResponse.json(
       saved
         ? { saved: true }
@@ -100,7 +124,8 @@ export const POST = withSuperAdmin(async (request, { user }) => {
           },
       { status: saved ? 200 : 409 },
     );
-  } catch {
+  } catch (error) {
+    if (isF42SourceUnavailable(error)) return NextResponse.json(F42_SOURCE_UNAVAILABLE, { status: 503 });
     return NextResponse.json(
       { error: "Không lưu được đánh giá QC" },
       { status: 500 },

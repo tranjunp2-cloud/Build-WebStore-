@@ -35,6 +35,7 @@ export type MigrationPage = {
   audit: MigrationAudit | null;
 };
 export type MigrationStore = {
+  fieldEvidence?: import('./field-evidence-summary').FieldEvidenceSummary | null;
   storeId: string;
   name: string;
   siteId: number;

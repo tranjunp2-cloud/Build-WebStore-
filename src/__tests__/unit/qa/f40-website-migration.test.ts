@@ -2,6 +2,68 @@
 import { mergeFooterSocialsWithSite } from "@/lib/site-settings";
 import { describe, it, expect } from "vitest";
 import { compareMigrationContent } from "@/lib/admin/qa/website-migration-compare";
+import { sanitizeMigrationSourceUrl } from "@/lib/admin/qa/website-migration-url";
+import { parsePw1ConnectionInput } from "@/lib/admin/qa/pw1-connection-input";
+import { fieldEvidenceRates, needsFieldReview } from '@/lib/admin/qa/field-evidence-summary';
+
+describe('[TC-F40-MIG-LIVE-08] field evidence rates', () => {
+  it('reserves 100 percent for exact match and complete coverage', () => {
+    const counts = { match: 19999, mismatch: 1, missing: 0, duplicate: 0, unsupported: 0, unverified: 0 };
+    expect(fieldEvidenceRates(counts).matchRate).toBe(99.9);
+    expect(fieldEvidenceRates({ ...counts, mismatch: 0, unverified: 1 }).coverage).toBe(99.9);
+    expect(fieldEvidenceRates({ ...counts, mismatch: 0 })).toEqual({ total: 19999, checked: 19999, coverage: 100, matchRate: 100 });
+  });
+  it('does not inflate coverage by excluding unsupported or unverified fields', () => {
+    const counts = { match: 76, mismatch: 2, missing: 1, duplicate: 1, unsupported: 15, unverified: 5 };
+    expect(fieldEvidenceRates(counts)).toEqual({ total: 100, checked: 80, coverage: 80, matchRate: 95 });
+  });
+  it('does not claim pass when nothing was checked or evidence is unavailable', () => {
+    expect(fieldEvidenceRates({ match: 0, mismatch: 0, missing: 0, duplicate: 0, unsupported: 5, unverified: 1 }).matchRate).toBeNull();
+    expect(fieldEvidenceRates({ match: 0, mismatch: 0, missing: 0, duplicate: 0, unsupported: 0, unverified: 0 }).coverage).toBeNull();
+    expect(needsFieldReview(null)).toBe(true);
+  });
+});
+
+describe("[TC-F40-MIG-LIVE-02] PW1 connection form validation", () => {
+  const approved = "mysql://server-user:server-password@pw1.example:3306/legacy";
+  it("uses entered credentials without changing the approved endpoint", () => {
+    expect(parsePw1ConnectionInput({ url: "mysql://tester:test%40password@pw1.example/qa" }, approved)).toEqual({ host: "pw1.example", port: 3306, user: "tester", password: "test@password", database: "qa" });
+  });
+  it("rejects arbitrary hosts, ports and URL options", () => {
+    for (const url of ["mysql://user:pw@127.0.0.1/db", "mysql://user:pw@pw1.example:1234/db", "mysql://user:pw@pw1.example/db?socketPath=/tmp/mysql.sock", "https://pw1.example/db"]) {
+      expect(() => parsePw1ConnectionInput({ url }, approved)).toThrow();
+    }
+  });
+  it("rejects missing configuration or incomplete fields", () => {
+    expect(() => parsePw1ConnectionInput({}, undefined)).toThrow();
+    expect(() => parsePw1ConnectionInput({ host: "pw1.example", user: "tester" }, approved)).toThrow();
+  });
+});
+
+describe("[TC-F40-MIG-LIVE-07] source URL safety", () => {
+  it('accepts public DNS names starting with fc and fd', () => {
+    for (const url of ['https://fcoffee.example/', 'https://fdesign.example/']) {
+      expect(sanitizeMigrationSourceUrl(url)).toBe(url);
+    }
+  });
+  it("retains only clean public HTTPS URLs for explicit click-through", () => {
+    expect(sanitizeMigrationSourceUrl("https://merchant.example/path")).toBe(
+      "https://merchant.example/path",
+    );
+    for (const value of [
+      "javascript:alert(1)",
+      "http://merchant.example/path",
+      "https://user:password@merchant.example/path",
+      "https://merchant.example/path?token=secret",
+      "https://127.0.0.1/private",
+      "https://192.168.1.10/private",
+      "https://localhost/private",
+      "https://[::ffff:127.0.0.1]/private",
+      "https://[::ffff:192.168.1.1]/private",
+    ]) expect(sanitizeMigrationSourceUrl(value)).toBeNull();
+  });
+});
+
 describe("[TC-F40-MIG-LIVE-01] source-bound website fields", () => {
   it("ignores AI layout decisions but reports lost text and HTML", () => {
     const fields = compareMigrationContent(

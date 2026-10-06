@@ -3,10 +3,23 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
-import { WebsiteMigrationInspector } from "./WebsiteMigrationInspector";
+import type { Detail as F42MigrationDetail } from "./WebsiteMigrationEvidence";
 import type { MigrationStore } from "@/lib/admin/qa/website-migration-compare";
 import { ReconciliationInspector } from "./ReconciliationInspector";
-import { type ReconciliationScope, type ReconciliationSnapshot } from "@/lib/admin/qa/migration-reconciliation";
+import { QuickQcMenu } from "./QuickQcMenu";
+import { FieldEvidencePanel } from './FieldEvidencePanel';
+import { fieldEvidenceRates } from '@/lib/admin/qa/field-evidence-summary';
+import { classifyMigrationReport } from '@/lib/admin/qa/migration-report-status';
+
+const REPORT_LABELS = { passed: 'Đạt đối soát', review: 'Cần kiểm tra', failed: 'Có lỗi', insufficient: 'Chưa đủ dữ liệu' } as const;
+type ReportFilter = 'all' | keyof typeof REPORT_LABELS;
+const REPORT_COLORS = { passed: 'text-emerald-300 bg-emerald-500/10', review: 'text-amber-300 bg-amber-500/10', failed: 'text-rose-300 bg-rose-500/10', insufficient: 'text-sky-300 bg-sky-500/10' } as const;
+import {
+  type ReconciliationIssue,
+  type ReconciliationRun,
+  type ReconciliationScope,
+  type ReconciliationSnapshot,
+} from "@/lib/admin/qa/migration-reconciliation";
 import {
   generateReconciliationCatalog,
   getFieldDiffRecordsForPage,
@@ -24,6 +37,7 @@ import {
   type EntityGroupType,
   type EntityDiffRecord,
   type FieldDiffItem,
+  type StoreFieldDiffAudit,
 } from "@/lib/admin/qa/migration-diff-engine";
 import {
   Layers,
@@ -92,11 +106,30 @@ import type {
 } from "@/lib/admin/qa/migration-render-evidence";
 import { deriveRenderEvidenceOverall } from "@/lib/admin/qa/migration-render-evidence";
 
-type FieldDiffSource = "ui_fixture" | "catalog_fixture" | "pw1_snapshot_unverified";
+type FieldDiffSource =
+  | "ui_fixture"
+  | "catalog_fixture"
+  | "pw1_snapshot_unverified"
+  | "f42_evidence";
 type LoadedFieldDiff = { data: StoreDeepDiff; source: FieldDiffSource };
 
 function getDisplayEvidenceState(field: FieldDiffItem, source: FieldDiffSource) {
-  return source === "ui_fixture" ? getFieldEvidenceVisualState(field) : "attention" as const;
+  return source === "ui_fixture" || source === "f42_evidence"
+    ? getFieldEvidenceVisualState(field)
+    : "attention" as const;
+}
+
+function isSafeF42FrameUrl(value: string | null | undefined): value is string {
+  return Boolean(value?.startsWith("/sites/"));
+}
+
+function isSafeF42ExternalUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -801,6 +834,267 @@ function websiteStoreSummary(store: MigrationStore): StoreSummary {
   };
 }
 
+function f42BlockType(kind: string): PageBlockItem["blockType"] {
+  const normalized = kind.toLowerCase();
+  if (normalized.includes("hero")) return "hero";
+  if (normalized.includes("banner")) return "banner";
+  if (normalized.includes("product")) return "products";
+  if (normalized.includes("categor")) return "categories";
+  if (normalized.includes("blog") || normalized.includes("post")) return "blog";
+  if (normalized.includes("footer")) return "footer";
+  if (normalized.includes("contact")) return "contact";
+  if (normalized.includes("gallery")) return "gallery";
+  return "richtext";
+}
+
+function f42PagePath(url: string | null): string {
+  if (!url) return "/";
+  try {
+    return new URL(url, "https://f42.local").pathname || "/";
+  } catch {
+    return "/";
+  }
+}
+
+function f42FieldItem(field: {
+  field: string;
+  source: string;
+  current: string;
+  status: "match" | "mismatch" | "unverified";
+}): FieldDiffItem {
+  const isMatch = field.status === "match";
+  return {
+    fieldName: field.field,
+    fieldLabel: field.field,
+    legacyKey: `F42 source.${field.field}`,
+    migratedKey: `PW2 current.${field.field}`,
+    legacyValue: field.source,
+    migratedValue: field.current,
+    status: isMatch ? "match" : "warning",
+    classification: isMatch ? "100% Match" : "P1 Warning",
+    diffExplanation:
+      field.status === "unverified"
+        ? "F42 chưa xác minh field này."
+        : field.status === "mismatch"
+          ? "F42 ghi nhận giá trị nguồn và PW2 khác nhau."
+          : undefined,
+  };
+}
+
+function emptyF42GroupStats(): StoreFieldDiffAudit["summary"]["groupStats"] {
+  return {
+    products: { total: 0, pass: 0, warn: 0, fail: 0 },
+    variants: { total: 0, pass: 0, warn: 0, fail: 0 },
+    banners: { total: 0, pass: 0, warn: 0, fail: 0 },
+    richtext: { total: 0, pass: 0, warn: 0, fail: 0 },
+    categories: { total: 0, pass: 0, warn: 0, fail: 0 },
+    navigation: { total: 0, pass: 0, warn: 0, fail: 0 },
+    posts: { total: 0, pass: 0, warn: 0, fail: 0 },
+    settings: { total: 0, pass: 0, warn: 0, fail: 0 },
+    blocks: { total: 0, pass: 0, warn: 0, fail: 0 },
+  };
+}
+
+/** Adapts only recorded F42 evidence to the established F40 inspector contract. */
+function f42DetailToStoreDeepDiff(detail: F42MigrationDetail): StoreDeepDiff {
+  const records: EntityDiffRecord[] = [];
+  const pages: DynamicStorePage[] = detail.pages.map((page, pageIndex) => {
+    const pageFields = page.fields.map(f42FieldItem);
+    if (pageFields.length) {
+      records.push({
+        id: `f42-page-${page.sourceId}`,
+        pageIds: [page.sourceId],
+        legacyId: page.sourceId,
+        migratedId: page.destinationId,
+        entityGroup: "blocks",
+        entityName: page.title,
+        entityIdentifier: "F42 page mapping",
+        matchStatus: pageFields.every((field) => field.status === "match")
+          ? "match"
+          : "warning",
+        totalFields: pageFields.length,
+        matchedFields: pageFields.filter((field) => field.status === "match").length,
+        discrepancyCount: pageFields.filter((field) => field.status !== "match").length,
+        fields: pageFields,
+      });
+    }
+    const blocks: PageBlockItem[] = page.blocks.map((block, blockIndex) => {
+      const fields = block.fields.map(f42FieldItem);
+      records.push({
+        id: `f42-block-${page.sourceId}-${block.sourceId}`,
+        pageIds: [page.sourceId],
+        legacyId: block.sourceId,
+        // F42 only records the source block id. It does not expose a target
+        // block id, so copying it here would claim a mapping that does not exist.
+        migratedId: null,
+        entityGroup: "blocks",
+        entityName: block.kind,
+        entityIdentifier: `F42 block ${block.sourceId}`,
+        matchStatus:
+          block.status === "match"
+            ? "match"
+            : block.status === "mismatch"
+              ? "warning"
+              : "warning",
+        totalFields: fields.length,
+        matchedFields: fields.filter((field) => field.status === "match").length,
+        discrepancyCount: fields.filter((field) => field.status !== "match").length,
+        fields,
+      });
+      const sourcePreview = Object.fromEntries(
+        block.sourceContent.map((item) => [item.field, item.value]),
+      );
+      return {
+        id: block.sourceId,
+        order: blockIndex + 1,
+        blockType: f42BlockType(block.kind),
+        title: `Khối #${blockIndex + 1}: ${block.kind}`,
+        pw1Component: block.kind,
+        pw2Block: "F42 không lưu loại block PW2",
+        pw1Preview: {
+          headline: String(sourcePreview.headline ?? sourcePreview.title ?? ""),
+          bodyText: String(sourcePreview.description ?? ""),
+        },
+        pw2Preview: {
+          headline: block.fields.find((field) => field.field === "headline")?.current,
+          bodyText: block.fields.find((field) => field.field === "description")?.current,
+        },
+        status: block.status === "match" ? "pass" : "warn",
+        discrepancyNote:
+          block.status === "unverified"
+            ? "F42 chưa xác minh block này."
+            : block.status === "mismatch"
+              ? "F42 ghi nhận khác biệt cần kiểm tra."
+              : undefined,
+      };
+    });
+    return {
+      id: page.sourceId,
+      name: page.title || `Trang ${pageIndex + 1}`,
+      path: f42PagePath(page.url),
+      pageType: pageIndex === 0 ? "home" : "custom_page",
+      // A page mapping is evidence PW1 existed; it is not evidence of a matching PW1 URL.
+      existsInPW1: true,
+      existsInPW2: page.destinationId !== null,
+      totalBlocks: blocks.length,
+      blocks,
+      breakdown: [],
+      defects: page.audit?.findings.map((finding) => ({
+        type: finding.severity.toLowerCase() === "p0" || finding.severity.toLowerCase() === "error" ? "p0" : finding.severity.toLowerCase() === "p2" || finding.severity.toLowerCase() === "info" ? "p2" : "p1",
+        icon: "⚠",
+        title: finding.code,
+        desc: finding.detail,
+        fix: "Xem evidence audit F42 và xác minh thủ công.",
+      })) ?? [],
+      mediaAudits: [],
+      textFormatAudits: [],
+    };
+  });
+  if (!pages.length) {
+    pages.push({
+      id: "f42-no-page-mapping",
+      name: "Chưa có page mapping trong F42",
+      path: "/",
+      pageType: "custom_page",
+      existsInPW1: false,
+      existsInPW2: false,
+      totalBlocks: 0,
+      blocks: [],
+      breakdown: [],
+      defects: [],
+      mediaAudits: [],
+      textFormatAudits: [],
+    });
+  }
+  const matchedRecords = records.filter((record) => record.matchStatus === "match").length;
+  const audit: StoreFieldDiffAudit = {
+    storeId: detail.storeId,
+    summary: {
+      // These are records observed by F42, not database population totals.
+      totalEntitiesV1: records.length,
+      totalEntitiesV2: 0,
+      matchedEntities: matchedRecords,
+      missingInPW2Count: pages.filter((page) => !page.existsInPW2).length,
+      orphanInPW2Count: 0,
+      fieldMatchRate: "F42 không cung cấp % tổng",
+      groupStats: emptyF42GroupStats(),
+    },
+    records,
+  };
+  const qcStatus = detail.review?.current ? detail.review.verdict : "unverified";
+  return {
+    id: detail.storeId,
+    name: detail.name,
+    ownerEmail: "F42 không lưu email chủ shop",
+    domain: detail.sourceUrl ?? "Chưa có URL PW1",
+    sslReady: Boolean(detail.sourceUrl),
+    templateCode: "F42",
+    templateName: "Evidence migration",
+    sector: "",
+    legacyDomain: detail.sourceUrl ?? "",
+    migratedDomain: detail.url,
+    score: "Chưa đo",
+    status:
+      qcStatus === "passed"
+        ? "passed"
+        : qcStatus === "failed"
+          ? "failed"
+          : "warning",
+    textScore: "Chưa đo",
+    mediaScore: "Chưa đo",
+    commerceScore: "Chưa đo",
+    blockScore: "Chưa đo",
+    totalPagesInPW1: pages.length,
+    totalPagesInPW2: pages.filter((page) => page.existsInPW2).length,
+    missingPagesCount: pages.filter((page) => !page.existsInPW2).length,
+    pages,
+    fieldDiffAudit: audit,
+    reconciliationAudit: {
+      totalProductsV1: 0,
+      totalProductsV2: 0,
+      matchedProducts: 0,
+      missingVariantsCount: 0,
+      droppedBrandCount: 0,
+      missingCostCount: 0,
+      brokenMediaCount: 0,
+      searchParity: "F42 chưa có evidence commerce",
+      cartParity: "F42 chưa có evidence commerce",
+      filterParity: "F42 chưa có evidence commerce",
+      richTextParity: "F42 chưa có evidence commerce",
+    },
+  };
+}
+
+const liveStateLabels: Record<string, string> = {
+  completed: "Đã migrate",
+  pending: "Chờ migrate",
+  running: "Đang migrate",
+  failed: "Migrate lỗi",
+  published: "Đã publish",
+  draft: "Draft",
+  checked: "Đã audit",
+  "not-checked": "Chưa audit",
+  historical: "Audit lịch sử",
+  stale: "Audit cũ",
+  "needs-fix": "Có lỗi audit",
+  "needs-review": "Cần review",
+};
+
+function LiveStateBadge({ value }: { value: string }) {
+  const color = ["completed", "published", "checked"].includes(value)
+    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+    : ["failed", "needs-fix"].includes(value)
+      ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
+      : "border-amber-500/30 bg-amber-500/10 text-amber-200";
+  return (
+    <span
+      className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold ${color}`}
+    >
+      {liveStateLabels[value] ?? value}
+    </span>
+  );
+}
+
 export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -812,6 +1106,11 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const [catalogError,setCatalogError] = useState("");
   const [catalogLoading,setCatalogLoading] = useState(false);
   const liveCatalogRequestRef=React.useRef(0);
+  const [liveDetail, setLiveDetail] = useState<F42MigrationDetail | null>(null);
+  const [liveDetailError, setLiveDetailError] = useState("");
+  const [liveDetailLoading, setLiveDetailLoading] = useState(false);
+  const [liveDetailRefresh, setLiveDetailRefresh] = useState(0);
+  const liveDetailRequestRef = React.useRef(0);
   const liveStoreById = useMemo(() => new Map(liveStores.map(store => [store.storeId, store])), [liveStores]);
   const metrics = useMemo(() => live ? {
     ...getDashboardMetrics([]), totalStores: catalog.length,
@@ -820,9 +1119,16 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
     failedStores: liveStores.filter(store => store.qcStatus === "failed").length,
     avgScore: "Chưa đo",
   } : getDashboardMetrics(catalog), [catalog, live, liveStores]);
+  const reportByStoreId = useMemo(() => new Map(liveStores.map(store => [store.storeId, classifyMigrationReport(store)])), [liveStores]);
+  const reportCounts = useMemo(() => {
+    const counts = { passed: 0, review: 0, failed: 0, insufficient: 0 };
+    for (const report of reportByStoreId.values()) counts[report.status]++;
+    return counts;
+  }, [reportByStoreId]);
 
   // Overview Table Filters
   const [filterStatus, setFilterStatus] = useState<"all" | "passed" | "warning" | "failed" | "unverified">("all");
+  const [liveMetricFilter, setLiveMetricFilter] = useState<ReportFilter>("all");
   const [filterTemplate, setFilterTemplate] = useState<string>("all");
   const selectedTemplateObj = useMemo(() => {
     if (filterTemplate === "all") return null;
@@ -866,10 +1172,22 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const [reconciliationLoading, setReconciliationLoading] = useState(false);
   const [reconciliationError, setReconciliationError] = useState<string | null>(null);
   const [reconciliationDemo, setReconciliationDemo] = useState(false);
+  const [reconciliationSourceStoreId, setReconciliationSourceStoreId] = useState("");
+  const [reconciliationRunId, setReconciliationRunId] = useState<string | null>(null);
+  const [reconciliationRefresh, setReconciliationRefresh] = useState(0);
+  const [reconciliationRuns, setReconciliationRuns] = useState<ReconciliationRun[]>([]);
+  const [reconciliationRunsTruncated, setReconciliationRunsTruncated] = useState(false);
+  const [reconciliationRunsLoading, setReconciliationRunsLoading] = useState(false);
+  const [reconciliationRunsError, setReconciliationRunsError] = useState<string | null>(null);
+  const [reconciliationIssues, setReconciliationIssues] = useState<ReconciliationIssue[]>([]);
+  const [reconciliationIssuesLoading, setReconciliationIssuesLoading] = useState(false);
+  const [reconciliationIssuesError, setReconciliationIssuesError] = useState<string | null>(null);
   const [previewSource, setPreviewSource] = useState<"template" | "live_domain">("template");
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
   const pw1DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
   const reconciliationRequestRef = React.useRef(0);
+  const reconciliationRunsRequestRef = React.useRef(0);
+  const reconciliationIssuesRequestRef = React.useRef(0);
   const pw2DeskIframeRef = React.useRef<HTMLIFrameElement>(null);
   const pw1MobIframeRef = React.useRef<HTMLIFrameElement>(null);
   const pw2MobIframeRef = React.useRef<HTMLIFrameElement>(null);
@@ -906,7 +1224,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const [customDbUser, setCustomDbUser] = useState("");
   const [customDbPassword, setCustomDbPassword] = useState("");
   const [customDbName, setCustomDbName] = useState("");
-  const [useSeparateFields, setUseSeparateFields] = useState(false);
+  const [useSeparateFields, setUseSeparateFields] = useState(true);
+  const [dbTestError, setDbTestError] = useState("");
 
   const checkLiveDbStatus = async () => {
     try {
@@ -924,8 +1243,10 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
   const handleTestDbConnection = async () => {
     setIsTestingDb(true);
+    setDbTestError("");
+    setDbStatus(null);
     try {
-      const config = useSeparateFields
+      const config = useSeparateFields && (customDbHost || customDbUser || customDbPassword || customDbName || customDbPort !== "3306")
         ? {
             host: customDbHost.trim(),
             port: parseInt(customDbPort.trim() || "3306", 10),
@@ -933,7 +1254,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
             password: customDbPassword,
             database: customDbName.trim(),
           }
-        : customDbUrl.trim()
+        : !useSeparateFields && customDbUrl.trim()
           ? { url: customDbUrl.trim() }
           : undefined;
 
@@ -946,6 +1267,9 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
         }),
       });
       const json = await res.json();
+      if (!res.ok || !json.data) {
+        throw new Error(json.error || "Không kiểm tra được kết nối PW1.");
+      }
       if (json.data) {
         setDbStatus(json.data);
         if (json.data.connected) {
@@ -954,8 +1278,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
           showToast(`🔴 Không thể kết nối: ${json.data.message}`);
         }
       }
-    } catch (err: any) {
-      showToast(`🔴 Lỗi kiểm tra: ${err.message || String(err)}`);
+    } catch (err: unknown) {
+      setDbTestError(err instanceof Error ? err.message : "Không kiểm tra được kết nối PW1.");
     } finally {
       setIsTestingDb(false);
     }
@@ -972,16 +1296,21 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
         const stores: MigrationStore[]=[];
         for(let page=1;;page++) {
           const response=await fetch(`/api/admin/qa/website-migrations?limit=100&page=${page}`,{cache:"no-store"});
-          if(!response.ok) throw new Error(`HTTP ${response.status}`);
+          if(!response.ok) {
+            const failure = await response.json().catch(() => null);
+            throw new Error(failure?.code === 'F42_SOURCE_UNAVAILABLE'
+              ? 'Nguồn F42 chưa sẵn sàng. Nhờ team F42 triển khai schema/evidence tương ứng rồi làm mới.'
+              : `Không đọc được báo cáo (HTTP ${response.status}). Vui lòng thử lại.`);
+          }
           const body=await response.json();stores.push(...body.data.stores);
           if(stores.length>=body.data.total || !body.data.stores.length) break;
         }
-        if(requestId!==liveCatalogRequestRef.current)return;
+        if(requestId!==liveCatalogRequestRef.current)return false;
         setLiveStores(stores);
         setCatalog(stores.map(websiteStoreSummary));
-      } catch(error) {if(requestId!==liveCatalogRequestRef.current)return;setCatalogError(error instanceof Error?error.message:"Không đọc được catalog");setCatalog([]);setLiveStores([])}
+        return true;
+      } catch(error) {if(requestId!==liveCatalogRequestRef.current)return false;setCatalogError(error instanceof Error?error.message:"Không đọc được catalog");setCatalog([]);setLiveStores([]);return false;}
       finally {if(requestId===liveCatalogRequestRef.current)setCatalogLoading(false)}
-      return;
     }
     try {
       const res = await fetch(`/api/qa/migration-diff?limit=2000&_t=${Date.now()}`, {
@@ -990,15 +1319,55 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       const json = await res.json();
       if (json.stores && json.stores.length > 0) {
         setCatalog(json.stores);
+        return true;
       }
     } catch (err) {
       console.error("[MigrationDiffClient] Failed to load live catalog:", err);
     }
+    return false;
   };
 
   useEffect(() => {
     void loadLiveCatalog();
   }, []);
+
+  useEffect(() => {
+    if (!live || !activeStoreId) {
+      setLiveDetail(null);
+      setLiveDetailError("");
+      setLiveDetailLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    const requestId = ++liveDetailRequestRef.current;
+    setLiveDetail(null);
+    setLiveDetailError("");
+    setLiveDetailLoading(true);
+    setActivePageIndex(0);
+    setReconciliationSourceStoreId(activeStoreId);
+    void fetch(`/api/admin/qa/website-migrations?store=${encodeURIComponent(activeStoreId)}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+        return body.data as F42MigrationDetail;
+      })
+      .then((detail) => {
+        if (!controller.signal.aborted && requestId === liveDetailRequestRef.current)
+          setLiveDetail(detail);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted && requestId === liveDetailRequestRef.current)
+          setLiveDetailError(error instanceof Error ? error.message : "Không đọc được evidence F42");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && requestId === liveDetailRequestRef.current)
+          setLiveDetailLoading(false);
+      });
+    return () => controller.abort();
+  }, [activeStoreId, live, liveDetailRefresh]);
 
   useEffect(() => {
     if (live || !activeStoreId) {
@@ -1039,16 +1408,117 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   }, [activeStoreId, fieldDiffUiDemo]);
 
   useEffect(() => {
+    setActiveViewTab("live_webview");
+  }, [activeStoreId]);
+
+  useEffect(() => {
+    setReconciliationRunId(null);
+  }, [activeStoreId, reconciliationSourceStoreId]);
+
+  useEffect(() => {
+    const isReconciliationTab = activeViewTab === "commerce_reconciliation" || activeViewTab === "settings_reconciliation";
+    if (!activeStoreId || !isReconciliationTab || reconciliationDemo || !reconciliationSourceStoreId) {
+      setReconciliationRuns([]);
+      setReconciliationRunsTruncated(false);
+      setReconciliationRunsLoading(false);
+      setReconciliationRunsError(null);
+      return;
+    }
+    const controller = new AbortController();
+    const requestId = ++reconciliationRunsRequestRef.current;
+    const load = async () => {
+      setReconciliationRunsLoading(true);
+      setReconciliationRunId(null);
+      setReconciliationSnapshot(null);
+      setReconciliationRuns([]);
+      setReconciliationRunsError(null);
+      try {
+        const response = await fetch(`/api/qa/migration-reconciliation/runs?store_id=${encodeURIComponent(reconciliationSourceStoreId)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload: { data?: ReconciliationRun[]; meta?: { truncated?: boolean } } = await response.json();
+        const runs = Array.isArray(payload.data) ? payload.data.filter((run) => run.storeId === reconciliationSourceStoreId) : [];
+        if (!controller.signal.aborted && requestId === reconciliationRunsRequestRef.current) {
+          setReconciliationRuns(runs);
+          setReconciliationRunId(runs[0]?.runId ?? null);
+          setReconciliationRunsTruncated(payload.meta?.truncated === true);
+        }
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationRunsRequestRef.current) {
+          setReconciliationRuns([]);
+          setReconciliationRunsTruncated(false);
+          setReconciliationRunsError("Kiểm tra ID store nguồn PW1 hoặc quyền truy cập rồi thử lại.");
+        }
+      } finally {
+        if (!controller.signal.aborted && requestId === reconciliationRunsRequestRef.current) setReconciliationRunsLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [activeStoreId, activeViewTab, reconciliationDemo, reconciliationSourceStoreId, reconciliationRefresh]);
+
+  useEffect(() => {
     const scope: ReconciliationScope | null = activeViewTab === "commerce_reconciliation" ? "commerce" : activeViewTab === "settings_reconciliation" ? "settings" : null;
-    if (!scope || !activeStoreId) return;
+    const selectedRunIsForActiveStore = reconciliationRuns.some(
+      (run) => run.runId === reconciliationRunId && run.storeId === reconciliationSourceStoreId,
+    );
+    if (!scope || !activeStoreId || (!reconciliationDemo && (!reconciliationSourceStoreId || !selectedRunIsForActiveStore))) {
+      setReconciliationSnapshot(null);
+      setReconciliationLoading(false);
+      setReconciliationError(null);
+      return;
+    }
     const controller = new AbortController();
     const requestId = ++reconciliationRequestRef.current;
-    const load = async () => { setReconciliationSnapshot(null); setReconciliationLoading(true); setReconciliationError(null); try { const response = await fetch(`/api/qa/migration-reconciliation?scope=${scope}&store_id=${encodeURIComponent(activeStoreId)}${reconciliationDemo ? "&demo=1" : ""}`, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload: { data?: ReconciliationSnapshot } = await response.json(); if (payload.data?.scope !== scope || payload.data.storeId !== activeStoreId) throw new Error("Phản hồi đối soát không khớp store hoặc phạm vi đang chọn"); if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationSnapshot(payload.data); } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationRequestRef.current) { setReconciliationSnapshot(null); setReconciliationError(error instanceof Error ? error.message : "Lỗi không xác định"); } } finally { if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationLoading(false); } };
+    const runParam = reconciliationDemo ? "" : `&run_id=${encodeURIComponent(reconciliationRunId ?? "")}`;
+    const selectedStoreId = reconciliationDemo ? activeStoreId : reconciliationSourceStoreId;
+    const load = async () => { setReconciliationSnapshot(null); setReconciliationLoading(true); setReconciliationError(null); try { const response = await fetch(`/api/qa/migration-reconciliation?scope=${scope}&store_id=${encodeURIComponent(selectedStoreId)}${runParam}${reconciliationDemo ? "&demo=1" : ""}`, { cache: "no-store", signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload: { data?: ReconciliationSnapshot } = await response.json(); if (payload.data?.scope !== scope || payload.data.storeId !== selectedStoreId) throw new Error("Phản hồi đối soát không khớp store hoặc phạm vi đang chọn"); if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationSnapshot(payload.data); } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationRequestRef.current) { setReconciliationSnapshot(null); setReconciliationError("Không thể tải đối soát. Kiểm tra run đã chọn và quyền truy cập rồi thử lại."); } } finally { if (!controller.signal.aborted && requestId === reconciliationRequestRef.current) setReconciliationLoading(false); } };
     void load(); return () => controller.abort();
-  }, [activeStoreId, activeViewTab, reconciliationDemo]);
+  }, [activeStoreId, activeViewTab, reconciliationDemo, reconciliationRunId, reconciliationRuns, reconciliationSourceStoreId]);
+
+  useEffect(() => {
+    const selectedRunIsForActiveStore = reconciliationRuns.some(
+      (run) => run.runId === reconciliationRunId && run.storeId === reconciliationSourceStoreId,
+    );
+    if (!activeStoreId || !selectedRunIsForActiveStore || reconciliationDemo) {
+      setReconciliationIssues([]);
+      setReconciliationIssuesLoading(false);
+      setReconciliationIssuesError(null);
+      return;
+    }
+    const controller = new AbortController();
+    const requestId = ++reconciliationIssuesRequestRef.current;
+    const load = async () => {
+      setReconciliationIssuesLoading(true);
+      setReconciliationIssuesError(null);
+      try {
+        const response = await fetch(`/api/qa/migration-reconciliation/issues?store_id=${encodeURIComponent(reconciliationSourceStoreId)}&run_id=${encodeURIComponent(reconciliationRunId ?? "")}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload: { data?: ReconciliationIssue[] } = await response.json();
+        if (!controller.signal.aborted && requestId === reconciliationIssuesRequestRef.current) {
+          setReconciliationIssues(Array.isArray(payload.data) ? payload.data : []);
+        }
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError") && requestId === reconciliationIssuesRequestRef.current) {
+          setReconciliationIssues([]);
+          setReconciliationIssuesError("Kiểm tra migration run đã chọn rồi thử lại.");
+        }
+      } finally {
+        if (!controller.signal.aborted && requestId === reconciliationIssuesRequestRef.current) setReconciliationIssuesLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [activeStoreId, reconciliationDemo, reconciliationRunId, reconciliationRuns, reconciliationSourceStoreId]);
 
   const selectedDiff: StoreDeepDiff | null = useMemo(() => {
-    if (live || !activeStoreId) return null;
+    if (live) return liveDetail ? f42DetailToStoreDeepDiff(liveDetail) : null;
+    if (!activeStoreId) return null;
     if (loadedFieldDiff?.data.id === activeStoreId) return loadedFieldDiff.data;
     const isResolved = resolvedStoreIds.has(activeStoreId);
     const catalogStore = catalog.find((s) => s.id === activeStoreId);
@@ -1063,16 +1533,18 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       };
     }
     return diff;
-  }, [activeStoreId, resolvedStoreIds, loadedFieldDiff, catalog, live]);
+  }, [activeStoreId, resolvedStoreIds, loadedFieldDiff, catalog, live, liveDetail]);
 
-  const fieldDiffSource: FieldDiffSource = loadedFieldDiff?.data.id === activeStoreId
-    ? loadedFieldDiff.source
-    : "catalog_fixture";
+  const fieldDiffSource: FieldDiffSource = live
+    ? "f42_evidence"
+    : loadedFieldDiff?.data.id === activeStoreId
+      ? loadedFieldDiff.source
+      : "catalog_fixture";
 
   const activePage = selectedDiff?.pages[activePageIndex] || selectedDiff?.pages[0];
 
   useEffect(() => {
-    if (!activeStoreId || !activePage) {
+    if (live || !activeStoreId || !activePage) {
       setRenderEvidence(null);
       setRenderEvidenceError(null);
       setIsRenderEvidenceLoading(false);
@@ -1114,7 +1586,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
     };
     void loadEvidence();
     return () => controller.abort();
-  }, [activeStoreId, activePage?.id, useDemoRenderEvidence]);
+  }, [activeStoreId, activePage?.id, useDemoRenderEvidence, live]);
 
   const evidenceByLegacyId = useMemo(
     () => new Map(renderEvidence?.blocks.map((item) => [item.legacyId, item]) ?? []),
@@ -1123,7 +1595,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
   // Dispatch smooth SPA navigation to live storefront iframes when user switches page tabs
   useEffect(() => {
-    if (activePage && previewSource === "template") {
+    if (!live && activePage && previewSource === "template") {
       const navMsg = {
         type: "spa-navigate",
         path: activePage.path,
@@ -1139,7 +1611,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
         console.warn("[MigrationDiffClient] postMessage failed:", e);
       }
     }
-  }, [activePageIndex, activePage, previewSource, selectedDiff?.id]);
+  }, [activePageIndex, activePage, previewSource, selectedDiff?.id, live]);
 
   // Default preview source to 'live_domain' if SSL is verified and ready, otherwise use 'template' (authentic MySQL prototype).
   useEffect(() => {
@@ -1177,7 +1649,11 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
     const cleanQ = rawQ.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "");
 
     return catalog.filter((s) => {
-      const matchStatus = filterStatus === "all" || (live ? liveStoreById.get(s.id)?.qcStatus : s.status) === filterStatus;
+      const matchStatus = live || filterStatus === "all" || s.status === filterStatus;
+      const matchMetric =
+        !live ||
+        liveMetricFilter === "all" ||
+        reportByStoreId.get(s.id)?.status === liveMetricFilter;
       const matchTpl = filterTemplate === "all" || s.templateCode === filterTemplate;
 
       const matchSearch =
@@ -1191,11 +1667,23 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
         s.templateCode.toLowerCase().includes(cleanQ) ||
         s.templateName.toLowerCase().includes(cleanQ);
 
-      return matchStatus && matchTpl && matchSearch;
+      return matchStatus && matchMetric && matchTpl && matchSearch;
     });
-  }, [catalog, filterStatus, filterTemplate, searchQuery, live, liveStoreById]);
+  }, [
+    catalog,
+    filterStatus,
+    filterTemplate,
+    searchQuery,
+    live,
+    liveMetricFilter,
+    liveStoreById,
+    reportByStoreId,
+  ]);
 
   const totalPages = Math.ceil(filteredStores.length / pageSize) || 1;
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
   const paginatedStores = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredStores.slice(start, start + pageSize);
@@ -1245,7 +1733,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       attention: fields.filter((field) => getDisplayEvidenceState(field, fieldDiffSource) === "attention").length,
       matched_value: fields.filter((field) => getDisplayEvidenceState(field, fieldDiffSource) === "matched_value").length,
       matched_empty: fields.filter((field) => getDisplayEvidenceState(field, fieldDiffSource) === "matched_empty").length,
-      recordsWithAttention: fieldDiffSource === "ui_fixture"
+      recordsWithAttention: fieldDiffSource === "ui_fixture" || fieldDiffSource === "f42_evidence"
         ? baseFilteredFieldRecords.filter(hasEntityDiffIssue).length
         : baseFilteredFieldRecords.length,
     };
@@ -1438,8 +1926,22 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
   return (
     <div data-testid={live ? "website-migration-live" : undefined} className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans">
-      {live && <><p className="rounded-xl border border-sky-800 bg-sky-950/30 p-3 text-sm text-sky-200">Dữ liệu migrate thật. QC Pass / Cần xem lại / P0 là đánh giá của tester theo phiên bản website; chưa có phép đo % text, ảnh, layout. Audit tự động không thay thế QC.</p>{catalogLoading && <p>Đang đọc danh sách migrate…</p>}{catalogError && <p role="alert">Không tải được dữ liệu: {catalogError}</p>}</>}
-      {live && activeStoreId && <WebsiteMigrationInspector storeId={activeStoreId} onClose={()=>setActiveStoreId(null)} onReviewed={()=>{void loadLiveCatalog()}} />}
+      {live && <><p className="rounded-xl border border-sky-800 bg-sky-950/30 p-3 text-sm text-sky-200">Báo cáo tự động từ evidence F42 đã lưu; kết luận QC thủ công hiển thị riêng. {!catalogLoading && !catalogError && <>Phạm vi: {catalog.length} website trong catalog hiện tại, chưa phải toàn bộ nguồn migration. </>}Làm mới chỉ đọc lại evidence, chưa quét dữ liệu PW2 hiện tại.</p>{catalogLoading && <p role="status">Đang đọc danh sách migrate…</p>}{catalogError && <p role="alert" className="rounded-xl border border-amber-500/40 bg-amber-950/30 p-4 text-amber-200">{catalogError} Chưa thể xác định số website hoặc kết quả đối soát.</p>}</>}
+      {live && activeStoreId && liveDetailLoading && (
+        <div className="fixed inset-0 z-[999999] grid place-items-center bg-slate-950/80 text-sm text-slate-200">
+          Đang đọc evidence F42…
+        </div>
+      )}
+      {live && activeStoreId && liveDetailError && (
+        <div className="fixed inset-0 z-[999999] grid place-items-center bg-slate-950/80 p-6">
+          <div className="max-w-md rounded-2xl border border-rose-500/40 bg-slate-900 p-5 text-sm text-rose-200">
+            <p>{liveDetailError}</p>
+            <button className="mt-4 rounded-lg border border-slate-600 px-3 py-2 text-slate-100" onClick={() => setActiveStoreId(null)}>
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-400/40 animate-bounce">
@@ -1470,7 +1972,9 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => !live && setDbModalOpen(true)}
+            aria-label="Cấu hình nguồn dữ liệu"
+            aria-haspopup="dialog"
+            onClick={() => setDbModalOpen(true)}
             className={`flex items-center gap-2 border rounded-xl px-3 py-1.5 text-xs font-semibold shadow-sm transition ${
               dbStatus?.connected
                 ? "bg-emerald-950/60 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/60"
@@ -1510,26 +2014,35 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
           </span>
           <button
             type="button"
-            onClick={() => {
+            disabled={catalogLoading}
+            onClick={async () => {
               if (!live) void checkLiveDbStatus();
-              void loadLiveCatalog();
-              showToast("Đã làm mới dữ liệu đối soát cho toàn bộ website!");
+              const loaded = await loadLiveCatalog();
+              if (loaded) showToast(live ? "Đã đọc lại evidence đã lưu cho catalog website." : "Đã làm mới dữ liệu đối soát.");
             }}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700/80 transition shadow-sm"
           >
             <RefreshCw className="size-3.5 text-slate-400" />
-            <span>Làm Mới Đối Soát</span>
+            <span>{catalogLoading ? "Đang tải…" : live ? "Làm mới evidence" : "Làm Mới Đối Soát"}</span>
           </button>
         </div>
       </div>
 
       {/* 5 Metric Summary Cards */}
+      {(!live || (!catalogLoading && !catalogError)) && <>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div
-          onClick={() => setFilterStatus("all")}
-          className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
-            filterStatus === "all"
-              ? "bg-slate-900 border-blue-500/80 shadow-[0_0_20px_-3px_rgba(59,130,246,0.2)] ring-1 ring-blue-500/40"
+        <button
+          type="button"
+          aria-pressed={filterStatus === "all" && liveMetricFilter === "all"}
+          data-testid={live ? "migration-metric-all" : undefined}
+          onClick={() => {
+            setFilterStatus("all");
+            setLiveMetricFilter("all");
+            setCurrentPage(1);
+          }}
+          className={`w-full cursor-pointer p-4 rounded-2xl border text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+            filterStatus === "all" && liveMetricFilter === "all"
+              ? "bg-slate-900 border-2 border-blue-400 shadow-[0_0_24px_-3px_rgba(59,130,246,0.38)] ring-2 ring-blue-500/40"
               : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
@@ -1538,63 +2051,116 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
           <div className="text-[11px] text-blue-400 mt-1 flex items-center gap-1 font-medium">
             <Sparkles className="size-3" /> {live ? `${catalog.length} Website` : "2.000 Website"}
           </div>
-        </div>
+        </button>
 
-        <div
-          onClick={() => setFilterStatus("passed")}
-          className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
-            filterStatus === "passed"
-              ? "bg-emerald-950/20 border-emerald-500/80 shadow-[0_0_20px_-3px_rgba(16,185,129,0.2)] ring-1 ring-emerald-500/40"
+        <button
+          type="button"
+          aria-pressed={live ? liveMetricFilter === "passed" : filterStatus === "passed"}
+          data-testid={live ? "migration-metric-passed" : undefined}
+          onClick={() => {
+            setFilterStatus(live ? "all" : "passed");
+            setLiveMetricFilter(live ? "passed" : "all");
+            setCurrentPage(1);
+          }}
+          className={`w-full cursor-pointer p-4 rounded-2xl border text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+            (live ? liveMetricFilter === "passed" : filterStatus === "passed")
+              ? "bg-emerald-950/20 border-2 border-emerald-400 shadow-[0_0_24px_-3px_rgba(16,185,129,0.38)] ring-2 ring-emerald-500/40"
               : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">{live ? "QC Pass (tester)" : "Khớp Chuẩn (≥95%)"}</div>
-          <div className="text-2xl font-bold text-emerald-400 mt-1">{metrics.passedStores}</div>
-          <div className="text-[11px] text-emerald-400/80 mt-1 font-medium">{live ? "Đã kiểm tra phiên bản hiện tại" : "Đủ điều kiện Cutover"}</div>
-        </div>
+          <div className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">{live ? "Đạt đối soát" : "Khớp Chuẩn (≥95%)"}</div>
+          <div className="text-2xl font-bold text-emerald-400 mt-1">{live ? reportCounts.passed : metrics.passedStores}</div>
+          <div className="text-[11px] text-emerald-400/80 mt-1 font-medium">{live ? "Đủ bằng chứng toàn bộ phạm vi" : "Đủ điều kiện Cutover"}</div>
+        </button>
 
-        <div
-          onClick={() => setFilterStatus("warning")}
-          className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
-            filterStatus === "warning"
-              ? "bg-amber-950/20 border-amber-500/80 shadow-[0_0_20px_-3px_rgba(245,158,11,0.2)] ring-1 ring-amber-500/40"
+        <button
+          type="button"
+          aria-pressed={live ? liveMetricFilter === "review" : filterStatus === "warning"}
+          data-testid={live ? "migration-metric-review" : undefined}
+          onClick={() => {
+            setFilterStatus(live ? "all" : "warning");
+            setLiveMetricFilter(live ? "review" : "all");
+            setCurrentPage(1);
+          }}
+          className={`w-full cursor-pointer p-4 rounded-2xl border text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+            (live ? liveMetricFilter === "review" : filterStatus === "warning")
+              ? "bg-amber-950/20 border-2 border-amber-400 shadow-[0_0_24px_-3px_rgba(245,158,11,0.38)] ring-2 ring-amber-500/40"
               : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider">{live ? "Cần Xem Lại (tester)" : "Cần Xem Lại (85-94%)"}</div>
-          <div className="text-2xl font-bold text-amber-400 mt-1">{metrics.warningStores}</div>
-          <div className="text-[11px] text-amber-400/80 mt-1 font-medium">Lệch ảnh / Map / Text</div>
-        </div>
+          <div className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider">{live ? "Cần kiểm tra" : "Cần Xem Lại (85-94%)"}</div>
+          <div className="text-2xl font-bold text-amber-400 mt-1">{live ? reportCounts.review : metrics.warningStores}</div>
+          <div className="text-[11px] text-amber-400/80 mt-1 font-medium">{live ? "Cảnh báo / cần kiểm chứng lại" : "Lệch ảnh / Map / Text"}</div>
+        </button>
 
-        <div
-          onClick={() => setFilterStatus("failed")}
-          className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
-            filterStatus === "failed"
-              ? "bg-rose-950/20 border-rose-500/80 shadow-[0_0_20px_-3px_rgba(244,63,94,0.2)] ring-1 ring-rose-500/40"
+        <button
+          type="button"
+          aria-pressed={live ? liveMetricFilter === "failed" : filterStatus === "failed"}
+          data-testid={live ? "migration-metric-failed" : undefined}
+          onClick={() => {
+            setFilterStatus(live ? "all" : "failed");
+            setLiveMetricFilter(live ? "failed" : "all");
+            setCurrentPage(1);
+          }}
+          className={`w-full cursor-pointer p-4 rounded-2xl border text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${
+            (live ? liveMetricFilter === "failed" : filterStatus === "failed")
+              ? "bg-rose-950/20 border-2 border-rose-400 shadow-[0_0_24px_-3px_rgba(244,63,94,0.38)] ring-2 ring-rose-500/40"
               : "bg-slate-900/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
           }`}
         >
-          <div className="text-[11px] text-rose-400 font-semibold uppercase tracking-wider">{live ? "P0 (tester xác nhận)" : "Lỗi Dữ Liệu P0 (<85%)"}</div>
-          <div className="text-2xl font-bold text-rose-400 mt-1">{metrics.failedStores}</div>
-          <div className="text-[11px] text-rose-400/80 mt-1 font-medium">Chặn Cutover</div>
-        </div>
+          <div className="text-[11px] text-rose-400 font-semibold uppercase tracking-wider">{live ? "Có lỗi" : "Lỗi Dữ Liệu P0 (<85%)"}</div>
+          <div className="text-2xl font-bold text-rose-400 mt-1">{live ? reportCounts.failed : metrics.failedStores}</div>
+          <div className="text-[11px] text-rose-400/80 mt-1 font-medium">{live ? "Migration / audit / dữ liệu sai lệch" : "Chặn Cutover"}</div>
+        </button>
 
-        <div className="p-4 rounded-2xl border border-slate-800/80 bg-slate-900/50">
-          <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Độ Khớp Trung Bình</div>
-          <div className="text-2xl font-bold text-sky-400 mt-1">{metrics.avgScore}</div>
-          <div className="text-[11px] text-slate-500 mt-1 font-medium">Toàn bộ hệ thống</div>
-        </div>
+        <button
+          type="button"
+          aria-pressed={live && liveMetricFilter === "insufficient"}
+          data-testid={live ? "migration-metric-insufficient" : undefined}
+          onClick={() => {
+            if (!live) return;
+            setFilterStatus("all");
+            setLiveMetricFilter("insufficient");
+            setCurrentPage(1);
+          }}
+          className={`w-full cursor-pointer p-4 rounded-2xl border text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
+            live ? "cursor-pointer" : ""
+          } ${
+            live && liveMetricFilter === "insufficient"
+              ? "border-2 border-sky-400 bg-sky-950/20 ring-2 ring-sky-500/40 shadow-[0_0_24px_-3px_rgba(56,189,248,0.38)]"
+              : "border-slate-800/80 bg-slate-900/50"
+          }`}
+        >
+          <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{live ? "Chưa đủ dữ liệu" : "Độ Khớp Trung Bình"}</div>
+          <div className="text-2xl font-bold text-sky-400 mt-1">{live ? reportCounts.insufficient : metrics.avgScore}</div>
+          <div className="text-[11px] text-slate-500 mt-1 font-medium">{live ? "Team migration bổ sung evidence" : "Toàn bộ hệ thống"}</div>
+        </button>
       </div>
 
       {/* Filter Hub & Search Bar */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800/80 shadow-sm">
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800">
-            {((live ? ["all", "passed", "warning", "failed", "unverified"] : ["all", "passed", "warning", "failed"]) as Array<typeof filterStatus>).map((st) => (
+          {live && (
+            <span className="text-[11px] font-semibold text-slate-400">
+              Kết quả tự động:
+            </span>
+          )}
+          <div
+            aria-label={live ? "Lọc kết quả tự động" : undefined}
+            className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800"
+          >
+            {live ? (['all', 'passed', 'review', 'failed', 'insufficient'] as ReportFilter[]).map(status => (
+              <button key={status} type="button" aria-pressed={liveMetricFilter === status}
+                onClick={() => { setLiveMetricFilter(status); setCurrentPage(1); }}
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${liveMetricFilter === status ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-400 hover:text-slate-200'}`}>
+                {status === 'all' ? 'Tất cả' : `${REPORT_LABELS[status]} (${reportCounts[status]})`}
+              </button>
+            )) : (["all", "passed", "warning", "failed"] as Array<typeof filterStatus>).map((st) => (
               <button
                 key={st}
                 onClick={() => {
                   setFilterStatus(st);
+                  setLiveMetricFilter("all");
                   setCurrentPage(1);
                 }}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
@@ -1603,7 +2169,13 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                {st === "all" ? "Tất Cả" : st === "passed" ? "QC Pass" : st === "warning" ? "Cần Xem Lại" : st === "unverified" ? "Chưa kiểm chứng" : "Lỗi P0"}
+                {st === "all"
+                  ? "Tất Cả"
+                  : st === "passed"
+                    ? "QC Pass"
+                    : st === "warning"
+                      ? "Cần Xem Lại"
+                      : "Lỗi P0"}
               </button>
             ))}
           </div>
@@ -1726,26 +2298,34 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       {/* 2,000 Stores Grid Table */}
       <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
+          <table className={`w-full text-left text-xs text-slate-300 ${live ? "min-w-[1040px] table-fixed" : ""}`}>
+            {live && <colgroup>
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '32%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '12%' }} />
+            </colgroup>}
             <thead className="bg-slate-900/90 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800 tracking-wider">
               <tr>
                 <th className="py-3.5 px-4 whitespace-nowrap">{live ? "Store / Đường dẫn PW2" : "Email Khách Hàng / Domain"}</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Giao Diện Mẫu</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Độ Khớp Dữ Liệu</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Trạng Thái QC</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Số Trang & Lỗi / Cảnh Báo</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Đối Soát Chi Tiết</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{live ? "Migration / Publish" : "Giao Diện Mẫu"}</th>
+                <th className="py-3.5 px-4">{live ? "Độ khớp dữ liệu (%) / Kết quả tự động" : "Độ Khớp Dữ Liệu"}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{live ? "QC thủ công" : "Trạng Thái QC"}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{live ? "Số trang" : "Số Trang & Lỗi / Cảnh Báo"}</th>
+                <th className="py-3.5 px-4 text-right">Đối Soát Chi Tiết</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {paginatedStores.map((store) => (
                 <tr key={store.id} data-testid={`migration-store-row-${store.id}`} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-4 px-4 font-semibold text-white whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-md">
+                  <td className="py-4 px-4 font-semibold text-white whitespace-nowrap overflow-hidden">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 font-mono text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-md">
                         {store.id}
                       </span>
-                      <span className="text-slate-100 font-semibold">{store.ownerEmail}</span>
+                      <span className="truncate text-slate-100 font-semibold" title={store.ownerEmail}>{store.ownerEmail}</span>
                     </div>
                     <div className="text-[12px] text-slate-400 font-normal font-mono mt-1 flex items-center gap-1.5">
                       <Globe className="size-3 text-slate-500 shrink-0" />
@@ -1753,33 +2333,83 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     </div>
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
-                    <span className="font-bold text-slate-200">{store.templateCode}</span>
-                    <div className="text-[11px] text-slate-400">{store.templateName}</div>
+                    {live ? (
+                      <div className="flex flex-col items-start gap-1.5">
+                        <LiveStateBadge value={liveStoreById.get(store.id)?.migration ?? "pending"} />
+                        <LiveStateBadge value={liveStoreById.get(store.id)?.publish ?? "draft"} />
+                      </div>
+                    ) : (
+                      <>
+                        <span className="font-bold text-slate-200">{store.templateCode}</span>
+                        <div className="text-[11px] text-slate-400">{store.templateName}</div>
+                      </>
+                    )}
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-bold text-white font-mono text-sm">{store.score}</span>
-                      <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            store.status === "passed"
-                              ? "bg-emerald-400"
-                              : store.status === "warning"
-                              ? "bg-amber-400"
-                              : "bg-rose-500"
-                          }`}
-                          style={{ width: live ? "0%" : store.score }}
-                        />
-                      </div>
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-1 font-mono">
-                      Văn Bản: {store.textScore} | Hình Ảnh: {store.mediaScore} | Bố Cục: {store.blockScore}
-                    </div>
+                    {live ? (
+                      (() => {
+                        const source = liveStoreById.get(store.id);
+                        const evidence = source?.fieldEvidence;
+                        const report = reportByStoreId.get(store.id);
+                        const rates = evidence ? fieldEvidenceRates(evidence.counts) : null;
+                        const percentage = rates?.matchRate ?? 0;
+                        const noDataReason = !evidence ? 'Chưa có dữ liệu đối soát' : !rates?.checked ? 'Chưa có trường được đối soát' : null;
+                        const accepted = percentage === 100 && report?.status === 'passed';
+                        const tone = accepted ? 'bg-emerald-400' : percentage >= 85 ? 'bg-amber-400' : 'bg-rose-500';
+                        const track = accepted ? 'bg-emerald-400/15' : percentage >= 85 ? 'bg-amber-400/15' : 'bg-rose-500/15';
+                        const fieldErrors = evidence ? evidence.counts.mismatch + evidence.counts.missing + evidence.counts.duplicate : 0;
+                        const primaryReason = report?.reasons.find(reason => !/trường|field evidence|Audit hiện tại báo lỗi|cảnh báo audit/.test(reason));
+                        const shortReason = primaryReason
+                          ?.replace('Chưa có audit hoàn chỉnh cho phiên bản hiện tại.', 'Chưa audit phiên bản này')
+                          .replace('Migration thất bại; kiểm tra lỗi của lần chạy F42.', 'Migration thất bại')
+                          .replace('Audit đã cũ hoặc chưa xác nhận phiên bản; cần chạy lại audit.', 'Audit cũ — cần chạy lại')
+                          .replace('Kết luận QC trước không còn hiệu lực; cần kiểm tra lại phần thay đổi.', 'Dữ liệu thay đổi — cần QC lại')
+                          .replace('Website PW2 chưa publish; cần kiểm tra trạng thái phát hành.', 'PW2 chưa publish')
+                          .replace('Audit còn hạng mục chờ dữ liệu backend.', 'Audit chờ dữ liệu backend');
+                        const historicalAudit = source?.auditStatus === 'stale' || source?.auditStatus === 'historical';
+                        return <div data-testid="migration-match-rate" className="max-w-sm space-y-1 text-[11px] text-slate-400"
+                          title="Độ khớp = trường khớp / trường đã kiểm tra trong snapshot F42, không phải toàn website hoặc dữ liệu PW2 hiện tại. Khi chưa có kết quả, 0% chỉ là giá trị hiển thị, không phải kết luận Failed.">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold font-mono tabular-nums text-white">{percentage}%</span>
+                            <div role="progressbar" aria-label="Độ khớp dữ liệu đã đối soát" aria-valuenow={percentage} aria-valuemin={0} aria-valuemax={100}
+                              aria-valuetext={noDataReason ? `0% — ${noDataReason}` : `${percentage}% khớp`} className={`h-1.5 w-24 overflow-hidden rounded-full ${track}`}>
+                              <div className={`h-full rounded-full ${tone}`} style={{ width: `${percentage}%` }} />
+                            </div>
+                          </div>
+                          {report && <span data-testid="migration-auto-status" title={report.reasons.join('\n')} className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${REPORT_COLORS[report.status]}`}>{REPORT_LABELS[report.status]}</span>}
+                          {noDataReason && <p className="text-amber-200">{noDataReason}</p>}
+                          {rates && <p>Đối soát {rates.checked}/{rates.total} trường{fieldErrors > 0 ? ` · ${fieldErrors} trường sai / thiếu / trùng` : ''}</p>}
+                          {shortReason && <p className="truncate" title={primaryReason}>{shortReason}</p>}
+                          {source && source.errors + source.warnings > 0 && <p>Audit{historicalAudit ? ' cũ' : ''}: {source.errors} lỗi · {source.warnings} cảnh báo</p>}
+                        </div>;
+                      })()
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-bold text-white font-mono text-sm">{store.score}</span>
+                          <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                store.status === "passed"
+                                  ? "bg-emerald-400"
+                                  : store.status === "warning"
+                                  ? "bg-amber-400"
+                                  : "bg-rose-500"
+                              }`}
+                              style={{ width: store.score }}
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1 font-mono">
+                          Văn Bản: {store.textScore} | Hình Ảnh: {store.mediaScore} | Bố Cục: {store.blockScore}
+                        </div>
+                      </>
+                    )}
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
                     {store.status === "passed" && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
-                        <CheckCircle2 className="size-3.5" /> {live ? "QC Pass (tester)" : "Khớp Chuẩn"}
+                        <CheckCircle2 className="size-3.5" /> {live ? "Pass" : "Khớp Chuẩn"}
                       </span>
                     )}
                     {live && liveStoreById.get(store.id)?.qcStatus === "unverified" && <span className="text-xs text-slate-400">Chưa kiểm chứng</span>}
@@ -1790,7 +2420,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     )}
                     {store.status === "failed" && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 whitespace-nowrap">
-                        <AlertOctagon className="size-3.5" /> Lỗi P0 Blocker
+                        <AlertOctagon className="size-3.5" /> {live ? "Failed" : "Lỗi P0 Blocker"}
                       </span>
                     )}
                   </td>
@@ -1799,7 +2429,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                       <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/50 px-2 py-0.5 rounded whitespace-nowrap">
                         {store.pageCount} Trang
                       </span>
-                      {store.failedBlocks.length > 0 ? (
+                      {!live && (store.failedBlocks.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {store.failedBlocks.map((fb, idx) => (
                             <span
@@ -1818,7 +2448,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                         <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 whitespace-nowrap">
                           <CheckCircle2 className="size-3.5" /> Khớp 100%
                         </span>
-                      )}
+                      ))}
                     </div>
                   </td>
                   <td className="py-4 px-4 text-right whitespace-nowrap">
@@ -1849,18 +2479,24 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                 <Search className="size-6" />
               </div>
               <div className="text-sm font-semibold text-white">
-                {live ? "Chưa có store migration phù hợp. Không dùng dữ liệu mẫu thay thế." : <>Không tìm thấy website nào khớp với từ khóa &ldquo;{searchQuery}&rdquo;</>}
+                {live
+                  ? "Không có website thuộc kết quả tự động và từ khóa đã chọn."
+                  : <>Không tìm thấy website nào khớp với từ khóa &ldquo;{searchQuery}&rdquo;</>}
               </div>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
                 Vui lòng kiểm tra lại Email khách hàng, Domain hoặc chuyển bộ lọc trạng thái sang &ldquo;Tất Cả&rdquo;.
               </p>
               <div className="flex items-center justify-center gap-2 pt-2">
-                {filterStatus !== "all" && (
+                {(filterStatus !== "all" || liveMetricFilter !== "all") && (
                   <button
-                    onClick={() => setFilterStatus("all")}
+                    onClick={() => {
+                      setFilterStatus("all");
+                      setLiveMetricFilter("all");
+                      setCurrentPage(1);
+                    }}
                     className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700 transition"
                   >
-                    Bỏ lọc trạng thái (Tìm trong Tất Cả)
+                    Bỏ lọc (Tìm trong Tất Cả)
                   </button>
                 )}
                 {searchQuery && (
@@ -1881,8 +2517,12 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
           <div>
             Đang hiển thị <strong>{paginatedStores.length}</strong> / <strong>{filteredStores.length}</strong> website
           </div>
-          <div className="flex items-center gap-2">
+          <div
+            data-testid="migration-pagination"
+            className="flex items-center gap-2"
+          >
             <button
+              aria-label="Trang trước"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 disabled:opacity-40 transition"
@@ -1893,6 +2533,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               Trang {currentPage} / {totalPages}
             </span>
             <button
+              aria-label="Trang sau"
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 disabled:opacity-40 transition"
@@ -1904,6 +2545,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       </div>
 
       {/* ========================================================================= */}
+      </>}
       {/* PROFESSIONAL DETAIL INSPECTOR MODAL WITH FULL 2-WEBSITE STREAM + FIELD DIFF */}
       {/* ========================================================================= */}
       {mounted && typeof document !== "undefined" && selectedDiff && activePage && createPortal(
@@ -1916,8 +2558,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
           <div className="bg-slate-900 border border-slate-700/80 rounded-none md:rounded-3xl w-full h-full flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
             
             {/* Top Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-slate-950 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
-              <div className="flex items-center gap-3.5">
+            <div className="relative p-4 pr-16 sm:p-5 sm:pr-16 border-b border-slate-800/80 bg-slate-950 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
+              <div className="flex min-w-0 flex-1 items-center gap-3.5">
                 <button
                   onClick={() => setActiveStoreId(null)}
                   className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition"
@@ -1928,16 +2570,18 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                 <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-xl shadow-md shadow-blue-500/20 ring-1 ring-white/20">
                   <Store className="size-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h2 id="modal-store-title" className="text-lg font-bold text-white tracking-tight">{selectedDiff.name}</h2>
                     <span className="font-mono text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-md">
                       {selectedDiff.id}
                     </span>
-                    <span className="text-xs text-slate-200 font-medium bg-slate-900 border border-slate-800 px-2.5 py-0.5 rounded-md">
-                      📧 {selectedDiff.ownerEmail}
-                    </span>
-                    <span className="text-xs text-slate-300 font-mono bg-slate-900 border border-slate-800 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                    {!live && (
+                      <span className="text-xs text-slate-200 font-medium bg-slate-900 border border-slate-800 px-2.5 py-0.5 rounded-md">
+                        📧 {selectedDiff.ownerEmail}
+                      </span>
+                    )}
+                    <span className="min-w-0 max-w-full break-all text-xs text-slate-300 font-mono bg-slate-900 border border-slate-800 px-2.5 py-0.5 rounded-md flex items-center gap-1">
                       <Globe className="size-3 text-slate-400" />
                       {selectedDiff.domain}
                     </span>
@@ -1950,11 +2594,19 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                           : "bg-rose-500/10 text-rose-400 border-rose-500/20"
                       }`}
                     >
-                      {selectedDiff.status === "passed" ? "✓ QC Pass (99.8%)" : selectedDiff.status === "warning" ? "⚠️ Cần Xem Lại" : "🚨 Lỗi P0 Blocker"}
+                      {live
+                        ? liveDetail?.review?.current && liveDetail.review.verdict
+                          ? `QC: ${liveDetail.review.verdict === "passed" ? "Pass" : liveDetail.review.verdict === "failed" ? "Failed" : "Cần xem lại"}`
+                          : "QC chưa kiểm chứng"
+                        : selectedDiff.status === "passed"
+                          ? "✓ QC Pass (99.8%)"
+                          : selectedDiff.status === "warning"
+                            ? "⚠️ Cần Xem Lại"
+                            : "🚨 Lỗi P0 Blocker"}
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
-                    <span>Gốc: <strong className="text-slate-200">{selectedDiff.templateCode} ({selectedDiff.templateName})</strong></span>
+                    <span>Gốc: <strong className="text-slate-200">{live ? "F42 evidence migration" : `${selectedDiff.templateCode} (${selectedDiff.templateName})`}</strong></span>
                     <span>•</span>
                     <span>Tổng số trang: <strong className="text-white">{selectedDiff.totalPagesInPW1} Trang</strong></span>
                     {selectedDiff.missingPagesCount > 0 && (
@@ -1967,7 +2619,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               </div>
 
               {/* Header Action Buttons */}
-              <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex max-w-full shrink-0 items-center gap-2.5 overflow-x-auto whitespace-nowrap [&>*]:shrink-0">
                 {/* Device View Mode Switcher (Desktop vs Mobile 375px) */}
                 <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-inner select-none">
                   <button
@@ -2000,30 +2652,42 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
                 <button
                   disabled={isReloading}
-                  onClick={() => handleReloadStoreData(selectedDiff.id)}
+                  onClick={() => {
+                    setReconciliationRefresh((value) => value + 1);
+                    if (live) {
+                      setLiveDetailRefresh((value) => value + 1);
+                      void loadLiveCatalog();
+                      return;
+                    }
+                    void handleReloadStoreData(selectedDiff.id);
+                  }}
                   className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700/80 transition shadow-sm disabled:opacity-50"
-                  title="Quét lại dữ liệu từ MySQL PW1 và Postgres PW2 sau khi Dev đã sửa"
+                  title={live ? "Đọc lại evidence F42 và trạng thái PW2" : "Quét lại dữ liệu từ MySQL PW1 và Postgres PW2 sau khi Dev đã sửa"}
                 >
                   <RefreshCw className={`size-3.5 ${isReloading ? "animate-spin text-blue-400" : "text-slate-400"}`} />
-                  <span>{isReloading ? "Đang Quét Lại..." : "Quét Lại CSDL"}</span>
+                  <span>{isReloading ? "Đang Quét Lại..." : live ? "Làm mới evidence" : "Quét Lại CSDL"}</span>
                 </button>
-                <button
-                  type="button"
-                  disabled
-                  onClick={() => handleApprovePass(selectedDiff.id)}
-                  title="Chỉ mở khi có evidence xác minh đầy đủ cho toàn bộ website"
-                  className="flex cursor-not-allowed items-center gap-1.5 rounded-xl bg-slate-700 px-4 py-2 text-xs font-semibold text-slate-400 opacity-70"
-                >
-                  <CheckCircle2 className="size-4" />
-                  <span>QC Pass chờ evidence</span>
-                </button>
-                <button
-                  onClick={() => setActiveStoreId(null)}
-                  className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition border border-slate-700/60"
-                >
-                  <X className="size-4" />
-                </button>
+                {live && activeStoreId && <QuickQcMenu
+                  key={activeStoreId}
+                  store={activeStoreId}
+                  version={liveDetail?.review?.version}
+                  ready={liveDetail?.migration === "completed" && Boolean(liveDetail?.attemptId)}
+                  onSaved={() => {
+                    setLiveDetailRefresh((value) => value + 1);
+                    void loadLiveCatalog();
+                    showToast("Đã lưu đánh giá QC.");
+                  }}
+                />}
               </div>
+              <button
+                type="button"
+                aria-label="Đóng màn hình so sánh"
+                title="Đóng màn hình so sánh"
+                onClick={() => setActiveStoreId(null)}
+                className="absolute right-4 top-4 sm:right-5 sm:top-5 flex size-9 items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition border border-slate-700/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              >
+                <X className="size-4" />
+              </button>
             </div>
 
             {/* Navigation Bar: Page Selectors & Mode Switcher */}
@@ -2119,8 +2783,102 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
             {/* Modal Body Area */}
             {activeViewTab === "commerce_reconciliation" || activeViewTab === "settings_reconciliation" ? (
-              <ReconciliationInspector scope={activeViewTab === "commerce_reconciliation" ? "commerce" : "settings"} snapshot={reconciliationSnapshot} loading={reconciliationLoading} error={reconciliationError} isDemo={reconciliationDemo} onToggleDemo={setReconciliationDemo} />
+              <div className="min-h-0 flex-1 overflow-y-auto" data-testid="migration-reconciliation-scroll">
+              {live && reconciliationSourceStoreId === activeStoreId && <FieldEvidencePanel
+                key={`${activeStoreId}-${activeViewTab}`}
+                store={reconciliationSourceStoreId}
+                scope={activeViewTab === 'commerce_reconciliation' ? 'commerce' : 'settings'}
+                refresh={reconciliationRefresh}
+              />}
+              <ReconciliationInspector
+                scope={activeViewTab === "commerce_reconciliation" ? "commerce" : "settings"}
+                snapshot={reconciliationSnapshot}
+                loading={reconciliationLoading}
+                error={reconciliationError}
+                isDemo={reconciliationDemo}
+                onToggleDemo={setReconciliationDemo}
+                sourceStoreId={reconciliationSourceStoreId}
+                onSourceStoreChange={(storeId) => {
+                  setReconciliationSourceStoreId(storeId);
+                  setReconciliationRunId(null);
+                  setReconciliationRuns([]);
+                  setReconciliationRunsTruncated(false);
+                  setReconciliationSnapshot(null);
+                  setReconciliationIssues([]);
+                }}
+                runId={reconciliationRunId}
+                runs={reconciliationRuns}
+                runsTruncated={reconciliationRunsTruncated}
+                runsLoading={reconciliationRunsLoading}
+                runsError={reconciliationRunsError}
+                onRunChange={(runId) => {
+                  setReconciliationRunId(runId);
+                  setReconciliationSnapshot(null);
+                  setReconciliationIssues([]);
+                }}
+                issues={reconciliationIssues}
+                issuesLoading={reconciliationIssuesLoading}
+                issuesError={reconciliationIssuesError}
+              />
+              </div>
             ) : activeViewTab === "visual_stream" ? (
+              live ? (
+                <div className="flex-1 overflow-y-auto bg-slate-900/30 p-5 sm:p-6">
+                  <section className="mx-auto max-w-6xl space-y-5">
+                    <div className="rounded-2xl border border-sky-500/30 bg-slate-950 p-5 shadow-xl">
+                      <div className="flex items-start gap-3">
+                        <BlockTreeIcon className="mt-0.5 size-5 shrink-0 text-sky-400" />
+                        <div>
+                          <h3 className="text-base font-bold text-white">Evidence khối từ F42</h3>
+                          <p className="mt-1 text-xs leading-5 text-slate-300">
+                            F42 lưu nội dung nguồn, giá trị PW2 và trạng thái field. F42 không lưu ảnh chụp hay cấu trúc render của từng block, nên màn này không giả lập giao diện sản phẩm/blog từ dữ liệu mẫu.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {liveDetail?.pages
+                      .find((page) => page.sourceId === activePage.id)
+                      ?.blocks.some((block) => !showOnlyErrors || block.status !== "match") ? (
+                      liveDetail.pages
+                        .find((page) => page.sourceId === activePage.id)!
+                        .blocks.filter((block) => !showOnlyErrors || block.status !== "match")
+                        .map((block, index) => (
+                          <article key={block.sourceId} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-lg">
+                            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/70 px-5 py-4">
+                              <div>
+                                <p className="font-mono text-[10px] text-slate-500">PW1 block ID: {block.sourceId}</p>
+                                <h4 className="mt-1 text-sm font-bold text-white">#{index + 1} · {block.kind}</h4>
+                              </div>
+                              <LiveStateBadge value={block.status === "match" ? "completed" : block.status === "mismatch" ? "needs-fix" : "not-checked"} />
+                            </header>
+                            <div className="overflow-x-auto p-5">
+                              <table className="w-full min-w-[640px] text-left text-xs">
+                                <thead className="border-b border-slate-800 text-[10px] uppercase text-slate-500">
+                                  <tr><th className="pb-2 pr-4">Field</th><th className="pb-2 pr-4 text-amber-300">PW1 source</th><th className="pb-2 pr-4 text-sky-300">PW2 current</th><th className="pb-2">F42</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/70 text-slate-300">
+                                  {block.fields.map((field) => (
+                                    <tr key={field.field}>
+                                      <td className="py-3 pr-4 font-mono text-slate-400">{field.field}</td>
+                                      <td className="max-w-sm break-words py-3 pr-4">{field.source || <span className="italic text-slate-600">trống</span>}</td>
+                                      <td className="max-w-sm break-words py-3 pr-4">{field.current || <span className="italic text-slate-600">trống</span>}</td>
+                                      <td className="py-3"><LiveStateBadge value={field.status === "match" ? "checked" : field.status === "mismatch" ? "needs-fix" : "not-checked"} /></td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </article>
+                        ))
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 px-6 py-12 text-center text-sm text-slate-400">
+                        {showOnlyErrors ? "Không có block F42 cần xem trên trang này." : "F42 chưa có block evidence cho trang này."}
+                      </div>
+                    )}
+                  </section>
+                </div>
+              ) : (
               /* ========================================================================= */
               /* 1. THE CLASSIC DUAL BROWSER PARITY STREAM VIEW (PW1 VS PW2) */
               /* ========================================================================= */
@@ -2480,6 +3238,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                   </div>
                 </div>
               </div>
+              )
             ) : activeViewTab === "live_webview" ? (
               /* ========================================================================= */
               /* 1.5. LIVE STOREFRONT WEBVIEW (100% REAL COMPILED HTML/CSS/JS IFRAME) */
@@ -2492,7 +3251,12 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
                         Nguồn Preview:
                       </span>
-                      {(() => {
+                      {live ? (
+                        <div className="flex items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-950/20 px-3 py-1.5 text-xs text-sky-200">
+                          <Globe className="size-3" />
+                          <span>URL nguồn và URL PW2 từ evidence F42</span>
+                        </div>
+                      ) : (() => {
                         const isDomainSslReady = isStoreDomainSslReady(selectedDiff);
                         return (
                           <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
@@ -2547,6 +3311,30 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                         <span>Trang: <strong>{activePage.name}</strong> ({activePage.path})</span>
                       </span>
                     </div>
+                    {live && activePageIndex > 0 && (
+                      <p className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-2 text-xs text-amber-100">
+                        F42 chỉ lưu URL PW1 của homepage. Khung bên trái đang hiển thị homepage PW1, không phải URL tương ứng của trang PW2 đang chọn.
+                      </p>
+                    )}
+                    {live && !isSafeF42ExternalUrl(liveDetail?.sourceUrl) && (
+                      <p className="rounded-lg border border-rose-500/30 bg-rose-950/20 px-3 py-2 text-xs text-rose-100">
+                        F42 không có URL PW1 công khai an toàn. Không thay thế bằng giao diện mẫu.
+                      </p>
+                    )}
+                    {live && isSafeF42ExternalUrl(liveDetail?.sourceUrl) && (
+                      <p className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-2 text-xs text-amber-100">
+                        PW1 được nhúng từ URL snapshot F42 để đối chiếu song song. Nếu khung PW1 trống, server PW1 đang chặn nhúng bằng CSP/X-Frame; cần bổ sung domain của F40 vào <code>frame-ancestors</code> trên PW1.
+                      </p>
+                    )}
+                    {live && (() => {
+                      const audit = liveDetail?.pages.find((page) => page.sourceId === activePage.id)?.audit;
+                      if (!audit) return null;
+                      return (
+                        <div className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+                          <span className="font-semibold text-sky-200">F42 audit:</span> {audit.status}{audit.stale ? " · dữ liệu audit cũ" : ""}{audit.findings.length ? ` · ${audit.findings.length} finding` : " · không có finding"}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Dual Browser URL Bar */}
@@ -2561,6 +3349,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                         </div>
                         <span className="text-[11px] font-mono text-amber-300 truncate">
                           {(() => {
+                            if (live)
+                              return `👈 PW1 homepage F42 • ${isSafeF42ExternalUrl(liveDetail?.sourceUrl) ? liveDetail.sourceUrl : "Chưa có URL công khai an toàn"}`;
                             const isSslReady = isStoreDomainSslReady(selectedDiff);
                             const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
                             return previewSource === "template" || !isSslReady
@@ -2582,6 +3372,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                         </button>
                         <a
                           href={(() => {
+                            if (live) return isSafeF42ExternalUrl(liveDetail?.sourceUrl) ? liveDetail.sourceUrl : "#";
                             const isSslReady = isStoreDomainSslReady(selectedDiff);
                             const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
                             return previewSource === "template" || !isSslReady
@@ -2609,7 +3400,9 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                           <span className="size-2 rounded-full bg-emerald-500/80" />
                         </div>
                         <span className="text-[11px] font-mono text-sky-300 truncate">
-                          {previewSource === "template"
+                          {live
+                            ? `👉 PW2 F42 • ${liveDetail?.pages.find((page) => page.sourceId === activePage.id)?.url ?? liveDetail?.url ?? "Chưa có URL"}`
+                            : previewSource === "template"
                             ? `👉 PW2 Next.js 15 • Theme ${selectedDiff.templateCode} • ${activePage.path}`
                             : `👉 PW2 Next.js 15 • ${selectedDiff.name} • ${activePage.path}`}
                         </span>
@@ -2626,7 +3419,12 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                         {activePage.existsInPW2 || previewSource === "template" ? (
                           <a
                             href={
-                              previewSource === "template"
+                              live
+                                ? (() => {
+                                    const url = liveDetail?.pages.find((page) => page.sourceId === activePage.id)?.url ?? liveDetail?.url;
+                                    return isSafeF42FrameUrl(url) ? url : "#";
+                                  })()
+                                : previewSource === "template"
                                 ? `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodeURIComponent(activePage.path)}&title=${encodeURIComponent(activePage.name)}#${activePage.path}`
                                 : `/api/qa/template-preview/${selectedDiff.templateCode.toLowerCase()}?version=pw2&store_id=${encodeURIComponent(selectedDiff.id)}&page=${encodeURIComponent(activePage.path)}&title=${encodeURIComponent(activePage.name)}#${activePage.path}`
                             }
@@ -2662,11 +3460,36 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                       ? `https://${cleanDomain}${liveDomainPath || "/"}${cleanDomain.includes("?") ? `&_t=${iframeReloadKey}` : `?_t=${iframeReloadKey}`}`
                       : pw1TemplateUrl;
                     const pw2LiveDomainUrl = pw2TemplateUrl;
+                    const f42Page = liveDetail?.pages.find(
+                      (page) => page.sourceId === activePage.id,
+                    );
+                    // F42 stores one PW1 homepage URL only. Never synthesize a
+                    // PW1 page URL from PW2 path, or replace missing evidence with a template.
+                    const f42PW1Url = isSafeF42ExternalUrl(liveDetail?.sourceUrl)
+                      ? liveDetail.sourceUrl
+                      : null;
+                    const f42PW2Candidate = f42Page?.url ?? liveDetail?.url;
+                    const f42PW2Url = isSafeF42FrameUrl(f42PW2Candidate)
+                      ? f42PW2Candidate
+                      : null;
 
                     const isDomainSslReady = isStoreDomainSslReady(selectedDiff);
-                    const pw1Url = (previewSource === "live_domain" && isDomainSslReady) ? pw1LiveDomainUrl : pw1TemplateUrl;
-                    const pw2Url = previewSource === "template" ? pw2TemplateUrl : pw2LiveDomainUrl;
-                    const iframeSandbox = "allow-scripts allow-same-origin allow-forms allow-popups";
+                    const pw1Url = live
+                      ? f42PW1Url ?? "about:blank"
+                      : (previewSource === "live_domain" && isDomainSslReady)
+                        ? pw1LiveDomainUrl
+                        : pw1TemplateUrl;
+                    const pw2Url = live
+                      ? f42PW2Url ?? "about:blank"
+                      : previewSource === "template"
+                        ? pw2TemplateUrl
+                        : pw2LiveDomainUrl;
+                    const pw1IframeSandbox = live
+                      ? "allow-scripts allow-forms allow-popups"
+                      : "allow-scripts allow-same-origin allow-forms allow-popups";
+                    // PW2 is an internal /sites route from this same trusted app.
+                    // It needs same-origin access for Next.js to hydrate correctly.
+                    const pw2IframeSandbox = "allow-scripts allow-same-origin allow-forms allow-popups";
 
                     return deviceView === "mobile" ? (
                       /* Mobile 375px Dual Phone Mockups with Real Iframes */
@@ -2686,9 +3509,10 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                               src={pw1Url}
                               title="PW1 Mobile Storefront"
                               className="w-full h-full border-0"
-                              sandbox={iframeSandbox}
+                              sandbox={pw1IframeSandbox}
+                              referrerPolicy="no-referrer"
                               onLoad={() => {
-                                if (previewSource === "template" || !isDomainSslReady) {
+                                if (!live && (previewSource === "template" || !isDomainSslReady)) {
                                   pw1MobIframeRef.current?.contentWindow?.postMessage({
                                     type: "spa-navigate",
                                     path: activePath,
@@ -2718,9 +3542,10 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                               src={pw2Url}
                               title="PW2 Next.js Mobile Storefront"
                               className="w-full h-full border-0"
-                              sandbox={iframeSandbox}
+                              sandbox={pw2IframeSandbox}
+                              referrerPolicy="no-referrer"
                               onLoad={() => {
-                                if (previewSource === "template") {
+                                if (!live && previewSource === "template") {
                                   pw2MobIframeRef.current?.contentWindow?.postMessage({
                                     type: "spa-navigate",
                                     path: activePath,
@@ -2751,9 +3576,10 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                               src={pw1Url}
                               title="PW1 Desktop Storefront"
                               className="w-full h-full border-0"
-                              sandbox={iframeSandbox}
+                              sandbox={pw1IframeSandbox}
+                              referrerPolicy="no-referrer"
                               onLoad={() => {
-                                if (previewSource === "template" || !isDomainSslReady) {
+                                if (!live && (previewSource === "template" || !isDomainSslReady)) {
                                   pw1DeskIframeRef.current?.contentWindow?.postMessage({
                                     type: "spa-navigate",
                                     path: activePath,
@@ -2779,9 +3605,10 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                               src={pw2Url}
                               title="PW2 Next.js Desktop Storefront"
                               className="w-full h-full border-0"
-                              sandbox={iframeSandbox}
+                              sandbox={pw2IframeSandbox}
+                              referrerPolicy="no-referrer"
                               onLoad={() => {
-                                if (previewSource === "template") {
+                                if (!live && previewSource === "template") {
                                   pw2DeskIframeRef.current?.contentWindow?.postMessage({
                                     type: "spa-navigate",
                                     path: activePath,
@@ -2820,6 +3647,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                       <strong>Nguồn dữ liệu:</strong>{" "}
                       {fieldDiffSource === "ui_fixture"
                         ? "fixture UI phục vụ kiểm thử, không phải migration thực tế."
+                        : fieldDiffSource === "f42_evidence"
+                        ? "evidence thực tế F42: giá trị nguồn/PW2 và trạng thái từng field được đọc từ migration run. F42 không lưu đủ định danh block PW2 hoặc tổng số bản ghi CSDL."
                         : fieldDiffSource === "pw1_snapshot_unverified"
                         ? "mới đọc PW1; PW2 và mapping định danh chưa được đọc. Không có field nào được xem là khớp migration."
                         : "catalog minh họa; chưa thay thế mapping PW1→PW2 đã được xác nhận."}
@@ -2999,18 +3828,23 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                               <span className="text-xs font-mono text-slate-400 font-normal">({record.entityIdentifier})</span>
                             </div>
                             <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                              MySQL Key ID: <strong className="text-amber-400">{record.legacyId}</strong> ➔ Postgres ID:{" "}
-                              {record.migratedId ? (
-                                <strong className="text-indigo-300">{record.migratedId}</strong>
+                              {fieldDiffSource === "f42_evidence" ? (
+                                <>F42 source ID: <strong className="text-amber-400">{record.legacyId}</strong> · PW2 block ID: <strong className="text-slate-500">F42 không lưu</strong></>
                               ) : (
-                                <strong className="text-rose-400">🚨 CHƯA CÓ TRÊN PW2</strong>
+                                <>MySQL Key ID: <strong className="text-amber-400">{record.legacyId}</strong> ➔ Postgres ID:{" "}
+                                  {record.migratedId ? (
+                                    <strong className="text-indigo-300">{record.migratedId}</strong>
+                                  ) : (
+                                    <strong className="text-rose-400">🚨 CHƯA CÓ TRÊN PW2</strong>
+                                  )}
+                                </>
                               )}
                             </div>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-3 self-end md:self-auto">
-                          {fieldDiffSource !== "ui_fixture" ? (
+                          {fieldDiffSource === "catalog_fixture" || fieldDiffSource === "pw1_snapshot_unverified" ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-950 text-amber-300 border border-amber-500/50">
                               <Info className="size-3.5" /> CHƯA XÁC MINH PW2
                             </span>
@@ -3113,7 +3947,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                                   )}
                                 </td>
                                 <td className="py-3.5 px-4 font-sans align-top">
-                                  {fieldDiffSource !== "ui_fixture" ? (
+                                  {fieldDiffSource === "catalog_fixture" || fieldDiffSource === "pw1_snapshot_unverified" ? (
                                     <span className="text-amber-300 font-bold flex items-center gap-1">
                                       <Info className="size-3.5" /> Chưa xác minh PW2
                                     </span>
@@ -3336,7 +4170,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       {/* Live PW1 MySQL Configuration & Test Modal */}
       {dbModalOpen && mounted && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-5 text-slate-100 animate-in fade-in zoom-in duration-200">
+          <div role="dialog" aria-modal="true" aria-labelledby="migration-db-dialog-title" className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-5 text-slate-100 animate-in fade-in zoom-in duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-3">
@@ -3344,19 +4178,27 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                   <Database className="size-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Kết Nối CSDL Live PW1 (MySQL)</h3>
-                  <p className="text-xs text-slate-400">Chế độ ĐỌC DỮ LIỆU AN TOÀN (Strictly Read-Only 100%)</p>
+                  <h3 id="migration-db-dialog-title" className="text-base font-bold text-white">{live ? "Nguồn dữ liệu F42 và kết nối PW1" : "Kết Nối CSDL Live PW1 (MySQL)"}</h3>
+                  <p className="text-xs text-slate-400">Kiểm tra kết nối dữ liệu nguồn</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setDbModalOpen(false)}
+                aria-label="Đóng cấu hình nguồn dữ liệu"
                 className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
               >
                 <X className="size-5" />
               </button>
             </div>
 
+            {live && (
+              <div className="rounded-2xl border border-sky-500/30 bg-sky-950/30 p-4 text-xs text-sky-100 space-y-2">
+                <strong>Nguồn đang dùng: migration F42</strong>
+                <p>Danh sách website, mapping và audit được đọc từ DB của hệ thống qua backend.</p>
+                <p>Kiểm tra kết nối MySQL PW1 bên dưới không thay đổi nguồn F42 và không chạy lại migration.</p>
+              </div>
+            )}
             {/* Read-Only Safety Banner */}
             <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5">
               <ShieldCheck className="size-4 shrink-0 mt-0.5 text-emerald-400" />
@@ -3371,7 +4213,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
             {/* Connection Status Card */}
             <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
               <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                <span>Trạng Thái Kết Nối Hiện Tại</span>
+                <span>Trạng thái kiểm tra MySQL PW1</span>
                 {dbStatus?.latencyMs !== undefined && (
                   <span className="text-[11px] font-mono text-slate-500">{dbStatus.latencyMs}ms</span>
                 )}
@@ -3379,7 +4221,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               <div className="flex items-center gap-2.5">
                 <span className={`size-3 rounded-full shrink-0 ${dbStatus?.connected ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
                 <span className={`text-sm font-bold ${dbStatus?.connected ? "text-emerald-400" : "text-slate-300"}`}>
-                  {dbStatus?.connected ? "Đã kết nối Live MySQL thành công" : "Chưa kết nối CSDL thật (Đang dùng dữ liệu mẫu)"}
+                  {dbStatus?.connected ? "Đã kết nối MySQL PW1 thành công" : dbStatus ? "Chưa kết nối được MySQL PW1" : "Chưa kiểm tra kết nối MySQL PW1"}
                 </span>
               </div>
               {dbStatus?.message && (
@@ -3406,6 +4248,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
             {/* Input Form */}
             <div className="space-y-3">
+              <p className="text-xs text-slate-300">Nhập thông tin để kiểm tra DB PW1. Host/Port phải khớp server PW1 được quản trị viên cấu hình. Kết quả chỉ dùng cho lần kiểm tra này, không lưu mật khẩu hoặc đổi nguồn F42. Để trống toàn bộ để kiểm tra kết nối mặc định.</p>
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-slate-300">
                   {useSeparateFields ? "Nhập thông số Host / Port / User:" : "Chuỗi kết nối MySQL (PW1_DATABASE_URL):"}
@@ -3421,7 +4264,9 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
               {!useSeparateFields ? (
                 <input
-                  type="text"
+                  type="password"
+                  aria-label="URL kết nối MySQL PW1"
+                  autoComplete="off"
                   placeholder="mysql://user:password@127.0.0.1:3306/legacy_db"
                   value={customDbUrl}
                   onChange={(e) => setCustomDbUrl(e.target.value)}
@@ -3433,6 +4278,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     <input
                       type="text"
                       placeholder="Host (vd: 127.0.0.1 hoặc db.domain.com)"
+                      aria-label="Host PW1"
                       value={customDbHost}
                       onChange={(e) => setCustomDbHost(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
@@ -3442,6 +4288,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     <input
                       type="text"
                       placeholder="Port (mặc định: 3306)"
+                      aria-label="Port PW1"
                       value={customDbPort}
                       onChange={(e) => setCustomDbPort(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
@@ -3451,6 +4298,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     <input
                       type="text"
                       placeholder="User (vd: qa_readonly)"
+                      aria-label="User PW1"
+                      autoComplete="off"
                       value={customDbUser}
                       onChange={(e) => setCustomDbUser(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
@@ -3460,6 +4309,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     <input
                       type="password"
                       placeholder="Password"
+                      aria-label="Password PW1"
+                      autoComplete="new-password"
                       value={customDbPassword}
                       onChange={(e) => setCustomDbPassword(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
@@ -3469,6 +4320,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     <input
                       type="text"
                       placeholder="Tên CSDL (Database Name)"
+                      aria-label="Database PW1"
                       value={customDbName}
                       onChange={(e) => setCustomDbName(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
@@ -3481,6 +4333,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               </p>
             </div>
 
+            {dbTestError && <p role="alert" className="text-xs text-rose-300">{dbTestError}</p>}
             {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
               <button
