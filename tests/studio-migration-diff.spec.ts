@@ -64,6 +64,22 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     expect([401, 403]).toContain(res.status());
   });
 
+  test("[TC-F40-14-API-01] F42 ledger run selector rejects unauthenticated access with 401/403", async ({
+    request,
+  }) => {
+    const res = await request.get("/api/qa/migration-reconciliation/runs?store_id=SITE-0001");
+    expect([401, 403]).toContain(res.status());
+  });
+
+  test("[TC-F40-14-API-02] F42 ledger issue reader rejects unauthenticated access with 401/403", async ({
+    request,
+  }) => {
+    const res = await request.get(
+      "/api/qa/migration-reconciliation/issues?store_id=SITE-0001&run_id=3f5f32ef-5385-4b46-9b4e-7a7c13f5c5db",
+    );
+    expect([401, 403]).toContain(res.status());
+  });
+
   test("[TC-F40-11-E2E-01] unauthenticated navigation to /studio/migration redirects to login", async ({
     page,
   }) => {
@@ -78,7 +94,7 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     );
 
     // Arrange
-    await page.goto("/studio/qa/migration-diff");
+    await page.goto("/studio/qa/migration-diff?demo=1");
     await page.getByPlaceholder("Tìm theo Email khách hàng, Domain, Mã Site...").fill("SITE-0001");
     await page.getByTestId("migration-store-compare-SITE-0001").click();
     await page.getByRole("button", { name: "Soi CSDL 1-to-1" }).click();
@@ -109,7 +125,7 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
       "Requires the super-admin E2E account configured by the f40-migration-diff project.",
     );
 
-    await page.goto("/studio/qa/migration-diff");
+    await page.goto("/studio/qa/migration-diff?demo=1");
     await page.getByPlaceholder("Tìm theo Email khách hàng, Domain, Mã Site...").fill("SITE-0001");
     await page.getByTestId("migration-store-compare-SITE-0001").click();
     await page.getByRole("button", { name: "Soi CSDL 1-to-1" }).click();
@@ -140,7 +156,7 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
       "Requires the super-admin E2E account configured by the f40-migration-diff project.",
     );
 
-    await page.goto("/studio/qa/migration-diff");
+    await page.goto("/studio/qa/migration-diff?demo=1");
     await page.getByRole("button", { name: "So Sánh Khối" }).click();
     await page.getByLabel("Xem dữ liệu mẫu để duyệt UI").check();
 
@@ -156,7 +172,7 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     );
 
     // Arrange
-    await page.goto("/studio/qa/migration-diff");
+    await page.goto("/studio/qa/migration-diff?demo=1");
 
     // Act
     await page.getByRole("button", { name: "Đối soát Commerce" }).click();
@@ -171,5 +187,35 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     // Switching scopes must not retain the Commerce-only Products filter.
     await page.getByRole("button", { name: "Đối soát Settings" }).click();
     await expect(page.getByText("Account profile")).toBeVisible();
+  });
+
+  test("[TC-F40-14-04] Super Admin selects an explicit verified F42 child run without retaining stale results", async ({ page }) => {
+    test.skip(
+      !process.env.TEST_EMAIL
+        || !process.env.TEST_PASSWORD
+        || !process.env.E2E_TEST_OTP_CODE
+        || !process.env.E2E_F42_SOURCE_STORE_ID
+        || !process.env.E2E_F42_RUN_ID,
+      "Requires a Super Admin session plus an approved F42 staging child run and source store ID.",
+    );
+
+    // Arrange
+    await page.goto("/studio/qa/migration-diff");
+    await page.getByRole("button", { name: "Đối soát Commerce" }).click();
+
+    // Act
+    await page.getByLabel("ID store nguồn PW1").fill(process.env.E2E_F42_SOURCE_STORE_ID ?? "");
+    const runSelector = page.getByLabel("Chọn migration run F42");
+    await expect(runSelector.locator(`option[value="${process.env.E2E_F42_RUN_ID}"]`)).toHaveCount(1);
+    await runSelector.selectOption(process.env.E2E_F42_RUN_ID);
+
+    // Assert
+    await expect(page.getByTestId("migration-reconciliation-shell")).toBeVisible();
+    await expect(page.getByTestId("migration-ledger-issues")).toBeVisible();
+
+    // Act / Assert — a new source Store must clear the old selected run and its issues.
+    await page.getByLabel("ID store nguồn PW1").fill("999999999");
+    await expect(runSelector).toHaveValue("");
+    await expect(page.getByTestId("migration-ledger-issues")).toHaveCount(0);
   });
 });

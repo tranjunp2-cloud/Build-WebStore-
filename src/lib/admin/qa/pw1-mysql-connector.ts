@@ -329,8 +329,19 @@ export async function closePw1Pool(): Promise<void> {
  */
 export async function testPw1Connection(overrideConfig?: Pw1DbConfig): Promise<Pw1ConnectionStatus> {
   const start = Date.now();
+  // A form test must not reuse or replace the application's shared pool.
+  const temporaryPool = overrideConfig ? mysql.createPool({
+    host: overrideConfig.host,
+    port: overrideConfig.port,
+    user: overrideConfig.user,
+    password: overrideConfig.password,
+    database: overrideConfig.database,
+    connectionLimit: 1,
+    connectTimeout: 10000,
+    multipleStatements: false,
+  }) : null;
   try {
-    const activePool = getPw1ConnectionPool(overrideConfig);
+    const activePool = temporaryPool ?? getPw1ConnectionPool();
     const connection = await activePool.getConnection();
 
     try {
@@ -359,9 +370,11 @@ export async function testPw1Connection(overrideConfig?: Pw1DbConfig): Promise<P
   } catch (err: any) {
     return {
       connected: false,
-      message: `Không thể kết nối tới MySQL PW1: ${err.message || String(err)}`,
+      message: "Không thể kết nối tới MySQL PW1. Kiểm tra thông tin đăng nhập, tên DB và quyền truy cập.",
       latencyMs: Date.now() - start,
     };
+  } finally {
+    await temporaryPool?.end();
   }
 }
 
