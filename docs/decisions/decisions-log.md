@@ -309,3 +309,31 @@
 | **Supersedes** | F23 PRD v1.2 BR-23-02 `Avatar Independence` và wording cũ của US-F23-01 cho phép Owner upload local avatar. |
 | **Dependency** | Written SSO Integration Contract phải xác nhận immutable identity/preflight, avatar field/format, `PRESENT`/`ABSENT`/`UNKNOWN` semantics, webhook/Profile API, authentication, caching permission, purge retention, retry/rate limit, SLA capability, backfill access và Staging fixtures. |
 | **Status** | ✅ Product behavior decided — ⏳ Development blocked by SSO Contract and cross-team reviews |
+
+---
+
+## PD-023 — F43 Billplz: Paid-After-Cancel Policy — 3-Layer (Prevent / Detect / Manual Refund)
+
+| | |
+|---|---|
+| **Date** | 2026-10-05 |
+| **Decision** | Khi Billplz callback báo `paid=true` trên order đã `cancelled`: order **giữ cancelled**, emit `PAID_AFTER_CANCEL` + alert seller, refund tay (v1). KHÔNG auto-revive order. |
+| **Options** | 1. Alert only + refund tay; 2. Auto-revive order → trừ kho lại; 3. Revive nếu còn hàng, alert nếu hết |
+| **Chosen** | **Option 1 — 3-layer.** L1 Prevent: `deleteBill` trên mọi pending→cancelled path (bills sống 30d vs order expiry 24h). L2 Detect: `PAID_AFTER_CANCEL` error log + seller alert khi payment lọt qua. L3 Resolve: order giữ cancelled; seller refund tay v1 (email `team@billplz.com` / chuyển khoản — giống COD/bank-transfer bookkeeping hiện tại); semi-auto qua Payment Order API là stretch US-F43-06. |
+| **Rationale** | **Cancelled là quyết định business, không hệ thống lớn nào hồi sinh order đã huỷ** (Shopee/Lazada kill payment link; Stripe session tự expire 24h). Billplz là anomaly: bill sống 30d + docs chính thức ghi "deleted bill reappears once paid" → lỗ hổng provider không đóng được, chỉ mitigate. Auto-revive = override quyết định cancel + rủi ro oversell (restock đã chạy, hàng có thể đã bán) + seller-cancelled phải được tôn trọng tuyệt đối. **Auto-refund không tồn tại cho FPX**: push-payment non-reversible ở network level (Billplz docs), Billplz không lưu bank details người trả → refund bắt buộc disbursement + buyer cung cấp số TK. |
+| **Impact** | **Code:** `voidBillplzBill` shared helper trên 3 cancel paths (expiry cron, buyer cancel-payment, seller pending-cancel); webhook dispatch paid-on-cancelled → `PAID_AFTER_CANCEL` + alert; refund route → 422 `BILLPLZ_MANUAL_REFUND`. **Docs:** `plans/261005-1427-billplz-payment/` phase-04, phase-05; stories US-F43-04/05/06. |
+| **Status** | ⚠️ Dev-decided (validated with owner 2026-10-05) — **pending BA confirm** |
+
+---
+
+## PD-024 — F43 Billplz: Connect Method — Manual Keys v1, OAuth Deferred (Blocked on Partner Access)
+
+| | |
+|---|---|
+| **Date** | 2026-10-05 |
+| **Decision** | Seller connect Billplz qua **3 manual keys** (API Secret + Collection ID + X Signature Key) trong Settings → Payments. OAuth Connect là stretch phase (US-F43-07), **blocked** chờ Billplz cấp partner credentials. |
+| **Options** | 1. Manual keys v1, OAuth sau khi có credentials; 2. Block toàn bộ feature chờ OAuth approval |
+| **Chosen** | **Option 1.** Manual keys cho hosted payment flow chạy được ngay; OAuth chỉ ảnh hưởng UX connect, không ảnh hưởng payment flow. Client đã thiết kế `BillplzAuth` union `{basic|bearer}` — nâng cấp OAuth sau chỉ là call-site change. |
+| **Rationale** | Billplz OAuth là **partner-only** (docs public không mô tả; endpoints Doorkeeper quan sát được trên dashboard domain nhưng client_id/secret, scopes, token→credential contract chưa public). Chờ OAuth approval chặn toàn bộ feature mà không có lý do business — Stripe Connect tương đương cũng có manual fallback. |
+| **Impact** | **Outreach:** email `team@billplz.com` xin partner access + confirm contract (credentials, scopes, credential retrieval endpoint, refresh semantics). **Code:** US-F43-07 build skeleton (state nonce+TTL+single-use — không clone eternal `HMAC(tenantId)` của Stripe) sau cờ `BILLPLZ_CLIENT_ID`; credential adapter chỉ implement sau khi contract confirmed. **Docs:** `plans/261005-1427-billplz-payment/phase-07-oauth.md`; issue #1918 label `blocked`. |
+| **Status** | ⚠️ Dev-decided (validated with owner 2026-10-05) — **pending BA confirm**; implementation blocked pending Billplz response |

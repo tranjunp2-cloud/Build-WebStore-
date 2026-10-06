@@ -2,6 +2,11 @@
 
 <!-- Rules & ID Convention: docs/stories/user-stories-p0.md -->
 
+> [!WARNING]
+> **Status:** Draft — **dev-researched, pending BA review**
+> **Provenance:** Researched + authored by Dev on `research/billplz-payment-method` (no BA involvement yet). Technical foundation: `plans/261005-1427-billplz-payment/` + `research.md`. Product decisions (late-payment policy, refund v1, OAuth deferral) logged as PD-023/PD-024 in `docs/decisions/decisions-log.md` — BA confirms or amends.
+> **When BA joins:** business context/scope/metrics → `docs/prd/F43-billplz-payment.md` (skeleton exists); ACs here get BA-accepted → Status: Ready.
+
 > **Feature:** F43 — Billplz Payment Integration (Malaysia hosted checkout: FPX, e-wallet/QR, card, BNPL)
 > **Wave:** 8 | **Priority:** P1 | **Plan:** [plans/261005-1427-billplz-payment/](../../plans/261005-1427-billplz-payment/plan.md) | **Research:** [research.md](../../plans/261005-1427-billplz-payment/research.md)
 > **Provider:** Billplz — per-merchant keys (API Secret + Collection ID + X Signature), non-custody, platform RM0.

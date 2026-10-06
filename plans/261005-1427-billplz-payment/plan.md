@@ -12,6 +12,9 @@ created: 2026-10-05
 
 # F43 — Billplz Payment Integration
 
+> [!NOTE]
+> **Provenance:** Dev-researched (no BA involvement yet). When BA joins: business context/scope/metrics → `docs/prd/F43-billplz-payment.md`; product decisions → PD-023/PD-024 in `docs/decisions/decisions-log.md`; stories → `docs/stories/F43-billplz-payment-stories.md` (BA-accept to mark Ready).
+
 > **Source of truth:** [research.md](./research.md) — API, X Signature algorithm, endpoint probing results, fees, risks.
 > **Convention:** 1 phase = 1 User Story = 1 branch = 1 PR into `staging`. Branch per phase: `feat/F43-XX-<slug>`.
 
