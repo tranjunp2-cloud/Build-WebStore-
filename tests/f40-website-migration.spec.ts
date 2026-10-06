@@ -52,7 +52,7 @@ async function checkWebsiteMigration({
   page,
   request,
   baseURL,
-}: { page: Page; request: APIRequestContext; baseURL: string | undefined }, qcOnly = false) {
+}: { page: Page; request: APIRequestContext; baseURL: string | undefined }, qcOnly = false, blocksOnly = false) {
   test.setTimeout(120000);
   expect([401, 403]).toContain(
     (
@@ -225,6 +225,34 @@ async function checkWebsiteMigration({
   const snapshot = (await detail.json()).data;
   expect(snapshot.storeId).toBe(store);
   expect(snapshot.pages.length).toBeGreaterThan(0);
+  // TC-F40-MIG-LIVE-13: real evidence and browser UI only. Return before
+  // QC/image writes; do not intercept requests or substitute fixture responses.
+  if (blocksOnly) {
+    await expect(page.getByText(/Báo cáo tự động từ evidence F42 đã lưu/)).toHaveCount(0);
+    await expect(page.getByText(/PW1 được nhúng từ URL snapshot F42/)).toHaveCount(0);
+    const attention = page.getByRole('button', { name: 'Lỗi / cần xem', exact: true });
+    await attention.click();
+    await expect(attention).toHaveAttribute('aria-pressed', 'true');
+    const panel = page.getByRole('region', { name: 'So sánh khối dễ đọc' });
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('Đối chiếu dữ liệu kỳ vọng F42 với PW2');
+    await panel.getByRole('button', { name: 'Tất cả', exact: true }).click();
+    await expect(panel.getByTestId('migration-block-card')).toHaveCount(snapshot.pages[0].blocks.length);
+    for (const [index] of snapshot.pages[0].blocks.entries()) {
+      const card = panel.getByTestId('migration-block-card').nth(index);
+      await expect(card).toHaveAttribute('data-block-number', String(index + 1));
+      await expect(card.locator('details')).toHaveCount(1);
+      await expect(card.locator('pre')).not.toBeVisible();
+      await card.getByText('Chi tiết kỹ thuật', { exact: true }).click();
+      await expect(card.locator('pre')).toBeVisible();
+      await card.getByText('Chi tiết kỹ thuật', { exact: true }).click();
+    }
+    await panel.getByRole('button', { name: 'Cần kiểm tra', exact: true }).click();
+    await expect(panel.getByRole('button', { name: 'Cần kiểm tra', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Xem Web Thật (Live Iframe)', exact: true }).click();
+    await expect(panel).toHaveCount(0);
+    return;
+  }
   // TC-F40-MIG-LIVE-11: compare the real API and visible labels with mapped
   // PW2 CMS records. Navigation-menu labels are not inferred from page order.
   const pagesClient = new Client({ connectionString: process.env.DATABASE_URI });
@@ -416,4 +444,8 @@ test("[TC-F40-MIG-LIVE-02] real website migration catalog and evidence", async (
 
 test("[TC-F40-MIG-LIVE-09] QC dropdown opens in comparison and rejects invalid requests without saving", async ({ page, request, baseURL }) => {
   await checkWebsiteMigration({ page, request, baseURL }, true);
+});
+
+test('[TC-F40-MIG-LIVE-13] readable block cards display real evidence without saving verdicts', async ({ page, request, baseURL }) => {
+  await checkWebsiteMigration({ page, request, baseURL }, false, true);
 });
