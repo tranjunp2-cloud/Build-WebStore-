@@ -9,6 +9,7 @@ import {
 import {
   evidenceVersionSql,
   readWebsiteReview,
+  readWebsiteReviews,
 } from "./website-migration-review";
 
 import {
@@ -22,6 +23,11 @@ import {
   type MigrationStore,
 } from "./website-migration-compare";
 import { sanitizeMigrationSourceUrl } from "./website-migration-url";
+type WebsiteDocument = Awaited<ReturnType<Payload['findByID']>>;
+import { summarizeWebsiteComparison, type WebsiteImageCheck } from './website-comparison-summary';
+import { imagePreviews } from './website-image-preview';
+import { websiteImageCacheKey } from './website-image-cache-key';
+import { isF42SchemaReady } from './f42-source-readiness';
 import { readFieldSummaries } from './f42-field-evidence-reader';
 export type {
   MigrationField,
@@ -39,6 +45,23 @@ async function execute<T>(
   return (await db.execute(query)).rows;
 }
 
+type DetailRow = { storeId: string;
+    siteId: number;
+    tenantId: number;
+    inputHash: string;
+    attemptId: string | null;
+    committedAt: string | null;
+    artifacts: unknown;
+    report: unknown;
+    checkedAt: string | null;
+    baseUrl: string | null;
+    migration: string;
+    publish: string;
+  };
+type DetailContext = {
+  payload: Payload; rows: DetailRow[]; sites: WebsiteDocument[]; tenants: WebsiteDocument[]; pages: WebsiteDocument[];
+  media: Map<number, unknown>; reviews: Awaited<ReturnType<typeof readWebsiteReviews>>;
+};
 export async function readWebsiteMigrations(input: {
   batch?: string;
   run?: string;
@@ -106,6 +129,7 @@ export async function readWebsiteMigrations(input: {
   );
   const stores = rows.filter((row) => Boolean(row.storeId));
   const fieldSummaries = await readFieldSummaries(stores.map(store => store.storeId));
+  const websiteSummaries = await readWebsiteComparisonSummaries(payload, stores.map(store => store.storeId));
   return {
     batches,
     summary: {
@@ -116,51 +140,41 @@ export async function readWebsiteMigrations(input: {
       needsAttention: rows[0]?.needsAttention ?? 0,
       unverifiedQc: rows[0]?.unverifiedQc ?? 0,
     },
-    stores: stores.map(store => ({ ...store, fieldEvidence: fieldSummaries.get(store.storeId) ?? null })),
+    stores: stores.map(store => ({ ...store, fieldEvidence: fieldSummaries.get(store.storeId) ?? null, websiteComparison: websiteSummaries.get(store.storeId) ?? null })),
     total: rows[0]?.total ?? 0,
     page: input.page,
     limit: input.limit,
   };
 }
-export async function readWebsiteMigrationDetail(storeId: string) {
-  const initialReview = await readWebsiteReview(storeId);
-  const payload = await getPayload({ config });
-  const rows = await execute<{
-    siteId: number;
-    tenantId: number;
-    inputHash: string;
-    attemptId: string | null;
-    committedAt: string | null;
-    artifacts: unknown;
-    report: unknown;
-    checkedAt: string | null;
-    baseUrl: string | null;
-    migration: string;
-    publish: string;
-  }>(
+export async function readWebsiteMigrationDetail(storeId: string, context?: DetailContext) {
+  const initialReview = context ? context.reviews.find(r => r.storeId === storeId) ?? null : await readWebsiteReview(storeId);
+  const payload = context?.payload ?? await getPayload({ config });
+  const rows = context ? context.rows.filter(row => row.storeId === storeId) : await execute<DetailRow>(
     payload,
     sql`
-      SELECT m.site_id AS "siteId",m.tenant_id AS "tenantId",m.input_hash AS "inputHash",m.status AS migration,s.status AS publish,c.attempt_id AS "attemptId",c.committed_at AS "committedAt",a.artifacts,q.report,q.checked_at AS "checkedAt",q.base_url AS "baseUrl"
+      SELECT m.source_store_id AS "storeId",m.site_id AS "siteId",m.tenant_id AS "tenantId",m.input_hash AS "inputHash",m.status AS migration,s.status AS publish,c.attempt_id AS "attemptId",c.committed_at AS "committedAt",a.artifacts,q.report,q.checked_at AS "checkedAt",q.base_url AS "baseUrl"
       FROM pw1_migration_stores m JOIN sites s ON s.id=m.site_id LEFT JOIN LATERAL (SELECT attempt_id,committed_at FROM pw1_migration_commits WHERE source_store_id=m.source_store_id AND input_hash=m.input_hash ORDER BY committed_at DESC LIMIT 1) c ON true
       LEFT JOIN pw1_migration_attempts a ON a.id=c.attempt_id LEFT JOIN pw1_migration_qa_audits q ON q.source_store_id=m.source_store_id AND q.input_hash=m.input_hash AND q.attempt_id=c.attempt_id WHERE m.source_store_id=${storeId}`,
   );
   const row = rows[0];
   if (!row) return null;
-  const site = await payload.findByID({
+  const site = context ? context.sites.find(site => site.id === row.siteId) : await payload.findByID({
     collection: "sites",
     id: row.siteId,
     depth: 0,
     overrideAccess: true,
   });
+  if (!site) return null;
   if (Number(asRecord(site.tenant).id ?? site.tenant) !== row.tenantId)
     throw new Error("Migration tenant mismatch");
-  const tenant = await payload.findByID({
+  const tenant = context ? context.tenants.find(tenant => tenant.id === row.tenantId) : await payload.findByID({
     collection: "tenants",
     id: row.tenantId,
     depth: 0,
     overrideAccess: true,
   });
-  const currentPages = await payload.find({
+  if (!tenant) return null;
+  const currentPages = context ? { docs: context.pages.filter(page => Number(asRecord(page.site).id ?? page.site) === row.siteId) } : await payload.find({
     collection: "pages",
     where: { site: { equals: row.siteId } },
     pagination: false,
@@ -168,8 +182,8 @@ export async function readWebsiteMigrationDetail(storeId: string) {
     overrideAccess: true,
   });
   const mediaIds = collectWebsiteMediaIds({ site, pages: currentPages.docs });
-  const media = new Map<number, unknown>();
-  for (let offset = 0; offset < mediaIds.length; offset += 100) {
+  const media = context?.media ?? new Map<number, unknown>();
+  for (let offset = 0; offset < (context ? 0 : mediaIds.length); offset += 100) {
     const result = await payload.find({
       collection: "media",
       where: { id: { in: mediaIds.slice(offset, offset + 100) } },
@@ -239,7 +253,15 @@ export async function readWebsiteMigrationDetail(storeId: string) {
         (item) => asRecord(item).sourceId === source.sourceId,
       ),
     );
-    const actual = asArray(resolveWebsiteMedia(current?.layout, media)),
+    // Website rendering uses the site-wide footer; legacy inline footers may
+    // omit fields (such as socials) that are preserved in the global JSON block.
+    const currentLayout = asArray(current?.layout).map((value) => {
+      const block = asRecord(value);
+      return block.blockType === "footer" && asRecord(site.footerBlock).blockType === "footer"
+        ? site.footerBlock
+        : value;
+    });
+    const actual = asArray(resolveWebsiteMedia(currentLayout, media)),
       blocks = asArray(expected.blocks);
     const pageAudit = asRecord(
       auditPages.find((item) => asRecord(item).pageId === current?.id),
@@ -405,7 +427,7 @@ export async function readWebsiteMigrationDetail(storeId: string) {
     };
   });
   // A concurrently committed rerun must not be presented with the previous source snapshot.
-  const latest = await execute<{ inputHash: string; attemptId: string | null }>(
+  const latest = context ? [{ inputHash: row.inputHash, attemptId: row.attemptId }] : await execute<{ inputHash: string; attemptId: string | null }>(
     payload,
     sql`SELECT m.input_hash AS "inputHash",c.attempt_id AS "attemptId" FROM pw1_migration_stores m LEFT JOIN LATERAL (SELECT attempt_id FROM pw1_migration_commits WHERE source_store_id=m.source_store_id AND input_hash=m.input_hash ORDER BY committed_at DESC LIMIT 1) c ON true WHERE m.source_store_id=${storeId}`,
   );
@@ -446,7 +468,7 @@ export async function readWebsiteMigrationDetail(storeId: string) {
         ),
     ),
   ];
-  const review = await readWebsiteReview(storeId);
+  const review = context ? initialReview : await readWebsiteReview(storeId);
   if (initialReview?.version !== review?.version)
     throw new Error("Website changed during evidence read; refresh");
   return {
@@ -470,4 +492,72 @@ export async function readWebsiteMigrationDetail(storeId: string) {
     auditStatus,
     review,
   };
+}
+
+/** Batch-load content for the visible catalog; never issue a detail query per store. */
+async function readWebsiteComparisonSummaries(payload: Payload, storeIds: string[]) {
+  const summaries = new Map<string, import('./website-comparison-summary').WebsiteComparisonSummary>();
+  if (!storeIds.length) return summaries;
+  const rows = await execute<DetailRow>(payload, sql`
+    SELECT m.source_store_id AS "storeId",m.site_id AS "siteId",m.tenant_id AS "tenantId",m.input_hash AS "inputHash",
+      m.status AS migration,s.status AS publish,c.attempt_id AS "attemptId",c.committed_at AS "committedAt",
+      a.artifacts,q.report,q.checked_at AS "checkedAt",q.base_url AS "baseUrl"
+    FROM pw1_migration_stores m JOIN sites s ON s.id=m.site_id
+    LEFT JOIN LATERAL (SELECT attempt_id,committed_at FROM pw1_migration_commits WHERE source_store_id=m.source_store_id AND input_hash=m.input_hash ORDER BY committed_at DESC LIMIT 1)c ON true
+    LEFT JOIN pw1_migration_attempts a ON a.id=c.attempt_id
+    LEFT JOIN pw1_migration_qa_audits q ON q.source_store_id=m.source_store_id AND q.input_hash=m.input_hash AND q.attempt_id=c.attempt_id
+    WHERE m.source_store_id IN (${sql.join(storeIds.map(id => sql`${id}`), sql`,`)})`);
+  const [sites, tenants, pages, reviews] = await Promise.all([
+    payload.find({ collection: 'sites', where: { id: { in: rows.map(row => row.siteId) } }, depth: 0, pagination: false, overrideAccess: true }),
+    payload.find({ collection: 'tenants', where: { id: { in: rows.map(row => row.tenantId) } }, depth: 0, pagination: false, overrideAccess: true }),
+    payload.find({ collection: 'pages', where: { site: { in: rows.map(row => row.siteId) } }, depth: 0, pagination: false, overrideAccess: true }),
+    readWebsiteReviews(storeIds),
+  ]);
+  const mediaIds = collectWebsiteMediaIds({ sites: sites.docs, pages: pages.docs });
+  const media = new Map<number, unknown>();
+  for (let offset = 0; offset < mediaIds.length; offset += 100) {
+    const found = await payload.find({ collection: 'media', where: { id: { in: mediaIds.slice(offset, offset + 100) } }, depth: 0, pagination: false, overrideAccess: true,
+      select: { url: true, alt: true, filename: true, mimeType: true, filesize: true, width: true, height: true, updatedAt: true } });
+    for (const item of found.docs) media.set(Number(item.id), item);
+  }
+  const context: DetailContext = { payload, rows, sites: sites.docs, tenants: tenants.docs, pages: pages.docs, media, reviews };
+  const details = await Promise.all(storeIds.map(id => readWebsiteMigrationDetail(id, context)));
+  const imagePairs: Array<WebsiteImageCheck & { store: string; key: string }> = [];
+  const mediaByUrl = new Map([...media.values()].map(value => [String(asRecord(value).url), asRecord(value)]));
+  for (const detail of details) {
+    if (!detail) continue;
+    for (const page of detail.pages) for (const block of page.blocks) for (const field of block.fields) {
+      const current = imagePreviews(field.field, field.current);
+      for (const source of imagePreviews(field.field, field.source)) {
+        const target = current.find(image => image.path === source.path);
+        const item = target?.url ? mediaByUrl.get(target.url) : undefined;
+        if (!source.url || !target?.url || !item?.id || !item.updatedAt) continue;
+        imagePairs.push({ store: detail.storeId, page: page.sourceId, block: block.sourceId, field: field.field, path: source.path,
+          key: websiteImageCacheKey(source.url, { id: Number(item.id), updatedAt: String(item.updatedAt) }, target.url),
+          check: { status: 'unavailable', detail: 'Chưa có kiểm tra ảnh hợp lệ' }, altMatches: source.alt === target.alt,
+          dimensionsMatch: source.width && source.height && target.width && target.height ? source.width === target.width && source.height === target.height : null });
+      }
+    }
+  }
+  const db = payload.db.drizzle;
+  const checksReady = await isF42SchemaReady(db, { pw1_migration_qa_image_checks: ['cache_key', 'result', 'checked_at'] });
+  const cached = checksReady && imagePairs.length ? await execute<{ key: string; result: WebsiteImageCheck['check'] }>(payload, sql`
+    SELECT cache_key AS key,result FROM pw1_migration_qa_image_checks
+    WHERE cache_key IN (${sql.join([...new Set(imagePairs.map(pair => pair.key))].map(key => sql`${key}`), sql`,`)})
+    AND checked_at>now()-CASE WHEN result->>'status'='unavailable' THEN interval '5 minutes' ELSE interval '24 hours' END`) : [];
+  const cachedByKey = new Map(cached.map(row => [row.key, row.result]));
+  const reviewsReady = await isF42SchemaReady(db, { pw1_migration_qa_image_reviews: ['source_store_id', 'evidence_version', 'page_id', 'block_id', 'field_name', 'image_path'] });
+  const imageReviews = reviewsReady ? await execute<{ store: string; version: string; page: string; block: string; field: string; path: string }>(payload, sql`
+    SELECT source_store_id AS store,evidence_version AS version,page_id AS page,block_id AS block,field_name AS field,image_path AS path
+    FROM pw1_migration_qa_image_reviews WHERE source_store_id IN (${sql.join(storeIds.map(id => sql`${id}`), sql`,`)})`) : [];
+  // Refuse to publish a percentage if the source/current website changed during batch assembly.
+  const latestReviews = new Map((await readWebsiteReviews(storeIds)).map(review => [review.storeId, review]));
+  for (const detail of details) {
+    if (!detail || detail.review?.version !== latestReviews.get(detail.storeId)?.version) continue;
+    const checks = imagePairs.filter(pair => pair.store === detail.storeId && cachedByKey.has(pair.key))
+      .map(pair => ({ ...pair, check: cachedByKey.get(pair.key)! }));
+    const approvals = imageReviews.filter(review => review.store === detail.storeId && review.version === detail.review?.version);
+    summaries.set(detail.storeId, summarizeWebsiteComparison(detail, checks, approvals));
+  }
+  return summaries;
 }
