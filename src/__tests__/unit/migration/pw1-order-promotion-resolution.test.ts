@@ -412,6 +412,14 @@ describe('TC-F42-EXP-106: explicitly approved negative Order identities', () => 
     expect(ctx.contributions.some(c => ['orders', 'order_details'].includes(c.table))).toBe(false)
     expect(ctx.tables.orders[0].total).toBe('-31.0')
   })
+  it('applies explicit Order approval to another source instance', () => {
+    // Arrange
+    const ctx = negativeContext('112', '43', '-31.0', true, 'PW1DEV')
+    // Act
+    mapCommerce(ctx)
+    // Assert
+    expect(ctx.diagnostics).toContainEqual(expect.objectContaining({ code: 'SOURCE_ENTITY_EXCLUDED', sourceId: '112', reason: 'APPROVED_NEGATIVE_TOTAL' }))
+  })
   it.each([
     ['113', '43', '-31.0', true, 'PW1PROD'],
     ['112', '44', '-31.0', true, 'PW1PROD'],
@@ -419,7 +427,6 @@ describe('TC-F42-EXP-106: explicitly approved negative Order identities', () => 
     ['112', '43', '0', true, 'PW1PROD'],
     ['112', '43', '-oops', true, 'PW1PROD'],
     ['112', '43', '-31.0', false, 'PW1PROD'],
-    ['112', '43', '-31.0', true, 'PW1DEV'],
   ] as const)('does not waive another/corrected/unapproved source (%s/%s/%s/%s/%s)', (id, storeId, total, enabled, sourceInstance) => {
     // Arrange
     const ctx = negativeContext(id, storeId, total, enabled, sourceInstance)

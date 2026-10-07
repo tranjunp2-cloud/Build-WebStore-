@@ -291,7 +291,8 @@ describe('[TC-F42-IMP-003/004/011] Classified retention and selected-scope fail-
     const actual = await loadImportArtifact(reorderedPrepared.manifestPath, { storeIds: ['205'] })
     // Assert
     expect(actual.diagnosticSummary).toEqual(original.diagnosticSummary)
-    expect(actual.blockers.map(item => item.code)).toEqual(['SHIPPING_SOURCE_REPLACED_BY_PW2_DEFAULT'])
+    expect(actual.blockers).toEqual([])
+    expect(actual.diagnosticSummary?.buckets.find(bucket => bucket.diagnostic.code === 'SHIPPING_SOURCE_REPLACED_BY_PW2_DEFAULT')?.disposition).toBe('APPROVED_POLICY')
   })
   it('retains credential sidecar authentication under the v3 snapshot binding', async () => {
     // Arrange
@@ -378,7 +379,7 @@ describe('[TC-F42-IMP-003/004] Exact exporter diagnostic source conventions', ()
     const prepared = await prepare(input); const artifact = await loadImportArtifact(prepared.manifestPath, { storeIds: ['205'] })
     // Assert
     expect(artifact.blockers.some(item => item.code === 'SOURCE_CLASSIFICATION_INVALID')).toBe(kind !== 'valid')
-    if (kind === 'valid') expect(artifact.blockers.map(item => item.code)).toContain('SHIPPING_SOURCE_REPLACED_BY_PW2_DEFAULT')
+    if (kind === 'valid') expect(artifact.diagnosticSummary?.buckets.find(bucket => bucket.diagnostic.code === 'SHIPPING_SOURCE_REPLACED_BY_PW2_DEFAULT')?.disposition).toBe('APPROVED_POLICY')
   })
   it.each([true, false])('excludes typed Page ownership only for a known reason through the artifact collector (known=%s)', async known => {
     // Arrange
@@ -934,9 +935,12 @@ describe('[TC-F42-IMP-POLICY-006] Exact negative-total Orders and inherited poli
     // Arrange / Act / Assert
     await expect(prepare(await mixedFixture(mode))).rejects.toThrow('SOURCE_EXCLUSION_EVIDENCE_INVALID')
   })
-  it.each(['wrong-instance','wrong-token'])('rejects %s namespace', async mode => {
-    // Arrange / Act / Assert
-    await expect(prepare(await mixedFixture(mode))).rejects.toThrow('NEGATIVE_ORDER_POLICY_SCOPE_INVALID')
+  it.each(['wrong-instance','wrong-token'])('uses exact Order approvals with the %s source identity', async mode => {
+    // Arrange / Act
+    const prepared = await prepare(await mixedFixture(mode))
+    const artifact = await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.blockers).toEqual([])
   })
 })
 
@@ -1097,11 +1101,17 @@ describe('[TC-F42-IMP-APPROVED-102] Four approved decisions share an exact artif
     // Arrange / Act / Assert
     await expect(prepare(await setup(mode))).rejects.toThrow()
   })
-  it.each(['missing-editor-receipt','owner-escalation','wrong-namespace'])('keeps the generic permission warning blocked without approved editor evidence (%s)',async mode=>{
+  it.each(['missing-editor-receipt','owner-escalation'])('keeps the generic permission warning blocked without approved editor evidence (%s)',async mode=>{
     // Arrange / Act
     const input=await setup(mode),prepared=await prepare(input),artifact=await loadImportArtifact(prepared.manifestPath)
     // Assert
     expect(artifact.diagnosticSummary?.buckets.find(b=>b.diagnostic.code==='USER_PERMISSION_RUNTIME_PARITY_UNVERIFIED')?.disposition).toBe('BLOCKED')
+  })
+  it('accepts verified editor evidence under another source namespace', async () => {
+    // Arrange / Act
+    const input = await setup('wrong-namespace'), prepared = await prepare(input), artifact = await loadImportArtifact(prepared.manifestPath)
+    // Assert
+    expect(artifact.diagnosticSummary?.buckets.find(b => b.diagnostic.code === 'USER_PERMISSION_RUNTIME_PARITY_UNVERIFIED')?.disposition).toBe('APPROVED_POLICY')
   })
 })
 

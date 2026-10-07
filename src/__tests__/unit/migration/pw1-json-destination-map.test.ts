@@ -12,7 +12,7 @@ async function outputPath() {
   directories.push(directory)
   return join(directory, 'destination-map.json')
 }
-function fixture(options: { pending?: boolean; foundation?: boolean; invalid?: boolean; wrongTenant?: boolean; targetHash?: string } = {}) {
+function fixture(options: { pending?: boolean; foundation?: boolean; invalid?: boolean; wrongTenant?: boolean; targetHash?: string; missingEvidence?: boolean } = {}) {
   const rows: Record<string, unknown>[] = [
     { source_store_id: '636', source_entity: 'stores', source_id: '636', target_collection: 'tenants', target_id: '425', live_id: 425, claim_valid: true },
     { source_store_id: '636', source_entity: 'sites', source_id: '636', target_collection: 'sites', target_id: '424', live_id: 424, tenant_id: options.wrongTenant ? 99 : 425, claim_valid: !options.invalid },
@@ -25,6 +25,7 @@ function fixture(options: { pending?: boolean; foundation?: boolean; invalid?: b
       profile: 'pw1-json-v3', sourceInstance: 'PW1_PROD', snapshotId: 'snapshot', targetHash: options.targetHash ?? 'target', manifestHash: 'manifest', masterHash: 'master', ...(options.foundation ? { executionScope: 'foundation' } : {}),
     }, selected_store_ids: options.pending ? ['636', '637'] : ['636'], state: options.pending ? 'PAUSED' : 'VERIFIED', created_at: '2026-09-23T00:00:00Z' }] }
     if (sql.startsWith('SELECT source_store_id,state')) return { rows: [{ source_store_id: '636', state: 'VERIFIED' }] }
+    if (sql.startsWith('SELECT selected.id AS store_id')) return { rows: options.missingEvidence ? [{ store_id: '636' }] : [] }
     return { rows }
   } }
   return { db, queries }
@@ -57,6 +58,13 @@ describe('[TC-F42-IMP-DESTINATION-MAP] compact ledger destination', () => {
     expect(value.completeness).toEqual({ selected: 2, verified: 1, pendingStoreIds: ['637'] })
     expect(value.stores['636'].productCategories).toEqual([])
     expect(value.stores['637']).toBeUndefined()
+  })
+  it('blocks a completed full destination when field evidence is missing', async () => {
+    // Arrange
+    const path = await outputPath(), { db } = fixture({ missingEvidence: true })
+    // Act / Assert
+    await expect(exportDestinationMap(db, batchId, 'target', path)).rejects.toThrow('DESTINATION_EVIDENCE_INCOMPLETE')
+    await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
   })
   it.each([{ invalid: true }, { wrongTenant: true }, { targetHash: 'other' }])('blocks invalid ownership, relationships or target %j', async options => {
     // Arrange

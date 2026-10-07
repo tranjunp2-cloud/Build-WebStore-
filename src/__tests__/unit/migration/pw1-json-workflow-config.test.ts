@@ -25,12 +25,13 @@ describe('[TC-F42-IMP-WORKFLOW] Strict configuration and run coordination', () =
     expect(args.selection).toMatchObject({ all: true, groupSize: 100, dryRun: true })
     expect(loaded).toMatchObject({ exportArtifact: join(directory, 'artifact'), credentials: join(directory, 'users.csv'), outputRoot: join(directory, 'runs') })
   })
-  it('supports supplied bindings while rejecting absent or ambiguous binding modes and unknown keys', () => {
+  it('supports supplied or deferred bindings while rejecting ambiguous modes and unknown keys', () => {
     // Arrange
     const { systemCreator: _systemCreator, ...base } = config
     // Act / Assert
     expect(workflowConfigSchema.safeParse({ ...base, creatorBindings: './bindings.json' }).success).toBe(true)
-    for (const invalid of [base, { ...config, creatorBindings: './bindings.json' }, { ...config, typo: true }, { ...config, systemCreator: { ...config.systemCreator, typo: true } }]) {
+    expect(workflowConfigSchema.safeParse(base).success).toBe(true)
+    for (const invalid of [{ ...config, creatorBindings: './bindings.json' }, { ...config, typo: true }, { ...config, systemCreator: { ...config.systemCreator, typo: true } }]) {
       expect(workflowConfigSchema.safeParse(invalid).success).toBe(false)
     }
   })

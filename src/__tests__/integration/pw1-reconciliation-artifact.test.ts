@@ -1,5 +1,5 @@
 import type { RowDisposition } from '@/lib/migration/pw1-export/source-dispositions'
-import { readFixtureMasterText, writeFixtureMaster, writeFixtureManifest } from '@/__tests__/helpers/pw1-master-artifact'
+import { readFixtureMasterText, syncFixtureSourceEvidence, writeFixtureMaster, writeFixtureManifest } from '@/__tests__/helpers/pw1-master-artifact'
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdtemp, readFile, writeFile, rm, appendFile } from 'node:fs/promises'
@@ -29,6 +29,7 @@ async function rewrite(output: string, name: string, value: unknown) {
   await writeFile(path.join(output, name), content)
   m.artifacts[name] = digest(content)
   await writeFixtureManifest(output,m)
+  if (name === 'mapping-report.json') await syncFixtureSourceEvidence(output)
 }
 
 async function legacyFixture() {
@@ -626,10 +627,12 @@ describe('TC-F42-EXP-106: negative Order source receipt contract', () => {
     m.migrationPolicy.approvedNegativeTotalOrders = config.migrationPolicy.approvedNegativeTotalOrders
     m.sourceSnapshot.sourceInstance = 'PW1DEV'
     await writeFixtureManifest(output,m)
-    await expect(validateArtifact(output)).rejects.toThrow('NEGATIVE_ORDER_POLICY_SOURCE_SCOPE_INVALID')
+    await syncFixtureSourceEvidence(output)
+    await expect(validateArtifact(output)).rejects.toThrow('RECONCILIATION_PROVENANCE_INVALID')
     m.sourceSnapshot.sourceInstance = 'PW1PROD'
     m.exporterVersion = '1.9.3'; m.contractSha256 = SOURCE_OMISSION_MASTER_SHA256
     await writeFixtureManifest(output,m)
+    await syncFixtureSourceEvidence(output)
     await expect(validateArtifact(output)).rejects.toThrow('MIGRATION_POLICY_NOT_APPROVED:approvedNegativeTotalOrders')
   })
 })

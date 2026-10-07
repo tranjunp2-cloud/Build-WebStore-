@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import { writeExportFixture } from '@/__tests__/helpers/pw1-export-fixture'
-import { readFixtureMasterText, writeFixtureMaster } from '@/__tests__/helpers/pw1-master-artifact'
+import { readFixtureMasterText, syncFixtureSourceEvidence, writeFixtureMaster } from '@/__tests__/helpers/pw1-master-artifact'
 import { exportMaster } from '@/lib/migration/pw1-export/export-master'
 import { validateArtifact } from '@/lib/migration/pw1-export/validate-artifact'
 import { MODEL_SETTINGS_MASTER_SHA256 } from '@/lib/migration/pw1-export/master-version'
@@ -34,6 +34,7 @@ async function rewriteReport(output: string, value: unknown) {
   const manifest = JSON.parse(await readFile(path.join(output, 'master-manifest.json'), 'utf8'))
   manifest.artifacts['mapping-report.json'] = digest(text)
   await writeFile(path.join(output, 'master-manifest.json'), JSON.stringify(manifest))
+  await syncFixtureSourceEvidence(output)
 }
 
 describe('[TC-F42-EXP-110] Hashed standalone media evidence', () => {
