@@ -111,12 +111,23 @@ npm run db:seed-sso
 
 **Sandbox:** đặt `--as-of` theo thời điểm snapshot đã xác minh; mốc dưới đây chỉ là ví dụ và phải thay trước khi chạy. Profile mặc định `configs/migration/pw1-prod-profile.json` chứa source identity, domain mapping, policy và các Store bị loại theo quyết định PROD; phải duyệt lại nếu dùng nguồn khác.
 
+Với snapshot PROD khoảng 2.918 Stores, Node 24 trong Sandbox từng OOM ở `build-coverage-report` khi V8 heap mặc định chỉ khoảng 2 GiB. Kiểm giới hạn bộ nhớ **trong Sandbox** trước khi export:
+
 ```bash
-PW1_AS_OF='2026-09-18T00:00:00Z'
-npm run migrate:pw1 -- /vercel/pw1-input --as-of "$PW1_AS_OF"
+cat /sys/fs/cgroup/memory.max
+free -h
+node -p 'Math.round(require("v8").getHeapStatistics().heap_size_limit / 1024 / 1024) + " MiB V8 heap"'
+df -h .
 ```
 
-Export chỉ đọc CSV, chưa import. Đọc `handoff.json`, `artifact/export-review.md`, số Store được chọn/bị loại và blockers. `exitCode=0` hoặc `status=exported` không đồng nghĩa import-ready. Ghi đường dẫn `Import config:` mà exporter in ra, rồi đặt biến theo **run ID thật**:
+Nếu cgroup có ít nhất 8 GiB RAM, dành 4 GiB V8 heap cho riêng lần export. Profile PROD còn giới hạn RSS ở 6 GiB; tăng heap quá gần giới hạn này có thể chuyển từ OOM sang `RESOURCE_MEMORY_LIMIT`. Nếu Sandbox thực tế dưới 8 GiB, cần đổi cấu hình Sandbox trước khi export, không dùng lệnh 4 GiB dưới đây. `NODE_OPTIONS` chỉ áp dụng cho câu lệnh này; không phải env staging cần lưu lâu dài.
+
+```bash
+PW1_AS_OF='2026-09-18T00:00:00Z'
+NODE_OPTIONS='--max-old-space-size=4096' npm run migrate:pw1 -- /vercel/pw1-input --as-of "$PW1_AS_OF"
+```
+
+Export chỉ đọc CSV, chưa import. Nếu trước đó exporter chết vì OOM, chạy lại lệnh sẽ tạo run ID mới; không dùng artifact/run dở của lần cũ để import. Đọc `handoff.json`, `artifact/export-review.md`, số Store được chọn/bị loại và blockers. `exitCode=0` hoặc `status=exported` không đồng nghĩa import-ready. Ghi đường dẫn `Import config:` mà exporter in ra, rồi đặt biến theo **run ID thật**:
 
 ```bash
 PW1_IMPORT_CONFIG='/vercel/pw1-app/.migration/runs/THAY-RUN-ID/import-config.json'
