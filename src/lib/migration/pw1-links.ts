@@ -19,7 +19,7 @@ export function isSourceHost(target: URL, sourceUrl: string, origins: readonly s
     return ['http:', 'https:'].includes(target.protocol) && !target.username && !target.password && [sourceUrl, ...origins].some(origin => new URL(origin).host === target.host)
 }
 
-export type SourceLinkPolicy = { sourceOrigins?: readonly string[]; aliases?: readonly { sourcePath: string; destinationPath: string }[]; brokenUrls?: readonly string[]; findings?: SourceLinkFinding[] }
+export type SourceLinkPolicy = { unavailableCategories?: readonly {sourceId:string;sourcePath:string}[]; sourceOrigins?: readonly string[]; aliases?: readonly { sourcePath: string; destinationPath: string }[]; brokenUrls?: readonly string[]; findings?: SourceLinkFinding[] }
 
 /** Resolve only pages proven to exist in this store. Never reinterpret legacy entity IDs. */
 export function createSourceLinkResolver(sourceUrl: string, pages: Array<{ sourcePath: string; destinationPath: string }>, warnings: string[], categories: readonly VerifiedCategoryLink[] = [], corrections: readonly { from: string; destinationPath: string }[] = [], policy: SourceLinkPolicy = {}) {
@@ -55,6 +55,16 @@ export function createSourceLinkResolver(sourceUrl: string, pages: Array<{ sourc
                 const params = new URLSearchParams(target.search)
                 params.delete(entityKeys[0]); params.set('categoryId', String(category.destinationId))
                 return `${category.destinationPath}?${params}${target.hash}`
+            }
+        }
+        if (entityKeys.length === 1 && ['category', 'category_id'].includes(entityKeys[0])) {
+            const unavailable = policy.unavailableCategories?.find(row => row.sourceId === target.searchParams.get(entityKeys[0]) && normalize(row.sourcePath) === normalize(target.pathname))
+            const destinationPath = routes.get(normalize(target.pathname))
+            if (unavailable && destinationPath) {
+                const params = new URLSearchParams(target.search)
+                params.delete(entityKeys[0]); params.set('categoryId', '0')
+                warnings.push(`Unavailable source category ${unavailable.sourceId}: migrated listing opens empty`)
+                return `${destinationPath}?${params}${target.hash}`
             }
         }
         const path = routes.get(normalize(target.pathname))

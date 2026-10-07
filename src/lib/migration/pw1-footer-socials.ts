@@ -18,7 +18,20 @@ export function extractFooterSocials(lines: Row[], warn: (message: string) => vo
       let url: URL;
       try { url = new URL(value); } catch { warn(`menu-line:${line.id}: invalid footer social URL`); continue; }
       if (!['http:','https:'].includes(url.protocol) || url.username || url.password) { warn(`menu-line:${line.id}: unsafe footer social URL`); continue; }
-      const platform = supportedHosts[url.hostname.toLowerCase().replace(/^(www\.|m\.)/, '')];
+      const prefix = String(row.key).replace(/\.url$/, '');
+      const image = entries.find(entry => entry.key === `${prefix}.image`)?.value;
+      let iconPlatform: string | undefined;
+      if (typeof image === 'string') {
+        try {
+          const icon = new URL(image);
+          // Only PW1's known icon library proves platform identity. Keep the
+          // configured href verbatim even if its hostname contains a typo.
+          if (icon.protocol === 'https:' && icon.hostname === 'tm-prime-web.sgp1.digitaloceanspaces.com') {
+            iconPlatform = icon.pathname.match(/\/images\/icons\/social_medias\/(facebook|instagram|twitter|linkedin|youtube|tiktok)(?:_\d+)?\.png$/)?.[1];
+          }
+        } catch { iconPlatform = undefined; }
+      }
+      const platform = supportedHosts[url.hostname.toLowerCase().replace(/^(www\.|m\.)/, '')] ?? iconPlatform;
       if (!platform) { warn(`menu-line:${line.id}: unsupported footer icon link ${url.hostname}`); continue; }
       if (!result.some(item => item.platform === platform && item.url === value)) result.push({platform,url:value});
     }

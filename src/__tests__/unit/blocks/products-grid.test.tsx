@@ -179,6 +179,20 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         setViewportWidth(1280)
     })
 
+    it('[TC-F09.240] keeps an unavailable migrated category empty and lets visitors clear it', async () => {
+        // Arrange: no PW2 category identity exists for this legacy footer destination.
+        mockSearchParams = new URLSearchParams('categoryId=0')
+        const fetchMock = mockStorefrontFetch({})
+        global.fetch = fetchMock as typeof fetch
+        // Act
+        render(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: false }} theme={{} as never} site={baseSite as never} />)
+        // Assert: never query all products for a missing category.
+        await waitFor(() => expect(screen.getByText('No products match your filters.')).toBeInTheDocument())
+        expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/storefront/products?'))).toBe(false)
+        fireEvent.click(screen.getByRole('button', { name: 'Clear all filters' }))
+        expect(mockReplace).toHaveBeenCalledWith('/sites/demo/products?', { scroll: false })
+    })
+
     it('[TC-F09.239] renders plain grid and skips category/bounds fetches when the filter flag is off', async () => {
         const fetchMock = mockStorefrontFetch({
             categories: [{ id: 10, name: 'Fashion', slug: 'fashion', parent: null }],

@@ -59,7 +59,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
     const requestedView = selectionMode === 'all' ? searchParams.get('view') : localView
     const viewMode: ProductsGridConfig['variant'] = requestedView === 'list' ? 'list' : 'grid-3'
     const cardVariant = viewMode
-    const hasActiveFilters = hasActiveProductFilters(displayFilters)
+    const hasActiveFilters = hasActiveProductFilters(displayFilters) || (selectionMode === 'all' && searchParams.getAll('categoryId').includes('0'))
 
     const showSidebar = filtersEnabled
     const showViewToggle = !loading && products.length > 0
@@ -99,6 +99,11 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
         }
 
         const params = new URLSearchParams(selectionMode === 'all' ? searchParams.toString() : localFilters)
+        if (intent !== 'view' && params.getAll('categoryId').includes('0')) {
+            const categoryIds = params.getAll('categoryId').filter(id => id !== '0')
+            params.delete('categoryId')
+            categoryIds.forEach(id => params.append('categoryId', id))
+        }
         mutate(params)
         if (selectionMode !== 'all' && intent === 'view') { setLocalView(params.get('view') || 'grid-3'); return }
         if (selectionMode !== 'all') { setLocalFilters(params.toString()); setLocalPage(1); return }
@@ -137,7 +142,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
     }
 
     const activeFilterChips = [
-        ...displayFilters.categoryIds.map((categoryId) => ({
+        ...displayFilters.categoryIds.filter(id => id !== '0').map((categoryId) => ({
             key: `category-${categoryId}`,
             label: categoryLookup.get(categoryId)?.name || categoryId,
             onRemove: (event: React.MouseEvent<HTMLButtonElement>) => removeCategoryFilter(categoryId, event),

@@ -356,3 +356,45 @@ it('[TC-F42-WEB-INPUT] retains footer hyperlink icons separately from empty site
   expect(contract.site.settings?.socialLinks).toEqual({});
   expect(parsed.reports[0].warnings).toContain('menu-line:icons: unsafe footer social URL');
 });
+
+
+it('[TC-F35.M27] routes missing footer categories to the migrated Products empty state', () => {
+    // Arrange: PW1 retains a menu link even when its category is absent in PW2 input.
+    const input = fixture()
+    input[0].pages.push({ id:'12', store_id:'205', name:'Products', type:'2', slug:'products', status:'1', components:[] })
+    const site = input[0].sites[0]
+    const footer = { id: '2', type: '2', status: '1', menu_items: [{
+        id: '3', name: 'About SJS', menu_lines: [{ id: '4', model_settings: [
+            { key: 'name', value: 'Corporate Profile' },
+            { key: 'model_type', value: 'App\\Models\\Category' },
+            { key: 'model_id', value: '27754' },
+        ] }],
+    }] }
+    // Act
+    const { entries, reports } = parseMigrationInput([{ ...input[0], sites: [{ ...site, menus: [...site.menus, footer] }] }])
+    // Assert: the footer label survives, without a fabricated or legacy destination.
+    expect(entries[0].website.footer.columns).toEqual([{ title: 'About SJS', links: [
+        { label: 'Corporate Profile', url: 'https://shop.example/products?category=27754' },
+    ] }])
+    expect(reports[0].warnings).toContain('menu-line:4: missing Category 27754; destination unavailable')
+    expect(entries[0].categoryMappings).toEqual([{sourceId:'27754',sourcePath:'/products',status:'unavailable'}])
+    const { contract, report } = adaptWebsiteInput(compactInput(entries[0]))
+    expect(report.categoryMappings).toEqual([{sourceId:'27754',sourcePath:'/products',status:'unavailable',destinationId:null}])
+    expect(contract.site.footer.columns).toEqual([{title:'About SJS',links:[{label:'Corporate Profile',url:'/products?categoryId=0'}]}])
+})
+
+
+it('[TC-F35.M27] retains Twitter icon and original href when source URL has a non-social hostname', () => {
+    // Arrange
+    const input = fixture(), site = input[0].sites[0]
+    const footer = { id: '2', type: '2', menu_items: [{ id: '3', name: 'Contact Us', menu_lines: [{
+        id: '4', type_id: '3', model_settings: [
+            { key: 'items.0.url', value: 'https://www.twister.com/' },
+            { key: 'items.0.image', value: 'https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/icons/social_medias/twitter_2.png' },
+        ],
+    }] }] }
+    // Act
+    const { entries } = parseMigrationInput([{ ...input[0], sites: [{ ...site, menus: [...site.menus, footer] }] }])
+    // Assert
+    expect(entries[0].website.footer.socials).toEqual([{ platform: 'twitter', url: 'https://www.twister.com/' }])
+})

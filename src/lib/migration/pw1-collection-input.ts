@@ -89,7 +89,8 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 if (!isSourceHost(url, base.origin, recognizedOrigins) || url.pathname === '/') return fallback.toLowerCase()
                 return url.pathname.toLowerCase()
             }
-            const resolveTarget = (model: unknown, id: unknown, url: unknown, context: string): Omit<Link, 'label'> | undefined => {
+            const categoryMappings = new Map<string, {sourceId:string;sourcePath:string;status:'pending'|'unavailable'}>()
+            const resolveTarget = (model: unknown, id: unknown, url: unknown, context: string, preserveLabel = false): Omit<Link, 'label'> | undefined => {
                 if (model) {
                     const kind = str(model).split('\\').filter(Boolean).at(-1)
                     if (kind === 'Page') {
@@ -102,7 +103,13 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                     const collection = kind === 'Category' ? 'categories' : kind === 'BlogCategory' ? 'blog_categories' : undefined
                     if (collection) {
                         const target = rows(bundle[collection]).find(r => str(r._ref).endsWith(`:${str(id)}`) && r.tenant === tenant._ref)
-                        if (!target) { report.warnings.push(`${context}: missing ${kind} ${str(id)}`); return }
+                        if (kind === 'Category') categoryMappings.set(str(id), {sourceId:str(id),sourcePath:'/products',status:target ? 'pending' : 'unavailable'})
+                        if (!target) {
+                            if (!/^\d+$/.test(str(id))) throw new Error(`${context}: invalid ${kind} source identity`)
+                            report.warnings.push(`${context}: missing ${kind} ${str(id)}; destination unavailable`)
+                            // Preserve the Products route with an explicit empty selection; never reuse a PW1 ID as a PW2 ID.
+                            return preserveLabel && kind === 'Category' ? { url: new URL(`/products?category=${encodeURIComponent(str(id))}`, base).href } : undefined
+                        }
                         report.warnings.push(`${context}: category CTA retains source URL until destination ID mapping is available`)
                         return { url: new URL(`${kind === 'Category' ? '/products' : '/articles'}?category=${encodeURIComponent(str(id))}`, base).href }
                     }
@@ -119,12 +126,12 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 return { url: target.href }
             }
             const menus = ordered(site.menus).filter(active)
-            const menuLinks = (item: Row): Link[] => {
+            const menuLinks = (item: Row, preserveLabel = false): Link[] => {
                 const values = { ...item, ...settings(item.model_settings) }
-                const target = resolveTarget(values.model_type, values.model_id, values.url, `menu:${str(item.id)}`)
+                const target = resolveTarget(values.model_type, values.model_id, values.url, `menu:${str(item.id)}`, preserveLabel)
                 const children = ordered(item.menu_lines).filter(active).flatMap(line => {
                     const v = settings(line.model_settings)
-                    const dest = resolveTarget(v.model_type, v.model_id, v.url, `menu-line:${str(line.id)}`)
+                    const dest = resolveTarget(v.model_type, v.model_id, v.url, `menu-line:${str(line.id)}`, preserveLabel)
                     if (!dest) {
                         if (v.content || v.content_ms) report.warnings.push(`menu-line:${str(line.id)}: formatted footer content flattened to tagline`)
                         return []
@@ -214,7 +221,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 document('p, div, li, h1, h2, h3, h4, h5, h6').append('\n')
                 return document.root().text().replace(/\n{3,}/g, '\n\n').trim()
             })).filter(Boolean).join('\n')
-            const columns = footerItems.map(i => ({ title: localized(i), links: menuLinks(i) })).filter(c => c.links.length > 0)
+            const columns = footerItems.map(i => ({ title: localized(i), links: menuLinks(i, true) })).filter(c => c.links.length > 0)
             if (columns.length > 4) throw new Error(`Store ${storeId}: native footer supports at most 4 nonempty link columns`)
             const pickStrings = (value: unknown, keys: string[]) => {
                 const data = object(value)
@@ -252,10 +259,10 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 socialLinks: pickStrings(site.socialLinks, ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok']),
                 seo: { ...pickStrings(site.seo, ['metaTitle', 'metaDescription']), ogImage: assetUrl(seo.ogImage) },
             }
-            entries.push({ ...(bundle.linkCorrections ? { linkCorrections: bundle.linkCorrections } : {}), ...(bundle.destination ? { destination: bundle.destination } : {}), sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin, ...(origins.length ? { origins: recognizedOrigins } : {}) }, website: {
+            entries.push({ categoryMappings: [...categoryMappings.values()], ...(bundle.linkCorrections ? { linkCorrections: bundle.linkCorrections } : {}), ...(bundle.destination ? { destination: bundle.destination } : {}), sourceUserId: ownerMatch[1], sourceStoreId: storeId, owner: { email: owner.email, firstName: owner.firstName }, source: { websiteUrl: base.origin, ...(origins.length ? { origins: recognizedOrigins } : {}) }, website: {
                 ...(disabledHomepage ? { publication: 'keep-draft' } : {}), settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
                 features: { cart: cartEnabled, orderTracking: cartEnabled && validPages.some(p => str(p.type) === '6' || rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'order_tracking')) },
-                navigation: ordered(header?.menu_items).filter(active).flatMap(menuLinks),
+                navigation: ordered(header?.menu_items).filter(active).flatMap(item => menuLinks(item)),
                 footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns, ...(footerSocials.length ? { socials: footerSocials } : {}) }, pages,
             } })
         }

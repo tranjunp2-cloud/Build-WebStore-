@@ -242,6 +242,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             await client.query('UPDATE pw1_migration_stores SET warning_count=$2 WHERE source_store_id=$1', [entry.sourceStoreId, warnings.length])
                             await save('be-readiness.json', readiness)
                             if (entry.destination) await save('be-mapping.json', { status: 'verified-declared-mappings', ...entry.destination, verifiedAt: new Date().toISOString() })
+                            await save('category-mapping.json', {sourceStoreId:entry.sourceStoreId,categories:adapted.report.categoryMappings})
                             await save('input-adaptation.json', adapted.report)
                             await save('source-link-checks.json', { sourceStoreId: entry.sourceStoreId, checks: sourceLinkChecks, findings: adapted.report.linkFindings })
                             await save('collection-input-report.json', inputReport ?? null)

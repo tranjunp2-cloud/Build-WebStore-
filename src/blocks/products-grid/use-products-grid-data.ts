@@ -51,6 +51,7 @@ export function useProductsGridData({ filtersEnabled, limit, siteId, localFilter
         if (['categoryId', 'minPrice', 'maxPrice', 'search'].includes(key) || key.startsWith('attr_')) productQuery.append(key, value)
     })
     const productFilterQuery = productQuery.toString()
+    const unavailableCategory = selectionMode === 'all' && searchParams.getAll('categoryId').includes('0')
     const pageQuery = searchParams.get('page')
     const [randomSeed] = useState(() => Math.random().toString(36).slice(2))
     const selectedIdsKey = JSON.stringify(selectedProductIds ?? [])
@@ -91,6 +92,15 @@ export function useProductsGridData({ filtersEnabled, limit, siteId, localFilter
             let didLoadProducts = false
 
             try {
+                // Website migration keeps legacy links whose categories were not imported.
+                // The explicit marker must never fall through to an unfiltered product list.
+                if (unavailableCategory) {
+                    setProducts([])
+                    setTotalDocs(0)
+                    setTotalPages(1)
+                    didLoadProducts = true
+                    return
+                }
                 const params = new URLSearchParams({ site: siteId, limit: String(limit), sort: '-createdAt' })
                 if (category) params.set('fixedCategoryId', category)
                 if (selectionMode !== 'all') params.set('selectionMode', selectionMode)
@@ -163,7 +173,7 @@ export function useProductsGridData({ filtersEnabled, limit, siteId, localFilter
 
         void loadProducts()
         return () => controller.abort()
-    }, [activeFilters, currentPage, filtersEnabled, limit, siteId, selectionMode, selectedIdsKey, includeOutOfStock, randomSeed, category])
+    }, [unavailableCategory, activeFilters, currentPage, filtersEnabled, limit, siteId, selectionMode, selectedIdsKey, includeOutOfStock, randomSeed, category])
 
     useEffect(() => {
         if (!filtersEnabled || !siteId) {

@@ -7,6 +7,7 @@ const BatchEntrySchema = z.object({
     sourceUserId: Identity, sourceStoreId: Identity,
     destination: DestinationSchema.optional(),
     linkCorrections: WebsiteInputSchema.shape.linkCorrections,
+    categoryMappings: WebsiteInputSchema.shape.categoryMappings,
     owner: z.object({ email: z.string().email().transform(v=>v.trim().toLowerCase()), firstName: z.string().min(1), lastName: z.string().optional() }).strict(),
     source: WebsiteInputSchema.shape.source.omit({storeId: true}),
     website: WebsiteInputSchema.shape.website.extend({ pages: WebsiteInputSchema.shape.pages }).strict(),
@@ -14,7 +15,7 @@ const BatchEntrySchema = z.object({
 export type BatchEntry = z.infer<typeof BatchEntrySchema>
 export function compactInput(entry: BatchEntry) {
     const { pages, ...website } = entry.website
-    return { linkCorrections: entry.linkCorrections, format:'pw2-website-input', version:'1.0.0', source:{...entry.source,storeId:entry.sourceStoreId}, website, pages }
+    return { categoryMappings: entry.categoryMappings, linkCorrections: entry.linkCorrections, format:'pw2-website-input', version:'1.0.0', source:{...entry.source,storeId:entry.sourceStoreId}, website, pages }
 }
 /** Validate the complete array before any connection, provisioning or generation. */
 export function parseBatchInput(input: unknown): BatchEntry[] {
