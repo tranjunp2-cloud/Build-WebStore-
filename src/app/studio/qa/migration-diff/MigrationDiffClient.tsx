@@ -8,6 +8,9 @@ import type { MigrationStore } from "@/lib/admin/qa/website-migration-compare";
 import { ReconciliationInspector } from "./ReconciliationInspector";
 import { QuickQcMenu } from "./QuickQcMenu";
 import { FieldEvidencePanel } from './FieldEvidencePanel';
+import { BlockComparisonPanel } from './BlockComparisonPanel';
+import { NeedsReviewToggle } from './NeedsReviewToggle';
+import { fieldEvidenceRates } from '@/lib/admin/qa/field-evidence-summary';
 import { classifyMigrationReport } from '@/lib/admin/qa/migration-report-status';
 
 const REPORT_LABELS = { passed: 'Đạt đối soát', review: 'Cần kiểm tra', failed: 'Có lỗi', insufficient: 'Chưa đủ dữ liệu' } as const;
@@ -2565,21 +2568,21 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
           <div className="bg-slate-900 border border-slate-700/80 rounded-none md:rounded-3xl w-full h-full flex flex-col shadow-2xl overflow-hidden ring-1 ring-white/10">
             
             {/* Top Modal Header */}
-            <div className="relative p-4 pr-16 sm:p-5 sm:pr-16 border-b border-slate-800/80 bg-slate-950 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
+            <div className="relative min-w-0 p-4 pr-16 sm:p-5 sm:pr-16 border-b border-slate-800/80 bg-slate-950 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 shrink-0">
               <div className="flex min-w-0 flex-1 items-center gap-3.5">
                 <button
                   onClick={() => setActiveStoreId(null)}
-                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition"
+                  className="shrink-0 p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition"
                   title="Quay lại danh sách"
                 >
                   <ArrowLeft className="size-4" />
                 </button>
-                <div className="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-xl shadow-md shadow-blue-500/20 ring-1 ring-white/20">
+                <div className="shrink-0 p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-xl shadow-md shadow-blue-500/20 ring-1 ring-white/20">
                   <Store className="size-5" />
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <h2 id="modal-store-title" className="text-lg font-bold text-white tracking-tight">{selectedDiff.name}</h2>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2 flex-wrap">
+                    <h2 id="modal-store-title" title={selectedDiff.name} className="min-w-0 max-w-full truncate text-base sm:text-lg font-bold text-white tracking-tight">{selectedDiff.name}</h2>
                     <span className="font-mono text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-md">
                       {selectedDiff.id}
                     </span>
@@ -2588,10 +2591,6 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                         📧 {selectedDiff.ownerEmail}
                       </span>
                     )}
-                    <span className="min-w-0 max-w-full break-all text-xs text-slate-300 font-mono bg-slate-900 border border-slate-800 px-2.5 py-0.5 rounded-md flex items-center gap-1">
-                      <Globe className="size-3 text-slate-400" />
-                      {selectedDiff.domain}
-                    </span>
                     <span
                       className={`text-xs px-3 py-0.5 rounded-full font-semibold border ${
                         selectedDiff.status === "passed"
@@ -2612,6 +2611,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                             : "🚨 Lỗi P0 Blocker"}
                     </span>
                   </div>
+                  <p title={selectedDiff.domain} className="mt-1 truncate text-xs text-slate-400">{selectedDiff.domain}</p>
                   <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
                     <span>Gốc: <strong className="text-slate-200">{live ? "F42 evidence migration" : `${selectedDiff.templateCode} (${selectedDiff.templateName})`}</strong></span>
                     <span>•</span>
@@ -2626,7 +2626,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               </div>
 
               {/* Header Action Buttons */}
-              <div className="flex max-w-full shrink-0 items-center gap-2.5 overflow-x-auto whitespace-nowrap [&>*]:shrink-0">
+              <div className="flex min-w-0 max-w-full shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 [&>*]:shrink-0">
                 {/* Device View Mode Switcher (Desktop vs Mobile 375px) */}
                 <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-inner select-none">
                   <button
@@ -2698,9 +2698,9 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
             </div>
 
             {/* Navigation Bar: Page Selectors & Mode Switcher */}
-            <div className="bg-slate-950 px-5 py-2.5 border-b border-slate-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shrink-0">
+            <div className="min-w-0 bg-slate-950 px-4 sm:px-5 py-2.5 border-b border-slate-800/80 flex flex-col gap-2 shrink-0">
               {/* Page Tabs */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+              <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none [&>button]:shrink-0">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0 flex items-center gap-1">
                   <Globe className="size-3.5 text-blue-400" /> Trang:
                 </span>
@@ -2742,8 +2742,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               </div>
 
               {/* View Mode Switcher (5 Modes) */}
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
+              <div className="flex min-w-0 max-w-full items-center gap-2">
+                <div className="flex min-w-0 items-center overflow-x-auto whitespace-nowrap bg-slate-900 p-1 rounded-xl border border-slate-800 [&>button]:shrink-0">
                   <button
                     onClick={() => setActiveViewTab("live_webview")}
                     className={`px-3 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
@@ -2776,15 +2776,15 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                 </div>
 
                 {/* Filter toggle */}
-                <label className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-800 cursor-pointer select-none text-xs text-slate-300 transition">
-                  <input
-                    type="checkbox"
-                    checked={showOnlyErrors}
-                    onChange={(e) => setShowOnlyErrors(e.target.checked)}
-                    className="rounded border-slate-700 text-blue-600 focus:ring-0 size-3.5"
-                  />
-                  <span className="font-semibold text-rose-400">Lỗi / cần xem</span>
-                </label>
+                <NeedsReviewToggle
+                  active={showOnlyErrors && (activeViewTab === "visual_stream" || (!live && activeViewTab === "field_diff"))}
+                  onChange={(enabled) => {
+                    setShowOnlyErrors(enabled);
+                    if (enabled && (live || activeViewTab !== "field_diff")) {
+                      setActiveViewTab("visual_stream");
+                    }
+                  }}
+                />
               </div>
             </div>
 
@@ -2830,61 +2830,11 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               </div>
             ) : activeViewTab === "visual_stream" ? (
               live ? (
-                <div className="flex-1 overflow-y-auto bg-slate-900/30 p-5 sm:p-6">
-                  <section className="mx-auto max-w-6xl space-y-5">
-                    <div className="rounded-2xl border border-sky-500/30 bg-slate-950 p-5 shadow-xl">
-                      <div className="flex items-start gap-3">
-                        <BlockTreeIcon className="mt-0.5 size-5 shrink-0 text-sky-400" />
-                        <div>
-                          <h3 className="text-base font-bold text-white">Evidence khối từ F42</h3>
-                          <p className="mt-1 text-xs leading-5 text-slate-300">
-                            F42 lưu nội dung nguồn, giá trị PW2 và trạng thái field. F42 không lưu ảnh chụp hay cấu trúc render của từng block, nên màn này không giả lập giao diện sản phẩm/blog từ dữ liệu mẫu.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {liveDetail?.pages
-                      .find((page) => page.sourceId === activePage.id)
-                      ?.blocks.some((block) => !showOnlyErrors || block.status !== "match") ? (
-                      liveDetail.pages
-                        .find((page) => page.sourceId === activePage.id)!
-                        .blocks.filter((block) => !showOnlyErrors || block.status !== "match")
-                        .map((block, index) => (
-                          <article key={block.sourceId} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-lg">
-                            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/70 px-5 py-4">
-                              <div>
-                                <p className="font-mono text-[10px] text-slate-500">PW1 block ID: {block.sourceId}</p>
-                                <h4 className="mt-1 text-sm font-bold text-white">#{index + 1} · {block.kind}</h4>
-                              </div>
-                              <LiveStateBadge value={block.status === "match" ? "completed" : block.status === "mismatch" ? "needs-fix" : "not-checked"} />
-                            </header>
-                            <div className="overflow-x-auto p-5">
-                              <table className="w-full min-w-[640px] text-left text-xs">
-                                <thead className="border-b border-slate-800 text-[10px] uppercase text-slate-500">
-                                  <tr><th className="pb-2 pr-4">Field</th><th className="pb-2 pr-4 text-amber-300">PW1 source</th><th className="pb-2 pr-4 text-sky-300">PW2 current</th><th className="pb-2">F42</th></tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800/70 text-slate-300">
-                                  {block.fields.map((field) => (
-                                    <tr key={field.field}>
-                                      <td className="py-3 pr-4 font-mono text-slate-400">{field.field}</td>
-                                      <td className="max-w-sm break-words py-3 pr-4">{field.source || <span className="italic text-slate-600">trống</span>}</td>
-                                      <td className="max-w-sm break-words py-3 pr-4">{field.current || <span className="italic text-slate-600">trống</span>}</td>
-                                      <td className="py-3"><LiveStateBadge value={field.status === "match" ? "checked" : field.status === "mismatch" ? "needs-fix" : "not-checked"} /></td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </article>
-                        ))
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 px-6 py-12 text-center text-sm text-slate-400">
-                        {showOnlyErrors ? "Không có block F42 cần xem trên trang này." : "F42 chưa có block evidence cho trang này."}
-                      </div>
-                    )}
-                  </section>
-                </div>
+                <BlockComparisonPanel
+                  page={liveDetail?.pages.find((page) => page.sourceId === activePage.id)}
+                  showOnlyErrors={showOnlyErrors}
+                  onShowOnlyErrorsChange={setShowOnlyErrors}
+                />
               ) : (
               /* ========================================================================= */
               /* 1. THE CLASSIC DUAL BROWSER PARITY STREAM VIEW (PW1 VS PW2) */
@@ -3253,17 +3203,27 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
                 {/* Preview Source Selector & Status Header */}
                 <div className="px-4 py-2 sm:px-6 sm:py-2.5 border-b border-slate-800/80 bg-slate-900/90 shrink-0 shadow-sm space-y-2">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
+                  {live ? (
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <details key={activePage.id} className="min-w-0 text-xs text-slate-400">
+                        <summary className="cursor-pointer rounded-md py-1 font-medium text-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">Thông tin đối chiếu</summary>
+                        <div className="mt-2 space-y-2 rounded-lg border border-slate-700 bg-slate-950 p-3 leading-5">
+                          <p>URL nguồn và URL PW2 lấy từ evidence F42 đã lưu.</p>
+                          <p>PW1 đang hiển thị trang chủ. URL này chưa xác nhận mapping với trang PW2 đang chọn.</p>
+                          {(() => {
+                            const audit = liveDetail?.pages.find((page) => page.sourceId === activePage.id)?.audit;
+                            return audit ? <p>F42 audit: {audit.status}{audit.stale ? " · dữ liệu audit cũ" : ""} · {audit.findings.length} finding.</p> : <p>Chưa có dữ liệu audit cho trang này.</p>;
+                          })()}
+                        </div>
+                      </details>
+                      {!isSafeF42ExternalUrl(liveDetail?.sourceUrl) && <span className="shrink-0 rounded-md bg-rose-500/10 px-2 py-1 text-xs text-rose-300">PW1: thiếu URL an toàn</span>}
+                    </div>
+                  ) : <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
                         Nguồn Preview:
                       </span>
-                      {live ? (
-                        <div className="flex items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-950/20 px-3 py-1.5 text-xs text-sky-200">
-                          <Globe className="size-3" />
-                          <span>URL nguồn và URL PW2 từ evidence F42</span>
-                        </div>
-                      ) : (() => {
+                      {(() => {
                         const isDomainSslReady = isStoreDomainSslReady(selectedDiff);
                         return (
                           <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
@@ -3318,46 +3278,23 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                         <span>Trang: <strong>{activePage.name}</strong> ({activePage.path})</span>
                       </span>
                     </div>
-                    {live && activePageIndex > 0 && (
-                      <p className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-2 text-xs text-amber-100">
-                        F42 chỉ lưu URL PW1 của homepage. Khung bên trái đang hiển thị homepage PW1, không phải URL tương ứng của trang PW2 đang chọn.
-                      </p>
-                    )}
-                    {live && !isSafeF42ExternalUrl(liveDetail?.sourceUrl) && (
-                      <p className="rounded-lg border border-rose-500/30 bg-rose-950/20 px-3 py-2 text-xs text-rose-100">
-                        F42 không có URL PW1 công khai an toàn. Không thay thế bằng giao diện mẫu.
-                      </p>
-                    )}
-                    {live && isSafeF42ExternalUrl(liveDetail?.sourceUrl) && (
-                      <p className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-2 text-xs text-amber-100">
-                        PW1 được nhúng từ URL snapshot F42 để đối chiếu song song. Nếu khung PW1 trống, server PW1 đang chặn nhúng bằng CSP/X-Frame; cần bổ sung domain của F40 vào <code>frame-ancestors</code> trên PW1.
-                      </p>
-                    )}
-                    {live && (() => {
-                      const audit = liveDetail?.pages.find((page) => page.sourceId === activePage.id)?.audit;
-                      if (!audit) return null;
-                      return (
-                        <div className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
-                          <span className="font-semibold text-sky-200">F42 audit:</span> {audit.status}{audit.stale ? " · dữ liệu audit cũ" : ""}{audit.findings.length ? ` · ${audit.findings.length} finding` : " · không có finding"}
-                        </div>
-                      );
-                    })()}
-                  </div>
+                  </div>}
 
                   {/* Dual Browser URL Bar */}
                   <div className={`grid gap-4 ${deviceView === "mobile" ? "grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2"}`}>
                     {/* Left Browser URL Bar (PW1 Laravel) */}
-                    <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-amber-500/30 flex items-center justify-between gap-2 shadow-inner">
+                    <div className="min-w-0 bg-slate-950 px-3 py-1.5 rounded-xl border border-amber-500/30 flex items-center justify-between gap-2 shadow-inner">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="flex gap-1">
                           <span className="size-2 rounded-full bg-rose-500/80" />
                           <span className="size-2 rounded-full bg-amber-500/80" />
                           <span className="size-2 rounded-full bg-emerald-500/80" />
                         </div>
-                        <span className="text-[11px] font-mono text-amber-300 truncate">
+                        {live && <span className="shrink-0 text-[11px] font-semibold text-amber-300">PW1 · Trang chủ</span>}
+                        <span title={live ? liveDetail?.sourceUrl ?? "Chưa có URL" : undefined} className="text-[11px] font-mono text-amber-300 truncate">
                           {(() => {
                             if (live)
-                              return `👈 PW1 homepage F42 • ${isSafeF42ExternalUrl(liveDetail?.sourceUrl) ? liveDetail.sourceUrl : "Chưa có URL công khai an toàn"}`;
+                              return isSafeF42ExternalUrl(liveDetail?.sourceUrl) ? liveDetail.sourceUrl : "Chưa có URL công khai an toàn";
                             const isSslReady = isStoreDomainSslReady(selectedDiff);
                             const cleanDomain = (selectedDiff.domain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
                             return previewSource === "template" || !isSslReady
@@ -3399,16 +3336,16 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     </div>
 
                     {/* Right Browser URL Bar (PW2 Next.js 15) */}
-                    <div className="bg-slate-950 px-3 py-1.5 rounded-xl border border-sky-500/30 flex items-center justify-between gap-2 shadow-inner">
+                    <div className="min-w-0 bg-slate-950 px-3 py-1.5 rounded-xl border border-sky-500/30 flex items-center justify-between gap-2 shadow-inner">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="flex gap-1">
                           <span className="size-2 rounded-full bg-rose-500/80" />
                           <span className="size-2 rounded-full bg-amber-500/80" />
                           <span className="size-2 rounded-full bg-emerald-500/80" />
                         </div>
-                        <span className="text-[11px] font-mono text-sky-300 truncate">
+                        <span title={live ? `PW2 · ${activePage.name} · ${liveDetail?.pages.find((page) => page.sourceId === activePage.id)?.url ?? liveDetail?.url ?? "Chưa có URL"}` : undefined} className="text-[11px] font-mono text-sky-300 truncate">
                           {live
-                            ? `👉 PW2 F42 • ${liveDetail?.pages.find((page) => page.sourceId === activePage.id)?.url ?? liveDetail?.url ?? "Chưa có URL"}`
+                            ? `PW2 · ${activePage.name} · ${liveDetail?.pages.find((page) => page.sourceId === activePage.id)?.url ?? liveDetail?.url ?? "Chưa có URL"}`
                             : previewSource === "template"
                             ? `👉 PW2 Next.js 15 • Theme ${selectedDiff.templateCode} • ${activePage.path}`
                             : `👉 PW2 Next.js 15 • ${selectedDiff.name} • ${activePage.path}`}
