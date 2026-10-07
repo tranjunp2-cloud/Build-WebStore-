@@ -39,14 +39,18 @@ type ProjectCardProps = {
     project: Project
     className?: string
     imageIndex?: number
+    naturalImageSize?: boolean
     /** Payload field path for the MediaUploadOverlay — omit for fallback-only slots. */
     uploadField?: string
 }
 
-function ProjectCard({ project, className = '', imageIndex, uploadField }: ProjectCardProps) {
+function ProjectCard({ project, className = '', imageIndex, uploadField, naturalImageSize = false }: ProjectCardProps) {
     // Internal (/path, #anchor, mailto:, tel:) → same tab, resolved via useLocalHref so
     // /products?... hits /sites/{slug}/products?... in local dev (custom domains keep it as-is).
     // External http(s) / protocol-relative → new tab + noopener (same rule as cta/getLinkAttrs).
+    const imageClassName = naturalImageSize
+        ? 'block w-full h-auto max-h-52 md:max-h-64 object-contain transition-transform duration-300 motion-safe:group-hover:scale-[1.025]'
+        : 'w-full h-full object-cover transition-transform duration-500 group-hover:scale-110'
     const resolveHref = useLocalHref()
     const linkUrl = project.linkUrl
     const isExternal = !!linkUrl && (/^https?:\/\//.test(linkUrl) || linkUrl.startsWith('//'))
@@ -55,19 +59,20 @@ function ProjectCard({ project, className = '', imageIndex, uploadField }: Proje
         ? { href: resolveHref(linkUrl), ...(isExternal ? { target: '_blank' as const, rel: 'noopener noreferrer' } : {}) }
         : {}
     return (
-        <Wrapper {...linkProps} className={`group relative overflow-hidden rounded-2xl block ${className}`}>
+        <Wrapper {...linkProps} className={`group relative overflow-hidden ${naturalImageSize ? 'rounded-lg bg-white px-3 pt-3 pb-10 md:p-5 transition-shadow duration-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4' : 'rounded-2xl'} block ${className}`}
+            style={naturalImageSize ? { border: '1px solid rgba(0, 0, 0, 0.06)' } : undefined}>
             {uploadField ? (
                 <MediaUploadOverlay
                     field={uploadField}
                     altText={project.title}
                     valueShape="media"
                     positionClass="relative"
-                    className="w-full h-full"
+                    className={naturalImageSize ? 'w-full' : 'w-full h-full'}
                 >
                     <img
                         src={project.imageUrl}
                         alt={project.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        className={imageClassName}
                         data-image-index={imageIndex}
                     />
                 </MediaUploadOverlay>
@@ -75,19 +80,24 @@ function ProjectCard({ project, className = '', imageIndex, uploadField }: Proje
                 <img
                     src={project.imageUrl}
                     alt={project.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    className={imageClassName}
                     data-image-index={imageIndex}
                 />
             )}
             {/* Hover overlay — pointer-events-none so mouse events reach the <img> for editor image-replace */}
-            <div
+            {naturalImageSize ? (
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-white/95 px-4 py-3 pointer-events-none md:opacity-0 md:translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 group-focus-visible:translate-y-0 transition-all duration-200">
+                    <span className="text-xs font-medium tracking-widest uppercase text-neutral-600">{project.title}</span>
+                    {linkUrl && <span aria-hidden="true" className="text-lg text-neutral-500 transition-transform duration-300 group-hover:translate-x-1">↗</span>}
+                </div>
+            ) : <div
                 className="absolute inset-0 flex flex-col justify-end p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                 style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.867), rgba(var(--brand-primary-rgb), 0.251), transparent)` }}
             >
                 <Caption className="font-semibold uppercase tracking-wider text-white/80 mb-1 block">{project.category}</Caption>
                 <Heading level={4} className="text-white mb-1">{project.title}</Heading>
                 <Body size="small" className="text-white/80 line-clamp-2">{project.description}</Body>
-            </div>
+            </div>}
         </Wrapper>
     )
 }
@@ -178,12 +188,13 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
 
             {/* Masonry variant */}
             {variant === 'masonry' && (
-                <div className="columns-2 md:columns-3 gap-6 space-y-6">
-                    {filtered.map(({ project, index }, i) => (
+                <div className="columns-2 md:columns-3 gap-4 max-w-4xl mx-auto">
+                    {filtered.map(({ project, index }) => (
                         <ProjectCard
                             key={index}
                             project={project}
-                            className={`break-inside-avoid ${i % 3 === 0 ? 'aspect-[3/4]' : 'aspect-square'}`}
+                            className="break-inside-avoid mb-4"
+                            naturalImageSize
                             imageIndex={index}
                             uploadField={index < rawProjects.length ? `projects.${index}.image` : undefined}
                         />
