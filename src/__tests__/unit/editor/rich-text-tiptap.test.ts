@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { RichTextMedia } from '@/components/editor/rich-text-media'
