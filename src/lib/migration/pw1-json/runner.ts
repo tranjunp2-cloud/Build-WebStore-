@@ -175,12 +175,19 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
     const exported = await inspectExportArtifact(artifact.directory)
     const sidecarHash = 'source-evidence.ndjson' in exported.manifest.artifacts
       ? exported.manifest.artifacts['source-evidence.ndjson'] : undefined
+    if (!args.dryRun && !sidecarHash) throw new MigrationError('SOURCE_EVIDENCE_SIDECAR_REQUIRED')
+    if (!args.dryRun) {
+      const guard = await runtime.pool.query<{ target_instance_id: string }>(
+        'SELECT target_instance_id FROM migration_target_guard WHERE singleton=true',
+      )
+      if (!guard.rows[0]?.target_instance_id ||
+        (args.stagingQcTargetId && guard.rows[0].target_instance_id !== args.stagingQcTargetId)) {
+        throw new MigrationError('EVIDENCE_TARGET_GUARD_MISMATCH')
+      }
+    }
     let evidenceSnapshot: { snapshotId: string } | undefined
     const writeFieldEvidence = async (storeId: string) => {
-      if (!sidecarHash) { await emit({ status: 'EVIDENCE_SKIPPED_LEGACY_ARTIFACT', storeId }); return }
-      if (args.targetHost && !args.stagingQcTargetId) {
-        await emit({ status: 'EVIDENCE_SKIPPED_NON_QC_REMOTE', storeId }); return
-      }
+      if (!sidecarHash) throw new MigrationError('SOURCE_EVIDENCE_SIDECAR_REQUIRED')
       const guard = await runtime!.pool.query<{ target_instance_id: string }>(
         'SELECT target_instance_id FROM migration_target_guard WHERE singleton=true',
       )
@@ -191,7 +198,8 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
       if (!evidenceSnapshot) {
         evidenceSnapshot = await ingestSourceEvidence({
           pool: runtime!.pool, artifactDir: artifact.directory, expectedTargetInstanceId: targetId,
-          ...(args.targetHost ? { remoteTarget: { targetHash: runtime!.identity, database: args.localDatabase!, approvedStoreIds: selected } } : {}),
+          ...(args.targetHost ? { remoteTarget: { targetHash: runtime!.identity, database: args.localDatabase!, approvedStoreIds: selected,
+            ...(args.stagingQcTargetId ? {} : { importBatchId: batch!.id }) } } : {}),
         })
         await emit({ status: 'SOURCE_EVIDENCE_INGESTED', snapshotId: evidenceSnapshot.snapshotId })
       }
@@ -288,8 +296,8 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
         check(); context.storeId = storeId; context.phase = 'apply'
         const applyStarted = Date.now()
         if (states[storeId] === 'VERIFIED') {
-          await emit({ status: 'STORE_REVERIFIED', storeId })
           await writeFieldEvidence(storeId)
+          await emit({ status: 'STORE_REVERIFIED', storeId })
           continue
         }
         await renewLease(runtime.pool, currentLease)
@@ -331,7 +339,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
         await runtime.transaction(async (req, db) => {
           await lockStore(db, currentLease, storeId)
           await verifyStore(currentRuntime, entities, targets, currentBatch, req, db, creatorContext)
-          await markStoreVerified(db, currentLease, storeId)
+          await markStoreVerified(db, currentLease, storeId, false)
         })
         const verifyMs = Date.now() - applyStarted - preflightMs - writeMs - finalizeMs
         states[storeId] = 'VERIFIED'
@@ -347,9 +355,11 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
             .sort((a, b) => a - b),
         }
         await logger.recordDestination(storeId, destination)
-        const durationMs = Date.now() - applyStarted
-        await emit({ status: 'STORE_VERIFIED', runId: currentBatch.id, storeId, entities: entities.length, destination, durationMs, preflightMs, writeMs, finalizeMs, verifyMs, destinationMs: durationMs - preflightMs - writeMs - finalizeMs - verifyMs, preflightLookups: proposal.preflightLookups, pendingReferenceCount: pending.size })
+        const evidenceStarted = Date.now()
         await writeFieldEvidence(storeId)
+        const evidenceMs = Date.now() - evidenceStarted
+        const durationMs = Date.now() - applyStarted
+        await emit({ status: 'STORE_VERIFIED', runId: currentBatch.id, storeId, entities: entities.length, destination, durationMs, preflightMs, writeMs, finalizeMs, verifyMs, evidenceMs, destinationMs: durationMs - preflightMs - writeMs - finalizeMs - verifyMs - evidenceMs, preflightLookups: proposal.preflightLookups, pendingReferenceCount: pending.size })
       }
       delete context.storeId
       await emit({ status: 'GROUP_VERIFIED', ...context, stores: ids.length })
@@ -362,7 +372,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
     else {
       const currentLease = lease!
       const complete = await runtime.transaction(async (_req, db) => completeBatch(db, currentLease))
-      if (!complete) throw new MigrationError('BATCH_INCOMPLETE')
+      if (!complete) throw new MigrationError('BATCH_EVIDENCE_INCOMPLETE')
       await emit({ status: 'VERIFIED', runId: batch!.id, stores: selected.length })
     }
     await logger.event({ status: 'SESSION_FINISHED', exitCode: 0, ...(batch ? { runId: batch.id } : {}) })

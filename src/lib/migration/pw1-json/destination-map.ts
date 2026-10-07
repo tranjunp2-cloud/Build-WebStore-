@@ -2,7 +2,7 @@ import { constants } from 'node:fs'
 import { open, lstat, link, rename, unlink } from 'node:fs/promises'
 import { dirname, resolve, isAbsolute } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { getBatch, listStoreStates, type SqlClient } from './ledger'
+import { getBatch, listStoreStates, missingFieldEvidenceStores, type SqlClient } from './ledger'
 import { validateOutputPath } from './destination-master'
 import { MigrationError } from './errors'
 
@@ -36,6 +36,8 @@ export async function buildDestinationMap(db: SqlClient, batchId: string, target
   if (Object.keys(states).some(id => !batch.storeIds.includes(id))) throw new MigrationError('DESTINATION_STORE_OUTSIDE_BATCH')
   const verified = batch.storeIds.filter(id => states[id] === 'VERIFIED')
   const pendingStoreIds = batch.storeIds.filter(id => states[id] !== 'VERIFIED')
+  if (batch.binding.executionScope !== 'foundation' && !pendingStoreIds.length &&
+    (await missingFieldEvidenceStores(db, batch.id)).length) throw new MigrationError('DESTINATION_EVIDENCE_INCOMPLETE')
   const output: DestinationMap = {
     version: 1, format: 'pw1-destination-map-v1', batchId: batch.id,
     source: { instance: batch.binding.sourceInstance, snapshotId: batch.binding.snapshotId,

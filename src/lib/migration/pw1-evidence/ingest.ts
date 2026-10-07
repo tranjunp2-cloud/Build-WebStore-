@@ -35,6 +35,24 @@ export const sourceEvidenceRowSchema = z.object({
 }).strict()
 
 type EvidenceRow = z.infer<typeof sourceEvidenceRowSchema>
+type RemoteTarget = { targetHash: string; database: string; approvedStoreIds: string[]; importBatchId?: string }
+
+async function assertRemoteEvidenceAuthorization(pool: Pool, targetId: string, remote: RemoteTarget): Promise<void> {
+  if (!remote.approvedStoreIds.length) throw new Error('EVIDENCE_STORE_SELECTION_REQUIRED')
+  if (!remote.importBatchId) {
+    await assertStagingQcAuthorization(pool, targetId, remote.targetHash, remote.database, remote.approvedStoreIds)
+    return
+  }
+  if (!/^json:[a-f0-9-]{36}$/.test(remote.importBatchId)) throw new Error('EVIDENCE_BATCH_ID_INVALID')
+  const result = await pool.query(`SELECT 1 FROM migration_import_batches b
+    JOIN migration_target_guard guard ON guard.singleton=true AND guard.target_instance_id=$2
+    WHERE b.batch_id=$1::uuid AND b.binding->>'targetHash'=$3
+      AND b.binding->>'executionScope' IS DISTINCT FROM 'foundation'
+      AND b.selected_store_ids=$4::jsonb AND b.state='APPLYING'
+      AND current_database()=$5`, [remote.importBatchId.slice(5), targetId, remote.targetHash,
+    JSON.stringify(remote.approvedStoreIds), remote.database])
+  if (result.rowCount !== 1) throw new Error('EVIDENCE_REMOTE_IMPORT_NOT_AUTHORIZED')
+}
 
 async function flushRows(client: PoolClient, snapshotId: string, rows: EvidenceRow[]): Promise<void> {
   if (!rows.length) return
@@ -59,7 +77,7 @@ export async function ingestSourceEvidence(input: {
   pool: Pool
   artifactDir: string
   expectedTargetInstanceId: string
-  remoteTarget?: { targetHash: string; database: string; approvedStoreIds: string[] }
+  remoteTarget?: RemoteTarget
 }): Promise<{ snapshotId: string; sourceRecords: number; sourceFields: number; reused: boolean }> {
   await validateArtifact(input.artifactDir)
   const manifestPath = await checkedFile(input.artifactDir, 'master-manifest.json')
@@ -69,11 +87,7 @@ export async function ingestSourceEvidence(input: {
   if (!sidecarHash) throw new Error('SOURCE_EVIDENCE_SIDECAR_REQUIRED')
   const sourceFile = await checkedFile(input.artifactDir, 'source-evidence.ndjson')
   const manifestHash = createHash('sha256').update(manifestBytes).digest('hex')
-  if (input.remoteTarget) {
-    if (!input.remoteTarget.approvedStoreIds.length) throw new Error('EVIDENCE_STORE_SELECTION_REQUIRED')
-    await assertStagingQcAuthorization(input.pool, input.expectedTargetInstanceId,
-      input.remoteTarget.targetHash, input.remoteTarget.database, input.remoteTarget.approvedStoreIds)
-  }
+  if (input.remoteTarget) await assertRemoteEvidenceAuthorization(input.pool, input.expectedTargetInstanceId, input.remoteTarget)
   const client = await input.pool.connect()
   try {
     await client.query('BEGIN')
@@ -154,10 +168,7 @@ export async function ingestSourceEvidence(input: {
       'SELECT count(*)::text AS count FROM migration_source_evidence_rows WHERE snapshot_id=$1', [snapshotId],
     )
     if (Number(dbCount.rows[0]?.count) !== sourceRecords) throw new Error('SOURCE_EVIDENCE_ROW_COUNT_MISMATCH')
-    if (input.remoteTarget) {
-      await assertStagingQcAuthorization(input.pool, input.expectedTargetInstanceId,
-        input.remoteTarget.targetHash, input.remoteTarget.database, input.remoteTarget.approvedStoreIds)
-    }
+    if (input.remoteTarget) await assertRemoteEvidenceAuthorization(input.pool, input.expectedTargetInstanceId, input.remoteTarget)
     await client.query(`UPDATE migration_source_evidence_snapshots
       SET pii_comparable=$2,hmac_key_id=$4,source_snapshot_at=$5::timestamptz,
         state='COMPLETE',summary=$3::jsonb,completed_at=clock_timestamp()

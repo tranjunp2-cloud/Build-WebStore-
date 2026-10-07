@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { MigrationError } from './errors'
+import { EVIDENCE_CONTRACT_VERSION } from '../pw1-evidence/comparator'
 
 /** Caller must provide the SAME transaction used by business writes. */
 export interface SqlClient {
@@ -252,7 +253,7 @@ export async function recordEntity(db: SqlClient, lease: LedgerLease, claim: Ent
 }
 
 /** Caller must verify expected projection/counts BEFORE marking complete. */
-export async function markStoreVerified(db: SqlClient, lease: LedgerLease, storeId: string): Promise<void> {
+export async function markStoreVerified(db: SqlClient, lease: LedgerLease, storeId: string, completeOnStore = true): Promise<void> {
   await lockStore(db, lease, storeId)
   await db.query(`UPDATE migration_entity_map SET state='VERIFIED' WHERE run_id IN
     (SELECT run_id FROM migration_import_stores WHERE batch_id=$1 AND source_store_id=$2)
@@ -261,7 +262,7 @@ export async function markStoreVerified(db: SqlClient, lease: LedgerLease, store
     evidence_verified_at=COALESCE(evidence_verified_at,clock_timestamp())
     WHERE batch_id=$1 AND source_store_id=$2`, [uuid(lease.batchId),storeId])
   await db.query(`UPDATE migration_import_stores SET state='VERIFIED'  WHERE batch_id=$1 AND source_store_id=$2`, [uuid(lease.batchId), storeId])
-  await completeBatch(db, lease)
+  if (completeOnStore) await completeBatch(db, lease)
   await assertFence(db, lease)
 }
 
@@ -396,6 +397,9 @@ export async function registerPreflightedStores(db: SqlClient, lease: LedgerLeas
 }
 export async function completeBatch(db: SqlClient, lease: LedgerLease): Promise<boolean> {
   await assertFence(db, lease)
+  const batch = await getBatch(db, lease.batchId)
+  if (batch.binding.executionScope !== 'foundation' &&
+    (await missingFieldEvidenceStores(db, batch.id)).length) return false
   const result = await db.query(`UPDATE migration_import_batches b SET state='VERIFIED',updated_at=clock_timestamp() WHERE batch_id=$1
     AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(b.selected_store_ids) selected(id)
       LEFT JOIN migration_import_stores s ON s.batch_id=b.batch_id AND s.source_store_id=selected.id
@@ -403,4 +407,30 @@ export async function completeBatch(db: SqlClient, lease: LedgerLease): Promise<
     AND NOT EXISTS(SELECT 1 FROM migration_import_stores s WHERE s.batch_id=b.batch_id AND NOT (b.selected_store_ids ? s.source_store_id))
     RETURNING batch_id`, [uuid(lease.batchId)])
   return result.rows.length === 1
+}
+
+/** A full import is complete only when every selected child has durable field evidence. */
+export async function missingFieldEvidenceStores(db: SqlClient, batchId: string): Promise<string[]> {
+  const result = await db.query(`SELECT selected.id AS store_id
+    FROM migration_import_batches b
+    CROSS JOIN LATERAL jsonb_array_elements_text(b.selected_store_ids) selected(id)
+    LEFT JOIN migration_import_stores s ON s.batch_id=b.batch_id AND s.source_store_id=selected.id
+    LEFT JOIN migration_runs r ON r.run_id=s.run_id
+    WHERE b.batch_id=$1 AND (s.state IS DISTINCT FROM 'VERIFIED' OR r.state IS DISTINCT FROM 'VERIFIED'
+      OR NOT EXISTS (
+        SELECT 1 FROM migration_evidence_generations g
+        JOIN migration_source_evidence_snapshots snapshot ON snapshot.snapshot_id=g.snapshot_id
+        WHERE g.child_run_id=s.run_id AND g.state='COMPLETE' AND g.contract_version=$2
+          AND g.target_instance_id=b.binding->>'targetHash'
+          AND g.mapping_version=b.binding->>'mappingHash'
+          AND snapshot.state='COMPLETE' AND snapshot.provenance_kind='exporter_sidecar'
+          AND snapshot.source_instance_id=b.binding->>'sourceInstance'
+          AND snapshot.source_snapshot_id=b.binding->>'snapshotId'
+          AND snapshot.sidecar_sha256 ~ '^[a-f0-9]{64}$'
+          AND g.digest ~ '^[a-f0-9]{64}$'
+          AND (g.summary->>'fieldTotal') ~ '^[1-9][0-9]*$'
+          AND (g.summary->>'fieldTotal')::bigint =
+            (SELECT count(*) FROM migration_field_evidence field WHERE field.generation_id=g.generation_id)
+      )) ORDER BY selected.id`, [uuid(batchId), EVIDENCE_CONTRACT_VERSION])
+  return result.rows.map(row => String(row.store_id))
 }

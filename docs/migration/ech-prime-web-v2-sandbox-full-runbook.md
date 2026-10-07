@@ -104,7 +104,7 @@ Chỉ chạy lệnh import thật khi dry-run có stage `DRY_RUN_PASSED`, target
 npm run migrate:pw1:import -- --run /DUONG-DAN-IMPORT-RUN-THAT --continue
 ```
 
-Hoàn tất BE cần `run.json` stage `COMPLETED`, `prepared/destination-manifest.json` và evidence/ledger có dữ liệu. `FINALIZE_SELECTION_READY` chưa phải hoàn tất.
+Hoàn tất BE cần `run.json` stage `COMPLETED`, `prepared/destination-manifest.json` và một `migration_evidence_generations` ở trạng thái `COMPLETE` cho **mỗi** Store đã chọn. Số dòng `migration_field_evidence` của từng generation phải bằng `summary.fieldTotal`. Import thật yêu cầu artifact có `source-evidence.ndjson`; thiếu sidecar hoặc evidence của bất kỳ Store nào sẽ khiến run báo lỗi thay vì hoàn tất. `COMPLETE` xác nhận evidence đã được ghi đầy đủ theo field registry; các dòng `mismatch`, `unsupported` và `unverified` vẫn cần được xem xét riêng. `FINALIZE_SELECTION_READY` và `STORE_VERIFIED` chưa phải hoàn tất.
 
 ## 6. Website migration và lưu kết quả
 
