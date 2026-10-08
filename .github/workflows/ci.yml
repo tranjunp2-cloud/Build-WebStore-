@@ -42,7 +42,7 @@ jobs:
   # ──────────────────────────────────────
   ci:
     name: "CI: Lint → Typecheck → Test → Build"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
       contents: read
@@ -275,7 +275,7 @@ jobs:
     name: "Deploy: Staging [2/2]"
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     environment: staging
     concurrency:
       group: deploy-staging
@@ -323,7 +323,7 @@ jobs:
     name: "Deploy: Production [2/2]"
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     environment: production
     concurrency:
       group: deploy-production

@@ -20,7 +20,7 @@ on:
 jobs:
   notify:
     name: 'Notify: Doc Changes'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:
