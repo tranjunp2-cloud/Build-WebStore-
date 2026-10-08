@@ -38,14 +38,15 @@ export type MigrationStore = {
   fieldEvidence?: import('./field-evidence-summary').FieldEvidenceSummary | null;
   storeId: string;
   name: string;
-  siteId: number;
+  siteId: number | null;
   migration: string;
-  publish: string;
+  publish: string | null;
+  canCompare?: boolean;
   auditStatus: string;
   errors: number;
   warnings: number;
   checkedAt: string | null;
-  url: string;
+  url: string | null;
   updatedAt: string;
   pageCount: number;
   qcStatus: "passed" | "warning" | "failed" | "unverified";

@@ -2,6 +2,7 @@ import { test, expect, type Page, type APIRequestContext } from "@playwright/tes
 import { Client } from "pg";
 import { SignJWT } from "jose";
 import { classifyMigrationReport } from "@/lib/admin/qa/migration-report-status";
+import { migrationLifecycleStatus, MIGRATION_LIFECYCLE_LABELS } from "@/lib/admin/qa/migration-lifecycle";
 import { fieldEvidenceRates } from "@/lib/admin/qa/field-evidence-summary";
 import type { MigrationStore } from "@/lib/admin/qa/website-migration-compare";
 
@@ -39,7 +40,7 @@ test('[TC-F40-MIG-LIVE-12] missing F42 source reports unavailable without false 
   // Act / Assert: unavailable is not an empty migration report.
   await page.goto('/studio/qa/migration-diff');
   const sourceAlert = page.getByTestId('website-migration-live').getByRole('alert');
-  await expect(sourceAlert).toContainText('Nguồn F42 chưa sẵn sàng');
+  await expect(sourceAlert).toContainText('Schema hoặc phạm vi nguồn F42 chưa xác định');
   await expect(page.getByTestId('migration-metric-all')).toHaveCount(0);
   await expect(page.getByTestId('migration-pagination')).toHaveCount(0);
   await expect(page.getByRole('table')).toHaveCount(0);
@@ -52,7 +53,7 @@ async function checkWebsiteMigration({
   page,
   request,
   baseURL,
-}: { page: Page; request: APIRequestContext; baseURL: string | undefined }, qcOnly = false, blocksOnly = false) {
+}: { page: Page; request: APIRequestContext; baseURL: string | undefined }, qcOnly = false, blocksOnly = false, lifecycleOnly = false) {
   test.setTimeout(120000);
   expect([401, 403]).toContain(
     (
@@ -167,8 +168,6 @@ async function checkWebsiteMigration({
   expect(catalog.status()).toBe(200);
   const data = (await catalog.json()).data;
   test.skip(!data.stores.length, "No migrated stores in fixture DB");
-  const store = data.stores[0].storeId;
-  await expect(page.getByTestId(`migration-store-row-${store}`)).toBeVisible();
   // TC-F40-MIG-LIVE-10: real catalog → report cards → filtered rows.
   // Arrange: use the source policy, never reproduce the classifier in tests.
   const inventory: MigrationStore[] = [];
@@ -180,21 +179,29 @@ async function checkWebsiteMigration({
     inventory.push(...batch.stores);
   }
   await expect(page.getByRole('columnheader', { name: 'QC thủ công', exact: true })).toBeVisible();
-  for (const status of ['passed', 'failed', 'review', 'insufficient'] as const) {
-    const expected = inventory.filter(item => classifyMigrationReport(item).status === status);
+  expect(new Set(inventory.map(item => item.storeId)).size).toBe(data.total);
+  await expect(page.getByTestId('migration-metric-all').getByText(data.total.toLocaleString(), { exact: true })).toBeVisible();
+  for (const status of ['not_started', 'running', 'completed', 'failed'] as const) {
+    const expected = inventory.filter(item => migrationLifecycleStatus(item.migration) === status);
     // Act
     const card = page.getByTestId(`migration-metric-${status}`);
     await card.click();
     // Assert: selection remains visible and table agrees with the same policy.
     await expect(card).toHaveAttribute('aria-pressed', 'true');
-    await expect(card).toHaveClass(/border-2/);
-    await expect(card.getByText(String(expected.length), { exact: true })).toBeVisible();
+    await expect(card).toContainText(MIGRATION_LIFECYCLE_LABELS[status]);
+    await expect(card.getByText(expected.length.toLocaleString(), { exact: true })).toBeVisible();
     await expect(page.getByTestId('migration-pagination')).toContainText('Trang 1 /');
     const visibleRows = page.locator('[data-testid^="migration-store-row-"]');
     await expect(visibleRows).toHaveCount(Math.min(15, expected.length));
     for (const item of expected.slice(0, 15)) {
       const row = page.getByTestId(`migration-store-row-${item.storeId}`);
       await expect(row).toBeVisible();
+      await expect(row).toContainText(MIGRATION_LIFECYCLE_LABELS[status]);
+      if (item.siteId === null) {
+        await expect(row).toContainText('Chưa có website PW2');
+        await expect(row.locator('a')).toHaveCount(0);
+        await expect(page.getByTestId(`migration-store-compare-${item.storeId}`)).toBeDisabled();
+      }
       await expect(row.getByRole('cell').nth(4)).toHaveText(/^\s*\d+ Trang\s*$/);
       const rate = row.getByTestId('migration-match-rate');
       const rates = item.fieldEvidence ? fieldEvidenceRates(item.fieldEvidence.counts) : null;
@@ -213,9 +220,42 @@ async function checkWebsiteMigration({
         ? 'bg-emerald-400' : displayedRate >= 85 ? 'bg-amber-400' : 'bg-rose-500';
       await expect(rate.getByRole('progressbar').locator('div')).toHaveClass(new RegExp(color));
     }
+    // Search and pagination must retain the selected lifecycle.
+    await page.getByRole('textbox', { name: 'Tìm store' }).fill('no-such-store-f40-lifecycle');
+    await expect(visibleRows).toHaveCount(0);
+    await expect(card).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('textbox', { name: 'Tìm store' }).fill('');
+    await expect(visibleRows).toHaveCount(Math.min(15, expected.length));
+    if (expected.length > 15) {
+      await page.getByRole('button', { name: 'Trang sau', exact: true }).click();
+      await expect(card).toHaveAttribute('aria-pressed', 'true');
+      await expect(visibleRows).toHaveCount(Math.min(15, expected.length - 15));
+      for (const item of expected.slice(15, 30)) {
+        await expect(page.getByTestId(`migration-store-row-${item.storeId}`)).toBeVisible();
+      }
+      await page.getByRole('button', { name: 'Trang trước', exact: true }).click();
+    }
   }
   await page.getByTestId('migration-metric-all').click();
   await expect(page.getByTestId('migration-metric-all')).toHaveAttribute('aria-pressed', 'true');
+  if (lifecycleOnly) {
+    // TC-F40-MIG-LIVE-16: require the fixture branch to be exercised, not silently skipped.
+    const sourceOnly = inventory.find(item => item.siteId === null && migrationLifecycleStatus(item.migration) === 'not_started');
+    expect(sourceOnly, 'Lifecycle fixture must include a registered source without a PW2 site').toBeDefined();
+    await page.getByTestId('migration-metric-not_started').click();
+    await page.getByRole('textbox', { name: 'Tìm store' }).fill(sourceOnly!.storeId);
+    const row = page.getByTestId(`migration-store-row-${sourceOnly!.storeId}`);
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('Chưa có website PW2');
+    await expect(row).toContainText('Chưa thể QC');
+    await expect(row.locator('a')).toHaveCount(0);
+    await expect(page.getByTestId(`migration-store-compare-${sourceOnly!.storeId}`)).toBeDisabled();
+    return;
+  }
+  const comparable = inventory.find(item => item.canCompare && item.siteId !== null);
+  expect(comparable, 'Fixture needs a mapped website for comparison').toBeDefined();
+  const store = comparable!.storeId;
+  await page.getByRole('textbox', { name: 'Tìm store' }).fill(store);
   await page.getByTestId(`migration-store-compare-${store}`).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   const detail = await page.request.get(
@@ -448,4 +488,8 @@ test("[TC-F40-MIG-LIVE-09] QC dropdown opens in comparison and rejects invalid r
 
 test('[TC-F40-MIG-LIVE-13] readable block cards display real evidence without saving verdicts', async ({ page, request, baseURL }) => {
   await checkWebsiteMigration({ page, request, baseURL }, false, true);
+});
+
+test('[TC-F40-MIG-LIVE-10][TC-F40-MIG-LIVE-16] lifecycle cards match the real catalog and preserve search and pagination filters', async ({ page, request, baseURL }) => {
+  await checkWebsiteMigration({ page, request, baseURL }, false, false, true);
 });
