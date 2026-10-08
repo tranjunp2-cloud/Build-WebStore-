@@ -18,7 +18,7 @@ jobs:
   sprint-start:
     name: 'Ritual: Sprint Start'
     if: github.event.schedule == '0 1 * * 1' || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: read
       pull-requests: read
@@ -95,7 +95,7 @@ jobs:
   daily-standup:
     name: 'Ritual: Daily Standup'
     if: github.event.schedule == '0 2 * * 2-5'
-    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout (for composite action)
         uses: actions/checkout@v4
@@ -122,7 +122,7 @@ jobs:
   sprint-review:
     name: 'Ritual: Sprint Review'
     if: github.event.schedule == '0 8 * * 5'
-    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: read
       pull-requests: read
