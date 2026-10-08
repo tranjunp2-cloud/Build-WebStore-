@@ -7,6 +7,11 @@ export const F42_SOURCE_UNAVAILABLE = {
   error: 'Nguồn F42 chưa sẵn sàng. Nhờ team F42 triển khai schema/evidence tương ứng rồi làm mới.',
 } as const;
 
+export const F42_CATALOG_SCOPE_UNAVAILABLE = {
+  code: 'F42_CATALOG_SCOPE_UNAVAILABLE',
+  error: 'Chưa xác minh được phạm vi nguồn F42 và liên kết website legacy. Cần đối chiếu bằng chứng định danh trước khi hiển thị tổng website.',
+} as const;
+
 export const F42_WEBSITE_SCHEMA: F42SchemaContract = {
   pw1_migration_batches: ['id', 'status', 'started_at', 'finished_at', 'limits', 'results'],
   pw1_migration_stores: ['source_store_id', 'site_id', 'tenant_id', 'status', 'input_hash', 'updated_at'],
@@ -22,6 +27,14 @@ export const F42_WEBSITE_SCHEMA: F42SchemaContract = {
 export const F42_IMAGE_REVIEW_SCHEMA: F42SchemaContract = {
   ...F42_WEBSITE_SCHEMA,
   pw1_migration_qa_image_reviews: ['source_store_id', 'evidence_version', 'page_id', 'block_id', 'field_name', 'image_path', 'reviewer_id', 'reviewed_at'],
+};
+
+export const F42_WEBSITE_CATALOG_SCHEMA: F42SchemaContract = {
+  ...F42_WEBSITE_SCHEMA,
+  migration_import_batches: ['batch_id', 'profile_version', 'binding', 'selected_store_ids', 'created_at'],
+  migration_import_stores: ['batch_id', 'source_store_id', 'run_id'],
+  migration_runs: ['run_id', 'batch_id', 'source_system', 'source_instance_id', 'source_store_id', 'target_instance_id'],
+  migration_entity_map: ['run_id', 'source_system', 'source_instance_id', 'source_entity', 'source_id', 'target_collection', 'target_id', 'claim_active', 'state'],
 };
 
 export const F42_IMAGE_CHECK_SCHEMA: F42SchemaContract = {
@@ -52,6 +65,13 @@ export class F42SourceUnavailableError extends Error {
   constructor() {
     super(F42_SOURCE_UNAVAILABLE.error);
     this.name = 'F42SourceUnavailableError';
+  }
+}
+
+export class F42CatalogScopeError extends F42SourceUnavailableError {
+  constructor(readonly reason: 'AMBIGUOUS_BINDING' | 'INVALID_BINDING' | 'INVALID_CATALOG' | 'UNPROVEN_LEGACY_IDENTITY' | 'SCOPE_CHANGED') {
+    super();
+    this.name = 'F42CatalogScopeError';
   }
 }
 

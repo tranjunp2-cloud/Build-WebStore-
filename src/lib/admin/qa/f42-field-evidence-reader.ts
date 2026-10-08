@@ -2,8 +2,9 @@ import { sql } from 'drizzle-orm';
 import { getPayload } from 'payload';
 import config from '@payload-config';
 import { QC_FIELD_REGISTRY, QC_FIELD_REGISTRY_HASH, F42_FIELD_EVIDENCE_CONTRACT } from './f42-reader-contract';
-import { F42_FIELD_SCHEMA } from './f42-source-contract';
+import { F42_FIELD_SCHEMA, F42_WEBSITE_CATALOG_SCHEMA, F42SourceUnavailableError } from './f42-source-contract';
 import { isF42SchemaReady } from './f42-source-readiness';
+import { readWebsiteCatalogScope } from './website-migration-catalog';
 import { APPROVED_RECONCILIATION_FIELD_KEYS } from './migration-reconciliation';
 import { FIELD_STATUSES, type FieldCounts, type FieldEvidenceResult, type FieldEvidenceSummary, type FieldStatus } from './field-evidence-summary';
 
@@ -21,9 +22,9 @@ async function schemaAvailable(db: Db) {
 }
 
 /** One batch query; latest VERIFIED run only, never fall back to an older run's evidence. */
-export async function readFieldSummaries(storeIds: string[], scope?: 'commerce' | 'settings'): Promise<Map<string, FieldEvidenceSummary>> {
+export async function readFieldSummaries(storeIds: string[], scope?: 'commerce' | 'settings', binding?: { sourceInstance: string; targetInstance: string }): Promise<Map<string, FieldEvidenceSummary>> {
   const result = new Map<string, FieldEvidenceSummary>();
-  if (!storeIds.length) return result;
+  if (!storeIds.length || !binding) return result;
   const { db: { drizzle: db } } = await getPayload({ config });
   if (!await schemaAvailable(db)) return result;
   const records = await rows<{ store: string; generationId: string; runId: string; digest: string; verifiedAt: string; sourceSnapshotAt: string | null; counts: FieldCounts | null; outsideScope: number; outsideComparison: number; openExceptions: number }>(db, sql`
@@ -31,6 +32,7 @@ export async function readFieldSummaries(storeIds: string[], scope?: 'commerce' 
       SELECT DISTINCT ON (r.source_store_id) r.source_store_id,r.run_id
       FROM migration_runs r JOIN migration_import_stores i ON i.run_id=r.run_id AND i.source_store_id=r.source_store_id
       WHERE r.source_store_id IN (${sql.join(storeIds.map(id => sql`${id}`), sql`,`)}) AND r.state='VERIFIED' AND i.state='VERIFIED'
+        AND r.source_system='pw1' AND r.source_instance_id=${binding.sourceInstance} AND r.target_instance_id=${binding.targetInstance}
       ORDER BY r.source_store_id,r.updated_at DESC,r.run_id DESC
     )
     SELECT l.source_store_id AS store,g.generation_id::text AS "generationId",l.run_id::text AS "runId",g.digest,
@@ -58,9 +60,12 @@ export async function readFieldSummaries(storeIds: string[], scope?: 'commerce' 
 }
 
 export async function readFieldEvidence(store: string, scope: 'commerce' | 'settings', page: number, status: FieldStatus | 'all'): Promise<FieldEvidenceResult> {
-  const summary = (await readFieldSummaries([store], scope)).get(store) ?? null;
+  const payload = await getPayload({ config });
+  const db = payload.db.drizzle;
+  if (!await isF42SchemaReady(db, F42_WEBSITE_CATALOG_SCHEMA)) throw new F42SourceUnavailableError();
+  const binding = await readWebsiteCatalogScope(payload);
+  const summary = (await readFieldSummaries([store], scope, binding)).get(store) ?? null;
   if (!summary) return { summary: null, rows: [], total: 0, page };
-  const { db: { drizzle: db } } = await getPayload({ config });
   const filter = sql`generation_id=${summary.generationId}::uuid AND (source_entity || '.' || source_field) IN (${sql.join(keys(scope).map(key => sql`${key}`), sql`,`)}) AND (${status}='all' OR comparison_status=${status})`;
   const [count] = await rows<{ total: number }>(db, sql`SELECT count(*)::integer total FROM migration_field_evidence WHERE ${filter}`);
   const fields = await rows<{ key: string; record: string; status: FieldStatus; reason: string; source: string | null; target: string | null; disposition: string }>(db, sql`

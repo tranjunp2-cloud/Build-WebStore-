@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import type { Detail as F42MigrationDetail } from "./WebsiteMigrationEvidence";
 import type { MigrationStore } from "@/lib/admin/qa/website-migration-compare";
+import { migrationLifecycleStatus, MIGRATION_LIFECYCLE_LABELS, type MigrationLifecycleStatus } from "@/lib/admin/qa/migration-lifecycle";
 import { ReconciliationInspector } from "./ReconciliationInspector";
 import { QuickQcMenu } from "./QuickQcMenu";
 import { FieldEvidencePanel } from './FieldEvidencePanel';
@@ -826,9 +827,9 @@ function SwipeSliderBlockRenderer({
 
 function websiteStoreSummary(store: MigrationStore): StoreSummary {
   return {
-    id: store.storeId, name: store.name, ownerEmail: store.name, domain: store.url,
+    id: store.storeId, name: store.name || `Website PW1 #${store.storeId}`, ownerEmail: store.name || `Website PW1 #${store.storeId}`, domain: store.url ?? "",
     templateCode: "—", templateName: "Chưa có evidence template", sector: "",
-    legacyDomain: "", migratedDomain: store.url, score: "Chưa đo",
+    legacyDomain: "", migratedDomain: store.url ?? "", score: "Chưa đo",
     status: store.qcStatus === "unverified" ? "warning" : store.qcStatus,
     failedBlocks: [`Migrate: ${store.migration}`, `Publish: ${store.publish}`, `Audit: ${store.auditStatus}`, `${store.errors} lỗi / ${store.warnings} cảnh báo`],
     subdomain1: "", subdomain2: "", pageCount: store.pageCount,
@@ -1068,10 +1069,7 @@ function f42DetailToStoreDeepDiff(detail: F42MigrationDetail): StoreDeepDiff {
 }
 
 const liveStateLabels: Record<string, string> = {
-  completed: "Đã migrate",
-  pending: "Chờ migrate",
-  running: "Đang migrate",
-  failed: "Migrate lỗi",
+  pending: MIGRATION_LIFECYCLE_LABELS.not_started,
   published: "Đã publish",
   draft: "Draft",
   checked: "Đã audit",
@@ -1080,6 +1078,7 @@ const liveStateLabels: Record<string, string> = {
   stale: "Audit cũ",
   "needs-fix": "Có lỗi audit",
   "needs-review": "Cần review",
+  ...MIGRATION_LIFECYCLE_LABELS,
 };
 
 function LiveStateBadge({ value }: { value: string }) {
@@ -1106,6 +1105,17 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const [catalog, setCatalog] = useState<StoreSummary[]>(() => live ? [] : generateReconciliationCatalog(2000));
   const [liveStores,setLiveStores] = useState<MigrationStore[]>([]);
   const refreshCatalogRef = React.useRef<() => Promise<boolean>>(() => Promise.resolve(false));
+  const [lifecycleFilter, setLifecycleFilter] = useState<MigrationLifecycleStatus | 'all'>('all');
+  const [catalogScope, setCatalogScope] = useState<{ label: string; warning?: string } | null>(null);
+  const lifecycleCounts = useMemo(() => {
+    const counts = { total: liveStores.length, not_started: 0, running: 0, completed: 0, failed: 0 };
+    for (const store of liveStores) counts[migrationLifecycleStatus(store.migration)]++;
+    return counts;
+  }, [liveStores]);
+  const canCompareStore = (storeId: string) => {
+    const store = liveStoreById.get(storeId);
+    return Boolean(store?.siteId && store.url && store.canCompare !== false);
+  };
   const [catalogError,setCatalogError] = useState("");
   const [catalogLoading,setCatalogLoading] = useState(false);
   const liveCatalogRequestRef=React.useRef(0);
@@ -1304,22 +1314,45 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       setCatalogLoading(true);setCatalogError("");
       try {
         const stores: MigrationStore[]=[];
+        let scope: { label: string; warning?: string } | null = null;
+        let catalogVersion: string | null = null;
+        const seenStoreIds = new Set<string>();
         for(let page=1;;page++) {
           const response=await fetch(`/api/admin/qa/website-migrations?limit=100&page=${page}`,{cache:"no-store"});
           if(!response.ok) {
             const failure = await response.json().catch(() => null);
-            throw new Error(failure?.code === 'F42_SOURCE_UNAVAILABLE'
-              ? 'Nguồn F42 chưa sẵn sàng. Nhờ team F42 triển khai schema/evidence tương ứng rồi làm mới.'
+            throw new Error(failure?.code === 'F42_CATALOG_SCOPE_UNAVAILABLE'
+              ? 'Chưa xác minh được phạm vi nguồn F42 hoặc mapping website. Nhờ team migration kiểm tra liên kết nguồn.'
+              : failure?.code === 'F42_SOURCE_UNAVAILABLE'
+              ? 'Schema hoặc phạm vi nguồn F42 chưa xác định. Nhờ team F42 kiểm tra rồi làm mới.'
               : `Không đọc được báo cáo (HTTP ${response.status}). Vui lòng thử lại.`);
           }
-          const body=await response.json();stores.push(...body.data.stores);
-          if(stores.length>=body.data.total || !body.data.stores.length) break;
+          const body=await response.json();
+          if (typeof body.data.catalogVersion !== 'string' || !body.data.catalogVersion) {
+            throw new Error('Chưa xác định phiên bản danh sách migration. Vui lòng làm mới.');
+          }
+          if (page === 1) {
+            scope = body.data.catalogScope ?? null;
+            catalogVersion = body.data.catalogVersion;
+          } else if (body.data.catalogVersion !== catalogVersion) {
+            throw new Error('Danh sách migration vừa thay đổi. Vui lòng làm mới.');
+          }
+          for (const store of body.data.stores as MigrationStore[]) {
+            if (seenStoreIds.has(store.storeId)) throw new Error('Danh sách migration có website trùng giữa các trang. Vui lòng làm mới.');
+            seenStoreIds.add(store.storeId);
+            stores.push(store);
+          }
+          if (stores.length > body.data.total || (!body.data.stores.length && stores.length < body.data.total)) {
+            throw new Error('Danh sách migration chưa đầy đủ. Vui lòng làm mới.');
+          }
+          if(stores.length === body.data.total) break;
         }
         if(requestId!==liveCatalogRequestRef.current)return false;
         setLiveStores(stores);
+        setCatalogScope(scope);
         setCatalog(stores.map(websiteStoreSummary));
         return true;
-      } catch(error) {if(requestId!==liveCatalogRequestRef.current)return false;setCatalogError(error instanceof Error?error.message:"Không đọc được catalog");setCatalog([]);setLiveStores([]);return false;}
+      } catch(error) {if(requestId!==liveCatalogRequestRef.current)return false;setCatalogError(error instanceof Error?error.message:"Không đọc được catalog");setCatalog([]);setLiveStores([]);setCatalogScope(null);return false;}
       finally {if(requestId===liveCatalogRequestRef.current)setCatalogLoading(false)}
     }
     try {
@@ -1663,8 +1696,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       const matchStatus = live || filterStatus === "all" || s.status === filterStatus;
       const matchMetric =
         !live ||
-        liveMetricFilter === "all" ||
-        reportByStoreId.get(s.id)?.status === liveMetricFilter;
+        lifecycleFilter === "all" ||
+        migrationLifecycleStatus(liveStoreById.get(s.id)?.migration) === lifecycleFilter;
       const matchTpl = filterTemplate === "all" || s.templateCode === filterTemplate;
 
       const matchSearch =
@@ -1687,6 +1720,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
     searchQuery,
     live,
     liveMetricFilter,
+    lifecycleFilter,
     liveStoreById,
     reportByStoreId,
   ]);
@@ -2041,7 +2075,20 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
       {/* 5 Metric Summary Cards */}
       {(!live || (!catalogLoading && !catalogError)) && <>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {live && <>
+        {catalogScope && <p className="text-xs text-slate-400">{catalogScope.label}{catalogScope.warning && <span className="block mt-1 text-amber-200">{catalogScope.warning}</span>}</p>}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {(['all', 'not_started', 'running', 'completed', 'failed'] as const).map(status => (
+            <button key={status} type="button" data-testid={`migration-metric-${status}`} aria-pressed={lifecycleFilter === status}
+              onClick={() => { setLifecycleFilter(status); setCurrentPage(1); }}
+              className={`rounded-2xl border p-4 text-left transition focus-visible:ring-2 focus-visible:ring-blue-400 ${lifecycleFilter === status ? 'border-blue-400 bg-blue-950/30 ring-2 ring-blue-500/30' : 'border-slate-800 bg-slate-900/50 hover:border-slate-600'}`}>
+              <div className="text-xs font-semibold text-slate-300">{status === 'all' ? 'Tổng website' : MIGRATION_LIFECYCLE_LABELS[status]}</div>
+              <div className={`mt-2 text-2xl font-bold tabular-nums ${status === 'completed' ? 'text-emerald-400' : status === 'failed' ? 'text-rose-400' : status === 'running' ? 'text-sky-400' : 'text-white'}`}>{lifecycleCounts[status === 'all' ? 'total' : status].toLocaleString()}</div>
+            </button>
+          ))}
+        </div>
+      </>}
+      {!live && <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <button
           type="button"
           aria-pressed={filterStatus === "all" && liveMetricFilter === "all"}
@@ -2146,25 +2193,24 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
           <div className="text-2xl font-bold text-sky-400 mt-1">{live ? reportCounts.insufficient : metrics.avgScore}</div>
           <div className="text-[11px] text-slate-500 mt-1 font-medium">{live ? "Team migration bổ sung evidence" : "Toàn bộ hệ thống"}</div>
         </button>
-      </div>
-
+      </div>}
       {/* Filter Hub & Search Bar */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800/80 shadow-sm">
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           {live && (
             <span className="text-[11px] font-semibold text-slate-400">
-              Kết quả tự động:
+              Trạng thái migration:
             </span>
           )}
           <div
-            aria-label={live ? "Lọc kết quả tự động" : undefined}
-            className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800"
+            aria-label={live ? "Lọc trạng thái migration" : undefined}
+            className="inline-flex flex-wrap rounded-xl bg-slate-950 p-1 border border-slate-800"
           >
-            {live ? (['all', 'passed', 'review', 'failed', 'insufficient'] as ReportFilter[]).map(status => (
-              <button key={status} type="button" aria-pressed={liveMetricFilter === status}
-                onClick={() => { setLiveMetricFilter(status); setCurrentPage(1); }}
-                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${liveMetricFilter === status ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-400 hover:text-slate-200'}`}>
-                {status === 'all' ? 'Tất cả' : `${REPORT_LABELS[status]} (${reportCounts[status]})`}
+            {live ? (['all', 'not_started', 'running', 'completed', 'failed'] as const).map(status => (
+              <button key={status} type="button" aria-pressed={lifecycleFilter === status}
+                onClick={() => { setLifecycleFilter(status); setCurrentPage(1); }}
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${lifecycleFilter === status ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-400 hover:text-slate-200'}`}>
+                {status === 'all' ? 'Tất cả' : `${MIGRATION_LIFECYCLE_LABELS[status]} (${lifecycleCounts[status]})`}
               </button>
             )) : (["all", "passed", "warning", "failed"] as Array<typeof filterStatus>).map((st) => (
               <button
@@ -2322,7 +2368,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               <tr>
                 <th className="py-3.5 px-4 whitespace-nowrap">{live ? "Store / Đường dẫn PW2" : "Email Khách Hàng / Domain"}</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">{live ? "Migration / Publish" : "Giao Diện Mẫu"}</th>
-                <th className="py-3.5 px-4">{live ? "Độ khớp website (%) / Kết quả tự động" : "Độ Khớp Dữ Liệu"}</th>
+                <th className="py-3.5 px-4">{live ? "Đối soát nội dung (%) / Kết quả tự động" : "Độ Khớp Dữ Liệu"}</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">{live ? "QC thủ công" : "Trạng Thái QC"}</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">{live ? "Số trang" : "Số Trang & Lỗi / Cảnh Báo"}</th>
                 <th className="py-3.5 px-4 text-right">Đối Soát Chi Tiết</th>
@@ -2340,14 +2386,14 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     </div>
                     <div className="text-[12px] text-slate-400 font-normal font-mono mt-1 flex items-center gap-1.5">
                       <Globe className="size-3 text-slate-500 shrink-0" />
-                      <span>{store.domain}</span>
+                      <span>{store.domain || (live ? 'Chưa có website PW2' : '')}</span>
                     </div>
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
                     {live ? (
                       <div className="flex flex-col items-start gap-1.5">
-                        <LiveStateBadge value={liveStoreById.get(store.id)?.migration ?? "pending"} />
-                        <LiveStateBadge value={liveStoreById.get(store.id)?.publish ?? "draft"} />
+                        <LiveStateBadge value={migrationLifecycleStatus(liveStoreById.get(store.id)?.migration)} />
+                        {liveStoreById.get(store.id)?.publish && <LiveStateBadge value={liveStoreById.get(store.id)!.publish!} />}
                       </div>
                     ) : (
                       <>
@@ -2417,6 +2463,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     )}
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
+                    {live && !canCompareStore(store.id) ? <span className="text-xs text-slate-400">Chưa thể QC</span> : <>
                     {store.status === "passed" && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
                         <CheckCircle2 className="size-3.5" /> {live ? "Pass" : "Khớp Chuẩn"}
@@ -2433,6 +2480,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                         <AlertOctagon className="size-3.5" /> {live ? "Failed" : "Lỗi P0 Blocker"}
                       </span>
                     )}
+                    </>}
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
@@ -2464,7 +2512,10 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                   <td className="py-4 px-4 text-right whitespace-nowrap">
                     <button
                       data-testid={`migration-store-compare-${store.id}`}
+                      disabled={live && !canCompareStore(store.id)}
+                      title={live && !canCompareStore(store.id) ? 'Chưa có website PW2 hoặc mapping hợp lệ để so sánh' : undefined}
                       onClick={() => {
+                        if (live && !canCompareStore(store.id)) return;
                         setLoadedFieldDiff(null);
                         setActiveStoreId(store.id);
                         setActivePageIndex(0);
@@ -2472,11 +2523,12 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                         setActiveViewTab("live_webview");
                         setPreviewSource(isStoreDomainSslReady(store) ? "live_domain" : "template");
                       }}
-                      className="px-3.5 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-600 rounded-xl font-semibold text-xs transition-all shadow-sm flex items-center gap-1 ml-auto whitespace-nowrap"
+                      className="px-3.5 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 hover:border-blue-600 rounded-xl font-semibold text-xs transition-all shadow-sm flex items-center gap-1 ml-auto whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <span>So Sánh</span>
                       <ChevronRight className="size-3.5" />
                     </button>
+                    {live && !canCompareStore(store.id) && <p className="mt-1 whitespace-normal text-[10px] text-slate-400">Chưa có PW2 hoặc mapping hợp lệ</p>}
                   </td>
                 </tr>
               ))}
@@ -2490,17 +2542,18 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
               </div>
               <div className="text-sm font-semibold text-white">
                 {live
-                  ? "Không có website thuộc kết quả tự động và từ khóa đã chọn."
+                  ? "Không có website thuộc trạng thái migration và từ khóa đã chọn."
                   : <>Không tìm thấy website nào khớp với từ khóa &ldquo;{searchQuery}&rdquo;</>}
               </div>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
                 Vui lòng kiểm tra lại Email khách hàng, Domain hoặc chuyển bộ lọc trạng thái sang &ldquo;Tất Cả&rdquo;.
               </p>
               <div className="flex items-center justify-center gap-2 pt-2">
-                {(filterStatus !== "all" || liveMetricFilter !== "all") && (
+                {(filterStatus !== "all" || liveMetricFilter !== "all" || lifecycleFilter !== "all") && (
                   <button
                     onClick={() => {
                       setFilterStatus("all");
+                      setLifecycleFilter("all");
                       setLiveMetricFilter("all");
                       setCurrentPage(1);
                     }}

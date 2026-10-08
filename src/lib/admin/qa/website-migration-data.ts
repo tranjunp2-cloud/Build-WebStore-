@@ -29,6 +29,8 @@ import { imagePreviews } from './website-image-preview';
 import { websiteImageCacheKey } from './website-image-cache-key';
 import { isF42SchemaReady } from './f42-source-readiness';
 import { readFieldSummaries } from './f42-field-evidence-reader';
+import { readWebsiteCatalogScope, websiteCatalogSources } from './website-migration-catalog';
+import { F42CatalogScopeError } from './f42-source-contract';
 export type {
   MigrationField,
   MigrationBlock,
@@ -72,6 +74,7 @@ export async function readWebsiteMigrations(input: {
   qc: string;
 }) {
   const payload = await getPayload({ config });
+  const scope = await readWebsiteCatalogScope(payload);
   const batches = await execute<{
     id: string;
     status: string;
@@ -83,9 +86,9 @@ export async function readWebsiteMigrations(input: {
     payload,
     sql`SELECT id,status,started_at AS "startedAt",finished_at AS "finishedAt", limits->'qaInput'->>'runId' AS "runId", limits->'qaInput'->>'part' AS part FROM pw1_migration_batches ORDER BY started_at DESC LIMIT 100`,
   );
-  const where = sql`(${input.batch ?? null}::uuid IS NULL OR EXISTS (SELECT 1 FROM pw1_migration_attempts x WHERE x.source_store_id=m.source_store_id AND x.batch_id=${input.batch ?? null}::uuid) OR EXISTS(SELECT 1 FROM pw1_migration_batches b CROSS JOIN LATERAL jsonb_array_elements(b.results) r WHERE b.id=${input.batch ?? null}::uuid AND r->>'sourceStoreId'=m.source_store_id))
-        AND (${input.run ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM pw1_migration_batches b WHERE b.limits->'qaInput'->>'runId'=${input.run ?? null} AND (EXISTS(SELECT 1 FROM pw1_migration_attempts x WHERE x.batch_id=b.id AND x.source_store_id=m.source_store_id) OR EXISTS(SELECT 1 FROM jsonb_array_elements(b.results) r WHERE r->>'sourceStoreId'=m.source_store_id))))
-        AND (${input.search}='' OR m.source_store_id ILIKE ${"%" + input.search + "%"} OR s.name ILIKE ${"%" + input.search + "%"})`;
+  const where = sql`(${input.batch ?? null}::uuid IS NULL OR EXISTS (SELECT 1 FROM pw1_migration_attempts x WHERE x.source_store_id=source.source_store_id AND x.batch_id=${input.batch ?? null}::uuid) OR EXISTS(SELECT 1 FROM pw1_migration_batches b CROSS JOIN LATERAL jsonb_array_elements(b.results) r WHERE b.id=${input.batch ?? null}::uuid AND r->>'sourceStoreId'=source.source_store_id))
+        AND (${input.run ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM pw1_migration_batches b WHERE b.limits->'qaInput'->>'runId'=${input.run ?? null} AND (EXISTS(SELECT 1 FROM pw1_migration_attempts x WHERE x.batch_id=b.id AND x.source_store_id=source.source_store_id) OR EXISTS(SELECT 1 FROM jsonb_array_elements(b.results) r WHERE r->>'sourceStoreId'=source.source_store_id))))
+        AND (${input.search}='' OR source.source_store_id ILIKE ${"%" + input.search + "%"} OR COALESCE(s.name,'Website PW1 #' || source.source_store_id) ILIKE ${"%" + input.search + "%"})`;
   const rows = await execute<
     MigrationStore & {
       total: number;
@@ -95,44 +98,69 @@ export async function readWebsiteMigrations(input: {
       unpublished: number;
       needsAttention: number;
       unverifiedQc: number;
+      allTotal: number;
+      notStarted: number;
+      running: number;
+      failed: number;
+      catalogVersion: string;
     }
   >(
     payload,
     sql`
-        WITH catalog AS (
-          SELECT m.source_store_id AS "storeId",s.name,m.site_id AS "siteId",m.status AS migration,
+        WITH source_rows AS (${websiteCatalogSources(scope)}), sources AS (
+          SELECT source_store_id,max(updated_at) AS updated_at FROM source_rows GROUP BY source_store_id
+        ), catalog AS (
+          SELECT source.source_store_id AS "storeId",COALESCE(s.name,'Website PW1 #' || source.source_store_id) AS name,m.site_id AS "siteId",COALESCE(m.status,'pending') AS migration,
+            (s.id IS NOT NULL AND t.id IS NOT NULL) AS "canCompare",
             (SELECT count(*)::integer FROM pages p WHERE p.site_id=m.site_id AND p.deleted_at IS NULL AND p.slug<>'404') AS "pageCount",
             CASE WHEN r.evidence_version=${evidenceVersionSql} THEN r.verdict ELSE 'unverified' END AS "qcStatus",r.reviewed_at AS "reviewedAt",
             s.status AS publish,CASE WHEN q.checked_at IS NOT NULL AND EXISTS(SELECT 1 FROM pages p WHERE p.site_id=m.site_id AND p.slug<>'404' AND (p.updated_at>q.checked_at OR EXISTS(SELECT 1 FROM jsonb_array_elements(q.report->'pages') version WHERE (version->>'pageId')::integer=p.id AND version->>'updatedAt' IS NOT NULL AND (version->>'updatedAt')::timestamptz<>p.updated_at))) OR q.checked_at IS NOT NULL AND s.updated_at>q.checked_at THEN 'stale' WHEN q.checked_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(q.report->'pages') version WHERE version->>'updatedAt' IS NOT NULL) THEN 'historical' ELSE COALESCE(q.report->>'status','not-checked') END AS "auditStatus",
             COALESCE((q.report->>'errors')::integer,0) AS errors,COALESCE((q.report->>'warnings')::integer,0) AS warnings,
-            q.checked_at AS "checkedAt",('/sites/' || t.slug) AS url,m.updated_at AS "updatedAt"
-          FROM pw1_migration_stores m JOIN sites s ON s.id=m.site_id JOIN tenants t ON t.id=m.tenant_id
+            q.checked_at AS "checkedAt",CASE WHEN s.id IS NOT NULL AND t.id IS NOT NULL THEN '/sites/' || t.slug ELSE NULL END AS url,COALESCE(m.updated_at,source.updated_at) AS "updatedAt"
+          FROM sources source LEFT JOIN pw1_migration_stores m ON m.source_store_id=source.source_store_id
+          LEFT JOIN sites s ON s.id=m.site_id AND s.tenant_id=m.tenant_id LEFT JOIN tenants t ON t.id=m.tenant_id
           LEFT JOIN LATERAL (SELECT attempt_id FROM pw1_migration_commits WHERE source_store_id=m.source_store_id AND input_hash=m.input_hash ORDER BY committed_at DESC LIMIT 1) c ON true
           LEFT JOIN pw1_migration_qa_audits q ON q.source_store_id=m.source_store_id AND q.input_hash=m.input_hash AND q.attempt_id=c.attempt_id
           LEFT JOIN LATERAL(SELECT * FROM pw1_migration_qa_reviews WHERE source_store_id=m.source_store_id ORDER BY reviewed_at DESC,id DESC LIMIT 1)r ON true
           WHERE ${where}
         ), stats AS (
-          SELECT count(*)::integer AS "allTotal", count(*) FILTER (WHERE migration='completed')::integer AS completed, count(*) FILTER (WHERE publish='published')::integer AS published, count(*) FILTER (WHERE migration<>'completed')::integer AS "migrationIncomplete", count(*) FILTER (WHERE publish<>'published')::integer AS unpublished, count(*) FILTER (WHERE "auditStatus" IN ('not-checked','historical','stale') OR errors+warnings>0)::integer AS "needsAttention", count(*) FILTER (WHERE "qcStatus"='unverified')::integer AS "unverifiedQc" FROM catalog
+          SELECT count(*)::integer AS "allTotal", count(*) FILTER (WHERE migration='pending')::integer AS "notStarted", count(*) FILTER (WHERE migration='running')::integer AS running, count(*) FILTER (WHERE migration='failed')::integer AS failed, count(*) FILTER (WHERE migration='completed')::integer AS completed, count(*) FILTER (WHERE publish='published')::integer AS published, count(*) FILTER (WHERE migration<>'completed')::integer AS "migrationIncomplete", count(*) FILTER (WHERE publish<>'published')::integer AS unpublished, count(*) FILTER (WHERE "auditStatus" IN ('not-checked','historical','stale') OR errors+warnings>0)::integer AS "needsAttention", count(*) FILTER (WHERE "qcStatus"='unverified')::integer AS "unverifiedQc" FROM catalog
+        ), catalog_version AS (
+          SELECT md5(${scope?.sourceInstance ?? 'legacy'} || ':' || ${scope?.targetInstance ?? 'legacy'} || ':' ||
+            COALESCE(string_agg("storeId" || ':' || migration || ':' || COALESCE("updatedAt"::text,''), ',' ORDER BY "storeId"),'')) AS "catalogVersion" FROM catalog
         ), filtered AS (
           SELECT * FROM catalog WHERE
-            (${input.status}='all' OR ${input.status}='incomplete' AND migration<>'completed' OR ${input.status}='unpublished' AND publish<>'published' OR ${input.status}='failed' AND migration='failed' OR ${input.status}='attention' AND (errors+warnings>0 OR "auditStatus" IN ('not-checked','historical','stale')) OR ${input.status}='unaudited' AND "auditStatus" IN ('not-checked','historical','stale'))
+            (${input.status}='all' OR ${input.status}='not_started' AND migration='pending' OR ${input.status}='running' AND migration='running' OR ${input.status}='completed' AND migration='completed' OR ${input.status}='incomplete' AND migration<>'completed' OR ${input.status}='unpublished' AND publish<>'published' OR ${input.status}='failed' AND migration='failed' OR ${input.status}='attention' AND (errors+warnings>0 OR "auditStatus" IN ('not-checked','historical','stale')) OR ${input.status}='unaudited' AND "auditStatus" IN ('not-checked','historical','stale'))
             AND (${input.qc}='all' OR "qcStatus"=${input.qc})
         ), filtered_stats AS (
           SELECT count(*)::integer AS total FROM filtered
-        ) SELECT page.*,filtered_stats.total,stats.completed,stats.published,stats."migrationIncomplete",stats.unpublished,stats."needsAttention",stats."unverifiedQc"
-        FROM stats CROSS JOIN filtered_stats
+        ) SELECT page.*,filtered_stats.total,stats.completed,stats.published,stats."migrationIncomplete",stats.unpublished,stats."needsAttention",stats."unverifiedQc",stats."allTotal",stats."notStarted",stats.running,stats.failed,catalog_version."catalogVersion"
+        FROM stats CROSS JOIN filtered_stats CROSS JOIN catalog_version
         LEFT JOIN LATERAL (
           SELECT filtered.*
           FROM filtered
-          ORDER BY "storeId"::bigint LIMIT ${input.limit} OFFSET ${(input.page - 1) * input.limit}
+          ORDER BY "storeId"::numeric,"storeId" LIMIT ${input.limit} OFFSET ${(input.page - 1) * input.limit}
         ) page ON true`,
   );
   const stores = rows.filter((row) => Boolean(row.storeId));
-  const fieldSummaries = await readFieldSummaries(stores.map(store => store.storeId));
-  const websiteSummaries = await readWebsiteComparisonSummaries(payload, stores.map(store => store.storeId));
+  const fieldSummaries: Awaited<ReturnType<typeof readFieldSummaries>> = scope ? await readFieldSummaries(stores.filter(store => store.canCompare).map(store => store.storeId), undefined, scope) : new Map();
+  const websiteSummaries = await readWebsiteComparisonSummaries(payload, stores.filter(store => store.canCompare).map(store => store.storeId));
+  // Scope/ownership can change while the catalog and evidence queries run.
+  // Revalidate before publishing any rows so newly ambiguous bindings fail closed.
+  const finalScope = await readWebsiteCatalogScope(payload);
+  if (scope?.sourceInstance !== finalScope?.sourceInstance || scope?.targetInstance !== finalScope?.targetInstance) {
+    throw new F42CatalogScopeError('SCOPE_CHANGED');
+  }
   return {
     batches,
+    catalogVersion: rows[0]?.catalogVersion ?? '',
+    catalogScope: {
+      kind: scope ? 'registered' : 'legacy_only',
+      label: scope ? 'Website nguồn đã đăng ký trong F42 và website ledger' : 'Website đã ghi nhận trong website ledger',
+      warning: scope ? 'Chỉ bao gồm nguồn đã đăng ký; không bao gồm website PW1 chưa từng được đăng ký với F42.' : 'Chưa có danh mục nguồn F42. Tổng chỉ bao gồm website ledger, không phải toàn bộ website PW1.',
+    },
     summary: {
+      lifecycle: { total: rows[0]?.allTotal ?? 0, not_started: rows[0]?.notStarted ?? 0, running: rows[0]?.running ?? 0, completed: rows[0]?.completed ?? 0, failed: rows[0]?.failed ?? 0 },
       completed: rows[0]?.completed ?? 0,
       published: rows[0]?.published ?? 0,
       migrationIncomplete: rows[0]?.migrationIncomplete ?? 0,

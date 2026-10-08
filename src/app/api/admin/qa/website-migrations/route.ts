@@ -3,7 +3,7 @@ import { z } from "zod";
 import { withSuperAdmin } from "@/lib/admin/api-utils";
 import { saveWebsiteReview } from "@/lib/admin/qa/website-migration-review";
 import { assertF42SourceReady } from "@/lib/admin/qa/f42-source-readiness";
-import { F42_SOURCE_UNAVAILABLE, F42_WEBSITE_SCHEMA, isF42SourceUnavailable } from "@/lib/admin/qa/f42-source-contract";
+import { F42_SOURCE_UNAVAILABLE, F42_CATALOG_SCOPE_UNAVAILABLE, F42CatalogScopeError, F42_WEBSITE_SCHEMA, F42_WEBSITE_CATALOG_SCHEMA, isF42SourceUnavailable } from "@/lib/admin/qa/f42-source-contract";
 import {
   readWebsiteMigrations,
   readWebsiteMigrationDetail,
@@ -22,7 +22,7 @@ const querySchema = z
     limit: z.coerce.number().int().min(1).max(100).default(25),
     search: z.string().trim().max(200).default(""),
     status: z
-      .enum(["all", "incomplete", "unpublished", "failed", "attention", "unaudited"])
+      .enum(["all", "not_started", "running", "completed", "incomplete", "unpublished", "failed", "attention", "unaudited"])
       .default("all"),
     qc: z
       .enum(["all", "passed", "warning", "failed", "unverified"])
@@ -39,13 +39,17 @@ export const GET = withSuperAdmin(async (request) => {
       { status: 400 },
     );
   try {
-    await assertF42SourceReady(F42_WEBSITE_SCHEMA);
+    await assertF42SourceReady(query.data.store ? F42_WEBSITE_SCHEMA : F42_WEBSITE_CATALOG_SCHEMA);
     if (query.data.store) {
       const data = await readWebsiteMigrationDetail(query.data.store);
       return NextResponse.json({ data }, { status: data ? 200 : 404 });
     }
     return NextResponse.json({ data: await readWebsiteMigrations(query.data) });
   } catch (error) {
+    if (error instanceof F42CatalogScopeError) {
+      console.error('[F40 catalog scope]', error.reason);
+      return NextResponse.json(F42_CATALOG_SCOPE_UNAVAILABLE, { status: 503 });
+    }
     if (isF42SourceUnavailable(error)) return NextResponse.json(F42_SOURCE_UNAVAILABLE, { status: 503 });
     console.error(
       "[F40 migration data]",
