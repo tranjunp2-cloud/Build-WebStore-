@@ -133,7 +133,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                     const v = settings(line.model_settings)
                     const dest = resolveTarget(v.model_type, v.model_id, v.url, `menu-line:${str(line.id)}`, preserveLabel)
                     if (!dest) {
-                        if (v.content || v.content_ms) report.warnings.push(`menu-line:${str(line.id)}: formatted footer content flattened to tagline`)
+                        if (v.content || v.content_ms) report.warnings.push(`menu-line:${str(line.id)}: footer text retained in its source column`)
                         return []
                     }
                     return [{ label: localized(v), ...dest }]
@@ -146,7 +146,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             // Explicit visibility takes priority over PW1's pre-created system pages.
             // Do not coerce null/empty/missing values to zero.
             const cartHidden = headerConfig.cart_status === 0 || headerConfig.cart_status === '0' || headerConfig.cart_status === false
-            const cartEnabled = !cartHidden && validPages.some(p => ['4','5'].includes(str(p.type)) || hasCommerceComponent(p))
+            const cartEnabled = !cartHidden && (str(headerConfig.cart_status) === '1' || validPages.some(p => ['4','5'].includes(str(p.type)) || hasCommerceComponent(p)))
             if (Number(headerConfig.search_status) === 1) report.warnings.push('Header product search setting is retained in source only; native navigation search mapping is pending')
             const pages = validPages.filter(p => {
                 if (['4', '5', '6'].includes(str(p.type)) || isNativeCommercePage(p)) { exclude(p.id, 'page', 'native-commerce-runtime'); return false }
@@ -175,7 +175,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                         const buttonEnabled = str(button.status) === '1'
                         const dest = buttonEnabled ? resolveTarget(undefined, undefined, b.url, `banner:${str(b.id)}`) : undefined
                         const label = buttonEnabled ? str(object(object(button.mode).default).text) : ''
-                        return { imageUrl: bannerImageUrl(b.image), alt: str(b.name), heading: str(h.status) === '1' ? str(h.text) : '', description: str(sub.status) === '1' ? str(sub.text) : '', cta: str(button.status) === '1' && label && dest?.url ? { label, url: dest.url } : null }
+                        return { imageUrl: bannerImageUrl(b.image), alt: str(b.name), heading: str(h.status) === '1' ? str(h.text) : '', description: str(sub.status) === '1' ? str(sub.text) : '', cta: buttonEnabled && label ? { label, url: dest?.url ?? '' } : null }
                     })
                     if (!slides.length) { exclude(c.id, 'component', 'empty-banner'); return [] }
                     return [{ ...common, content: { slides }, config: { size: config.size ?? 'hero', autoplay: config.animation === 'auto', intervalMs: Math.max(1000, Number(config.timing_animation ?? 5) * 1000), sourceSettings } }]
@@ -213,15 +213,43 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             }) }))
             const footerItems = ordered(footer?.menu_items).filter(active)
             const footerSocials = extractFooterSocials(footerItems.flatMap(i => ordered(i.menu_lines).filter(active)), message => report.warnings.push(message))
-            const tagline = footerItems.flatMap(i => ordered(i.menu_lines).filter(active).map(l => {
-                const v = settings(l.model_settings), html = str(locale === 'ms' ? v.content_ms || v.content : v.content)
-                if (!html) return ''
-                const document = load(html)
-                document('br').replaceWith('\n')
-                document('p, div, li, h1, h2, h3, h4, h5, h6').append('\n')
-                return document.root().text().replace(/\n{3,}/g, '\n\n').trim()
-            })).filter(Boolean).join('\n')
-            const columns = footerItems.map(i => ({ title: localized(i), links: menuLinks(i, true) })).filter(c => c.links.length > 0)
+            // PW1 footer columns contain ordinary links, rich text and arbitrary icon links.
+            // Preserve their column ownership; icon links are not necessarily social networks.
+            const columns = footerItems.map(item => {
+                const lines = ordered(item.menu_lines).filter(active)
+                const links = menuLinks(item, true)
+                const text = lines.map(line => {
+                    const v = settings(line.model_settings)
+                    const html = str(locale === 'ms' ? v.content_ms || v.content : v.content)
+                    if (!html) return ''
+                    const document = load(html)
+                    document('br').replaceWith('\n')
+                    document('p, div, li, h1, h2, h3, h4, h5, h6').append('\n')
+                    return document.root().text().replace(/\n{3,}/g, '\n\n').trim()
+                }).filter(Boolean).join('\n')
+                const iconLinks = lines.flatMap(line => {
+                    const v = settings(line.model_settings)
+                    return Object.keys(v).filter(key => /^items\.\d+\.url$/.test(key)).sort((a,b) => Number(a.split('.')[1]) - Number(b.split('.')[1])).flatMap(key => {
+                        const url = str(v[key]).trim()
+                        if (!url) return []
+                        let parsedUrl: URL
+                        try { parsedUrl = new URL(url) } catch { report.warnings.push(`footer-icon:${str(line.id)}: invalid URL omitted`); return [] }
+                        if (!['https:', 'http:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) { report.warnings.push(`footer-icon:${str(line.id)}: unsafe URL omitted`); return [] }
+                        const target = resolveTarget(undefined, undefined, url, `footer-icon:${str(line.id)}`)
+                        if (!target?.url) throw new Error(`Footer icon target could not be preserved: ${str(line.id)}`)
+                        const host = new URL(url).hostname.replace(/^www\./, '')
+                        const label = host.includes('whatsapp') || host === 'wa.me' ? 'WhatsApp'
+                            : host.includes('google') ? 'Google Maps'
+                            : host.includes('grab') ? 'GrabMart'
+                            : host.includes('foodpanda') ? 'Foodpanda'
+                            : host.includes('facebook') ? 'Facebook' : host
+                        const imageUrl = str(v[key.replace(/\.url$/, '.image')]).trim()
+                        return [{label, ...target, ...( /^https?:\/\//.test(imageUrl) ? {imageUrl} : {})}]
+                    })
+                })
+                return { title: localized(item), links: [...links, ...iconLinks], ...(text ? {text} : {}) }
+            }).filter(column => column.links.length > 0 || column.text)
+            const tagline = ''
             if (columns.length > 4) throw new Error(`Store ${storeId}: native footer supports at most 4 nonempty link columns`)
             const pickStrings = (value: unknown, keys: string[]) => {
                 const data = object(value)

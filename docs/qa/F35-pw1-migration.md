@@ -36,6 +36,7 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — Keep source contract and page identity without generating legacy blocks; reject duplicate page/component IDs and invalid homepage/order.
 
 ### TC-F35.M27 — BE collection adapter
+- [x] AUTO — Preserve footer contact text and arbitrary HTTP(S) icon links in their source columns (WhatsApp, Maps, GrabMart, Foodpanda); retain enabled URL-less banner labels without inventing targets; explicit header cart visibility enables the native widget even with disabled legacy commerce pages. Browser checks store 922/1044/1174/1856 and SJS category regression.
 - [x] AUTO — Website JSON giữ category references (`pending`/`unavailable`); `category-mapping.json` ghi ID PW1 → ID PW2 đã xác minh, hoặc `destinationId: null`. Không đổi BE import. Link category unavailable mở listing PW2 rỗng bằng `categoryId=0`; category đã có mapping dùng ID PW2 thật. Kiểm duplicate/ID giả và E2E bấm footer → Products → clear filters.
 - [x] AUTO — Project website-only data; keep locale and content; exclude disabled/deleted/empty records; promote valid menu children; reject ambiguous owners and cross-store settings.
 

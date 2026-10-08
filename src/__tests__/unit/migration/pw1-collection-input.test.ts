@@ -1,3 +1,4 @@
+import { PW1_EMPTY_CTA_URL } from '@/lib/navigation-url'
 import { validateMigrationBatch } from '@/lib/migration/pw1-batch-validation'
 import { compactInput } from '@/lib/migration/pw1-batch-input'
 import { adaptWebsiteInput } from '@/lib/migration/pw2-website-input'
@@ -261,14 +262,14 @@ it('[TC-F35.M27] retains category cards without images using the migration place
     expect(contract.pages[0].components[0].block.html).toContain('href="https://other.example/"')
  })
 
-it('[TC-F35.M27] disabled commerce pages override stale header cart settings', () => {
+it('[TC-F35.M27] explicit header cart visibility survives disabled source commerce pages', () => {
     const input = fixture()
     const data = [{...input[0], sites:[{...input[0].sites[0],menus:[{...input[0].sites[0].menus[0],config:'{"cart_status":1}'}]}],pages:[...input[0].pages,
         {id:'20',store_id:'205',name:'Cart',type:'4',slug:'cart',status:'0',components:[{id:'30',status:'1',frontend_component:{name:'cart'}}]},
         {id:'21',store_id:'205',name:'Tracking',type:'6',slug:'order-tracking',status:'0',components:[]},
     ]}]
     const {entries} = parseMigrationInput(data)
-    expect(entries[0].website.features).toEqual({cart:false,orderTracking:false})
+    expect(entries[0].website.features).toEqual({cart:true,orderTracking:false})
 })
 
 it.each([0, '0', false, 1, '1', undefined, null, ''])('[TC-F35.M27] honors explicit header cart visibility %s over active system pages', (cartStatus) => {
@@ -397,4 +398,37 @@ it('[TC-F35.M27] retains Twitter icon and original href when source URL has a no
     const { entries } = parseMigrationInput([{ ...input[0], sites: [{ ...site, menus: [...site.menus, footer] }] }])
     // Assert
     expect(entries[0].website.footer.socials).toEqual([{ platform: 'twitter', url: 'https://www.twister.com/' }])
+})
+
+it('[TC-F35.M27] preserves footer text and non-social image links in their original columns', () => {
+    const input = fixture()
+    const footer = {id:'footer',type:'2',status:'1',menu_items:[
+        {id:'contact',name:'CONTACT INFO',position:'1',menu_lines:[
+            {id:'fax',type_id:'4',model_settings:[{key:'content',value:'<p>Fax: 123<br>Monday - Friday</p>'}]},
+            {id:'wa',type_id:'3',model_settings:[{key:'items.0.url',value:'https://wa.me/123'}]},
+        ]},
+        {id:'shop',name:'Online Shop',position:'2',menu_lines:[{id:'grab',type_id:'3',model_settings:[
+            {key:'items.0.url',value:'https://mart.grab.com/my/en/merchant/example'},
+            {key:'items.0.image',value:'https://shop.example/grab.png'},
+        ]}]},
+    ]}
+    const data = [{...input[0],sites:[{...input[0].sites[0],menus:[...input[0].sites[0].menus,footer]}]}]
+    const {entries} = parseMigrationInput(data)
+    const {contract} = adaptWebsiteInput(compactInput(entries[0]))
+    expect(contract.site.footer.columns).toEqual([
+        {title:'CONTACT INFO',text:'Fax: 123\nMonday - Friday',links:[{label:'WhatsApp',url:'https://wa.me/123'}]},
+        {title:'Online Shop',links:[{label:'GrabMart',url:'https://mart.grab.com/my/en/merchant/example',imageUrl:'https://shop.example/grab.png'}]},
+    ])
+    expect(contract.site.footer.tagline).toBe('')
+})
+
+it('[TC-F35.M27] retains an enabled banner CTA without inventing a destination', () => {
+    const input = fixture()
+    const data = [{...input[0],pages:[{...input[0].pages[0],components:[{
+        id:'20',page_id:'10',status:'1',frontend_component:{name:'banner'},
+        banners:[{id:'30',page_component_id:'20',store_id:'205',status:'1',image:'https://shop.example/banner.png',url:'',button:JSON.stringify({status:'1',mode:{default:{text:'GET STARTED'}}})}],
+    }]}]}]
+    const {entries} = parseMigrationInput(data)
+    const {contract} = adaptWebsiteInput(compactInput(entries[0]))
+    expect(contract.pages[0].components[0].block).toMatchObject({slides:[{ctaButtons:[{label:'GET STARTED',url:PW1_EMPTY_CTA_URL}]}]})
 })
