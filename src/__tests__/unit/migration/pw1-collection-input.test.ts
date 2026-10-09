@@ -422,6 +422,25 @@ it('[TC-F35.M27] preserves footer text and non-social image links in their origi
     expect(contract.site.footer.tagline).toBe('')
 })
 
+it('[TC-F35.M27] merges footer columns beyond four into the fourth column without dropping links', () => {
+    // Arrange: six PW1 footer columns, each with one link; the sixth also carries text.
+    const input = fixture()
+    const item = (n: number) => ({id:`c${n}`,name:`Col ${n}`,position:String(n),menu_lines:[
+        {id:`l${n}`,type_id:'3',model_settings:[{key:'items.0.url',value:`https://wa.me/${n}`}]},
+        ...(n === 6 ? [{id:'t6',type_id:'4',model_settings:[{key:'content',value:'<p>Open daily</p>'}]}] : []),
+    ]})
+    const footer = {id:'footer',type:'2',status:'1',menu_items:[1,2,3,4,5,6].map(item)}
+    const data = [{...input[0],sites:[{...input[0].sites[0],menus:[...input[0].sites[0].menus,footer]}]}]
+    // Act
+    const {entries, reports} = parseMigrationInput(data)
+    // Assert: four columns; overflow links and text appended to the fourth.
+    const columns = entries[0].website.footer.columns
+    expect(columns.map(c => c.title)).toEqual(['Col 1','Col 2','Col 3','Col 4'])
+    expect(columns[3].links.map(l => l.url)).toEqual(['https://wa.me/4','https://wa.me/5','https://wa.me/6'])
+    expect(columns[3].text).toBe('Col 6\nOpen daily')
+    expect(reports[0].warnings).toContain('footer: 2 column(s) beyond 4 merged into "Col 4"')
+})
+
 it('[TC-F35.M27] retains an enabled banner CTA without inventing a destination', () => {
     const input = fixture()
     const data = [{...input[0],pages:[{...input[0].pages[0],components:[{

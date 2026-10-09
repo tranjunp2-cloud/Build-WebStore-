@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto'
 import { readdir, readFile, rm } from 'node:fs/promises'
 import { resolve, relative } from 'node:path'
 import { tmpdir } from 'node:os'
+import { realpathSync } from 'node:fs'
 import { readStoreTargetChecks, loadImportArtifact, readImportStore, readBoundFile, inspectExportArtifact } from './artifact'
 import { loadCredentialSidecar } from './credentials'
 import { selectStoreIds } from './selectors'
@@ -131,7 +132,7 @@ export async function runImport(args: Arguments, options: ImportOrchestrationOpt
     storeGroups([], groupSize)
     const manifestPath = batch?.binding.manifestPath ?? resolve(args.manifest!)
     const artifactStarted = Date.now()
-    const artifact = await loadImportArtifact(manifestPath, { progress: progress.report, spoolDirectory: tmpdir(), ...(batch ? { storeIds: batch.storeIds } : { selector: args }) })
+    const artifact = await loadImportArtifact(manifestPath, { progress: progress.report, spoolDirectory: realpathSync(tmpdir()), ...(batch ? { storeIds: batch.storeIds } : { selector: args }) })
     spool = artifact.spoolDirectory
     if (artifact.creatorBindings && artifact.creatorBindings.targetIdentityHash !== runtime.identity) throw new MigrationError('CREATOR_BINDING_TARGET_MISMATCH')
     const selected = batch?.storeIds ?? selectStoreIds(artifact.storeIds, args)
