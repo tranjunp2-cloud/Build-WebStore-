@@ -1104,6 +1104,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
   const [catalog, setCatalog] = useState<StoreSummary[]>(() => live ? [] : generateReconciliationCatalog(2000));
   const [liveStores,setLiveStores] = useState<MigrationStore[]>([]);
+  const refreshCatalogRef = React.useRef<() => Promise<boolean>>(() => Promise.resolve(false));
   const [lifecycleFilter, setLifecycleFilter] = useState<MigrationLifecycleStatus | 'all'>('all');
   const [catalogScope, setCatalogScope] = useState<{ label: string; warning?: string } | null>(null);
   const lifecycleCounts = useMemo(() => {
@@ -1297,6 +1298,13 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
     }
   };
 
+  useEffect(() => {
+    if (!live) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = () => { clearTimeout(timer); timer = setTimeout(() => { void refreshCatalogRef.current(); }, 500); };
+    window.addEventListener('website-comparison-updated', refresh);
+    return () => { clearTimeout(timer); window.removeEventListener('website-comparison-updated', refresh); };
+  }, [live]);
   const [loadedFieldDiff, setLoadedFieldDiff] = useState<LoadedFieldDiff | null>(null);
   const fieldDiffRequestRef = React.useRef(0);
 
@@ -1361,6 +1369,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
     }
     return false;
   };
+  refreshCatalogRef.current = loadLiveCatalog;
 
   useEffect(() => {
     void loadLiveCatalog();
@@ -1962,7 +1971,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
   return (
     <div data-testid={live ? "website-migration-live" : undefined} className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans">
-      {live && <>{catalogLoading && <p role="status">Đang đọc danh sách migrate…</p>}{catalogError && <p role="alert" className="rounded-xl border border-amber-500/40 bg-amber-950/30 p-4 text-amber-200">{catalogError} Chưa thể xác định số website hoặc kết quả đối soát.</p>}</>}
+      {live && <><p className="rounded-xl border border-sky-800 bg-sky-950/30 p-3 text-sm text-sky-200">Độ khớp nội dung website so với PW2 hiện tại; kết luận QC thủ công hiển thị riêng. {!catalogLoading && !catalogError && <>Phạm vi: {catalog.length} website trong catalog hiện tại, chưa phải toàn bộ nguồn migration. </>}Làm mới tính lại đối soát nội dung website; không chạy lại audit trình duyệt hoặc đối soát Commerce/BE.</p>{catalogLoading && <p role="status">Đang đọc danh sách migrate…</p>}{catalogError && <p role="alert" className="rounded-xl border border-amber-500/40 bg-amber-950/30 p-4 text-amber-200">{catalogError} Chưa thể xác định số website hoặc kết quả đối soát.</p>}</>}
       {live && activeStoreId && liveDetailLoading && (
         <div className="fixed inset-0 z-[999999] grid place-items-center bg-slate-950/80 text-sm text-slate-200">
           Đang đọc evidence F42…
@@ -2397,15 +2406,14 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                     {live ? (
                       (() => {
                         const source = liveStoreById.get(store.id);
-                        const evidence = source?.fieldEvidence;
+                        const evidence = source?.websiteComparison;
                         const report = reportByStoreId.get(store.id);
-                        const rates = evidence ? fieldEvidenceRates(evidence.counts) : null;
-                        const percentage = rates?.matchRate ?? 0;
-                        const noDataReason = !evidence ? 'Chưa có dữ liệu đối soát' : !rates?.checked ? 'Chưa có trường được đối soát' : null;
-                        const accepted = percentage === 100 && report?.status === 'passed';
-                        const tone = accepted ? 'bg-emerald-400' : percentage >= 85 ? 'bg-amber-400' : 'bg-rose-500';
-                        const track = accepted ? 'bg-emerald-400/15' : percentage >= 85 ? 'bg-amber-400/15' : 'bg-rose-500/15';
-                        const fieldErrors = evidence ? evidence.counts.mismatch + evidence.counts.missing + evidence.counts.duplicate : 0;
+                        const percentage = evidence?.percentage ?? null;
+                        const noDataReason = !evidence?.total ? 'Chưa có dữ liệu đối soát website' : null;
+                        const accepted = percentage === 100;
+                        const tone = accepted ? 'bg-emerald-400' : (percentage ?? 0) >= 85 ? 'bg-amber-400' : 'bg-rose-500';
+                        const track = accepted ? 'bg-emerald-400/15' : (percentage ?? 0) >= 85 ? 'bg-amber-400/15' : 'bg-rose-500/15';
+                        const fieldErrors = evidence?.mismatched ?? 0;
                         const primaryReason = report?.reasons.find(reason => !/trường|field evidence|Audit hiện tại báo lỗi|cảnh báo audit/.test(reason));
                         const shortReason = primaryReason
                           ?.replace('Chưa có audit hoàn chỉnh cho phiên bản hiện tại.', 'Chưa audit phiên bản này')
@@ -2416,17 +2424,17 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                           .replace('Audit còn hạng mục chờ dữ liệu backend.', 'Audit chờ dữ liệu backend');
                         const historicalAudit = source?.auditStatus === 'stale' || source?.auditStatus === 'historical';
                         return <div data-testid="migration-match-rate" className="max-w-sm space-y-1 text-[11px] text-slate-400"
-                          title="Độ khớp = trường khớp / trường đã kiểm tra trong snapshot F42, không phải toàn website hoặc dữ liệu PW2 hiện tại. Khi chưa có kết quả, 0% chỉ là giá trị hiển thị, không phải kết luận Failed.">
+                          title="Độ khớp website = field website khớp / tổng field cần đối soát. Gồm xác nhận ảnh thủ công còn hiệu lực; không phải tỷ lệ Commerce/BE hoặc kết luận QC giao diện.">
                           <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold font-mono tabular-nums text-white">{percentage}%</span>
-                            <div role="progressbar" aria-label="Độ khớp dữ liệu đã đối soát" aria-valuenow={percentage} aria-valuemin={0} aria-valuemax={100}
-                              aria-valuetext={noDataReason ? `0% — ${noDataReason}` : `${percentage}% khớp`} className={`h-1.5 w-24 overflow-hidden rounded-full ${track}`}>
+                            <span className="text-sm font-bold font-mono tabular-nums text-white">{percentage === null ? '—' : `${percentage}%`}</span>
+                            <>{percentage !== null && <div role="progressbar" aria-label="Độ khớp website" aria-valuenow={percentage} aria-valuemin={0} aria-valuemax={100}
+                              aria-valuetext={`${percentage}% khớp`} className={`h-1.5 w-24 overflow-hidden rounded-full ${track}`}>
                               <div className={`h-full rounded-full ${tone}`} style={{ width: `${percentage}%` }} />
-                            </div>
+                            </div>}</>
                           </div>
                           {report && <span data-testid="migration-auto-status" title={report.reasons.join('\n')} className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${REPORT_COLORS[report.status]}`}>{REPORT_LABELS[report.status]}</span>}
                           {noDataReason && <p className="text-amber-200">{noDataReason}</p>}
-                          {rates && <p>Đối soát {rates.checked}/{rates.total} trường{fieldErrors > 0 ? ` · ${fieldErrors} trường sai / thiếu / trùng` : ''}</p>}
+                          {evidence && evidence.total > 0 && <p>Khớp {evidence.matched}/{evidence.total} field website{fieldErrors > 0 ? ` · ${fieldErrors} field khác` : ''}{evidence.unverified > 0 ? ` · ${evidence.unverified} chưa xác minh` : ''}</p>}
                           {shortReason && <p className="truncate" title={primaryReason}>{shortReason}</p>}
                           {source && source.errors + source.warnings > 0 && <p>Audit{historicalAudit ? ' cũ' : ''}: {source.errors} lỗi · {source.warnings} cảnh báo</p>}
                         </div>;

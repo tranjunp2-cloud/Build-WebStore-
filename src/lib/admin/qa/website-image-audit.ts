@@ -1,7 +1,7 @@
 import { getPayload } from "payload";
 import config from "@payload-config";
 import { Client } from "pg";
-import { createHash } from "node:crypto";
+import { websiteImageCacheKey } from "./website-image-cache-key";
 import { readFile, stat } from "node:fs/promises";
 import { resolve, basename } from "node:path";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
@@ -209,17 +209,7 @@ export async function auditWebsiteImages(
             const media = docs.find((media) => media.url === pair.destination);
             if (!media?.filename)
               throw Error("Ảnh đích chưa resolve được vào media của store");
-            const key = createHash("sha256")
-              .update(
-                JSON.stringify([
-                  "image-v1",
-                  pair.source,
-                  media.id,
-                  media.updatedAt,
-                  pair.destination,
-                ]),
-              )
-              .digest("hex");
+            const key = websiteImageCacheKey(pair.source, media, pair.destination);
             const prior = force
               ? undefined
               : (

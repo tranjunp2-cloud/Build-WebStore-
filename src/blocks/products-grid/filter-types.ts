@@ -31,6 +31,8 @@ export interface AttributeFilter {
 }
 
 export interface ProductFilterBounds {
+    currency?: string
+    categoryIds?: string[]
     minPrice: number
     maxPrice: number
     attributes: AttributeFilter[]

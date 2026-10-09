@@ -56,9 +56,9 @@ OpeningHoursEditModal
 
 ## Related Code Files
 
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/editor/local-business/geo-link-input.tsx` — Extract palette, input semantics, accessible errors.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/editor/local-business/completion-checklist.tsx` — completed/incomplete theme palette.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/components/editor/local-business/opening-hours-edit-modal.tsx` — prevent incomplete custom ranges from being submitted.
+- **Modify:** `<worktree-1>/src/components/editor/local-business/geo-link-input.tsx` — Extract palette, input semantics, accessible errors.
+- **Modify:** `<worktree-1>/src/components/editor/local-business/completion-checklist.tsx` — completed/incomplete theme palette.
+- **Modify:** `<worktree-1>/src/components/editor/local-business/opening-hours-edit-modal.tsx` — prevent incomplete custom ranges from being submitted.
 - **Create/Delete:** none.
 
 ## Implementation Steps

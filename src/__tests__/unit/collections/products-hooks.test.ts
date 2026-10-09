@@ -20,7 +20,7 @@ describe('Products Collection Hooks (TC-F08)', () => {
             // Act
             const result = await (hook as FieldHook)({
                 value: stableSlug,
-                data: { aiReviewPending: true },
+                data: { aiReviewPending: true, tenant: 1 },
                 req: { payload: { find } },
             } as never)
 
@@ -39,7 +39,7 @@ describe('Products Collection Hooks (TC-F08)', () => {
             // Act
             const result = await (hook as FieldHook)({
                 value: stableLookingSlug,
-                data: { aiReviewPending: false },
+                data: { aiReviewPending: false, tenant: 1 },
                 req: { payload: { find } },
             } as never)
 
@@ -57,7 +57,7 @@ describe('Products Collection Hooks (TC-F08)', () => {
             // Act
             const result = await (hook as FieldHook)({
                 value: 'Ordinary Product',
-                data: { aiReviewPending: true },
+                data: { aiReviewPending: true, tenant: 1 },
                 req: { payload: { find } },
             } as never)
 

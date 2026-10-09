@@ -204,21 +204,18 @@ async function checkWebsiteMigration({
       }
       await expect(row.getByRole('cell').nth(4)).toHaveText(/^\s*\d+ Trang\s*$/);
       const rate = row.getByTestId('migration-match-rate');
-      const rates = item.fieldEvidence ? fieldEvidenceRates(item.fieldEvidence.counts) : null;
-      // 0 is a presentation placeholder only; the explanation must distinguish
-      // absent evidence from a measured 0% match. Backend formula stays nullable.
-      if (!rates || rates.matchRate === null) {
-        await expect(rate).toContainText('0%');
-        await expect(rate.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
-        await expect(rate).toContainText(/Chưa có dữ liệu đối soát|Chưa có trường/);
+      const percentage = item.websiteComparison?.percentage ?? null;
+      if (percentage === null) {
+        await expect(rate).toContainText('—');
+        await expect(rate.getByRole('progressbar')).toHaveCount(0);
+        await expect(rate).toContainText('Chưa có dữ liệu đối soát website');
       } else {
-        await expect(rate).toContainText(`${rates.matchRate}%`);
-        await expect(rate.getByRole('progressbar')).toHaveAttribute('aria-valuenow', String(rates.matchRate));
+        await expect(rate).toContainText(`${percentage}%`);
+        await expect(rate.getByRole('progressbar')).toHaveAttribute('aria-valuenow', String(percentage));
+        const color = percentage === 100 ? 'bg-emerald-400' : percentage >= 85 ? 'bg-amber-400' : 'bg-rose-500';
+        await expect(rate.getByRole('progressbar').locator('div')).toHaveClass(new RegExp(color));
       }
-      const displayedRate = rates?.matchRate ?? 0;
-      const color = displayedRate === 100 && classifyMigrationReport(item).status === 'passed'
-        ? 'bg-emerald-400' : displayedRate >= 85 ? 'bg-amber-400' : 'bg-rose-500';
-      await expect(rate.getByRole('progressbar').locator('div')).toHaveClass(new RegExp(color));
+
     }
     // Search and pagination must retain the selected lifecycle.
     await page.getByRole('textbox', { name: 'Tìm store' }).fill('no-such-store-f40-lifecycle');
@@ -484,6 +481,31 @@ test("[TC-F40-MIG-LIVE-02] real website migration catalog and evidence", async (
 
 test("[TC-F40-MIG-LIVE-09] QC dropdown opens in comparison and rejects invalid requests without saving", async ({ page, request, baseURL }) => {
   await checkWebsiteMigration({ page, request, baseURL }, true);
+});
+
+test('[TC-F40-MIG-WEB-RATE-02] website percentage uses current content without BE field evidence', async ({ page, baseURL }) => {
+  test.setTimeout(120000);
+  test.skip(!process.env.DATABASE_URI || !process.env.PAYLOAD_SECRET || !baseURL || !['localhost', '127.0.0.1'].includes(new URL(baseURL).hostname), 'Local real-data regression only');
+  const db = new Client({ connectionString: process.env.DATABASE_URI });
+  await db.connect();
+  let admin: number | undefined;
+  try { admin = (await db.query("SELECT u.id FROM users u JOIN users_roles r ON r.parent_id=u.id WHERE r.value='super-admin' LIMIT 1")).rows[0]?.id; }
+  finally { await db.end(); }
+  expect(admin).toBeTruthy();
+  const token = await new SignJWT({ id: admin, collection: 'users', mfa_verified: true, roles: ['super-admin'] })
+    .setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('5m').sign(new TextEncoder().encode(process.env.PAYLOAD_SECRET));
+  await page.context().addCookies([{ name: 'payload-token', value: token, url: baseURL! }]);
+  const response = await page.request.get('/api/admin/qa/website-migrations?limit=100&page=1');
+  expect(response.ok()).toBeTruthy();
+  const stores: MigrationStore[] = (await response.json()).data.stores;
+  const store = stores.find(item => item.storeId === '3') ?? stores.find(item => (item.websiteComparison?.percentage ?? 0) > 0);
+  expect(store?.websiteComparison?.percentage).toBeGreaterThan(0);
+  console.log(`Store ${store!.storeId}: ${store!.websiteComparison!.percentage}% (${store!.websiteComparison!.matched}/${store!.websiteComparison!.total} website fields matched)`);
+  await page.goto('/studio/qa/migration-diff');
+  await expect(page.getByRole('columnheader', { name: /Độ khớp website/ })).toBeVisible({ timeout: 60000 });
+  const rate = page.getByTestId(`migration-store-row-${store!.storeId}`).getByTestId('migration-match-rate');
+  await expect(rate).toContainText(`${store!.websiteComparison!.percentage}%`, { timeout: 60000 });
+  await expect(rate).toContainText(`Khớp ${store!.websiteComparison!.matched}/${store!.websiteComparison!.total} field website`);
 });
 
 test('[TC-F40-MIG-LIVE-13] readable block cards display real evidence without saving verdicts', async ({ page, request, baseURL }) => {

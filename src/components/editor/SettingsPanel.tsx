@@ -1,11 +1,14 @@
 'use client'
 
+import { mergeFooterSocialsWithSite, mergeContactInfoWithSite, mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
+
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { AlertTriangle, Building2, ChevronDown, Compass, Globe, Globe2, ListTree, Loader2, Palette, Search, Settings, Sparkles, UploadCloud, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { ProductListingSettings } from './ProductListingSettings'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
@@ -17,9 +20,12 @@ import { BlockImageEditor } from './BlockImageEditor'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
+import HeroSlidesSettings from './HeroSlidesSettings'
+import type { HeroConfig } from '@/blocks/hero/config'
 import FaqSettings from './FaqSettings'
 import TeamSettings from './TeamSettings'
 import LogoCloudSettings from './LogoCloudSettings'
+import PortfolioGridSettings from './PortfolioGridSettings'
 import PricingSettings from './PricingSettings'
 import FeatureComparisonSettings from './FeatureComparisonSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
@@ -32,6 +38,7 @@ import type { MenuCategory, MenuItem } from '@/blocks/menu-food/config'
 import type { FAQConfig } from '@/blocks/faq/config'
 import type { TeamConfig } from '@/blocks/team/config'
 import type { LogoCloudConfig } from '@/blocks/logo-cloud/config'
+import type { PortfolioGridConfig } from '@/blocks/portfolio-grid/config'
 import type { PricingConfig } from '@/blocks/pricing/config'
 import { SETTINGS_PANEL_WIDTH } from './layout-constants'
 import type { PageData } from '@/store/editorStore'
@@ -120,6 +127,8 @@ const FOOTER_SOCIAL_PLATFORMS = [
     { key: 'instagram', label: 'Instagram URL' },
     { key: 'linkedin',  label: 'LinkedIn URL' },
     { key: 'youtube',   label: 'YouTube URL' },
+    { key: 'tiktok', label: 'TikTok URL' },
+    { key: 'whatsapp', label: 'WhatsApp URL' },
 ] as const
 
 // ─── Constants ──────────────────────────────────────────────────────────
@@ -1488,6 +1497,10 @@ function SettingsPanelInner({
     }
 
     const renderMenuContent = () => {
+        const resolvedFooter = mergeFooterSocialsWithSite({
+            logo: footerBlock?.logo,
+            socials: footerBlock?.socials as Array<{ platform: string; url: string }> | undefined,
+        }, site)
         return (
             <div className="space-y-5">
                 {/* 1. Navigation Style */}
@@ -1685,7 +1698,7 @@ function SettingsPanelInner({
                                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterBrandOpen && 'rotate-180')} />
                             </button>
                             {isFooterBrandOpen && (() => {
-                                const currentLogoUrl = (footerBlock?.logo as { url?: string } | undefined)?.url || ''
+                                const currentLogoUrl = (resolvedFooter.logo as { url?: string } | undefined)?.url || ''
                                 return (
                                 <div className="mt-1 space-y-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 pb-3 pt-2.5">
                                     {/* Upload Logo */}
@@ -1781,7 +1794,7 @@ function SettingsPanelInner({
                                 <div className="mt-1 space-y-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 pb-3 pt-2.5">
                                     {FOOTER_SOCIAL_PLATFORMS.map(({ key, label }) => {
                                         const PlatformIcon = SOCIAL_ICONS[key]
-                                        const currentUrl = ((footerBlock?.socials as { platform: string; url: string }[] | undefined) || [])
+                                        const currentUrl = resolvedFooter.socials
                                             .find(s => s.platform === key)?.url || ''
                                         return (
                                             <div key={key} className="flex flex-col gap-1.5">
@@ -1790,7 +1803,7 @@ function SettingsPanelInner({
                                                     {label}
                                                 </label>
                                                 <Input
-                                                    key={`footer-social-${key}-${fbk}`}
+                                                    key={`footer-social-${key}-${fbk}-${currentUrl}`}
                                                     defaultValue={currentUrl}
                                                     placeholder={`https://${key}.com/yourcompany`}
                                                     onBlur={(e: FieldBlurEvent) => {
@@ -1800,9 +1813,10 @@ function SettingsPanelInner({
                                                             e.target.value = currentUrl
                                                             return
                                                         }
-                                                        const existing = ((footerBlock?.socials as { platform: string; url: string }[] | undefined) || [])
+                                                        const existing = resolvedFooter.socials
                                                             .filter(s => s.platform !== key)
-                                                        const updated = val ? [...existing, { platform: key, url: val }] : existing
+                                                        if (val === currentUrl) return
+                                                        const updated = [...existing, { platform: key, url: val }]
                                                         onFooterUpdate?.({ socials: updated })
                                                     }}
                                                     variant="editor"
@@ -1886,6 +1900,7 @@ function SettingsPanelInner({
 
     const isGlobal = block?.__editorBlockIndex !== undefined && (block.__editorBlockIndex as number) < 0
     const globalKey = bt ? BLOCK_TYPE_TO_KEY[bt] : undefined
+    const resolvedContact = mergeContactInfoWithSite({ email: block?.email as string | undefined, phone: block?.phone as string | undefined, address: block?.address as string | undefined }, site?.contactInfo)
     const effectiveBlock = (isGlobal && globalKey
         ? (storeGlobalBlocks?.[globalKey] ?? block)
         : block) as BlockData | null
@@ -2033,7 +2048,7 @@ function SettingsPanelInner({
                             </div>
                             {activeTab === 'block' && block ? (
                                 <div className="mt-1 pl-7 flex items-center gap-2">
-                                    <p className="text-[11px] text-slate-500">[{block.blockType}]</p>
+                                    <p className="text-[11px] text-slate-500">{block.blockType === 'custom-html' ? 'Rich text' : `[${block.blockType}]`}</p>
                                     {isGlobal && (
                                         <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none" style={{ background: 'hsl(var(--info)/0.12)', color: 'hsl(var(--info))' }}>
                                             <Globe className="h-3 w-3" aria-hidden /> Global
@@ -2064,19 +2079,9 @@ function SettingsPanelInner({
                                     <span className="text-xs text-gray-500">#{currentBlockIndex + 1}</span>
                                 </div>
                             </div>
+                            {bt === 'products-grid' && <ProductListingSettings key={`${site?.id}-${currentBlockIndex}`} siteId={site?.id} block={block} locale={siteLocale} onChange={(field, value) => onBlockUpdate(currentBlockIndex, { [field]: value })} />}
                             {/* Variant Switcher */}
-                            {bt === 'products-grid' && block.showCategoryFilter !== undefined ? (
-                                <div className={sectionCls}>
-                                    <label className="group flex cursor-pointer items-center gap-3 rounded-xl border border-solid border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 py-2 text-sm text-[var(--editor-text)] transition-colors hover:border-[hsl(var(--primary)/0.45)] focus-within:border-[hsl(var(--ring)/0.65)]">
-                                        <Checkbox
-                                            checked={Boolean(block.showCategoryFilter)}
-                                            onCheckedChange={(checked) => onBlockFieldChange(currentBlockIndex, 'showCategoryFilter', checked === true)}
-                                            className="h-5 w-5 rounded-md border-solid border-[hsl(var(--input-border))] bg-[var(--editor-surface-deep)] text-[hsl(var(--primary-foreground))] transition-colors focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--editor-surface-elevated)] data-[state=checked]:border-[hsl(var(--primary))] data-[state=checked]:bg-[hsl(var(--primary))] data-[state=checked]:text-[hsl(var(--primary-foreground))]"
-                                        />
-                                        <span>{s.showCategoryFilter}</span>
-                                    </label>
-                                </div>
-                            ) : (info?.variants?.length || 0) > 1 && (
+                            {bt !== 'products-grid' && (info?.variants?.length || 0) > 1 && (
                                 <div>
                                     <label className="text-xs font-medium uppercase text-gray-500">{s.variant}</label>
                                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -2137,6 +2142,7 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
+                            {bt === 'custom-html' && <p className="text-sm text-slate-400">Click the Rich text content on the page to edit text, images, links and tables inline.</p>}
                             {/* ─── Common Text Fields ──────────────────────── */}
                             {block.logoText !== undefined && (
                                 <div>
@@ -2148,7 +2154,7 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {block.headline !== undefined && (
+                            {block.headline !== undefined && !(bt === 'hero' && block.variant === 'slideshow') && (
                                 <div>
                                     <label className={labelCls}>{s.headline}</label>
                                     <Input defaultValue={stripHtmlForDisplay(block.headline)} key={`hl-${bk}`}
@@ -2158,7 +2164,7 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {block.subheadline !== undefined && (
+                            {block.subheadline !== undefined && !(bt === 'hero' && block.variant === 'slideshow') && (
                                 <div>
                                     <label className={labelCls}>{s.subheadline}</label>
                                     <Textarea defaultValue={stripHtmlForDisplay(block.subheadline)} rows={2} key={`sub-${bk}`}
@@ -2168,7 +2174,7 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {bt !== 'products-grid' && block.showCategoryFilter !== undefined && (
+                            {bt !== 'products-grid' && (bt === 'blog-list' || block.showCategoryFilter !== undefined) && (
                                 <div className={sectionCls}>
                                     <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-slate-500">
                                         <Checkbox
@@ -2228,7 +2234,7 @@ function SettingsPanelInner({
                                     <div className="mt-3 space-y-3">
                                         <div>
                                             <label className={labelCls}>{s.email}</label>
-                                            <Input type="email" defaultValue={(block.email as string) || ''} key={`email-${bk}`}
+                                            <Input type="email" defaultValue={resolvedContact.email} key={`email-${bk}-${resolvedContact.email}`}
                                                 onBlur={(e: FieldBlurEvent) => {
                                                     if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
                                                         onBlockFieldChange(currentBlockIndex, 'email', e.target.value)
@@ -2241,14 +2247,14 @@ function SettingsPanelInner({
                                         </div>
                                         <div>
                                             <label className={labelCls}>{s.phone}</label>
-                                            <Input defaultValue={(block.phone as string) || ''} key={`phone-${bk}`}
+                                            <Input defaultValue={resolvedContact.phone} key={`phone-${bk}-${resolvedContact.phone}`}
                                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'phone', e.target.value)}
                                                 variant="editor"
                                                 className={editorInputClassName} placeholder={s.phonePlaceholder} />
                                         </div>
                                         <div>
                                             <label className={labelCls}>{s.address}</label>
-                                            <Textarea defaultValue={(block.address as string) || ''} rows={2} key={`addr-${bk}`}
+                                            <Textarea defaultValue={resolvedContact.address} rows={2} key={`address-${bk}-${resolvedContact.address}`}
                                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'address', e.target.value)}
                                                 variant="editor"
                                                 className={editorTextareaClassName} placeholder={s.addressPlaceholder} />
@@ -2539,7 +2545,8 @@ function SettingsPanelInner({
                             )}
 
                             {/* ─── Hero CTA Buttons ───────────────────────── */}
-                            {bt === 'hero' && (
+                            {bt === 'hero' && block.variant === 'slideshow' && <HeroSlidesSettings key={currentBlockIndex} block={block as unknown as HeroConfig} blockIndex={currentBlockIndex} onBlockUpdate={onBlockUpdate} />}
+                            {bt === 'hero' && block.variant !== 'slideshow' && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">{s.ctaButtons}</label>
                                     {((block.ctaButtons || []) as CtaButton[]).length === 0 && (
@@ -2949,10 +2956,18 @@ function SettingsPanelInner({
                                 />
                             )}
 
+                            {bt === 'portfolio-grid' && block && (
+                                <PortfolioGridSettings
+                                    block={block as unknown as PortfolioGridConfig}
+                                    blockIndex={currentBlockIndex}
+                                    onBlockUpdate={onBlockUpdate}
+                                />
+                            )}
+
                             {bt === 'socialWidget' && (
                                 <div className={sectionCls}>
                                     {(() => {
-                                        const normalizedSocialBlock = normalizeSocialWidgetConfig((effectiveBlock ?? block) as Record<string, unknown>)
+                                        const normalizedSocialBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite((effectiveBlock ?? block) as Record<string, unknown> & { links?: Array<{ platform: string; url: string; enabled?: boolean }> }, site?.socialLinks))
 
                                         return (
                                             <>
@@ -3145,7 +3160,7 @@ function SettingsPanelInner({
                             )}
 
                             {/* Image Editor — for blocks with image/backgroundImage fields */}
-                            {block && (block.image || block.backgroundImage || block.heroImage) && (
+                            {block && !(bt === 'hero' && block.variant === 'slideshow') && (block.image || block.backgroundImage || block.heroImage) && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">Image</label>
                                     <div className="mt-2">

@@ -81,9 +81,9 @@ payload.find({
 
 | Action | Absolute path | Change |
 |---|---|---|
-| Modify | `/home/liam/data/ech-prime-web-v2/src/lib/dashboard/dashboard-types.ts` | Add `PendingOrderRow`, `PendingOrdersData`, and ready/unavailable load state to the existing shared revamp types. |
-| Create | `/home/liam/data/ech-prime-web-v2/src/lib/dashboard/pending-orders-data.ts` | Implement secure query and DTO mapper. |
-| Create | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/pending-orders-data.test.ts` | Verify query contract and mapping from source code. |
+| Modify | `./src/lib/dashboard/dashboard-types.ts` | Add `PendingOrderRow`, `PendingOrdersData`, and ready/unavailable load state to the existing shared revamp types. |
+| Create | `./src/lib/dashboard/pending-orders-data.ts` | Implement secure query and DTO mapper. |
+| Create | `./src/__tests__/unit/dashboard/pending-orders-data.test.ts` | Verify query contract and mapping from source code. |
 
 ## Implementation Steps
 

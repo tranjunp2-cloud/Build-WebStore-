@@ -1,0 +1,38 @@
+# Phase 02 — DB evidence và vòng đời generation
+
+**Owner:** F42 backend/DB. **Effort:** 3–5 dev-days. **Dependency:** Phase 01 identity, status, registry schema core. **Deliverable:** DDL additive + builder lưu evidence atomic, retry-safe; chưa cần mọi comparator.
+
+## Schema đề nghị
+
+Tên chính thức do F42 chọn, nhưng phân tách logic sau. **Run field evidence** có FK tới `migration_runs.run_id`, index `(child_run_id, generation_id, source_entity, source_id)` và tenant/store guard. **Export coverage** phải có khóa riêng theo `(source instance, snapshot hash, source Store ID)` vì Store bị blocked/excluded không có child run; link child UUID chỉ khi đã emit/import. Kích thước row/retention phải được đo trước full run.
+
+| Logic table | Khóa và dữ liệu | Ràng buộc |
+| --- | --- | --- |
+| Generation header | child run, generation number/id, contract/registry/rule versions/hash, source snapshot ID/checksum/as-of, target binding/hash, producer SHA, state `BUILDING/COMPLETE/PARTIAL/UNAVAILABLE`, start/finish, digest | Unique `(child_run_id,generation_no)`; `COMPLETE` chỉ sau count/digest validation |
+| Source inventory | entity/source ID, field rule/element key, disposition, source field presence, safe fingerprint, source snapshot provenance | Unique expected instance; không lưu raw secret/PII |
+| Record evidence | source identity, target collection, safe target ID(s) reference, record status/reason, target read state, target read time | Unique record/generation; các target được xác nhận qua anomaly relation |
+| Field evidence | source/target field, element key, **target collection/ID hoặc FK record/claim không mơ hồ**, comparison status/reason, canonical type/unit, transform code/version, safe display hoặc HMAC, source/target fingerprints, verified at | Unique `(generation, source entity/id, rule, elementKey[, output path])` theo fan-out contract; khi đọc row phải truy được mapping version và source snapshot/checksum từ header qua FK |
+| Anomaly/summary | duplicate provenance, target drift, exception link; expected/reconciled/status counts, outside-scope breakdown, inventory/evidence digests | Summary cùng generation; không đếm từ row evidence đơn lẻ |
+| Export coverage | source snapshot + selected CSV hashes, source Store/table/row/field identity, safe disposition/reason/owner, emitted master ref nếu có | Gồm blocked/deferred/policy-excluded Store; không FK bắt buộc tới child run; không lưu raw CSV/PII/secret |
+
+## Steps
+
+1. Thêm DDL `CREATE TABLE IF NOT EXISTS`, additive `ALTER`, indexes/FKs/checks vào `scripts/pw1-migration-schema.js`; cập nhật `PW1_MIGRATION_SCHEMA_REQUIREMENTS` columns/types/indexes/constraints cùng file. `scripts/db-setup.js` đang import/call `runPw1MigrationSchema()`; xác nhận call vẫn chạy trong `--migrate-only`. Không DROP, không migration destructive. Nếu thêm Payload collection field thì thêm matching SQL ở `db-setup.js` theo AGENTS.md.
+2. Tạo typed repository dùng prepared SQL. Trước build, join `migration_import_stores` + `migration_runs`; xác nhận `source_store_id` numeric đúng, `run_id` child UUID, cả state `VERIFIED`, source instance/snapshot/target binding đúng. Pin `importer_profile`/execution scope và selected source inventory: users-only/foundation child run dù VERIFIED cũng không được public generation `complete` với nhãn full Commerce; field không nằm trong run scope mang reason `NOT_IN_RUN_SCOPE` và full coverage gate bị từ chối. Không nhận Batch ID làm run ID; không tự tạo run.
+3. Thêm **source evidence collector** vào exporter: chụp source identity/field presence và canonical safe value hoặc keyed HMAC **trước các bước filter/mapper**, sau mapping ghép disposition/reason từ report bằng khóa nguồn rồi ghi sidecar. Không ghi raw PII/credential hoặc checksum không khóa của dữ liệu nhạy cảm; pin sidecar hash trong `master-manifest.json` và validate-only. Operator sau export kiểm CSV/config/manifest/report/master hashes và nạp sidecar an toàn vào DB, kể cả Store không emit; QC không cần CSV. Builder run evidence dùng sidecar đã bind + emitted master/projection/ledger, có CLI theo `sourceStoreId + childRunId + bound artifact` cho direct importer và config workflow; cả hai đường có cùng digest. Không scan toàn Store trong transaction importer đang giữ lock; giữ importer verify nguyên vẹn. Artifact/sidecar thiếu hoặc hash sai thì fail closed, không đổi child VERIFIED; CLI retry/resume theo Store.
+4. `BUILDING` generation riêng: enumerate inventory từ source artifact + registry. Dùng **projection/checksum đã được `verifyStore()` xác nhận** trong ledger làm mốc PW2 tại thời điểm import; chỉ trích xuất field allowlisted, không serialize nguyên `detail.projection`. Đọc lại target theo tenant guard/bounded batch để phát hiện drift và xác nhận target còn tồn tại. Nếu target đã đổi giữa importer verify và evidence build, không gán khác biệt hiện tại thành lỗi migration tại verify time: ghi generation/reason `TARGET_DRIFT` và current-state check riêng hoặc `unverified` theo rule đã chốt. Ghi rows theo batch transaction/checkpoint, tạo summary/digest deterministic; publication `COMPLETE` cùng transaction chốt header+summary sau khi mọi expected instance có đúng một status. Crash/retry để generation chưa complete ẩn khỏi F40; replay cùng inputs idempotent; khác snapshot/rule/target revision tạo generation mới hoặc báo conflict rõ.
+5. Ghi `sourceSnapshotAt`, **importer `verifiedAt`**, evidence `targetReadAt` và generation `createdAt` tách biệt. Target revision/checksum theo canonical projection; generation cũ immutable. Target drift sau verify là generation mới/current-state result với reason `TARGET_DRIFT`; không sửa status lịch sử lặng lẽ.
+6. Bổ sung command/report chỉ in child UUID lấy từ DB **sau commit**; logger `STORE_VERIFIED.runId` hiện là batch ID nên không dùng làm handoff. Query phải cho thấy run/store state, snapshot và batch ID tách cột.
+7. Privacy và retention: không persist password, token, credential, PII thô; source/target display values chỉ allowlist; HMAC key ngoài repo nếu cần, env placeholders ở cả hai example files; key rotation/old generation behavior có runbook. Không log raw data hoặc DB URI.
+
+## Acceptance / test
+
+- Schema migration chạy lại hai lần không đổi kết quả; strict requirement verifier phát hiện thiếu index/constraint và không silently continue. Roll forward trên DB clone có ledger cũ; không làm hỏng importer hiện có.
+- Run chưa VERIFIED, Store/child mismatch, artifact hash sai, target binding khác bị reject trước ghi `COMPLETE`. Foundation/users-only run không đạt full Commerce coverage dù VERIFIED. Crash giữa build không public partial rows; retry cùng input không tạo duplicate; hai builder đồng thời chỉ một được publish.
+- Source-only/unsupported field vẫn có expected inventory; SQL count của field evidence khớp expected count trước publish. Security test quét persisted rows/API sample không thấy secret/raw PII.
+- Test Product/Order bị exporter lọc và một Store blocked: sidecar/DB vẫn có export coverage row/count/reason nhưng không có child UUID; không tạo `missing` PW2 giả. Sau khi export hoàn tất, QC test **không có CSV** vẫn đọc đủ safe coverage từ DB. Xóa/đổi sidecar hoặc sai hash khiến full-source gate BLOCKED, dù master/run vẫn VERIFIED. Với artifact lịch sử thiếu sidecar và CSV, đánh dấu metadata-only/BLOCKED cho field-value coverage.
+- Child UUID có thể query từ ledger; output report không nhầm `json:<uuid>`.
+
+## Files dự kiến
+
+`scripts/pw1-migration-schema.js`, `scripts/db-setup.js` (nếu cần), module mới dưới `src/lib/migration/pw1-json/` cho builder/repository, CLI trong `scripts/`, test DB integration và QA TC-ID từ Phase 01. Các tên file mới là đề nghị, không coi là code đã tồn tại.

@@ -83,3 +83,7 @@ Trong Migration Inspector thêm hai tab: **Đối soát Commerce** và **Đối 
 - Không có trạng thái pass dựa trên preview/suy đoán hoặc fallback mapping.
 - Counts, record diff và aggregate tài chính có evidence snapshot + timestamp.
 - PII/secret không lộ qua API hoặc UI.
+
+## Coordination note — 2026-09-17
+
+Importer #1886 đang có [kế hoạch tiếp nối](../260916-1617-pw1-local-json-import/plan.md) để nhận artifact exporter mới. Hai plan không chặn toàn bộ nhau: UI shell vẫn có thể build với trạng thái Chưa xác minh, importer local không cần UI này. Khi nhận shared-ledger evidence, adapter cần phân biệt businessCREATE với external creator binding SKIP/non-owning và consumer dependencies; không suy active source claim là User đã được tạo hoặc Store sở hữu actor. Đây là handoff cần xác minh sau implementation, chưa phải schema/evidence đã triển khai.

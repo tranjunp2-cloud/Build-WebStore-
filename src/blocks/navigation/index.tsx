@@ -67,7 +67,7 @@ function NavLogo({
     scrolled = false,
 }: NavLogoProps) {
     if (logo?.url) {
-        return <Image src={logo.url} alt={logoText || 'Logo'} width={0} height={0} sizes="(max-width: 768px) 128px, 256px" className={className || 'h-6 sm:h-8 w-auto'} />
+        return <Image src={logo.url} alt={logoText || 'Logo'} width={0} height={0} sizes="(max-width: 640px) 180px, 240px" className={`h-10 sm:h-11 w-auto max-w-[min(45vw,180px)] sm:max-w-[240px] object-contain ${className ?? ''}`} />
     }
     const shouldShowGradient =
         gradientMode === 'always' || (gradientMode === 'when-scrolled' && scrolled)
@@ -1128,7 +1128,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
             >
                 {/* Logo */}
                 <NavLogoLink block={mergedBlock as Record<string, unknown>} className="font-bold text-lg font-heading cursor-pointer shrink-0">
-                    <NavLogo logo={mergedBlock.logo} logoText={logoText} className="h-6 w-auto" />
+                    <NavLogo logo={mergedBlock.logo} logoText={logoText} className="!h-10" />
                 </NavLogoLink>
 
                 {/* Desktop Links */}

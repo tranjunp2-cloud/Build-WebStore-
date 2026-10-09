@@ -3,8 +3,8 @@
 ## Context Links
 
 - Existing filter plan: [F08 PR-2 — Storefront Category Filter](../260714-1538-f08-category-filter-products-grid/plan.md)
-- Persistence point: [src/app/api/ai/generate-site/route.ts](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/app/api/ai/generate-site/route.ts:1016)
-- Fallback `/products` page builder: [src/app/api/ai/generate-site/route.ts](/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/app/api/ai/generate-site/route.ts:2129)
+- Persistence point: [src/app/api/ai/generate-site/route.ts](<worktree-1>/src/app/api/ai/generate-site/route.ts:1016)
+- Fallback `/products` page builder: [src/app/api/ai/generate-site/route.ts](<worktree-1>/src/app/api/ai/generate-site/route.ts:2129)
 
 ## Overview
 

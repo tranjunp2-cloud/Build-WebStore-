@@ -51,10 +51,12 @@ describe('Products collection config [TC-F08-01-01]', () => {
         expect(seoField?.type).toBe('group')
     })
 
-    it('has shortDescription with maxLength 300', () => {
-        const field = Products.fields.find((f: any) => f.name === 'shortDescription') as any
-        expect(field).toBeDefined()
-        expect(field?.maxLength).toBe(300)
+    it('preserves historical shortDescription without a 300-character limit', () => {
+        // Arrange / Act
+        const field = Products.fields.find(field => 'name' in field && field.name === 'shortDescription')
+        // Assert
+        expect(field).toMatchObject({ name: 'shortDescription', type: 'textarea' })
+        expect(field).not.toHaveProperty('maxLength')
     })
 
     it('price field has min 0', () => {

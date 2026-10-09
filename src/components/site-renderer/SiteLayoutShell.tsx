@@ -1,3 +1,4 @@
+import { migrationAllowsTracking } from '@/lib/migration/pw1-commerce'
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
@@ -137,7 +138,7 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children, forceCart
     const headerBlock: Record<string, unknown> | null = rawHeader
         ? {
             ...rawHeader,
-            _hasCart: hasCart,
+            _hasCart: hasCart && migrationAllowsTracking(gb),
             links: rewriteNavLinks(rawHeader.links, rewriteUrl, hiddenSlugs, slugCanonical),
             ctaButton: rawHeaderCta
                 ? headerCtaHidden

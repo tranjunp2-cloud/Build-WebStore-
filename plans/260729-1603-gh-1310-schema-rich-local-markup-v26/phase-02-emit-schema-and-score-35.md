@@ -24,13 +24,13 @@ FAQ is absent from scorer input, breakdown, and total.
 
 ## Related files and actions
 
-- `/home/liam/data/ech-prime-web-v2/src/lib/seo/schema-helpers.ts:82` — retire F37 direct `businessCategory → @type`; retain F01 `schemaTypeFor(siteType)`, complete-address/time guards, and category-only price fallback. Add a compatible subtype resolver backed by Phase 01 mapping.
-- `/home/liam/data/ech-prime-web-v2/src/lib/seo/json-ld.ts:229` — strict homepage generator uses compatible `schemaSubtype`, otherwise generic `LocalBusiness`; require trimmed name and complete structured address for strict parent; omit incomplete hours/geo and invalid nested values.
-- `/home/liam/data/ech-prime-web-v2/src/lib/seo/json-ld.ts:350` — aggregate Organization and one strict homepage LocalBusiness without duplication; independent generator failures do not crash unrelated schemas.
-- `/home/liam/data/ech-prime-web-v2/src/lib/seo/json-ld.ts:25` — retain and exclusively use `serializeJsonLd()` for `<`, `>`, `&`, `</script>`, U+2028/U+2029 safety.
-- `/home/liam/data/ech-prime-web-v2/src/components/site-renderer/SiteRenderer.tsx:430` and `:669` — retain the existing generation/injection seam; no renderer architecture rewrite.
-- `/home/liam/data/ech-prime-web-v2/src/lib/seo/schema-score.ts` — replace WIP Schema 40 with a pure scorer accepting one `SchemaGenerationArtifact` produced from one immutable site snapshot. The artifact contains the canonical strict LocalBusiness node, Organization node, and validated category/subtype evidence; no arbitrary cross-site node/context mixing, Payload/network/API calls.
-- `/home/liam/data/ech-prime-web-v2/src/lib/seo/local-seo-score.ts` and score route — do not rewire; US-F37-04 owns the top-level engine/API.
+- `./src/lib/seo/schema-helpers.ts:82` — retire F37 direct `businessCategory → @type`; retain F01 `schemaTypeFor(siteType)`, complete-address/time guards, and category-only price fallback. Add a compatible subtype resolver backed by Phase 01 mapping.
+- `./src/lib/seo/json-ld.ts:229` — strict homepage generator uses compatible `schemaSubtype`, otherwise generic `LocalBusiness`; require trimmed name and complete structured address for strict parent; omit incomplete hours/geo and invalid nested values.
+- `./src/lib/seo/json-ld.ts:350` — aggregate Organization and one strict homepage LocalBusiness without duplication; independent generator failures do not crash unrelated schemas.
+- `./src/lib/seo/json-ld.ts:25` — retain and exclusively use `serializeJsonLd()` for `<`, `>`, `&`, `</script>`, U+2028/U+2029 safety.
+- `./src/components/site-renderer/SiteRenderer.tsx:430` and `:669` — retain the existing generation/injection seam; no renderer architecture rewrite.
+- `./src/lib/seo/schema-score.ts` — replace WIP Schema 40 with a pure scorer accepting one `SchemaGenerationArtifact` produced from one immutable site snapshot. The artifact contains the canonical strict LocalBusiness node, Organization node, and validated category/subtype evidence; no arbitrary cross-site node/context mixing, Payload/network/API calls.
+- `./src/lib/seo/local-seo-score.ts` and score route — do not rewire; US-F37-04 owns the top-level engine/API.
 
 ## Compatibility and failure rules
 

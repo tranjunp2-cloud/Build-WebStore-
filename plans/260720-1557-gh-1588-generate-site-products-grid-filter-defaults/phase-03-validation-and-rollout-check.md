@@ -63,7 +63,7 @@ Validate the narrow fix. Confirm it solves generated-site `products-grid` defaul
 
 ## Next Steps
 
-- Implementation handoff: `/ck:cook --auto /home/liam/data/worktrees/ech-prime-web-v2-worktree-1/plans/260720-1557-gh-1588-generate-site-products-grid-filter-defaults/plan.md`
+- Implementation handoff: `/ck:cook --auto <worktree-1>/plans/260720-1557-gh-1588-generate-site-products-grid-filter-defaults/plan.md`
 
 
 ## Follow-Up Note

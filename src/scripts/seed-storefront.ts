@@ -214,7 +214,7 @@ async function seed() {
     for (const p of products) {
         const existing = await payload.find({
             collection: 'products',
-            where: { slug: { equals: p.slug } },
+            where: { slug: { equals: p.slug }, tenant: { equals: tenant.id } },
             limit: 1,
         })
 

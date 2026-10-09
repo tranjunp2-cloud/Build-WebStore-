@@ -11,6 +11,7 @@ import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
 import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 void _CSS_VARS
 
@@ -38,29 +39,40 @@ type ProjectCardProps = {
     project: Project
     className?: string
     imageIndex?: number
+    naturalImageSize?: boolean
     /** Payload field path for the MediaUploadOverlay — omit for fallback-only slots. */
     uploadField?: string
 }
 
-function ProjectCard({ project, className = '', imageIndex, uploadField }: ProjectCardProps) {
-    const Wrapper = project.linkUrl ? 'a' : 'div'
-    const linkProps = project.linkUrl
-        ? { href: project.linkUrl, target: '_blank' as const, rel: 'noopener noreferrer' }
+function ProjectCard({ project, className = '', imageIndex, uploadField, naturalImageSize = false }: ProjectCardProps) {
+    // Internal (/path, #anchor, mailto:, tel:) → same tab, resolved via useLocalHref so
+    // /products?... hits /sites/{slug}/products?... in local dev (custom domains keep it as-is).
+    // External http(s) / protocol-relative → new tab + noopener (same rule as cta/getLinkAttrs).
+    const imageClassName = naturalImageSize
+        ? 'block w-full h-auto max-h-52 md:max-h-64 object-contain transition-transform duration-300 motion-safe:group-hover:scale-[1.025]'
+        : 'w-full h-full object-cover transition-transform duration-500 group-hover:scale-110'
+    const resolveHref = useLocalHref()
+    const linkUrl = project.linkUrl
+    const isExternal = !!linkUrl && (/^https?:\/\//.test(linkUrl) || linkUrl.startsWith('//'))
+    const Wrapper = linkUrl ? 'a' : 'div'
+    const linkProps = linkUrl
+        ? { href: resolveHref(linkUrl), ...(isExternal ? { target: '_blank' as const, rel: 'noopener noreferrer' } : {}) }
         : {}
     return (
-        <Wrapper {...linkProps} className={`group relative overflow-hidden rounded-2xl block ${className}`}>
+        <Wrapper {...linkProps} className={`group relative overflow-hidden ${naturalImageSize ? 'rounded-lg bg-white px-3 pt-3 pb-10 md:p-5 transition-shadow duration-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4' : 'rounded-2xl'} block ${className}`}
+            style={naturalImageSize ? { border: '1px solid rgba(0, 0, 0, 0.06)' } : undefined}>
             {uploadField ? (
                 <MediaUploadOverlay
                     field={uploadField}
                     altText={project.title}
                     valueShape="media"
                     positionClass="relative"
-                    className="w-full h-full"
+                    className={naturalImageSize ? 'w-full' : 'w-full h-full'}
                 >
                     <img
                         src={project.imageUrl}
                         alt={project.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        className={imageClassName}
                         data-image-index={imageIndex}
                     />
                 </MediaUploadOverlay>
@@ -68,19 +80,24 @@ function ProjectCard({ project, className = '', imageIndex, uploadField }: Proje
                 <img
                     src={project.imageUrl}
                     alt={project.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    className={imageClassName}
                     data-image-index={imageIndex}
                 />
             )}
             {/* Hover overlay — pointer-events-none so mouse events reach the <img> for editor image-replace */}
-            <div
+            {naturalImageSize ? (
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-white/95 px-4 py-3 pointer-events-none md:opacity-0 md:translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 group-focus-visible:translate-y-0 transition-all duration-200">
+                    <span className="text-xs font-medium tracking-widest uppercase text-neutral-600">{project.title}</span>
+                    {linkUrl && <span aria-hidden="true" className="text-lg text-neutral-500 transition-transform duration-300 group-hover:translate-x-1">↗</span>}
+                </div>
+            ) : <div
                 className="absolute inset-0 flex flex-col justify-end p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                 style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.867), rgba(var(--brand-primary-rgb), 0.251), transparent)` }}
             >
                 <Caption className="font-semibold uppercase tracking-wider text-white/80 mb-1 block">{project.category}</Caption>
                 <Heading level={4} className="text-white mb-1">{project.title}</Heading>
                 <Body size="small" className="text-white/80 line-clamp-2">{project.description}</Body>
-            </div>
+            </div>}
         </Wrapper>
     )
 }
@@ -95,24 +112,24 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
     const projects = Array.from({ length: projectCount }, (_, i) => {
         const p = rawProjects[i]
         const imgSrc = (p?.image as { url?: string } | undefined)?.url || p?.imageUrl
-        const cat = stripHtml(p?.category || '')
+        const cat = stripHtml(p?.category || '').trim()
         if (imgSrc) return { ...p, imageUrl: imgSrc, category: cat }
         return { ...p, imageUrl: fallbackUrls[i % fallbackUrls.length] ?? fallbackUrls[0], title: p?.title || '', category: cat, description: p?.description || '' }
     })
 
     const categories = useMemo(() => {
-        const cats = Array.from(new Set(projects.map((p) => p.category)))
-        return ['All', ...cats]
+        return Array.from(new Set(projects.map((p) => p.category).filter(Boolean)))
     }, [projects])
 
-    const [activeCategory, setActiveCategory] = useState('All')
+    const [activeCategory, setActiveCategory] = useState<string | null>(null)
+    const selectedCategory = activeCategory && categories.includes(activeCategory) ? activeCategory : null
 
     // Track original index through filter so imageIndex always maps to the correct projects[] slot
     const filtered = useMemo(() =>
         projects
             .map((project, index) => ({ project, index }))
-            .filter(({ project }) => activeCategory === 'All' || project.category === activeCategory),
-        [projects, activeCategory]
+            .filter(({ project }) => selectedCategory === null || project.category === selectedCategory),
+        [projects, selectedCategory]
     )
 
     return (
@@ -124,22 +141,27 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
             </div>
 
             {/* Category filter */}
-            <div className="flex flex-wrap justify-center gap-3 mb-12">
-                {categories.map((cat) => (
+            {categories.length > 0 && <div className="flex flex-wrap justify-center gap-3 mb-12" role="group" aria-label="Filter projects by category">
+                {[null, ...categories].map((cat) => (
                     <button
-                        key={cat}
+                        key={cat === null ? 'all-projects' : `category:${cat}`}
+                        aria-pressed={selectedCategory === cat}
                         type="button"
+                        // Filter pills are derived UI — "All" is hardcoded, category labels come from
+                        // projects[].category. Inline-editing them would no-op ("All") or silently
+                        // rewrite only the first matching project's category. Edit via settings panel.
+                        data-no-text-edit
                         onClick={() => setActiveCategory(cat)}
                         className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${TOUCH_TARGET.min}`}
-                        style={activeCategory === cat
+                        style={selectedCategory === cat
                             ? { background: 'var(--brand-primary)', color: '#fff' }
                             : { background: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'inherit', border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }
                         }
                     >
-                        {cat}
+                        {cat ?? 'All'}
                     </button>
                 ))}
-            </div>
+            </div>}
 
             {/* Showcase variant: first item large */}
             {variant === 'showcase' && filtered.length > 0 && (
@@ -166,12 +188,13 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
 
             {/* Masonry variant */}
             {variant === 'masonry' && (
-                <div className="columns-2 md:columns-3 gap-6 space-y-6">
-                    {filtered.map(({ project, index }, i) => (
+                <div className="columns-2 md:columns-3 gap-4 max-w-4xl mx-auto">
+                    {filtered.map(({ project, index }) => (
                         <ProjectCard
                             key={index}
                             project={project}
-                            className={`break-inside-avoid ${i % 3 === 0 ? 'aspect-[3/4]' : 'aspect-square'}`}
+                            className="break-inside-avoid mb-4"
+                            naturalImageSize
                             imageIndex={index}
                             uploadField={index < rawProjects.length ? `projects.${index}.image` : undefined}
                         />

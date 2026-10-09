@@ -1,8 +1,9 @@
-  import { z } from 'zod'
+import { z } from 'zod'
+import { allowsProductImages } from '@/lib/products/image-limit'
 
 type ProductFormI18n = { dashboard?: { products?: { form?: { errors?: Record<string, string> } } } };
 
-export const getProductFormSchema = (t: ProductFormI18n) => {
+export const getProductFormSchema = (t: ProductFormI18n, previousImages: readonly { id: string | number }[] = []) => {
     const errorT = t?.dashboard?.products?.form?.errors || {};
 
     const skuVariantSchema = z.object({
@@ -25,7 +26,7 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
     return z.object({
         name: z.string().trim().min(3, errorT.nameMin || 'Product name must be at least 3 characters').max(120, errorT.nameMax || 'Product name must not exceed 120 characters'),
         categoryIds: z.array(z.union([z.string(), z.number()])).min(1, errorT.categoryRequired || 'Product must belong to at least one category'),
-        images: z.array(z.object({ id: z.union([z.string(), z.number()]), url: z.string(), alt: z.string().optional() })).max(5, errorT.imagesMax || 'Maximum 5 images allowed'),
+        images: z.array(z.object({ id: z.union([z.string(), z.number()]), url: z.string(), alt: z.string().optional() })).refine(images => allowsProductImages(images.map(image => image.id), previousImages.map(image => image.id)), errorT.imagesMax || 'Maximum 5 images allowed'),
         
         hasVariants: z.boolean().default(false),
         

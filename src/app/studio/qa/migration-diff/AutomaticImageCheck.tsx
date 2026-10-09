@@ -75,7 +75,10 @@ export function AutomaticImageCheck({
       if (!c.signal.aborted)
         setError(e instanceof Error ? e.message : "Không kiểm tra được ảnh");
     } finally {
-      if (controller.current === c) setRunning(false);
+      if (controller.current === c) {
+        setRunning(false);
+        if (!c.signal.aborted) window.dispatchEvent(new Event('website-comparison-updated'));
+      }
     }
   }
   return (

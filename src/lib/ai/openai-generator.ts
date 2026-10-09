@@ -5,6 +5,8 @@
  */
 
 import OpenAI from 'openai'
+import type { WebsiteBlueprint } from '@/lib/migration/pw1-contract'
+import { generateNativePw1WithAI } from '@/lib/migration/pw1-native-ai'
 import { blockRegistry } from '@/blocks/registry'
 import { sanitizeBusinessInfo } from './sanitize-user-input'
 import { buildSystemPrompt, buildPersonalizePrompt, type BusinessInfoInput } from './system-prompt'
@@ -79,6 +81,8 @@ export type SSEEvent = {
 }
 
 export interface GenerateSiteOptions {
+    /** Server-internal, public source projection; never accepted from HTTP input. */
+    sourceBlueprint?: WebsiteBlueprint
     /** Locale already selected by the user or accepted in the confirmation popup. */
     targetLocale?: string
     /** Request-local mode selected by the route's single credit pilot. */
@@ -256,6 +260,11 @@ export async function generateSiteWithAI(
     onEvent?: (e: SSEEvent) => void,
     options: GenerateSiteOptions = {},
 ): Promise<GenerateSiteOutput> {
+    if (options.sourceBlueprint) {
+        const openai = getOpenAI()
+        if (!openai) throw new Error('OPENAI_API_KEY is required for source-aware generation')
+        return generateNativePw1WithAI(openai, options.sourceBlueprint.nativeContract, onEvent)
+    }
     // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
     // intermittent "400 could not parse JSON body" from OpenAI when clipboard
     // carries broken Unicode (common from mobile emoji paste + Windows clip).

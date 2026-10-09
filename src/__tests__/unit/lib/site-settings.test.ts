@@ -555,3 +555,7 @@ describe('[TC-F19.01] mergeNavigationBrandingWithSite — nav block branding fal
         expect(result.logoText).toBe('Fallback Text')
     })
 })
+
+it('[TC-F19.54] explicit blank footer social does not restore inherited links or render an empty icon', () => {
+    expect(mergeFooterSocialsWithSite({ socials: [{ platform: 'facebook', url: '' }] }, { socialLinks: { facebook: 'https://facebook.com/site' } }).socials).toEqual([])
+})

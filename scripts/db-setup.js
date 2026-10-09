@@ -19,6 +19,12 @@
 const { spawn } = require('child_process');
 const { bootstrapSeed } = require('./bootstrap-seed');
 const { seedMalaysiaGeo } = require('./seed-malaysia-geo-boot');
+const { runPw1MigrationSchema } = require('./pw1-migration-schema');
+const { runPw1JsonMigrationSchema } = require('./pw1-json-migration-schema');
+const { runPw1EvidenceSchema } = require('./pw1-evidence-schema');
+const { runContentSlugTenantMigration } = require('./pw1-content-schema');
+// Matching collection DDL (atomic helper): ALTER TABLE products ALTER COLUMN short_description TYPE varchar;
+// ALTER TABLE orders_items ALTER COLUMN product_id DROP NOT NULL;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -63,6 +69,11 @@ async function getTableCount(pool) {
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
+  { name: 'pw1_migration.batch_ledger', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-batch.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_audits', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-qa.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_reviews', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-qa-reviews.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_image_reviews', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-image-reviews.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_image_checks', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-image-checks.sql'), 'utf8') },
   // ── Users: Auth tables (Payload Drizzle schema) ──
   // Payload 3.14 uses VARCHAR id (UUID), mixed column naming:
   //   roles: parent_id, order (no underscore)
@@ -843,6 +854,20 @@ const MIGRATIONS = [
   },
   // Hero CTA buttons
   {
+    name: 'pw1_reconstruction.native_blocks',
+    sql: `ALTER TABLE pages_blocks_hero ADD COLUMN IF NOT EXISTS source_layout jsonb;
+ALTER TABLE IF EXISTS _pages_v_blocks_hero ADD COLUMN IF NOT EXISTS source_layout jsonb;
+CREATE TABLE IF NOT EXISTS pages_blocks_rich_text (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, html text, source_component_id varchar, padding_y numeric DEFAULT 64);
+CREATE TABLE IF NOT EXISTS _pages_v_blocks_rich_text (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, html text, source_component_id varchar, padding_y numeric DEFAULT 64);
+CREATE TABLE IF NOT EXISTS pages_blocks_content_cards (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, variant varchar, headline varchar, source_component_id varchar, source_content jsonb);
+CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, variant varchar, headline varchar, source_component_id varchar, source_content jsonb);`,
+  },
+  {
+    name: 'pages_blocks_hero.slides',
+    sql: `ALTER TABLE "pages_blocks_hero" ADD COLUMN IF NOT EXISTS "slides" jsonb;
+      ALTER TABLE IF EXISTS "_pages_v_blocks_hero" ADD COLUMN IF NOT EXISTS "slides" jsonb;`,
+  },
+  {
     name: 'pages_blocks_hero_cta_buttons.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_hero_cta_buttons" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -1378,10 +1403,6 @@ const MIGRATIONS = [
   {
     name: 'users.has_seen_ai_wizard',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_ai_wizard boolean DEFAULT false;`,
-  },
-  {
-    name: 'users.has_seen_ai_wizard.backfill_legacy',
-    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id FROM users_tenants WHERE _parent_id IS NOT NULL);`,
   },
   // ── Payload locked documents rels: FK columns for new collections ──
   {
@@ -2253,6 +2274,12 @@ const MIGRATIONS = [
       variant varchar, headline varchar, autoplay boolean, "interval" integer
     );`,
   },
+  {
+    name: 'carousel.source_image_layout',
+    sql: `ALTER TABLE IF EXISTS pages_blocks_carousel ADD COLUMN IF NOT EXISTS aspect_ratio numeric, ADD COLUMN IF NOT EXISTS image_fit varchar, ADD COLUMN IF NOT EXISTS max_image_width numeric, ADD COLUMN IF NOT EXISTS slides_per_view numeric;
+    ALTER TABLE IF EXISTS _pages_v_blocks_carousel ADD COLUMN IF NOT EXISTS aspect_ratio numeric, ADD COLUMN IF NOT EXISTS image_fit varchar, ADD COLUMN IF NOT EXISTS max_image_width numeric, ADD COLUMN IF NOT EXISTS slides_per_view numeric;`,
+  },
+
   {
     name: '_pages_v_blocks_carousel_items.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_carousel_items" (
@@ -4165,6 +4192,22 @@ const MIGRATIONS = [
   { name: 'pages_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "pages_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  // PW1 listing selection: apply to live pages and draft/version snapshots.
+  ...['pages_blocks_products_grid', '_pages_v_blocks_products_grid'].map(table => ({
+    name: `${table}.product_selection`,
+    sql: `DO $$ BEGIN
+      CREATE TYPE "enum_${table}_selection_mode" AS ENUM ('all', 'fixed', 'random');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS selection_mode "enum_${table}_selection_mode" DEFAULT 'all';
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS selected_product_ids jsonb DEFAULT '[]'::jsonb;
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS include_out_of_stock boolean DEFAULT true;`,
+  })),
+  // PW1 page-wide filter controls, live and versioned blocks.
+  { name: 'pages_blocks_products_grid.filter_controls', sql: `ALTER TABLE pages_blocks_products_grid ADD COLUMN IF NOT EXISTS filter_controls jsonb;` },
+  { name: '_pages_v_blocks_products_grid.filter_controls', sql: `ALTER TABLE _pages_v_blocks_products_grid ADD COLUMN IF NOT EXISTS filter_controls jsonb;` },
+  { name: 'pages_blocks_blog_list.category_filter', sql: `ALTER TABLE pages_blocks_blog_list ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
+  { name: '_pages_v_blocks_blog_list.category_filter', sql: `ALTER TABLE _pages_v_blocks_blog_list ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
   // GH-1588: showCategoryFilter opt-in toggle (F08 storefront category filter)
   { name: 'pages_blocks_products_grid.show_category_filter', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
   { name: 'pages_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
@@ -5625,6 +5668,10 @@ async function runMigrations(pool) {
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
   }
+  // Import ledger failures must abort setup: claims and fencing are safety boundaries.
+  await runPw1MigrationSchema(pool);
+  await runPw1JsonMigrationSchema(pool);
+  await runPw1EvidenceSchema(pool);
 
   console.log(
     `[db-setup] Migration summary: skipped=${skipped}, applied=${ran}, always-run=${alwaysRan}, failed=${failed}, total=${MIGRATIONS.length}`,
@@ -6170,7 +6217,7 @@ const COLLECTION_SLUGS = [
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
   'seo_meta_jobs', 'notifications', 'subscribers',
-  'contact_submissions',
+  'contact_submissions', 'push-subscriptions',
   'ai_usage_logs',
   'template_quality_scores',
   'block_catalog_entries',
@@ -6297,6 +6344,7 @@ async function checkDB() {
       await runMigrations(pool);
       await cleanupApprovedDuplicateIndexes(pool);
       await runCategorySlugTenantMigration(pool);
+      await runContentSlugTenantMigration(pool);
       await ensureRuntimeIssueUniqueIndex(pool);
       await syncPayloadRelsTables(pool);
       await runBootstrapSeed(pool);
@@ -6511,6 +6559,7 @@ async function main() {
         await runMigrations(pool);
         await cleanupApprovedDuplicateIndexes(pool);
         await runCategorySlugTenantMigration(pool);
+        await runContentSlugTenantMigration(pool);
         await ensureRuntimeIssueUniqueIndex(pool);
         await verifyCriticalIndexes(pool);
         await syncPayloadRelsTables(pool);
@@ -6694,6 +6743,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  runContentSlugTenantMigration,
   MIGRATIONS,
   APPROVED_DUPLICATE_INDEX_PAIRS,
   buildDuplicateIndexCleanupPlan,

@@ -34,6 +34,8 @@ loadEnvFile(path.join(cwd, '.env'))
 
 // Monkey-patch require('@next/env') so payload/dist/bin/loadEnv.js gets a shim
 const Module = require('module')
+// Server scripts inspect block schemas through the registry; they never render CSS.
+Module._extensions['.css'] = module => { module.exports = {} }
 const originalLoad = Module._load
 
 Module._load = function (request, parent, isMain) {

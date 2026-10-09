@@ -127,7 +127,7 @@ export const Orders: CollectionConfig = {
                     name: 'product',
                     type: 'relationship',
                     relationTo: 'products',
-                    required: true,
+                    admin: { description: 'Optional catalog link; historical item snapshots remain valid after a product is removed.' },
                 },
                 {
                     name: 'productName',

@@ -179,6 +179,20 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         setViewportWidth(1280)
     })
 
+    it('[TC-F09.240] keeps an unavailable migrated category empty and lets visitors clear it', async () => {
+        // Arrange: no PW2 category identity exists for this legacy footer destination.
+        mockSearchParams = new URLSearchParams('categoryId=0')
+        const fetchMock = mockStorefrontFetch({})
+        global.fetch = fetchMock as typeof fetch
+        // Act
+        render(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: false }} theme={{} as never} site={baseSite as never} />)
+        // Assert: never query all products for a missing category.
+        await waitFor(() => expect(screen.getByText('No products match your filters.')).toBeInTheDocument())
+        expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/storefront/products?'))).toBe(false)
+        fireEvent.click(screen.getByRole('button', { name: 'Clear all filters' }))
+        expect(mockReplace).toHaveBeenCalledWith('/sites/demo/products?', { scroll: false })
+    })
+
     it('[TC-F09.239] renders plain grid and skips category/bounds fetches when the filter flag is off', async () => {
         const fetchMock = mockStorefrontFetch({
             categories: [{ id: 10, name: 'Fashion', slug: 'fashion', parent: null }],
@@ -195,7 +209,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         expect(urls[0]).toContain('/api/storefront/products?')
     })
 
-    it('[TC-F09.239a] uses the configured limit without filters, 9 on desktop filters, and 10 on mobile filters', async () => {
+    it('[TC-F09.239a] uses the configured limit with and without filters on desktop and mobile', async () => {
         const plainFetch = mockStorefrontFetch()
         const plainView = render(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: false, limit: 20 }} theme={{} as never} site={baseSite as never} />)
 
@@ -213,7 +227,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
 
         await waitFor(() => expect(screen.getByText('Search Products')).toBeInTheDocument())
         const filteredUrls = filteredFetch.mock.calls.map(([url]) => String(url))
-        expect(filteredUrls.some((url) => url.includes('/api/storefront/products?') && url.includes('limit=9'))).toBe(true)
+        expect(filteredUrls.some((url) => url.includes('/api/storefront/products?') && url.includes('limit=2'))).toBe(true)
 
         filteredView.unmount()
 
@@ -226,7 +240,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
 
         await waitFor(() => expect(screen.getByText('Search Products')).toBeInTheDocument())
         const mobileUrls = mobileFetch.mock.calls.map(([url]) => String(url))
-        expect(mobileUrls.some((url) => url.includes('/api/storefront/products?') && url.includes('limit=10'))).toBe(true)
+        expect(mobileUrls.some((url) => url.includes('/api/storefront/products?') && url.includes('limit=2'))).toBe(true)
     })
 
     it('[TC-F09.239b] hides pagination completely when showCategoryFilter is off', async () => {
@@ -331,7 +345,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         view.rerender(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
 
         // Assert
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/storefront/products?site=1&limit=9&sort=-createdAt&categoryId=10'), expect.anything()))
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/storefront/products?site=1&limit=6&sort=-createdAt&categoryId=10'), expect.anything()))
         expect(screen.getByText('Original Product')).toBeInTheDocument()
         expect(screen.getByRole('status')).toHaveTextContent('Updating products...')
 
@@ -375,7 +389,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         mockSearchParams = new URLSearchParams('site=1')
         view.rerender(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
 
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/storefront/products?site=1&limit=9&sort=-createdAt'), expect.anything()))
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/storefront/products?site=1&limit=6&sort=-createdAt'), expect.anything()))
         rejectSecondProducts?.()
 
         await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
@@ -417,7 +431,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         mockSearchParams = new URLSearchParams('site=1')
         view.rerender(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
 
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/storefront/products?site=1&limit=9&sort=-createdAt'), expect.anything()))
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/storefront/products?site=1&limit=6&sort=-createdAt'), expect.anything()))
         expect(screen.getByText('Category Product')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Remove Fashion' })).toBeInTheDocument()
         expect(screen.getByRole('status')).toHaveTextContent('Updating products...')
@@ -428,7 +442,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove Fashion' })).not.toBeInTheDocument())
     })
 
-    it('[TC-F09.240be] scrolls back to the top of the block when filter params change, but not when only the view mode changes', async () => {
+    it('[TC-F09.240be] preserves scroll when filter params or view mode change', async () => {
         mockStorefrontFetch({
             categories: [{ id: 10, name: 'Fashion', slug: 'fashion', parent: null }],
             bounds: { minPrice: 10, maxPrice: 80, attributes: [] },
@@ -442,7 +456,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         mockSearchParams = new URLSearchParams('site=1&categoryId=10')
         view.rerender(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
 
-        await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalledTimes(2))
+        await waitFor(() => expect(mockScrollIntoView).not.toHaveBeenCalled())
 
         mockScrollIntoView.mockClear()
         mockSearchParams = new URLSearchParams('site=1&categoryId=10&view=list')
@@ -483,7 +497,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         mockSearchParams = new URLSearchParams('site=1&categoryId=10')
         view.rerender(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
 
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/storefront/products?site=1&limit=9&sort=-createdAt&categoryId=10'), expect.anything()))
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/storefront/products?site=1&limit=6&sort=-createdAt&categoryId=10'), expect.anything()))
         resolveSecondProducts?.()
 
         await waitFor(() => expect(screen.getByText('Filtered Product')).toBeInTheDocument())
@@ -565,7 +579,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         render(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
         await waitFor(() => expect(screen.getByRole('button', { name: 'Remove Fashion' })).toBeInTheDocument())
         expect(screen.getByRole('button', { name: 'Remove Tops' })).toBeInTheDocument()
-        expect(screen.getByText('Price: $20 - $80')).toBeInTheDocument()
+        expect(screen.getByText('Price: RM 20 - RM 80')).toBeInTheDocument()
         expect(screen.getAllByRole('button', { name: 'Clear all filters' })[0]).toBeInTheDocument()
 
         fireEvent.click(screen.getByRole('button', { name: 'Remove Fashion' }))
@@ -576,7 +590,7 @@ describe('[TC-F09.239–241] ProductsGridBlock filter shell', () => {
         expect(removeCategoryHref).toContain('minPrice=20')
         expect(removeCategoryHref).toContain('maxPrice=80')
 
-        fireEvent.click(screen.getByRole('button', { name: 'Remove Price: $20 - $80' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Remove Price: RM 20 - RM 80' }))
         const removePriceHref = mockReplace.mock.calls[1][0] as string
         expect(removePriceHref).toContain('/sites/demo/products?')
         expect(removePriceHref).toContain('categoryId=10')
@@ -1004,7 +1018,7 @@ describe('[TC-F09.256–259, TC-F09.261] Products Grid storefront stability', ()
         vi.mocked(isInEditorPreview).mockReturnValue(false)
     })
 
-    it('[TC-F09.256] repositions the results anchor immediately and after filtered results settle', async () => {
+    it('[TC-F09.256] preserves scroll before and after filtered results settle', async () => {
         // Arrange
         let resolveFilteredProducts: (() => void) | undefined
         let productRequestCount = 0
@@ -1038,16 +1052,15 @@ describe('[TC-F09.256–259, TC-F09.261] Products Grid storefront stability', ()
 
         // Assert
         expect(resultsAnchor).toHaveClass('scroll-mt-24')
-        await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalledTimes(1))
-        expect(mockScrollIntoView).toHaveBeenLastCalledWith({ behavior: 'auto', block: 'start' })
+        await waitFor(() => expect(mockScrollIntoView).not.toHaveBeenCalled())
 
         resolveFilteredProducts?.()
         await waitFor(() => expect(screen.getByText('Filtered Product')).toBeInTheDocument())
-        await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalledTimes(2))
+        await waitFor(() => expect(mockScrollIntoView).not.toHaveBeenCalled())
         expect(screen.getByTestId('products-grid-results-top')).toBe(resultsAnchor)
     })
 
-    it('[TC-F09.257] repositions for pagination while ignoring view-only changes', async () => {
+    it('[TC-F09.257] does not globally scroll for URL pagination or view changes', async () => {
         // Arrange
         let resolveSecondPage: (() => void) | undefined
         let productRequestCount = 0
@@ -1081,11 +1094,11 @@ describe('[TC-F09.256–259, TC-F09.261] Products Grid storefront stability', ()
 
         // Assert
         expect(mockPush).toHaveBeenCalledWith('/sites/demo/products?site=1&page=2', { scroll: false })
-        await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalledTimes(1))
+        await waitFor(() => expect(mockScrollIntoView).not.toHaveBeenCalled())
 
         resolveSecondPage?.()
         await waitFor(() => expect(screen.getByText('Page Two Product')).toBeInTheDocument())
-        await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalledTimes(2))
+        await waitFor(() => expect(mockScrollIntoView).not.toHaveBeenCalled())
 
         // Act — change only presentation state.
         mockScrollIntoView.mockClear()
@@ -1110,10 +1123,10 @@ describe('[TC-F09.256–259, TC-F09.261] Products Grid storefront stability', ()
         view.rerender(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
 
         // Assert
-        await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalled())
+        await waitFor(() => expect(mockScrollIntoView).not.toHaveBeenCalled())
     })
 
-    it('[TC-F09.257] repositions when duplicate single-value params change their effective first value', async () => {
+    it('[TC-F09.257] preserves scroll when duplicate query params change', async () => {
         // Arrange
         mockSearchParams = new URLSearchParams('site=1&page=2&page=3')
         mockStorefrontFetch({ page: 2, totalPages: 3, totalDocs: 27 })
@@ -1126,7 +1139,7 @@ describe('[TC-F09.256–259, TC-F09.261] Products Grid storefront stability', ()
         view.rerender(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
 
         // Assert
-        await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalled())
+        await waitFor(() => expect(mockScrollIntoView).not.toHaveBeenCalled())
     })
 
     it('[TC-F09.258] renders exactly six non-interactive responsive card skeletons during initial loading', async () => {
@@ -1311,7 +1324,7 @@ describe('[TC-F09.256–259, TC-F09.261] Products Grid storefront stability', ()
         expect(within(dialog).getByRole('checkbox', { name: 'Leaf B' })).toHaveAttribute('data-state', 'checked')
     })
 
-    it('[TC-F09.261] keeps the latest reposition pending when a rapid filter change aborts its predecessor', async () => {
+    it('[TC-F09.261] preserves scroll when rapid filters abort prior requests', async () => {
         // Arrange
         let productRequestCount = 0
         const replacementRequest: { signal?: AbortSignal | null } = {}
@@ -1361,13 +1374,27 @@ describe('[TC-F09.256–259, TC-F09.261] Products Grid storefront stability', ()
 
         // Assert
         expect(replacementRequest.signal?.aborted).toBe(true)
-        expect(mockScrollIntoView).toHaveBeenCalledTimes(2)
+        expect(mockScrollIntoView).not.toHaveBeenCalled()
         mockScrollIntoView.mockClear()
         await Promise.resolve()
         expect(mockScrollIntoView).not.toHaveBeenCalled()
 
         resolveLatestProducts?.()
         await waitFor(() => expect(screen.getByText('Latest Product')).toBeInTheDocument())
-        await waitFor(() => expect(mockScrollIntoView).toHaveBeenCalledTimes(1))
+        await waitFor(() => expect(mockScrollIntoView).not.toHaveBeenCalled())
     })
+})
+
+
+it('[TC-F35.M60] preserves store currency in the active price chip and ignores unrelated URL changes', async () => {
+    mockSearchParams = new URLSearchParams('site=1&minPrice=20')
+    const fetchMock = mockStorefrontFetch({ bounds: { minPrice: 10, maxPrice: 80, attributes: [] } })
+    const view = render(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
+    await waitFor(() => expect(screen.getByText('Price: RM 20 - RM 80')).toBeInTheDocument())
+    const productCalls = () => fetchMock.mock.calls.filter(([url]) => String(url).includes('/products?')).length
+    const before = productCalls()
+    mockSearchParams = new URLSearchParams('site=1&minPrice=20&blogCategory=news&view=list')
+    view.rerender(<ProductsGridBlock block={{ ...baseBlock, showCategoryFilter: true }} theme={{} as never} site={baseSite as never} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(productCalls()).toBe(before)
 })
