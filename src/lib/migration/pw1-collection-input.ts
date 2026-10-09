@@ -250,7 +250,14 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 return { title: localized(item), links: [...links, ...iconLinks], ...(text ? {text} : {}) }
             }).filter(column => column.links.length > 0 || column.text)
             const tagline = ''
-            if (columns.length > 4) throw new Error(`Store ${storeId}: native footer supports at most 4 nonempty link columns`)
+            // Native footer renders at most 4 columns. Fold overflow columns into the 4th so every
+            // source link and text survives instead of rejecting the whole store.
+            if (columns.length > 4) {
+                const [last, ...overflow] = columns.splice(3)
+                const text = [last.text, ...overflow.filter(c => c.text).map(c => [c.title, c.text].filter(Boolean).join('\n'))].filter(Boolean).join('\n\n')
+                columns.push({ title: last.title, links: [...last.links, ...overflow.flatMap(c => c.links)], ...(text ? { text } : {}) })
+                report.warnings.push(`footer: ${overflow.length} column(s) beyond 4 merged into "${last.title}"`)
+            }
             const pickStrings = (value: unknown, keys: string[]) => {
                 const data = object(value)
                 return Object.fromEntries(keys.filter(key => data[key] != null).map(key => [key, str(data[key])]))

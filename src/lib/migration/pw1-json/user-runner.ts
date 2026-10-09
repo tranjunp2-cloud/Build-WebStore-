@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util'
 import { resolve, dirname, isAbsolute } from 'node:path'
 import { stat, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { realpathSync } from 'node:fs'
 import { loadImportArtifact, readImportStore, readStoreTargetChecks } from './artifact'
 import { loadCredentialSidecar } from './credentials'
 import { selectStoreIds } from './selectors'
@@ -149,7 +150,7 @@ export async function runUserImport(args: UserArguments, options: ImportOrchestr
     const artifact = await loadImportArtifact(manifestPath, {
       scope: 'foundation',
       progress: progress.report,
-      spoolDirectory: tmpdir(),
+      spoolDirectory: realpathSync(tmpdir()),
       selector: args,
     })
     spool = artifact.spoolDirectory

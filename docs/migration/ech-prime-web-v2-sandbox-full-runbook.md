@@ -49,14 +49,14 @@ test -d "$CSV_DIR" || { echo 'CSV_DIR không tồn tại'; exit 1; }
 umask 077
 
 vercel link
-vercel env pull /tmp/pw1-staging.env.local --environment=preview --git-branch=staging
+vercel env pull /tmp/pw1-staging.env.local --environment=staging
 sandbox copy --project "$PROJECT" /tmp/pw1-staging.env.local "$SB:/vercel/pw1-staging.env.local"
 
 tar -czf /tmp/pw1-csv.tar.gz -C "$CSV_DIR" .
 sandbox copy --project "$PROJECT" /tmp/pw1-csv.tar.gz "$SB:/vercel/pw1-csv.tar.gz"
 ```
 
-Nếu staging là Vercel **Custom Environment** thay vì Preview branch, thay lệnh pull bằng `vercel env pull /tmp/pw1-staging.env.local --environment=staging`. Khi `vercel link` hỏi, chọn đúng team/project. File env được pull phải chứa secret thật, không phải placeholder; không dùng env trỏ DB local hoặc production.
+Staging của project là Vercel **Custom Environment** `staging`; Preview scope không kế thừa sang staging nên không dùng `--environment=preview`. Khi `vercel link` hỏi, chọn đúng team/project. File env được pull phải chứa secret thật, không phải placeholder; không dùng env trỏ DB local hoặc production.
 
 ## 3. Trong Sandbox: chuẩn bị CSV và env
 
@@ -103,7 +103,9 @@ SSO phải báo tạo/cập nhật thành công, không phải `SKIPPED`. Lệnh
 
 ## 5. Export rồi import data
 
-Trong **Sandbox**, dùng đúng thời điểm snapshot. Ví dụ dưới đây dành cho snapshot ngày 18/09/2026; thay nếu bộ CSV của bạn khác. Với bộ PROD lớn, cấp 4 GiB V8 heap cho exporter để tránh OOM ở bước coverage. Sandbox cần ít nhất 8 GiB RAM; kiểm `/sys/fs/cgroup/memory.max` nếu đã tạo Sandbox với cấu hình khác.
+Trong **Sandbox**, dùng đúng thời điểm snapshot. Ví dụ dưới đây dành cho snapshot ngày 18/09/2026; thay nếu bộ CSV của bạn khác. Với bộ PROD lớn, cấp 4 GiB V8 heap cho exporter để tránh OOM ở bước coverage. Sandbox cần ít nhất 8 GiB RAM; kiểm `/sys/fs/cgroup/memory.max` nếu đã tạo Sandbox với cấu hình khác. Không tăng heap quá 4096: source config PROD có guard RSS 6 GiB (`maxResidentBytes`), heap lớn hơn làm GC trễ và exporter dừng với `RESOURCE_MEMORY_LIMIT`.
+
+Chạy trên macOS (không phải Sandbox Linux): cài `flock` bằng `brew install util-linux` và thêm `export PATH="$(brew --prefix util-linux)/bin:$PATH"` trước các lệnh `migrate:pw1:*`.
 
 ```bash
 NODE_OPTIONS='--max-old-space-size=4096' npm run migrate:pw1 -- /vercel/pw1-input --as-of 2026-09-18T00:00:00Z
