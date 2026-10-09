@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import type { HeroConfig } from './config'
 import { RichText } from '../shared/RichText'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
-import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
+import { BROKEN_URL_PREFIX, PW1_EMPTY_CTA_URL } from '@/lib/navigation-url'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
@@ -50,7 +50,7 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
             {buttons.map((btn, i) => {
                 const rawUrl = btn?.url
                 const isBroken = rawUrl?.startsWith(BROKEN_URL_PREFIX)
-                const href = resolveHref(isBroken ? '#' : rawUrl)
+                const href = rawUrl && rawUrl !== PW1_EMPTY_CTA_URL ? resolveHref(isBroken ? '#' : rawUrl) : undefined
                 const isExternal = !isBroken && !!rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))
                 return (
                 <BrokenLinkWarning key={i} url={rawUrl} rounded="rounded-xl">
