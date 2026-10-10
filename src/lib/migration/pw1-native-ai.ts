@@ -180,6 +180,8 @@ export async function generateNativePw1WithAI(openai: OpenAI, input: unknown, on
     let result: GenerationResult
     try { result = bindNativeDesign(source, JSON.parse(response.choices[0].message.content || 'null')) }
     catch (error) {
+        // Surface why a paid re-generation happens so retry causes can be measured per store.
+        emit({ event: 'step', data: { step: 'ai-native-design-retry', attempt: attempt + 1, reason: (error instanceof Error ? error.message : 'Invalid layout').slice(0, 300), tokens: response.usage } })
         if (attempt === 1) throw error
         correction = `Previous response failed validation: ${error instanceof Error ? error.message : 'Invalid layout'}. Return exactly the provided pages and components in order, one section per component, selecting only its allowedOutput. Expected identities: ${JSON.stringify(source.pages.map(p => ({ sourceId: p.sourceId, sections: p.components.map(c => ({sourceId: c.sourceId, allowedOutput: nativeSectionChoices(c)})) })))}. Do not omit empty components or add components from the legacy website.`
         continue

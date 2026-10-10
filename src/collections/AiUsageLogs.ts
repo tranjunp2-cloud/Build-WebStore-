@@ -60,6 +60,7 @@ export const AiUsageLogs: CollectionConfig = {
                 { label: 'Product description', value: 'product-description' },
                 { label: 'URL extraction', value: 'url-extraction' },
                 { label: 'Bulk parse', value: 'bulk-parse' },
+                { label: 'Brand analysis (PW1 migration)', value: 'brand-analysis' },
             ],
         },
         {

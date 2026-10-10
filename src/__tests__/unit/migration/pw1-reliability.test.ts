@@ -77,4 +77,25 @@ describe('[TC-F35.M29] Store execution retry policy', () => {
         // Assert
         expect(shouldRetry(failure, 1, 3)).toBe(false)
     })
+    it.each([
+        '429 You have no credits remaining. Add credits to continue using the API',
+        '429 You exceeded your current quota, please check your plan and billing details.',
+        'Shared generation service failed (status 500): insufficient_quota',
+    ])('treats exhausted AI billing as a non-retryable batch stop: %s', message => {
+        // Arrange: billing exhaustion arrives as HTTP 429 but is not a rate limit
+        const error = Object.assign(new Error(message), { status: 429 })
+        // Act
+        const attempt = classifyStoreAttemptError(error)
+        const migration = classifyMigrationError(error)
+        // Assert
+        expect(attempt).toMatchObject({ code: 'AI_QUOTA_EXHAUSTED', retryable: false })
+        expect(migration).toMatchObject({ code: 'AI_QUOTA_EXHAUSTED', retryable: false })
+        expect(shouldRetry(attempt, 1, 3)).toBe(false)
+    })
+    it('still retries an ordinary 429 rate limit', () => {
+        // Arrange
+        const error = Object.assign(new Error('429 Rate limit reached for requests'), { status: 429 })
+        // Act / Assert
+        expect(classifyMigrationError(error)).toMatchObject({ code: 'TRANSIENT', retryable: true })
+    })
 })

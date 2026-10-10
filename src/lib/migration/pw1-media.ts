@@ -1,6 +1,6 @@
 import sharp from 'sharp'
 import { PW1_PLACEHOLDER_URL } from './pw1-placeholder'
-import { SUPPORTED_IMAGE_MIMES } from '@/lib/media/image-signature'
+import { SUPPORTED_IMAGE_MIMES, hasValidImageSignature } from '@/lib/media/image-signature'
 import { recordCreatedPw1Media } from './pw1-media-tracking'
 import { sql } from 'drizzle-orm'
 import { createHash } from 'node:crypto'
@@ -42,7 +42,15 @@ export async function downloadSourceImage(value: string) {
             chunks.push(chunk)
         }
     } finally { reader.releaseLock() }
-    return { buffer: Buffer.concat(chunks), mimetype }
+    const buffer = Buffer.concat(chunks)
+    // Media accepts only JPEG/PNG/WebP/ICO bytes. PW1 also serves GIF/AVIF (or a mislabelled
+    // content-type); re-encode those to PNG (first frame for animations) instead of failing the store.
+    if (hasValidImageSignature(new Uint8Array(buffer.subarray(0, 12)))) return { buffer, mimetype }
+    try {
+        return { buffer: await sharp(buffer, { animated: false }).png().toBuffer(), mimetype: 'image/png' }
+    } catch {
+        return { buffer, mimetype } // undecodable bytes: Media upload validation rejects them as before
+    }
 }
 
 /** Upload actual source assets through the existing shared uploader. Never replace
