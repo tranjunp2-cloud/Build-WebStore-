@@ -2,11 +2,17 @@ export type MigrationFailure = { code: string; message: string; retryable: boole
 export class MigrationError extends Error {
     constructor(public readonly code: string, message: string, public readonly retryable = false) { super(message); this.name = 'MigrationError' }
 }
+/** OpenAI billing exhaustion (HTTP 429 `insufficient_quota`) is not a rate limit: retrying cannot succeed. */
+const AI_QUOTA_EXHAUSTED = /insufficient_quota|no credits remaining|exceeded your current quota/i
+export function isAiQuotaExhausted(failure: Pick<MigrationFailure, 'code' | 'message'>) {
+    return failure.code === 'AI_QUOTA_EXHAUSTED' || AI_QUOTA_EXHAUSTED.test(failure.message)
+}
 export function classifyMigrationError(error: unknown): MigrationFailure {
     if (error instanceof MigrationError) return { code: error.code, message: error.message, retryable: error.retryable }
     const e = error as { message?: string; code?: string; name?: string; cause?: unknown; status?: number }
     const message = e?.message || 'Unknown migration failure'
     const code = e?.code || ''
+    if (code === 'insufficient_quota' || AI_QUOTA_EXHAUSTED.test(message)) return { code: 'AI_QUOTA_EXHAUSTED', message, retryable: false }
     if (e?.cause && e.cause !== error) {
         const cause = classifyMigrationError(e.cause)
         if (cause.retryable) return cause
@@ -27,6 +33,7 @@ export function shouldRetry(failure: MigrationFailure, attempt: number, maxAttem
 // attempt, including AI layout validation, rather than only transport failures.
 export function classifyStoreAttemptError(error: unknown): MigrationFailure {
     const failure = classifyMigrationError(error)
+    if (isAiQuotaExhausted(failure)) return { ...failure, code: 'AI_QUOTA_EXHAUSTED', retryable: false }
     const stopCodes = ['INTERRUPTED', 'BATCH_TIME_LIMIT', 'STORE_TIME_LIMIT', 'GENERATION_LIMIT', 'DESIGN_TOKEN_LIMIT',
         'IDENTITY_CONFLICT', 'BE_MAPPING_INVALID', 'BE_DATA_MISSING', 'PUBLISHED_SITE', 'CONCURRENT_EDIT', 'USER_NOT_IMPORTED']
     if (stopCodes.includes(failure.code)) return { ...failure, retryable: false }

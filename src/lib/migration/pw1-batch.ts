@@ -262,6 +262,9 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             const failure = classifyStoreAttemptError(error)
                             await client.query("UPDATE pw1_migration_attempts SET status='failed',error=$2,error_code=$3,retryable=$4,finished_at=now() WHERE id=$1", [attemptId, failure.message, failure.code, failure.retryable])
                             await client.query("UPDATE pw1_migration_stores SET status='failed',updated_at=now() WHERE source_store_id=$1", [entry.sourceStoreId])
+                            // Exhausted AI billing fails every remaining store: stop the batch like an interrupt
+                            // so pending stores stay deferred (resumable) instead of burning their attempts.
+                            if (failure.code === 'AI_QUOTA_EXHAUSTED' && !controller.signal.aborted) controller.abort(new MigrationError('AI_QUOTA_EXHAUSTED', failure.message))
                             retry = !controller.signal.aborted && shouldRetry(failure, attempt, maxAttempts)
                             console.error(`[${entry.sourceStoreId}] attempt ${attempt}/${maxAttempts}: ${failure.code}: ${failure.message}; ${retry ? 'retrying automatically' : 'failed; continuing with other stores'}`)
                             if (!retry) throw new MigrationError(failure.code, failure.message, failure.retryable)
@@ -273,7 +276,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                 }
             } catch (error) {
                 const failure = classifyMigrationError(controller.signal.aborted ? controller.signal.reason : error)
-                const deferred = ['BATCH_TIME_LIMIT','GENERATION_LIMIT','DESIGN_TOKEN_LIMIT','INTERRUPTED'].includes(failure.code)
+                const deferred = ['BATCH_TIME_LIMIT','GENERATION_LIMIT','DESIGN_TOKEN_LIMIT','INTERRUPTED','AI_QUOTA_EXHAUSTED'].includes(failure.code)
                 result = { sourceStoreId: entry.sourceStoreId, status: deferred ? 'deferred' : 'failed', ...failure, error: failure.message, durationSeconds: (Date.now() - storeStartedAt) / 1000 }
             }
             if ((result.status === 'failed' || failedAttemptIds.length > 0) && !controller.signal.aborted) {
