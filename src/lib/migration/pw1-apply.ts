@@ -87,6 +87,7 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
             const { generateSiteService } = await import('@/lib/ai/generate-site-service')
             await options.onStage?.('generation')
             let designUsage: { model: string; totalTokens: number | null } | undefined
+            const designRetries: Array<{ attempt: number; reason: string }> = []
             let generationError: unknown
             let expectedLayouts: Array<{ slug: string; types: string[] }> = []
             const response = await generateSiteService({
@@ -120,10 +121,15 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
                             designUsage = { ...usage, totalTokens: usage.totalTokens === null && !designUsage ? null : (designUsage?.totalTokens ?? 0) + (usage.totalTokens ?? 0) }
                             options.onDesignUsage?.(usage)
                         }
+                        if (event.data.step === 'ai-native-design-retry') {
+                            const data = event.data as { attempt?: number; reason?: string }
+                            designRetries.push({ attempt: Number(data.attempt ?? 0), reason: String(data.reason ?? '') })
+                        }
                     }
                 },
             })
-            if (designUsage) await options.save('usage.json', designUsage)
+            if (designUsage) await options.save('usage.json', { ...designUsage, designRetries: designRetries.length })
+            if (designRetries.length) await options.save('design-retries.json', designRetries)
             const outcome = await response.json() as Record<string, unknown>
             await options.save('service-response.json', { httpStatus: response.status, ...outcome })
             if (!response.ok || outcome.success !== true) throw generationError ?? new MigrationError('GENERATION_FAILED', `Shared generation service failed (status ${response.status}); inspect service-response.json`, response.status === 429 || response.status >= 500)

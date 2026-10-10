@@ -192,8 +192,11 @@ it('[TC-F35.M39] corrects one invalid AI layout without weakening binder validat
     const response = (value: unknown) => ({ model: 'test', choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(value) } }] })
     const create = vi.fn().mockResolvedValueOnce(response(invalid)).mockResolvedValueOnce(response(design))
     const client = { chat: { completions: { create } } } as unknown as OpenAI
-    const output = await generateNativePw1WithAI(client, source)
+    const events: Array<{ event: string; data: Record<string, unknown> }> = []
+    const output = await generateNativePw1WithAI(client, source, event => events.push(event as never))
     expect(create).toHaveBeenCalledTimes(2)
+    // The paid re-generation is observable with its validation reason.
+    expect(events.filter(e => e.data.step === 'ai-native-design-retry')).toEqual([expect.objectContaining({ data: expect.objectContaining({ attempt: 1, reason: 'AI page count mismatch' }) })])
     expect(JSON.parse(create.mock.calls[1][0].messages[1].content).validationCorrection).toContain('AI page count mismatch')
     expect(output.result.pages).toHaveLength(1)
     create.mockReset().mockResolvedValue(response(invalid))
