@@ -1,6 +1,6 @@
 import { readFixtureMasterText, writeFixtureMaster } from '@/__tests__/helpers/pw1-master-artifact'
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -8,6 +8,9 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { writeExportFixture } from '../helpers/pw1-export-fixture'
 import { MASTER_SHA256, LEGACY_MASTER_SHA256 } from '@/lib/migration/pw1-export/master-version'
+// Each test spawns one or more real CLI subprocesses (15s cap each via execFile); the
+// default 5s test timeout flakes on slower CI runners before the subprocess finishes.
+vi.setConfig({ testTimeout: 60_000 })
 let root: string
 beforeEach(async () => {
   root = await mkdtemp(path.join(os.tmpdir(), 'pw1-cli-test-'))
