@@ -1,6 +1,6 @@
 import sharp from 'sharp'
 import { PW1_PLACEHOLDER_URL } from './pw1-placeholder'
-import { SUPPORTED_IMAGE_MIMES, hasValidImageSignature } from '@/lib/media/image-signature'
+import { hasValidImageSignature } from '@/lib/media/image-signature'
 import { recordCreatedPw1Media } from './pw1-media-tracking'
 import { sql } from 'drizzle-orm'
 import { createHash } from 'node:crypto'
@@ -28,8 +28,14 @@ export async function downloadSourceImage(value: string) {
         return placeholderImage()
     }
     if (!response.ok || !response.body) throw new Error(`Source media download failed (HTTP ${response.status})`)
-    const mimetype = (response.headers.get('content-type') || '').split(';')[0]
-    if (!SUPPORTED_IMAGE_MIMES.has(mimetype) && !['image/gif', 'image/avif'].includes(mimetype)) throw new Error('Source media is not a supported raster image')
+    const mimetype = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
+    // PW1 banners may hold a video; image-only blocks cannot use it, so keep the store on a neutral placeholder.
+    if (mimetype.startsWith('video/')) {
+        await response.body.cancel()
+        console.warn(`[PW1 media] Source is a video (${mimetype}); using placeholder`)
+        return placeholderImage()
+    }
+    if (!mimetype.startsWith('image/')) throw new Error('Source media is not a supported raster image')
     const limit = 30 * 1024 * 1024
     if (Number(response.headers.get('content-length')) > limit) { await response.body.cancel(); throw new Error('Source image exceeds 30 MiB') }
     const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0
@@ -43,14 +49,25 @@ export async function downloadSourceImage(value: string) {
         }
     } finally { reader.releaseLock() }
     const buffer = Buffer.concat(chunks)
-    // Media accepts only JPEG/PNG/WebP/ICO bytes. PW1 also serves GIF/AVIF (or a mislabelled
-    // content-type); re-encode those to PNG (first frame for animations) instead of failing the store.
-    if (hasValidImageSignature(new Uint8Array(buffer.subarray(0, 12)))) return { buffer, mimetype }
+    // Media accepts only JPEG/PNG/WebP/ICO bytes and PW1 content-types are unreliable (image/jpg,
+    // AVIF labelled image/png): trust the bytes, re-encode other formats to PNG (first frame for
+    // animations), and fall back to the neutral placeholder when the bytes cannot be decoded.
+    const signatureMimetype = detectSupportedImageMimetype(new Uint8Array(buffer.subarray(0, 12)))
+    if (signatureMimetype) return { buffer, mimetype: signatureMimetype }
     try {
         return { buffer: await sharp(buffer, { animated: false }).png().toBuffer(), mimetype: 'image/png' }
-    } catch {
-        return { buffer, mimetype } // undecodable bytes: Media upload validation rejects them as before
+    } catch (error) {
+        console.warn(`[PW1 media] Source image (${mimetype}) could not be decoded; using placeholder: ${error instanceof Error ? error.message : error}`)
+        return placeholderImage()
     }
+}
+
+function detectSupportedImageMimetype(head: Uint8Array): string | undefined {
+    if (!hasValidImageSignature(head)) return undefined
+    if (head[0] === 0xFF) return 'image/jpeg'
+    if (head[0] === 0x89) return 'image/png'
+    if (head[0] === 0x00) return 'image/x-icon'
+    return 'image/webp'
 }
 
 /** Upload actual source assets through the existing shared uploader. Never replace

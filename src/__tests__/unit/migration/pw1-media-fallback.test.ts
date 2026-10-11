@@ -23,7 +23,7 @@ describe('[TC-F35.M12] Missing/forbidden images and download size', () => {
         await expect(downloadSourceImage('https://source.example/error.png')).rejects.toThrow('HTTP 500')
     })
     it('accepts downloads over the old 10 MiB limit', async () => {
-        const bytes = Buffer.alloc(11 * 1024 * 1024)
+        const bytes = Buffer.alloc(11 * 1024 * 1024); bytes.set([0x89, 0x50, 0x4E, 0x47])
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(bytes, {headers:{'content-type':'image/png'}})))
         expect((await downloadSourceImage('https://source.example/large.png')).buffer.length).toBe(bytes.length)
     })
@@ -36,6 +36,33 @@ describe('[TC-F35.M12] Missing/forbidden images and download size', () => {
         // Assert: PNG bytes, same dimensions
         expect(asset.mimetype).toBe('image/png')
         expect(await sharp(asset.buffer).metadata()).toMatchObject({ format: 'png', width: 4, height: 3 })
+    })
+    it('trusts JPEG bytes served with the non-standard image/jpg content-type', async () => {
+        // Arrange
+        const jpeg = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#00ff00' } }).jpeg().toBuffer()
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(jpeg, {headers:{'content-type':'image/jpg'}})))
+        // Act
+        const asset = await downloadSourceImage('https://source.example/photo.jpg')
+        // Assert
+        expect(asset).toEqual({ buffer: jpeg, mimetype: 'image/jpeg' })
+    })
+    it('uses the placeholder when a banner image slot points at a video', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(Buffer.from('0000001c66747970', 'hex'), {headers:{'content-type':'video/mp4'}})))
+        const asset = await downloadSourceImage('https://source.example/banner.mp4')
+        expect(await sharp(asset.buffer).metadata()).toMatchObject({ format: 'png', width: 960 })
+    })
+    it('uses the placeholder when mislabelled image bytes cannot be decoded', async () => {
+        // Arrange: AVIF container header served as PNG, truncated so no decoder can read it
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(Buffer.from('000000186674797061766966', 'hex'), {headers:{'content-type':'image/png'}})))
+        // Act
+        const asset = await downloadSourceImage('https://source.example/broken.png')
+        // Assert
+        expect(asset.mimetype).toBe('image/png')
+        expect((await sharp(asset.buffer).metadata()).width).toBe(960)
+    })
+    it('still rejects a non-image response', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html></html>', {headers:{'content-type':'text/html'}})))
+        await expect(downloadSourceImage('https://source.example/page.png')).rejects.toThrow('not a supported raster image')
     })
     it('enforces the new limit for streamed responses without content-length', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(Buffer.alloc(31 * 1024 * 1024), {headers:{'content-type':'image/png'}})))
