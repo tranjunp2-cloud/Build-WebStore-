@@ -87,8 +87,7 @@ export async function readWebsiteMigrations(input: {
     sql`SELECT id,status,started_at AS "startedAt",finished_at AS "finishedAt", limits->'qaInput'->>'runId' AS "runId", limits->'qaInput'->>'part' AS part FROM pw1_migration_batches ORDER BY started_at DESC LIMIT 100`,
   );
   const where = sql`(${input.batch ?? null}::uuid IS NULL OR EXISTS (SELECT 1 FROM pw1_migration_attempts x WHERE x.source_store_id=source.source_store_id AND x.batch_id=${input.batch ?? null}::uuid) OR EXISTS(SELECT 1 FROM pw1_migration_batches b CROSS JOIN LATERAL jsonb_array_elements(b.results) r WHERE b.id=${input.batch ?? null}::uuid AND r->>'sourceStoreId'=source.source_store_id))
-        AND (${input.run ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM pw1_migration_batches b WHERE b.limits->'qaInput'->>'runId'=${input.run ?? null} AND (EXISTS(SELECT 1 FROM pw1_migration_attempts x WHERE x.batch_id=b.id AND x.source_store_id=source.source_store_id) OR EXISTS(SELECT 1 FROM jsonb_array_elements(b.results) r WHERE r->>'sourceStoreId'=source.source_store_id))))
-        AND (${input.search}='' OR source.source_store_id ILIKE ${"%" + input.search + "%"} OR COALESCE(s.name,'Website PW1 #' || source.source_store_id) ILIKE ${"%" + input.search + "%"} OR t.slug ILIKE ${"%" + input.search + "%"})`;
+        AND (${input.run ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM pw1_migration_batches b WHERE b.limits->'qaInput'->>'runId'=${input.run ?? null} AND (EXISTS(SELECT 1 FROM pw1_migration_attempts x WHERE x.batch_id=b.id AND x.source_store_id=source.source_store_id) OR EXISTS(SELECT 1 FROM jsonb_array_elements(b.results) r WHERE r->>'sourceStoreId'=source.source_store_id))))`;
   const rows = await execute<
     MigrationStore & {
       total: number;
@@ -119,7 +118,7 @@ export async function readWebsiteMigrations(input: {
             CASE WHEN r.evidence_version=${evidenceVersionSql} THEN r.verdict ELSE 'unverified' END AS "qcStatus",r.reviewed_at AS "reviewedAt",
             s.status AS publish,CASE WHEN q.checked_at IS NOT NULL AND EXISTS(SELECT 1 FROM pages p WHERE p.site_id=m.site_id AND p.slug<>'404' AND (p.updated_at>q.checked_at OR EXISTS(SELECT 1 FROM jsonb_array_elements(q.report->'pages') version WHERE (version->>'pageId')::integer=p.id AND version->>'updatedAt' IS NOT NULL AND (version->>'updatedAt')::timestamptz<>p.updated_at))) OR q.checked_at IS NOT NULL AND s.updated_at>q.checked_at THEN 'stale' WHEN q.checked_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(q.report->'pages') version WHERE version->>'updatedAt' IS NOT NULL) THEN 'historical' ELSE COALESCE(q.report->>'status','not-checked') END AS "auditStatus",
             COALESCE((q.report->>'errors')::integer,0) AS errors,COALESCE((q.report->>'warnings')::integer,0) AS warnings,
-            q.checked_at AS "checkedAt",CASE WHEN s.id IS NOT NULL AND t.id IS NOT NULL THEN '/sites/' || t.slug ELSE NULL END AS url,COALESCE(m.updated_at,source.updated_at) AS "updatedAt"
+            q.checked_at AS "checkedAt",CASE WHEN s.id IS NOT NULL AND t.id IS NOT NULL THEN '/sites/' || t.slug ELSE NULL END AS url,t.slug AS "tenantSlug",COALESCE(m.updated_at,source.updated_at) AS "updatedAt"
           FROM sources source LEFT JOIN pw1_migration_stores m ON m.source_store_id=source.source_store_id
           LEFT JOIN sites s ON s.id=m.site_id AND s.tenant_id=m.tenant_id LEFT JOIN tenants t ON t.id=m.tenant_id
           LEFT JOIN LATERAL (SELECT attempt_id FROM pw1_migration_commits WHERE source_store_id=m.source_store_id AND input_hash=m.input_hash ORDER BY committed_at DESC LIMIT 1) c ON true
@@ -133,7 +132,8 @@ export async function readWebsiteMigrations(input: {
             COALESCE(string_agg("storeId" || ':' || migration || ':' || COALESCE("updatedAt"::text,''), ',' ORDER BY "storeId"),'')) AS "catalogVersion" FROM catalog
         ), filtered AS (
           SELECT * FROM catalog WHERE
-            (${input.status}='all' OR ${input.status}='not_started' AND migration='pending' OR ${input.status}='running' AND migration='running' OR ${input.status}='completed' AND migration='completed' OR ${input.status}='incomplete' AND migration<>'completed' OR ${input.status}='unpublished' AND publish<>'published' OR ${input.status}='failed' AND migration='failed' OR ${input.status}='attention' AND (errors+warnings>0 OR "auditStatus" IN ('not-checked','historical','stale')) OR ${input.status}='unaudited' AND "auditStatus" IN ('not-checked','historical','stale'))
+            (${input.search}='' OR "storeId" ILIKE ${"%" + input.search + "%"} OR name ILIKE ${"%" + input.search + "%"} OR "tenantSlug" ILIKE ${"%" + input.search + "%"})
+            AND (${input.status}='all' OR ${input.status}='not_started' AND migration='pending' OR ${input.status}='running' AND migration='running' OR ${input.status}='completed' AND migration='completed' OR ${input.status}='incomplete' AND migration<>'completed' OR ${input.status}='unpublished' AND publish<>'published' OR ${input.status}='failed' AND migration='failed' OR ${input.status}='attention' AND (errors+warnings>0 OR "auditStatus" IN ('not-checked','historical','stale')) OR ${input.status}='unaudited' AND "auditStatus" IN ('not-checked','historical','stale'))
             AND (${input.qc}='all' OR "qcStatus"=${input.qc})
         ), filtered_stats AS (
           SELECT count(*)::integer AS total FROM filtered

@@ -1157,10 +1157,19 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const committedQueryRef = React.useRef("");
   useEffect(() => {
     // Same normalisation as the old client-side filter: a pasted URL searches by host.
-    const timer = setTimeout(() => setDebouncedQuery(searchQuery.trim().toLowerCase()
-      .replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "")), 300);
+    const timer = setTimeout(() => {
+      const next = searchQuery.trim().toLowerCase()
+        .replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "");
+      if (next === committedQueryRef.current) return;
+      committedQueryRef.current = next;
+      // Page reset rides along with the committed query so the catalog reload
+      // fires one request instead of an extra request carrying the stale query.
+      setDebouncedQuery(next);
+      setCurrentPage(1);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
   const [deviceView, setDeviceView] = useState<"desktop" | "mobile">("desktop");
@@ -2333,18 +2342,12 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
             aria-label={live ? "Tìm store" : undefined}
             placeholder={live ? "Tìm tên store, đường dẫn, ID PW1…" : "Tìm theo Email khách hàng, Domain, Mã Site..."}
             value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500 transition shadow-inner"
           />
           {searchQuery && (
             <button
-              onClick={() => {
-                setSearchQuery("");
-                setCurrentPage(1);
-              }}
+              onClick={() => setSearchQuery("")}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white rounded-md transition"
               title="Xóa tìm kiếm"
             >
