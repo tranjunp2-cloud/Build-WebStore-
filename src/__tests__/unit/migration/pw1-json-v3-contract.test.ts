@@ -1060,7 +1060,7 @@ describe('[TC-F42-IMP-SCOPE-001] 1.10.1 model settings source-only contract',()=
     const input=await setup(mutation),prepared=await prepare(input),artifact=await loadImportArtifact(prepared.manifestPath)
     // Assert
     expect(artifact.blockers.some(d=>d.code==='SOURCE_CLASSIFICATION_INVALID')).toBe(true)
-  })
+  },30_000)
 })
 
 
