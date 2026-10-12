@@ -134,9 +134,15 @@ export const GET = withSuperAdmin(async (request: NextRequest) => {
 
     const { run_id: runId, store_id: storeId, scope } = query.data;
     const verifiedRun = Boolean(runId && storeId && snapshot.evidence?.available && snapshot.evidence.mode === 'verified');
-    const previewResult = verifiedRun && scope === 'commerce'
-      ? await readCommerceRecordPreviews(storeId!, runId!)
-      : null;
+    // Previews are decoration: a failing F42 query must degrade to "no preview", not hide the ledger.
+    let previewResult: Awaited<ReturnType<typeof readCommerceRecordPreviews>> | null = null;
+    if (verifiedRun && scope === 'commerce') {
+      try {
+        previewResult = await readCommerceRecordPreviews(storeId!, runId!);
+      } catch (error) {
+        console.error("[migration-reconciliation] Record previews unavailable", error instanceof Error ? error.name : "unknown error");
+      }
+    }
     const safe = sanitizeReconciliationSnapshot(snapshot, {
       allowDemoFixture: query.data.demo === "1",
       decorateRecord: verifiedRun ? (record) => ({

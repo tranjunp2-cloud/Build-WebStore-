@@ -97,6 +97,25 @@ describe("[TC-F40-14-03] F42 ledger reconciliation API", () => {
     expect(body.data.records[0].preview).toEqual({ label: 'Tên sản phẩm', pw1: 'Fresh Passion Fruits', pw2: 'Fresh Passion Fruits', status: 'match' });
     expect(body.data.fieldGeneration).toEqual({ generationId: GEN_ID, digest: DIGEST });
   });
+  it("TC-F40-14-07: keeps the ledger when the preview query fails", async () => {
+    // Arrange
+    const record = { sourceEntity: 'products', sourceId: '41603', targetIds: ['1417'] };
+    mocks.getSnapshot.mockResolvedValueOnce({ evidence: { available: true, mode: 'verified' }, records: [record] });
+    mocks.readCommerceRecordPreviews.mockRejectedValueOnce(new Error('F42 schema drift'));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const request = new NextRequest(`http://localhost/api/qa/migration-reconciliation?scope=commerce&store_id=205&run_id=${RUN_ID}`);
+
+    // Act
+    const response = await reconciliationGet(request);
+    const body = await response.json();
+
+    // Assert
+    expect(response.status).toBe(200);
+    expect(body.data.records).toHaveLength(1);
+    expect(body.data.records[0].preview).toBeUndefined();
+    expect(body.data.records[0].reference).toMatch(/^[a-f0-9]{32}$/);
+    errorSpy.mockRestore();
+  });
   it("TC-F40-14-07: joins Discount mapping to promotion-code evidence", async () => {
     // Arrange
     const record = { sourceEntity: 'discounts', sourceId: '13', targetIds: ['1'] };
