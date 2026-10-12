@@ -51,7 +51,8 @@ describe('[TC-F40-14-08] Commerce source coverage request lifecycle', () => {
     fireEvent.click(screen.getByText(/Xem từng trường và lọc kết quả/));
     fireEvent.click(screen.getByRole('button', { name: /Chưa hỗ trợ/ }));
     await waitFor(() => expect(fieldRequests()).toHaveLength(2));
-    fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
+    // The pager renders only after the filtered response arrives, so wait for it.
+    fireEvent.click(await screen.findByRole('button', { name: 'Trang sau' }));
     await waitFor(() => expect(fieldRequests()).toHaveLength(3));
 
     // Assert
