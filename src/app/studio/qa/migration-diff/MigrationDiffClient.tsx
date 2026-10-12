@@ -2844,12 +2844,19 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
             {/* Modal Body Area */}
             {activeViewTab === "commerce_reconciliation" || activeViewTab === "settings_reconciliation" ? (
               <div className="min-h-0 flex-1 overflow-y-auto" data-testid="migration-reconciliation-scroll">
-              {live && reconciliationSourceStoreId === activeStoreId && <FieldEvidencePanel
-                key={`${activeStoreId}-${activeViewTab}`}
-                store={reconciliationSourceStoreId}
-                scope={activeViewTab === 'commerce_reconciliation' ? 'commerce' : 'settings'}
-                refresh={reconciliationRefresh}
-              />}
+              {live && !reconciliationDemo && reconciliationSourceStoreId === activeStoreId && (
+                reconciliationRunId || activeViewTab === 'commerce_reconciliation'
+                  ? <FieldEvidencePanel
+                    key={`${activeStoreId}-${activeViewTab}-${reconciliationRunId ?? 'no-run'}-${reconciliationRefresh}`}
+                    store={reconciliationSourceStoreId}
+                    scope={activeViewTab === 'commerce_reconciliation' ? 'commerce' : 'settings'}
+                    refresh={reconciliationRefresh}
+                    selectedRunId={reconciliationRunId}
+                  />
+                  : <p className="m-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100" role="status">
+                    Chưa chọn được migration run VERIFIED để xem bằng chứng từng trường.
+                  </p>
+              )}
               <ReconciliationInspector
                 scope={activeViewTab === "commerce_reconciliation" ? "commerce" : "settings"}
                 snapshot={reconciliationSnapshot}

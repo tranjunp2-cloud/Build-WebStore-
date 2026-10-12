@@ -14,6 +14,8 @@ created: 2026-09-10
 
 # US-F40-14 — Đối soát migration Commerce và Settings
 
+> **Cập nhật 2026-10-09:** Phần hoàn thiện Commerce toàn nguồn trước lọc, so sánh giá trị field và gate QC được lập chi tiết tại [kế hoạch F40 Commerce toàn nguồn](../261009-1146-f40-commerce-full-reconciliation/plan.md). Các phase Commerce/UI trong tài liệu này là baseline lịch sử, không phải một luồng triển khai song song với kế hoạch mới. Phần Settings và điều kiện hoàn thành toàn bộ US-F40-14 vẫn theo dõi riêng ở đây; không coi Commerce-ready là hoàn thành Settings hoặc cutover.
+
 ## Overview
 
 Mở rộng Migration Inspector để Tester đối soát toàn bộ lịch sử dữ liệu PW1 → PW2 theo hai phần:

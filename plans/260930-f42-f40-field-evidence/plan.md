@@ -13,6 +13,8 @@ tags: [f42, f40, migration, reconciliation, evidence, qa]
 
 # Kế hoạch F42 → F40 field evidence
 
+> **Tích hợp Commerce 2026-10-09:** [Kế hoạch F40 Commerce toàn nguồn](../261009-1146-f40-commerce-full-reconciliation/plan.md) tiêu thụ source sidecar, generation và comparator từ Phase 01–07/09 của kế hoạch này. Phase contract/API/UI của F40 có thể bắt đầu độc lập; nghiệm thu dữ liệu thật phụ thuộc producer và handoff staging. Kế hoạch F40 không thay thế Phase 10 hoặc tự kết luận toàn bộ migration/cutover đạt.
+
 > **Trạng thái triển khai 2026-10-01:** Xem [checklist đóng gap theo yêu cầu QC](qc-gap-closure-implementation.md) trước khi thực hiện phase tiếp theo. Code hiện tại chỉ giữ phần migration/F42; các trang/API Studio F40 đã được gỡ và thuộc nhánh F40 riêng. Không coi các phase bên dưới là đã hoàn thành chỉ vì local synthetic fixture trả đủ sáu nhãn status.
 
 Tracking issue: [#1905](https://github.com/primeproduction/ech-prime-web-v2/issues/1905). Các phase triển khai cần issue/PR riêng theo quy ước 1 US = 1 branch = 1 PR; #1905 theo dõi acceptance tổng thể và gate QC.

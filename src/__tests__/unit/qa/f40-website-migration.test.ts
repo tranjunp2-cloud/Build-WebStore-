@@ -8,18 +8,38 @@ import { fieldEvidenceRates, needsFieldReview } from '@/lib/admin/qa/field-evide
 
 describe('[TC-F40-MIG-LIVE-08] field evidence rates', () => {
   it('reserves 100 percent for exact match and complete coverage', () => {
+    // Arrange
     const counts = { match: 19999, mismatch: 1, missing: 0, duplicate: 0, unsupported: 0, unverified: 0 };
-    expect(fieldEvidenceRates(counts).matchRate).toBe(99.9);
+
+    // Act
+    const rates = fieldEvidenceRates(counts);
+
+    // Assert
+    expect(rates.matchExpected).toBe(99.9);
+    expect(rates.matchRate).toBe(99.9);
     expect(fieldEvidenceRates({ ...counts, mismatch: 0, unverified: 1 }).coverage).toBe(99.9);
-    expect(fieldEvidenceRates({ ...counts, mismatch: 0 })).toEqual({ total: 19999, checked: 19999, coverage: 100, matchRate: 100 });
+    expect(fieldEvidenceRates({ ...counts, mismatch: 0 })).toEqual({ total: 19999, checked: 19999, coverage: 100, matchRate: 100, matchExpected: 100 });
   });
   it('does not inflate coverage by excluding unsupported or unverified fields', () => {
+    // Arrange
     const counts = { match: 76, mismatch: 2, missing: 1, duplicate: 1, unsupported: 15, unverified: 5 };
-    expect(fieldEvidenceRates(counts)).toEqual({ total: 100, checked: 80, coverage: 80, matchRate: 95 });
+
+    // Act
+    const rates = fieldEvidenceRates(counts);
+
+    // Assert
+    expect(rates).toEqual({ total: 100, checked: 80, coverage: 80, matchRate: 95, matchExpected: 76 });
   });
   it('does not claim pass when nothing was checked or evidence is unavailable', () => {
-    expect(fieldEvidenceRates({ match: 0, mismatch: 0, missing: 0, duplicate: 0, unsupported: 5, unverified: 1 }).matchRate).toBeNull();
-    expect(fieldEvidenceRates({ match: 0, mismatch: 0, missing: 0, duplicate: 0, unsupported: 0, unverified: 0 }).coverage).toBeNull();
+    // Arrange / Act
+    const unchecked = fieldEvidenceRates({ match: 0, mismatch: 0, missing: 0, duplicate: 0, unsupported: 5, unverified: 1 });
+    const empty = fieldEvidenceRates({ match: 0, mismatch: 0, missing: 0, duplicate: 0, unsupported: 0, unverified: 0 });
+
+    // Assert
+    expect(unchecked.matchRate).toBeNull();
+    expect(unchecked.matchExpected).toBe(0);
+    expect(empty.coverage).toBeNull();
+    expect(empty.matchExpected).toBeNull();
     expect(needsFieldReview(null)).toBe(true);
   });
 });

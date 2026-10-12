@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Database, ShieldCheck } from "lucide-react";
+import { RecordFieldEvidencePanel } from "./RecordFieldEvidencePanel";
 import type {
   ReconciliationIssue,
   ReconciliationRecord,
@@ -108,6 +109,7 @@ export function ReconciliationInspector({
   const [onlyIssues, setOnlyIssues] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<ReconciliationRecord | null>(null);
+  const detailRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     setFeature("overview");
     setStatus("all");
@@ -116,6 +118,13 @@ export function ReconciliationInspector({
     setPage(1);
     setSelected(null);
   }, [scope]);
+  useEffect(() => { setSelected(null); }, [sourceStoreId, runId]);
+  useEffect(() => {
+    if (selected) {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      detailRef.current?.focus({ preventScroll: true });
+    }
+  }, [selected]);
   const nav =
     scope === "commerce"
       ? [
@@ -142,7 +151,7 @@ export function ReconciliationInspector({
           (feature === "overview" || record.sourceEntity === feature) &&
           (status === "all" || record.status === status) &&
           (!onlyIssues || record.status !== "match") &&
-          `${record.label} ${record.sourceId} ${record.targetIds.join(" ")}`
+          `${record.label} ${record.sourceId} ${record.targetIds.join(" ")} ${record.preview?.pw1 ?? ''} ${record.preview?.pw2 ?? ''}`
             .toLocaleLowerCase()
             .includes(query.trim().toLocaleLowerCase()),
       ),
@@ -188,11 +197,12 @@ export function ReconciliationInspector({
           <div>
             <h3 className="flex gap-2 font-bold text-white">
               <ShieldCheck className="size-5 text-blue-400" />
-              Đối soát migration{" "}
-              {scope === "commerce" ? "Commerce" : "Settings"}
+              {scope === "commerce" ? "Liên kết bản ghi PW1 → PW2" : "Đối soát migration Settings"}
             </h3>
             <p className="mt-1 text-xs text-slate-400">
-              Chỉ kết luận khi có mapping định danh PW1 → PW2 đã xác nhận.
+              {scope === "commerce"
+                ? "Các số bên dưới chỉ tính bản ghi có trong ledger của run này. Liên kết đúng ID chưa chứng minh giá trị từng trường khớp; xem phần đối chiếu phía trên."
+                : "Chỉ kết luận khi có mapping định danh PW1 → PW2 đã xác nhận."}
             </p>
           </div>
           <label className="flex items-center gap-2 text-xs text-slate-300">
@@ -241,7 +251,13 @@ export function ReconciliationInspector({
           <p className="mt-1 text-xs text-slate-400">Không hiển thị source ID, dữ liệu cá nhân hoặc chi tiết exception.</p>
           {issuesLoading ? <p className="mt-3 text-xs text-slate-400" role="status" aria-live="polite">Đang tải issue…</p> : null}
           {issuesError ? <p className="mt-3 text-xs text-rose-300" role="alert">Không tải được issue: {issuesError}</p> : null}
-          {!issuesLoading && !issuesError && !issues.length ? <p className="mt-3 text-xs text-emerald-300" role="status" aria-live="polite">Không có issue mở.</p> : null}
+          {!issuesLoading && !issuesError && !issues.length ? (
+            <p className={`mt-3 text-xs ${error || !snapshot?.evidence.available ? "text-amber-200" : "text-emerald-300"}`} role="status" aria-live="polite">
+              {error || !snapshot?.evidence.available
+                ? "Không có issue trong dữ liệu đã tải; chưa thể kết luận vì mapping chưa khả dụng."
+                : "Không có issue mở trong migration run này."}
+            </p>
+          ) : null}
           {!issuesLoading && !issuesError && issues.length ? (
             <ul className="mt-3 space-y-2">
               {issues.map((issue) => (
@@ -259,18 +275,19 @@ export function ReconciliationInspector({
       ) : null}
       <section className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {[
-          ["Tổng PW1", snapshot?.summary.pw1Total ?? 0, "text-white"],
-          ["Đã map PW2", snapshot?.summary.pw2Total ?? 0, "text-sky-200"],
-          ["Bản ghi cần kiểm tra", recordsNeedingReview, "text-amber-200"],
-          ["Issue mở", openIssueTotal, "text-rose-200"],
-          ["Chưa có mapping", snapshot?.summary.unverified ?? 0, "text-slate-300"],
+          [scope === "commerce" ? "Bản ghi trong ledger" : "Tổng PW1", snapshot?.summary.pw1Total ?? 0, "text-white"],
+          [scope === "commerce" ? "Liên kết PW2 xác nhận" : "Đã map PW2", snapshot?.summary.pw2Total ?? 0, "text-sky-200"],
+          [scope === "commerce" ? "Mapping cần kiểm tra" : "Bản ghi cần kiểm tra", recordsNeedingReview, "text-amber-200"],
+          [scope === "commerce" ? "Exception mở" : "Issue mở", openIssueTotal, "text-rose-200"],
+          [scope === "commerce" ? "Mapping chưa xác nhận" : "Chưa có mapping", snapshot?.summary.unverified ?? 0, "text-slate-300"],
         ].map(([label, count, className]) => (
           <div key={String(label)} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
             <p className="text-[11px] text-slate-500">{label}</p>
-            <p className={`mt-1 text-xl font-bold ${className}`}>{snapshot ? count : "—"}</p>
+            <p className={`mt-1 text-xl font-bold ${className}`}>{snapshot?.evidence.available && !error ? count : "—"}</p>
           </div>
         ))}
       </section>
+      {scope === "commerce" && !isDemo && <p className="text-xs leading-5 text-slate-400">Các số 0 chỉ áp dụng cho bản ghi ledger và exception của run này; chưa kiểm tra mọi bản ghi nguồn hoặc lỗi từng trường. Bảng hiển thị ID nội bộ và giá trị đã lưu trong evidence F42. Snapshot hiện tại không lưu tên, email, số điện thoại Customer dạng hiển thị.</p>}
       <nav className="flex gap-1 overflow-x-auto">
         {nav.map(([key, label]) => (
           <button
@@ -324,7 +341,7 @@ export function ReconciliationInspector({
               setPage(1);
             }}
           />
-          Chỉ lỗi/cần kiểm tra
+          {scope === "commerce" && isLedgerEvidence ? "Chỉ mapping cần kiểm tra" : "Chỉ lỗi/cần kiểm tra"}
         </label>
         <input
           aria-label="Tìm dữ liệu đối soát"
@@ -333,7 +350,7 @@ export function ReconciliationInspector({
             setQuery(event.target.value);
             setPage(1);
           }}
-          placeholder="Tìm mã PW1/PW2 hoặc tên"
+          placeholder={scope === "commerce" && isLedgerEvidence ? "Tìm ID PW1/PW2 hoặc giá trị hiển thị" : "Tìm mã PW1/PW2 hoặc tên"}
           className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-white placeholder:text-slate-500"
         />
       </div>
@@ -346,18 +363,22 @@ export function ReconciliationInspector({
           <p className="p-8 text-center text-sm text-slate-400" role="status" aria-live="polite">Đang tải…</p>
         ) : records.length === 0 ? (
           <p className="p-8 text-center text-sm text-slate-400" role="status" aria-live="polite">
-            Chưa có record có evidence để đối soát.
+            {error || !snapshot?.evidence.available
+              ? "Chưa có dữ liệu mapping khả dụng để đối soát."
+              : isLedgerEvidence && scope === "commerce"
+                ? "Không có mapping trong ledger cho nhóm và bộ lọc này; điều đó không chứng minh PW1 không có bản ghi."
+                : "Không có bản ghi trong phạm vi và bộ lọc hiện tại."}
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-xs">
+            <table className={`w-full text-left text-xs ${isLedgerEvidence && scope === "commerce" ? "min-w-[600px]" : "min-w-[760px]"}`}>
               <thead className="bg-slate-900 text-slate-400">
                 <tr>
-                  <th className="p-3">Nhóm</th>
-                  <th className="p-3">Dữ liệu PW1</th>
-                  <th className="p-3">Bản ghi PW2</th>
-                  <th className="p-3">Kết quả</th>
-                  <th className="p-3">Lý do</th>
+                  <th scope="col" className="p-3">Nhóm</th>
+                    <th scope="col" className="p-3">Dữ liệu PW1</th>
+                    <th scope="col" className="p-3">Dữ liệu PW2</th>
+                  <th scope="col" className="p-3">{isLedgerEvidence && scope === "commerce" ? "Trạng thái liên kết" : "Kết quả"}</th>
+                  {!(isLedgerEvidence && scope === "commerce") && <th scope="col" className="p-3">Lý do</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
@@ -371,13 +392,21 @@ export function ReconciliationInspector({
                       {LABELS[record.sourceEntity]}
                     </td>
                     <td className="p-3 font-medium text-white">
-                      {record.label}
-                      <small className="block font-mono text-slate-500">
-                        PW1: {record.sourceId}
-                      </small>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); setSelected(record); }}
+                        className="text-left hover:text-sky-300 focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+                        aria-label={`Xem chi tiết ${LABELS[record.sourceEntity]} PW1 ${record.sourceId}`}>
+                        {isLedgerEvidence && scope === "commerce" ? <span className="font-mono">PW1: {record.sourceId}</span>
+                          : <>{record.label}<small className="block font-mono text-slate-500">PW1: {record.sourceId}</small></>}
+                      </button>
+                      {isLedgerEvidence && record.preview?.pw1 != null && <span className="mt-1 block max-w-[25rem] break-words text-slate-300">{record.preview.label}: {record.preview.pw1 || 'Chuỗi rỗng'}</span>}
                     </td>
                     <td className="p-3 font-mono text-slate-300">
-                      {record.targetIds.length ? record.targetIds.join(", ") : "—"}
+                      {record.targetIds.length ? `${isLedgerEvidence && scope === "commerce" ? "PW2: " : ""}${record.targetIds.join(", ")}` : "—"}
+                      {isLedgerEvidence && record.preview?.pw2 != null && <span className="mt-1 block max-w-[25rem] break-words font-sans">{record.preview.label}: {record.preview.pw2 || 'Chuỗi rỗng'}</span>}
+                      {isLedgerEvidence && record.preview && <span className={`mt-1 block text-xs font-sans ${record.preview.status === 'match' ? 'text-emerald-300' : 'text-amber-200'}`}>
+                        Trường gợi ý: {record.preview.status === 'match' ? 'khớp' : statusMeta(record.preview.status).label.toLowerCase()}
+                        {record.preview.explanation ? ` · ${record.preview.explanation}` : ''}
+                      </span>}
                     </td>
                     <td className="p-3">
                       <span
@@ -386,11 +415,9 @@ export function ReconciliationInspector({
                       >
                         {statusMeta(record.status).label}
                       </span>
-                      <p className="mt-1 text-[10px] text-slate-500">
-                        {statusMeta(record.status).copy}
-                      </p>
+                      {!(isLedgerEvidence && scope === "commerce") && <p className="mt-1 text-[10px] text-slate-500">{statusMeta(record.status).copy}</p>}
                     </td>
-                    <td className="p-3 text-slate-400">{record.reason}</td>
+                    {!(isLedgerEvidence && scope === "commerce") && <td className="p-3 text-slate-400">{record.reason}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -406,9 +433,9 @@ export function ReconciliationInspector({
         ) : null}
       </section>
       {selected && (
-        <section className="rounded-2xl border border-slate-700 bg-slate-950 p-5">
+        <section ref={detailRef} tabIndex={-1} className="rounded-2xl border border-slate-700 bg-slate-950 p-5 outline-none">
           <div className="flex justify-between">
-            <h4 className="font-bold text-white">{selected.label}</h4>
+            <h4 className="font-bold text-white">{isLedgerEvidence && scope === "commerce" ? `${LABELS[selected.sourceEntity]} PW1: ${selected.sourceId}` : selected.label}</h4>
             <button
               onClick={() => setSelected(null)}
               className="text-xs text-slate-400"
@@ -471,10 +498,16 @@ export function ReconciliationInspector({
               </table>
             </div>
           ) : null}
-          <div className="mt-4 space-y-3">
+          {isLedgerEvidence && scope === "commerce" ? (
+            selected.reference && runId && snapshot?.fieldGeneration ? <RecordFieldEvidencePanel
+              key={`${sourceStoreId}-${runId}-${selected.reference}-${snapshot.fieldGeneration.generationId}-${snapshot.fieldGeneration.digest}`}
+              storeId={sourceStoreId} runId={runId} reference={selected.reference}
+              version={snapshot.fieldGeneration}
+            /> : <p className="mt-4 text-xs text-amber-200">Chưa có generation field evidence hợp lệ cho bản ghi này. Tải lại run để kiểm tra.</p>
+          ) : <div className="mt-4 space-y-3">
             {sections.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                Chưa có field để hiển thị.
+              <p className="text-xs text-slate-400">
+                Ledger chỉ xác nhận liên kết ID cho bản ghi này; chưa có kết quả so sánh từng trường gắn trực tiếp với dòng này. Xem khối đối chiếu trường phía trên để điều tra bằng chứng hiện có.
               </p>
             ) : (
               sections.map(([section, fields], index) => (
@@ -538,7 +571,7 @@ export function ReconciliationInspector({
                 </details>
               ))
             )}
-          </div>
+          </div>}
         </section>
       )}
     </div>

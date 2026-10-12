@@ -133,13 +133,34 @@ describe("[TC-F40-14-01][TC-F40-14-03] Migration reconciliation evidence boundar
 
     // Assert
     expect(sanitized.records[0]).toEqual(expect.objectContaining({
-      sourceId: "PW1 record",
+      sourceId: "PW1 record #1",
       targetIds: [],
-      label: "Bản ghi đã che dữ liệu",
+      label: "Tên/chi tiết đã ẩn",
       status: "unverified",
     }));
     expect(sanitized.summary.match).toBe(0);
     expect(sanitized.summary.unverified).toBe(1);
+  });
+
+  it("TC-F40-14-01: shows valid internal Commerce IDs to Super Admin while withholding names and malformed IDs", () => {
+    // Arrange
+    const snapshot = createDemoReconciliationSnapshot({ scope: "commerce", storeId: "205" });
+    snapshot.evidence = { available: true, mode: "verified", contractVersion: "v1", message: "ignored" };
+    snapshot.records = [
+      { sourceEntity: "products", sourceId: "451", targetCollection: "products", targetIds: ["712"], label: "secret product name", status: "match", reason: "ignored", fields: [] },
+      { sourceEntity: "customers", sourceId: "18591", targetCollection: "customers", targetIds: ["932"], label: "Private Customer", status: "match", reason: "ignored", fields: [] },
+      { sourceEntity: "orders", sourceId: "order@example.test", targetCollection: "orders", targetIds: ["933"], label: "ignored", status: "unverified", reason: "ignored", fields: [] },
+    ];
+
+    // Act
+    const sanitized = sanitizeReconciliationSnapshot(snapshot);
+
+    // Assert
+    expect(sanitized.records[0]).toMatchObject({ sourceId: "451", targetIds: ["712"], label: "Tên/chi tiết đã ẩn" });
+    expect(sanitized.records[1]).toMatchObject({ sourceId: "18591", targetIds: ["932"], label: "Tên/chi tiết đã ẩn" });
+    expect(JSON.stringify(sanitized.records)).not.toContain("Private Customer");
+    expect(JSON.stringify(sanitized.records)).not.toContain("order@example.test");
+    expect(sanitized.records[2].sourceId).toBe("PW1 record #3");
   });
 
   it("TC-F40-14-01: never counts an unverified candidate as a mapped PW2 record", () => {

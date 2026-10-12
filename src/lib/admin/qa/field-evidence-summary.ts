@@ -13,14 +13,21 @@ export function fieldEvidenceRates(counts: FieldCounts) {
     total, checked,
     coverage: percentage(checked, total),
     matchRate: percentage(counts.match, checked),
+    matchExpected: percentage(counts.match, total),
   };
 }
 export type FieldEvidenceSummary = {
   generationId: string;
+  snapshotId?: string;
   runId: string;
   digest: string;
   verifiedAt: string;
   sourceSnapshotAt: string | null;
+  sourceSnapshotId?: string | null;
+  sourceInstance?: string;
+  targetInstance?: string;
+  registryVersion?: string | null;
+  targetDriftCheck?: string | null;
   counts: FieldCounts;
   outsideScope: number;
   outsideComparison: number;
@@ -33,7 +40,37 @@ export function needsFieldReview(summary: FieldEvidenceSummary | null | undefine
 }
 export type FieldEvidenceResult = {
   summary: FieldEvidenceSummary | null;
-  rows: Array<{ key: string; record: string; status: FieldStatus; reason: string; source: string | null; target: string | null; disposition: string }>;
+  byEntity?: Partial<Record<'products' | 'orders' | 'discounts' | 'customers', FieldCounts>>;
+  rows: Array<{ key: string; record: string; status: FieldStatus; reason: string; source: string | null; target: string | null; sourcePresence?: 'absent' | 'null' | 'empty' | 'value' | null; disposition: string }>;
   total: number;
   page: number;
+};
+
+export type RecordFieldEvidenceResult = {
+  state: 'complete' | 'unavailable';
+  reason: string | null;
+  runId: string;
+  generationId: string | null;
+  snapshotId: string | null;
+  sourceSnapshotAt: string | null;
+  verifiedAt: string | null;
+  counts: FieldCounts;
+  total: number;
+  page: number;
+  rows: Array<{
+    entity: string;
+    sourceRecord: string;
+    key: string;
+    targetKey: string | null;
+    elementKey: string;
+    source: string | null;
+    target: string | null;
+    displayAllowed: boolean;
+    sourcePresence: 'absent' | 'null' | 'empty' | 'value' | null;
+    status: FieldStatus;
+    reason: string;
+    transform: string;
+    disposition: string;
+    targetIdentityMatchesLedger: boolean | null;
+  }>;
 };
