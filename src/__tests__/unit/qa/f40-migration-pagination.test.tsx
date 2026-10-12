@@ -29,7 +29,7 @@ const requestedUrls = (request: ReturnType<typeof vi.fn>) => request.mock.calls.
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-describe('[TC-F40-MIG-LIVE-16] pageWindow', () => {
+describe('[TC-F40-MIG-LIVE-17] pageWindow', () => {
   it('keeps a window around the current page and marks both gaps', () => {
     // Arrange: a catalog large enough to leave pages hidden on both sides.
     // Act + Assert
@@ -50,7 +50,7 @@ describe('[TC-F40-MIG-LIVE-16] pageWindow', () => {
   });
 });
 
-describe('[TC-F40-MIG-LIVE-16] MigrationPagination', () => {
+describe('[TC-F40-MIG-LIVE-17] MigrationPagination', () => {
   it('disables previous on the first page and emits the next page once', () => {
     // Arrange
     const onChange = vi.fn();
@@ -84,7 +84,7 @@ describe('[TC-F40-MIG-LIVE-16] MigrationPagination', () => {
   });
 });
 
-describe('[TC-F40-MIG-LIVE-16] live catalog pagination', () => {
+describe('[TC-F40-MIG-LIVE-17] live catalog pagination', () => {
   it('requests only the visible page and navigates pages on the server', async () => {
     // Arrange: a two-page live catalog (30 stores at the default page size 15).
     const request = vi.fn(async (input: RequestInfo | URL) =>
@@ -123,7 +123,7 @@ describe('[TC-F40-MIG-LIVE-16] live catalog pagination', () => {
     expect(committed).toContain('search=alpha');
   });
 
-  it('[TC-F40-MIG-LIVE-10] summary cards keep whole-catalog counts while search filters the page', async () => {
+  it('[TC-F40-MIG-LIVE-17] summary cards keep whole-catalog counts while search filters the page', async () => {
     // Arrange: the catalog has 30 stores but the search page returns only 1.
     const request = vi.fn(async (input: RequestInfo | URL) => {
       const searched = String(input).includes('search=');
