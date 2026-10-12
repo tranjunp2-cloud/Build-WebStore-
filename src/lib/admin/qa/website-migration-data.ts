@@ -88,7 +88,7 @@ export async function readWebsiteMigrations(input: {
   );
   const where = sql`(${input.batch ?? null}::uuid IS NULL OR EXISTS (SELECT 1 FROM pw1_migration_attempts x WHERE x.source_store_id=source.source_store_id AND x.batch_id=${input.batch ?? null}::uuid) OR EXISTS(SELECT 1 FROM pw1_migration_batches b CROSS JOIN LATERAL jsonb_array_elements(b.results) r WHERE b.id=${input.batch ?? null}::uuid AND r->>'sourceStoreId'=source.source_store_id))
         AND (${input.run ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM pw1_migration_batches b WHERE b.limits->'qaInput'->>'runId'=${input.run ?? null} AND (EXISTS(SELECT 1 FROM pw1_migration_attempts x WHERE x.batch_id=b.id AND x.source_store_id=source.source_store_id) OR EXISTS(SELECT 1 FROM jsonb_array_elements(b.results) r WHERE r->>'sourceStoreId'=source.source_store_id))))
-        AND (${input.search}='' OR source.source_store_id ILIKE ${"%" + input.search + "%"} OR COALESCE(s.name,'Website PW1 #' || source.source_store_id) ILIKE ${"%" + input.search + "%"})`;
+        AND (${input.search}='' OR source.source_store_id ILIKE ${"%" + input.search + "%"} OR COALESCE(s.name,'Website PW1 #' || source.source_store_id) ILIKE ${"%" + input.search + "%"} OR t.slug ILIKE ${"%" + input.search + "%"})`;
   const rows = await execute<
     MigrationStore & {
       total: number;
@@ -98,6 +98,9 @@ export async function readWebsiteMigrations(input: {
       unpublished: number;
       needsAttention: number;
       unverifiedQc: number;
+      qcPassed: number;
+      qcWarning: number;
+      qcFailed: number;
       allTotal: number;
       notStarted: number;
       running: number;
@@ -124,7 +127,7 @@ export async function readWebsiteMigrations(input: {
           LEFT JOIN LATERAL(SELECT * FROM pw1_migration_qa_reviews WHERE source_store_id=m.source_store_id ORDER BY reviewed_at DESC,id DESC LIMIT 1)r ON true
           WHERE ${where}
         ), stats AS (
-          SELECT count(*)::integer AS "allTotal", count(*) FILTER (WHERE migration='pending')::integer AS "notStarted", count(*) FILTER (WHERE migration='running')::integer AS running, count(*) FILTER (WHERE migration='failed')::integer AS failed, count(*) FILTER (WHERE migration='completed')::integer AS completed, count(*) FILTER (WHERE publish='published')::integer AS published, count(*) FILTER (WHERE migration<>'completed')::integer AS "migrationIncomplete", count(*) FILTER (WHERE publish<>'published')::integer AS unpublished, count(*) FILTER (WHERE "auditStatus" IN ('not-checked','historical','stale') OR errors+warnings>0)::integer AS "needsAttention", count(*) FILTER (WHERE "qcStatus"='unverified')::integer AS "unverifiedQc" FROM catalog
+          SELECT count(*)::integer AS "allTotal", count(*) FILTER (WHERE migration='pending')::integer AS "notStarted", count(*) FILTER (WHERE migration='running')::integer AS running, count(*) FILTER (WHERE migration='failed')::integer AS failed, count(*) FILTER (WHERE migration='completed')::integer AS completed, count(*) FILTER (WHERE publish='published')::integer AS published, count(*) FILTER (WHERE migration<>'completed')::integer AS "migrationIncomplete", count(*) FILTER (WHERE publish<>'published')::integer AS unpublished, count(*) FILTER (WHERE "auditStatus" IN ('not-checked','historical','stale') OR errors+warnings>0)::integer AS "needsAttention", count(*) FILTER (WHERE "qcStatus"='unverified')::integer AS "unverifiedQc", count(*) FILTER (WHERE "qcStatus"='passed')::integer AS "qcPassed", count(*) FILTER (WHERE "qcStatus"='warning')::integer AS "qcWarning", count(*) FILTER (WHERE "qcStatus"='failed')::integer AS "qcFailed" FROM catalog
         ), catalog_version AS (
           SELECT md5(${scope?.sourceInstance ?? 'legacy'} || ':' || ${scope?.targetInstance ?? 'legacy'} || ':' ||
             COALESCE(string_agg("storeId" || ':' || migration || ':' || COALESCE("updatedAt"::text,''), ',' ORDER BY "storeId"),'')) AS "catalogVersion" FROM catalog
@@ -134,7 +137,7 @@ export async function readWebsiteMigrations(input: {
             AND (${input.qc}='all' OR "qcStatus"=${input.qc})
         ), filtered_stats AS (
           SELECT count(*)::integer AS total FROM filtered
-        ) SELECT page.*,filtered_stats.total,stats.completed,stats.published,stats."migrationIncomplete",stats.unpublished,stats."needsAttention",stats."unverifiedQc",stats."allTotal",stats."notStarted",stats.running,stats.failed,catalog_version."catalogVersion"
+        ) SELECT page.*,filtered_stats.total,stats.completed,stats.published,stats."migrationIncomplete",stats.unpublished,stats."needsAttention",stats."unverifiedQc",stats."qcPassed",stats."qcWarning",stats."qcFailed",stats."allTotal",stats."notStarted",stats.running,stats.failed,catalog_version."catalogVersion"
         FROM stats CROSS JOIN filtered_stats CROSS JOIN catalog_version
         LEFT JOIN LATERAL (
           SELECT filtered.*
@@ -167,6 +170,7 @@ export async function readWebsiteMigrations(input: {
       unpublished: rows[0]?.unpublished ?? 0,
       needsAttention: rows[0]?.needsAttention ?? 0,
       unverifiedQc: rows[0]?.unverifiedQc ?? 0,
+      qc: { passed: rows[0]?.qcPassed ?? 0, warning: rows[0]?.qcWarning ?? 0, failed: rows[0]?.qcFailed ?? 0, unverified: rows[0]?.unverifiedQc ?? 0 },
     },
     stores: stores.map(store => ({ ...store, fieldEvidence: fieldSummaries.get(store.storeId) ?? null, websiteComparison: websiteSummaries.get(store.storeId) ?? null })),
     total: rows[0]?.total ?? 0,
