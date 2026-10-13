@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import sharp from 'sharp'
 import { uploadImageBuffer } from '@/lib/ai/upload-media'
 import type { Payload } from 'payload'
 import { importPw1BlockMedia, validatePw1MediaUrl } from '@/lib/migration/pw1-media'
@@ -53,4 +54,41 @@ describe('[TC-F35.M12] Source media URL boundary', () => {
         expect(fetchMock.mock.calls[0][1].headers['User-Agent']).toMatch(/^Mozilla\//)
         expect(block.html).toContain('src="https://destination.example/hosted.png"')
     })
+    describe('[TC-F35.M67] placeholder results never stick', () => {
+        const realPng = () => sharp({ create: { width: 4, height: 4, channels: 3, background: '#336699' } }).png().toBuffer()
+        const makePayload = (cachedRow?: Record<string, unknown>) => {
+            const execute = vi.fn().mockResolvedValue({ rows: cachedRow ? [cachedRow] : [] })
+            const payload = { db: { drizzle: { execute } }, find: vi.fn().mockResolvedValue({ docs: [] }), findByID: vi.fn().mockResolvedValue({ url: 'https://destination.example/new.png' }) } as unknown as Payload
+            return { payload, execute }
+        }
+        beforeEach(() => vi.mocked(uploadImageBuffer).mockClear())
+        afterEach(() => vi.unstubAllGlobals())
+
+        it('does not register a placeholder in the URL cache, so the next run retries the download', async () => {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('blocked', { status: 403 })))
+            const { payload, execute } = makePayload()
+            const block = { html: '<img src="https://blocked.example/a.png">' }
+            await importPw1BlockMedia([[block]], 830, payload)
+            expect(vi.mocked(uploadImageBuffer).mock.calls[0][2]).toMatch(/-placeholder\.jpg$/)
+            expect(execute).toHaveBeenCalledTimes(1) // only the cache lookup, no INSERT
+        })
+        it('retries a cached placeholder and caches the real image under a new filename', async () => {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(await realPng(), { headers: { 'content-type': 'image/png' } })))
+            const { payload, execute } = makePayload({ media_id: 5, mime_type: 'image/png', width: 960, height: 640 })
+            const block = { html: '<img src="https://cdn.example/a.png">' }
+            await importPw1BlockMedia([[block]], 830, payload)
+            expect(vi.mocked(uploadImageBuffer).mock.calls[0][2]).toMatch(/r\.jpg$/)
+            expect(execute).toHaveBeenCalledTimes(2) // lookup + INSERT of the real image
+            expect(block.html).toContain('https://destination.example/new.png')
+        })
+        it('keeps reusing a cached real image without downloading again', async () => {
+            const fetchMock = vi.fn()
+            vi.stubGlobal('fetch', fetchMock)
+            const { payload } = makePayload({ media_id: 9, mime_type: 'image/jpeg', width: 1200, height: 600 })
+            await importPw1BlockMedia([[{ html: '<img src="https://cdn.example/a.png">' }]], 830, payload)
+            expect(fetchMock).not.toHaveBeenCalled()
+            expect(vi.mocked(uploadImageBuffer)).not.toHaveBeenCalled()
+        })
+    })
 })
+

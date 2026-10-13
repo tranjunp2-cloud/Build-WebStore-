@@ -55,6 +55,9 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 ### TC-F35.M66 — Footer variant for branded multi-column footers
 - [x] AUTO — A source footer with a tagline or contact details and three or more link columns is always bound to `dark-gradient`, regardless of the AI's choice; fewer columns or no brand block keep the AI choice.
 
+### TC-F35.M67 — Placeholder images are retried
+- [x] AUTO — A placeholder produced by a blocked/failed download is not cached by URL (next run retries it), and an already cached 960x640 placeholder is retried and replaced by the real image under a new filename; cached real images are reused without downloading.
+
 ### Rich text editor HTML compatibility
 - [x] AUTO TC-F35-RT-01: Tiptap retains PW1 container styles, headings, lists, image metadata and tables during an HTML edit round trip.
 - [x] AUTO TC-F35-RT-02: Editing text color replaces the prior color without removing unrelated span styles.
