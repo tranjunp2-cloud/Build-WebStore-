@@ -8,7 +8,7 @@ import { nativeBannerChoices } from '@/lib/migration/pw1-native-ai'
 
 const IMAGE = 'https://img.test/a.jpg'
 
-describe('[TC-F35.M28] migration only offers variants that render the source content', () => {
+describe('[TC-F35.M62] migration only offers variants that render the source content', () => {
   it.each(HeroConfigSchema.shape.variant.removeDefault().options)('hero variant %s image support matches the real component', variant => {
     const html = renderToStaticMarkup(<HeroBlock block={{ blockType: 'hero', variant, headline: 'H', ctaButtons: [], image: { url: IMAGE } } as never} /> as never)
     expect(html.includes('img.test'), `${variant} renders image`).toBe(HERO_VARIANT_RENDERS_IMAGE[variant])

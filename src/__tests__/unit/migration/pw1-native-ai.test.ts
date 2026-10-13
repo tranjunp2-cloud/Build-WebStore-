@@ -95,7 +95,7 @@ describe('[TC-F35.M18] AI chooses only existing PW2 blocks', () => {
         design.pages[0].sections[0] = { sourceId:'11', blockType:'hero', variant:'centered' }
         expect(bindNativeDesign(source, design).pages![0].blocks[1]).toMatchObject({blockType:'hero',variant:'centered',headline:'One',image:{url:'https://source.example/1.jpg'},ctaButtons:[{label:'Buy',url:'/products'}]})
     })
-    it('[TC-F35.M28] rejects the image-less fullscreen hero for a banner that has an image', () => {
+    it('[TC-F35.M62] rejects the image-less fullscreen hero for a banner that has an image', () => {
         const { source, design } = fixture()
         source.pages[0].components[0].block.sourceLayout!.size = 'hero'
         source.pages[0].components[0].block.slides!.pop()
@@ -175,7 +175,7 @@ it('[TC-F35.M18] does not pick the minimal footer when a single column carries s
 it.each([
     ['tagline', {tagline:'About us'}],
     ['contact info', {tagline:'', showContactInfo:true}],
-])('[TC-F35.M32] uses dark-gradient for a footer with %s and three link columns whatever AI chose', (_name, extra) => {
+])('[TC-F35.M66] uses dark-gradient for a footer with %s and three link columns whatever AI chose', (_name, extra) => {
     const {source, design} = fixture()
     const column = (title: string) => ({title, links:[{label:title,url:'/a'}]})
     const footer = {...source.site.footer, ...extra, columns:[column('A'), column('B'), column('C')]}
@@ -183,7 +183,7 @@ it.each([
         expect(bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant}).pages![0].blocks.at(-1)).toMatchObject({variant:'dark-gradient'})
 })
 
-it('[TC-F35.M32] keeps the AI footer choice when there are fewer than three columns or no brand block', () => {
+it('[TC-F35.M66] keeps the AI footer choice when there are fewer than three columns or no brand block', () => {
     const {source, design} = fixture()
     const column = (title: string) => ({title, links:[{label:title,url:'/a'}]})
     const twoColumns = {...source.site.footer, tagline:'About us', columns:[column('A'), column('B')]}

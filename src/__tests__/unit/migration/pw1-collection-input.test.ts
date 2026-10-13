@@ -498,7 +498,7 @@ it('[TC-F35.M27] retains an enabled banner CTA without inventing a destination',
     expect(contract.pages[0].components[0].block).toMatchObject({slides:[{ctaButtons:[{label:'GET STARTED',url:PW1_EMPTY_CTA_URL}]}]})
 })
 
-it('[TC-F35.M31] shows the store description and contact details in the footer brand block', () => {
+it('[TC-F35.M65] shows the store description and contact details in the footer brand block', () => {
     const input = fixture()
     const site = input[0].sites[0]
     const build = (extra: Record<string, unknown>) => {

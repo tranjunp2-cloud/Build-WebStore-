@@ -1,13 +1,10 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import sharp from 'sharp'
-import { downloadSourceImage } from '@/lib/migration/pw1-media'
+import { downloadSourceImage, registerBrowserImageFetcher } from '@/lib/migration/pw1-media'
 import { PW1_PLACEHOLDER_URL } from '@/lib/migration/pw1-placeholder'
-import { fetchImageViaBrowser } from '@/lib/migration/pw1-media-browser'
 
-vi.mock('@/lib/migration/pw1-media-browser', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/migration/pw1-media-browser')>(), fetchImageViaBrowser: vi.fn().mockResolvedValue(null) }))
-
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); registerBrowserImageFetcher(undefined) })
 describe('[TC-F35.M12] Missing/forbidden images and download size', () => {
     it('creates a valid local placeholder without fetching a missing category image', async () => {
         const fetchMock = vi.fn()
@@ -71,14 +68,14 @@ describe('[TC-F35.M12] Missing/forbidden images and download size', () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(Buffer.alloc(31 * 1024 * 1024), {headers:{'content-type':'image/png'}})))
         await expect(downloadSourceImage('https://source.example/too-large.png')).rejects.toThrow('30 MiB')
     })
-    it('[TC-F35.M30] loads a bot-protected image through the browser fallback instead of the placeholder', async () => {
+    it('[TC-F35.M64] loads a bot-protected image through the browser fallback instead of the placeholder', async () => {
         const png = await sharp({ create: { width: 4, height: 4, channels: 3, background: '#336699' } }).png().toBuffer()
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('challenge', { status: 403 })))
-        vi.mocked(fetchImageViaBrowser).mockResolvedValueOnce({ buffer: png, mimetype: 'image/png' })
+        registerBrowserImageFetcher(vi.fn().mockResolvedValue({ buffer: png, mimetype: 'image/png' }))
         const asset = await downloadSourceImage('https://blocked.example/a.png')
         expect((await sharp(asset.buffer).metadata()).width).toBe(4)
     })
-    it('[TC-F35.M30] follows redirects and validates each hop', async () => {
+    it('[TC-F35.M64] follows redirects and validates each hop', async () => {
         const png = await sharp({ create: { width: 4, height: 4, channels: 3, background: '#336699' } }).png().toBuffer()
         const fetchMock = vi.fn()
             .mockResolvedValueOnce(new Response(null, { status: 301, headers: { location: '/moved/a.png' } }))
@@ -89,7 +86,7 @@ describe('[TC-F35.M12] Missing/forbidden images and download size', () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { location: 'http://insecure.example/a.png' } })))
         await expect(downloadSourceImage('https://cdn.example/b.png')).rejects.toThrow('HTTPS')
     })
-    it('[TC-F35.M30] accepts image bytes labelled with a generic content-type but not other bytes', async () => {
+    it('[TC-F35.M64] accepts image bytes labelled with a generic content-type but not other bytes', async () => {
         const png = await sharp({ create: { width: 4, height: 4, channels: 3, background: '#336699' } }).png().toBuffer()
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(png, { headers: { 'content-type': 'image' } })))
         expect((await downloadSourceImage('https://s3.example/a.jpg')).mimetype).toBe('image/png')

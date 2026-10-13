@@ -560,7 +560,7 @@ it('[TC-F19.54] explicit blank footer social does not restore inherited links or
     expect(mergeFooterSocialsWithSite({ socials: [{ platform: 'facebook', url: '' }] }, { socialLinks: { facebook: 'https://facebook.com/site' } }).socials).toEqual([])
 })
 
-describe('[TC-F35.M31] mergeFooterSocialsWithSite — stored logo reference', () => {
+describe('[TC-F35.M65] mergeFooterSocialsWithSite — stored logo reference', () => {
     it('falls back to the branding logo when the footer logo is a media id without a url', () => {
         const block = { logo: 73571, socials: [], logoText: '' } as unknown as { socials: Array<{ platform: string; url: string }>; logoText: string }
         const result = mergeFooterSocialsWithSite(block, { name: 'Shop', branding: { logo: 'https://cdn.test/logo.png' } })

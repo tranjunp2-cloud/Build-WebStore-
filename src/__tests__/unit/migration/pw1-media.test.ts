@@ -36,7 +36,7 @@ describe('[TC-F35.M12] Source media URL boundary', () => {
         await importPw1BlockMedia([[block]], 830, payload)
         expect(block.slides[0].image).toEqual({ url: 'https://destination.example/banner.png', alt: 'Banner', width: 1893, height: 560 })
     })
-    it('[TC-F35.M29] decodes HTML entities in rich-text image URLs before downloading', async () => {
+    it('[TC-F35.M63] decodes HTML entities in rich-text image URLs before downloading', async () => {
         const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64')
         const fetchMock = vi.fn().mockResolvedValue(new Response(png, { status: 200, headers: { 'content-type': 'image/png' } }))
         vi.stubGlobal('fetch', fetchMock)
