@@ -1,3 +1,5 @@
+/** Internal persistence marker for a visible PW1 CTA without a target; never emitted as href. */
+export const PW1_EMPTY_CTA_URL = '_pw1_empty_cta_:'
 function isValidIpv4Hostname(hostname: string) {
     const parts = hostname.split('.')
     if (parts.length !== 4) return false

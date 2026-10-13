@@ -49,7 +49,7 @@ describe('[TC-F40-MIG-LIVE-12] F42 source readiness contract', () => {
     expect(F42_IMAGE_CHECK_SCHEMA.pw1_migration_media).toContain('tenant_id');
     expect(F42_IMAGE_CHECK_SCHEMA.pw1_migration_qa_image_checks).toContain('result');
     expect(F42_IMAGE_REVIEW_SCHEMA.pw1_migration_qa_image_reviews).toContain('image_path');
-    expect(fieldTables).toEqual(['migration_runs', 'migration_import_stores', 'migration_exceptions', 'migration_evidence_generations', 'migration_source_evidence_snapshots', 'migration_field_evidence']);
+    expect(fieldTables).toEqual(['migration_runs', 'migration_import_stores', 'migration_exceptions', 'migration_evidence_generations', 'migration_source_evidence_snapshots', 'migration_source_evidence_rows', 'migration_field_evidence']);
   });
 
   it.each(['42P01', '42703'])('recognizes a post-preflight PostgreSQL schema race (%s)', (code) => {

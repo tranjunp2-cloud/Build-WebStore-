@@ -13,6 +13,7 @@
 // all).
 export const STRUCTURAL_BLOCK_FIELDS = new Set([
     'variant',
+    'filterControls', 'selectionMode', 'selectedProductIds', 'includeOutOfStock', 'category', 'limit', 'showCategoryFilter',
     'backgroundColor',
     // locale-control flags are site-wide switches, not content
     'showLanguageSwitcher',

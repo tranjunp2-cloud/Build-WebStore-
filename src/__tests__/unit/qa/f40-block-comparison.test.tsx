@@ -89,7 +89,7 @@ describe('[TC-F40-MIG-LIVE-13] readable block evidence', () => {
       pages: [page([block([field('headline', 'Same', 'Same', 'match')], 'one'), block([field('headline', 'Old', 'New')], 'two')]), { ...page([]), sourceId: 'products', title: 'Products', url: '/sites/example/products', destinationId: 43 }],
     };
     const request = vi.fn(async (input: string) => new Response(JSON.stringify({ data: input.includes('?store=') ? detail : {
-      total: 1, catalogVersion: 'fixture-v1', stores: [{ storeId: '42', name: 'Test store', siteId: 42, canCompare: true, migration: 'completed', publish: 'published', auditStatus: 'not-checked', errors: 0, warnings: 0, checkedAt: null, url: '/sites/example', updatedAt: '', pageCount: 1, qcStatus: 'unverified', reviewedAt: null }],
+      total: 1, catalogVersion: 'fixture-v1', summary: { lifecycle: { total: 1, not_started: 0, running: 0, completed: 1, failed: 0 }, qc: { passed: 0, warning: 0, failed: 0, unverified: 1 } }, stores: [{ storeId: '42', name: 'Test store', siteId: 42, canCompare: true, migration: 'completed', publish: 'published', auditStatus: 'not-checked', errors: 0, warnings: 0, checkedAt: null, url: '/sites/example', updatedAt: '', pageCount: 1, qcStatus: 'unverified', reviewedAt: null }],
     } }), { status: 200 }));
     vi.stubGlobal('fetch', request);
     render(<MigrationDiffClient live />);

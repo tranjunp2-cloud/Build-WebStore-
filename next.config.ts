@@ -52,6 +52,10 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     reactCompiler: false,
+    // GitHub-hosted runners (~7GB RAM) OOM-kill `next build` (exit 137) since the F42 migration
+    // merge: trade some build speed for lower peak memory, and cap build workers on CI.
+    webpackMemoryOptimizations: true,
+    ...(process.env.CI ? { cpus: 2 } : {}),
     serverActions: {
       bodySizeLimit: '50mb',
     },

@@ -34,10 +34,14 @@ export type ReconciliationEntity =
 export type ReconciliationRecord = {
   sourceEntity: ReconciliationEntity;
   sourceId: string;
+  /** Opaque, run-bound selector for privileged record evidence; never a raw source ID. */
+  reference?: string;
   targetCollection: string | null;
   /** One or more confirmed PW2 identifiers; never encode multiples in a string. */
   targetIds: string[];
   label: string;
+  /** Safe business-field sample from the same F42 generation, attached after sanitization. */
+  preview?: { label: string; pw1: string | null; pw2: string | null; status: ReconciliationStatus; explanation?: string };
   status: ReconciliationStatus;
   reason: string;
   fields: Array<{
@@ -74,6 +78,8 @@ export type ReconciliationSnapshot = {
     contractVersion: string | null;
     message: string;
   };
+  /** F42 field generation used for the visible previews and record drill-down. */
+  fieldGeneration?: { generationId: string; digest: string };
   summary: ReconciliationSummary;
   records: ReconciliationRecord[];
 };
@@ -110,6 +116,7 @@ const SECRET_FIELD_PATTERN = /(password|secret|token|api[_-]?key|key_string|dns_
 const PII_FIELD_PATTERN = /(email|phone|hotline|address|post_code|postal|customer_name|account_name|account_id)/i;
 const MAX_DISPLAY_TEXT_LENGTH = 240;
 const PUBLIC_ID_PATTERN = /^[A-Za-z0-9:_-]{1,128}$/;
+const INTERNAL_RECORD_ID_PATTERN = /^(?:\d{1,19}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 /**
  * Immutable, Security-reviewed field registry for real adapter output. Add a
  * key only with the mapping-contract change that documents its classification.
@@ -216,16 +223,23 @@ function hasValidMappingIdentity(record: ReconciliationRecord): boolean {
  */
 export function sanitizeReconciliationSnapshot(
   snapshot: ReconciliationSnapshot,
-  options: { allowDemoFixture?: boolean } = {},
+  options: {
+    allowDemoFixture?: boolean;
+    /** Adds run-bound extras from the original record, so callers never pair by array index. */
+    decorateRecord?: (original: ReconciliationRecord) => Pick<ReconciliationRecord, "reference" | "preview">;
+  } = {},
 ): ReconciliationSnapshot {
   const isTrustedDemo = options.allowDemoFixture === true && snapshot.evidence?.mode === "demo";
   const mode = isTrustedDemo ? "demo" : snapshot.evidence?.mode === "verified" ? "verified" : "unavailable";
-  const records = Array.isArray(snapshot.records) ? snapshot.records.map((record) => {
+  const records = Array.isArray(snapshot.records) ? snapshot.records.map((record, recordIndex) => {
     const identityValid = hasValidMappingIdentity(record);
     const targetIds = identityValid ? record.targetIds : [];
     const status = identityValid ? normalizedStatus(record.status, targetIds) : "unverified";
     const displayTargetIds = status === "unverified" ? [] : targetIds;
     const isPersonRecord = record.sourceEntity === "customers" || record.sourceEntity === "team_members";
+    // The reconciliation workspace is Super Admin-only. Numeric/UUID internal
+    // IDs are useful crosswalks; personal field values remain protected below.
+    const showInternalIds = !isTrustedDemo && snapshot.scope === "commerce";
     const fields = Array.isArray(record.fields) ? record.fields.flatMap((field) => {
       const key = `${field.sourceKey ?? ""} ${field.targetKey ?? ""} ${field.label ?? ""}`;
       if (SECRET_FIELD_PATTERN.test(key)) return [];
@@ -246,11 +260,19 @@ export function sanitizeReconciliationSnapshot(
     }) : [];
 
     return {
+      ...options.decorateRecord?.(record),
       sourceEntity: record.sourceEntity,
-      sourceId: isTrustedDemo && isPublicIdentifier(record.sourceId) ? record.sourceId : "PW1 record",
+      sourceId: isTrustedDemo && isPublicIdentifier(record.sourceId)
+        ? record.sourceId
+        : showInternalIds && INTERNAL_RECORD_ID_PATTERN.test(record.sourceId)
+          ? record.sourceId
+          : `PW1 record #${recordIndex + 1}`,
       targetCollection: toSafeText(record.targetCollection),
-      targetIds: isTrustedDemo ? displayTargetIds : displayTargetIds.map((_, index) => `PW2 record #${index + 1}`),
-      label: toPublicLabel(record.label, isPersonRecord, isTrustedDemo),
+      targetIds: isTrustedDemo ? displayTargetIds : displayTargetIds.map((id, index) =>
+        showInternalIds && INTERNAL_RECORD_ID_PATTERN.test(id)
+          ? id
+          : `PW2 record #${recordIndex + 1}.${index + 1}`),
+      label: showInternalIds ? "Tên/chi tiết đã ẩn" : toPublicLabel(record.label, isPersonRecord, isTrustedDemo),
       status,
       reason: SAFE_STATUS_REASONS[status],
       fields,
@@ -279,7 +301,7 @@ export function sanitizeReconciliationSnapshot(
       mode,
       contractVersion: toSafeText(snapshot.evidence?.contractVersion),
       message: mode === "verified"
-        ? "Đã nạp evidence mapping đã được xác nhận. Dữ liệu nhạy cảm được che trước khi trả về UI."
+        ? "Đã nạp evidence mapping đã được xác nhận. Giá trị riêng tư không có trong evidence hiển thị."
         : mode === "demo"
           ? "Dữ liệu mẫu để xem giao diện; không phải kết quả migration thực tế."
           : "Chưa có mapping định danh PW1 → PW2 được xác nhận. Hệ thống không suy đoán kết quả migration.",

@@ -3,6 +3,7 @@ import { BaseBlockSchema } from '../types'
 import type { BlockMeta } from '../types'
 
 export const BlogListConfigSchema = BaseBlockSchema.extend({
+    showCategoryFilter: z.boolean().default(false),
     variant: z.enum(['cards', 'list']).default('cards'),
     headline: z.string().optional(),
     subheadline: z.string().optional(),
@@ -22,6 +23,7 @@ export const blogListMeta: BlockMeta = {
     variants: ['cards', 'list'],
     defaultVariant: 'cards',
     editableFields: [
+        'showCategoryFilter',
         'headline',
         'subheadline',
         'limit',

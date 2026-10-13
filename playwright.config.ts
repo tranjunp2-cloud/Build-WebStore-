@@ -28,6 +28,12 @@ export default defineConfig({
     },
     projects: [
         {
+            name: 'pw1-footer-category-links',
+            testDir: './tests',
+            use: { ...devices['Desktop Chrome'] },
+            testMatch: /pw1-footer-category-links\.spec\.ts/,
+        },
+        {
             name: 'f40-website-migration',
             testDir: './tests',
             use: { ...devices['Desktop Chrome'] },

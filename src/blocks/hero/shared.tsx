@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import type { HeroConfig } from './config'
 import { RichText } from '../shared/RichText'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
-import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
+import { BROKEN_URL_PREFIX, PW1_EMPTY_CTA_URL } from '@/lib/navigation-url'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
@@ -50,7 +50,7 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
             {buttons.map((btn, i) => {
                 const rawUrl = btn?.url
                 const isBroken = rawUrl?.startsWith(BROKEN_URL_PREFIX)
-                const href = resolveHref(isBroken ? '#' : rawUrl)
+                const href = rawUrl && rawUrl !== PW1_EMPTY_CTA_URL ? resolveHref(isBroken ? '#' : rawUrl) : undefined
                 const isExternal = !isBroken && !!rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))
                 return (
                 <BrokenLinkWarning key={i} url={rawUrl} rounded="rounded-xl">
@@ -166,41 +166,9 @@ export function VideoControlButton({ isPlaying, onClick, className = '', iconSiz
 }
 
 // ── Shared SlideshowDot — touch-friendly dot indicator ─────────────────────
-// 10px visual dot wrapped in 44px button hit area (WCAG 2.5.5).
+// Compact 24px-wide targets keep dots close, with 44px height for tapping.
 
-type SlideshowDotProps = {
-    active: boolean
-    onClick: () => void
-    label: string
-    activeColor?: string
-    inactiveColor?: string
-}
-
-export function SlideshowDot({
-    active,
-    onClick,
-    label,
-    activeColor = '#fff',
-    inactiveColor = 'rgba(255,255,255,0.4)',
-}: SlideshowDotProps) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full transition-all duration-300`}
-            aria-label={label}
-            aria-current={active}
-        >
-            <span
-                className="w-2.5 h-2.5 rounded-full transition-all duration-300"
-                style={{
-                    background: active ? activeColor : inactiveColor,
-                    transform: active ? 'scale(1.3)' : 'scale(1)',
-                }}
-            />
-        </button>
-    )
-}
+export { SlideshowDot } from '../shared/slideshow-controls'
 
 // Re-export ReactNode so variants don't need separate imports
 export type { ReactNode }

@@ -5,6 +5,7 @@ import type {
     CollectionBeforeOperationHook,
 } from 'payload'
 import { APIError } from 'payload'
+import { isMigrationContext } from '@/lib/migration/pw1-json/runtime'
 import { randomBytes } from 'crypto'
 import { sendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
@@ -91,6 +92,8 @@ const rejectInvalidRoleFilter: CollectionBeforeOperationHook = ({ args }) => {
  * Skip if req.user is null — system-level operations (e.g. Payload internal tasks) have no caller.
  */
 const setAuditFields: CollectionBeforeChangeHook = ({ data, operation, req }) => {
+    // Preserve the verified historical actor only for the private local-import capability.
+    if (isMigrationContext(req.context)) return data
     const callerId = req.user?.id ?? null
     if (!callerId) return data
 

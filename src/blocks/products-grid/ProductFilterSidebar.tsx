@@ -11,13 +11,17 @@ import { PriceRangeFilter } from './filters/PriceRangeFilter'
 import { SearchFilter } from './filters/SearchFilter'
 
 interface ProductFilterSidebarProps {
+    controls?: { category: boolean; price: boolean; search: boolean; attributes: boolean }
+    localSearchParams?: string
+    onLocalFilterChange?: (params: URLSearchParams) => void
+    pricePrefix?: string
     categories: SidebarCategory[]
     bounds: ProductFilterBounds
     activeFilters: ActiveProductFilters
     primaryColor: string
 }
 
-export function ProductFilterSidebar({ categories, bounds, activeFilters, primaryColor }: ProductFilterSidebarProps) {
+export function ProductFilterSidebar({ controls, categories, bounds, activeFilters, primaryColor, pricePrefix, localSearchParams, onLocalFilterChange }: ProductFilterSidebarProps) {
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
@@ -33,53 +37,55 @@ export function ProductFilterSidebar({ categories, bounds, activeFilters, primar
             return
         }
 
+        if (onLocalFilterChange) { onLocalFilterChange(params); return }
         router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     }
 
     return (
         <aside className="sticky top-6 space-y-10">
-            {categories.length > 0 && (
+            {controls?.category !== false && categories.length > 0 && (
                 <CategoryTree
                     categories={categories}
                     activeCategoryIds={activeFilters.categoryIds}
                     onUpdateFilter={updateFilter}
                     primaryColor={primaryColor}
-                    searchParams={searchParams.toString()}
+                    searchParams={localSearchParams ?? searchParams.toString()}
                     title={t.storefront.products.categoriesHeading}
                 />
             )}
 
-            {bounds.maxPrice > bounds.minPrice && (
+            {controls?.price !== false && bounds.maxPrice > bounds.minPrice && (
                 <PriceRangeFilter
+                    pricePrefix={pricePrefix}
                     activeMinPrice={activeFilters.minPrice}
                     activeMaxPrice={activeFilters.maxPrice}
                     bounds={bounds}
                     onUpdateFilter={updateFilter}
                     primaryColor={primaryColor}
-                    searchParams={searchParams.toString()}
+                    searchParams={localSearchParams ?? searchParams.toString()}
                     title={t.storefront.products.priceHeading}
                     minLabel={t.storefront.products.priceMin}
                     maxLabel={t.storefront.products.priceMax}
                 />
             )}
 
-            <SearchFilter
+            {controls?.search !== false && <SearchFilter
                 activeSearch={activeFilters.search}
                 onUpdateFilter={updateFilter}
                 primaryColor={primaryColor}
-                searchParams={searchParams.toString()}
+                searchParams={localSearchParams ?? searchParams.toString()}
                 title={productText.searchHeading || 'Search Products'}
                 placeholder={productText.searchPlaceholder || 'Search your keyword...'}
                 submitAriaLabel={productText.searchButtonLabel || 'Search products'}
-            />
+            />}
 
-            {bounds.attributes.length > 0 && (
+            {controls?.attributes !== false && bounds.attributes.length > 0 && (
                 <AttributeFilters
                     attributes={bounds.attributes}
                     attributeFilters={activeFilters.attributeFilters}
                     onUpdateFilter={updateFilter}
                     primaryColor={primaryColor}
-                    searchParams={searchParams.toString()}
+                    searchParams={localSearchParams ?? searchParams.toString()}
                     title={t.storefront.products.attributesHeading}
                 />
             )}

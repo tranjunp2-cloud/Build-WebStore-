@@ -96,7 +96,7 @@ export function BlockLibraryPanel({
     // categoryLabels comes from i18n (stable ref); included in deps for correctness.
     const baseCategories = useMemo(() => {
         const allBlocks = listAllBlocks()
-            .filter(b => b.aiVisible !== false)
+            .filter(b => b.aiVisible !== false || b.slug === 'custom-html')
             .filter(b => !b.isSystem)
             .filter(b => b.category !== 'archive')
         const byCategory = new Map<string, typeof allBlocks>()

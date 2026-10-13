@@ -2,6 +2,8 @@ import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }), usePathname: () => '/sites/example', useSearchParams: () => new URLSearchParams() }))
+
 vi.mock('next/image', () => ({
     default: ({ alt }: { alt: string }) => <span>{alt}</span>,
 }))
@@ -38,10 +40,30 @@ vi.mock('@/blocks/shared/SectionWrapper', () => ({
 }))
 
 import { BlogListBlock } from '@/blocks/blog-list'
+import en from '@/i18n/locales/en.json'
+import ms from '@/i18n/locales/ms.json'
 
 describe('BlogListBlock locale rendering', () => {
     afterEach(() => {
         vi.unstubAllGlobals()
+    })
+
+    it.each([
+        ['cards', 'en', '   ', en.storefront.blog.noPosts],
+        ['list', 'ms-MY', '', ms.storefront.blog.noPosts],
+        ['cards', 'fr', 'Aucun article.', 'Aucun article.'],
+    ])('[TC-F35.M20] renders %s empty state for %s without an app locale provider', async (variant, locale, label, expected) => {
+        // Arrange
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ docs: [] }) }))
+        const props = {
+            block: { blockType: 'blog-list', variant, headline: 'News', emptyStateLabel: label },
+            theme: { colorMode: 'light' },
+            site: { tenant: 7, generationLocale: locale },
+        } as unknown as React.ComponentProps<typeof BlogListBlock>
+        // Act
+        render(<BlogListBlock {...props} />)
+        // Assert
+        expect(await screen.findByRole('status')).toHaveTextContent(expected)
     })
 
     it('renders persisted French labels and formats dates with the site locale', async () => {
@@ -88,4 +110,18 @@ describe('BlogListBlock locale rendering', () => {
         expect(screen.queryByText('Read Article')).not.toBeInTheDocument()
         expect(screen.queryByText('Uncategorized')).not.toBeInTheDocument()
     })
+})
+
+it.each([['en', 'Read more'], ['ms-MY', 'Baca lagi']])('[TC-F35.M57] supplies empty CTA label in store locale %s', async (locale, expected) => {
+    // Arrange
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ docs: [{ id: 1, title: 'News', slug: 'news', content: 'Body' }] }) }))
+    const props = { block: { blockType: 'blog-list', variant: 'cards', readArticleLabel: ' ' }, theme: {}, site: { tenant: 7, generationLocale: locale } } as unknown as React.ComponentProps<typeof BlogListBlock>
+    try {
+        // Act
+        render(<BlogListBlock {...props} />)
+        // Assert
+        expect(await screen.findByText(expected)).toBeInTheDocument()
+    } finally {
+        vi.unstubAllGlobals()
+    }
 })

@@ -117,6 +117,8 @@ jobs:
         run: npm run lint
 
       - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run typecheck
 
   # ──────────────────────────────────────
@@ -337,7 +339,7 @@ jobs:
     # merge commit was already CI-validated on its source PR.
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: 45
     concurrency:
       group: vercel-deploy-staging
       cancel-in-progress: false
@@ -517,7 +519,7 @@ jobs:
     # No `needs` — see deploy-staging rationale above.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: 45
     concurrency:
       group: vercel-deploy-production
       cancel-in-progress: false
@@ -670,7 +672,7 @@ jobs:
     # by sync-staging-to-qc-test.yml after auto-merging staging into qc-test).
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: 45
     concurrency:
       group: vercel-deploy-qc-test
       cancel-in-progress: false

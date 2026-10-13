@@ -27,7 +27,7 @@ Fix only the two failures reproduced from issue comment `#issuecomment-503022397
 | Add Subcategory explains parent/current/new level | Fail | Fix |
 | Deleting a category with assigned products shows exact count | Pass | Regression gate only |
 
-Evidence: `/home/liam/data/ech-prime-web-v2/.gstack/qa-reports/qa-report-localhost-2026-08-04.md`.
+Evidence: `./.gstack/qa-reports/qa-report-localhost-2026-08-04.md`.
 
 ## Scope Challenge
 

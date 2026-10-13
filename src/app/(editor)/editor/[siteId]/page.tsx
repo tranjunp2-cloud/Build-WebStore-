@@ -274,6 +274,7 @@ function extractPublishErrorDetail(body: PublishFailureBody, status: number): st
 const NON_TRANSLATABLE_FIELDS = [
     // structural
     'id', 'blockType', 'variant', 'backgroundColor', 'showLanguageSwitcher', 'multilingualEnabled', 'primaryLocale', 'secondaryLocale', '_localeContent',
+    'filterControls', 'selectionMode', 'selectedProductIds', 'includeOutOfStock', 'category', 'limit', 'showCategoryFilter',
     // media / assets
     'logo', 'image', 'backgroundImage', 'images', 'icon', 'avatar', 'media',
     // links / urls

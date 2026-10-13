@@ -53,6 +53,8 @@ export type AITask =
     | 'image-rating'
     | 'url-extraction'
     | 'bulk-parse'
+    // PW1 website migration: vision colour analysis of the source site/logo (logged separately for cost tracking).
+    | 'brand-analysis'
 
 /**
  * Default model per task.
@@ -83,6 +85,7 @@ const DEFAULT_MODELS: Record<AITask, AIModel> = {
     // GH-1588: bulk parse now performs semantic tenant-category selection as well as extraction.
     // Live A/B rejected nano because it ignored cross-product and product-type constraints.
     'bulk-parse':         'gpt-4.1-mini',
+    'brand-analysis':     'gpt-5.4-mini',
 }
 
 /**
@@ -104,6 +107,7 @@ const ENV_KEY: Record<AITask, string> = {
     'image-rating':       'AI_MODEL_IMAGE_RATING',
     'url-extraction':     'AI_MODEL_URL_EXTRACT',
     'bulk-parse':         'AI_MODEL_BULK_PARSE',
+    'brand-analysis':     'AI_MODEL_BRAND_ANALYSIS',
 }
 
 /**
@@ -149,6 +153,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'image-rating': 1,
         'url-extraction': 10,        // per day
         'bulk-parse': 5,             // per day
+        'brand-analysis': 0,         // internal PW1 migration only; not user-callable
     },
     starter: {
         'site-generation': 5,        // per month
@@ -163,6 +168,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'image-rating': 5,
         'url-extraction': 30,        // per day
         'bulk-parse': 20,            // per day
+        'brand-analysis': 0,         // internal PW1 migration only; not user-callable
     },
     pro: {
         'site-generation': 20,       // per month
@@ -177,6 +183,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'image-rating': 20,
         'url-extraction': 100,       // per day
         'bulk-parse': 100,           // per day
+        'brand-analysis': 0,         // internal PW1 migration only; not user-callable
     },
     business: {
         'site-generation': 999999,   // unlimited
@@ -191,6 +198,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'image-rating': 999999,
         'url-extraction': 999999,
         'bulk-parse': 999999,
+        'brand-analysis': 0,         // internal PW1 migration only; not user-callable
     },
 }
 
@@ -260,4 +268,5 @@ export const ESTIMATED_COSTS: Record<AITask, number> = {
     'image-rating': 0.002,
     'url-extraction': 0.001,      // GPT-4o-mini, ~2.3K in + 500 out
     'bulk-parse': 0.005,          // gpt-4.1-mini, bounded taxonomy + generated product batch
+    'brand-analysis': 0.002,      // gpt-5.4-mini low-detail vision colour analysis
 }

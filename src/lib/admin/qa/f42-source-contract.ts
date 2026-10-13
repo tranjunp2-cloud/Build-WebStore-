@@ -50,7 +50,14 @@ export const F42_FIELD_SCHEMA: F42SchemaContract = {
   migration_exceptions: ['run_id', 'state'],
   migration_evidence_generations: ['generation_id', 'child_run_id', 'snapshot_id', 'state', 'contract_version', 'summary', 'digest', 'completed_at', 'verified_at'],
   migration_source_evidence_snapshots: ['snapshot_id', 'source_snapshot_at', 'state', 'provenance_kind', 'summary'],
+  migration_source_evidence_rows: ['snapshot_id', 'source_entity', 'source_id', 'record_no', 'fields'],
   migration_field_evidence: ['generation_id', 'source_entity', 'source_field', 'comparison_status', 'source_id', 'source_record_no', 'element_key', 'reason_code', 'source_display', 'target_display', 'source_disposition'],
+};
+
+export const F42_SOURCE_COVERAGE_SCHEMA: F42SchemaContract = {
+  migration_source_evidence_snapshots: ['snapshot_id', 'source_instance_id', 'source_snapshot_id', 'source_snapshot_at', 'manifest_sha256', 'sidecar_sha256', 'state', 'provenance_kind', 'summary', 'completed_at'],
+  migration_source_evidence_rows: ['snapshot_id', 'source_store_id', 'source_entity', 'source_id', 'record_no', 'disposition', 'redacted_field_count', 'fields'],
+  migration_import_batches: ['batch_id', 'profile_version', 'binding'],
 };
 
 export function missingF42SchemaColumns(columns: readonly F42SchemaColumn[], required: F42SchemaContract): string[] {

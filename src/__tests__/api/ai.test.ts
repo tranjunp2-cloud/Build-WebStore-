@@ -1,4 +1,6 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
+import { generateSiteService } from '@/lib/ai/generate-site-service'
+import type { GenerateSiteServiceContext } from '@/lib/ai/generate-site-service'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
 import { POST as GenerateSitePOST, buildGeneratedPages, canonicalizePageSlug } from '@/app/api/ai/generate-site/route'
 import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
@@ -294,6 +296,53 @@ describe('AI Streaming APIs', () => {
 
     describe('POST /api/ai/generate-site', () => {
         
+        it('[TC-F35.M11] rejects a migration account that does not own the target before generation or writes', async () => {
+            // Arrange
+            const payload = await getPayload({ config: {} as Parameters<typeof getPayload>[0]['config'] })
+            vi.mocked(payload.findByID).mockResolvedValueOnce({ id: 'target-site', tenant: 'foreign-tenant' })
+            const input = { businessInfo: { businessName: 'Source shop', industry: 'ecommerce', products: 'Catalog', shortDescription: 'Original shop' } }
+            const sourceBlueprint = { nativeContract: { format: 'pw2-reconstruction-contract' as const, version: '1.0.0' as const, source: {storeId:'11',url:'https://source.example',capturedAt:'',dumpHash:''}, site:{name:'Source shop',navigation:{},footer:{}},pages:[],reconciliation:[] }, storeId: '11', siteName: 'Source shop', description: '', storeSettings: {},
+                navigation: { menus: [], menu_items: [], menu_lines: [], settings: [] }, pages: [], warnings: [], excludedPages: 0, excludedComponents: 0 }
+            const user = { id: 'user-xyz', tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }] } as unknown as GenerateSiteServiceContext['user']
+
+            // Act
+            const response = await generateSiteService({ payload, user, input, streaming: false,
+                migration: { targetSiteId: 'target-site', sourceBlueprint } })
+
+            // Assert
+            expect(response.status).toBe(403)
+            expect(generateSiteWithAI).not.toHaveBeenCalled()
+            expect(generateSampleProducts).not.toHaveBeenCalled()
+            expect(payload.create).not.toHaveBeenCalled()
+            expect(payload.update).not.toHaveBeenCalled()
+            expect(payload.delete).not.toHaveBeenCalled()
+        })
+
+        it('[TC-F35.M11] allows owned CLI migration to reach generation without a subscription', async () => {
+            // Arrange
+            const payload = await getPayload({ config: {} as Parameters<typeof getPayload>[0]['config'] })
+            vi.mocked(payload.findByID).mockResolvedValueOnce({ id: 'target-site', tenant: 'tenant-1' })
+            const input = { businessInfo: { businessName: 'Source shop', industry: 'ecommerce', products: 'Catalog', shortDescription: 'Original shop' } }
+            const sourceBlueprint = { nativeContract: { format: 'pw2-reconstruction-contract' as const, version: '1.0.0' as const, source: {storeId:'11',url:'https://source.example',capturedAt:'',dumpHash:''}, site:{name:'Source shop',navigation:{},footer:{}},pages:[],reconciliation:[] }, storeId: '11', siteName: 'Source shop', description: '', storeSettings: {},
+                navigation: { menus: [], menu_items: [], menu_lines: [], settings: [] }, pages: [], warnings: [], excludedPages: 0, excludedComponents: 0 }
+            const user = { id: 'user-xyz', tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }] } as unknown as GenerateSiteServiceContext['user']
+
+            const { getActivePlanSubscription, canUse } = await import('@/lib/subscriptions/plan-subscription')
+            const subscriptionImplementation = vi.mocked(getActivePlanSubscription).getMockImplementation()!
+            vi.mocked(getActivePlanSubscription).mockResolvedValueOnce(null)
+            // Act
+            const response = await generateSiteService({ payload, user, input, streaming: false,
+                migration: { targetSiteId: 'target-site', sourceBlueprint } })
+
+            // Assert: reaching AI proves the migration bypasses both billing gates.
+            expect(getActivePlanSubscription).not.toHaveBeenCalled()
+            expect(canUse).not.toHaveBeenCalled()
+            expect(generateSiteWithAI).toHaveBeenCalled()
+            expect(response.status).not.toBe(403)
+            vi.mocked(getActivePlanSubscription).mockReset()
+            vi.mocked(getActivePlanSubscription).mockImplementation(subscriptionImplementation)
+        })
+
         it('TC-F41-26: returns 400 and records only a safe validation incident for an authenticated rejected form', async () => {
              // Arrange
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
@@ -930,6 +979,23 @@ describe('AI Streaming APIs', () => {
              }
              expect(rest).toContain('event: theme_generated')
              expect(rest).toContain('event: done')
+        })
+
+        it('[TC-F35.M11] HTTP input cannot bypass missing subscription with a migration flag', async () => {
+            const { getActivePlanSubscription } = await import('@/lib/subscriptions/plan-subscription')
+            vi.mocked(getActivePlanSubscription).mockResolvedValueOnce(null)
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh bread' },
+                    migration: { targetSiteId: 'target-site' },
+                    skipSubscription: true,
+                }),
+            })
+            const res = await GenerateSitePOST(req)
+            expect(res.status).toBe(403)
+            expect((await res.json()).error.code).toBe('SUBSCRIPTION_EXPIRED')
+            expect(generateSiteWithAI).not.toHaveBeenCalled()
         })
 
         it('[TC-F34-06] returns 403 when website_builder feature is locked on current plan', async () => {

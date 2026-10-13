@@ -1,3 +1,4 @@
+import { migrationAllowsTracking } from '@/lib/migration/pw1-commerce'
 import { blockRegistry } from '@/blocks/registry'
 import { isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
@@ -185,7 +186,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     }))
     const _preprocessedBlocks = applyGlobalSystemBlocks(pageBlocks, site, pages)
     // Detect cart: true when cartWidget block was injected (site has commerce enabled)
-    const _hasCart = _preprocessedBlocks.some(b => b.blockType === 'cartWidget')
+    const _hasCart = _preprocessedBlocks.some(b => b.blockType === 'cartWidget') && migrationAllowsTracking(site.globalBlocks)
     const rawBlocks = _preprocessedBlocks.map(b => {
         if (b.blockType === 'navigation') {
             return { ...b, _hasCart }
@@ -592,7 +593,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             // footer, breadcrumb) normally return unwrapped; breadcrumb gets
             // wrapped when a fixed-nav offset applies.
             rendered = (
-                <div key={`${block.blockType}-${index}`} style={spacingStyle}>
+                <div key={`${block.blockType}-${index}`} data-block-index={index} data-block-type={block.blockType} style={spacingStyle}>
                     {blockContent}
                 </div>
             )

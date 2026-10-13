@@ -69,4 +69,4 @@ Use only the parsed product name and trusted category path. Never use AI-generat
 
 ## Handoff
 
-`/ck:cook /home/liam/data/worktrees/ech-prime-web-v2-worktree-2/plans/260804-1543-gh-1588-unmatched-category-guard/plan.md`
+`/ck:cook <worktree-2>/plans/260804-1543-gh-1588-unmatched-category-guard/plan.md`

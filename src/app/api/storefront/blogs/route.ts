@@ -27,7 +27,10 @@ export async function GET(req: Request) {
         const page = parseInt(url.searchParams.get('page') || '1')
         const sort = url.searchParams.get('sort') || '-createdAt'
         const category = url.searchParams.get('category')
+        const includeCategories = url.searchParams.get('includeCategories') === '1'
         const search = url.searchParams.get('search')?.trim()
+
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(page) || page < 1 || (tenantId && !/^[1-9]\d*$/.test(tenantId)) || !['createdAt', '-createdAt', 'publishedAt', '-publishedAt', 'title', '-title'].includes(sort)) return NextResponse.json({ error: 'Invalid listing parameters' }, { status: 400 })
 
         if (!tenantId) {
             return NextResponse.json({ docs: [], totalDocs: 0 })
@@ -40,6 +43,8 @@ export async function GET(req: Request) {
             { status: { equals: 'published' } },
         ]
 
+        const categories = includeCategories ? (await payload.find({ collection: 'blog_categories', where: { and: [{ tenant: { equals: tenantId } }, { status: { equals: 'active' } }] }, pagination: false, depth: 0, sort: 'name', select: { name: true, slug: true }, overrideAccess: true })).docs.map(cat => ({ id: cat.id, name: cat.name, slug: cat.slug })) : undefined
+
         if (category) {
             // Payload does not support dot-notation on relationship fields.
             // Two-step lookup: find the category doc by slug, then filter blogs by category ID.
@@ -48,6 +53,7 @@ export async function GET(req: Request) {
                 where: {
                     and: [
                         { slug: { equals: category } },
+                        { status: { equals: 'active' } },
                         { tenant: { equals: tenantId } },
                     ],
                 },
@@ -59,7 +65,7 @@ export async function GET(req: Request) {
                 conditions.push({ category: { equals: catId } })
             } else {
                 // Category slug not found — return empty (no match)
-                return NextResponse.json({ docs: [], totalDocs: 0, page: 1, totalPages: 0 })
+                return NextResponse.json({ docs: [], totalDocs: 0, page: 1, totalPages: 0, categories })
             }
         }
         if (search) {
@@ -78,6 +84,7 @@ export async function GET(req: Request) {
         })
 
         return NextResponse.json({
+            categories,
             docs: result.docs,
             totalDocs: result.totalDocs,
             page: result.page,

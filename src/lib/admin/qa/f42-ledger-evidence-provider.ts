@@ -51,6 +51,12 @@ const ENTITY_BY_SOURCE_ENTITY: Record<string, {
   },
 };
 
+/** Drizzle expands a plain array into a SQL tuple; PostgreSQL ANY requires an array. */
+export function f42LedgerSourceEntityFilter() {
+  const entities = Object.keys(ENTITY_BY_SOURCE_ENTITY);
+  return sql`m.source_entity IN (${sql.join(entities.map(entity => sql`${entity}`), sql`, `)})`;
+}
+
 type LedgerRunRow = {
   run_id: string;
   source_store_id: string;
@@ -312,8 +318,6 @@ export function createF42LedgerEvidenceProvider(reader: F42LedgerReader): Migrat
 export const readF42LedgerEvidence: F42LedgerReader = async ({ runId, storeId }) => {
   const payload = await getPayload({ config });
   const db = payload.db.drizzle;
-  const sourceEntities = Object.keys(ENTITY_BY_SOURCE_ENTITY);
-
   const [runResult, mapResult, exceptionResult] = await Promise.all([
     db.execute(sql`
       SELECT r.run_id::text, r.source_store_id, r.state AS run_state,
@@ -354,7 +358,7 @@ export const readF42LedgerEvidence: F42LedgerReader = async ({ runId, storeId })
       LEFT JOIN migration_entity_map owner ON owner.id = m.depends_on_entity_map_id
       WHERE m.run_id = ${runId}::uuid
         AND m.source_system = 'pw1'
-        AND m.source_entity = ANY(${sourceEntities})
+        AND ${f42LedgerSourceEntityFilter()}
       ORDER BY m.source_entity, m.source_id, m.id
       LIMIT ${MAX_LEDGER_RECORDS + 1}
     `) as Promise<QueryResult<LedgerMapRow>>,

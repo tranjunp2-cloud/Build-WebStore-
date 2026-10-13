@@ -15,10 +15,10 @@ Prove the shipped behavior on a real published storefront, complete manual struc
 
 ## Related files and actions
 
-- `/home/liam/data/ech-prime-web-v2/tests/f37-schema-rich-local-markup.spec.ts` — new read-only public-storefront Playwright test per AGENTS.md. Resolve the E2E account's sole site through existing auth state, fetch raw HTML before DOM parsing, then visit the public homepage and parse every `script[type="application/ld+json"]`.
-- `/home/liam/data/ech-prime-web-v2/playwright.config.ts:48` — add a dedicated `f37-storefront-regression` project so existing storefront tests keep their original dependency graph. Authentication is used only to discover the account's sole site; storefront requests use the project's unauthenticated context.
-- `/home/liam/data/ech-prime-web-v2/docs/qa/fixtures/F37-schema-rich-local-markup.md` — keep the non-secret account-based fixture and CI preflight contract.
-- `/home/liam/data/ech-prime-web-v2/docs/qa/F37-local-seo.md:118` — update only after evidence exists.
+- `./tests/f37-schema-rich-local-markup.spec.ts` — new read-only public-storefront Playwright test per AGENTS.md. Resolve the E2E account's sole site through existing auth state, fetch raw HTML before DOM parsing, then visit the public homepage and parse every `script[type="application/ld+json"]`.
+- `./playwright.config.ts:48` — add a dedicated `f37-storefront-regression` project so existing storefront tests keep their original dependency graph. Authentication is used only to discover the account's sole site; storefront requests use the project's unauthenticated context.
+- `./docs/qa/fixtures/F37-schema-rich-local-markup.md` — keep the non-secret account-based fixture and CI preflight contract.
+- `./docs/qa/F37-local-seo.md:118` — update only after evidence exists.
 - Issue `#1312` / US-F37-04 — document pure `SchemaScoreResult` input/output and the downstream exact overall weights `20/35/15/30`.
 
 ## Browser acceptance

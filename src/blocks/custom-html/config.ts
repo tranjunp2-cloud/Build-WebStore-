@@ -10,15 +10,15 @@ export type CustomHtmlConfig = z.infer<typeof CustomHtmlConfigSchema>
 
 export const customHtmlMeta: BlockMeta = {
     type: 'custom-html',
-    name: 'Custom HTML',
-    description: 'Render custom HTML content safely.',
-    icon: '💻',
+    name: 'Rich text',
+    description: 'Formatted text, images, links and tables.',
+    icon: '📝',
     variants: ['default'],
     defaultVariant: 'default',
     editableFields: ['html'],
     quickActions: [],
     aiVisible: false,
-    category: 'archive' as const,
+    category: 'content' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

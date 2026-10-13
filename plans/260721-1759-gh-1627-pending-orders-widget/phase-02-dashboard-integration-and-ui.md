@@ -60,12 +60,12 @@ Keep `blocks` as the persisted source. Derive a filtered render list for unautho
 
 | Action | Absolute path | Change |
 |---|---|---|
-| Modify | `/home/liam/data/ech-prime-web-v2/src/app/(dashboard)/dashboard/page.tsx` | Fetch user once, derive tenant/permission, run the conditional loader, and filter unauthorized Orders rendering. |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/components/dashboard/revamp/pending-orders.tsx` | Replace mock/overlay with DTO-driven rows and empty state. |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/lib/dashboard-utils.ts` | Remove Orders `soon: true`; keep it absent from defaults and update stale comments. |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/app/(dashboard)/dashboard/dashboard-revamp.css` | Add dedicated order layout, hover, focus, empty, and breakpoints. |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/i18n/locales/en.json` | Replace mock-only order keys with real count/item/empty copy. |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/i18n/locales/ms.json` | Mirror EN key shape with natural Malay copy. |
+| Modify | `./src/app/(dashboard)/dashboard/page.tsx` | Fetch user once, derive tenant/permission, run the conditional loader, and filter unauthorized Orders rendering. |
+| Modify | `./src/components/dashboard/revamp/pending-orders.tsx` | Replace mock/overlay with DTO-driven rows and empty state. |
+| Modify | `./src/lib/dashboard-utils.ts` | Remove Orders `soon: true`; keep it absent from defaults and update stale comments. |
+| Modify | `./src/app/(dashboard)/dashboard/dashboard-revamp.css` | Add dedicated order layout, hover, focus, empty, and breakpoints. |
+| Modify | `./src/i18n/locales/en.json` | Replace mock-only order keys with real count/item/empty copy. |
+| Modify | `./src/i18n/locales/ms.json` | Mirror EN key shape with natural Malay copy. |
 
 ## Implementation Steps
 

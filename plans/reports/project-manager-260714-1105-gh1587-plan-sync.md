@@ -187,10 +187,10 @@ Synced plan bookkeeping to reflect COMPLETE implementation status for all 5 bugs
 ## Files Changed
 
 ### Plan Files (4 updated)
-- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/plans/260713-1733-GH-1587-category-tenant-isolation-security/plan.md` (status + phases table)
-- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/plans/260713-1733-GH-1587-category-tenant-isolation-security/phase-01-bug-a-parent-idor.md` (status + todos)
-- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/plans/260713-1733-GH-1587-category-tenant-isolation-security/phase-02-bug-b-anonymous-read-block.md` (status + todos)
-- `/home/liam/data/worktrees/ech-prime-web-v2-worktree-2/plans/260713-1733-GH-1587-category-tenant-isolation-security/phase-03-tests.md` (status + todos)
+- `<worktree-2>/plans/260713-1733-GH-1587-category-tenant-isolation-security/plan.md` (status + phases table)
+- `<worktree-2>/plans/260713-1733-GH-1587-category-tenant-isolation-security/phase-01-bug-a-parent-idor.md` (status + todos)
+- `<worktree-2>/plans/260713-1733-GH-1587-category-tenant-isolation-security/phase-02-bug-b-anonymous-read-block.md` (status + todos)
+- `<worktree-2>/plans/260713-1733-GH-1587-category-tenant-isolation-security/phase-03-tests.md` (status + todos)
 
 ### Code Files (NOT modified by project-manager)
 - All code + tests already committed on `fix/category-tenant-isolation-security` branch

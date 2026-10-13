@@ -8,6 +8,21 @@ export default defineConfig({
     test: {
         globals: true,
         setupFiles: ['./src/__tests__/helpers/setup.ts'],
+        // CI runners are containers capped with `docker --cpus 2`, but
+        // os.availableParallelism() still reports every host core (8), so
+        // vitest started ~7 workers on 2 CPUs and the CLI-spawning specs hit
+        // the 5s timeout. Size the pool to the quota; override with
+        // VITEST_MAX_WORKERS when a runner gets more CPUs.
+        // The F42 CLI specs spawn a real node process (their execFile allows
+        // 30s); on a shared runner a cold start alone lands at ~5s, so match
+        // the per-test budget to that instead of vitest's 5s default.
+        ...(process.env.CI
+            ? {
+                  minWorkers: 1,
+                  maxWorkers: Number(process.env.VITEST_MAX_WORKERS) || 2,
+                  testTimeout: 30_000,
+              }
+            : {}),
         // Most specs are plain logic (.ts) and never touch the DOM, yet running
         // them under jsdom pays a full window bootstrap per file — that made
         // the unit suite the slowest CI step. Component specs (.tsx) keep

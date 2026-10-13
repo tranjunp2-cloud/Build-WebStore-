@@ -72,3 +72,13 @@ const rows: QcField[] = [
 ];
 export const QC_FIELD_REGISTRY: readonly Readonly<QcField>[] = Object.freeze(rows.map(row => Object.freeze(row)));
 export const QC_FIELD_REGISTRY_HASH = createHash('sha256').update(JSON.stringify(rows)).digest('hex');
+
+/**
+ * Keys whose values are private. F42 already stores no display value for them;
+ * the reader still refuses to surface one if a producer ever regresses.
+ * Mirrors PRIVATE_SOURCE in the F42 comparator, kept local like the rest of this file.
+ */
+export const QC_PRIVATE_DISPLAY_KEYS: ReadonlySet<string> = new Set([
+  'orders.code', 'customers.name', 'customers.email', 'customers.phone',
+  'promotion_codes.code', 'store_email_templates.subject',
+]);

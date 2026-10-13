@@ -24,7 +24,14 @@ export function classifyMigrationReport(store: MigrationStore): MigrationReportR
   if (currentAudit && (store.errors > 0 || store.auditStatus === 'needs-fix')) {
     failures.push(`Audit hiện tại báo lỗi (${store.errors}); mở chi tiết để xử lý.`);
   }
-  if (fields) {
+  if (store.websiteComparison !== undefined) {
+    const website = store.websiteComparison;
+    if (!website?.total) missing.push('Chưa có dữ liệu đối soát website.');
+    else {
+      if (website.mismatched) failures.push(`${website.mismatched} field website khác; cần kiểm tra.`);
+      if (website.unverified) missing.push(`${website.unverified} field website chưa xác minh.`);
+    }
+  } else if (fields) {
     const { counts } = fields;
     if (counts.mismatch > 0) failures.push(`${counts.mismatch} trường dữ liệu sai lệch trong evidence F42.`);
     if (counts.missing > 0) failures.push(`${counts.missing} trường dữ liệu bị thiếu trong evidence F42.`);

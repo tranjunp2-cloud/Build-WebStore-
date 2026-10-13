@@ -8,14 +8,14 @@ effort: 4h
 
 ## Context Links
 
-- Parent plan: `/home/liam/data/ech-prime-web-v2/plans/260804-1505-gh-1587-category-ui-rework/plan.md`
-- Test convention: `/home/liam/data/ech-prime-web-v2/docs/TEST_CONVENTION.md`
-- QA matrix: `/home/liam/data/ech-prime-web-v2/docs/qa/F08-product-crud.md`
-- Existing component regression: `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/category-manager-modal-focus.test.tsx`
-- Existing depth regression: `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/category-manager-depth-guard.test.ts`
-- Existing delete integrity regression: `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/category-delete-integrity.test.ts`
-- Existing category browser flow: `/home/liam/data/ech-prime-web-v2/e2e/products-crud.spec.ts`
-- Playwright config: `/home/liam/data/ech-prime-web-v2/playwright.config.ts`
+- Parent plan: `./plans/260804-1505-gh-1587-category-ui-rework/plan.md`
+- Test convention: `./docs/TEST_CONVENTION.md`
+- QA matrix: `./docs/qa/F08-product-crud.md`
+- Existing component regression: `./src/__tests__/unit/dashboard/category-manager-modal-focus.test.tsx`
+- Existing depth regression: `./src/__tests__/unit/dashboard/category-manager-depth-guard.test.ts`
+- Existing delete integrity regression: `./src/__tests__/unit/dashboard/category-delete-integrity.test.ts`
+- Existing category browser flow: `./e2e/products-crud.spec.ts`
+- Playwright config: `./playwright.config.ts`
 
 ## Overview
 
@@ -58,31 +58,31 @@ Add durable tests for all four rework cases, document the existing category E2E 
 
 ### Modify
 
-- `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/category-manager-modal-focus.test.tsx`
+- `./src/__tests__/unit/dashboard/category-manager-modal-focus.test.tsx`
   - Update the i18n mock to expose `ti` and the new locale keys.
   - Make Select mocks forward `disabled` and accessible state.
   - Make ConfirmModal mock expose its open state and confirmation callback.
   - Add AAA cases for subcategory context and normal create/edit absence.
   - Add class assertions for L1/L2/L3 if the real presentation helper remains in the component.
   - Add the exact assigned-product delete-message mapping and open-modal regression.
-- `/home/liam/data/ech-prime-web-v2/playwright.config.ts`
+- `./playwright.config.ts`
   - Register `category-management-regression` against the new `tests` file, using saved dashboard auth and depending on `setup`.
-- `/home/liam/data/ech-prime-web-v2/docs/qa/F08-product-crud.md`
+- `./docs/qa/F08-product-crud.md`
   - Add TC-F08-05-38 for level badge themes.
   - Add TC-F08-05-39 for contextual Add Subcategory guidance.
   - Reconcile automation notes/mapping for TC-06, TC-17, TC-18, TC-19.
 
 ### Create
 
-- `/home/liam/data/ech-prime-web-v2/tests/category-management-rework.spec.ts`
+- `./tests/category-management-rework.spec.ts`
   - Authenticated browser regression for the hierarchy, modal guidance, and light/dark computed colors.
 
 ### Read, Do Not Modify Unless a Regression Is Found
 
-- `/home/liam/data/ech-prime-web-v2/e2e/products-crud.spec.ts`
+- `./e2e/products-crud.spec.ts`
   - User-excluded from this rework; retain its legacy TC-13/TC-19 titles and track the canonical TC-17/TC-18/TC-06 mapping in QA documentation.
-- `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/category-manager-depth-guard.test.ts`
-- `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/category-delete-integrity.test.ts`
+- `./src/__tests__/unit/dashboard/category-manager-depth-guard.test.ts`
+- `./src/__tests__/unit/dashboard/category-delete-integrity.test.ts`
 
 ## Implementation Steps
 

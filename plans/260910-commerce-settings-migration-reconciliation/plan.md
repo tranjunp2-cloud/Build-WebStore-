@@ -14,6 +14,8 @@ created: 2026-09-10
 
 # US-F40-14 — Đối soát migration Commerce và Settings
 
+> **Cập nhật 2026-10-09:** Phần hoàn thiện Commerce toàn nguồn trước lọc, so sánh giá trị field và gate QC được lập chi tiết tại [kế hoạch F40 Commerce toàn nguồn](../261009-1146-f40-commerce-full-reconciliation/plan.md). Các phase Commerce/UI trong tài liệu này là baseline lịch sử, không phải một luồng triển khai song song với kế hoạch mới. Phần Settings và điều kiện hoàn thành toàn bộ US-F40-14 vẫn theo dõi riêng ở đây; không coi Commerce-ready là hoàn thành Settings hoặc cutover.
+
 ## Overview
 
 Mở rộng Migration Inspector để Tester đối soát toàn bộ lịch sử dữ liệu PW1 → PW2 theo hai phần:
@@ -83,3 +85,7 @@ Trong Migration Inspector thêm hai tab: **Đối soát Commerce** và **Đối 
 - Không có trạng thái pass dựa trên preview/suy đoán hoặc fallback mapping.
 - Counts, record diff và aggregate tài chính có evidence snapshot + timestamp.
 - PII/secret không lộ qua API hoặc UI.
+
+## Coordination note — 2026-09-17
+
+Importer #1886 đang có [kế hoạch tiếp nối](../260916-1617-pw1-local-json-import/plan.md) để nhận artifact exporter mới. Hai plan không chặn toàn bộ nhau: UI shell vẫn có thể build với trạng thái Chưa xác minh, importer local không cần UI này. Khi nhận shared-ledger evidence, adapter cần phân biệt businessCREATE với external creator binding SKIP/non-owning và consumer dependencies; không suy active source claim là User đã được tạo hoặc Store sở hữu actor. Đây là handoff cần xác minh sau implementation, chưa phải schema/evidence đã triển khai.

@@ -10,14 +10,13 @@
 const fs = require('fs')
 const path = require('path')
 
-// ── Load DATABASE_URI: env var takes priority (Docker), fallback to .env.local ─
+// ── Load DATABASE_URI from .env.local or process.env ─────────────────────────
+const envPath = path.join(__dirname, '..', '.env.local')
 if (!process.env.DATABASE_URI) {
-  const envPath = path.join(__dirname, '..', '.env.local')
   if (!fs.existsSync(envPath)) {
     console.log('[db-migrate-dev] .env.local missing — skipping (set DATABASE_URI to enable)')
     process.exit(0)
   }
-
   const envContent = fs.readFileSync(envPath, 'utf8')
   const uriMatch = envContent.match(/^DATABASE_URI="?([^"\n]+)"?/m)
   if (!uriMatch) {
@@ -50,9 +49,14 @@ const sslmodeMatch = connStr.match(/[?&]sslmode=([^&]+)/)
 const sslmode = sslmodeMatch ? sslmodeMatch[1].toLowerCase() : null
 const hostMatch = connStr.match(/@([^:/?]+)/)
 const host = hostMatch ? hostMatch[1].toLowerCase() : ''
+// treat docker-compose service names (no dots, no dashes typical of cloud hosts) as local
+const isDockerService = /^[a-z][a-z0-9_-]*$/.test(host) && !host.includes('.')
 const isLocal =
-  host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal' ||
-  !host.includes('.') // Docker service names (e.g. "postgres") have no dots
+  host === 'localhost' ||
+  host === '127.0.0.1' ||
+  host === '::1' ||
+  host === 'host.docker.internal' ||
+  isDockerService
 const useSsl = sslmode === 'disable' ? false : isLocal ? false : { rejectUnauthorized: false }
 
 const cleanConn = connStr

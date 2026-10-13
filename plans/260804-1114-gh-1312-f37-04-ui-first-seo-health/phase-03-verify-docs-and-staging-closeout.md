@@ -76,13 +76,13 @@ The earlier local-closeout statements below are historical. This section control
 
 ## Related Code Files
 
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/tests/f37-local-seo-score-checklist.spec.ts` — browser acceptance for existing Dashboard/API/Editor routes.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/docs/qa/F37-local-seo.md` — TC mapping and evidence after resolving upstream edits.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/docs/architecture/F37-local-seo.md` — final data flow and exported contracts.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/docs/stories/F37-local-seo-stories.md` — PRD-aligned AC/DoD.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/docs/design/F37-local-seo-wireframes.md` — mark/remove stale dual-card target in favor of F03 unified design.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/docs/CHANGELOG.md`.
-- **Modify if still open:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/docs/tracking/OPEN_BLOCKERS.md`.
+- **Create:** `<worktree-1>/tests/f37-local-seo-score-checklist.spec.ts` — browser acceptance for existing Dashboard/API/Editor routes.
+- **Modify:** `<worktree-1>/docs/qa/F37-local-seo.md` — TC mapping and evidence after resolving upstream edits.
+- **Modify:** `<worktree-1>/docs/architecture/F37-local-seo.md` — final data flow and exported contracts.
+- **Modify:** `<worktree-1>/docs/stories/F37-local-seo-stories.md` — PRD-aligned AC/DoD.
+- **Modify:** `<worktree-1>/docs/design/F37-local-seo-wireframes.md` — mark/remove stale dual-card target in favor of F03 unified design.
+- **Modify:** `<worktree-1>/docs/CHANGELOG.md`.
+- **Modify if still open:** `<worktree-1>/docs/tracking/OPEN_BLOCKERS.md`.
 
 ## Test Matrix
 

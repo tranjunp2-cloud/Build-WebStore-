@@ -30,10 +30,10 @@
 
 | Action | File | Change |
 |---|---|---|
-| Modify | `/home/liam/data/ech-prime-web-v2/docs/qa/F-SSO-PW2.md` | Add scoped GH-1725 TC rows and correct generic-entry wording |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/auth/sso-session.test.ts` | Generic regression and legacy-path compatibility cases |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/auth/sso-authorization-client.test.tsx` | Optional intent POST and output fallback |
-| Create | `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/auth/sso-authorization-page.test.tsx` | Query-to-client boundary coverage |
+| Modify | `./docs/qa/F-SSO-PW2.md` | Add scoped GH-1725 TC rows and correct generic-entry wording |
+| Modify | `./src/__tests__/unit/auth/sso-session.test.ts` | Generic regression and legacy-path compatibility cases |
+| Modify | `./src/__tests__/unit/auth/sso-authorization-client.test.tsx` | Optional intent POST and output fallback |
+| Create | `./src/__tests__/unit/auth/sso-authorization-page.test.tsx` | Query-to-client boundary coverage |
 
 ## Acceptance Test Matrix
 

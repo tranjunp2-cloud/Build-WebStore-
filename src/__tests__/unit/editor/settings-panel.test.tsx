@@ -388,8 +388,8 @@ describe('SettingsPanel', () => {
             )
 
             // Act
-            const checkbox = screen.getByRole('checkbox', { name: 'Show category filter' })
-            const row = checkbox.closest('label')
+            const checkbox = screen.getByRole('checkbox', { name: 'Show filters' })
+            const row = checkbox.closest('label')?.parentElement
 
             // Assert
             expect(checkbox).toBeChecked()
@@ -404,17 +404,17 @@ describe('SettingsPanel', () => {
             expect(checkbox).toHaveClass('data-[state=checked]:bg-[hsl(var(--primary))]')
         })
 
-        it('writes the next boolean value through onBlockFieldChange', () => {
+        it('writes the next boolean value through onBlockUpdate', () => {
             // Arrange
-            const onBlockFieldChange = vi.fn()
-            render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={{ blockType: 'products-grid', headline: 'Products', variant: 'grid-3', showCategoryFilter: false }} onBlockFieldChange={onBlockFieldChange} /></I18nProvider>)
-            const checkbox = screen.getByRole('checkbox', { name: 'Show category filter' })
+            const onBlockUpdate = vi.fn()
+            render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={{ blockType: 'products-grid', headline: 'Products', variant: 'grid-3', showCategoryFilter: false }} onBlockUpdate={onBlockUpdate} /></I18nProvider>)
+            const checkbox = screen.getByRole('checkbox', { name: 'Show filters' })
 
             // Act
             fireEvent.click(checkbox)
 
             // Assert
-            expect(onBlockFieldChange).toHaveBeenCalledWith(0, 'showCategoryFilter', true)
+            expect(onBlockUpdate).toHaveBeenCalledWith(0, { showCategoryFilter: true })
         })
     })
 

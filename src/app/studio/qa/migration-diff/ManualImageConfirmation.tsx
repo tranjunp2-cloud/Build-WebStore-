@@ -125,6 +125,7 @@ export function ManualImageConfirmation({
           setError("");
           try {
             await context.save({ page, block, field, path }, !review);
+            window.dispatchEvent(new Event('website-comparison-updated'));
           } catch (error) {
             setError(
               error instanceof Error

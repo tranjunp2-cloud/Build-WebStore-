@@ -50,10 +50,10 @@ QA TC registry
 
 ## Related Code Files
 
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/docs/qa/F37-local-seo.md` — advance the QA document to v4.9, add a GH-1757 changelog note, and register TC-F37-10-01..05.
-- **Create:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/unit/editor/geo-link-input.test.tsx` — coordinate input regression.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/unit/editor/opening-hours-editor.test.tsx` — modal submission and selected-day render regression.
-- **Modify:** `/home/liam/data/worktrees/ech-prime-web-v2-worktree-1/src/__tests__/unit/editor/settings-panel.test.tsx` — populated `ogImage` regression.
+- **Modify:** `<worktree-1>/docs/qa/F37-local-seo.md` — advance the QA document to v4.9, add a GH-1757 changelog note, and register TC-F37-10-01..05.
+- **Create:** `<worktree-1>/src/__tests__/unit/editor/geo-link-input.test.tsx` — coordinate input regression.
+- **Modify:** `<worktree-1>/src/__tests__/unit/editor/opening-hours-editor.test.tsx` — modal submission and selected-day render regression.
+- **Modify:** `<worktree-1>/src/__tests__/unit/editor/settings-panel.test.tsx` — populated `ogImage` regression.
 - **Delete:** none.
 
 ## Implementation Steps
