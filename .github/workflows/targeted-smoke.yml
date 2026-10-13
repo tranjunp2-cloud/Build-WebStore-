@@ -34,7 +34,7 @@ permissions:
 jobs:
   targeted-smoke:
     name: Targeted critical-flow Smoke
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - name: Validate immutable dispatch inputs
