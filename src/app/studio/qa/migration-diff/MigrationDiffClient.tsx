@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import type { Detail as F42MigrationDetail } from "./WebsiteMigrationEvidence";
+import { MigrationPagination } from "./MigrationPagination";
 import type { MigrationStore } from "@/lib/admin/qa/website-migration-compare";
 import { migrationLifecycleStatus, MIGRATION_LIFECYCLE_LABELS, type MigrationLifecycleStatus } from "@/lib/admin/qa/migration-lifecycle";
 import { ReconciliationInspector } from "./ReconciliationInspector";
@@ -50,7 +51,6 @@ import {
   AlertOctagon,
   Copy,
   ExternalLink,
-  ChevronLeft,
   ChevronRight,
   ChevronDown,
   LayoutTemplate,
@@ -1096,6 +1096,11 @@ function LiveStateBadge({ value }: { value: string }) {
   );
 }
 
+type LiveCatalogSummary = {
+  lifecycle: { total: number; not_started: number; running: number; completed: number; failed: number };
+  qc: { passed: number; warning: number; failed: number; unverified: number };
+};
+
 export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -1107,11 +1112,10 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const refreshCatalogRef = React.useRef<() => Promise<boolean>>(() => Promise.resolve(false));
   const [lifecycleFilter, setLifecycleFilter] = useState<MigrationLifecycleStatus | 'all'>('all');
   const [catalogScope, setCatalogScope] = useState<{ label: string; warning?: string } | null>(null);
-  const lifecycleCounts = useMemo(() => {
-    const counts = { total: liveStores.length, not_started: 0, running: 0, completed: 0, failed: 0 };
-    for (const store of liveStores) counts[migrationLifecycleStatus(store.migration)]++;
-    return counts;
-  }, [liveStores]);
+  // Live mode is paginated by the server: `liveStores` is only the current page and the totals come from `summary`.
+  const [liveSummary, setLiveSummary] = useState<LiveCatalogSummary | null>(null);
+  const [liveTotal, setLiveTotal] = useState(0);
+  const lifecycleCounts = liveSummary?.lifecycle ?? { total: 0, not_started: 0, running: 0, completed: 0, failed: 0 };
   const canCompareStore = (storeId: string) => {
     const store = liveStoreById.get(storeId);
     return Boolean(store?.siteId && store.url && store.canCompare !== false);
@@ -1126,18 +1130,18 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const liveDetailRequestRef = React.useRef(0);
   const liveStoreById = useMemo(() => new Map(liveStores.map(store => [store.storeId, store])), [liveStores]);
   const metrics = useMemo(() => live ? {
-    ...getDashboardMetrics([]), totalStores: catalog.length,
-    passedStores: liveStores.filter(store => store.qcStatus === "passed").length,
-    warningStores: liveStores.filter(store => store.qcStatus === "warning").length,
-    failedStores: liveStores.filter(store => store.qcStatus === "failed").length,
+    ...getDashboardMetrics([]), totalStores: lifecycleCounts.total,
+    passedStores: liveSummary?.qc.passed ?? 0,
+    warningStores: liveSummary?.qc.warning ?? 0,
+    failedStores: liveSummary?.qc.failed ?? 0,
     avgScore: "Chưa đo",
-  } : getDashboardMetrics(catalog), [catalog, live, liveStores]);
+  } : getDashboardMetrics(catalog), [catalog, live, liveSummary, lifecycleCounts.total]);
   const reportByStoreId = useMemo(() => new Map(liveStores.map(store => [store.storeId, classifyMigrationReport(store)])), [liveStores]);
-  const reportCounts = useMemo(() => {
-    const counts = { passed: 0, review: 0, failed: 0, insufficient: 0 };
-    for (const report of reportByStoreId.values()) counts[report.status]++;
-    return counts;
-  }, [reportByStoreId]);
+  // Summary cards use the catalog-wide QC verdict counts returned by the API, not per-row classification.
+  const reportCounts = {
+    passed: liveSummary?.qc.passed ?? 0, review: liveSummary?.qc.warning ?? 0,
+    failed: liveSummary?.qc.failed ?? 0, insufficient: liveSummary?.qc.unverified ?? 0,
+  };
 
   // Overview Table Filters
   const [filterStatus, setFilterStatus] = useState<"all" | "passed" | "warning" | "failed" | "unverified">("all");
@@ -1152,6 +1156,22 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const committedQueryRef = React.useRef("");
+  useEffect(() => {
+    // Same normalisation as the old client-side filter: a pasted URL searches by host.
+    const timer = setTimeout(() => {
+      const next = searchQuery.trim().toLowerCase()
+        .replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "");
+      if (next === committedQueryRef.current) return;
+      committedQueryRef.current = next;
+      // Page reset rides along with the committed query so the catalog reload
+      // fires one request instead of an extra request carrying the stale query.
+      setDebouncedQuery(next);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   const [deviceView, setDeviceView] = useState<"desktop" | "mobile">("desktop");
   const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false);
   const deviceDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -1313,46 +1333,29 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       const requestId=++liveCatalogRequestRef.current;
       setCatalogLoading(true);setCatalogError("");
       try {
-        const stores: MigrationStore[]=[];
-        let scope: { label: string; warning?: string } | null = null;
-        let catalogVersion: string | null = null;
-        const seenStoreIds = new Set<string>();
-        for(let page=1;;page++) {
-          const response=await fetch(`/api/admin/qa/website-migrations?limit=100&page=${page}`,{cache:"no-store"});
-          if(!response.ok) {
-            const failure = await response.json().catch(() => null);
-            throw new Error(failure?.code === 'F42_CATALOG_SCOPE_UNAVAILABLE'
-              ? 'Chưa xác minh được phạm vi nguồn F42 hoặc mapping website. Nhờ team migration kiểm tra liên kết nguồn.'
-              : failure?.code === 'F42_SOURCE_UNAVAILABLE'
-              ? 'Schema hoặc phạm vi nguồn F42 chưa xác định. Nhờ team F42 kiểm tra rồi làm mới.'
-              : `Không đọc được báo cáo (HTTP ${response.status}). Vui lòng thử lại.`);
-          }
-          const body=await response.json();
-          if (typeof body.data.catalogVersion !== 'string' || !body.data.catalogVersion) {
-            throw new Error('Chưa xác định phiên bản danh sách migration. Vui lòng làm mới.');
-          }
-          if (page === 1) {
-            scope = body.data.catalogScope ?? null;
-            catalogVersion = body.data.catalogVersion;
-          } else if (body.data.catalogVersion !== catalogVersion) {
-            throw new Error('Danh sách migration vừa thay đổi. Vui lòng làm mới.');
-          }
-          for (const store of body.data.stores as MigrationStore[]) {
-            if (seenStoreIds.has(store.storeId)) throw new Error('Danh sách migration có website trùng giữa các trang. Vui lòng làm mới.');
-            seenStoreIds.add(store.storeId);
-            stores.push(store);
-          }
-          if (stores.length > body.data.total || (!body.data.stores.length && stores.length < body.data.total)) {
-            throw new Error('Danh sách migration chưa đầy đủ. Vui lòng làm mới.');
-          }
-          if(stores.length === body.data.total) break;
+        // Only the page being viewed is requested; search and migrate-status filters run on the server.
+        const params = new URLSearchParams({ limit: String(pageSize), page: String(currentPage) });
+        if (debouncedQuery) params.set("search", debouncedQuery);
+        if (lifecycleFilter !== "all") params.set("status", lifecycleFilter);
+        const response=await fetch(`/api/admin/qa/website-migrations?${params}`,{cache:"no-store"});
+        if(!response.ok) {
+          const failure = await response.json().catch(() => null);
+          throw new Error(failure?.code === 'F42_CATALOG_SCOPE_UNAVAILABLE'
+            ? 'Chưa xác minh được phạm vi nguồn F42 hoặc mapping website. Nhờ team migration kiểm tra liên kết nguồn.'
+            : failure?.code === 'F42_SOURCE_UNAVAILABLE'
+            ? 'Schema hoặc phạm vi nguồn F42 chưa xác định. Nhờ team F42 kiểm tra rồi làm mới.'
+            : `Không đọc được báo cáo (HTTP ${response.status}). Vui lòng thử lại.`);
         }
+        const { data } = await response.json();
         if(requestId!==liveCatalogRequestRef.current)return false;
+        const stores = data.stores as MigrationStore[];
         setLiveStores(stores);
-        setCatalogScope(scope);
         setCatalog(stores.map(websiteStoreSummary));
+        setCatalogScope(data.catalogScope ?? null);
+        setLiveTotal(data.total);
+        setLiveSummary({ lifecycle: data.summary.lifecycle, qc: data.summary.qc });
         return true;
-      } catch(error) {if(requestId!==liveCatalogRequestRef.current)return false;setCatalogError(error instanceof Error?error.message:"Không đọc được catalog");setCatalog([]);setLiveStores([]);setCatalogScope(null);return false;}
+      } catch(error) {if(requestId!==liveCatalogRequestRef.current)return false;setCatalogError(error instanceof Error?error.message:"Không đọc được catalog");setCatalog([]);setLiveStores([]);setLiveSummary(null);setLiveTotal(0);setCatalogScope(null);return false;}
       finally {if(requestId===liveCatalogRequestRef.current)setCatalogLoading(false)}
     }
     try {
@@ -1371,8 +1374,12 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
   };
   refreshCatalogRef.current = loadLiveCatalog;
 
+  // Live: reload just the visible page whenever the page, search or status filter changes.
   useEffect(() => {
-    void loadLiveCatalog();
+    if (live) void loadLiveCatalog();
+  }, [live, currentPage, pageSize, debouncedQuery, lifecycleFilter]);
+  useEffect(() => {
+    if (!live) void loadLiveCatalog();
   }, []);
 
   useEffect(() => {
@@ -1692,6 +1699,8 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
     // Normalize URL/Domain search if user pastes full URL or domain
     const cleanQ = rawQ.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "");
 
+    // Live rows are already filtered and paginated by the server.
+    if (live) return catalog;
     return catalog.filter((s) => {
       const matchStatus = live || filterStatus === "all" || s.status === filterStatus;
       const matchMetric =
@@ -1725,14 +1734,16 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
     reportByStoreId,
   ]);
 
-  const totalPages = Math.ceil(filteredStores.length / pageSize) || 1;
+  const filteredTotal = live ? liveTotal : filteredStores.length;
+  const totalPages = Math.ceil(filteredTotal / pageSize) || 1;
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
   const paginatedStores = useMemo(() => {
+    if (live) return filteredStores;
     const start = (currentPage - 1) * pageSize;
     return filteredStores.slice(start, start + pageSize);
-  }, [filteredStores, currentPage, pageSize]);
+  }, [filteredStores, currentPage, pageSize, live]);
 
   const scopedFieldRecords = useMemo(() => {
     if (!selectedDiff?.fieldDiffAudit?.records || !activePage) return [];
@@ -2074,7 +2085,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
       </div>
 
       {/* 5 Metric Summary Cards */}
-      {(!live || (!catalogLoading && !catalogError)) && <>
+      {(!live || ((!catalogLoading || liveSummary) && !catalogError)) && <>
       {live && <>
         {catalogScope && <p className="text-xs text-slate-400">{catalogScope.label}{catalogScope.warning && <span className="block mt-1 text-amber-200">{catalogScope.warning}</span>}</p>}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -2107,7 +2118,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
           <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Tổng Số Website</div>
           <div className="text-2xl font-bold text-white mt-1">{metrics.totalStores.toLocaleString()}</div>
           <div className="text-[11px] text-blue-400 mt-1 flex items-center gap-1 font-medium">
-            <Sparkles className="size-3" /> {live ? `${catalog.length} Website` : "2.000 Website"}
+            <Sparkles className="size-3" /> {live ? `${metrics.totalStores} Website` : "2.000 Website"}
           </div>
         </button>
 
@@ -2331,18 +2342,12 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
             aria-label={live ? "Tìm store" : undefined}
             placeholder={live ? "Tìm tên store, đường dẫn, ID PW1…" : "Tìm theo Email khách hàng, Domain, Mã Site..."}
             value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-blue-500 transition shadow-inner"
           />
           {searchQuery && (
             <button
-              onClick={() => {
-                setSearchQuery("");
-                setCurrentPage(1);
-              }}
+              onClick={() => setSearchQuery("")}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white rounded-md transition"
               title="Xóa tìm kiếm"
             >
@@ -2354,8 +2359,17 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
 
       {/* 2,000 Stores Grid Table */}
       <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
-          <table className={`w-full text-left text-xs text-slate-300 ${live ? "min-w-[1040px] table-fixed" : ""}`}>
+        {/* While the next page loads, dim the previous rows so they are not mistaken for the new page. */}
+        <div className="relative overflow-x-auto" aria-busy={live && catalogLoading}>
+          {live && catalogLoading && (
+            <div role="status" aria-live="polite" data-testid="migration-table-loading" className="absolute inset-0 z-10 flex items-start justify-center bg-slate-950/50 pt-24">
+              <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-200 shadow-xl">
+                <RefreshCw className="size-3.5 animate-spin text-blue-400" />
+                <span>Đang tải trang {currentPage}…</span>
+              </div>
+            </div>
+          )}
+          <table className={`w-full text-left text-xs text-slate-300 transition-opacity ${live ? "min-w-[1040px] table-fixed" : ""} ${live && catalogLoading ? "pointer-events-none select-none opacity-40" : ""}`}>
             {live && <colgroup>
               <col style={{ width: '22%' }} />
               <col style={{ width: '14%' }} />
@@ -2535,7 +2549,7 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
             </tbody>
           </table>
 
-          {paginatedStores.length === 0 && (
+          {paginatedStores.length === 0 && !(live && catalogLoading) && (
             <div className="p-12 text-center space-y-3">
               <div className="size-12 rounded-2xl bg-slate-800/80 border border-slate-700/80 mx-auto flex items-center justify-center text-slate-400">
                 <Search className="size-6" />
@@ -2578,32 +2592,14 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
         {/* Pagination Footer */}
         <div className="flex items-center justify-between p-4 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-400">
           <div>
-            Đang hiển thị <strong>{paginatedStores.length}</strong> / <strong>{filteredStores.length}</strong> website
+            Đang hiển thị <strong>{paginatedStores.length}</strong> / <strong>{filteredTotal}</strong> website
           </div>
-          <div
-            data-testid="migration-pagination"
-            className="flex items-center gap-2"
-          >
-            <button
-              aria-label="Trang trước"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 disabled:opacity-40 transition"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <span className="font-semibold text-slate-200 px-2">
-              Trang {currentPage} / {totalPages}
-            </span>
-            <button
-              aria-label="Trang sau"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 disabled:opacity-40 transition"
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
+          <MigrationPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            disabled={live && catalogLoading}
+            onChange={setCurrentPage}
+          />
         </div>
       </div>
 

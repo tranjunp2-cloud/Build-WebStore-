@@ -87,8 +87,7 @@ export async function readWebsiteMigrations(input: {
     sql`SELECT id,status,started_at AS "startedAt",finished_at AS "finishedAt", limits->'qaInput'->>'runId' AS "runId", limits->'qaInput'->>'part' AS part FROM pw1_migration_batches ORDER BY started_at DESC LIMIT 100`,
   );
   const where = sql`(${input.batch ?? null}::uuid IS NULL OR EXISTS (SELECT 1 FROM pw1_migration_attempts x WHERE x.source_store_id=source.source_store_id AND x.batch_id=${input.batch ?? null}::uuid) OR EXISTS(SELECT 1 FROM pw1_migration_batches b CROSS JOIN LATERAL jsonb_array_elements(b.results) r WHERE b.id=${input.batch ?? null}::uuid AND r->>'sourceStoreId'=source.source_store_id))
-        AND (${input.run ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM pw1_migration_batches b WHERE b.limits->'qaInput'->>'runId'=${input.run ?? null} AND (EXISTS(SELECT 1 FROM pw1_migration_attempts x WHERE x.batch_id=b.id AND x.source_store_id=source.source_store_id) OR EXISTS(SELECT 1 FROM jsonb_array_elements(b.results) r WHERE r->>'sourceStoreId'=source.source_store_id))))
-        AND (${input.search}='' OR source.source_store_id ILIKE ${"%" + input.search + "%"} OR COALESCE(s.name,'Website PW1 #' || source.source_store_id) ILIKE ${"%" + input.search + "%"})`;
+        AND (${input.run ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM pw1_migration_batches b WHERE b.limits->'qaInput'->>'runId'=${input.run ?? null} AND (EXISTS(SELECT 1 FROM pw1_migration_attempts x WHERE x.batch_id=b.id AND x.source_store_id=source.source_store_id) OR EXISTS(SELECT 1 FROM jsonb_array_elements(b.results) r WHERE r->>'sourceStoreId'=source.source_store_id))))`;
   const rows = await execute<
     MigrationStore & {
       total: number;
@@ -98,6 +97,9 @@ export async function readWebsiteMigrations(input: {
       unpublished: number;
       needsAttention: number;
       unverifiedQc: number;
+      qcPassed: number;
+      qcWarning: number;
+      qcFailed: number;
       allTotal: number;
       notStarted: number;
       running: number;
@@ -116,7 +118,7 @@ export async function readWebsiteMigrations(input: {
             CASE WHEN r.evidence_version=${evidenceVersionSql} THEN r.verdict ELSE 'unverified' END AS "qcStatus",r.reviewed_at AS "reviewedAt",
             s.status AS publish,CASE WHEN q.checked_at IS NOT NULL AND EXISTS(SELECT 1 FROM pages p WHERE p.site_id=m.site_id AND p.slug<>'404' AND (p.updated_at>q.checked_at OR EXISTS(SELECT 1 FROM jsonb_array_elements(q.report->'pages') version WHERE (version->>'pageId')::integer=p.id AND version->>'updatedAt' IS NOT NULL AND (version->>'updatedAt')::timestamptz<>p.updated_at))) OR q.checked_at IS NOT NULL AND s.updated_at>q.checked_at THEN 'stale' WHEN q.checked_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(q.report->'pages') version WHERE version->>'updatedAt' IS NOT NULL) THEN 'historical' ELSE COALESCE(q.report->>'status','not-checked') END AS "auditStatus",
             COALESCE((q.report->>'errors')::integer,0) AS errors,COALESCE((q.report->>'warnings')::integer,0) AS warnings,
-            q.checked_at AS "checkedAt",CASE WHEN s.id IS NOT NULL AND t.id IS NOT NULL THEN '/sites/' || t.slug ELSE NULL END AS url,COALESCE(m.updated_at,source.updated_at) AS "updatedAt"
+            q.checked_at AS "checkedAt",CASE WHEN s.id IS NOT NULL AND t.id IS NOT NULL THEN '/sites/' || t.slug ELSE NULL END AS url,t.slug AS "tenantSlug",COALESCE(m.updated_at,source.updated_at) AS "updatedAt"
           FROM sources source LEFT JOIN pw1_migration_stores m ON m.source_store_id=source.source_store_id
           LEFT JOIN sites s ON s.id=m.site_id AND s.tenant_id=m.tenant_id LEFT JOIN tenants t ON t.id=m.tenant_id
           LEFT JOIN LATERAL (SELECT attempt_id FROM pw1_migration_commits WHERE source_store_id=m.source_store_id AND input_hash=m.input_hash ORDER BY committed_at DESC LIMIT 1) c ON true
@@ -124,17 +126,18 @@ export async function readWebsiteMigrations(input: {
           LEFT JOIN LATERAL(SELECT * FROM pw1_migration_qa_reviews WHERE source_store_id=m.source_store_id ORDER BY reviewed_at DESC,id DESC LIMIT 1)r ON true
           WHERE ${where}
         ), stats AS (
-          SELECT count(*)::integer AS "allTotal", count(*) FILTER (WHERE migration='pending')::integer AS "notStarted", count(*) FILTER (WHERE migration='running')::integer AS running, count(*) FILTER (WHERE migration='failed')::integer AS failed, count(*) FILTER (WHERE migration='completed')::integer AS completed, count(*) FILTER (WHERE publish='published')::integer AS published, count(*) FILTER (WHERE migration<>'completed')::integer AS "migrationIncomplete", count(*) FILTER (WHERE publish<>'published')::integer AS unpublished, count(*) FILTER (WHERE "auditStatus" IN ('not-checked','historical','stale') OR errors+warnings>0)::integer AS "needsAttention", count(*) FILTER (WHERE "qcStatus"='unverified')::integer AS "unverifiedQc" FROM catalog
+          SELECT count(*)::integer AS "allTotal", count(*) FILTER (WHERE migration='pending')::integer AS "notStarted", count(*) FILTER (WHERE migration='running')::integer AS running, count(*) FILTER (WHERE migration='failed')::integer AS failed, count(*) FILTER (WHERE migration='completed')::integer AS completed, count(*) FILTER (WHERE publish='published')::integer AS published, count(*) FILTER (WHERE migration<>'completed')::integer AS "migrationIncomplete", count(*) FILTER (WHERE publish<>'published')::integer AS unpublished, count(*) FILTER (WHERE "auditStatus" IN ('not-checked','historical','stale') OR errors+warnings>0)::integer AS "needsAttention", count(*) FILTER (WHERE "qcStatus"='unverified')::integer AS "unverifiedQc", count(*) FILTER (WHERE "qcStatus"='passed')::integer AS "qcPassed", count(*) FILTER (WHERE "qcStatus"='warning')::integer AS "qcWarning", count(*) FILTER (WHERE "qcStatus"='failed')::integer AS "qcFailed" FROM catalog
         ), catalog_version AS (
           SELECT md5(${scope?.sourceInstance ?? 'legacy'} || ':' || ${scope?.targetInstance ?? 'legacy'} || ':' ||
             COALESCE(string_agg("storeId" || ':' || migration || ':' || COALESCE("updatedAt"::text,''), ',' ORDER BY "storeId"),'')) AS "catalogVersion" FROM catalog
         ), filtered AS (
           SELECT * FROM catalog WHERE
-            (${input.status}='all' OR ${input.status}='not_started' AND migration='pending' OR ${input.status}='running' AND migration='running' OR ${input.status}='completed' AND migration='completed' OR ${input.status}='incomplete' AND migration<>'completed' OR ${input.status}='unpublished' AND publish<>'published' OR ${input.status}='failed' AND migration='failed' OR ${input.status}='attention' AND (errors+warnings>0 OR "auditStatus" IN ('not-checked','historical','stale')) OR ${input.status}='unaudited' AND "auditStatus" IN ('not-checked','historical','stale'))
+            (${input.search}='' OR "storeId" ILIKE ${"%" + input.search + "%"} OR name ILIKE ${"%" + input.search + "%"} OR "tenantSlug" ILIKE ${"%" + input.search + "%"})
+            AND (${input.status}='all' OR ${input.status}='not_started' AND migration='pending' OR ${input.status}='running' AND migration='running' OR ${input.status}='completed' AND migration='completed' OR ${input.status}='incomplete' AND migration<>'completed' OR ${input.status}='unpublished' AND publish<>'published' OR ${input.status}='failed' AND migration='failed' OR ${input.status}='attention' AND (errors+warnings>0 OR "auditStatus" IN ('not-checked','historical','stale')) OR ${input.status}='unaudited' AND "auditStatus" IN ('not-checked','historical','stale'))
             AND (${input.qc}='all' OR "qcStatus"=${input.qc})
         ), filtered_stats AS (
           SELECT count(*)::integer AS total FROM filtered
-        ) SELECT page.*,filtered_stats.total,stats.completed,stats.published,stats."migrationIncomplete",stats.unpublished,stats."needsAttention",stats."unverifiedQc",stats."allTotal",stats."notStarted",stats.running,stats.failed,catalog_version."catalogVersion"
+        ) SELECT page.*,filtered_stats.total,stats.completed,stats.published,stats."migrationIncomplete",stats.unpublished,stats."needsAttention",stats."unverifiedQc",stats."qcPassed",stats."qcWarning",stats."qcFailed",stats."allTotal",stats."notStarted",stats.running,stats.failed,catalog_version."catalogVersion"
         FROM stats CROSS JOIN filtered_stats CROSS JOIN catalog_version
         LEFT JOIN LATERAL (
           SELECT filtered.*
@@ -167,6 +170,7 @@ export async function readWebsiteMigrations(input: {
       unpublished: rows[0]?.unpublished ?? 0,
       needsAttention: rows[0]?.needsAttention ?? 0,
       unverifiedQc: rows[0]?.unverifiedQc ?? 0,
+      qc: { passed: rows[0]?.qcPassed ?? 0, warning: rows[0]?.qcWarning ?? 0, failed: rows[0]?.qcFailed ?? 0, unverified: rows[0]?.unverifiedQc ?? 0 },
     },
     stores: stores.map(store => ({ ...store, fieldEvidence: fieldSummaries.get(store.storeId) ?? null, websiteComparison: websiteSummaries.get(store.storeId) ?? null })),
     total: rows[0]?.total ?? 0,
