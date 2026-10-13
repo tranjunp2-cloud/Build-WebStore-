@@ -23,7 +23,7 @@ jobs:
     if: >-
       github.event_name == 'issues' &&
       (github.event.action == 'opened' || github.event.action == 'assigned' || github.event.action == 'closed')
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: write
       repository-projects: write
@@ -133,7 +133,7 @@ jobs:
   label-transitions:
     name: 'Board: Label transitions'
     if: github.event_name == 'issues' && github.event.action == 'labeled'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: write
       repository-projects: write
@@ -409,7 +409,7 @@ jobs:
   pr-link-review:
     name: 'Board: PR → Code Review'
     if: github.event_name == 'pull_request' && github.event.action == 'opened'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: read
       pull-requests: read
@@ -533,7 +533,7 @@ jobs:
   stale-check:
     name: 'Check: Stale Issues'
     if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: write
       contents: read
