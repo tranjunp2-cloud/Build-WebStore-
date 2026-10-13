@@ -97,7 +97,7 @@ describe("[TC-F40-14-03] F42 ledger reconciliation API", () => {
     expect(body.data.records[0].preview).toEqual({ label: 'Tên sản phẩm', pw1: 'Fresh Passion Fruits', pw2: 'Fresh Passion Fruits', status: 'match' });
     expect(body.data.fieldGeneration).toEqual({ generationId: GEN_ID, digest: DIGEST });
   });
-  it("TC-F40-14-07: keeps the ledger when the preview query fails", async () => {
+  it("TC-F40-14-09: keeps the ledger when the preview query fails", async () => {
     // Arrange
     const record = { sourceEntity: 'products', sourceId: '41603', targetIds: ['1417'] };
     mocks.getSnapshot.mockResolvedValueOnce({ evidence: { available: true, mode: 'verified' }, records: [record] });
