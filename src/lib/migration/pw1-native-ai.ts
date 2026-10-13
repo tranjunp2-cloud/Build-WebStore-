@@ -16,6 +16,7 @@ import type { GenerateSiteOutput, SSEEvent } from '@/lib/ai/openai-generator'
 import { ContractSchema } from './pw1-contract'
 import { FooterConfigSchema } from '@/blocks/footer/config'
 import { HeroConfigSchema } from '@/blocks/hero/config'
+import { bannerContentLosses } from './pw1-variant-fidelity'
 import { ContentCardsConfigSchema } from '@/blocks/content-cards/config'
 
 export const NATIVE_BLOCKS = ['navigation', 'footer', 'hero', 'carousel', 'portfolio-grid', 'custom-html', 'video', 'products-grid', 'blog-list'] as const
@@ -28,11 +29,14 @@ export const NativeDesignSchema = z.object({
 }).strict()
 export function nativeBannerChoices(block: Record<string, unknown>): string[] {
     const banner = HeroConfigSchema.parse(block)
-    if (banner.sourceLayout?.size === 'small') return ['carousel:images', 'carousel:cards']
-    const only = banner.slides?.length === 1 ? banner.slides[0] : banner
-    if ((banner.slides?.length ?? 0) <= 1 && only.image?.url && !only.headline?.trim() && !only.subheadline?.trim() && !only.ctaButtons?.length) return ['hero:slideshow']
-    if ((banner.slides?.length ?? 0) > 1) return ['hero:slideshow']
-    return ['hero:centered', 'hero:split-left', 'hero:split-right', 'hero:fullscreen', 'hero:magazine', 'hero:cards-overlay', 'hero:parallax', 'hero:slideshow']
+    const slides = banner.slides?.length ? banner.slides : [banner]
+    const keepsContent = (output: string) => !bannerContentLosses(slides, ...(output.split(':') as [string, string])).length
+    if (banner.sourceLayout?.size === 'small') return ['carousel:images', 'carousel:cards'].filter(keepsContent)
+    const only = slides[0]
+    if (slides.length <= 1 && only.image?.url && !only.headline?.trim() && !only.subheadline?.trim() && !only.ctaButtons?.length) return ['hero:slideshow']
+    if (slides.length > 1) return ['hero:slideshow']
+    // Variants that cannot render the source image/link are never offered
+    return ['hero:centered', 'hero:split-left', 'hero:split-right', 'hero:fullscreen', 'hero:magazine', 'hero:cards-overlay', 'hero:parallax', 'hero:slideshow'].filter(keepsContent)
 }
 export function nativeSectionChoices(component: {kind: string; block: Record<string, unknown>}): string[] {
     if (component.kind === 'banner') return nativeBannerChoices(component.block)
@@ -112,9 +116,11 @@ export function bindNativeDesign(input: unknown, designInput: unknown): Generati
             if (choice.sourceId !== component.sourceId) throw new Error('AI component order mismatch')
             let output: GeneratedBlock[]
             if (component.kind === 'banner') {
-                if (!nativeBannerChoices(component.block).includes(`${choice.blockType}:${choice.variant}`)) throw new Error(`Banner block must match source hero/small role and slide count: ${component.sourceId} selected ${choice.blockType}:${choice.variant}; allowed ${nativeBannerChoices(component.block).join(', ')}`)
                 const banner = HeroConfigSchema.parse(component.block)
                 const slides = banner.slides?.length ? banner.slides : [banner]
+                const losses = bannerContentLosses(slides, choice.blockType, choice.variant)
+                if (losses.length) throw new Error(`Banner ${component.sourceId}: ${choice.blockType}:${choice.variant} cannot render the source ${losses.join(' and ')}`)
+                if (!nativeBannerChoices(component.block).includes(`${choice.blockType}:${choice.variant}`)) throw new Error(`Banner block must match source hero/small role and slide count: ${component.sourceId} selected ${choice.blockType}:${choice.variant}; allowed ${nativeBannerChoices(component.block).join(', ')}`)
                 if (choice.blockType === 'hero') {
                     const first = slides[0]
                     const imageOnly = slides.length === 1 && first.image?.url && !first.headline?.trim() && !first.subheadline?.trim() && !first.ctaButtons.length
@@ -148,7 +154,7 @@ export function bindNativeDesign(input: unknown, designInput: unknown): Generati
             return { sourceId: component.sourceId, sourceType: component.kind, blockIndexes, status: 'mapped' }
         })
         const footer = source.site.footer
-        const hasRichFooter = Boolean(footer.tagline || (Array.isArray(footer.socials) && footer.socials.length) || (Array.isArray(footer.columns) && footer.columns.length > 1))
+        const hasRichFooter = Boolean(footer.tagline || (Array.isArray(footer.socials) && footer.socials.length) || (Array.isArray(footer.columns) && (footer.columns.length > 1 || footer.columns.some((c: { text?: string }) => c?.text))))
         const simpleDropsContent = design.footerVariant === 'simple' && Boolean(footer.tagline || (Array.isArray(footer.columns) && footer.columns.length))
         const footerVariant = (design.footerVariant === 'minimal' && hasRichFooter) || simpleDropsContent ? 'centered-stack' : design.footerVariant
         blocks.push(validate({ ...footer, blockType: 'footer', variant: footerVariant }))

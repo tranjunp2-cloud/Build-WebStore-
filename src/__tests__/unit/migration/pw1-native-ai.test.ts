@@ -92,8 +92,16 @@ describe('[TC-F35.M18] AI chooses only existing PW2 blocks', () => {
         const { source, design } = fixture()
         source.pages[0].components[0].block.sourceLayout!.size = 'hero'
         source.pages[0].components[0].block.slides!.pop()
+        design.pages[0].sections[0] = { sourceId:'11', blockType:'hero', variant:'centered' }
+        expect(bindNativeDesign(source, design).pages![0].blocks[1]).toMatchObject({blockType:'hero',variant:'centered',headline:'One',image:{url:'https://source.example/1.jpg'},ctaButtons:[{label:'Buy',url:'/products'}]})
+    })
+    it('[TC-F35.M28] rejects the image-less fullscreen hero for a banner that has an image', () => {
+        const { source, design } = fixture()
+        source.pages[0].components[0].block.sourceLayout!.size = 'hero'
+        source.pages[0].components[0].block.slides!.pop()
+        expect(nativeBannerChoices(source.pages[0].components[0].block)).not.toContain('hero:fullscreen')
         design.pages[0].sections[0] = { sourceId:'11', blockType:'hero', variant:'fullscreen' }
-        expect(bindNativeDesign(source, design).pages![0].blocks[1]).toMatchObject({blockType:'hero',variant:'fullscreen',headline:'One',image:{url:'https://source.example/1.jpg'},ctaButtons:[{label:'Buy',url:'/products'}]})
+        expect(() => bindNativeDesign(source, design)).toThrow('cannot render the source image')
     })
     it('[TC-F35.M25] binds categories to native cards and portfolio layouts with ordered items', () => {
         const { source, design } = fixture()
@@ -152,6 +160,16 @@ it.each(FooterConfigSchema.shape.variant.removeDefault().options)('[TC-F35.M18] 
     const footer = {...source.site.footer, tagline:'Source tagline', copyrightText:'Source copyright', columns:[{title:'Links',links:[{label:'Contact',url:'/contact'}]}]}
     const result = bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant})
     for (const page of result.pages!) expect(page.blocks.at(-1)).toMatchObject({...footer,variant: ['minimal', 'simple'].includes(variant) ? 'centered-stack' : variant})
+})
+
+it('[TC-F35.M18] does not pick the minimal footer when a single column carries source text', () => {
+    // Arrange: minimal only mirrors header links, so a lone text column would be dropped.
+    const {source, design} = fixture()
+    const footer = {...source.site.footer, tagline:'', columns:[{title:'Contact',text:'Phone: 0123',links:[]}]}
+    // Act
+    const result = bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:'minimal'})
+    // Assert
+    expect(result.pages![0].blocks.at(-1)).toMatchObject({variant:'centered-stack',columns:footer.columns})
 })
 
 it.each(NavigationConfigSchema.shape.variant.removeDefault().options)('[TC-F35.M18] preserves navigation content with native %s variant', variant => {
