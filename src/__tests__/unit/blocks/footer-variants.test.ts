@@ -241,3 +241,24 @@ describe('[TC-S2-014] Footer Block Variants', () => {
         })
     })
 })
+
+// ── TC-F35.M31: footer brand block shows contact details ────────────────────
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { FooterBlock } from '@/blocks/footer'
+
+describe('[TC-F35.M31] Footer contact info under the logo', () => {
+    const site = { name: 'Shop', contactInfo: { address: 'Selangor, Malaysia', phone: '0116 745 8888', email: 'a@b.com' } }
+    it.each(['dark-gradient', 'centered-stack'])('%s renders tagline, address, phone and email when showContactInfo is on', variant => {
+        const block = FooterConfigSchema.parse(minimalFooterConfig({ variant, tagline: 'About us', showContactInfo: true }))
+        const html = renderToStaticMarkup(React.createElement(FooterBlock, { block, site } as never))
+        for (const text of ['About us', 'Selangor, Malaysia', '0116 745 8888', 'a@b.com']) expect(html).toContain(text)
+        expect(html).toContain('href="tel:01167458888"')
+        expect(html).toContain('href="mailto:a@b.com"')
+    })
+    it('omits the contact list by default', () => {
+        const block = FooterConfigSchema.parse(minimalFooterConfig({ variant: 'dark-gradient' }))
+        expect(renderToStaticMarkup(React.createElement(FooterBlock, { block, site } as never))).not.toContain('Selangor, Malaysia')
+    })
+})
+
