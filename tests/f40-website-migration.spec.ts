@@ -28,11 +28,12 @@ test('[TC-F40-MIG-LIVE-12] missing F42 source reports unavailable without false 
   } finally { await db.end(); }
   // Arrange: real server authentication, never mock the missing schema response.
   expect([401, 403]).toContain((await request.get('/api/admin/qa/website-migrations')).status());
+  expect([401, 403]).toContain((await request.get('/api/qa/migration-reconciliation?view=source_coverage&store_id=3')).status());
   const token = await new SignJWT({ id: userId!, collection: 'users', mfa_verified: true, roles: ['super-admin'] })
     .setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('5m')
     .sign(new TextEncoder().encode(process.env.PAYLOAD_SECRET));
   await page.context().addCookies([{ name: 'payload-token', value: token, url: baseURL! }]);
-  for (const path of ['/api/admin/qa/website-migrations', '/api/admin/qa/website-migrations?store=3', '/api/qa/migration-reconciliation?view=fields&store_id=3', `/api/admin/qa/website-migrations/images?store=3&version=${'0'.repeat(32)}`]) {
+  for (const path of ['/api/admin/qa/website-migrations', '/api/admin/qa/website-migrations?store=3', '/api/qa/migration-reconciliation?view=fields&store_id=3', '/api/qa/migration-reconciliation?view=source_coverage&store_id=3', `/api/admin/qa/website-migrations/images?store=3&version=${'0'.repeat(32)}`]) {
     const response = await page.request.get(path);
     expect(response.status()).toBe(503);
     expect((await response.json()).code).toBe('F42_SOURCE_UNAVAILABLE');
@@ -68,6 +69,7 @@ async function checkWebsiteMigration({
     data: { mode: 'quick', store: '1', version: '0'.repeat(32), verdict: 'passed' },
   })).status());
   expect([401, 403]).toContain((await request.get('/api/qa/migration-reconciliation?view=fields&store_id=575')).status());
+  expect([401, 403]).toContain((await request.get('/api/qa/migration-reconciliation?view=source_coverage&store_id=575')).status());
   test.skip(
     !process.env.PAYLOAD_SECRET || !process.env.DATABASE_URI,
     "Requires the local migration fixture DB and Payload secret",
@@ -364,17 +366,62 @@ async function checkWebsiteMigration({
   // TC-F40-MIG-LIVE-08: real authenticated browser reads the field-evidence panel.
   await page.getByRole('button', { name: 'Đối soát Commerce', exact: true }).click();
   const fieldPanel = page.getByRole('region', { name: 'Đối soát từng trường F42' });
-  await expect(fieldPanel).toBeVisible();
   await expect(page.getByTestId('migration-reconciliation-scroll')).toHaveCSS('overflow-y', 'auto');
+  await expect(page.getByTestId('migration-reconciliation-scroll')).not.toContainText('Đang đọc bằng chứng đối soát…');
   const fieldResponse = await page.request.get(`/api/qa/migration-reconciliation?view=fields&store_id=${store}&scope=commerce`);
   expect(fieldResponse.status()).toBe(200);
   const fieldData = (await fieldResponse.json()).data;
-  if (!fieldData.summary) {
-    await expect(fieldPanel).toContainText('Chưa có field evidence F42 hợp lệ');
+  // TC-F40-MIG-LIVE-08: the browser reads the real pre-filter source artifact.
+  // An older fixture may lack the F42 sidecar schema, which must fail closed.
+  const pinnedSnapshot = fieldData.summary?.snapshotId ? `&snapshot_id=${encodeURIComponent(fieldData.summary.snapshotId)}` : '';
+  const sourceResponse = await page.request.get(`/api/qa/migration-reconciliation?view=source_coverage&store_id=${store}&scope=commerce${pinnedSnapshot}`);
+  if (sourceResponse.status() === 503) {
+    expect((await sourceResponse.json()).code).toBe('F42_SOURCE_UNAVAILABLE');
   } else {
-    await expect(fieldPanel).toContainText(fieldData.summary.generationId);
-    await fieldPanel.getByRole('button', { name: /^Khác dữ liệu/ }).click();
-    await expect(fieldPanel.getByRole('button', { name: /^Khác dữ liệu/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(sourceResponse.status()).toBe(200);
+    const source = (await sourceResponse.json()).data;
+    expect(['complete', 'unavailable']).toContain(source.state);
+    if (source.state === 'complete') {
+      expect(source.snapshotId).toMatch(/^[0-9a-f-]{36}$/i);
+      expect(source.manifestSha256).toMatch(/^[0-9a-f]{64}$/i);
+      expect(source.sidecarSha256).toMatch(/^[0-9a-f]{64}$/i);
+      if (fieldData.summary?.snapshotId) expect(source.snapshotId).toBe(fieldData.summary.snapshotId);
+      expect(source.records).toBeGreaterThan(0);
+      expect(source.buckets.reduce((sum: number, bucket: { records: number }) => sum + bucket.records, 0)).toBe(source.records);
+    } else {
+      expect(source.reason).toEqual(expect.any(String));
+      expect(source.records).toBe(0);
+    }
+  }
+  if (!fieldData.summary) await expect(fieldPanel).toBeVisible();
+  if (await fieldPanel.count()) {
+    const sourceCard = page.getByTestId('commerce-source-coverage');
+    const fidelityCard = page.getByTestId('commerce-import-fidelity');
+    await expect(sourceCard).toContainText('Dữ liệu gốc trong PW1');
+    await expect(fidelityCard).toContainText('Các trường đã được đối chiếu');
+    if (sourceResponse.status() === 503) {
+      await expect(sourceCard).toContainText('Không đọc được kiểm kê nguồn PW1');
+    } else if ((await sourceResponse.json()).data.state === 'unavailable') {
+      await expect(sourceCard).toContainText('Chưa đủ bằng chứng');
+    } else {
+      await expect(sourceCard).toContainText(/bản ghi ở các bảng Commerce|Chưa đủ bằng chứng/);
+      await fieldPanel.getByText('Xem kiểm kê nguồn và thông tin kỹ thuật').click();
+      await expect(fieldPanel.getByText(/Sidecar SHA-256/)).toBeVisible();
+    }
+    if (fieldData.summary) {
+      if (!await fieldPanel.locator('details').first().evaluate(el => (el as HTMLDetailsElement).open)) {
+        await fieldPanel.getByText('Xem kiểm kê nguồn và thông tin kỹ thuật').click();
+      }
+      await expect(fieldPanel.getByText(new RegExp(fieldData.summary.generationId))).toBeVisible();
+      await fieldPanel.getByText(/Xem từng trường và lọc kết quả/).click();
+      await fieldPanel.getByRole('button', { name: /^Khác dữ liệu/ }).click();
+      await expect(fieldPanel.getByRole('button', { name: /^Khác dữ liệu/ })).toHaveAttribute('aria-pressed', 'true');
+    } else {
+      await expect(fieldPanel).toContainText('Chưa có field evidence F42 hợp lệ');
+      await expect(sourceCard).toBeVisible();
+    }
+  } else {
+    await expect(page.getByTestId('migration-reconciliation-scroll')).toContainText(/Không có field evidence F42 cho migration run đang chọn|Chưa chọn được migration run VERIFIED/);
   }
   await page.getByRole('button', { name: 'Xem Web Thật (Live Iframe)', exact: true }).click();
   if (snapshot.review?.version) {

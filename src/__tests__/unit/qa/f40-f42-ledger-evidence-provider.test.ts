@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 import {
   F42_LEDGER_CONTRACT_VERSION,
   createF42LedgerEvidenceProvider,
+  f42LedgerSourceEntityFilter,
   type F42LedgerReadResult,
 } from "@/lib/admin/qa/f42-ledger-evidence-provider";
 
@@ -33,6 +35,20 @@ function verifiedLedger(overrides: Partial<F42LedgerReadResult> = {}): F42Ledger
 }
 
 describe("[TC-F40-14-01][TC-F40-14-03] F42 ledger evidence provider", () => {
+  it("TC-F40-14-03: compiles the real entity filter as SQL IN with bound values", () => {
+    // Arrange
+    const dialect = new PgDialect();
+
+    // Act
+    const query = dialect.sqlToQuery(f42LedgerSourceEntityFilter());
+
+    // Assert
+    expect(query.sql).toMatch(/^m\.source_entity IN \(\$1(?:, \$\d+)+\)$/);
+    expect(query.params).toContain("products");
+    expect(query.params).toContain("orders");
+    expect(query.params).not.toContain("ANY");
+  });
+
   it("TC-F40-14-03: exposes only an explicitly selected, verified F42 run", async () => {
     // Arrange
     const provider = createF42LedgerEvidenceProvider(async () => verifiedLedger());

@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API Tests", () => {
+test.describe("F40 US-F40-09 Reconciliation API guards (no session)", () => {
+  // The project injects the Super Admin session; these guards must run without it.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("[TC-F40-09-API-01] GET /api/qa/migration-diff rejects unauthenticated access with 401/403", async ({
     request,
   }) => {
@@ -80,12 +83,27 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     expect([401, 403]).toContain(res.status());
   });
 
+  test("[TC-F40-14-07] record field evidence rejects unauthenticated access", async ({ request }) => {
+    // Arrange
+    const url = `/api/qa/migration-reconciliation?scope=commerce&view=record_fields&store_id=42&run_id=3f5f32ef-5385-4b46-9b4e-7a7c13f5c5db&record_ref=${'a'.repeat(32)}`;
+
+    // Act
+    const response = await request.get(url);
+
+    // Assert
+    expect([401, 403]).toContain(response.status());
+  });
+
   test("[TC-F40-11-E2E-01] unauthenticated navigation to /studio/migration redirects to login", async ({
     page,
   }) => {
     await page.goto("/studio/migration");
     await expect(page).toHaveURL(/\/admin/);
   });
+
+});
+
+test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API Tests (Super Admin)", () => {
 
   test("[TC-F40-11-E2E-02] switching page tabs scopes the field diff grid", async ({ page }) => {
     test.skip(
@@ -157,6 +175,8 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     );
 
     await page.goto("/studio/qa/migration-diff?demo=1");
+    await page.getByPlaceholder("Tìm theo Email khách hàng, Domain, Mã Site...").fill("SITE-0001");
+    await page.getByTestId("migration-store-compare-SITE-0001").click();
     await page.getByRole("button", { name: "So Sánh Khối" }).click();
     await page.getByLabel("Xem dữ liệu mẫu để duyệt UI").check();
 
@@ -173,6 +193,8 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
 
     // Arrange
     await page.goto("/studio/qa/migration-diff?demo=1");
+    await page.getByPlaceholder("Tìm theo Email khách hàng, Domain, Mã Site...").fill("SITE-0001");
+    await page.getByTestId("migration-store-compare-SITE-0001").click();
 
     // Act
     await page.getByRole("button", { name: "Đối soát Commerce" }).click();
@@ -201,6 +223,7 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
 
     // Arrange
     await page.goto("/studio/qa/migration-diff");
+    await page.getByTestId("migration-store-compare-SITE-0001").click();
     await page.getByRole("button", { name: "Đối soát Commerce" }).click();
 
     // Act
@@ -210,8 +233,41 @@ test.describe("F40 US-F40-09 Dual-Mode Ingestion & Reconciliation Security & API
     await runSelector.selectOption(process.env.E2E_F42_RUN_ID);
 
     // Assert
-    await expect(page.getByTestId("migration-reconciliation-shell")).toBeVisible();
+    const ledgerResponse = await page.request.get(
+      `/api/qa/migration-reconciliation?scope=commerce&store_id=${encodeURIComponent(process.env.E2E_F42_SOURCE_STORE_ID ?? "")}&run_id=${encodeURIComponent(process.env.E2E_F42_RUN_ID ?? "")}`,
+    );
+    expect(ledgerResponse.status()).toBe(200);
+    const ledger = (await ledgerResponse.json()).data;
+    expect(ledger.evidence.available).toBe(true);
+    expect(ledger.fieldGeneration).toBeTruthy();
+    const shell = page.getByTestId("migration-reconciliation-shell");
+    await expect(shell).toBeVisible();
+    await expect(shell).toContainText("Bản ghi trong ledger");
+    const product = ledger.records.find((record: { sourceEntity: string; sourceId: string; reference?: string }) =>
+      record.sourceEntity === "products" && /^\d+$/.test(record.sourceId));
+    if (product?.reference) {
+      await shell.getByLabel("Tìm dữ liệu đối soát").fill(product.sourceId);
+      await expect(shell.locator("table tbody tr").filter({ hasText: `PW1: ${product.sourceId}` }).first()).toBeVisible();
+      await shell.getByRole('button', { name: `Xem chi tiết Sản phẩm PW1 ${product.sourceId}` }).click();
+      const recordFields = page.getByRole('region', { name: 'Bằng chứng từng trường của bản ghi' });
+      await expect(recordFields).toBeVisible();
+      await expect(recordFields).toContainText('Giá trị PW1 và PW2 theo từng trường');
+      const fieldResponse = await page.request.get(
+        `/api/qa/migration-reconciliation?scope=commerce&view=record_fields&store_id=${encodeURIComponent(process.env.E2E_F42_SOURCE_STORE_ID ?? '')}&run_id=${encodeURIComponent(process.env.E2E_F42_RUN_ID ?? '')}&record_ref=${encodeURIComponent(product.reference)}&generation_id=${encodeURIComponent(ledger.fieldGeneration.generationId)}&generation_digest=${encodeURIComponent(ledger.fieldGeneration.digest)}`,
+      );
+      expect(fieldResponse.status()).toBe(200);
+      const fieldData = (await fieldResponse.json()).data;
+      if (fieldData.state === 'complete' && fieldData.total > 0) {
+        await expect(recordFields.getByRole('columnheader', { name: 'PW1 gốc' })).toBeVisible();
+        await expect(recordFields.getByRole('columnheader', { name: 'PW2 sau migration' })).toBeVisible();
+      } else {
+        await expect(recordFields).toContainText(fieldData.reason);
+      }
+    }
+    expect(ledger.records.filter((record: { sourceEntity: string }) => record.sourceEntity === "customers")
+      .every((record: { sourceId: string }) => /^\d+$/.test(record.sourceId))).toBe(true);
     await expect(page.getByTestId("migration-ledger-issues")).toBeVisible();
+    await expect(page.getByTestId("migration-reconciliation-shell")).not.toContainText("Không tải được dữ liệu:");
 
     // Act / Assert — a new source Store must clear the old selected run and its issues.
     await page.getByLabel("ID store nguồn PW1").fill("999999999");
