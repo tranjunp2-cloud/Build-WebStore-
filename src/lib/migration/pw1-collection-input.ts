@@ -301,8 +301,10 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 })
                 return { title: localized(item), links: [...links, ...richLinks, ...iconLinks], ...(text ? {text} : {}) }
             }).filter(column => column.links.length > 0 || column.text)
-            // PW1 footers show the store description (PW2 keeps it as the SEO description) and contact details under the logo
-            const tagline = str(object(site.seo).metaDescription).trim()
+            const tagline = ''
+            // PW1 footers show the store description (PW2 keeps it as the SEO description) and contact details under the
+            // logo. Only the dark-gradient footer renders them, so the binder applies them once the variant is known.
+            const storeDescription = str(object(site.seo).metaDescription).trim()
             // Native footer renders at most 4 columns. Fold overflow columns into the 4th so every
             // source link and text survives instead of rejecting the whole store.
             if (columns.length > 4) {
@@ -351,7 +353,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 ...(disabledHomepage ? { publication: 'keep-draft' } : {}), settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
                 features: { cart: cartEnabled, orderTracking: cartEnabled && validPages.some(p => str(p.type) === '6' || rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'order_tracking')) },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(item => menuLinks(item)),
-                footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, ...(Object.values(siteSettings.contactInfo).some(Boolean) ? { showContactInfo: true } : {}), columns, ...(footerSocials.length ? { socials: footerSocials } : {}) }, pages,
+                footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, ...(storeDescription ? { storeDescription } : {}), ...(Object.values(siteSettings.contactInfo).some(Boolean) ? { showContactInfo: true } : {}), columns, ...(footerSocials.length ? { socials: footerSocials } : {}) }, pages,
             } })
         }
     }

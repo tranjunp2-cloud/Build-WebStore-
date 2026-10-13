@@ -250,7 +250,6 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                         {tagline && (
                             <Body size="small" data-footer-field="tagline" className="whitespace-pre-line opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
                         )}
-                        {mergedBlock.showContactInfo && <FooterContactInfo contact={site?.contactInfo} className="mb-8 inline-block text-left" />}
 
                         {/* Link columns as horizontal lists */}
                         {columns.length > 0 && (

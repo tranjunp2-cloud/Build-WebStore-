@@ -50,7 +50,7 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — Redirects are followed with every hop kept HTTPS/no-credentials/no-port; 403 from bot-protected CDNs is retried through a headless browser before falling back to the placeholder; images labelled with a generic content-type are accepted when the bytes are a real image.
 
 ### TC-F35.M65 — Footer brand block
-- [x] AUTO — Footer uses the store logo image (not text) when its stored logo is a media id, and shows the store description plus address/phone/email with icons under the logo (`dark-gradient`, `centered-stack`) when the source store has them.
+- [x] AUTO — Footer uses the store logo image (not text) when its stored logo is a media id, and shows the store description plus address/phone/email with icons under the logo in `dark-gradient` only (other variants keep the source footer unchanged) when the source store has them.
 
 ### TC-F35.M66 — Footer variant for branded multi-column footers
 - [x] AUTO — A source footer with a tagline or contact details and three or more link columns is always bound to `dark-gradient`, regardless of the AI's choice; fewer columns or no brand block keep the AI choice.

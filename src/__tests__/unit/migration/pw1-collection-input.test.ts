@@ -506,8 +506,9 @@ it('[TC-F35.M65] shows the store description and contact details in the footer b
         return {entry: entries[0], contract: adaptWebsiteInput(compactInput(entries[0])).contract}
     }
     const full = build({contactInfo:{phone:'123',email:'shop@example.com',address:'1 Road'}, seo:{metaTitle:'T', metaDescription:'Store description'}})
-    expect(full.contract.site.footer).toMatchObject({tagline:'Store description', showContactInfo:true})
+    expect(full.contract.site.footer).toMatchObject({tagline:'', storeDescription:'Store description', showContactInfo:true})
     const bare = build({contactInfo:{phone:'',email:'',address:''}, seo:{metaTitle:'T'}})
     expect(bare.entry.website.footer.tagline).toBe('')
+    expect(bare.entry.website.footer.storeDescription).toBeUndefined()
     expect(bare.entry.website.footer.showContactInfo).toBeUndefined()
 })
