@@ -172,6 +172,26 @@ it('[TC-F35.M18] does not pick the minimal footer when a single column carries s
     expect(result.pages![0].blocks.at(-1)).toMatchObject({variant:'centered-stack',columns:footer.columns})
 })
 
+it.each([
+    ['tagline', {tagline:'About us'}],
+    ['contact info', {tagline:'', showContactInfo:true}],
+])('[TC-F35.M32] uses dark-gradient for a footer with %s and three link columns whatever AI chose', (_name, extra) => {
+    const {source, design} = fixture()
+    const column = (title: string) => ({title, links:[{label:title,url:'/a'}]})
+    const footer = {...source.site.footer, ...extra, columns:[column('A'), column('B'), column('C')]}
+    for (const variant of ['simple', 'minimal', 'centered-stack', 'dark-gradient'] as const)
+        expect(bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant}).pages![0].blocks.at(-1)).toMatchObject({variant:'dark-gradient'})
+})
+
+it('[TC-F35.M32] keeps the AI footer choice when there are fewer than three columns or no brand block', () => {
+    const {source, design} = fixture()
+    const column = (title: string) => ({title, links:[{label:title,url:'/a'}]})
+    const twoColumns = {...source.site.footer, tagline:'About us', columns:[column('A'), column('B')]}
+    expect(bindNativeDesign({...source,site:{...source.site,footer:twoColumns}}, {...design,footerVariant:'centered-stack'}).pages![0].blocks.at(-1)).toMatchObject({variant:'centered-stack'})
+    const noBrand = {...source.site.footer, tagline:'', columns:[column('A'), column('B'), column('C')]}
+    expect(bindNativeDesign({...source,site:{...source.site,footer:noBrand}}, {...design,footerVariant:'centered-stack'}).pages![0].blocks.at(-1)).toMatchObject({variant:'centered-stack'})
+})
+
 it.each(NavigationConfigSchema.shape.variant.removeDefault().options)('[TC-F35.M18] preserves navigation content with native %s variant', variant => {
     const {source, design} = fixture()
     const result = bindNativeDesign(source, {...design,navigationVariant:variant})
