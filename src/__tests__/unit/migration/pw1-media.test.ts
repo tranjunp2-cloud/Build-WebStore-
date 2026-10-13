@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+import { uploadImageBuffer } from '@/lib/ai/upload-media'
 import type { Payload } from 'payload'
 import { importPw1BlockMedia, validatePw1MediaUrl } from '@/lib/migration/pw1-media'
+
+vi.mock('@/lib/ai/upload-media', () => ({ uploadImageBuffer: vi.fn().mockResolvedValue(77) }))
 
 describe('[TC-F35.M12] Source media URL boundary', () => {
     it.each([
@@ -32,5 +35,22 @@ describe('[TC-F35.M12] Source media URL boundary', () => {
         const block = { slides: [{ image: { url: 'https://source.example/banner.png', width: 800, height: 600 } }] }
         await importPw1BlockMedia([[block]], 830, payload)
         expect(block.slides[0].image).toEqual({ url: 'https://destination.example/banner.png', alt: 'Banner', width: 1893, height: 560 })
+    })
+    it('[TC-F35.M29] decodes HTML entities in rich-text image URLs before downloading', async () => {
+        const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64')
+        const fetchMock = vi.fn().mockResolvedValue(new Response(png, { status: 200, headers: { 'content-type': 'image/png' } }))
+        vi.stubGlobal('fetch', fetchMock)
+        const payload = {
+            db: { drizzle: { execute: vi.fn().mockResolvedValue({ rows: [] }) } },
+            find: vi.fn().mockResolvedValue({ docs: [] }),
+            findByID: vi.fn().mockResolvedValue({ url: 'https://destination.example/hosted.png' }),
+        } as unknown as Payload
+        const block = { html: '<figure><img src="https://cdn.source.example/a.png?e=1&amp;v=beta&amp;t=sig" alt="x"></figure>' }
+        await importPw1BlockMedia([[block]], 830, payload)
+        vi.unstubAllGlobals()
+        expect(String(fetchMock.mock.calls[0][0])).toBe('https://cdn.source.example/a.png?e=1&v=beta&t=sig')
+        expect(vi.mocked(uploadImageBuffer)).toHaveBeenCalled()
+        expect(fetchMock.mock.calls[0][1].headers['User-Agent']).toMatch(/^Mozilla\//)
+        expect(block.html).toContain('src="https://destination.example/hosted.png"')
     })
 })

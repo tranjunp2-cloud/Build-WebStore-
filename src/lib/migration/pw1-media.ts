@@ -1,7 +1,9 @@
 import sharp from 'sharp'
+import { load } from 'cheerio'
 import { PW1_PLACEHOLDER_URL } from './pw1-placeholder'
 import { hasValidImageSignature } from '@/lib/media/image-signature'
 import { recordCreatedPw1Media } from './pw1-media-tracking'
+import { BROWSER_USER_AGENT, fetchImageViaBrowser } from './pw1-media-browser'
 import { sql } from 'drizzle-orm'
 import { createHash } from 'node:crypto'
 import type { Payload } from 'payload'
@@ -18,12 +20,33 @@ async function placeholderImage() {
     return { buffer: await sharp(Buffer.from(svg)).png().toBuffer(), mimetype: 'image/png' }
 }
 
+const MAX_REDIRECTS = 5
+
+/** Fetch with manual redirects so every hop passes the same HTTPS/no-credentials/no-port check as the source URL. */
+async function fetchSourceImage(initial: URL): Promise<Response> {
+    let url = initial
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+        // Some CDNs (e.g. oecd.org) answer 403 to the default fetch User-Agent but serve browsers
+        const request = () => fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000), headers: { 'User-Agent': BROWSER_USER_AGENT, Accept: 'image/*,*/*;q=0.8' } })
+        // One retry absorbs transient CDN timeouts/resets
+        const response = await request().catch(() => request())
+        const location = response.headers.get('location')
+        if (response.status < 300 || response.status >= 400 || !location) return response
+        await response.body?.cancel()
+        url = validatePw1MediaUrl(new URL(location, url).href)
+    }
+    throw new Error('Source media redirected too many times')
+}
+
 export async function downloadSourceImage(value: string) {
     if (value === PW1_PLACEHOLDER_URL) return placeholderImage()
     const url = validatePw1MediaUrl(value)
-    const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000) })
+    const response = await fetchSourceImage(url)
     if (response.status === 403) {
         await response.body?.cancel()
+        // Bot-protected CDNs (Cloudflare challenge) reject fetch but serve a real browser
+        const viaBrowser = await fetchImageViaBrowser(url).catch(() => null)
+        if (viaBrowser) return normalizeImageBytes(viaBrowser.buffer, viaBrowser.mimetype, true)
         console.warn('[PW1 media] Source returned HTTP 403; using placeholder')
         return placeholderImage()
     }
@@ -35,7 +58,9 @@ export async function downloadSourceImage(value: string) {
         console.warn(`[PW1 media] Source is a video (${mimetype}); using placeholder`)
         return placeholderImage()
     }
-    if (!mimetype.startsWith('image/')) throw new Error('Source media is not a supported raster image')
+    // Some storage hosts label images "image" or octet-stream; the bytes are validated below
+    const typedAsImage = mimetype.startsWith('image/')
+    if (!typedAsImage && !['image', 'application/octet-stream', 'binary/octet-stream'].includes(mimetype)) throw new Error('Source media is not a supported raster image')
     const limit = 30 * 1024 * 1024
     if (Number(response.headers.get('content-length')) > limit) { await response.body.cancel(); throw new Error('Source image exceeds 30 MiB') }
     const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0
@@ -48,15 +73,20 @@ export async function downloadSourceImage(value: string) {
             chunks.push(chunk)
         }
     } finally { reader.releaseLock() }
-    const buffer = Buffer.concat(chunks)
-    // Media accepts only JPEG/PNG/WebP/ICO bytes and PW1 content-types are unreliable (image/jpg,
-    // AVIF labelled image/png): trust the bytes, re-encode other formats to PNG (first frame for
-    // animations), and fall back to the neutral placeholder when the bytes cannot be decoded.
+    return normalizeImageBytes(Buffer.concat(chunks), mimetype, typedAsImage)
+}
+
+/** Media accepts only JPEG/PNG/WebP/ICO bytes and PW1 content-types are unreliable (image/jpg,
+ * AVIF labelled image/png): trust the bytes, re-encode other formats to PNG (first frame for
+ * animations), and fall back to the neutral placeholder when bytes of an image-typed response
+ * cannot be decoded. Bytes of an untyped response that are not an image are an error. */
+async function normalizeImageBytes(buffer: Buffer, mimetype: string, typedAsImage: boolean) {
     const signatureMimetype = detectSupportedImageMimetype(new Uint8Array(buffer.subarray(0, 12)))
     if (signatureMimetype) return { buffer, mimetype: signatureMimetype }
     try {
         return { buffer: await sharp(buffer, { animated: false }).png().toBuffer(), mimetype: 'image/png' }
     } catch (error) {
+        if (!typedAsImage) throw new Error('Source media is not a supported raster image')
         console.warn(`[PW1 media] Source image (${mimetype}) could not be decoded; using placeholder: ${error instanceof Error ? error.message : error}`)
         return placeholderImage()
     }
@@ -133,7 +163,8 @@ async function rehostHtmlImages(html: string, tenantId: number | string, payload
 
     let result = html
     for (const match of matches) {
-        const originalSrc = match[2].trim()
+        // The regex yields raw attribute text; decode entities (&amp; in signed CDN URLs) before fetching
+        const originalSrc = (load(match[0], null, false)('img').attr('src') ?? match[2]).trim()
         if (!/^https?:\/\//i.test(originalSrc)) continue
 
         try {
