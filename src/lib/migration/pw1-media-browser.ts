@@ -1,8 +1,8 @@
 /** CLI-only: fetches an image through headless Chromium when the source CDN blocks plain HTTP clients. */
 import { lookup } from 'node:dns/promises'
 import { publicBrandAddress } from './pw1-brand-scan'
+import { BROWSER_USER_AGENT } from './pw1-media'
 
-export const BROWSER_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
 const LIMIT = 30 * 1024 * 1024
 
 export async function fetchImageViaBrowser(url: URL): Promise<{ buffer: Buffer; mimetype: string } | null> {

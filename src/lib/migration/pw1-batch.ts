@@ -7,6 +7,8 @@ import { verifyMigrationDestination, resolveDeclaredCategories } from './pw1-des
 import { analyzePw1Brand } from './pw1-brand-analysis'
 import { selectPw1TenantSlug } from './pw1-tenant-slug'
 import { scanPw1Brand } from './pw1-brand-scan'
+import { registerBrowserImageFetcher } from './pw1-media'
+import { fetchImageViaBrowser } from './pw1-media-browser'
 import { configureMigrationTransactions } from './pw1-transactions'
 import { MigrationMutex, runStorePool } from './pw1-concurrency'
 import { acquireMediaCreateLock } from '@/lib/ai/media-create-lock'
@@ -28,6 +30,9 @@ import { applyPw1Website } from './pw1-apply'
 import { createNativeBlueprint } from './pw1-contract'
 import { adaptWebsiteInput } from './pw2-website-input'
 import { batchAction, batchEntryHash, compactInput, type BatchEntry } from './pw1-batch-input'
+
+// Batch migration is CLI-only: let image downloads fall back to a real browser for bot-protected CDNs.
+registerBrowserImageFetcher(fetchImageViaBrowser)
 
 type Mapping = { source_store_id:string;source_user_id:string;tenant_id:number;site_id:number;input_hash:string|null;status:string }
 type Tx = { execute(query:unknown):Promise<unknown> }

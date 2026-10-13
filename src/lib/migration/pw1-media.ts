@@ -3,11 +3,17 @@ import { load } from 'cheerio'
 import { PW1_PLACEHOLDER_URL } from './pw1-placeholder'
 import { hasValidImageSignature } from '@/lib/media/image-signature'
 import { recordCreatedPw1Media } from './pw1-media-tracking'
-import { BROWSER_USER_AGENT, fetchImageViaBrowser } from './pw1-media-browser'
 import { sql } from 'drizzle-orm'
 import { createHash } from 'node:crypto'
 import type { Payload } from 'payload'
 import { uploadImageBuffer } from '@/lib/ai/upload-media'
+
+export const BROWSER_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+
+type BrowserImageFetcher = (url: URL) => Promise<{ buffer: Buffer; mimetype: string } | null>
+let browserImageFetcher: BrowserImageFetcher | undefined
+/** CLI-only hook: this module is reachable from web routes, which must not bundle a browser, so the CLI registers one. */
+export function registerBrowserImageFetcher(fetcher: BrowserImageFetcher | undefined) { browserImageFetcher = fetcher }
 
 export function validatePw1MediaUrl(value: string): URL {
     const url = new URL(value)
@@ -45,7 +51,7 @@ export async function downloadSourceImage(value: string) {
     if (response.status === 403) {
         await response.body?.cancel()
         // Bot-protected CDNs (Cloudflare challenge) reject fetch but serve a real browser
-        const viaBrowser = await fetchImageViaBrowser(url).catch(() => null)
+        const viaBrowser = await browserImageFetcher?.(url).catch(() => null)
         if (viaBrowser) return normalizeImageBytes(viaBrowser.buffer, viaBrowser.mimetype, true)
         console.warn('[PW1 media] Source returned HTTP 403; using placeholder')
         return placeholderImage()
