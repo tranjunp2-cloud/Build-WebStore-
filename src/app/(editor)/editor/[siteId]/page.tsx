@@ -401,6 +401,18 @@ export default function EditorPage() {
     const [showSaveGuard, setShowSaveGuard] = useState(false)
     const reorderSaveTimerRef = useRef<number | null>(null)
     const footerUpdateSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    // "Saved"/"Published" flashes reset themselves after a delay; cancel them on unmount so a late
+    // timer never updates state of an unmounted editor (it also fires after test teardown otherwise).
+    const flashResetTimersRef = useRef(new Set<number>())
+    const resetFlashAfter = useCallback((reset: () => void, delayMs: number) => {
+        const timers = flashResetTimersRef.current
+        const id = window.setTimeout(() => { timers.delete(id); reset() }, delayMs)
+        timers.add(id)
+    }, [])
+    useEffect(() => {
+        const timers = flashResetTimersRef.current
+        return () => { timers.forEach(id => window.clearTimeout(id)); timers.clear() }
+    }, [])
     // Imperative handle to send postMessages to iframe without full reload (Gap B)
     const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
     const isSavingRef = useRef(false)
@@ -829,7 +841,7 @@ export default function EditorPage() {
                         toast.success(options.successToast ?? t.editor.toast.saveSuccess)
                     }
 
-                    window.setTimeout(() => setSaveSuccess(false), 2000)
+                    resetFlashAfter(() => setSaveSuccess(false), 2000)
                     return true
                 } catch (err) {
                     if (!isEditorSaveContextCurrent(saveContext, useEditorStore.getState())) {
@@ -854,7 +866,7 @@ export default function EditorPage() {
                 setIsSaving(false)
             }
         }
-    }, [markSaved, page, setIsSaving, siteId])
+    }, [markSaved, page, resetFlashAfter, setIsSaving, siteId])
 
     const handleManualSave = useCallback(async (source: 'shell' | 'iframe' | 'footer' = 'shell') => {
         if (templateApplyPendingRef.current) return false
@@ -1273,7 +1285,7 @@ export default function EditorPage() {
                     if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
                 }
                 if (changes.branding) setIframeKey(key => key + 1)
-                window.setTimeout(() => setSaveSuccess(false), 1800)
+                resetFlashAfter(() => setSaveSuccess(false), 1800)
             }
             return true
         } catch (error) {
@@ -1287,7 +1299,7 @@ export default function EditorPage() {
                 setIsContactSavePending(false)
             }
         }
-    }, [currentPageId, siteId, t.editor.settings.localBusinessSaveUnknownDescription, t.editor.settings.localBusinessSaveUnknownTitle, updateSiteName, updateHeaderBlock])
+    }, [currentPageId, resetFlashAfter, siteId, t.editor.settings.localBusinessSaveUnknownDescription, t.editor.settings.localBusinessSaveUnknownTitle, updateSiteName, updateHeaderBlock])
 
     const drainLocalBusinessSaves = useCallback((targetSiteId: string) => {
         if (localBusinessSaveInFlightSiteIdsRef.current.has(targetSiteId)) return
@@ -2485,7 +2497,7 @@ export default function EditorPage() {
                 toast.success(t.editor.toast.unpublishSuccess)
             }
 
-            window.setTimeout(() => setPublishSuccess(false), 3000)
+            resetFlashAfter(() => setPublishSuccess(false), 3000)
         } catch (err) {
             if (process.env.NODE_ENV === 'development') console.error('[Editor] Publish failed:', err)
             const detail = err instanceof Error ? err.message : undefined
@@ -2500,7 +2512,7 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [flushSavesBeforePublish, isPublishing, markPublished, setPages, site?.status, siteId, siteName])
+    }, [flushSavesBeforePublish, isPublishing, markPublished, resetFlashAfter, setPages, site?.status, siteId, siteName])
 
     // Re-publish: always PATCH (never DELETE). Used by "Update" button on published sites.
     const handleRepublish = useCallback(async () => {
@@ -2573,7 +2585,7 @@ export default function EditorPage() {
                 toast.success(`🎉 ${t.editor.toast.publishSuccess}`)
             }
 
-            window.setTimeout(() => setPublishSuccess(false), 3000)
+            resetFlashAfter(() => setPublishSuccess(false), 3000)
         } catch (err) {
             if (process.env.NODE_ENV === 'development') console.error('[Editor] Re-publish failed:', err)
             const detail = err instanceof Error ? err.message : undefined
@@ -2588,7 +2600,7 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [flushSavesBeforePublish, isPublishing, markPublished, setPages, siteId])
+    }, [flushSavesBeforePublish, isPublishing, markPublished, resetFlashAfter, setPages, siteId])
 
     const handlePageSelected = useCallback(async (pageId: string) => {
         if (templateApplyPendingRef.current) return

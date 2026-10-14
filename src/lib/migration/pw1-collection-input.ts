@@ -6,6 +6,7 @@ import { load } from 'cheerio'
 import { parseBatchInput, type BatchEntry } from './pw1-batch-input'
 
 type Row = Record<string, unknown>
+const FOOTER_CONTACT_URL = /^(mailto|tel|sms|whatsapp):\S+$/i
 type Link = { label: string; url?: string; pageId?: string; children?: Link[] }
 export type CollectionReport = { sourceStoreId: string; excluded: Array<{ id: string; kind: string; reason: string }>; warnings: string[] }
 const rows = (value: unknown): Row[] => z.array(z.record(z.unknown())).parse(value ?? [])
@@ -116,6 +117,8 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                     throw new Error(`${context}: unsupported link model ${kind}`)
                 }
                 if (!url) return
+                // Footer-only (preserveLabel): click-to-call/mail links render natively, so keep them instead of rejecting the store.
+                if (preserveLabel && FOOTER_CONTACT_URL.test(str(url).trim())) return { url: str(url).trim() }
                 const target = new URL(str(url), base)
                 if (!['https:', 'http:'].includes(target.protocol)) throw new Error(`${context}: unsupported URL protocol`)
                 if (isSourceHost(target, base.origin, recognizedOrigins)) {
@@ -218,14 +221,63 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
             const columns = footerItems.map(item => {
                 const lines = ordered(item.menu_lines).filter(active)
                 const links = menuLinks(item, true)
+                // Rich-text lines may hold hyperlinks (e.g. an "Our Services" list pointing at /services).
+                // A line made only of anchors becomes a column link; anchors mixed into prose stay in the
+                // text and are also kept as links so no destination is lost. Anchors may be http(s), relative,
+                // mailto:/tel:/sms:/whatsapp: or image-only (kept as an image link); other schemes stay text.
+                const richLinks: Link[] = []
                 const text = lines.map(line => {
                     const v = settings(line.model_settings)
                     const html = str(locale === 'ms' ? v.content_ms || v.content : v.content)
                     if (!html) return ''
                     const document = load(html)
+                    const where = `footer-richtext:${str(line.id)}`
+                    const anchors: (Link & { imageUrl?: string })[] = []
+                    document('a[href]').each((_, el) => {
+                        const anchor = document(el)
+                        const href = str(anchor.attr('href')).trim()
+                        const image = anchor.find('img[src]').first()
+                        let imageUrl: string | undefined
+                        const rawSrc = str(image.attr('src')).trim()
+                        try { const src = rawSrc ? new URL(rawSrc, base) : undefined; if (src && ['https:', 'http:'].includes(src.protocol)) imageUrl = src.href } catch { imageUrl = undefined }
+                        const label = anchor.text().replace(/\s+/g, ' ').trim() || str(image.attr('alt')).trim()
+                        let target: Omit<Link, 'label'> | undefined
+                        try {
+                            const parsed = new URL(href, base)
+                            if (FOOTER_CONTACT_URL.test(href)) target = { url: href }
+                            else if (['https:', 'http:'].includes(parsed.protocol) && !parsed.username && !parsed.password) target = resolveTarget(undefined, undefined, parsed.href, where, true)
+                            if (target && !label && !imageUrl) target = undefined
+                            if (target && !label) report.warnings.push(`${where}: image link without alt text`)
+                        } catch { target = undefined }
+                        if (!target) return
+                        anchors.push({ label: label || new URL(target.url ?? base.href).hostname, ...target, ...(imageUrl ? { imageUrl } : {}) })
+                        anchor.replaceWith(`\u0001${anchors.length - 1}\u0001`)
+                    })
+                    // Adjacent inline tags ("<b>Phone:</b><span>0123</span>") render with CSS spacing in PW1 but
+                    // concatenate once flattened, so restore the space after a trailing colon.
+                    document('span, strong, b, em, i, u, font, label').each((_, el) => {
+                        const next = el.next
+                        const following = next?.type === 'text' ? (next as { data?: string }).data ?? '' : next ? document(next).text() : ''
+                        if (document(el).text().trimEnd().endsWith(':') && following && !/^\s/.test(following)) document(el).append(' ')
+                    })
                     document('br').replaceWith('\n')
                     document('p, div, li, h1, h2, h3, h4, h5, h6').append('\n')
-                    return document.root().text().replace(/\n{3,}/g, '\n\n').trim()
+                    const kept = document.root().text().replace(/:(?=\u0001)/g, ': ').replace(/\n{3,}/g, '\n\n').trim().split('\n').flatMap(raw => {
+                        const row = raw.trim()
+                        const tokens = [...row.matchAll(/\u0001(\d+)\u0001/g)].map(m => anchors[Number(m[1])])
+                        // "Phone: <a href=tel:...>0123</a>" is one clickable item, not a text line plus a duplicate link.
+                        const labelled = tokens.length === 1 && /^[^\u0001]*:\s*\u0001\d+\u0001$/.test(row)
+                        if (labelled) {
+                            richLinks.push({ ...tokens[0], label: row.replace(/\u0001(\d+)\u0001/g, (_, i) => anchors[Number(i)].label) })
+                            return []
+                        }
+                        richLinks.push(...tokens)
+                        if (tokens.length && !row.replace(/\u0001\d+\u0001/g, '').trim()) return []
+                        if (tokens.length) report.warnings.push(`${where}: inline link kept as text and as column link`)
+                        return [row.replace(/\u0001(\d+)\u0001/g, (_, i) => anchors[Number(i)].label)]
+                    })
+                    if (document('img').length) report.warnings.push(`${where}: image outside a link omitted`)
+                    return kept.join('\n')
                 }).filter(Boolean).join('\n')
                 const iconLinks = lines.flatMap(line => {
                     const v = settings(line.model_settings)
@@ -247,9 +299,12 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                         return [{label, ...target, ...( /^https?:\/\//.test(imageUrl) ? {imageUrl} : {})}]
                     })
                 })
-                return { title: localized(item), links: [...links, ...iconLinks], ...(text ? {text} : {}) }
+                return { title: localized(item), links: [...links, ...richLinks, ...iconLinks], ...(text ? {text} : {}) }
             }).filter(column => column.links.length > 0 || column.text)
             const tagline = ''
+            // PW1 footers show the store description (PW2 keeps it as the SEO description) and contact details under the
+            // logo. Only the dark-gradient footer renders them, so the binder applies them once the variant is known.
+            const storeDescription = str(object(site.seo).metaDescription).trim()
             // Native footer renders at most 4 columns. Fold overflow columns into the 4th so every
             // source link and text survives instead of rejecting the whole store.
             if (columns.length > 4) {
@@ -298,7 +353,7 @@ export function parseMigrationInput(input: unknown): { entries: BatchEntry[]; re
                 ...(disabledHomepage ? { publication: 'keep-draft' } : {}), settings: siteSettings, name: str(site.name), locale, branding: { logoUrl: logo },
                 features: { cart: cartEnabled, orderTracking: cartEnabled && validPages.some(p => str(p.type) === '6' || rows(p.components).some(c => active(c) && str(object(c.frontend_component).name) === 'order_tracking')) },
                 navigation: ordered(header?.menu_items).filter(active).flatMap(item => menuLinks(item)),
-                footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, columns, ...(footerSocials.length ? { socials: footerSocials } : {}) }, pages,
+                footer: { copyright: Number(footer?.copyright_status) === 1 ? str(footer?.copyright_content) : '', tagline, ...(storeDescription ? { storeDescription } : {}), ...(Object.values(siteSettings.contactInfo).some(Boolean) ? { showContactInfo: true } : {}), columns, ...(footerSocials.length ? { socials: footerSocials } : {}) }, pages,
             } })
         }
     }

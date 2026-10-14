@@ -92,8 +92,16 @@ describe('[TC-F35.M18] AI chooses only existing PW2 blocks', () => {
         const { source, design } = fixture()
         source.pages[0].components[0].block.sourceLayout!.size = 'hero'
         source.pages[0].components[0].block.slides!.pop()
+        design.pages[0].sections[0] = { sourceId:'11', blockType:'hero', variant:'centered' }
+        expect(bindNativeDesign(source, design).pages![0].blocks[1]).toMatchObject({blockType:'hero',variant:'centered',headline:'One',image:{url:'https://source.example/1.jpg'},ctaButtons:[{label:'Buy',url:'/products'}]})
+    })
+    it('[TC-F35.M62] rejects the image-less fullscreen hero for a banner that has an image', () => {
+        const { source, design } = fixture()
+        source.pages[0].components[0].block.sourceLayout!.size = 'hero'
+        source.pages[0].components[0].block.slides!.pop()
+        expect(nativeBannerChoices(source.pages[0].components[0].block)).not.toContain('hero:fullscreen')
         design.pages[0].sections[0] = { sourceId:'11', blockType:'hero', variant:'fullscreen' }
-        expect(bindNativeDesign(source, design).pages![0].blocks[1]).toMatchObject({blockType:'hero',variant:'fullscreen',headline:'One',image:{url:'https://source.example/1.jpg'},ctaButtons:[{label:'Buy',url:'/products'}]})
+        expect(() => bindNativeDesign(source, design)).toThrow('cannot render the source image')
     })
     it('[TC-F35.M25] binds categories to native cards and portfolio layouts with ordered items', () => {
         const { source, design } = fixture()
@@ -152,6 +160,52 @@ it.each(FooterConfigSchema.shape.variant.removeDefault().options)('[TC-F35.M18] 
     const footer = {...source.site.footer, tagline:'Source tagline', copyrightText:'Source copyright', columns:[{title:'Links',links:[{label:'Contact',url:'/contact'}]}]}
     const result = bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant})
     for (const page of result.pages!) expect(page.blocks.at(-1)).toMatchObject({...footer,variant: ['minimal', 'simple'].includes(variant) ? 'centered-stack' : variant})
+})
+
+it('[TC-F35.M18] does not pick the minimal footer when a single column carries source text', () => {
+    // Arrange: minimal only mirrors header links, so a lone text column would be dropped.
+    const {source, design} = fixture()
+    const footer = {...source.site.footer, tagline:'', columns:[{title:'Contact',text:'Phone: 0123',links:[]}]}
+    // Act
+    const result = bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:'minimal'})
+    // Assert
+    expect(result.pages![0].blocks.at(-1)).toMatchObject({variant:'centered-stack',columns:footer.columns})
+})
+
+it.each([
+    ['tagline', {tagline:'About us'}],
+    ['contact info', {tagline:'', showContactInfo:true}],
+    ['store description', {tagline:'', storeDescription:'Store description'}],
+])('[TC-F35.M66] uses dark-gradient for a footer with %s and three link columns whatever AI chose', (_name, extra) => {
+    const {source, design} = fixture()
+    const column = (title: string) => ({title, links:[{label:title,url:'/a'}]})
+    const footer = {...source.site.footer, ...extra, columns:[column('A'), column('B'), column('C')]}
+    for (const variant of ['simple', 'minimal', 'centered-stack', 'dark-gradient'] as const)
+        expect(bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant}).pages![0].blocks.at(-1)).toMatchObject({variant:'dark-gradient'})
+})
+
+it('[TC-F35.M66] applies the store description and contact details to dark-gradient only', () => {
+    const {source, design} = fixture()
+    const column = (title: string) => ({title, links:[{label:title,url:'/a'}]})
+    const footer = {...source.site.footer, tagline:'', storeDescription:'Store description', showContactInfo:true, columns:[column('A')]}
+    const bind = (variant: string) => bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant}).pages![0].blocks.at(-1)
+    expect(bind('dark-gradient')).toMatchObject({variant:'dark-gradient', tagline:'Store description', showContactInfo:true})
+    for (const variant of ['simple', 'minimal', 'centered-stack']) {
+        const block = bind(variant) as Record<string, unknown>
+        expect(block.tagline).toBe('')
+        expect(block).not.toHaveProperty('storeDescription')
+        expect(block).not.toHaveProperty('showContactInfo')
+    }
+    expect(bind('dark-gradient')).not.toHaveProperty('storeDescription')
+})
+
+it('[TC-F35.M66] keeps the AI footer choice when there are fewer than three columns or no brand block', () => {
+    const {source, design} = fixture()
+    const column = (title: string) => ({title, links:[{label:title,url:'/a'}]})
+    const twoColumns = {...source.site.footer, tagline:'About us', columns:[column('A'), column('B')]}
+    expect(bindNativeDesign({...source,site:{...source.site,footer:twoColumns}}, {...design,footerVariant:'centered-stack'}).pages![0].blocks.at(-1)).toMatchObject({variant:'centered-stack'})
+    const noBrand = {...source.site.footer, tagline:'', columns:[column('A'), column('B'), column('C')]}
+    expect(bindNativeDesign({...source,site:{...source.site,footer:noBrand}}, {...design,footerVariant:'centered-stack'}).pages![0].blocks.at(-1)).toMatchObject({variant:'centered-stack'})
 })
 
 it.each(NavigationConfigSchema.shape.variant.removeDefault().options)('[TC-F35.M18] preserves navigation content with native %s variant', variant => {

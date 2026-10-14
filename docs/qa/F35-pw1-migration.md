@@ -40,6 +40,24 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — Website JSON giữ category references (`pending`/`unavailable`); `category-mapping.json` ghi ID PW1 → ID PW2 đã xác minh, hoặc `destinationId: null`. Không đổi BE import. Link category unavailable mở listing PW2 rỗng bằng `categoryId=0`; category đã có mapping dùng ID PW2 thật. Kiểm duplicate/ID giả và E2E bấm footer → Products → clear filters.
 - [x] AUTO — Project website-only data; keep locale and content; exclude disabled/deleted/empty records; promote valid menu children; reject ambiguous owners and cross-store settings.
 
+### TC-F35.M62 — Variant fidelity
+- [x] AUTO — Banner with a source image is never bound to a hero variant that cannot render it (fullscreen/gradient/minimal); the capability table is verified by rendering every hero variant, and the binder rejects a lossy AI choice.
+
+### TC-F35.M63 — Rich-text image rehost
+- [x] AUTO — Entity-encoded `src` (e.g. `&amp;` in signed CDN URLs) is decoded before download, so the real image is hosted instead of the 403 placeholder; source downloads send a browser User-Agent for CDNs that block the default one.
+
+### TC-F35.M64 — Source image download resilience
+- [x] AUTO — Redirects are followed with every hop kept HTTPS/no-credentials/no-port; 403 from bot-protected CDNs is retried through a headless browser before falling back to the placeholder; images labelled with a generic content-type are accepted when the bytes are a real image.
+
+### TC-F35.M65 — Footer brand block
+- [x] AUTO — Footer uses the store logo image (not text) when its stored logo is a media id, and shows the store description plus address/phone/email with icons under the logo in `dark-gradient` only (other variants keep the source footer unchanged) when the source store has them.
+
+### TC-F35.M66 — Footer variant for branded multi-column footers
+- [x] AUTO — A source footer with a tagline or contact details and three or more link columns is always bound to `dark-gradient`, regardless of the AI's choice; fewer columns or no brand block keep the AI choice.
+
+### TC-F35.M67 — Placeholder images are retried
+- [x] AUTO — A placeholder produced by a blocked/failed download is not cached by URL (next run retries it), and an already cached 960x640 placeholder is retried and replaced by the real image under a new filename; cached real images are reused without downloading.
+
 ### Rich text editor HTML compatibility
 - [x] AUTO TC-F35-RT-01: Tiptap retains PW1 container styles, headings, lists, image metadata and tables during an HTML edit round trip.
 - [x] AUTO TC-F35-RT-02: Editing text color replaces the prior color without removing unrelated span styles.

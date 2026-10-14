@@ -1374,6 +1374,39 @@ afterEach(() => {
         // The unpublish API call itself is tested in src/__tests__/api/publish.test.ts
     })
 
+    it('TC-F05.24: cancels the publish success flash timer when the editor unmounts', async () => {
+        // Arrange: record the "Published" flash timers (3s) and spy on clearTimeout
+        const realSetTimeout = window.setTimeout.bind(window)
+        const flashTimerIds: number[] = []
+        const setTimeoutSpy = vi.spyOn(window, 'setTimeout').mockImplementation(((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+            const id = realSetTimeout(handler, delay, ...args)
+            if (delay === 3000) flashTimerIds.push(id)
+            return id
+        }) as typeof window.setTimeout)
+        const clearSpy = vi.spyOn(window, 'clearTimeout')
+        try {
+            ;(global.fetch as any).mockImplementation((url: string | URL) => {
+                if (url.toString().includes('/publish')) return Promise.resolve({ ok: true, json: async () => ({ data: { url: 'https://coffee-shop.primeweb.app', domain: 'coffee-shop.primeweb.app' } }) })
+                return Promise.resolve({ ok: true, json: async () => ({}) })
+            })
+            const { unmount } = render(<EditorPage />)
+            await waitFor(() => expect(screen.getByTestId('toolbar')).toBeInTheDocument())
+            fireEvent.click(screen.getByTestId('publish-btn'))
+            fireEvent.click(await screen.findByRole('button', { name: /Publish now/i }))
+            await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Website đã live!'), expect.any(Object)))
+
+            // Act
+            unmount()
+
+            // Assert: the pending flash reset never outlives the editor
+            expect(flashTimerIds.length).toBeGreaterThan(0)
+            expect(flashTimerIds.some(id => clearSpy.mock.calls.some(call => call[0] === id))).toBe(true)
+        } finally {
+            setTimeoutSpy.mockRestore()
+            clearSpy.mockRestore()
+        }
+    })
+
     it('[GH-1640] saves a revision created while publish is flushing before publishing', async () => {
         // Arrange
         let resolveFirstSave: ((response: {

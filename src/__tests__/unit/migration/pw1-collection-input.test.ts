@@ -422,6 +422,52 @@ it('[TC-F35.M27] preserves footer text and non-social image links in their origi
     expect(contract.site.footer.tagline).toBe('')
 })
 
+const footerOf = (items: unknown[]) => {
+    const input = fixture()
+    const footer = {id:'footer',type:'2',status:'1',menu_items:items}
+    const {entries, reports} = parseMigrationInput([{...input[0],sites:[{...input[0].sites[0],menus:[...input[0].sites[0].menus,footer]}]}])
+    return {columns: entries[0].website.footer.columns, warnings: reports[0].warnings, contract: adaptWebsiteInput(compactInput(entries[0])).contract}
+}
+const richColumn = (name: string, html: string, position = '1') => ({id:name,name,position,menu_lines:[{id:`${name}-line`,type_id:'4',model_settings:[{key:'content',value:html}]}]})
+
+it('[TC-F35.M27] keeps hyperlinks inside footer rich text as column links', () => {
+    // Arrange: an "Our Services" column whose rich text is a list of anchors, plus an unsafe anchor that must stay text.
+    const {columns, warnings} = footerOf([
+        richColumn('OUR SERVICES', '<p><a href="/services">Fibre Optic Infrastructure</a><br><a href="/services">Structured Cabling</a></p><p><a href="javascript:alert(1)">Unsafe</a></p>'),
+        richColumn('MORE', '<p>Call <a href="/contact">us</a> today</p>', '2'),
+    ])
+    // Assert: anchor-only lines become links, not plain text; unsafe anchors keep their label as text.
+    expect(columns[0].links.map(l => l.label)).toEqual(['Fibre Optic Infrastructure', 'Structured Cabling'])
+    expect(columns[0].links.every(l => /\/services$/.test(l.url ?? ''))).toBe(true)
+    expect(columns[0].text).toBe('Unsafe')
+    expect(columns[1].text).toBe('Call us today')
+    expect(columns[1].links.map(l => l.label)).toEqual(['us'])
+    expect(warnings.some(w => w.includes('inline link kept as text'))).toBe(true)
+})
+
+it('[TC-F35.M27] keeps click-to-call and mailto footer links through the adapter', () => {
+    // Arrange: contact rows written as "label: <a href=tel/mailto>value</a>" plus a tel: menu item.
+    const {columns, contract} = footerOf([
+        richColumn('COVERAGE', '<p><strong>Phone:</strong><a href="tel:+60116">0116</a></p><p>Email:<a href="mailto:a@b.com">a@b.com</a></p>'),
+        {id:'call',name:'Call us',position:'2',model_settings:[{key:'url',value:'tel:+60116'}],menu_lines:[]},
+    ])
+    // Assert: values stay clickable, labels are spaced, and a tel: menu URL no longer rejects the store.
+    expect(columns[0].text).toBeUndefined()
+    expect(columns[0].links).toEqual([{label:'Phone: 0116',url:'tel:+60116'},{label:'Email: a@b.com',url:'mailto:a@b.com'}])
+    expect(columns[1].links).toEqual([{label:'Call us',url:'tel:+60116'}])
+    expect(contract.site.footer.columns[0].links.map(l => l.url)).toEqual(['tel:+60116','mailto:a@b.com'])
+})
+
+it('[TC-F35.M27] keeps image-only footer anchors as image links and reports orphan images', () => {
+    // Arrange: a partner badge wrapped in a link, and a bare image that cannot be represented.
+    const {columns, warnings} = footerOf([
+        richColumn('PARTNERS', '<p><a href="https://wa.me/1"><img src="https://cdn.example/badge.png" alt="Badge"></a></p><p><img src="https://cdn.example/bare.png"></p>'),
+    ])
+    // Assert: the column survives with the image link; the bare image is flagged rather than silently dropped.
+    expect(columns).toEqual([{title:'PARTNERS',links:[{label:'Badge',url:'https://wa.me/1',imageUrl:'https://cdn.example/badge.png'}]}])
+    expect(warnings.some(w => w.includes('image outside a link omitted'))).toBe(true)
+})
+
 it('[TC-F35.M27] merges footer columns beyond four into the fourth column without dropping links', () => {
     // Arrange: six PW1 footer columns, each with one link; the sixth also carries text.
     const input = fixture()
@@ -450,4 +496,19 @@ it('[TC-F35.M27] retains an enabled banner CTA without inventing a destination',
     const {entries} = parseMigrationInput(data)
     const {contract} = adaptWebsiteInput(compactInput(entries[0]))
     expect(contract.pages[0].components[0].block).toMatchObject({slides:[{ctaButtons:[{label:'GET STARTED',url:PW1_EMPTY_CTA_URL}]}]})
+})
+
+it('[TC-F35.M65] shows the store description and contact details in the footer brand block', () => {
+    const input = fixture()
+    const site = input[0].sites[0]
+    const build = (extra: Record<string, unknown>) => {
+        const {entries} = parseMigrationInput([{...input[0], sites: [{...site, ...extra}]}])
+        return {entry: entries[0], contract: adaptWebsiteInput(compactInput(entries[0])).contract}
+    }
+    const full = build({contactInfo:{phone:'123',email:'shop@example.com',address:'1 Road'}, seo:{metaTitle:'T', metaDescription:'Store description'}})
+    expect(full.contract.site.footer).toMatchObject({tagline:'', storeDescription:'Store description', showContactInfo:true})
+    const bare = build({contactInfo:{phone:'',email:'',address:''}, seo:{metaTitle:'T'}})
+    expect(bare.entry.website.footer.tagline).toBe('')
+    expect(bare.entry.website.footer.storeDescription).toBeUndefined()
+    expect(bare.entry.website.footer.showContactInfo).toBeUndefined()
 })

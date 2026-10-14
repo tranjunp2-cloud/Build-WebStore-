@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import Image from 'next/image'
-import { EyeOff } from 'lucide-react'
+import { EyeOff, Mail, MapPin, Phone } from 'lucide-react'
 
 import type { BlockProps } from '../types'
 import type { FooterConfig } from './config'
@@ -95,6 +95,26 @@ function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoPro
                 </span>
             )}
         </div>
+    )
+}
+
+/** Site contact details (address, phone, email) with icons, shown under the brand when `showContactInfo` is on. */
+function FooterContactInfo({ contact, className = '' }: { contact?: { address?: string | null; phone?: string | null; email?: string | null } | null; className?: string }) {
+    const rows = [
+        { key: 'address', Icon: MapPin, text: contact?.address?.trim(), href: undefined },
+        { key: 'phone', Icon: Phone, text: contact?.phone?.trim(), href: contact?.phone?.trim() ? `tel:${contact.phone.replace(/[^\d+]/g, '')}` : undefined },
+        { key: 'email', Icon: Mail, text: contact?.email?.trim(), href: contact?.email?.trim() ? `mailto:${contact.email.trim()}` : undefined },
+    ].filter(row => row.text)
+    if (rows.length === 0) return null
+    return (
+        <ul data-footer-field="contactInfo" className={`space-y-3 ${className}`.trim()}>
+            {rows.map(({ key, Icon, text, href }) => (
+                <li key={key} className="flex items-start gap-3 opacity-80">
+                    <Icon size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    {href ? <SmartLink href={href} className="hover:opacity-100 transition-opacity"><Body size="small" as="span">{text}</Body></SmartLink> : <Body size="small" as="span">{text}</Body>}
+                </li>
+            ))}
+        </ul>
     )
 }
 
@@ -298,8 +318,9 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                         <div className="lg:max-w-xs">
                             <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-3" />
                             {tagline && (
-                                <Body size="small" data-footer-field="tagline" className="whitespace-pre-line opacity-40 leading-relaxed">{tagline}</Body>
+                                <Body size="small" data-footer-field="tagline" className="whitespace-pre-line opacity-70 leading-relaxed">{tagline}</Body>
                             )}
+                            {mergedBlock.showContactInfo && <FooterContactInfo contact={site?.contactInfo} className="mt-5" />}
                         </div>
 
                         {/* Link columns center */}
