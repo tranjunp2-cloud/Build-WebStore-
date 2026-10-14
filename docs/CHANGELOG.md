@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-08-05
+last_updated: 2026-10-13
 ---
 
 # Project Changelog
@@ -14,6 +14,11 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ---
 
 ## [Unreleased] — Staging
+
+### F35 — PW1 website migration: unblock pending stores (GH-1956)
+
+- **Root cause:** 44 of the 58 pending stores were not BE mapping gaps. 18 stores kept `product_category` pointing at a template-owned category (PW1 template cloning copies it verbatim); 26 stores selected fixed products the BE export deliberately excluded (`NO_VALID_VARIANTS`, `MISSING_VARIANT_DOMAIN`). The other 14 pass product selection; their pending cause needs the Neon batch logs.
+- **Fix:** `resolveProductSelections` leaves a template-owned category listing empty and drops fixed products that the BE evidence marks as not emitted, each with a store warning. Missing mappings without evidence still fail `BE_MAPPING_INVALID`. Tests: TC-F35.M62, TC-F35.M63.
 
 ### F37 — Unified SEO Health Score + Checklist (US-F37-04, GH-1312)
 

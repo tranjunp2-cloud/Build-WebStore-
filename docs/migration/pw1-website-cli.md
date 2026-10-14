@@ -253,6 +253,15 @@ The importing operator supplies the source-to-destination identities. Runtime ch
 
 This implements product-category link mapping only. It does not certify completeness of BE product/blog imports, map brands/blog categories/product detail URLs, or apply legacy listing selections/sorting. Those remain pending. Input without `destination` behaves as before. `--dry-run` validates the declaration's structure and source-page reference only; it does not access the destination DB.
 
+### Product selection fallbacks (Issue #1956)
+
+`resolveProductSelections` only accepts verified `migration_entity_map` rows that sit in the shop's own site/tenant. Two evidenced cases now degrade to a store warning instead of `BE_MAPPING_INVALID`; every other missing or ambiguous mapping still fails.
+
+- **Template-owned category.** PW1 template cloning copies `product_category` verbatim (`prime-web-api` `EloquentStoreRepository::clonePages`), so a shop can keep pointing at its template's category. PW1 filters products by the shop's `store_id`, so that listing renders empty there. The BE import maps the category correctly, but into the template's tenant/site. When a `random` listing's category has a VERIFIED mapping outside the destination (the check does not confirm template ownership), the block becomes `selectionMode=fixed` with no products, and the report gets a warning naming the destination tenant/site the category maps to so QC can verify it. Deleted destination categories do not qualify. The shop owner can pick products in the editor. Names are never used to find a "similar" category of the shop.
+- **Fixed products the BE export did not emit.** If a `fixed` product has no in-scope mapping and `migration_source_evidence_rows` marks it `retained-source` for that source store in the `exporter_sidecar` snapshot of the store's own `VERIFIED` import run (`migration_runs`, same source instance and snapshot; fixture or other-instance snapshots are ignored), it is removed from the selection (order of the rest is kept) and a warning names the snapshot. The evidence table does not store the exclusion reason; look it up in the export `mapping-report.json` (for example `NO_VALID_VARIANTS`, `MISSING_VARIANT_DOMAIN`). Without evidence the store still fails, so a genuine BE gap is never hidden.
+
+Requires `npm run migrate:pw1:evidence:ingest` to have loaded the snapshot into the destination database. Without it the second case keeps failing as before.
+
 ### Public quality audit (no BE dependency)
 
 ```sh

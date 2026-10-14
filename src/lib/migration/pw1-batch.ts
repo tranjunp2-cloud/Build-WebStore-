@@ -187,9 +187,9 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                     const { adapted, sourceLinkChecks } = await prepareSourceLinks(compactInput(entry), categoryMappings, controller.signal)
                     controls.checkTime(storeStartedAt)
                     const blueprint = createNativeBlueprint(adapted.contract)
-                    await resolveProductSelections((text, params) => client.query(text, params), activePayload, blueprint, mapping.site_id, mapping.tenant_id)
+                    const selectionWarnings = await resolveProductSelections((text, params) => client.query(text, params), activePayload, blueprint, mapping.site_id, mapping.tenant_id, entry.sourceStoreId)
                     const inputReport = options.inputReports?.find(r => r.sourceStoreId === entry.sourceStoreId)
-                    const warnings = [...new Set([...readiness.warnings, ...(inputReport?.warnings ?? []).filter(w => !w.includes('category CTA retains source URL')), ...adapted.report.warnings, ...adapted.report.pending.map(p => `${p.sourceId}: ${p.reason}`)])]
+                    const warnings = [...new Set([...readiness.warnings, ...(inputReport?.warnings ?? []).filter(w => !w.includes('category CTA retains source URL')), ...adapted.report.warnings, ...adapted.report.pending.map(p => `${p.sourceId}: ${p.reason}`), ...selectionWarnings])]
                     if (unresolvedCategories.length) warnings.push(`Declared categories have no verified source mapping in migration_entity_map: ${unresolvedCategories.join(',')}`)
                     if (entry.website.pages.some(p => p.components.some(c => c.binding))) warnings.push('Product/blog data is provided by the separate BE import; database bindings were not imported by this batch')
                     await client.query('UPDATE pw1_migration_stores SET warning_count=$2 WHERE source_store_id=$1', [entry.sourceStoreId, warnings.length])

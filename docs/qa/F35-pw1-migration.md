@@ -186,3 +186,12 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO: Browser verifies migrated product filter controls on desktop/mobile and blog category filtering without scroll navigation.
 
 - [x] AUTO (TC-F35.M60): Active price chips use store currency; unrelated blog/view URL parameters do not refetch products.
+
+### TC-F35.M62 — Template-owned category in a product listing (Issue #1956)
+- [x] AUTO — A `random` listing whose source category has a VERIFIED mapping outside the destination site/tenant becomes an empty `fixed` listing with a warning; a category with no mapping still fails `BE_MAPPING_INVALID`; an in-scope category resolves as before (`src/__tests__/unit/migration/pw1-product-selection.test.ts`).
+
+### TC-F35.M63 — Fixed products not emitted by the BE export (Issue #1956)
+- [x] AUTO — Evidenced (`retained-source`) products are dropped from a `fixed` selection in source order with a snapshot-naming warning; missing mappings without evidence, products with several targets, and calls without a source store id still fail `BE_MAPPING_INVALID`; the evidence lookup receives the source store id (`src/__tests__/unit/migration/pw1-product-selection.test.ts`).
+
+### TC-F35.M64 — Evidence and category lookups on a real database (Issue #1956)
+- [x] AUTO — `scripts/tests/pw1-selection-evidence.ts` (local DB only, rolled-back transaction): evidence is taken only from the `exporter_sidecar` snapshot of the store's own `VERIFIED` run, ignoring a later `synthetic_fixture` snapshot, another source instance and another store's rows; out-of-scope categories report their destination tenant/site and ignore soft-deleted targets.
