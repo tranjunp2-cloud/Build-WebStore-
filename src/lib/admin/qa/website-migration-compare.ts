@@ -143,6 +143,9 @@ function canonical(value: unknown): string {
         Object.entries(asRecord(value))
           .filter(([key, item]) => {
             if (["id", "createdAt", "updatedAt"].includes(key)) return false;
+            // Payload stores an unset optional field as null while the F42
+            // source omits it. Both mean "no value"; a lost value still differs.
+            if (item === null || item === undefined) return false;
             // Link renderers treat an omitted target flag as opening in the same tab.
             if (
               key === "openInNewTab" &&

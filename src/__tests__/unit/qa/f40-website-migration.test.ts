@@ -118,6 +118,43 @@ describe("[TC-F40-MIG-LIVE-01] source-bound website fields", () => {
       })[0].status,
     ).toBe("mismatch");
   });
+  it("treats an omitted optional field and a null destination field as the same", () => {
+    const source = { items: [{ title: "Slide", description: "" }] };
+    expect(
+      compareMigrationContent(source, {
+        items: [{ id: "pw2", title: "Slide", description: "", linkUrl: null }],
+      })[0].status,
+    ).toBe("match");
+    expect(
+      compareMigrationContent(
+        { items: [{ title: "Slide", linkUrl: "/products" }] },
+        { items: [{ title: "Slide", linkUrl: null }] },
+      )[0].status,
+    ).toBe("mismatch");
+    expect(
+      compareMigrationContent(
+        { items: [{ title: "Slide" }] },
+        { items: [{ title: "Slide", linkUrl: "/extra" }] },
+      )[0].status,
+    ).toBe("mismatch");
+  });
+  it("applies the null-equals-omitted rule inside nested objects but not to a missing top-level field", () => {
+    expect(
+      compareMigrationContent(
+        { items: [{ cta: { label: "Buy" } }] },
+        { items: [{ cta: { label: "Buy", url: null } }] },
+      )[0].status,
+    ).toBe("match");
+    expect(
+      compareMigrationContent(
+        { items: [{ cta: { label: "Buy", url: "/shop" } }] },
+        { items: [{ cta: { label: "Buy", url: null } }] },
+      )[0].status,
+    ).toBe("mismatch");
+    expect(compareMigrationContent({ logo: "/a.png" }, {})[0].status).toBe(
+      "unverified",
+    );
+  });
   it("normalizes same-tab link defaults while preserving meaningful differences", () => {
     const links = [
       { label: "Products", url: "/products" },
@@ -384,5 +421,82 @@ describe("[TC-F40-MIG-LIVE-06] aggregate current image verdicts", () => {
         [],
       ),
     ).toBe("mismatch");
+  });
+});
+
+describe("[TC-F40-MIG-LIVE-01] reported T006 carousel evidence", () => {
+  const source = JSON.stringify([
+    {
+      image: {
+        alt: "Where does it come from?",
+        url: "https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-prime-web/images/templates/f009-4/banner/banner_3.png",
+      },
+      title: "Where does it come from?",
+      description: "",
+    },
+  ]);
+  const current = JSON.stringify([
+    {
+      id: "6ac95226e77979e1f42905fd",
+      image: {
+        id: 90726,
+        url: "https://sgp1.digitaloceanspaces.com/tm-prime-web-dev/pw1-159-1b8f22436989eb6ed882.jpg",
+        alt: "Where does it come from?",
+        filename: "pw1-159-1b8f22436989eb6ed882.jpg",
+        mimeType: "image/png",
+        filesize: 244272,
+        width: 1170,
+        height: 780,
+      },
+      title: "Where does it come from?",
+      description: "",
+      linkUrl: null,
+    },
+  ]);
+  const field = "block[5].items";
+  const block = (): MigrationBlock => ({
+    sourceId: "273",
+    kind: "banner",
+    indexes: [5],
+    sourceContent: [],
+    status: "mismatch",
+    fields: [
+      {
+        field,
+        source,
+        current,
+        status: compareMigrationContent(
+          { items: JSON.parse(source) },
+          { items: JSON.parse(current) },
+        )[0].status,
+      },
+    ],
+  });
+  it("is no longer a data mismatch; the re-hosted image still needs verification", () => {
+    // Raw comparison still differs because the re-hosted image has new media
+    // metadata; only the image-aware layer may resolve it.
+    expect(block().fields[0].status).toBe("mismatch");
+    expect(
+      compareMigrationContent(
+        {
+          items: JSON.parse(source).map((item: Record<string, unknown>) => ({
+            ...item,
+            image: "[image]",
+          })),
+        },
+        {
+          items: JSON.parse(current).map((item: Record<string, unknown>) => ({
+            ...item,
+            image: "[image]",
+          })),
+        },
+      )[0].status,
+    ).toBe("match");
+    expect(effectiveBlockStatus(block(), "page", [], [])).toBe("unverified");
+  });
+  it("matches once the re-hosted image is confirmed", () => {
+    const [image] = imagePreviews(field, source);
+    const review = { page: "page", block: "273", field, path: image.path };
+    expect(effectiveBlockStatus(block(), "page", [], [review])).toBe("match");
   });
 });
