@@ -15,7 +15,7 @@ concurrency:
 jobs:
   sync-stories:
     name: 'Sync: Stories → Issues'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: write
       contents: read

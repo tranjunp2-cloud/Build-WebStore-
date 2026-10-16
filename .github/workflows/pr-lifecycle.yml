@@ -21,7 +21,7 @@ jobs:
   pr-opened:
     name: 'PR Opened'
     if: github.event_name == 'pull_request' && github.event.action == 'opened'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
       issues: write
@@ -249,7 +249,7 @@ jobs:
   pr-review:
     name: 'PR Review'
     if: github.event_name == 'pull_request_review'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
       issues: write
@@ -357,7 +357,7 @@ jobs:
   pr-merged:
     name: 'PR Merged'
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: read
       issues: write
@@ -573,7 +573,7 @@ jobs:
   stale-pr-check:
     name: 'Stale PR Check'
     if: github.event_name == 'schedule'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: read
       contents: read

@@ -10,7 +10,7 @@ jobs:
   release:
     name: 'Release: Tag & Changelog'
     if: github.event.pull_request.merged == true
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: write
     steps:

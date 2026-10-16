@@ -10,7 +10,7 @@ on:
 jobs:
   check-security:
     name: 'Security: Weekly Check'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       security-events: read
       contents: read

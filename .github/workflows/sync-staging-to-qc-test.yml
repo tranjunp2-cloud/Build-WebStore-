@@ -34,7 +34,7 @@ concurrency:
 jobs:
   sync:
     name: Sync qc-test with staging
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: write

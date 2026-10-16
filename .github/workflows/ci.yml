@@ -212,7 +212,7 @@ jobs:
     name: "PR Metrics"
     needs: [test]
     if: success() && github.event_name == 'pull_request'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
       contents: read
@@ -303,7 +303,7 @@ jobs:
     # deploy_fail notification; this job catches quality/test failures.
     needs: [quality-check, test]
     if: failure() && github.event_name == 'pull_request'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:

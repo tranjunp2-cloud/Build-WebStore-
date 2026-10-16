@@ -19,7 +19,7 @@ on:
 jobs:
   health-check:
     name: 'Check Staging Health'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout (for lark-notify action)
         uses: actions/checkout@v4
