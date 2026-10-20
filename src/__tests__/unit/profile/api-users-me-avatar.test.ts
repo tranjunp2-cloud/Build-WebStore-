@@ -89,6 +89,46 @@ describe('POST /api/users/me/avatar', () => {
         expect(body).toHaveProperty('error', 'Missing file field')
     })
 
+    // TC-F23-SSO-10: Owner avatar is SSO-owned — local upload is rejected
+    it('returns 403 and creates no media when an Owner uploads an avatar', async () => {
+        // Arrange
+        vi.mocked(getCurrentUser).mockResolvedValue({
+            id: 'owner-1',
+            tenants: [{ tenant: 't-1', role: 'owner' }],
+        } as any)
+        const jpeg = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0, 0])], 'a.jpg', { type: 'image/jpeg' })
+
+        // Act
+        const res = (await POST(createMockRequest(jpeg))) as any
+
+        // Assert
+        expect(res.status).toBe(403)
+        expect(mockPayload.create).not.toHaveBeenCalled()
+        expect(mockPayload.update).not.toHaveBeenCalled()
+    })
+
+    // TC-F23-SSO-10: Staff local upload flow has no regression
+    it('lets Staff upload a JPEG avatar and links it to the user', async () => {
+        // Arrange
+        vi.mocked(getCurrentUser).mockResolvedValue({
+            id: 'staff-1',
+            tenants: [{ tenant: 't-1', role: 'editor' }],
+        } as any)
+        const jpeg = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0, 0])], 'a.jpg', { type: 'image/jpeg' })
+
+        // Act
+        const res = (await POST(createMockRequest(jpeg))) as any
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(mockPayload.create).toHaveBeenCalledWith(expect.objectContaining({ collection: 'media' }))
+        expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'users',
+            id: 'staff-1',
+            data: { avatar: 'media-1' },
+        }))
+    })
+
     // TC-F23-01-06: Payload methods are properly integrated
     it('route handler integrates payload.create and payload.update', async () => {
         // This test verifies the route handler calls the correct Payload methods

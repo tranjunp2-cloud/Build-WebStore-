@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-10-13
+last_updated: 2026-10-20
 ---
 
 # Project Changelog
@@ -14,6 +14,13 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ---
 
 ## [Unreleased] — Staging
+
+### F23 — Sync Store Owner avatar from SSO (US-F23-05, GH-1723)
+
+- **Owner avatar is SSO-owned:** `POST /api/users/me/avatar` now returns 403 for Owners and the `users.avatar` field denies Owner updates through REST/GraphQL (`canUpdateAvatarField`). Staff upload is unchanged. TC-F23-SSO-10.
+- **New SSO push endpoint:** `POST /api/v1/sso/sync-avatar` (super-admin Bearer, same as the other `/v1/sso/*` routes). SSO sends `PRESENT`/`ABSENT` on avatar change, on every PW2 open and during backfill. PWv2 downloads the image into Media (HTTPS, never follows redirects (3xx → 422), ≤ 2 MB, JPEG/PNG bytes; any host — no env needed), links it with a compare-and-set on `ssoAvatarSyncedAt` (concurrent syncs cannot both win) and deletes the previous avatar Media only when an avatar flow created it (`alt: 'User avatar'`) and no other user uses it. Failures keep the last-known avatar: transient → 502 (SSO retries), permanent (URL/size/type/4xx) → 422. Duplicate `avatar_key` and older `changed_at` are no-ops.
+- **Immutable identity:** new `users.ssoUserId` (unique), `ssoAvatarKey`, `ssoAvatarSyncedAt` (+ `db-setup.js` migrations; server-only, create/update access denied). Provision stores `sso_user_id` and returns 409 before creating a tenant if that id is already bound. Existing Owners are bound once by exact email only when it matches exactly one unbound Owner; otherwise 409 with a reason for the backfill report.
+- **No new env var.** Contract: `plans/261020-1358-gh-1723-sso-owner-avatar-sync/contract-sso-pw2-avatar-sync.md`. Tests: TC-F23-SSO-01..11.
 
 ### F35 — PW1 website migration: unblock pending stores (GH-1956)
 

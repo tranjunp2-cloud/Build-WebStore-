@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { AVATAR_MAX_BYTES, AVATAR_ALLOWED_MIME } from '@/lib/profile/schemas'
+import { blockOwner, type UserLike } from '@/lib/profile/role-guard'
 
 export const runtime = 'nodejs'
 
@@ -13,7 +14,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // All authenticated users (owner + staff) can upload avatar — no blockOwner() guard here
+        // Owner avatar is synced from SSO (PD-F23-02, GH-1723); only Staff upload locally
+        const ownerBlocked = blockOwner(user as UserLike)
+        if (ownerBlocked) return ownerBlocked
 
         const formData = await req.formData()
         const file = formData.get('file') as File | null

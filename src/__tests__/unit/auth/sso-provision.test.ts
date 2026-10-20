@@ -190,6 +190,73 @@ describe('POST /api/v1/sso/provision', () => {
         }))
     })
 
+    // TC-F23-SSO-09: provision stores the immutable SSO users.id when SSO sends it
+    it('stores ssoUserId on the new Owner when sso_user_id is provided', async () => {
+        // Arrange
+        mockPayload.auth.mockResolvedValue({ user: { id: 1, roles: ['super-admin'] } })
+        mockPayload.find.mockResolvedValue({ docs: [] })
+        mockPayload.create.mockImplementation(async (args: any) => {
+            if (args.collection === 'tenants') return { id: 99, slug: 'acme-rand' }
+            if (args.collection === 'users') return { id: 100, email: 'owner@test.com' }
+            return { id: 1 }
+        })
+        const req = createMockRequest({ authorization: 'Bearer token123' }, {
+            company_name: 'Acme', email: 'owner@test.com', password: 'secret_password_123',
+            pack_code: 'professional', name: 'Jane Doe', sso_user_id: 4321,
+        })
+
+        // Act
+        const res = await POST(req) as unknown as { data: any, status: number }
+
+        // Assert
+        expect(res.status).toBe(201)
+        const userCall = mockPayload.create.mock.calls.find((call: any[]) => call[0].collection === 'users')
+        expect(userCall[0].data.ssoUserId).toBe(4321)
+    })
+
+    // TC-F23-SSO-09: SSO id already bound (e.g. by avatar sync) → 409 before any tenant is created
+    it('returns 409 without creating a tenant when sso_user_id is already bound', async () => {
+        // Arrange
+        mockPayload.auth.mockResolvedValue({ user: { id: 1, roles: ['super-admin'] } })
+        mockPayload.find
+            .mockResolvedValueOnce({ docs: [] })            // email + customerId check
+            .mockResolvedValueOnce({ docs: [{ id: 55 }] })  // ssoUserId check
+        const req = createMockRequest({ authorization: 'Bearer token123' }, {
+            company_name: 'Acme', email: 'owner@test.com', password: 'secret_password_123',
+            pack_code: 'professional', name: 'Jane Doe', sso_user_id: 4321,
+        })
+
+        // Act
+        const res = await POST(req) as unknown as { data: any, status: number }
+
+        // Assert
+        expect(res.status).toBe(409)
+        expect(mockPayload.create).not.toHaveBeenCalled()
+    })
+
+    // TC-F23-SSO-09: invalid sso_user_id is ignored (older SSO builds / bad data)
+    it('ignores a non-integer sso_user_id', async () => {
+        // Arrange
+        mockPayload.auth.mockResolvedValue({ user: { id: 1, roles: ['super-admin'] } })
+        mockPayload.find.mockResolvedValue({ docs: [] })
+        mockPayload.create.mockImplementation(async (args: any) => {
+            if (args.collection === 'tenants') return { id: 99, slug: 'acme-rand' }
+            if (args.collection === 'users') return { id: 100, email: 'owner@test.com' }
+            return { id: 1 }
+        })
+        const req = createMockRequest({ authorization: 'Bearer token123' }, {
+            company_name: 'Acme', email: 'owner@test.com', password: 'secret_password_123',
+            pack_code: 'professional', name: 'Jane Doe', sso_user_id: '4321',
+        })
+
+        // Act
+        await POST(req)
+
+        // Assert
+        const userCall = mockPayload.create.mock.calls.find((call: any[]) => call[0].collection === 'users')
+        expect(userCall[0].data).not.toHaveProperty('ssoUserId')
+    })
+
     it('returns 500 on internal errors', async () => {
         mockPayload.auth.mockResolvedValue({
             user: { roles: ['super-admin'] }

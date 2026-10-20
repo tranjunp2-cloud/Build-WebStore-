@@ -55,6 +55,10 @@ export async function POST(req: NextRequest) {
         const customerId = rawPayload.customer_id_number || ''
         const serviceId = rawPayload.service_id || ''
         const orderId = rawPayload.unifi_order_id || ''
+        // GH-1723: immutable SSO users.id (optional — older SSO builds do not send it)
+        const ssoUserId = Number.isInteger(rawPayload.sso_user_id) && rawPayload.sso_user_id > 0
+            ? rawPayload.sso_user_id as number
+            : undefined
 
         // Name: v1 gửi `name` (full), v2 gửi `first_name` + `last_name`
         let firstName = rawPayload.first_name || ''
@@ -103,6 +107,23 @@ export async function POST(req: NextRequest) {
                 { message: 'User already provisioned' },
                 { status: 409 },
             )
+        }
+
+        // GH-1723: the SSO id may already be bound (e.g. by avatar sync) — check before creating the tenant
+        if (ssoUserId) {
+            const boundBySsoId = await payload.find({
+                collection: 'users',
+                where: { ssoUserId: { equals: ssoUserId } },
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+            })
+            if (boundBySsoId.docs.length > 0) {
+                return NextResponse.json(
+                    { message: 'User already provisioned' },
+                    { status: 409 },
+                )
+            }
         }
 
         // ── 5. Map pack_code → plan ──
@@ -163,6 +184,7 @@ export async function POST(req: NextRequest) {
                     },
                 ],
                 ...(customerId && { customerIdNumber: String(customerId) }),
+                ...(ssoUserId && { ssoUserId }),
                 migrationStatus: 'migrated',
                 ...(keyString && { keyString }),
                 // Audit trail: payload.create() local API has no req.user; set explicitly
