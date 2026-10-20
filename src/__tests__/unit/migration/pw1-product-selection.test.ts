@@ -60,6 +60,14 @@ const stubQuery = ({ scoped = {}, outOfScope = [], evidence = [], seen = [] }: S
     return { rows: (params[1] as string[]).filter(id => scoped[id]).map(source_id => ({ source_id, target_id: scoped[source_id] })) }
 }
 
+describe('[TC-F35.M73] Empty fixed list shows every product, as on PW1', () => {
+    it('binds a fixed listing without source items to all', async () => {
+        const value = selectionBlueprint({ mode: 'fixed', sourceProductIds: [] })
+        await resolveProductSelections(stubQuery({}), payloadOf(), value, 71, 71)
+        expect(block(value)).toMatchObject({ selectionMode: 'all', selectedProductIds: [] })
+    })
+})
+
 describe('[TC-F35.M62] Template-owned category (Issue #1956)', () => {
     it('leaves the listing empty with a warning when the verified mapping is outside the destination', async () => {
         const value = selectionBlueprint({ mode: 'random', sourceProductIds: [], sourceCategoryId: '606' })

@@ -72,7 +72,9 @@ export async function resolveProductSelections(query: SelectionQuery, payload: P
         }
         component.block.includeOutOfStock = selection.includeOutOfStock
         const category = selection.mode === 'random' && selection.sourceCategoryId ? await resolveCategory(selection.sourceCategoryId) : ''
-        component.block.selectionMode = category === undefined ? 'fixed' : selection.mode
+        // PW1 drops its empty `id` filter, so a fixed list without items shows every active product; keep that instead of an empty grid.
+        const emptyFixed = selection.mode === 'fixed' && selection.sourceProductIds.length === 0
+        component.block.selectionMode = category === undefined ? 'fixed' : emptyFixed ? 'all' : selection.mode
         component.block.selectedProductIds = category === undefined ? [] : await resolveProducts(selection.mode === 'fixed' ? selection.sourceProductIds : [])
         component.block.category = category ?? ''
     }

@@ -98,7 +98,7 @@ function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoPro
     )
 }
 
-/** Site contact details (address, phone, email) with icons, shown under the brand when `showContactInfo` is on. */
+/** Site contact details (address, phone, email) with icons, shown under the brand by the dark-gradient variant. */
 function FooterContactInfo({ contact, className = '' }: { contact?: { address?: string | null; phone?: string | null; email?: string | null } | null; className?: string }) {
     const rows = [
         { key: 'address', Icon: MapPin, text: contact?.address?.trim(), href: undefined },
@@ -224,6 +224,9 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     const resolveHref = useLocalHref()
     const mergedBlock = mergeFooterSocialsWithSite(block, site)
     const { logoText, tagline, columns = [], copyrightText, backgroundColor, variant = 'simple' } = mergedBlock
+    // dark-gradient always presents the store: its own tagline, else the site description (plus contact details below)
+    const siteDescription = typeof (site?.seo as { metaDescription?: unknown } | undefined)?.metaDescription === 'string' ? ((site?.seo as { metaDescription: string }).metaDescription).trim() : ''
+    const brandText = tagline || siteDescription
     const footerStyle: React.CSSProperties = backgroundColor ? { backgroundColor } : {}
 
     const copyrightLine = copyrightText
@@ -317,10 +320,10 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                         {/* Logo + tagline */}
                         <div className="lg:max-w-xs">
                             <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-3" />
-                            {tagline && (
-                                <Body size="small" data-footer-field="tagline" className="whitespace-pre-line opacity-70 leading-relaxed">{tagline}</Body>
+                            {brandText && (
+                                <Body size="small" data-footer-field="tagline" className="whitespace-pre-line opacity-70 leading-relaxed">{brandText}</Body>
                             )}
-                            {mergedBlock.showContactInfo && <FooterContactInfo contact={site?.contactInfo} className="mt-5" />}
+                            <FooterContactInfo contact={site?.contactInfo} className="mt-5" />
                         </div>
 
                         {/* Link columns center */}

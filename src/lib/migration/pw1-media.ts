@@ -189,7 +189,7 @@ export async function importPw1BlockMedia(buckets: Record<string, unknown>[][], 
     return { succeeded, failed: 0 }
 }
 
-async function rehostHtmlImages(html: string, tenantId: number | string, payload: Payload, cache: Map<string, number>): Promise<string> {
+export async function rehostHtmlImages(html: string, tenantId: number | string, payload: Payload, cache: Map<string, number>, shouldRehost: (url: string) => boolean = () => true): Promise<string> {
     const imgRegex = /<img\b([^>]*?)\bsrc=["']([^"']+)["']([^>]*?)>/gi
     const matches = [...html.matchAll(imgRegex)]
     if (!matches.length) return html
@@ -199,6 +199,7 @@ async function rehostHtmlImages(html: string, tenantId: number | string, payload
         // The regex yields raw attribute text; decode entities (&amp; in signed CDN URLs) before fetching
         const originalSrc = (load(match[0], null, false)('img').attr('src') ?? match[2]).trim()
         if (!/^https?:\/\//i.test(originalSrc)) continue
+        if (!shouldRehost(originalSrc)) continue
 
         try {
             const httpsUrl = originalSrc.startsWith('http://') ? originalSrc.replace(/^http:\/\//i, 'https://') : originalSrc
@@ -226,4 +227,12 @@ async function rehostHtmlImages(html: string, tenantId: number | string, payload
         }
     }
     return result
+}
+
+/** Media for a source image: the stored copy when there is a real one, else a fresh download (a still-broken source yields the existing placeholder, nothing new is uploaded). */
+export async function restorePw1Media(payload: Payload, tenantId: number | string, url: string, alt: string): Promise<number | undefined> {
+    const sourceHash = createHash('sha256').update(url).digest('hex')
+    const filename = `pw1-${tenantId}-${sourceHash.slice(0, 20)}.jpg`
+    const reusable = await findReusablePw1Media(payload, tenantId, sourceHash, filename)
+    return reusable.id ?? downloadAndStorePw1Media(payload, tenantId, url, sourceHash, filename, alt, reusable.stale)
 }
