@@ -184,19 +184,16 @@ it.each([
         expect(bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant}).pages![0].blocks.at(-1)).toMatchObject({variant:'dark-gradient'})
 })
 
-it('[TC-F35.M66] applies the store description and contact details to dark-gradient only', () => {
+it('[TC-F35.M66] uses the store description and contact flag only to pick the variant, never as footer block fields', () => {
     const {source, design} = fixture()
     const column = (title: string) => ({title, links:[{label:title,url:'/a'}]})
     const footer = {...source.site.footer, tagline:'', storeDescription:'Store description', showContactInfo:true, columns:[column('A')]}
-    const bind = (variant: string) => bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant}).pages![0].blocks.at(-1)
-    expect(bind('dark-gradient')).toMatchObject({variant:'dark-gradient', tagline:'Store description', showContactInfo:true})
-    for (const variant of ['simple', 'minimal', 'centered-stack']) {
-        const block = bind(variant) as Record<string, unknown>
+    for (const variant of ['simple', 'minimal', 'centered-stack', 'dark-gradient']) {
+        const block = bindNativeDesign({...source,site:{...source.site,footer}}, {...design,footerVariant:variant}).pages![0].blocks.at(-1) as Record<string, unknown>
         expect(block.tagline).toBe('')
         expect(block).not.toHaveProperty('storeDescription')
         expect(block).not.toHaveProperty('showContactInfo')
     }
-    expect(bind('dark-gradient')).not.toHaveProperty('storeDescription')
 })
 
 it('[TC-F35.M66] keeps the AI footer choice when there are fewer than three columns or no brand block', () => {

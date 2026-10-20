@@ -248,21 +248,25 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { FooterBlock } from '@/blocks/footer'
 
 describe('[TC-F35.M65] Footer contact info under the logo', () => {
-    const site = { name: 'Shop', contactInfo: { address: 'Selangor, Malaysia', phone: '0116 745 8888', email: 'a@b.com' } }
-    it('dark-gradient renders tagline, address, phone and email when showContactInfo is on', () => {
-        const block = FooterConfigSchema.parse(minimalFooterConfig({ variant: 'dark-gradient', tagline: 'About us', showContactInfo: true }))
-        const html = renderToStaticMarkup(React.createElement(FooterBlock, { block, site } as never))
+    const site = { name: 'Shop', contactInfo: { address: 'Selangor, Malaysia', phone: '0116 745 8888', email: 'a@b.com' }, seo: { metaDescription: 'From the site SEO' } }
+    const render = (variant: string, extra: Record<string, unknown> = {}) => renderToStaticMarkup(React.createElement(FooterBlock, { block: FooterConfigSchema.parse(minimalFooterConfig({ variant, ...extra })), site } as never))
+    it('dark-gradient shows the tagline, address, phone and email by default', () => {
+        const html = render('dark-gradient', { tagline: 'About us' })
         for (const text of ['About us', 'Selangor, Malaysia', '0116 745 8888', 'a@b.com']) expect(html).toContain(text)
         expect(html).toContain('href="tel:01167458888"')
         expect(html).toContain('href="mailto:a@b.com"')
     })
-    it.each(['simple', 'minimal', 'centered-stack'])('%s never renders the contact list', variant => {
-        const block = FooterConfigSchema.parse(minimalFooterConfig({ variant, tagline: 'About us', showContactInfo: true }))
-        expect(renderToStaticMarkup(React.createElement(FooterBlock, { block, site } as never))).not.toContain('Selangor, Malaysia')
+    it('dark-gradient falls back to the site description when the footer has no tagline', () => {
+        expect(render('dark-gradient')).toContain('From the site SEO')
+        expect(render('dark-gradient', { tagline: 'About us' })).not.toContain('From the site SEO')
     })
-    it('omits the contact list by default', () => {
-        const block = FooterConfigSchema.parse(minimalFooterConfig({ variant: 'dark-gradient' }))
-        expect(renderToStaticMarkup(React.createElement(FooterBlock, { block, site } as never))).not.toContain('Selangor, Malaysia')
+    it('dark-gradient omits the contact list when the site has no contact details', () => {
+        const html = renderToStaticMarkup(React.createElement(FooterBlock, { block: FooterConfigSchema.parse(minimalFooterConfig({ variant: 'dark-gradient' })), site: { name: 'Shop' } } as never))
+        expect(html).not.toContain('data-footer-field="contactInfo"')
+    })
+    it.each(['simple', 'minimal', 'centered-stack'])('%s never renders the contact list or the site description', variant => {
+        const html = render(variant, { tagline: 'About us' })
+        expect(html).not.toContain('Selangor, Malaysia')
+        expect(html).not.toContain('From the site SEO')
     })
 })
-

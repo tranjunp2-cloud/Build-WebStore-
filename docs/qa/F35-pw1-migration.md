@@ -50,13 +50,37 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — Redirects are followed with every hop kept HTTPS/no-credentials/no-port; 403 from bot-protected CDNs is retried through a headless browser before falling back to the placeholder; images labelled with a generic content-type are accepted when the bytes are a real image.
 
 ### TC-F35.M65 — Footer brand block
-- [x] AUTO — Footer uses the store logo image (not text) when its stored logo is a media id, and shows the store description plus address/phone/email with icons under the logo in `dark-gradient` only (other variants keep the source footer unchanged) when the source store has them.
+- [x] AUTO — Footer uses the store logo image (not text) when its stored logo is a media id, and `dark-gradient` always shows the footer tagline (else the site SEO description) plus the site's address/phone/email with icons under the logo, with no per-footer flag; other variants never show them and keep the source footer unchanged.
 
 ### TC-F35.M66 — Footer variant for branded multi-column footers
 - [x] AUTO — A source footer with a tagline or contact details and three or more link columns is always bound to `dark-gradient`, regardless of the AI's choice; fewer columns or no brand block keep the AI choice.
 
 ### TC-F35.M67 — Placeholder images are retried
 - [x] AUTO — A placeholder produced by a blocked/failed download is not cached by URL (next run retries it), and an already cached 960x640 placeholder is retried and replaced by the real image under a new filename; cached real images are reused without downloading.
+
+### TC-F35.M68 — Footer variant repair for generated stores
+- [x] AUTO — The repair rule (brand info or SEO description or contact details beside 3+ link columns => `dark-gradient`) updates an already generated footer (not yet on dark-gradient; footers already on dark-gradient are never touched) using the site's own SEO description/contact info, changes only the variant (logo/links/socials/tagline untouched), is idempotent, and leaves footers with fewer than 3 columns, no brand info, or no footer untouched. The binder and the repair share one rule.
+- [ ] MANUAL — `npm run migrate:pw1:repair -- --only footer` (dry-run) lists the stores to change; `-- --apply` appends the previous footers to a backup JSONL before updating `footer_block`/`pending_footer_block`, skips a footer edited meanwhile; after the 5-minute footer cache (first view after expiry may still be stale) the public footer shows the dark-gradient layout.
+
+### TC-F35.M69 — Rich-text image repair for generated stores
+- [x] AUTO — Absolute `<img>` sources in rich text that were never rehosted (not `pw1-<tenant>-…` media) are found with entities decoded; the repair reuses the migration's downloader to rehost them and rewrite the `src`, does nothing (and downloads nothing) when all images are already rehosted, and reports images that still cannot be downloaded without changing the html.
+- [ ] MANUAL — `npm run migrate:pw1:repair -- --only images` (dry-run) lists the images still pointing at PW1 per store/page/block without downloading; `-- --apply` rehosts them, updates `pages_blocks_custom_html` and the matching draft-version rows, saves the previous html to the backup first, and reports images broken at the source.
+
+### TC-F35.M70 — Hero banner variant repair for generated stores
+- [x] AUTO — A hero with an image on a variant that cannot render it (fullscreen → parallax, gradient/minimal → centered) is moved to an image-rendering variant; heroes without an image or already on an image-rendering variant are untouched, and every replacement variant renders the image.
+- [ ] MANUAL — `npm run migrate:pw1:repair -- --only hero` (dry-run) lists affected heroes per store/page/block; `-- --apply` updates `pages_blocks_hero` and the matching draft-version rows, saving the previous variant to the backup first.
+
+### TC-F35.M71 — Footer link repair for generated stores
+- [x] AUTO — A footer column that holds fewer links than the same-titled column adapted from the PW1 export takes the source links and text; complete columns, unmatched columns and every other footer field are untouched.
+- [ ] MANUAL — `npm run migrate:pw1:repair -- --input <pw1-export.json> --only links` (dry-run) lists the columns to restore per store; `-- --apply` rewrites `sites.footer_block` / `pending_footer_block` (previous JSON saved to the backup first). Re-running reports 0 footers.
+
+### TC-F35.M72 — Placeholder image repair for generated stores
+- [x] AUTO — Placeholder media is matched to its PW1 source URL through the tenant/hash filename; repointing updates every foreign key into `media` and the copied media URL inside json columns, and skips the URL rewrite when it did not change.
+- [ ] MANUAL — `npm run migrate:pw1:repair -- --input <pw1-export.json> --only placeholders` (dry-run) lists placeholder media per store without downloading; `-- --apply` downloads the real image (uploads to the configured media storage), repoints all references and reports images still broken at the source (no upload for those).
+
+### TC-F35.M73 — Empty fixed product list shows every product
+- [x] AUTO — PW1 drops the empty `id` filter, so a `fixed` listing without items lists every active product: the binder maps it to `all` (a fixed list whose products the BE did not emit, and a template-owned category, stay empty), and the repair turns existing `fixed` grids with no products into `all`; grids with products or another mode are untouched, and stores whose migration warned about a deliberate empty selection are skipped.
+- [ ] MANUAL — `npm run migrate:pw1:repair -- --dry-run --only product-grids` lists the grids per store/page/block; the default run updates `pages_blocks_products_grid` and the draft-version rows (previous mode saved to the backup). `/sites/mas-anita` then shows its 4 products under "New Arrival" and "Harga Istimewa".
 
 ### Rich text editor HTML compatibility
 - [x] AUTO TC-F35-RT-01: Tiptap retains PW1 container styles, headings, lists, image metadata and tables during an HTML edit round trip.
