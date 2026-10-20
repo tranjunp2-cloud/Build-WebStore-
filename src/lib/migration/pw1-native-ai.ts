@@ -17,6 +17,7 @@ import { ContractSchema } from './pw1-contract'
 import { FooterConfigSchema } from '@/blocks/footer/config'
 import { HeroConfigSchema } from '@/blocks/hero/config'
 import { bannerContentLosses } from './pw1-variant-fidelity'
+import { isBrandWithColumns } from './pw1-footer-brand'
 import { ContentCardsConfigSchema } from '@/blocks/content-cards/config'
 
 export const NATIVE_BLOCKS = ['navigation', 'footer', 'hero', 'carousel', 'portfolio-grid', 'custom-html', 'video', 'products-grid', 'blog-list'] as const
@@ -156,13 +157,10 @@ export function bindNativeDesign(input: unknown, designInput: unknown): Generati
         const footer = source.site.footer
         const hasRichFooter = Boolean(footer.tagline || (Array.isArray(footer.socials) && footer.socials.length) || (Array.isArray(footer.columns) && (footer.columns.length > 1 || footer.columns.some((c: { text?: string }) => c?.text))))
         const simpleDropsContent = design.footerVariant === 'simple' && Boolean(footer.tagline || (Array.isArray(footer.columns) && footer.columns.length))
-        // A brand block (tagline/contact) beside three or more link columns always uses the columned dark-gradient layout
-        const brandWithColumns = Boolean(footer.tagline || footer.storeDescription || footer.showContactInfo) && Array.isArray(footer.columns) && footer.columns.length >= 3
-        const footerVariant = brandWithColumns ? 'dark-gradient' : (design.footerVariant === 'minimal' && hasRichFooter) || simpleDropsContent ? 'centered-stack' : design.footerVariant
-        // Store description and contact details are shown by dark-gradient only; other variants keep the source footer as is.
-        const { storeDescription, showContactInfo, ...sourceFooter } = footer
-        const brandInfo = footerVariant === 'dark-gradient' ? { ...(storeDescription && !sourceFooter.tagline ? { tagline: storeDescription } : {}), ...(showContactInfo ? { showContactInfo: true } : {}) } : {}
-        blocks.push(validate({ ...sourceFooter, ...brandInfo, blockType: 'footer', variant: footerVariant }))
+        const footerVariant = isBrandWithColumns(footer) ? 'dark-gradient' : (design.footerVariant === 'minimal' && hasRichFooter) || simpleDropsContent ? 'centered-stack' : design.footerVariant
+        // The store description and contact flag only decide the variant; dark-gradient renders them from the site itself.
+        const sourceFooter = Object.fromEntries(Object.entries(footer).filter(([key]) => key !== 'storeDescription' && key !== 'showContactInfo'))
+        blocks.push(validate({ ...sourceFooter, blockType: 'footer', variant: footerVariant }))
         blocks.forEach((block, i) => { block.sortOrder = i; block.blockSpacing = { paddingTop: 0, paddingBottom: 0 } })
         mappings.push({ sourceId: page.sourceId, groups })
         return { sourceId: page.sourceId, title: page.title, slug: page.slug, isHomepage: page.isHomepage, blocks, seo: { title: page.title, description: '' } }
