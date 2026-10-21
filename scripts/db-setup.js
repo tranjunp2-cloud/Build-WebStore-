@@ -5616,6 +5616,23 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
       END IF;
     END $$;`,
   },
+  // ── F23 GH-1723: SSO Owner avatar sync (immutable SSO identity + idempotency/ordering) ──
+  {
+    name: 'users.sso_user_id',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_user_id integer;`,
+  },
+  {
+    name: 'users.sso_user_id_unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS users_sso_user_id_uniq ON users (sso_user_id) WHERE sso_user_id IS NOT NULL;`,
+  },
+  {
+    name: 'users.sso_avatar_key',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_avatar_key varchar;`,
+  },
+  {
+    name: 'users.sso_avatar_synced_at',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_avatar_synced_at timestamp(3) with time zone;`,
+  },
 ];
 
 // PERF: cache applied migration names in a state table so subsequent builds
