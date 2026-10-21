@@ -21,8 +21,10 @@ Kiểm tra `node scripts/check-migrations.js` pass.
 |---|---|
 | `sync-avatar-schema.ts` | zod schema payload contract (PRESENT bắt buộc `avatar_url` + `avatar_key`) |
 | `download-sso-avatar.ts` | tải ảnh theo link SSO gửi: https, `redirect:'manual'` (không bao giờ theo redirect; 3xx → 422), timeout 10s, stream ≤ 2MB (`AVATAR_MAX_BYTES`), magic bytes JPEG/PNG (`hasValidImageSignature` + chỉ chấp nhận jpeg/png) |
-| `resolve-sso-owner.ts` | map user theo contract (sso_user_id → bind email có điều kiện); trả `{ user }` hoặc `{ reason }`. Hằng `ALLOW_EMAIL_BIND = true` để tắt nhanh nếu PO từ chối |
-| `apply-avatar-state.ts` | idempotent/stale check, PRESENT/ABSENT, tạo Media (theo pattern `avatar/route.ts`: `alt: 'User avatar'`), update user `overrideAccess: true`, xóa Media cũ sau khi update thành công (chỉ xóa nếu không user nào khác tham chiếu) |
+| `resolve-sso-owner.ts` | map user theo contract (sso_user_id → bind email có điều kiện); trả `{ user }` hoặc `{ reason }`. Hằng `ALLOW_EMAIL_BIND = false` (bật cùng PR cập nhật PRD khi PO đồng ý BR-23-04; tắt → `email_bind_disabled`). Bind bằng 1 câu `UPDATE … WHERE sso_user_id IS NULL` (`sso-user-sql.ts`) |
+| `apply-avatar-state.ts` | idempotent/stale check, PRESENT/ABSENT, tạo Media (qua `withMediaCreateLock`, `alt: 'User avatar'`), ghi user bằng compare-and-set atomic (`sso-user-sql.ts`), xóa Media cũ sau khi ghi thành công (chỉ xóa nếu do luồng avatar tạo và không user nào khác dùng) |
+| `sso-user-sql.ts` | `bindSsoUserId` và `casSetAvatarState`: mỗi hàm đúng 1 câu `UPDATE … WHERE … RETURNING id` qua `payload.db.pool` (cùng pattern `register-media.ts`); `23505` → conflict, lỗi khác throw lại |
+| `is-public-ip.ts` | kiểm tra IPv4/IPv6 công khai cho SSRF guard (không cần cấu hình) |
 
 Tái dùng: `AVATAR_MAX_BYTES` (`src/lib/profile/schemas.ts`), `hasValidImageSignature` (`src/lib/media/image-signature.ts`), `isOwner` (`src/lib/profile/role-utils.ts`).
 
@@ -40,7 +42,7 @@ Không thêm env mới (bỏ allow-list host theo quyết định 2026-10-20: t�
 |---|---|
 | TC-F23-SSO-07 | trùng `avatar_key` → unchanged; `changed_at` cũ → stale |
 | TC-F23-SSO-08 | http / >2MB / GIF / HTTP 3xx-4xx → 422; 5xx, 429, timeout, lỗi mạng → 502; không đổi avatar |
-| TC-F23-SSO-09 | map theo `sso_user_id`; bind email chỉ khi đủ điều kiện; email trùng 2 user → 409 `ambiguous_email`; staff → 409 `not_owner`; sso_id đã gắn user khác → 409 |
+| TC-F23-SSO-09 | map theo `sso_user_id`; bind email **chỉ khi `ALLOW_EMAIL_BIND`** (mặc định tắt → 409 `email_bind_disabled`) và đủ điều kiện; email trùng 2 user → 409 `ambiguous_email`; staff → 409 `not_owner`; sso_id đã gắn user khác → 409 |
 | TC-F23-SSO-05/11 | ABSENT → avatar null + xóa Media cũ; PRESENT → Media mới + xóa cũ |
 | TC-F23-SSO-06 | tải lỗi → giữ avatar cũ, 502 |
 | auth | thiếu Bearer 401, không phải super-admin 403, payload sai 400 |

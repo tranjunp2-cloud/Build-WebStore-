@@ -83,17 +83,17 @@ TC-ID scheme hiện hữu: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **tr�
 
 | TC-ID | AC Ref | Description | AUTO |
 |---|---|---|---|
-| TC-F23-SSO-01 | AC-05.1 | Backfill Owner có SSO avatar; thay legacy local reference và hiển thị Header/Profile | ✓ — `sso-avatar-apply-state.test.ts`, `sso-avatar-download.test.ts`, `sso-sync-avatar.test.ts` (unit) + staging manual |
-| TC-F23-SSO-02 | AC-05.1 | Authenticated `ABSENT` khi backfill; retire/purge legacy local media và dùng initials | ✓ — `sso-avatar-apply-state.test.ts`, `sso-sync-avatar.test.ts` (unit) + staging manual |
+| TC-F23-SSO-01 | AC-05.1 | Backfill Owner có SSO avatar; thay legacy local reference và hiển thị Header/Profile (Owner cũ chưa có `sso_user_id` chỉ backfill được sau khi PO duyệt BR-23-04 và bật `ALLOW_EMAIL_BIND`; trước đó → 409 `email_bind_disabled`) | ✓ — `sso-avatar-apply-state.test.ts`, `sso-avatar-download.test.ts`, `sso-sync-avatar.test.ts` (unit) + staging manual |
+| TC-F23-SSO-02 | AC-05.1 | Authenticated `ABSENT` khi backfill; retire/purge legacy local media và dùng initials (cùng điều kiện `sso_user_id`/`ALLOW_EMAIL_BIND` như TC-01) | ✓ — `sso-avatar-apply-state.test.ts`, `sso-sync-avatar.test.ts` (unit) + staging manual |
 | TC-F23-SSO-03 | AC-05.2 | Confirmed update đạt propagation p95 ≤ 5 phút | Manual — staging (Phase 05) |
 | TC-F23-SSO-04 | AC-05.3 | Missed webhook được login reconciliation; failure không block login | Manual — staging (SSO `login` trigger) |
 | TC-F23-SSO-05 | AC-05.4 | Authenticated `ABSENT` purge reference, stored object, derivatives/CDN theo retention | ✓ — `sso-avatar-apply-state.test.ts` (Media purge) |
 | TC-F23-SSO-06 | AC-05.5 | `UNKNOWN`/SSO outage giữ last-known avatar và retry/monitor | ✓ — `sso-avatar-apply-state.test.ts`, `sso-avatar-download.test.ts`, `sso-sync-avatar.test.ts` + staging manual |
 | TC-F23-SSO-07 | AC-05.6 | Duplicate/out-of-order event idempotent; event cũ không rollback | ✓ — `sso-avatar-apply-state.test.ts` |
-| TC-F23-SSO-08 | AC-05.7 | Invalid/expired/unsafe resource không persist/render hoặc fetch private network | ✓ — `sso-avatar-download.test.ts` |
-| TC-F23-SSO-09 | AC-05.8 | Immutable identity và cross-user/cross-tenant isolation | ✓ — `sso-avatar-resolve-owner.test.ts`, `sso-sync-avatar.test.ts`, `sso-provision.test.ts`, `sso-avatar-apply-state.test.ts` |
+| TC-F23-SSO-08 | AC-05.7 | Invalid/expired/unsafe resource không persist/render hoặc fetch private network | ✓ — `sso-avatar-download.test.ts`, `sso-avatar-is-public-ip.test.ts` (+ staging manual) |
+| TC-F23-SSO-09 | AC-05.8 | Immutable identity và cross-user/cross-tenant isolation | ✓ — `sso-avatar-resolve-owner.test.ts`, `sso-user-sql.test.ts`, `sso-sync-avatar.test.ts`, `sso-provision.test.ts`, `sso-avatar-apply-state.test.ts` |
 | TC-F23-SSO-10 | AC-05.9 | Owner local mutation bị chặn; Staff avatar flow không regression | ✓ — `api-users-me-avatar.test.ts`, `avatar-field-access.test.ts` |
-| TC-F23-SSO-11 | AC-05.10, AC-05.11 | Identity preflight quarantine và `PRESENT`/`ABSENT`/`UNKNOWN` semantics | ✓ — `sso-avatar-resolve-owner.test.ts`, `sso-sync-avatar.test.ts` |
+| TC-F23-SSO-11 | AC-05.10, AC-05.11 | Identity preflight quarantine (gồm `email_bind_disabled` mặc định) và `PRESENT`/`ABSENT`/`UNKNOWN` semantics | ✓ — `sso-avatar-resolve-owner.test.ts`, `sso-sync-avatar.test.ts` |
 
 ---
 

@@ -1,6 +1,12 @@
+import { lookup } from 'node:dns/promises'
+import { isIP } from 'node:net'
+import sharp from 'sharp'
 import { AVATAR_MAX_BYTES } from '@/lib/profile/schemas'
+import { isPublicIp } from './is-public-ip'
 
 const DOWNLOAD_TIMEOUT_MS = 10_000
+/** Pixel cap (not a side cap): rejects decompression-bomb images but keeps well-compressed phone photos. */
+export const MAX_AVATAR_PIXELS = 50_000_000
 
 /**
  * Any reason the SSO avatar could not be fetched safely — caller keeps last-known avatar.
@@ -40,6 +46,34 @@ export function validateSsoAvatarUrl(rawUrl: string): URL {
     return url
 }
 
+/**
+ * SSRF guard: the avatar host must resolve to public addresses only (no loopback, private,
+ * link-local/cloud-metadata, CGNAT…). No allow-list or env needed. Residual risk accepted:
+ * DNS can change between this check and the fetch (rebinding); the endpoint is super-admin only.
+ */
+async function assertPublicHost(url: URL): Promise<void> {
+    // strip IPv6 brackets and a trailing root dot (`localhost.` is still localhost)
+    const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase()
+    if (host === 'localhost' || host.endsWith('.localhost')) {
+        throw new AvatarDownloadError('Avatar host is not public')
+    }
+    let addresses: string[]
+    if (isIP(host)) {
+        addresses = [host]
+    } else {
+        try {
+            addresses = (await lookup(host, { all: true })).map((a) => a.address)
+        } catch (err) {
+            const code = (err as { code?: string }).code
+            // ENOTFOUND is permanent for this link; other DNS failures (EAI_AGAIN, timeouts) may recover
+            throw new AvatarDownloadError(`Avatar host lookup failed: ${code ?? 'unknown'}`, code !== 'ENOTFOUND')
+        }
+    }
+    if (addresses.length === 0 || addresses.some((a) => !isPublicIp(a))) {
+        throw new AvatarDownloadError('Avatar host resolves to a non-public address')
+    }
+}
+
 /** Same JPEG/PNG magic-byte rule as the local avatar upload (users/me/avatar). */
 export function detectAvatarMimetype(buffer: Buffer): DownloadedAvatar['mimetype'] | null {
     if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return 'image/jpeg'
@@ -71,6 +105,7 @@ async function readCapped(body: ReadableStream<Uint8Array>, limit: number): Prom
 /** Download an SSO avatar with URL, size and content checks. Throws AvatarDownloadError. */
 export async function downloadSsoAvatar(rawUrl: string): Promise<DownloadedAvatar> {
     const url = validateSsoAvatarUrl(rawUrl)
+    await assertPublicHost(url)
 
     let response: Response
     try {
@@ -102,5 +137,19 @@ export async function downloadSsoAvatar(rawUrl: string): Promise<DownloadedAvata
     }
     const mimetype = detectAvatarMimetype(buffer)
     if (!mimetype) throw new AvatarDownloadError('Avatar is not a JPEG or PNG image')
+
+    // Header-only read: protects the Media image processing that runs later from huge-pixel files
+    let width = 0
+    let height = 0
+    try {
+        const meta = await sharp(buffer).metadata()
+        width = meta.width ?? 0
+        height = meta.height ?? 0
+    } catch {
+        throw new AvatarDownloadError('Avatar is not a decodable image')
+    }
+    if (width < 1 || height < 1 || width * height > MAX_AVATAR_PIXELS) {
+        throw new AvatarDownloadError(`Avatar dimensions are not acceptable (${width}x${height})`)
+    }
     return { buffer, mimetype, ext: mimetype === 'image/png' ? 'png' : 'jpg' }
 }

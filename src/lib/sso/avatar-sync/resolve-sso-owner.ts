@@ -1,11 +1,13 @@
 import type { BasePayload } from 'payload'
 import { isOwner } from '@/lib/profile/role-utils'
+import { bindSsoUserId } from './sso-user-sql'
 
 /**
- * Allow binding `ssoUserId` by email the first time an SSO Owner is seen (proposed BR-23-04 change,
- * GH-1723). Set to false if PO rejects it: only users already bound by `ssoUserId` will sync.
+ * Allow binding `ssoUserId` by email the first time an SSO Owner is seen. OFF until PO/BA approve
+ * the BR-23-04 change (PRD still forbids email mapping): only users already bound by `ssoUserId`
+ * (new SSO provisions send it) sync. Flip to true in the same PR that updates the PRD.
  */
-export const ALLOW_EMAIL_BIND = true
+export const ALLOW_EMAIL_BIND = false
 
 export type SsoOwnerDoc = {
     id: number | string
@@ -17,7 +19,7 @@ export type SsoOwnerDoc = {
     ssoAvatarSyncedAt?: string | null
 }
 
-export type ResolveFailureReason = 'not_found' | 'ambiguous_email' | 'not_owner' | 'sso_id_conflict'
+export type ResolveFailureReason = 'not_found' | 'ambiguous_email' | 'not_owner' | 'sso_id_conflict' | 'email_bind_disabled'
 
 export type ResolveResult =
     | { ok: true; user: SsoOwnerDoc; bound: boolean }
@@ -34,7 +36,9 @@ const isOwnerDoc = (user: SsoOwnerDoc) =>
 export async function resolveSsoOwner(
     payload: BasePayload,
     input: { ssoUserId: number; email: string },
+    options: { allowEmailBind?: boolean } = {},
 ): Promise<ResolveResult> {
+    const allowEmailBind = options.allowEmailBind ?? ALLOW_EMAIL_BIND
     const byId = await payload.find({
         collection: 'users',
         where: { ssoUserId: { equals: input.ssoUserId } },
@@ -47,7 +51,7 @@ export async function resolveSsoOwner(
         return isOwnerDoc(boundUser) ? { ok: true, user: boundUser, bound: false } : { ok: false, reason: 'not_owner' }
     }
 
-    if (!ALLOW_EMAIL_BIND) return { ok: false, reason: 'not_found' }
+    if (!allowEmailBind) return { ok: false, reason: 'email_bind_disabled' }
 
     // Payload stores auth emails lowercased → exact `equals` on the normalized value.
     // limit 2 is enough to tell "exactly one" from "ambiguous".
@@ -67,24 +71,10 @@ export async function resolveSsoOwner(
     if (candidate.ssoUserId != null) return { ok: false, reason: 'sso_id_conflict' }
     if (!isOwnerDoc(candidate)) return { ok: false, reason: 'not_owner' }
 
-    // Atomic bind: the `exists:false` guard makes a concurrent bind lose instead of overwriting
-    // another SSO id. A unique-index violation (same id on another user) is reported in `errors`
-    // for bulk updates, or thrown — both mean the id is taken.
-    try {
-        const res = await payload.update({
-            collection: 'users',
-            where: { and: [{ id: { equals: candidate.id } }, { ssoUserId: { exists: false } }] },
-            data: { ssoUserId: input.ssoUserId },
-            depth: 0,
-            overrideAccess: true,
-        })
-        if (res.errors?.length) {
-            console.error('[V2][SSO SyncAvatar] bind ssoUserId failed:', JSON.stringify(res.errors))
-            return { ok: false, reason: 'sso_id_conflict' }
-        }
-        if (res.docs.length === 0) return { ok: false, reason: 'sso_id_conflict' }
-    } catch (err) {
-        console.error('[V2][SSO SyncAvatar] bind ssoUserId failed:', err instanceof Error ? err.message : err)
+    // Atomic bind (single UPDATE … WHERE sso_user_id IS NULL): a concurrent bind or an id already
+    // owned by another user (unique index) loses with 'conflict'. Other database errors propagate
+    // so the route answers 5xx and SSO retries.
+    if ((await bindSsoUserId(payload, candidate.id, input.ssoUserId)) === 'conflict') {
         return { ok: false, reason: 'sso_id_conflict' }
     }
     return { ok: true, user: { ...candidate, ssoUserId: input.ssoUserId }, bound: true }

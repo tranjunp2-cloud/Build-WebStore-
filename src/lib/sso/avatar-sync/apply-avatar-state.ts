@@ -1,5 +1,7 @@
-import type { BasePayload, Where } from 'payload'
+import type { BasePayload } from 'payload'
+import { withMediaCreateLock } from '@/lib/ai/media-create-lock'
 import { downloadSsoAvatar } from './download-sso-avatar'
+import { casSetAvatarState } from './sso-user-sql'
 import type { SsoOwnerDoc } from './resolve-sso-owner'
 import type { SyncAvatarInput } from './sync-avatar-schema'
 
@@ -34,29 +36,11 @@ async function deletePreviousAvatarMedia(payload: BasePayload, mediaId: number |
 }
 
 /**
- * Compare-and-set update: only applies when `ssoAvatarSyncedAt` is still the value we read,
- * so two concurrent syncs for the same Owner cannot both win. Returns false when we lost.
- */
-async function casUpdateUser(payload: BasePayload, user: SsoOwnerDoc, data: Record<string, unknown>): Promise<boolean> {
-    const syncedAtGuard: Where = user.ssoAvatarSyncedAt
-        ? { ssoAvatarSyncedAt: { equals: user.ssoAvatarSyncedAt } }
-        : { ssoAvatarSyncedAt: { exists: false } }
-    const res = await payload.update({
-        collection: 'users',
-        where: { and: [{ id: { equals: user.id } }, syncedAtGuard] },
-        data,
-        depth: 0,
-        overrideAccess: true,
-    })
-    if (res.errors?.length) throw new Error(`user update failed: ${JSON.stringify(res.errors)}`)
-    return res.docs.length > 0
-}
-
-/**
  * Apply the SSO avatar state to a resolved Owner (GH-1723).
  * - stale `changed_at` or same `avatar_key` → no-op (idempotent, ordering-safe)
  * - PRESENT → download, store as Media, link; ABSENT → unlink (initials)
- * - concurrent sync lost the CAS → new Media removed, result 'stale'
+ * - the write is one atomic compare-and-set on `sso_avatar_synced_at` (sso-user-sql.ts); a sync that
+ *   lost the race removes its new Media and answers 'stale'
  * - download errors propagate as AvatarDownloadError → caller keeps last-known avatar
  */
 export async function applyAvatarState(
@@ -74,7 +58,7 @@ export async function applyAvatarState(
 
     if (input.state === 'ABSENT') {
         if (previousMediaId == null && !user.ssoAvatarKey) return 'unchanged'
-        const won = await casUpdateUser(payload, user, { avatar: null, ssoAvatarKey: null, ssoAvatarSyncedAt: syncedAt })
+        const won = await casSetAvatarState(payload, user.id, user.ssoAvatarSyncedAt ?? null, { avatarId: null, avatarKey: null, syncedAt })
         if (!won) return 'stale'
         if (previousMediaId != null) await deletePreviousAvatarMedia(payload, previousMediaId, user.id)
         return 'cleared'
@@ -83,16 +67,23 @@ export async function applyAvatarState(
     if (input.avatar_key === user.ssoAvatarKey && previousMediaId != null) return 'unchanged'
 
     const image = await downloadSsoAvatar(input.avatar_url)
-    const media = await payload.create({
+    // GH-1185: parallel Media creates race in the drizzle adapter (lost rows / 500) — same mutex as uploads.
+    // The unique suffix avoids Payload's numeric-suffix renaming (`…-3.png` → `…-4.png`) on name clashes.
+    const media = await withMediaCreateLock(() => payload.create({
         collection: 'media',
         data: { alt: AVATAR_MEDIA_ALT },
-        file: { data: image.buffer, mimetype: image.mimetype, name: `sso-avatar-${user.id}.${image.ext}`, size: image.buffer.length },
+        file: {
+            data: image.buffer,
+            mimetype: image.mimetype,
+            name: `sso-avatar-u${user.id}-${Date.now().toString(36)}.${image.ext}`,
+            size: image.buffer.length,
+        },
         overrideAccess: true,
-    })
+    }))
 
     let won = false
     try {
-        won = await casUpdateUser(payload, user, { avatar: media.id, ssoAvatarKey: input.avatar_key, ssoAvatarSyncedAt: syncedAt })
+        won = await casSetAvatarState(payload, user.id, user.ssoAvatarSyncedAt ?? null, { avatarId: media.id, avatarKey: input.avatar_key, syncedAt })
     } finally {
         if (!won) await payload.delete({ collection: 'media', id: media.id, overrideAccess: true }).catch(() => {})
     }

@@ -74,6 +74,22 @@ describe('POST /api/v1/sso/sync-avatar', () => {
         expect(applyAvatarState).not.toHaveBeenCalled()
     })
 
+    // TC-F23-SSO-11: email mapping disabled (default) → 409 with its own reason, never a silent bind
+    it('returns 409 email_bind_disabled when the Owner is not bound yet and email binding is off', async () => {
+        vi.mocked(resolveSsoOwner).mockResolvedValue({ ok: false, reason: 'email_bind_disabled' })
+        const res = await POST(makeRequest(presentBody))
+        expect(res.status).toBe(409)
+        expect(await res.json()).toMatchObject({ reason: 'email_bind_disabled' })
+        expect(applyAvatarState).not.toHaveBeenCalled()
+    })
+
+    // TC-F23-SSO-06: a database error must surface as 500 (SSO retries), not as a permanent 409
+    it('lets SSO retry by returning 500 when resolving the Owner hits a database error', async () => {
+        vi.mocked(resolveSsoOwner).mockRejectedValue(Object.assign(new Error('connection terminated'), { code: 'ECONNRESET' }))
+        const res = await POST(makeRequest(presentBody))
+        expect(res.status).toBe(500)
+    })
+
     // TC-F23-SSO-06: transient download failure keeps last-known avatar and asks SSO to retry
     it('returns 502 when the avatar download fails transiently', async () => {
         vi.mocked(resolveSsoOwner).mockResolvedValue({ ok: true, user: ownerDoc, bound: false })

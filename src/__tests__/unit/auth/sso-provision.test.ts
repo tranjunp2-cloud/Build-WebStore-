@@ -36,6 +36,7 @@ describe('POST /api/v1/sso/provision', () => {
             auth: vi.fn(),
             find: vi.fn(),
             create: vi.fn(),
+            delete: vi.fn().mockResolvedValue({}),
         }
 
         vi.mocked(getPayload).mockResolvedValue(mockPayload as any)
@@ -232,6 +233,56 @@ describe('POST /api/v1/sso/provision', () => {
         // Assert
         expect(res.status).toBe(409)
         expect(mockPayload.create).not.toHaveBeenCalled()
+    })
+
+    // TC-F23-SSO-09: a concurrent request bound the same sso_user_id after the pre-check → drop our tenant, answer 409
+    it('returns 409 and deletes the new tenant when the user create loses a race on sso_user_id', async () => {
+        // Arrange
+        mockPayload.auth.mockResolvedValue({ user: { id: 1, roles: ['super-admin'] } })
+        mockPayload.find
+            .mockResolvedValueOnce({ docs: [] })            // email + customerId check
+            .mockResolvedValueOnce({ docs: [] })            // ssoUserId pre-check passes
+            .mockResolvedValueOnce({ docs: [{ id: 55 }] })  // after the failed create: id is now bound
+        mockPayload.create.mockImplementation(async (args: any) => {
+            if (args.collection === 'tenants') return { id: 99, slug: 'acme-rand' }
+            if (args.collection === 'users') throw new Error('duplicate key value violates unique constraint')
+            return { id: 1 }
+        })
+        const req = createMockRequest({ authorization: 'Bearer token123' }, {
+            company_name: 'Acme', email: 'owner@test.com', password: 'secret_password_123',
+            pack_code: 'professional', name: 'Jane Doe', sso_user_id: 4321,
+        })
+
+        // Act
+        const res = await POST(req) as unknown as { data: any, status: number }
+
+        // Assert
+        expect(res.status).toBe(409)
+        expect(mockPayload.delete).toHaveBeenCalledWith(expect.objectContaining({ collection: 'tenants', id: 99 }))
+    })
+
+    // TC-F23-SSO-09: any other user-create failure is still an error (500), not a fake 409
+    it('rethrows (500) when the user create fails and the sso_user_id is not bound by anyone', async () => {
+        // Arrange
+        vi.spyOn(console, 'error').mockImplementation(() => { })
+        mockPayload.auth.mockResolvedValue({ user: { id: 1, roles: ['super-admin'] } })
+        mockPayload.find.mockResolvedValue({ docs: [] })
+        mockPayload.create.mockImplementation(async (args: any) => {
+            if (args.collection === 'tenants') return { id: 99, slug: 'acme-rand' }
+            if (args.collection === 'users') throw new Error('db down')
+            return { id: 1 }
+        })
+        const req = createMockRequest({ authorization: 'Bearer token123' }, {
+            company_name: 'Acme', email: 'owner@test.com', password: 'secret_password_123',
+            pack_code: 'professional', name: 'Jane Doe', sso_user_id: 4321,
+        })
+
+        // Act
+        const res = await POST(req) as unknown as { data: any, status: number }
+
+        // Assert
+        expect(res.status).toBe(500)
+        expect(mockPayload.delete).not.toHaveBeenCalled()
     })
 
     // TC-F23-SSO-09: invalid sso_user_id is ignored (older SSO builds / bad data)

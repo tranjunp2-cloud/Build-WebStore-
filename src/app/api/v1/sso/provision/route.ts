@@ -167,31 +167,55 @@ export async function POST(req: NextRequest) {
         })
 
         // ── 8. Create User (with password from SSO) ──
-        const newUser = await payload.create({
-            collection: 'users',
-            overrideAccess: true,
-            data: {
-                email,
-                password, // SSO provides password → user can login immediately
-                firstName,
-                lastName,
-                phone,
-                roles: ['tenant-owner'],
-                tenants: [
-                    {
-                        tenant: newTenant.id,
-                        role: 'owner',
-                    },
-                ],
-                ...(customerId && { customerIdNumber: String(customerId) }),
-                ...(ssoUserId && { ssoUserId }),
-                migrationStatus: 'migrated',
-                ...(keyString && { keyString }),
-                // Audit trail: payload.create() local API has no req.user; set explicitly
-                createdBy: callerUser.id,
-                updatedBy: callerUser.id,
-            },
-        })
+        let newUser
+        try {
+            newUser = await payload.create({
+                collection: 'users',
+                overrideAccess: true,
+                data: {
+                    email,
+                    password, // SSO provides password → user can login immediately
+                    firstName,
+                    lastName,
+                    phone,
+                    roles: ['tenant-owner'],
+                    tenants: [
+                        {
+                            tenant: newTenant.id,
+                            role: 'owner',
+                        },
+                    ],
+                    ...(customerId && { customerIdNumber: String(customerId) }),
+                    ...(ssoUserId && { ssoUserId }),
+                    migrationStatus: 'migrated',
+                    ...(keyString && { keyString }),
+                    // Audit trail: payload.create() local API has no req.user; set explicitly
+                    createdBy: callerUser.id,
+                    updatedBy: callerUser.id,
+                },
+            })
+        } catch (err) {
+            // GH-1723: a concurrent request bound the same sso_user_id between the pre-check and this
+            // create (unique index) → drop the tenant created above and answer 409 like the pre-check.
+            if (ssoUserId) {
+                // A failing lookup must not hide the original create error → treat it as "no race"
+                const raced = await payload.find({
+                    collection: 'users',
+                    where: { ssoUserId: { equals: ssoUserId } },
+                    limit: 1,
+                    depth: 0,
+                    overrideAccess: true,
+                }).catch(() => ({ docs: [] as unknown[] }))
+                if (raced.docs.length > 0) {
+                    await payload.delete({ collection: 'tenants', id: newTenant.id, overrideAccess: true }).catch((cleanupErr) => {
+                        // Orphan tenant: leave a trace so it can be cleaned up by hand
+                        console.error(`[SSO Provisioning] could not remove tenant ${newTenant.id} after the sso_user_id race:`, cleanupErr)
+                    })
+                    return NextResponse.json({ message: 'User already provisioned' }, { status: 409 })
+                }
+            }
+            throw err
+        }
 
         // ── 9. Create PlanSubscription (non-blocking — failure does not abort provision) ──
         const startsAt = startDate

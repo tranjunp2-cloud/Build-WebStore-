@@ -24,7 +24,10 @@ const absent: SyncAvatarInput = {
 }
 
 describe('applyAvatarState (GH-1723)', () => {
-    let payload: Record<'find' | 'findByID' | 'create' | 'update' | 'delete', ReturnType<typeof vi.fn>>
+    let payload: Record<'find' | 'findByID' | 'create' | 'delete', ReturnType<typeof vi.fn>> & { db: { pool: { query: ReturnType<typeof vi.fn> } } }
+    // The compare-and-set is ONE raw `UPDATE … WHERE … RETURNING id`: one returned row means we won
+    const won = { rows: [{ id: 7 }] }
+    const lost = { rows: [] }
 
     beforeEach(() => {
         vi.clearAllMocks()
@@ -33,37 +36,34 @@ describe('applyAvatarState (GH-1723)', () => {
             find: vi.fn().mockResolvedValue({ docs: [] }),
             findByID: vi.fn().mockResolvedValue({ id: 400, alt: AVATAR_MEDIA_ALT }),
             create: vi.fn().mockResolvedValue({ id: 501 }),
-            // bulk update (CAS) → one doc updated = we won
-            update: vi.fn().mockResolvedValue({ docs: [{ id: 7 }], errors: [] }),
             delete: vi.fn().mockResolvedValue({}),
+            db: { pool: { query: vi.fn().mockResolvedValue(won) } },
         }
         vi.mocked(downloadSsoAvatar).mockResolvedValue({ buffer: Buffer.from([0x89, 0x50, 0x4E, 0x47]), mimetype: 'image/png', ext: 'png' })
     })
 
     // TC-F23-SSO-01: PRESENT replaces the legacy/previous avatar and purges the old avatar Media
-    it('stores the SSO avatar as Media, links it via CAS and deletes the old avatar Media', async () => {
+    it('stores the SSO avatar as Media, links it with one guarded UPDATE and deletes the old avatar Media', async () => {
         const user = { id: 7, avatar: { id: 400 }, ssoAvatarKey: 'old.png', ssoAvatarSyncedAt: '2026-10-01T00:00:00.000Z' }
 
         const result = await applyAvatarState(payload as any, user, present())
 
         expect(result).toBe('updated')
         expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({ collection: 'media', data: { alt: AVATAR_MEDIA_ALT } }))
-        expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
-            collection: 'users',
-            overrideAccess: true,
-            where: { and: [{ id: { equals: 7 } }, { ssoAvatarSyncedAt: { equals: '2026-10-01T00:00:00.000Z' } }] },
-            data: { avatar: 501, ssoAvatarKey: 'new.png', ssoAvatarSyncedAt: '2026-10-20T06:40:00.000Z' },
-        }))
+        const [sql, params] = payload.db.pool.query.mock.calls[0]
+        expect(sql).toMatch(/UPDATE users/)
+        expect(sql).toMatch(/sso_avatar_synced_at IS NOT DISTINCT FROM \$5::timestamptz/)
+        expect(sql).toMatch(/RETURNING id/)
+        // [avatar_id, sso_avatar_key, new synced_at, user id, expected (read) synced_at]
+        expect(params).toEqual([501, 'new.png', '2026-10-20T06:40:00.000Z', 7, '2026-10-01T00:00:00.000Z'])
         expect(payload.delete).toHaveBeenCalledWith(expect.objectContaining({ collection: 'media', id: 400 }))
     })
 
-    // TC-F23-SSO-07: first sync guards on "never synced"
-    it('guards the first sync with ssoAvatarSyncedAt not existing', async () => {
+    // TC-F23-SSO-07: first sync guards on "never synced" (NULL-safe comparison)
+    it('guards the first sync with an expected synced_at of NULL', async () => {
         await applyAvatarState(payload as any, { id: 7, avatar: null }, present())
 
-        expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
-            where: { and: [{ id: { equals: 7 } }, { ssoAvatarSyncedAt: { exists: false } }] },
-        }))
+        expect(payload.db.pool.query.mock.calls[0][1].at(-1)).toBeNull()
     })
 
     // TC-F23-SSO-07: same avatar_key → idempotent no-op
@@ -72,7 +72,7 @@ describe('applyAvatarState (GH-1723)', () => {
 
         await expect(applyAvatarState(payload as any, user, present())).resolves.toBe('unchanged')
         expect(downloadSsoAvatar).not.toHaveBeenCalled()
-        expect(payload.update).not.toHaveBeenCalled()
+        expect(payload.db.pool.query).not.toHaveBeenCalled()
     })
 
     // TC-F23-SSO-07: older event never rolls back a newer state
@@ -80,12 +80,12 @@ describe('applyAvatarState (GH-1723)', () => {
         const user = { id: 7, avatar: 400, ssoAvatarKey: 'newer.png', ssoAvatarSyncedAt: '2026-10-21T00:00:00.000Z' }
 
         await expect(applyAvatarState(payload as any, user, present())).resolves.toBe('stale')
-        expect(payload.update).not.toHaveBeenCalled()
+        expect(payload.db.pool.query).not.toHaveBeenCalled()
     })
 
     // TC-F23-SSO-07: concurrent sync won the CAS → our new Media is removed, old Media kept
-    it('returns stale and removes its new Media when it loses the compare-and-set', async () => {
-        payload.update.mockResolvedValue({ docs: [], errors: [] })
+    it('returns stale and removes its new Media when the guarded UPDATE matches no row', async () => {
+        payload.db.pool.query.mockResolvedValue(lost)
 
         const result = await applyAvatarState(payload as any, { id: 7, avatar: 400 }, present())
 
@@ -101,16 +101,22 @@ describe('applyAvatarState (GH-1723)', () => {
         const result = await applyAvatarState(payload as any, user, absent)
 
         expect(result).toBe('cleared')
-        expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
-            data: { avatar: null, ssoAvatarKey: null, ssoAvatarSyncedAt: '2026-10-20T06:40:00.000Z' },
-        }))
+        expect(payload.db.pool.query.mock.calls[0][1]).toEqual([null, null, '2026-10-20T06:40:00.000Z', 7, null])
         expect(payload.delete).toHaveBeenCalledWith(expect.objectContaining({ collection: 'media', id: 400 }))
+    })
+
+    // TC-F23-SSO-07: a lost CAS on ABSENT must not delete the Media the winner may still use
+    it('returns stale and keeps the old Media when the ABSENT write loses the race', async () => {
+        payload.db.pool.query.mockResolvedValue(lost)
+
+        await expect(applyAvatarState(payload as any, { id: 7, avatar: 400, ssoAvatarKey: 'old.png' }, absent)).resolves.toBe('stale')
+        expect(payload.delete).not.toHaveBeenCalled()
     })
 
     // TC-F23-SSO-02: ABSENT on an Owner with no avatar is a no-op
     it('returns unchanged on ABSENT when there is nothing to clear', async () => {
         await expect(applyAvatarState(payload as any, { id: 7, avatar: null }, absent)).resolves.toBe('unchanged')
-        expect(payload.update).not.toHaveBeenCalled()
+        expect(payload.db.pool.query).not.toHaveBeenCalled()
     })
 
     // TC-F23-SSO-06: download failure keeps the last-known avatar
@@ -119,12 +125,12 @@ describe('applyAvatarState (GH-1723)', () => {
 
         await expect(applyAvatarState(payload as any, { id: 7, avatar: 400 }, present())).rejects.toThrow(AvatarDownloadError)
         expect(payload.create).not.toHaveBeenCalled()
-        expect(payload.update).not.toHaveBeenCalled()
+        expect(payload.db.pool.query).not.toHaveBeenCalled()
     })
 
     // TC-F23-SSO-06: failed user update removes the just-created Media (no orphan)
     it('rolls back the new Media when linking it fails', async () => {
-        payload.update.mockRejectedValue(new Error('db down'))
+        payload.db.pool.query.mockRejectedValue(new Error('db down'))
 
         await expect(applyAvatarState(payload as any, { id: 7, avatar: 400 }, present())).rejects.toThrow('db down')
         expect(payload.delete).toHaveBeenCalledWith(expect.objectContaining({ collection: 'media', id: 501 }))

@@ -46,7 +46,7 @@ Phase 02 và 03 làm song song được (cùng dựa trên contract).
 Rollback: revert/deploy lại SSO (không có công tắc env; job còn trong queue vẫn chạy tiếp, cần thì xóa queue `default`). PWv2 giữ avatar đang có.
 
 ## Quyết định còn chờ
-- PO: đồng ý sửa BR-23-04 / FR-23-13 (bind lần đầu bằng email có điều kiện). Nếu không: tắt bước bind bằng email (`allowEmailBind=false` trong code PWv2), chỉ nhận `sso_user_id` đã gắn sẵn.
+- PO: đồng ý sửa BR-23-04 / FR-23-13 (bind lần đầu bằng email có điều kiện). **Hiện mặc định TẮT** (`ALLOW_EMAIL_BIND = false`, trả `409 email_bind_disabled`): chỉ Owner đã có `sso_user_id` (provision mới) sync được; Owner cũ cần PO duyệt rồi đổi hằng thành `true` cùng PR cập nhật PRD.
 - Security: chấp nhận Bearer super-admin cho endpoint mới.
 
 ## Ràng buộc
