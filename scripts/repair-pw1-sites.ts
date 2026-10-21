@@ -14,17 +14,17 @@
  *   npm run migrate:pw1:repair -- --dry-run             # only list what would change
  *   npm run migrate:pw1:repair -- --store 2898          # one store
  *   npm run migrate:pw1:repair -- --only images         # one repair only (footer | hero | images)
- * Input for links/placeholders defaults to PW1_REPAIR_INPUT, else .migration/pw1-input.json. Previous values are backed up before every write.
+ * Input for links/placeholders defaults to PW1_REPAIR_INPUT, else every master part of every completed run in .migration/runs, each store matched by the input hash recorded in the DB. Previous values are backed up before every write.
  */
-import { existsSync } from 'node:fs'
 import { appendFile, mkdir, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { Client } from 'pg'
 import type { Payload } from 'payload'
 import { adaptWebsiteInput } from '../src/lib/migration/pw2-website-input'
-import { compactInput } from '../src/lib/migration/pw1-batch-input'
+import { batchEntryHash, compactInput, type BatchEntry } from '../src/lib/migration/pw1-batch-input'
 import { validateMigrationBatch } from '../src/lib/migration/pw1-batch-validation'
+import { discoverAllPreparedParts } from '../src/lib/migration/pw1-prepared-input'
 import { repairFooterLinks } from '../src/lib/migration/pw1-footer-links-repair'
 import { repointMedia } from '../src/lib/migration/pw1-media-repoint'
 import { placeholderCandidates, sourceUrls } from '../src/lib/migration/pw1-placeholder-image-repair'
@@ -34,7 +34,7 @@ import { repairFooterVariant } from '../src/lib/migration/pw1-footer-variant-rep
 import { externalImageUrls, repairRichTextImages } from '../src/lib/migration/pw1-richtext-image-repair'
 
 type Store = {
-    source_store_id: string; site_id: number; tenant_id: number
+    source_store_id: string; site_id: number; tenant_id: number; input_hash: string | null
     footer_block: unknown; pending_footer_block: unknown
     seo_meta_description: string | null
     contact_info_phone: string | null; contact_info_email: string | null; contact_info_address: string | null
@@ -189,19 +189,49 @@ async function repairImages(client: Client, stores: Store[], apply: boolean, bac
 
 type Sources = Map<string, { footerColumns: Array<{ title?: string; text?: string; links?: Array<{ label: string; url?: string; imageUrl?: string }> }>; urls: Set<string> }>
 
-/** The PW1 export, adapted exactly as the migration does it (no AI, no network), keyed by PW1 store ID. */
-async function loadSources(file: string, store?: string): Promise<Sources> {
-    const parsed = validateMigrationBatch(JSON.parse(await readFile(resolve(file), 'utf8')))
+/**
+ * The PW1 export, adapted exactly as the migration does it (no AI, no network), keyed by PW1 store ID.
+ * A store takes the input entry whose hash equals the hash the migration recorded for it; when none does (the
+ * export was prepared again after the migration) it takes the newest entry for that store. The per-store guards
+ * (column title, fewer links, placeholder file name derived from the source URL) keep a fallback harmless.
+ */
+async function loadSources(files: string[], stores: Store[]): Promise<Sources> {
+    const wanted = new Map(stores.map(store => [store.source_store_id, store.input_hash]))
+    const chosen = new Map<string, { entry: BatchEntry; exact: boolean }>()
+    for (const file of files) {
+        const parsed = validateMigrationBatch(JSON.parse(await readFile(resolve(file), 'utf8')))
+        for (const entry of parsed.entries) {
+            if (!wanted.has(entry.sourceStoreId) || chosen.get(entry.sourceStoreId)?.exact) continue
+            const exact = batchEntryHash(entry) === wanted.get(entry.sourceStoreId)
+            if (exact || !chosen.has(entry.sourceStoreId)) chosen.set(entry.sourceStoreId, { entry, exact })
+        }
+    }
     const sources: Sources = new Map()
-    for (const entry of parsed.entries.filter(e => !store || e.sourceStoreId === store)) {
+    for (const [id, { entry }] of chosen) {
         try {
             const { contract } = adaptWebsiteInput(compactInput(entry))
-            sources.set(entry.sourceStoreId, { footerColumns: (contract.site.footer as { columns?: never[] }).columns ?? [], urls: sourceUrls(contract) })
-        } catch (error) { console.warn(`[input] store ${entry.sourceStoreId} skipped: ${error instanceof Error ? error.message : error}`) }
+            sources.set(id, { footerColumns: (contract.site.footer as { columns?: never[] }).columns ?? [], urls: sourceUrls(contract) })
+        } catch (error) { console.warn(`[input] store ${id} skipped: ${error instanceof Error ? error.message : error}`) }
     }
-    for (const invalid of parsed.errors) console.warn(`[input] store ${invalid.sourceStoreId ?? invalid.inputIndex} invalid: ${invalid.error}`)
-    console.log(`[input] ${sources.size} store(s) loaded from ${file}`)
+    const exactCount = [...chosen.values()].filter(c => c.exact).length
+    const missing = [...wanted.keys()].filter(id => !chosen.has(id))
+    console.log(`[input] ${sources.size}/${wanted.size} store(s) have a PW1 source (${exactCount} exact input hash, ${chosen.size - exactCount} newest entry) from ${files.length} file(s)`)
+    if (missing.length) console.warn(`[input] ${missing.length} store(s) not found in any input, left out of links/placeholders: ${missing.slice(0, 20).join(', ')}${missing.length > 20 ? ' ...' : ''}`)
     return sources
+}
+
+/** --input / PW1_REPAIR_INPUT else every master part of every completed run in .migration/runs. */
+async function resolveInputFiles(input?: string): Promise<string[]> {
+    const explicit = input ?? process.env.PW1_REPAIR_INPUT
+    if (explicit) return [explicit]
+    try {
+        const { parts, skipped } = await discoverAllPreparedParts()
+        for (const run of skipped) console.warn(`[input] run skipped: ${run.directory}: ${run.reason}`)
+        return parts.map(part => part.path)
+    } catch (error) {
+        console.warn(`[input] no PW1 export found: ${error instanceof Error ? error.message : error}`)
+        return []
+    }
 }
 
 async function repairPlaceholders(client: Client, stores: Store[], sources: Sources, apply: boolean, backup: Backup) {
@@ -236,15 +266,11 @@ async function repairPlaceholders(client: Client, stores: Store[], sources: Sour
 async function main() {
     const { values } = parseArgs({ options: { apply: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, store: { type: 'string' }, only: { type: 'string' }, input: { type: 'string' }, 'backup-dir': { type: 'string' }, help: { type: 'boolean' } }, strict: true })
     if (values.help) {
-        console.log('Usage: npm run migrate:pw1:repair -- [--store PW1_STORE_ID] [--only footer|hero|product-grids|links|placeholders|images] [--input PW1_EXPORT.json] [--dry-run] [--backup-dir DIR]\nWrites by default; --dry-run lists changes only. Writes after saving the previous values to a backup JSON.')
+        console.log('Usage: npm run migrate:pw1:repair -- [--store PW1_STORE_ID] [--only footer|hero|product-grids|links|placeholders|images] [--input PW1_EXPORT.json (default: completed runs in .migration/runs)] [--dry-run] [--backup-dir DIR]\nWrites by default; --dry-run lists changes only. Writes after saving the previous values to a backup JSON.')
         return
     }
     if (values.store && !/^\d+$/.test(values.store)) throw new Error('store must be a numeric PW1 store ID')
     if (values.only && !['footer', 'hero', 'product-grids', 'links', 'placeholders', 'images'].includes(values.only)) throw new Error('--only must be footer, hero, product-grids, links, placeholders or images')
-    // Default export for the no-argument run: PW1_REPAIR_INPUT, else .migration/pw1-input.json when it exists
-    values.input ??= process.env.PW1_REPAIR_INPUT || (existsSync('.migration/pw1-input.json') ? '.migration/pw1-input.json' : undefined)
-    const needsInput = (name: string) => values.only === name && !values.input
-    if (needsInput('links') || needsInput('placeholders')) throw new Error(`--only ${values.only} needs --input (the PW1 export used by migrate-pw1)`)
     const url = process.env.DATABASE_URI
     if (!url) throw new Error('DATABASE_URI is required')
     const client = new Client({ connectionString: url })
@@ -253,7 +279,7 @@ async function main() {
         const apply = Boolean(values.apply) && !values['dry-run']
         console.log(`${apply ? 'APPLY' : 'DRY-RUN'} on ${new URL(url).host}`)
         const { rows: stores } = await client.query<Store>(
-            `SELECT m.source_store_id, m.site_id, m.tenant_id, s.footer_block, s.pending_footer_block, s.seo_meta_description,
+            `SELECT m.source_store_id, m.input_hash, m.site_id, m.tenant_id, s.footer_block, s.pending_footer_block, s.seo_meta_description,
                     s.contact_info_phone, s.contact_info_email, s.contact_info_address
              FROM pw1_migration_stores m JOIN sites s ON s.id = m.site_id
              WHERE m.status = 'completed' ${values.store ? 'AND m.source_store_id = $1' : ''}
@@ -261,8 +287,11 @@ async function main() {
         const backup = createBackup(resolve(values['backup-dir'] ?? '.migration/site-repair'))
         const run = (name: string) => !values.only || values.only === name
         if (run('footer')) await repairFooters(client, stores, apply, backup)
-        const sources = values.input ? await loadSources(values.input, values.store) : undefined
-        if (!sources && run('links') && !values.only) console.log('[links] [placeholders] skipped: pass --input PW1_EXPORT.json to repair footer links and placeholder images')
+        const needsSources = run('links') || run('placeholders')
+        const inputFiles = needsSources ? await resolveInputFiles(values.input) : []
+        if (needsSources && inputFiles.length === 0 && (values.only === 'links' || values.only === 'placeholders')) throw new Error(`--only ${values.only} needs the PW1 export: run migrate first or pass --input FILE`)
+        const sources = inputFiles.length > 0 ? await loadSources(inputFiles, stores) : undefined
+        if (!sources && needsSources) console.log('[links] [placeholders] skipped: no PW1 export found (run migrate first or pass --input FILE)')
         if (sources && run('links')) await repairFooterLinkColumns(client, stores, sources, apply, backup)
         if (sources && run('placeholders')) await repairPlaceholders(client, stores, sources, apply, backup)
         if (run('product-grids')) await repairProductGrids(client, stores, apply, backup)

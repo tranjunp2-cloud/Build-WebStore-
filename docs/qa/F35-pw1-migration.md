@@ -72,11 +72,11 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 
 ### TC-F35.M71 — Footer link repair for generated stores
 - [x] AUTO — A footer column that holds fewer links than the same-titled column adapted from the PW1 export takes the source links and text; complete columns, unmatched columns and every other footer field are untouched.
-- [ ] MANUAL — `npm run migrate:pw1:repair -- --input <pw1-export.json> --only links` (dry-run) lists the columns to restore per store; `-- --apply` rewrites `sites.footer_block` / `pending_footer_block` (previous JSON saved to the backup first). Re-running reports 0 footers.
+- [ ] MANUAL — `npm run migrate:pw1:repair -- --only links` (dry-run) lists the columns to restore per store; `-- --apply` rewrites `sites.footer_block` / `pending_footer_block` (previous JSON saved to the backup first). Re-running reports 0 footers.
 
 ### TC-F35.M72 — Placeholder image repair for generated stores
 - [x] AUTO — Placeholder media is matched to its PW1 source URL through the tenant/hash filename; repointing updates every foreign key into `media` and the copied media URL inside json columns, and skips the URL rewrite when it did not change.
-- [ ] MANUAL — `npm run migrate:pw1:repair -- --input <pw1-export.json> --only placeholders` (dry-run) lists placeholder media per store without downloading; `-- --apply` downloads the real image (uploads to the configured media storage), repoints all references and reports images still broken at the source (no upload for those).
+- [ ] MANUAL — `npm run migrate:pw1:repair -- --only placeholders` (dry-run) lists placeholder media per store without downloading; `-- --apply` downloads the real image (uploads to the configured media storage), repoints all references and reports images still broken at the source (no upload for those).
 
 ### TC-F35.M73 — Empty fixed product list shows every product
 - [x] AUTO — PW1 drops the empty `id` filter, so a `fixed` listing without items lists every active product: the binder maps it to `all` (a fixed list whose products the BE did not emit, and a template-owned category, stay empty), and the repair turns existing `fixed` grids with no products into `all`; grids with products or another mode are untouched, and stores whose migration warned about a deliberate empty selection are skipped.
