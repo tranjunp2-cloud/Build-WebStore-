@@ -71,7 +71,7 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [ ] MANUAL — `npm run migrate:pw1:repair -- --only hero` (dry-run) lists affected heroes per store/page/block; `-- --apply` updates `pages_blocks_hero` and the matching draft-version rows, saving the previous variant to the backup first.
 
 ### TC-F35.M71 — Footer link repair for generated stores
-- [x] AUTO — A footer column that holds fewer links than the same-titled column adapted from the PW1 export takes the source links and text; complete columns, unmatched columns and every other footer field are untouched.
+- [x] AUTO — A footer column that still has label text and holds fewer links than the same-titled column adapted from the PW1 export takes the source links and text; the source's social icon links (already shown as the footer's social icons), complete columns, columns without text, unmatched columns and every other footer field are untouched.
 - [ ] MANUAL — `npm run migrate:pw1:repair -- --only links` (dry-run) lists the columns to restore per store; `-- --apply` rewrites `sites.footer_block` / `pending_footer_block` (previous JSON saved to the backup first). Re-running reports 0 footers.
 
 ### TC-F35.M72 — Placeholder image repair for generated stores

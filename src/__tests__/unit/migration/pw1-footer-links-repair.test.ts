@@ -26,6 +26,18 @@ describe('pw1 footer links repair', () => {
         const footer = { columns: [{ title: 'About', links: [{ label: 'Team', url: '/team' }] }] }
         expect(repairFooterLinks(footer, source)).toEqual({ changed: false })
     })
+    it('does not count the source social icon links as missing links', () => {
+        const withSocial = [{ title: 'About', links: [{ label: 'Team', url: '/team' }, { label: 'Facebook', url: 'https://www.facebook.com/' }] }]
+        const footer = { socials: [{ platform: 'facebook', url: 'https://www.facebook.com/' }], columns: [{ title: 'About', text: 'Team', links: [{ label: 'Team', url: '/team' }] }] }
+        expect(repairFooterLinks(footer, withSocial)).toEqual({ changed: false })
+        const flattened = { ...footer, columns: [{ title: 'About', text: 'Team\nFacebook', links: [] }] }
+        const repair = repairFooterLinks(flattened, withSocial)
+        expect(repair.changed && (repair.footer.columns as Array<{ links: unknown[] }>)[0].links).toEqual([{ label: 'Team', url: '/team' }])
+    })
+    it('leaves a column without text alone even when the source has more links', () => {
+        const footer = { columns: [{ title: 'About', links: [] }] }
+        expect(repairFooterLinks(footer, source)).toEqual({ changed: false })
+    })
     it('ignores unmatched columns and non-footer values', () => {
         expect(repairFooterLinks({ columns: [{ title: 'Other', links: [] }] }, source)).toEqual({ changed: false })
         expect(repairFooterLinks(null, source)).toEqual({ changed: false })
