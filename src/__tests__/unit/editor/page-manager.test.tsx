@@ -193,6 +193,7 @@ describe('PageManagerPanel', () => {
         })
         expect(useEditorStore.getState().pages).toHaveLength(3)
         expect(useEditorStore.getState().pages[2].slug).toBe('khuyen-mai')
+        expect(toast).toHaveBeenCalledWith('Page “Khuyến mãi” created — add it to Menu to show it', expect.anything())
     })
 
     it('TC-F05.08: Catch Slug conflict error during creation (Mocking UI fallback)', async () => {
@@ -240,7 +241,7 @@ describe('PageManagerPanel', () => {
         })
 
         // Assert toast offers undo
-        expect(toast).toHaveBeenCalledWith('Page deleted. Undo?', expect.objectContaining({
+        expect(toast).toHaveBeenCalledWith('Page “About Us” deleted', expect.objectContaining({
             action: expect.objectContaining({ label: 'Undo' })
         }))
         expect(useEditorStore.getState().pages.find(p => p.id === 'page-2')?.deletedAt).toBeTruthy()
@@ -366,6 +367,7 @@ describe('PageManagerPanel', () => {
         })
 
         expect(useEditorStore.getState().pages.find(p => p.id === 'page-2')?.isVisible).toBe(false)
+        expect(toast).toHaveBeenCalledWith('About Us hidden from your website', expect.anything())
     })
 
     it('TC-F05-02-18: Home page keeps hide/delete icons disabled; other pages have them on the title row', () => {
@@ -508,7 +510,7 @@ describe('PageManagerPanel', () => {
                 body: JSON.stringify({ isVisible: true }),
             }))
         })
-        expect(toast).toHaveBeenCalledWith('Page is now visible')
+        expect(toast).toHaveBeenCalledWith('About Us is now visible', expect.anything())
     })
 
     it('TC-F05-02-25: clicking anywhere on a non-current card selects it; the current card ignores body clicks', () => {
@@ -546,5 +548,23 @@ describe('PageManagerPanel', () => {
         expect(name.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(badge.compareDocumentPosition(hide) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(name.parentElement).toBe(badge.closest('div'))
+    })
+
+    it('TC-F05-02-27: page names with "$" patterns are shown literally in the delete confirm and toasts', async () => {
+        // Arrange: JS String.replace treats "$&" specially unless a replacer function is used
+        useEditorStore.getState().updatePageInState('page-2', { title: 'Sale $& more' })
+        ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+        render(<TestWrapper />)
+
+        // Act
+        const card = within(getCard('page-2'))
+        fireEvent.click(card.getByRole('button', { name: 'Delete page' }))
+
+        // Assert confirm text, then the toast after confirming
+        expect(card.getByRole('alertdialog')).toHaveAttribute('aria-label', 'Delete “Sale $& more”? You can undo for a few seconds.')
+        fireEvent.click(card.getByRole('button', { name: 'Delete' }))
+        await waitFor(() => {
+            expect(toast).toHaveBeenCalledWith('Page “Sale $& more” deleted', expect.anything())
+        })
     })
 })

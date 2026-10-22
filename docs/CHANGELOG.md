@@ -21,8 +21,9 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 - **Add new page moved to the end of the list** (dashed button → inline form with `URL: /slug` preview). Duplicate name/slug (incl. `home` and `404`) and names with no letters/numbers are rejected inline; the server's 409 stays as fallback. The empty state keeps the button.
 - **Inline delete confirm** replaces the modal (Esc/Cancel close it); soft delete + Undo toast unchanged.
 - **Hidden badge:** a page with `isVisible = false` shows a grey `Hidden` badge (was Live + amber "Hidden"). Live / Draft / No Link logic unchanged.
+- **Toasts** name the page ("Menu hidden from your website", "Page “X” created — add it to Menu to show it", deleted/restored) with a teal check icon and border; scoped to this panel via `page-toast.tsx`, the shared editor Toaster is unchanged.
 - **Custom 404** is pinned to the bottom of the panel; its button reads "Editing 404 page" while selected.
-- **Internals:** `PageManagerPanel.tsx` (628 → 176 lines) now composes `src/components/editor/page-manager/*`. Light theme colours added. i18n keys added for en/ms; unused `visible`/`hidden`/`deleteConfirm*` removed. No API, store or schema change. Tests: TC-F05-02-18..26.
+- **Internals:** `PageManagerPanel.tsx` (628 → 176 lines) now composes `src/components/editor/page-manager/*`. Light theme colours added. i18n keys added for en/ms; unused `visible`/`hidden`/`deleteConfirm*` removed. No API, store or schema change. Tests: TC-F05-02-18..27.
 
 ### F23 — Sync Store Owner avatar from SSO (US-F23-05, GH-1723)
 

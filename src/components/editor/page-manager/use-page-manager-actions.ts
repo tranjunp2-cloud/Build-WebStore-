@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, getDisplayPageTitle } from '@/store/editorStore'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { SYSTEM_PAGE_SLUGS, slugifyPageTitle } from './page-manager-helpers'
+import { pageToast, withPageName } from './page-toast'
 
 interface UsePageManagerActionsArgs {
     siteId: string
@@ -33,6 +34,7 @@ export function usePageManagerActions({
     const pm = t.editor.pageManager
     const sub = t.common.subscriptionErrors
     const pages = useEditorStore(state => state.pages)
+    const activeLocale = useEditorStore(state => state.activeLocale)
     const setPages = useEditorStore(state => state.setPages)
     const addPageToState = useEditorStore(state => state.addPageToState)
     const updatePageInState = useEditorStore(state => state.updatePageInState)
@@ -63,7 +65,7 @@ export function usePageManagerActions({
 
             const data = await res.json()
             addPageToState(data.page)
-            toast.success(pm.pageCreated)
+            pageToast(withPageName(pm.pageCreated, data.page?.title ?? title))
 
             const pageId = data.page?.id
             if (pageId) {
@@ -100,7 +102,8 @@ export function usePageManagerActions({
                 throw new Error(resolveApiError(data, pm.visibilityFailed, sub))
             }
             onPagesChanged?.()
-            toast(newVisible ? pm.pageShown : pm.pageHidden)
+            const name = getDisplayPageTitle(page, activeLocale)
+            pageToast(withPageName(newVisible ? pm.pageShown : pm.pageHidden, name))
         } catch (err) {
             updatePageInState(page.id, { isVisible: page.isVisible })
             toast.error(err instanceof Error ? err.message : pm.visibilityFailed)
@@ -129,7 +132,7 @@ export function usePageManagerActions({
 
             setPendingPageId(null)
             onPagesChanged?.()
-            toast.success(pm.restored)
+            pageToast(withPageName(pm.restored, getDisplayPageTitle(page, activeLocale)))
         } catch (err) {
             toast.error(err instanceof Error ? err.message : pm.restoreFailed)
         }
@@ -174,7 +177,7 @@ export function usePageManagerActions({
         }
 
         setPendingPageId(null)
-        toast(pm.deleteSuccess, {
+        pageToast(withPageName(pm.deleteSuccess, getDisplayPageTitle(page, activeLocale)), {
             action: { label: pm.undo, onClick: () => void restorePage(page) },
             duration: 5000,
         })

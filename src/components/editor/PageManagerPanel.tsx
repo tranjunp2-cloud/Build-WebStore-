@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, getDisplayPageTitle } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { AddPageForm } from './page-manager/add-page-form'
 import { Custom404Footer } from './page-manager/custom-404-footer'
 import { PageCard } from './page-manager/page-card'
 import { SYSTEM_PAGE_SLUGS, collectMenuPageIds, getPageStatus } from './page-manager/page-manager-helpers'
+import { withPageName } from './page-manager/page-toast'
 import { usePageManagerActions } from './page-manager/use-page-manager-actions'
 
 interface PageManagerPanelProps {
@@ -143,7 +144,7 @@ export function PageManagerPanel({
                                 page={page}
                                 locale={activeLocale}
                                 status={getPageStatus(page, statusLabels, siteStatus, menuPageIds)}
-                                labels={{ ...cardLabels, deleteMessage: pm.deleteInlineConfirm.replace('{name}', page.title) }}
+                                labels={{ ...cardLabels, deleteMessage: withPageName(pm.deleteInlineConfirm, getDisplayPageTitle(page, activeLocale)) }}
                                 isCurrent={page.id === currentPageId}
                                 isProtected={isProtected}
                                 isPending={pendingPageId === page.id}
