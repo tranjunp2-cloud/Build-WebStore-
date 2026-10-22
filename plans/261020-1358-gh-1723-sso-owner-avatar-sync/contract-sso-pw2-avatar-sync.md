@@ -35,7 +35,7 @@ Ví dụ (dùng làm fixture test PWv2):
 
 ## Map user (PWv2)
 1. Tìm `users.sso_user_id = sso_user_id` → dùng user đó (bỏ qua email).
-2. Chưa có → **chỉ khi `ALLOW_EMAIL_BIND = true`** (mặc định `false` cho tới khi PO/BA xác nhận BR-23-04; tắt thì trả `409 email_bind_disabled`, chỉ Owner đã có `sso_user_id` — ví dụ provision mới — mới sync được) bind bằng email **chỉ khi tất cả** đúng:
+2. Chưa có → **chỉ khi `ALLOW_EMAIL_BIND = true`** (mặc định `true` từ GH-1979 để Owner tạo trước khi có `sso_user_id` sync được; đặt `false` thì trả `409 email_bind_disabled` và chỉ Owner đã có `sso_user_id` — ví dụ provision mới — mới sync được; cần PRD BR-23-04 cho phép bind lần đầu bằng email) bind bằng email **chỉ khi tất cả** đúng:
    - email (so khớp không phân biệt hoa/thường) khớp **đúng 1** user (PWv2 cho phép trùng email khác `customerIdNumber` — AC-09 provision);
    - user là Owner (`tenants[].role === 'owner'`);
    - user chưa có `sso_user_id`;

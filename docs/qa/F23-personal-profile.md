@@ -83,7 +83,7 @@ TC-ID scheme hiện hữu: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **tr�
 
 | TC-ID | AC Ref | Description | AUTO |
 |---|---|---|---|
-| TC-F23-SSO-01 | AC-05.1 | Backfill Owner có SSO avatar; thay legacy local reference và hiển thị Header/Profile (Owner cũ chưa có `sso_user_id` chỉ backfill được sau khi PO duyệt BR-23-04 và bật `ALLOW_EMAIL_BIND`; trước đó → 409 `email_bind_disabled`) | ✓ — `sso-avatar-apply-state.test.ts`, `sso-avatar-download.test.ts`, `sso-sync-avatar.test.ts` (unit) + staging manual |
+| TC-F23-SSO-01 | AC-05.1 | Backfill Owner có SSO avatar; thay legacy local reference và hiển thị Header/Profile (Owner cũ chưa có `sso_user_id` được bind lần đầu theo email khi `ALLOW_EMAIL_BIND` bật — mặc định từ GH-1979; tắt → 409 `email_bind_disabled`) | ✓ — `sso-avatar-apply-state.test.ts`, `sso-avatar-download.test.ts`, `sso-sync-avatar.test.ts` (unit) + staging manual |
 | TC-F23-SSO-02 | AC-05.1 | Authenticated `ABSENT` khi backfill; retire/purge legacy local media và dùng initials (cùng điều kiện `sso_user_id`/`ALLOW_EMAIL_BIND` như TC-01) | ✓ — `sso-avatar-apply-state.test.ts`, `sso-sync-avatar.test.ts` (unit) + staging manual |
 | TC-F23-SSO-03 | AC-05.2 | Confirmed update đạt propagation p95 ≤ 5 phút | Manual — staging (Phase 05) |
 | TC-F23-SSO-04 | AC-05.3 | Missed webhook được login reconciliation; failure không block login | Manual — staging (SSO `login` trigger) |
@@ -93,7 +93,7 @@ TC-ID scheme hiện hữu: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **tr�
 | TC-F23-SSO-08 | AC-05.7 | Invalid/expired/unsafe resource không persist/render hoặc fetch private network | ✓ — `sso-avatar-download.test.ts`, `sso-avatar-is-public-ip.test.ts` (+ staging manual) |
 | TC-F23-SSO-09 | AC-05.8 | Immutable identity và cross-user/cross-tenant isolation | ✓ — `sso-avatar-resolve-owner.test.ts`, `sso-user-sql.test.ts`, `sso-sync-avatar.test.ts`, `sso-provision.test.ts`, `sso-avatar-apply-state.test.ts` |
 | TC-F23-SSO-10 | AC-05.9 | Owner local mutation bị chặn; Staff avatar flow không regression | ✓ — `api-users-me-avatar.test.ts`, `avatar-field-access.test.ts` |
-| TC-F23-SSO-11 | AC-05.10, AC-05.11 | Identity preflight quarantine (gồm `email_bind_disabled` mặc định) và `PRESENT`/`ABSENT`/`UNKNOWN` semantics | ✓ — `sso-avatar-resolve-owner.test.ts`, `sso-sync-avatar.test.ts` |
+| TC-F23-SSO-11 | AC-05.10, AC-05.11 | Identity preflight quarantine (gồm `email_bind_disabled` khi `allowEmailBind=false`) và `PRESENT`/`ABSENT`/`UNKNOWN` semantics | ✓ — `sso-avatar-resolve-owner.test.ts`, `sso-sync-avatar.test.ts` |
 
 ---
 
