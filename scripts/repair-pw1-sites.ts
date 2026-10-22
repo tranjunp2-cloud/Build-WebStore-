@@ -6,9 +6,10 @@
  *   product-grids - fixed product listings without items become "all products", as PW1 shows them.
  *   links   - (needs --input) footer columns whose hyperlinks were flattened to plain text get their links back.
  *   placeholders - (needs --input) images that were replaced by the neutral placeholder are downloaded again from PW1
- *             and every reference (block fields, drafts, slide JSON) is pointed at the real media.
- *   images  - rich-text (custom-html) <img> tags still pointing at PW1 are rehosted into destination media
- *             with the migration's own downloader (entity decoding, redirects, browser UA, Chromium fallback).
+ *             and every reference (block fields, drafts, slide JSON) is pointed at the real media. Rich-text <img> placeholders
+ *             get the real media too, or, for images hotlinked from other sites, their original URL back.
+ *   images  - rich-text (custom-html) <img> tags still pointing at PW1 storage (DigitalOcean Spaces) are rehosted into
+ *             destination media with the migration's own downloader. Images from other sites keep their URL.
  *
  *   npm run migrate:pw1:repair                          # writes: every completed store, all repairs (npm script passes --apply)
  *   npm run migrate:pw1:repair -- --dry-run             # only list what would change
@@ -27,6 +28,8 @@ import { validateMigrationBatch } from '../src/lib/migration/pw1-batch-validatio
 import { discoverAllPreparedParts } from '../src/lib/migration/pw1-prepared-input'
 import { repairFooterLinks } from '../src/lib/migration/pw1-footer-links-repair'
 import { repointMedia } from '../src/lib/migration/pw1-media-repoint'
+import { isPw1StorageUrl } from '../src/lib/migration/pw1-image-origin'
+import { htmlImageUrls, htmlPlaceholders, swapHtmlImageSource } from '../src/lib/migration/pw1-html-placeholder-repair'
 import { placeholderCandidates, sourceUrls } from '../src/lib/migration/pw1-placeholder-image-repair'
 import { hasDeliberateEmptySelection, repairProductGrid } from '../src/lib/migration/pw1-product-grid-repair'
 import { repairHeroVariant } from '../src/lib/migration/pw1-hero-variant-repair'
@@ -187,7 +190,7 @@ async function repairImages(client: Client, stores: Store[], apply: boolean, bac
         : `[images] ${imagesFound} image(s) still point at PW1 (dry-run: nothing downloaded)`)
 }
 
-type Sources = Map<string, { footerColumns: Array<{ title?: string; text?: string; links?: Array<{ label: string; url?: string; imageUrl?: string }> }>; urls: Set<string> }>
+type Sources = Map<string, { footerColumns: Array<{ title?: string; text?: string; links?: Array<{ label: string; url?: string; imageUrl?: string }> }>; urls: Set<string>; htmlImages: Set<string> }>
 
 /**
  * The PW1 export, adapted exactly as the migration does it (no AI, no network), keyed by PW1 store ID.
@@ -210,7 +213,7 @@ async function loadSources(files: string[], stores: Store[]): Promise<Sources> {
     for (const [id, { entry }] of chosen) {
         try {
             const { contract } = adaptWebsiteInput(compactInput(entry))
-            sources.set(id, { footerColumns: (contract.site.footer as { columns?: never[] }).columns ?? [], urls: sourceUrls(contract) })
+            sources.set(id, { footerColumns: (contract.site.footer as { columns?: never[] }).columns ?? [], urls: sourceUrls(contract), htmlImages: htmlImageUrls(contract) })
         } catch (error) { console.warn(`[input] store ${id} skipped: ${error instanceof Error ? error.message : error}`) }
     }
     const exactCount = [...chosen.values()].filter(c => c.exact).length
@@ -263,6 +266,36 @@ async function repairPlaceholders(client: Client, stores: Store[], sources: Sour
     console.log(apply ? `[placeholders] ${restored}/${found} image(s) restored; ${broken} broken at the source` : `[placeholders] ${found} image(s) are still placeholders (dry-run: nothing downloaded)`)
 }
 
+/** Rich-text images that the migration replaced by the placeholder: PW1 storage ones are downloaded again, images hotlinked from other sites get their original URL back (they are never copied). */
+async function repairHtmlPlaceholders(client: Client, stores: Store[], sources: Sources, apply: boolean, backup: Backup) {
+    let payload: Payload | undefined
+    let found = 0, restored = 0, broken = 0
+    for (const store of stores) {
+        const source = sources.get(store.source_store_id)
+        if (!source?.htmlImages.size) continue
+        const { rows } = await client.query<{ filename: string; url: string | null }>(`SELECT filename, url FROM media WHERE filename LIKE $1`, [`pw1-${store.tenant_id}-%-placeholder.jpg`])
+        for (const { url, placeholderUrl } of htmlPlaceholders(source.htmlImages, store.tenant_id, rows)) {
+            found++
+            const own = isPw1StorageUrl(url)
+            if (!apply) { console.log(`[html-placeholders] store ${store.source_store_id}: ${own ? 'PW1 storage image is downloaded again' : 'original URL is put back'}\n    ${url}`); continue }
+            let target = url
+            if (own) {
+                payload ??= await openPayload()
+                const { restorePw1Media } = await import('../src/lib/migration/pw1-media')
+                const mediaId = await restorePw1Media(payload, store.tenant_id, url.replace(/^http:\/\//i, 'https://'), new URL(url).pathname.split('/').pop() || 'PW1 image').catch(() => undefined)
+                const media = mediaId ? await payload.findByID({ collection: 'media', id: mediaId, depth: 0 }) : undefined
+                if (!media?.url || media.url === placeholderUrl) { broken++; console.log(`[html-placeholders] store ${store.source_store_id}: ${url} cannot be downloaded (broken at the source)`); continue }
+                target = media.url
+            }
+            const updated = await swapHtmlImageSource((text, params) => client.query(text, params), store.site_id, placeholderUrl, target,
+                block => backup.add({ kind: 'html-placeholder', siteId: store.site_id, storeId: store.source_store_id, pageId: block.page_id, blockId: block.id, before: block.html }))
+            restored++
+            console.log(`[html-placeholders] store ${store.source_store_id}: ${url} -> ${updated} block(s) updated`)
+        }
+    }
+    console.log(apply ? `[html-placeholders] ${restored}/${found} image(s) restored; ${broken} broken at the source` : `[html-placeholders] ${found} rich-text image(s) are still placeholders (dry-run: nothing changed)`)
+}
+
 async function main() {
     const { values } = parseArgs({ options: { apply: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, store: { type: 'string' }, only: { type: 'string' }, input: { type: 'string' }, 'backup-dir': { type: 'string' }, help: { type: 'boolean' } }, strict: true })
     if (values.help) {
@@ -294,6 +327,7 @@ async function main() {
         if (!sources && needsSources) console.log('[links] [placeholders] skipped: no PW1 export found (run migrate first or pass --input FILE)')
         if (sources && run('links')) await repairFooterLinkColumns(client, stores, sources, apply, backup)
         if (sources && run('placeholders')) await repairPlaceholders(client, stores, sources, apply, backup)
+        if (sources && run('placeholders')) await repairHtmlPlaceholders(client, stores, sources, apply, backup)
         if (run('product-grids')) await repairProductGrids(client, stores, apply, backup)
         if (run('hero')) await repairHeroes(client, stores, apply, backup)
         if (run('images')) await repairImages(client, stores, apply, backup)

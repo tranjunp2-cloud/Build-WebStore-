@@ -1,12 +1,13 @@
 import { load } from 'cheerio'
 import type { Payload } from 'payload'
+import { isPw1StorageUrl } from './pw1-image-origin'
 import { rehostHtmlImages } from './pw1-media'
 
-/** Rehosted images are stored as `pw1-<tenant>-<hash>…` media (cloned template content can carry another tenant's), so any other absolute <img> URL is still the PW1 original. */
+/** Rehosted images are stored as `pw1-<tenant>-<hash>…` media (cloned template content can carry another tenant's), so an absolute <img> URL on PW1 storage that does not look like that is still the PW1 original. Images hotlinked from other sites are left alone by design. */
 const REHOSTED_MEDIA = /pw1-\d+-[0-9a-f]{20}/
-const isExternalImage = (url: string) => /^https?:\/\//i.test(url) && !REHOSTED_MEDIA.test(url)
+const isExternalImage = (url: string) => isPw1StorageUrl(url) && !REHOSTED_MEDIA.test(url)
 
-/** Absolute http(s) <img> sources in rich text that were never rehosted into destination media (entities decoded). */
+/** Absolute <img> sources in rich text that still point at PW1 storage instead of destination media (entities decoded). */
 export function externalImageUrls(html: string): string[] {
     if (!html.includes('<img')) return []
     const urls = new Set<string>()
