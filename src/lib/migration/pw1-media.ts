@@ -1,6 +1,7 @@
 import sharp from 'sharp'
 import { load } from 'cheerio'
 import { PW1_PLACEHOLDER_URL } from './pw1-placeholder'
+import { isPw1StorageUrl } from './pw1-image-origin'
 import { hasValidImageSignature } from '@/lib/media/image-signature'
 import { recordCreatedPw1Media } from './pw1-media-tracking'
 import { sql } from 'drizzle-orm'
@@ -189,7 +190,7 @@ export async function importPw1BlockMedia(buckets: Record<string, unknown>[][], 
     return { succeeded, failed: 0 }
 }
 
-export async function rehostHtmlImages(html: string, tenantId: number | string, payload: Payload, cache: Map<string, number>, shouldRehost: (url: string) => boolean = () => true): Promise<string> {
+export async function rehostHtmlImages(html: string, tenantId: number | string, payload: Payload, cache: Map<string, number>, shouldRehost: (url: string) => boolean = isPw1StorageUrl): Promise<string> {
     const imgRegex = /<img\b([^>]*?)\bsrc=["']([^"']+)["']([^>]*?)>/gi
     const matches = [...html.matchAll(imgRegex)]
     if (!matches.length) return html
