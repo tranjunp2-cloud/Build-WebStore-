@@ -16,9 +16,11 @@ const Manifest = z.object({
 })
 export type PreparedPart = { path: string; outputHash: string; bytes: number; storeIds: string[] }
 
-/** Only completed BE handoffs qualify; never select an exporter master directly. */
-export async function discoverPreparedInput(root = resolve('.migration/runs')) {
-    const candidates: Array<{ directory: string; modified: number; batchId: string }> = []
+type CompletedRun = { directory: string; modified: number; batchId: string }
+
+/** Every completed BE run under the root, newest first. */
+async function completedRuns(root: string): Promise<CompletedRun[]> {
+    const candidates: CompletedRun[] = []
     async function visit(directory: string, depth: number): Promise<void> {
         const entries = await readdir(directory, { withFileTypes: true })
         if (entries.some(e => e.name === 'run.json' && e.isFile())) {
@@ -34,19 +36,41 @@ export async function discoverPreparedInput(root = resolve('.migration/runs')) {
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') throw new Error('No BE runs found in .migration/runs; supply an input JSON file')
         throw error
     }
-    candidates.sort((a, b) => b.modified - a.modified || b.directory.localeCompare(a.directory))
-    const selected = candidates[0]
-    if (!selected) throw new Error('No completed BE import found in .migration/runs; finish BE import or supply an input JSON file')
+    return candidates.sort((a, b) => b.modified - a.modified || b.directory.localeCompare(a.directory))
+}
+
+async function preparedParts(selected: CompletedRun) {
     const prepared = join(selected.directory, 'prepared')
     if ((await lstat(prepared)).isSymbolicLink()) throw new Error('Prepared directory must not be a symlink')
     const manifest = Manifest.parse(JSON.parse(await readFile(join(prepared, 'destination-manifest.json'), 'utf8')))
     if (manifest.mapping.batchId !== `json:${selected.batchId}`) throw new Error('BE run and destination manifest batch mismatch')
     const names = manifest.files.map(f => f.filename)
     if (new Set(names).size !== names.length) throw new Error('Duplicate master part in destination manifest')
-    const parts = manifest.files.map(f => ({ path: join(prepared, f.filename), outputHash: f.outputHash, bytes: f.bytes, storeIds: f.storeIds }))
+    return manifest.files.map(f => ({ path: join(prepared, f.filename), outputHash: f.outputHash, bytes: f.bytes, storeIds: f.storeIds }))
+}
+
+/** Only completed BE handoffs qualify; never select an exporter master directly. */
+export async function discoverPreparedInput(root = resolve('.migration/runs')) {
+    const selected = (await completedRuns(root))[0]
+    if (!selected) throw new Error('No completed BE import found in .migration/runs; finish BE import or supply an input JSON file')
+    const parts = await preparedParts(selected)
     // Check every part before the first child can write to the database.
     for (const part of parts) await verifyPreparedPart(part)
     return { directory: selected.directory, parts }
+}
+
+/** Master parts of every completed run, newest first; runs with a broken handoff are reported and skipped (read-only callers). */
+export async function discoverAllPreparedParts(root = resolve('.migration/runs')) {
+    const parts: PreparedPart[] = []
+    const skipped: Array<{ directory: string; reason: string }> = []
+    for (const run of await completedRuns(root)) {
+        try {
+            const runParts = await preparedParts(run)
+            for (const part of runParts) await verifyPreparedPart(part)
+            parts.push(...runParts)
+        } catch (error) { skipped.push({ directory: run.directory, reason: error instanceof Error ? error.message : String(error) }) }
+    }
+    return { parts, skipped }
 }
 
 export async function verifyPreparedPart(part: PreparedPart) {

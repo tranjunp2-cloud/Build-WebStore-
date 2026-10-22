@@ -15,6 +15,7 @@ import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
 import { canBypassOtpForEmail, getQcBypassCode, isValidQcBypass } from '@/lib/otp/qc-bypass'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
 import { normalizeTenants } from '@/lib/normalize-tenants'
+import { canUpdateAvatarField } from '@/lib/profile/avatar-field-access'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
@@ -1242,6 +1243,8 @@ export const Users: CollectionConfig = {
             name: 'avatar',
             type: 'upload',
             relationTo: 'media',
+            // Owner avatar comes from SSO (GH-1723); only Staff/super-admin may change it here.
+            access: { update: canUpdateAvatarField },
         },
         {
             name: 'prefer_lang',
@@ -1284,6 +1287,26 @@ export const Users: CollectionConfig = {
             name: 'customerIdNumber',
             type: 'text',
             admin: { description: 'TM customer ID — composite key with email' },
+        },
+        // ── SSO Owner avatar sync (GH-1723). Server-managed: written only via Local API overrideAccess ──
+        {
+            name: 'ssoUserId',
+            type: 'number',
+            unique: true,
+            access: { create: () => false, update: () => false },
+            admin: { readOnly: true, position: 'sidebar', description: 'Immutable SSO users.id (bound on provision or first avatar sync)' },
+        },
+        {
+            name: 'ssoAvatarKey',
+            type: 'text',
+            access: { create: () => false, update: () => false },
+            admin: { hidden: true, description: 'Last applied SSO avatar file key (idempotency)' },
+        },
+        {
+            name: 'ssoAvatarSyncedAt',
+            type: 'date',
+            access: { create: () => false, update: () => false },
+            admin: { hidden: true, description: 'SSO changed_at of the last applied avatar state (ordering)' },
         },
         // ── Audit trail (hidden from admin) ──
         {
