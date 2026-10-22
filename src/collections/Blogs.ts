@@ -1,4 +1,5 @@
 import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
 
 function unwrapRelationId(
     value: string | number | { id: string | number } | null | undefined,
@@ -110,19 +111,19 @@ export const Blogs: CollectionConfig = {
                 const isPublishing = doc.status === 'published' && previousDoc?.status !== 'published'
                 if (!isPublishing) return doc
                 if (context?.skipPublishNotify) return doc
-                // Fire-and-forget: notify tenant owners of published blog
-                import('@/lib/notifications/notify-tenant-owners')
-                    .then(({ notifyTenantOwners }) => {
-                        const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
-                        return notifyTenantOwners(req.payload, tenantId, {
-                            type: 'BLOG_PUBLISHED',
-                            title: 'Blog Published',
-                            message: `${doc.title} has been published`,
-                            actionUrl: '/blog',
-                            metadata: { blogTitle: doc.title },
-                        })
+                // Notify tenant owners of published blog after the response is sent
+                const payload = req.payload
+                const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+                runAfterResponse('Notification BLOG_PUBLISHED', async () => {
+                    const { notifyTenantOwners } = await import('@/lib/notifications/notify-tenant-owners')
+                    await notifyTenantOwners(payload, tenantId, {
+                        type: 'BLOG_PUBLISHED',
+                        title: 'Blog Published',
+                        message: `${doc.title} has been published`,
+                        actionUrl: '/blog',
+                        metadata: { blogTitle: doc.title },
                     })
-                    .catch((err) => console.error('[Notification] BLOG_PUBLISHED hook failed', err))
+                })
                 return doc
             },
         ],

@@ -1,4 +1,7 @@
 import type { CollectionConfig, AccessResult } from 'payload'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
+import { sendPushToUser } from '@/lib/notifications/send-push'
+import { signalNotificationUsers } from '@/lib/notifications/signal-notification'
 
 /**
  * F16 — Notifications Collection
@@ -52,23 +55,25 @@ export const Notifications: CollectionConfig = {
     },
     hooks: {
         afterChange: [
-            async ({ doc, operation, req }) => {
+            async ({ doc, operation, req, context }) => {
                 if (operation !== 'create') return doc
-                // Fire-and-forget push notification — never block the response
-                import('@/lib/notifications/send-push')
-                    .then(({ sendPushToUser }) => {
-                        const userId = typeof doc.user === 'object' ? doc.user?.id : doc.user
-                        const tenantId = typeof doc.tenant === 'object' ? doc.tenant?.id : doc.tenant
-                        if (!userId || !tenantId) return
-                        return sendPushToUser(userId, tenantId, {
-                            id: String(doc.id),
-                            title: doc.title,
-                            body: doc.message || undefined,
-                            tag: doc.type,
-                            actionUrl: doc.actionUrl || undefined,
-                        }, req.payload)
-                    })
-                    .catch((err) => console.error('[Push] Hook failed', err))
+                // notifyTenantOwners sends push itself (after the realtime signal, outside
+                // the create transaction). Only manual creates (admin panel / REST) reach below.
+                if (context?.skipPush) return doc
+                const payload = req.payload
+                runAfterResponse('Push', async () => {
+                    const userId = typeof doc.user === 'object' ? doc.user?.id : doc.user
+                    const tenantId = typeof doc.tenant === 'object' ? doc.tenant?.id : doc.tenant
+                    if (!userId || !tenantId) return
+                    await signalNotificationUsers([userId]) // doorbell first, then push
+                    await sendPushToUser(userId, tenantId, {
+                        id: String(doc.id),
+                        title: doc.title,
+                        body: doc.message || undefined,
+                        tag: doc.type,
+                        actionUrl: doc.actionUrl || undefined,
+                    }, payload)
+                })
                 return doc
             },
         ],

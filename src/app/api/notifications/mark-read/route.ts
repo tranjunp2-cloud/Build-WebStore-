@@ -5,6 +5,8 @@ import { sql } from 'drizzle-orm'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import type { MarkReadPayload } from '@/types/notification'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
+import { signalNotificationUsers } from '@/lib/notifications/signal-notification'
 
 import { z } from 'zod'
 
@@ -19,6 +21,11 @@ export const dynamic = 'force-dynamic'
 
 // Postgres int4 upper bound — a larger id/value overflows `::integer[]` casts → 500.
 const INT4_MAX = 2147483647
+
+/** Tell the user's other devices to refresh their badge (after the response is sent). */
+function signalRead(userId: number) {
+    runAfterResponse('mark-read-signal', () => signalNotificationUsers([userId]))
+}
 
 /**
  * POST /api/notifications/mark-read
@@ -88,7 +95,9 @@ export const POST = withAuth(async (user, request) => {
                 SET is_read = true, updated_at = now()
                 WHERE user_id = ${uid} AND tenant_id = ${tid} AND is_read = false
             `)
-            return NextResponse.json({ success: true, updated: Number(result?.rowCount ?? 0) })
+            const updated = Number(result?.rowCount ?? 0)
+            if (updated > 0) signalRead(uid)
+            return NextResponse.json({ success: true, updated })
         }
 
         if (!body.notificationIds || body.notificationIds.length === 0) {
@@ -113,7 +122,9 @@ export const POST = withAuth(async (user, request) => {
             SET is_read = true, updated_at = now()
             WHERE id = ANY(${idArray}::integer[]) AND user_id = ${uid} AND tenant_id = ANY(${tenantArray}::integer[]) AND is_read = false
         `)
-        return NextResponse.json({ success: true, updated: Number(result?.rowCount ?? 0) })
+        const updated = Number(result?.rowCount ?? 0)
+        if (updated > 0) signalRead(uid)
+        return NextResponse.json({ success: true, updated })
     } catch (error) {
         console.error('[Notifications Mark-Read Error]', error)
         return NextResponse.json(

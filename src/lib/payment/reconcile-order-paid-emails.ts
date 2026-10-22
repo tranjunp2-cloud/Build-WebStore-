@@ -4,6 +4,7 @@ import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
 
 /** Minimal tenant shape for email templates. */
 interface TenantDoc {
@@ -110,15 +111,16 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
         console.error('[Reconcile] Failed to send confirmation email:', emailErr)
     }
 
-    // Fire-and-forget: ORDER_NEW in-app notification for merchant
-    import('@/lib/notifications/notify-tenant-owners')
-        .then(({ notifyTenantOwners }) => notifyTenantOwners(payload, tenantId, {
+    // ORDER_NEW in-app notification for merchant, after the response is sent
+    runAfterResponse('Notification ORDER_NEW', async () => {
+        const { notifyTenantOwners } = await import('@/lib/notifications/notify-tenant-owners')
+        await notifyTenantOwners(payload, tenantId, {
             type: 'ORDER_NEW',
             title: `New Order #${order.orderNumber} - ${order.currency || 'MYR'} ${(order.total ?? 0).toFixed(2)}`,
             message: `Order placed by ${order.customerName}`,
             actionUrl: '/orders',
             metadata: { orderNumber: order.orderNumber, currency: order.currency || 'MYR', total: (order.total ?? 0).toFixed(2), customerName: order.customerName },
             dedupeKey: `ORDER_NEW:${order.orderNumber}`,
-        }))
-        .catch((err) => console.error('[Notification] ORDER_NEW hook failed', err))
+        })
+    })
 }

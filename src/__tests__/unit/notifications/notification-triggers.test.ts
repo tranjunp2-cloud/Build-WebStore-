@@ -19,7 +19,7 @@ import { Orders } from '@/collections/Orders'
 import { Products, lowStockHook } from '@/collections/Products'
 import { Blogs } from '@/collections/Blogs'
 
-const mockPayload = { find: vi.fn(), create: vi.fn() } as any
+const mockPayload = { find: vi.fn(), create: vi.fn(), findByID: vi.fn() } as any
 
 function makeReq(overrides = {}) {
     return { payload: mockPayload, user: { id: 1 }, ...overrides } as any
@@ -30,6 +30,30 @@ describe('[TC-F16.14] ORDER_NEW trigger — Orders.afterChange', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        // Order still exists when the after-response task runs
+        mockPayload.findByID.mockResolvedValue({ id: 1 })
+    })
+
+    // TC-F16.14 / #1972: the task runs after the response; checkout deletes the order
+    // again on stock/discount failure, so a vanished order must not notify anyone.
+    it('does NOT notify when the order no longer exists (checkout rolled it back)', async () => {
+        mockPayload.findByID.mockResolvedValue(null)
+        const doc = { id: 1, tenant: 5, orderNumber: 'ORD-GONE', currency: 'MYR', total: 10, customerName: 'Bob' }
+
+        await hook({ doc, operation: 'create', req: makeReq(), previousDoc: undefined } as any)
+        await vi.waitFor(() => expect(mockPayload.findByID).toHaveBeenCalled())
+
+        expect(mockNotifyTenantOwners).not.toHaveBeenCalled()
+    })
+
+    it('does NOT notify when a failed rollback left the order behind as cancelled', async () => {
+        mockPayload.findByID.mockResolvedValue({ id: 1, status: 'cancelled' })
+        const doc = { id: 1, tenant: 5, orderNumber: 'ORD-CXL', currency: 'MYR', total: 10, customerName: 'Bob' }
+
+        await hook({ doc, operation: 'create', req: makeReq(), previousDoc: undefined } as any)
+        await vi.waitFor(() => expect(mockPayload.findByID).toHaveBeenCalled())
+
+        expect(mockNotifyTenantOwners).not.toHaveBeenCalled()
     })
 
     it('fires notification on order create (COD/QR Banking)', async () => {

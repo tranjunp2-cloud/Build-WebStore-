@@ -15,6 +15,12 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F16 — Realtime notification qua Firebase RTDB signal, bỏ polling (GH-1972)
+
+- **Realtime:** server ghi "chuông báo" `{at}` lên Firebase RTDB (`pw2/{env}/u/{userId}`, `pw2/{env}/broadcast`); client nghe rồi gọi `GET /api/notifications`. Bỏ vòng poll 15s/60s; chỉ poll 60s khi Firebase tắt/lỗi. Auth bằng custom token (`/api/notifications/firebase-token`), rules `firebase/pw2-database-rules.json`.
+- **Độ tin cậy trên Vercel:** producer chạy trong `after()` (`runAfterResponse`); signal gửi trước push; push không còn chạy trong transaction của create; ORDER_NEW bỏ qua đơn đã bị checkout xoá.
+- **Dọn dẹp:** gỡ trigger `pg_notify` không có listener (`notifications.drop_pg_notify_trigger`). Env mới (server-only): `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_DATABASE_URL`, `FIREBASE_WEB_API_KEY`. Tests: TC-F16.45–.57.
+
 ### F35 — PW1 website migration: unblock pending stores (GH-1956)
 
 - **Root cause:** 44 of the 58 pending stores were not BE mapping gaps. 18 stores kept `product_category` pointing at a template-owned category (PW1 template cloning copies it verbatim); 26 stores selected fixed products the BE export deliberately excluded (`NO_VALID_VARIANTS`, `MISSING_VARIANT_DOMAIN`). The other 14 pass product selection; their pending cause needs the Neon batch logs.
