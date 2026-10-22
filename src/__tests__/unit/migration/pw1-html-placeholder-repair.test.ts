@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { htmlImageUrls, htmlPlaceholders, swapHtmlImageSource, swapImageSource } from '@/lib/migration/pw1-html-placeholder-repair'
-import { pw1PlaceholderFilename } from '@/lib/migration/pw1-placeholder-image-repair'
+import { pw1MediaFilename, pw1PlaceholderFilename } from '@/lib/migration/pw1-placeholder-image-repair'
 import { isPw1StorageUrl } from '@/lib/migration/pw1-image-origin'
 
 const THIRD_PARTY = 'https://www.oecd.org/adobe/dynamicmedia/deliver/a.jpg?x=1&y=2'
@@ -38,6 +38,20 @@ describe('[TC-F35.M75] htmlPlaceholders', () => {
             { url: THIRD_PARTY, placeholderUrl: media[0].url },
             { url: http, placeholderUrl: media[1].url },
         ])
+    })
+})
+
+describe('[TC-F35.M75] htmlPlaceholders (any stored copy of a third-party image)', () => {
+    const copy = (url: string, extra: object = {}) => ({ filename: pw1MediaFilename(3023, url) + '', url: 'https://s.example/media/' + pw1MediaFilename(3023, url), ...extra })
+    it('swaps back a third-party image whatever copy the migration stored, even a normal downloaded one', () => {
+        const media = [copy(THIRD_PARTY, { width: 800, height: 600, filesize: 120000 })]
+        expect(htmlPlaceholders([THIRD_PARTY], 3023, media)).toEqual([{ url: THIRD_PARTY, placeholderUrl: media[0].url }])
+    })
+    it('leaves a good copy of an image on PW1 storage alone but swaps its neutral placeholder', () => {
+        const good = copy(OWN, { width: 800, height: 600, filesize: 120000 })
+        const neutral = copy(OWN, { width: 960, height: 640, filesize: 9447 })
+        expect(htmlPlaceholders([OWN], 3023, [good])).toEqual([])
+        expect(htmlPlaceholders([OWN], 3023, [neutral])).toEqual([{ url: OWN, placeholderUrl: neutral.url }])
     })
 })
 

@@ -29,8 +29,8 @@ import { discoverAllPreparedParts } from '../src/lib/migration/pw1-prepared-inpu
 import { repairFooterLinks } from '../src/lib/migration/pw1-footer-links-repair'
 import { repointMedia } from '../src/lib/migration/pw1-media-repoint'
 import { isPw1StorageUrl } from '../src/lib/migration/pw1-image-origin'
-import { htmlImageUrls, htmlPlaceholders, swapHtmlImageSource } from '../src/lib/migration/pw1-html-placeholder-repair'
-import { placeholderCandidates, sourceUrls } from '../src/lib/migration/pw1-placeholder-image-repair'
+import { htmlImageUrls, htmlMediaNamePrefix, htmlPlaceholders, swapHtmlImageSource, type HtmlMedia } from '../src/lib/migration/pw1-html-placeholder-repair'
+import { PLACEHOLDER_MEDIA_WHERE, placeholderCandidates, placeholderMediaPattern, sourceUrls } from '../src/lib/migration/pw1-placeholder-image-repair'
 import { hasDeliberateEmptySelection, repairProductGrid } from '../src/lib/migration/pw1-product-grid-repair'
 import { repairHeroVariant } from '../src/lib/migration/pw1-hero-variant-repair'
 import { repairFooterVariant } from '../src/lib/migration/pw1-footer-variant-repair'
@@ -244,7 +244,7 @@ async function repairPlaceholders(client: Client, stores: Store[], sources: Sour
         const source = sources.get(store.source_store_id)
         if (!source) continue
         const { rows } = await client.query<{ id: number; filename: string }>(
-            `SELECT id, filename FROM media WHERE filename LIKE $1`, [`pw1-${store.tenant_id}-%-placeholder.jpg`])
+            `SELECT id, filename FROM media WHERE ${PLACEHOLDER_MEDIA_WHERE}`, [placeholderMediaPattern(store.tenant_id)])
         for (const { url, placeholder } of placeholderCandidates(source.urls, store.tenant_id, rows)) {
             found++
             if (!apply) { console.log(`[placeholders] store ${store.source_store_id}: media ${placeholder.id} is a placeholder for\n    ${url}`); continue }
@@ -266,14 +266,15 @@ async function repairPlaceholders(client: Client, stores: Store[], sources: Sour
     console.log(apply ? `[placeholders] ${restored}/${found} image(s) restored; ${broken} broken at the source` : `[placeholders] ${found} image(s) are still placeholders (dry-run: nothing downloaded)`)
 }
 
-/** Rich-text images that the migration replaced by the placeholder: PW1 storage ones are downloaded again, images hotlinked from other sites get their original URL back (they are never copied). */
+/** Rich-text images that differ from PW1: images hotlinked from other sites get their original URL back whatever copy the migration made (they are never copied); PW1 storage ones that ended as the placeholder are downloaded again. */
 async function repairHtmlPlaceholders(client: Client, stores: Store[], sources: Sources, apply: boolean, backup: Backup) {
     let payload: Payload | undefined
     let found = 0, restored = 0, broken = 0
     for (const store of stores) {
         const source = sources.get(store.source_store_id)
         if (!source?.htmlImages.size) continue
-        const { rows } = await client.query<{ filename: string; url: string | null }>(`SELECT filename, url FROM media WHERE filename LIKE $1`, [`pw1-${store.tenant_id}-%-placeholder.jpg`])
+        const prefixes = [...source.htmlImages].map(url => `${htmlMediaNamePrefix(store.tenant_id, url)}%`)
+        const { rows } = await client.query<HtmlMedia>(`SELECT filename, url, width, height, filesize FROM media WHERE filename LIKE ANY($1)`, [prefixes])
         for (const { url, placeholderUrl } of htmlPlaceholders(source.htmlImages, store.tenant_id, rows)) {
             found++
             const own = isPw1StorageUrl(url)
