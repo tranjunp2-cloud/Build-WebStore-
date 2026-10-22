@@ -6,8 +6,9 @@ import { bindSsoUserId } from './sso-user-sql'
  * Allow binding `ssoUserId` by email the first time an SSO Owner is seen (GH-1979). Owners created
  * before `users.sso_user_id` existed have no SSO id, so without this they get 409 `email_bind_disabled`
  * and never sync. The bind only happens when the email matches exactly one unbound Owner (see
- * `resolveSsoOwner`); afterwards the immutable `ssoUserId` is the key. BR-23-04 / FR-23-13 in the PRD
- * must be updated to allow this first-time email bind.
+ * `resolveSsoOwner`); afterwards the immutable `ssoUserId` is the key. Allowed by PRD BR-23-04 / FR-23-13.
+ * Relies on SSO keeping emails unique (unique index on SSO `users.email`), so the payload carries no
+ * `customer_id_number`.
  */
 export const ALLOW_EMAIL_BIND = true
 

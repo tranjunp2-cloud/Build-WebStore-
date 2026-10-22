@@ -1,7 +1,7 @@
 # PRD: Personal Profile (F23)
 
-> **Version:** 1.3
-> **Updated:** 2026-09-08
+> **Version:** 1.4
+> **Updated:** 2026-10-22
 > **Status:** Integration Refinement — Blocked by SSO Contract
 > **Priority:** P1 | **Original Sprint:** Wave 2 | **Size:** Re-estimate required
 > **Depends on:** F02 Auth, written SSO Integration Contract
@@ -126,7 +126,7 @@ PWv2 không runtime-fetch SSO trên mỗi page render. Khi SSO lỗi tạm thờ
 | FR-23-10 | Xử lý duplicate/out-of-order event idempotently, không rollback version mới | US-F23-05 | P0 |
 | FR-23-11 | Giữ last-known avatar khi transient failure; xóa cached reference và dùng initials khi SSO confirmed absent/delete | US-F23-05 | P0 |
 | FR-23-12 | Validate external avatar resource và bảo đảm immutable identity, tenant isolation, safe caching và observability | US-F23-05 | P0 |
-| FR-23-13 | Chạy immutable SSO identity preflight trước avatar backfill; skip/quarantine/report account thiếu hoặc có mapping duplicate/ambiguous và không fallback email | US-F23-05 | P0 |
+| FR-23-13 | Chạy immutable SSO identity preflight trước avatar backfill; skip/quarantine/report account thiếu hoặc có mapping duplicate/ambiguous. Email chỉ được dùng một lần để gắn `sso_user_id` cho Owner chưa có id khi email khớp đúng 1 Owner chưa gắn (GH-1979) | US-F23-05 | P0 |
 | FR-23-14 | Chuẩn hóa SSO avatar state thành `PRESENT`, `ABSENT` hoặc `UNKNOWN`; chỉ authenticated `ABSENT` mới cho phép purge | US-F23-05 | P0 |
 
 ## 10. Business Rules
@@ -134,7 +134,7 @@ PWv2 không runtime-fetch SSO trên mỗi page render. Khi SSO lỗi tạm thờ
 - **BR-23-01 — Owner Identity Source:** First Name, Last Name, Email và Phone của Owner là Read-only tại PWv2. PWv2 không ghi ngược các field này về SSO từ Personal Profile.
 - **BR-23-02 — Role-based Avatar Source:** Owner avatar do SSO quản lý authoritative; Staff avatar do PWv2 quản lý local. Quy tắc này supersede BR-23-02 `Avatar Independence` của PRD v1.2.
 - **BR-23-03 — Owner Local Mutation Block:** Owner không được upload, replace hoặc delete avatar local qua UI hoặc API.
-- **BR-23-04 — Stable Identity:** Mapping Owner phải dùng immutable SSO identifier như OIDC `sub` hoặc `sso_user_id`; email không phải primary mapping key. Identity preflight phải chạy trước avatar backfill. Missing/duplicate/ambiguous mapping bị skip, quarantine và report mà không thay đổi avatar.
+- **BR-23-04 — Stable Identity:** Mapping Owner phải dùng immutable SSO identifier như OIDC `sub` hoặc `sso_user_id`; email không phải primary mapping key. Owner tạo trước khi có `sso_user_id` được gắn id theo email ở lần sync đầu tiên, chỉ khi email khớp đúng 1 Owner chưa gắn id (SSO đảm bảo email là duy nhất qua unique index `users.email`); từ đó mapping dùng `sso_user_id` (GH-1979). Identity preflight phải chạy trước avatar backfill. Missing/duplicate/ambiguous mapping bị skip, quarantine và report mà không thay đổi avatar.
 - **BR-23-05 — Trusted Update:** Chỉ confirmed event/API response từ trusted SSO integration flow mới được overwrite Owner cached avatar.
 - **BR-23-06 — Idempotency and Ordering:** Duplicate event không tạo duplicate outcome; event/version cũ không overwrite avatar mới hơn.
 - **BR-23-07 — Canonical State:** SSO avatar state được chuẩn hóa thành `PRESENT`, `ABSENT` hoặc `UNKNOWN`. `ABSENT` là authenticated explicit no-avatar/deletion state. Field omission, insufficient scope, timeout, invalid resource và uncontracted `null`/`404` là `UNKNOWN`; chỉ `ABSENT` mới cho phép purge.
@@ -507,3 +507,4 @@ Các nhóm bắt buộc phải có written answer:
 |---|---|---|
 | 1.2 | 2026-03-26 | Baseline Personal Profile cho Owner/Staff; avatar được mô tả độc lập SSO |
 | 1.3 | 2026-09-08 | Thay avatar contract theo Role; thêm SSO synchronization, backfill, SLA, fallback, security và readiness gates cho Issue #1723 |
+| 1.4 | 2026-10-22 | BR-23-04 / FR-23-13: cho phép gắn `sso_user_id` theo email ở lần sync đầu cho Owner cũ (PO/BA đã xác nhận, Issue #1979) |

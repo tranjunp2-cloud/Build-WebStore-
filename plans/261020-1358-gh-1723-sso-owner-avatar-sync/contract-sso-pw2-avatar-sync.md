@@ -35,11 +35,12 @@ Ví dụ (dùng làm fixture test PWv2):
 
 ## Map user (PWv2)
 1. Tìm `users.sso_user_id = sso_user_id` → dùng user đó (bỏ qua email).
-2. Chưa có → **chỉ khi `ALLOW_EMAIL_BIND = true`** (mặc định `true` từ GH-1979 để Owner tạo trước khi có `sso_user_id` sync được; đặt `false` thì trả `409 email_bind_disabled` và chỉ Owner đã có `sso_user_id` — ví dụ provision mới — mới sync được; cần PRD BR-23-04 cho phép bind lần đầu bằng email) bind bằng email **chỉ khi tất cả** đúng:
+2. Chưa có → **chỉ khi `ALLOW_EMAIL_BIND = true`** (mặc định `true` từ GH-1979 để Owner tạo trước khi có `sso_user_id` sync được; đặt `false` thì trả `409 email_bind_disabled` và chỉ Owner đã có `sso_user_id` — ví dụ provision mới — mới sync được; PRD BR-23-04 v1.4 cho phép bind lần đầu bằng email) bind bằng email **chỉ khi tất cả** đúng:
    - email (so khớp không phân biệt hoa/thường) khớp **đúng 1** user (PWv2 cho phép trùng email khác `customerIdNumber` — AC-09 provision);
    - user là Owner (`tenants[].role === 'owner'`);
    - user chưa có `sso_user_id`;
    - `sso_user_id` chưa gắn user khác (unique index).
+   - **Giả định từ SSO:** email là duy nhất giữa các user SSO (unique index `users_email_unique` trên `users.email`, tính cả user soft-delete), nên payload không cần `customer_id_number`. Nếu SSO bỏ ràng buộc này thì phải thêm `customer_id_number` vào payload và bắt buộc khớp khi user PWv2 đã có `customerIdNumber`.
    → ghi `sso_user_id` bằng **một câu** `UPDATE users SET sso_user_id=$1 … WHERE id=$2 AND sso_user_id IS NULL RETURNING id` (atomic; không dùng `payload.update({where})`). 0 dòng hoặc unique violation Postgres `23505` → `409 sso_id_conflict`; lỗi DB khác **không** đổi thành 409 mà trả 500 để SSO retry. Sau đó xử lý tiếp.
 3. Không thỏa → không đổi gì, trả `409` với `reason`, log `[V2][SSO SyncAvatar] skipped`.
 
