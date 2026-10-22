@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, Mock } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
 import { useEditorStore } from '@/store/editorStore'
 import { I18nProvider } from '@/i18n'
@@ -45,6 +45,9 @@ describe('PageManagerPanel', () => {
             },
         ])
     })
+
+    const getCard = (pageId: string) =>
+        document.querySelector<HTMLElement>(`[data-page-id="${pageId}"]`)!
 
     const TestWrapper = () => (
         <I18nProvider defaultLocale="en">
@@ -175,7 +178,7 @@ describe('PageManagerPanel', () => {
         // Act
         fireEvent.click(screen.getByText('Add new page'))
         
-        const input = screen.getByPlaceholderText('Page name (e.g. Promotions)')
+        const input = screen.getByPlaceholderText('e.g. Promotions')
         fireEvent.change(input, { target: { value: 'Khuyến mãi' } })
         
         const form = input.closest('form')!
@@ -205,7 +208,7 @@ describe('PageManagerPanel', () => {
 
         // Act
         fireEvent.click(screen.getByText('Add new page'))
-        const input = screen.getByPlaceholderText('Page name (e.g. Promotions)')
+        const input = screen.getByPlaceholderText('e.g. Promotions')
         fireEvent.change(input, { target: { value: 'Duplicate Slug' } })
         const form = input.closest('form')!
         fireEvent.submit(form)
@@ -217,26 +220,18 @@ describe('PageManagerPanel', () => {
         expect(useEditorStore.getState().pages).toHaveLength(2) // No new page added
     })
 
-    it('TC-F05.09: Soft deletes a page, updates store, and triggers Toast Undo', async () => {
+    it('TC-F05.09: Soft deletes a page via inline confirm, updates store, and triggers Toast Undo', async () => {
         // Arrange
-        const mockResponse = { ok: true }
-        ;(global.fetch as any).mockResolvedValueOnce(mockResponse)
-        
+        ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
         render(<TestWrapper />)
 
-        // Act: Open delete confirmation for "About Us" (page-2)
-        // Note: Target by Title to find correct buttons
-        const aboutUsContainer = screen.getByText('About Us').closest('div[class*="rounded-xl"]')!
-        const deleteButton = aboutUsContainer.querySelector('button[title="Delete page"]')!
-        fireEvent.click(deleteButton)
+        // Act: trash icon → inline confirm inside the card → confirm
+        const card = within(getCard('page-2'))
+        fireEvent.click(card.getByRole('button', { name: 'Delete page' }))
+        expect(card.getByRole('alertdialog')).toBeInTheDocument()
+        fireEvent.click(card.getByRole('button', { name: 'Delete' }))
 
-        // Wait for modal and confirm
-        // Modal has a delete button with Trash2 icon — find by the modal container
-        const modal = screen.getByText('Delete this page?').closest('div[class*="max-w"]')!
-        const confirmDeleteButton = modal.querySelectorAll('button')[1] // second button is confirm
-        fireEvent.click(confirmDeleteButton)
-
-        // Assert API Request
+        // Assert API request
         await waitFor(() => {
             expect(global.fetch).toHaveBeenCalledWith('/api/sites/site-123/pages/page-2', expect.objectContaining({
                 method: 'PATCH',
@@ -244,22 +239,38 @@ describe('PageManagerPanel', () => {
             }))
         })
 
-        // Assert toast called with undo
+        // Assert toast offers undo
         expect(toast).toHaveBeenCalledWith('Page deleted. Undo?', expect.objectContaining({
             action: expect.objectContaining({ label: 'Undo' })
         }))
-
-        // Assert UI hides it - About us is gone from store view
         expect(useEditorStore.getState().pages.find(p => p.id === 'page-2')?.deletedAt).toBeTruthy()
     })
 
-    it('TC-F05-02-15e: published page with isVisible=false on live site shows Live badge + Hidden sublabel', () => {
+    it('TC-F05-02-21: Esc and Cancel close the inline delete confirm without calling the API', () => {
+        // Arrange
+        render(<TestWrapper />)
+        const card = within(getCard('page-2'))
+
+        // Act + Assert: Esc
+        fireEvent.click(card.getByRole('button', { name: 'Delete page' }))
+        fireEvent.keyDown(card.getByRole('alertdialog'), { key: 'Escape' })
+        expect(card.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+        // Act + Assert: Cancel
+        fireEvent.click(card.getByRole('button', { name: 'Delete page' }))
+        fireEvent.click(card.getByRole('button', { name: 'Cancel' }))
+        expect(card.queryByRole('alertdialog')).not.toBeInTheDocument()
+        expect(global.fetch).not.toHaveBeenCalled()
+    })
+
+    it('TC-F05-02-15e: published page with isVisible=false on live site shows Hidden badge', () => {
         // Arrange — page published + visible:false; site published
         useEditorStore.getState().setPages([
             { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
             { id: 'page-2', title: 'Secret', slug: 'secret', status: 'published', isVisible: false, updatedAt: new Date().toISOString() },
         ])
 
+        // Act
         render(
             <I18nProvider defaultLocale="en">
                 <PageManagerPanel
@@ -271,12 +282,11 @@ describe('PageManagerPanel', () => {
             </I18nProvider>,
         )
 
-        // Assert — Live badge present AND Hidden sublabel (amber badge) next to it.
-        // Note: pm.hidden ("Hidden") also appears as the toggle button text, so use getAllByText.
-        expect(screen.getByText('Live')).toBeInTheDocument()
-        const hiddenElements = screen.getAllByText('Hidden')
-        // At least 2: the amber sublabel badge + the visibility toggle button text
-        expect(hiddenElements.length).toBeGreaterThanOrEqual(2)
+        // Assert — hidden wins over Live; the eye button offers to show it again
+        const card = within(getCard('page-2'))
+        expect(card.getByText('Hidden')).toBeInTheDocument()
+        expect(card.queryByText('Live')).not.toBeInTheDocument()
+        expect(card.getByRole('button', { name: 'Show page' })).toBeInTheDocument()
     })
 
     it('TC-F05-02-15f: published page not in nav menu on live site shows Live badge + No Link sublabel', () => {
@@ -345,10 +355,7 @@ describe('PageManagerPanel', () => {
         render(<TestWrapper />)
 
         // Act: Find eye button for 'About Us'
-        const aboutUsContainer = screen.getByText('About Us').closest('div[class*="rounded-xl"]')!
-        const hideButton = aboutUsContainer.querySelector('button[title="Hide page"]')!
-        
-        fireEvent.click(hideButton)
+        fireEvent.click(within(getCard('page-2')).getByRole('button', { name: 'Hide page' }))
 
         // Assert
         await waitFor(() => {
@@ -359,5 +366,185 @@ describe('PageManagerPanel', () => {
         })
 
         expect(useEditorStore.getState().pages.find(p => p.id === 'page-2')?.isVisible).toBe(false)
+    })
+
+    it('TC-F05-02-18: Home page keeps hide/delete icons disabled; other pages have them on the title row', () => {
+        // Arrange & Act
+        render(<TestWrapper />)
+
+        // Assert
+        const home = within(getCard('page-1'))
+        expect(home.getByRole('button', { name: "The homepage can't be hidden" })).toBeDisabled()
+        expect(home.getByRole('button', { name: "The homepage can't be deleted" })).toBeDisabled()
+        const about = within(getCard('page-2'))
+        expect(about.getByRole('button', { name: 'Hide page' })).toBeEnabled()
+        expect(about.getByRole('button', { name: 'Delete page' })).toBeEnabled()
+    })
+
+    it('TC-F05-02-19: Add new page sits after the list, previews the URL, and Esc cancels', () => {
+        // Arrange
+        render(<TestWrapper />)
+        const addButton = screen.getByRole('button', { name: 'Add new page' })
+        const lastCard = getCard('page-2')
+        expect(lastCard.compareDocumentPosition(addButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+        // Act
+        fireEvent.click(addButton)
+        const input = screen.getByPlaceholderText('e.g. Promotions')
+        fireEvent.change(input, { target: { value: 'Khuyến mãi' } })
+
+        // Assert preview, then Esc closes the form
+        expect(screen.getByText('/khuyen-mai')).toBeInTheDocument()
+        fireEvent.keyDown(input, { key: 'Escape' })
+        expect(screen.queryByPlaceholderText('e.g. Promotions')).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Add new page' })).toBeInTheDocument()
+    })
+
+    it('TC-F05-02-19b: empty state still offers Add new page', () => {
+        // Arrange
+        useEditorStore.getState().setPages([])
+
+        // Act
+        render(<TestWrapper />)
+
+        // Assert
+        expect(screen.getByText('No pages found')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Add new page' })).toBeInTheDocument()
+    })
+
+    it.each([
+        ['About Us', 'same title'],
+        ['about', 'same slug'],
+        ['Home', 'homepage slug'],
+        ['  ABOUT us ', 'case/space-insensitive title'],
+    ])('TC-F05-02-20: duplicate "%s" (%s) shows inline error and disables Create page', (value) => {
+        // Arrange
+        render(<TestWrapper />)
+        fireEvent.click(screen.getByRole('button', { name: 'Add new page' }))
+
+        // Act
+        fireEvent.change(screen.getByPlaceholderText('e.g. Promotions'), { target: { value } })
+
+        // Assert
+        expect(screen.getByRole('alert')).toHaveTextContent('A page with this name or URL already exists')
+        expect(screen.getByRole('button', { name: 'Create page' })).toBeDisabled()
+    })
+
+    it('TC-F05-02-20b: a name with no letters/numbers shows an error instead of posting an empty slug', () => {
+        // Arrange
+        render(<TestWrapper />)
+        fireEvent.click(screen.getByRole('button', { name: 'Add new page' }))
+
+        // Act
+        fireEvent.change(screen.getByPlaceholderText('e.g. Promotions'), { target: { value: '!!!' } })
+
+        // Assert
+        expect(screen.getByRole('alert')).toHaveTextContent('Use at least one letter or number')
+        expect(screen.getByRole('button', { name: 'Create page' })).toBeDisabled()
+        expect(global.fetch).not.toHaveBeenCalled()
+    })
+
+    it('TC-F05-02-22: current page shows Editing badge and "Edit with AI chat" calls onEditPage', () => {
+        // Arrange
+        const onEditPage = vi.fn()
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel siteId="site-123" currentPageId="page-2" onPageSelected={vi.fn()} onEditPage={onEditPage} />
+            </I18nProvider>,
+        )
+
+        // Act
+        const card = within(getCard('page-2'))
+        fireEvent.click(card.getByRole('button', { name: 'Edit with AI chat' }))
+
+        // Assert
+        expect(card.getByText('Editing')).toBeInTheDocument()
+        expect(onEditPage).toHaveBeenCalledWith('page-2')
+        expect(within(getCard('page-1')).queryByRole('button', { name: 'Edit with AI chat' })).not.toBeInTheDocument()
+    })
+
+    it('TC-F05-02-23: Custom 404 footer toggles and selects the 404 page', () => {
+        // Arrange
+        const onPageSelected = vi.fn()
+        useEditorStore.getState().setPages([
+            ...useEditorStore.getState().pages,
+            { id: 'page-404', title: '404', slug: '404', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+        const { rerender } = render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel siteId="site-123" currentPageId="page-1" onPageSelected={onPageSelected} />
+            </I18nProvider>,
+        )
+        expect(document.querySelector('[data-page-id="page-404"]')).toBeNull() // not in regular list
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: 'Custom 404 page' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Edit 404 page' }))
+
+        // Assert
+        expect(onPageSelected).toHaveBeenCalledWith('page-404')
+
+        // Assert: when editing the 404 page the label changes
+        rerender(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel siteId="site-123" currentPageId="page-404" onPageSelected={onPageSelected} />
+            </I18nProvider>,
+        )
+        expect(screen.getByRole('button', { name: 'Editing 404 page' })).toBeInTheDocument()
+    })
+
+    it('TC-F05-02-24: showing a hidden page PATCHes isVisible=true', async () => {
+        // Arrange
+        useEditorStore.getState().updatePageInState('page-2', { isVisible: false })
+        ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+        render(<TestWrapper />)
+
+        // Act
+        fireEvent.click(within(getCard('page-2')).getByRole('button', { name: 'Show page' }))
+
+        // Assert
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith('/api/sites/site-123/pages/page-2', expect.objectContaining({
+                body: JSON.stringify({ isVisible: true }),
+            }))
+        })
+        expect(toast).toHaveBeenCalledWith('Page is now visible')
+    })
+
+    it('TC-F05-02-25: clicking anywhere on a non-current card selects it; the current card ignores body clicks', () => {
+        // Arrange
+        const onPageSelected = vi.fn()
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel siteId="site-123" currentPageId="page-1" onPageSelected={onPageSelected} />
+            </I18nProvider>,
+        )
+
+        // Act + Assert: path/date line of another page selects it
+        fireEvent.click(within(getCard('page-2')).getByText(/\/about/))
+        expect(onPageSelected).toHaveBeenCalledTimes(1)
+        expect(onPageSelected).toHaveBeenCalledWith('page-2')
+
+        // Act + Assert: icon buttons do NOT select the card
+        fireEvent.click(within(getCard('page-2')).getByRole('button', { name: 'Delete page' }))
+        expect(onPageSelected).toHaveBeenCalledTimes(1)
+
+        // Act + Assert: current card body click is a no-op
+        fireEvent.click(within(getCard('page-1')).getByText(/^\/ ·/))
+        expect(onPageSelected).toHaveBeenCalledTimes(1)
+    })
+
+    it('TC-F05-02-26: status badge sits right after the page name, before the action icons', () => {
+        // Arrange & Act
+        render(<TestWrapper />)
+
+        // Assert: DOM order inside the card = name, badge, then icon buttons
+        const card = getCard('page-2')
+        const name = within(card).getByText('About Us')
+        const badge = within(card).getByText('Draft')
+        const hide = within(card).getByRole('button', { name: 'Hide page' })
+        expect(name.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(badge.compareDocumentPosition(hide) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(name.parentElement).toBe(badge.closest('div'))
     })
 })
