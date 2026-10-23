@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PLACEHOLDER_MEDIA_WHERE, placeholderCandidates, placeholderMediaPattern, pw1MediaFilename, pw1PlaceholderFilename, sourceUrls } from '@/lib/migration/pw1-placeholder-image-repair'
+import { PLACEHOLDER_MEDIA_WHERE, placeholderCandidates, placeholderMediaPattern, pw1MediaFilename, pw1PlaceholderFilename, sourceUrls, isPlaceholderMedia } from '@/lib/migration/pw1-placeholder-image-repair'
 import { isMediaReferenced, repointMedia } from '@/lib/migration/pw1-media-repoint'
 
 const URL_A = 'https://pw1.test/a.jpg'
@@ -23,6 +23,12 @@ describe('pw1 placeholder image repair', () => {
         expect(placeholderMediaPattern(7)).toBe('pw1-7-%')
         expect(PLACEHOLDER_MEDIA_WHERE).toContain("filename LIKE '%-placeholder.jpg'")
         expect(PLACEHOLDER_MEDIA_WHERE).toMatch(/width = 960 AND height = 640 AND filesize = 9447/)
+    })
+    it('recognises the placeholder restorePw1Media falls back to, so the repair counts it as broken', () => {
+        expect(isPlaceholderMedia({ filename: 'pw1-187-b6c7e249791324010419-placeholder.jpg', width: 960, height: 640, filesize: 9447 })).toBe(true)
+        expect(isPlaceholderMedia({ filename: 'pw1-3023-685391f1304448447ad9.jpg', width: '960', height: '640', filesize: '9447' })).toBe(true)
+        expect(isPlaceholderMedia({ filename: 'pw1-3023-b06ef7942b85744053a9.jpg', width: 668, height: 290, filesize: 395518 })).toBe(false)
+        expect(isPlaceholderMedia({ filename: 'pw1-7-aaaaaaaaaaaaaaaaaaaa.jpg', width: 960, height: 640, filesize: 38533 })).toBe(false)
     })
     it('also matches a placeholder an older build stored under the plain media name', () => {
         const placeholders = [{ id: 21, filename: pw1MediaFilename(7, URL_A) }]

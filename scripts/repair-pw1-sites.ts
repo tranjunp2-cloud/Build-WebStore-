@@ -30,7 +30,7 @@ import { repairFooterLinks } from '../src/lib/migration/pw1-footer-links-repair'
 import { isMediaReferenced, repointMedia } from '../src/lib/migration/pw1-media-repoint'
 import { isPw1StorageUrl } from '../src/lib/migration/pw1-image-origin'
 import { htmlImageUrls, htmlMediaNamePrefix, htmlPlaceholders, isHtmlImageInUse, swapHtmlImageSource, type HtmlMedia } from '../src/lib/migration/pw1-html-placeholder-repair'
-import { PLACEHOLDER_MEDIA_WHERE, placeholderCandidates, placeholderMediaPattern, sourceUrls } from '../src/lib/migration/pw1-placeholder-image-repair'
+import { PLACEHOLDER_MEDIA_WHERE, isPlaceholderMedia, placeholderCandidates, placeholderMediaPattern, sourceUrls } from '../src/lib/migration/pw1-placeholder-image-repair'
 import { hasDeliberateEmptySelection, repairProductGrid } from '../src/lib/migration/pw1-product-grid-repair'
 import { repairHeroVariant } from '../src/lib/migration/pw1-hero-variant-repair'
 import { repairFooterVariant } from '../src/lib/migration/pw1-footer-variant-repair'
@@ -254,8 +254,11 @@ async function repairPlaceholders(client: Client, stores: Store[], sources: Sour
             payload ??= await openPayload()
             const { restorePw1Media } = await import('../src/lib/migration/pw1-media')
             const mediaId = await restorePw1Media(payload, store.tenant_id, url, new URL(url).pathname.split('/').pop() || 'PW1 image').catch(() => undefined)
-            if (!mediaId || mediaId === placeholder.id) { broken++; console.log(`[placeholders] store ${store.source_store_id}: ${url} cannot be downloaded (broken at the source)`); continue }
-            const [from, to] = await Promise.all([placeholder.id, mediaId].map(id => payload!.findByID({ collection: 'media', id, depth: 0 })))
+            const [from, to] = mediaId && mediaId !== placeholder.id
+                ? await Promise.all([placeholder.id, mediaId].map(id => payload!.findByID({ collection: 'media', id, depth: 0 })))
+                : [undefined, undefined]
+            // A source that is still unusable comes back as another placeholder: count it as broken, leave the site as it is
+            if (!from || !to || isPlaceholderMedia(to)) { broken++; console.log(`[placeholders] store ${store.source_store_id}: ${url} cannot be downloaded (broken at the source)`); continue }
             await backup.add({ kind: 'placeholder', storeId: store.source_store_id, fromId: from.id, fromUrl: from.url, toId: to.id, toUrl: to.url })
             await client.query('BEGIN')
             try {
@@ -290,7 +293,7 @@ async function repairHtmlPlaceholders(client: Client, stores: Store[], sources: 
                 const { restorePw1Media } = await import('../src/lib/migration/pw1-media')
                 const mediaId = await restorePw1Media(payload, store.tenant_id, url.replace(/^http:\/\//i, 'https://'), new URL(url).pathname.split('/').pop() || 'PW1 image').catch(() => undefined)
                 const media = mediaId ? await payload.findByID({ collection: 'media', id: mediaId, depth: 0 }) : undefined
-                if (!media?.url || media.url === placeholderUrl) { broken++; console.log(`[html-placeholders] store ${store.source_store_id}: ${url} cannot be downloaded (broken at the source)`); continue }
+                if (!media?.url || media.url === placeholderUrl || isPlaceholderMedia(media)) { broken++; console.log(`[html-placeholders] store ${store.source_store_id}: ${url} cannot be downloaded (broken at the source)`); continue }
                 target = media.url
             }
             const updated = await swapHtmlImageSource((text, params) => client.query(text, params), store.site_id, placeholderUrl, target,
