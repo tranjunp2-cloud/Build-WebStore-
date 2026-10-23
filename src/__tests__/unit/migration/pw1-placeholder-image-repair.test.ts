@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { placeholderCandidates, pw1MediaFilename, pw1PlaceholderFilename, sourceUrls } from '@/lib/migration/pw1-placeholder-image-repair'
+import { PLACEHOLDER_MEDIA_WHERE, placeholderCandidates, placeholderMediaPattern, pw1MediaFilename, pw1PlaceholderFilename, sourceUrls } from '@/lib/migration/pw1-placeholder-image-repair'
 import { repointMedia } from '@/lib/migration/pw1-media-repoint'
 
 const URL_A = 'https://pw1.test/a.jpg'
@@ -17,6 +17,15 @@ describe('pw1 placeholder image repair', () => {
     })
     it('matches only URLs whose placeholder file exists for that tenant', () => {
         const placeholders = [{ id: 11, filename: pw1PlaceholderFilename(7, URL_A) }, { id: 12, filename: pw1PlaceholderFilename(8, URL_B) }]
+        expect(placeholderCandidates([URL_A, URL_B], 7, placeholders)).toEqual([{ url: URL_A, placeholder: placeholders[0] }])
+    })
+    it('selects the plain-named media only by the neutral image size, for the tenant pattern', () => {
+        expect(placeholderMediaPattern(7)).toBe('pw1-7-%')
+        expect(PLACEHOLDER_MEDIA_WHERE).toContain("filename LIKE '%-placeholder.jpg'")
+        expect(PLACEHOLDER_MEDIA_WHERE).toMatch(/width = 960 AND height = 640 AND filesize = 9447/)
+    })
+    it('also matches a placeholder an older build stored under the plain media name', () => {
+        const placeholders = [{ id: 21, filename: pw1MediaFilename(7, URL_A) }]
         expect(placeholderCandidates([URL_A, URL_B], 7, placeholders)).toEqual([{ url: URL_A, placeholder: placeholders[0] }])
     })
     it('repoints foreign keys and copied URLs', async () => {

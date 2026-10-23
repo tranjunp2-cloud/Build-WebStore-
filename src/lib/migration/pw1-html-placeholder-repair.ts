@@ -1,5 +1,6 @@
 import { load } from 'cheerio'
-import { pw1PlaceholderFilename } from './pw1-placeholder-image-repair'
+import { isPw1StorageUrl } from './pw1-image-origin'
+import { pw1MediaFilename } from './pw1-placeholder-image-repair'
 
 type Query = <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rows: T[]; rowCount: number | null }>
 
@@ -16,13 +17,23 @@ export function htmlImageUrls(value: unknown, found = new Set<string>()): Set<st
 }
 
 export type HtmlPlaceholder = { url: string; placeholderUrl: string }
+export type HtmlMedia = { filename: string; url: string | null; width?: number | string | null; height?: number | string | null; filesize?: number | string | null }
 
-/** Source images whose rehosted copy in the html is still the neutral placeholder (found by the placeholder file name, which encodes the tenant and the URL hash; the migration hashes the https form of the URL). */
-export function htmlPlaceholders(urls: Iterable<string>, tenantId: number | string, placeholders: Array<{ filename: string; url: string | null }>): HtmlPlaceholder[] {
-    const byName = new Map(placeholders.flatMap(media => media.url ? [[media.filename, media.url] as const] : []))
+/** Stored copies of a source image are named `pw1-<tenant>-<hash of the https URL>` (plus `-placeholder` / `r` variants); this is the part they share. */
+export const htmlMediaNamePrefix = (tenantId: number | string, url: string) => pw1MediaFilename(tenantId, url.replace(/^http:\/\//i, 'https://')).replace(/\.jpg$/, '')
+const isNeutralImage = (media: HtmlMedia) => media.filename.endsWith('-placeholder.jpg') || (Number(media.width) === 960 && Number(media.height) === 640 && Number(media.filesize) === 9447)
+
+/**
+ * Source images whose copy in the html differs from what PW1 shows. An image hotlinked from another site must be
+ * exactly the PW1 URL, so any stored copy of it (downloaded or neutral placeholder) is to be swapped back; an image
+ * on PW1 storage is only swapped while its copy is still the neutral placeholder (a good copy is what we want).
+ */
+export function htmlPlaceholders(urls: Iterable<string>, tenantId: number | string, media: HtmlMedia[]): HtmlPlaceholder[] {
     return [...urls].flatMap(url => {
-        const placeholderUrl = byName.get(pw1PlaceholderFilename(tenantId, url.replace(/^http:\/\//i, 'https://')))
-        return placeholderUrl ? [{ url, placeholderUrl }] : []
+        const prefix = htmlMediaNamePrefix(tenantId, url)
+        return media
+            .filter(item => item.url && item.filename.startsWith(prefix) && (!isPw1StorageUrl(url) || isNeutralImage(item)))
+            .map(item => ({ url, placeholderUrl: item.url as string }))
     })
 }
 
