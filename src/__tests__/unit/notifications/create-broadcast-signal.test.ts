@@ -29,6 +29,16 @@ describe('[TC-F16.50] createBroadcastNotifications signal', () => {
         expect(mockSignalBroadcast).toHaveBeenCalledTimes(1)
     })
 
+    it('does not make the admin request wait on Firebase (signal runs after the response)', async () => {
+        mockExecute.mockResolvedValueOnce({ rowCount: 3 })
+        mockSignalBroadcast.mockReturnValueOnce(new Promise(() => {})) // Firebase hangs
+
+        const result = await createBroadcastNotifications(params)
+
+        expect(result.notified).toBe(3)
+        expect(mockSignalBroadcast).toHaveBeenCalledTimes(1)
+    })
+
     it('does not signal when nobody was notified', async () => {
         mockExecute.mockResolvedValue({ rowCount: 0 })
 

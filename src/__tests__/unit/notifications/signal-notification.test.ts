@@ -45,6 +45,17 @@ describe('[TC-F16.45] signalNotificationUsers', () => {
         })
     })
 
+    it('writes nothing on Vercel without VERCEL_TARGET_ENV (fail-closed, no cross-env doorbell)', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        vi.stubEnv('VERCEL_TARGET_ENV', '')
+        vi.stubEnv('VERCEL', '1')
+
+        await signalNotificationUsers([1])
+        await signalNotificationBroadcast()
+
+        expect(fetchMock).not.toHaveBeenCalled()
+    })
+
     it('dedupes ids and drops invalid ones (NaN, negative, non-integer, zero)', async () => {
         await signalNotificationUsers([5, '5', 'abc', -1, 0, 1.5, 6])
 

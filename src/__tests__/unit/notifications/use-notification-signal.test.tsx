@@ -85,6 +85,31 @@ describe('[TC-F16.55] useNotificationSignal', () => {
         expect(h.onReconnect).toHaveBeenCalledTimes(1)
     })
 
+    it('dropped for 30s after being live → fallback; reconnect → live again + onReconnect', async () => {
+        mount(); await flush()
+        connected(true)
+        connected(false)
+
+        await flush(29_000)
+        expect(modes()).toEqual(['live']) // short blips do not start polling
+        await flush(1_000)
+        expect(modes()).toEqual(['live', 'fallback'])
+
+        connected(true)
+        expect(modes()).toEqual(['live', 'fallback', 'live'])
+        expect(h.onReconnect).toHaveBeenCalledTimes(1)
+    })
+
+    it('a drop shorter than 30s stays live (timer cancelled on reconnect)', async () => {
+        mount(); await flush()
+        connected(true); connected(false)
+        await flush(10_000)
+        connected(true)
+
+        await flush(60_000)
+        expect(modes()).toEqual(['live'])
+    })
+
     it('enabled:false → fallback, no retry, no Firebase connection', async () => {
         fetchMock.mockResolvedValue(json({ enabled: false }))
         mount(); await flush(5 * 60_000)

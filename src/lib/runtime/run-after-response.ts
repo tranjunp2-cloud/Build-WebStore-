@@ -6,6 +6,11 @@ import { after } from 'next/server'
  * throws, so the task runs immediately instead — same behaviour as before.
  *
  * The task must NOT use the request's `req` / transaction: it outlives the request.
+ *
+ * Caveat (scripts only): with no request scope the task starts immediately, so when
+ * called from a Payload hook it runs while that hook's transaction is still open —
+ * a signal may fire before commit and push work shares the pool with the open
+ * transaction. Bulk scripts should pass `context.skipPush` (see notifyTenantOwners).
  */
 export function runAfterResponse(label: string, task: () => Promise<unknown>): void {
     const run = () =>

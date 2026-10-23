@@ -25,11 +25,14 @@ interface TokenResponse {
 }
 
 const CONNECT_TIMEOUT_MS = 15_000
+/** Lost connection after being live for this long → poll until Firebase reconnects. */
+const DISCONNECT_FALLBACK_MS = 30_000
 const RETRY_DELAYS_MS = [30_000, 60_000, 120_000, 120_000, 120_000]
 
 /**
  * Subscribes to the Firebase RTDB doorbell. Falls back (via onModeChange) when
- * Firebase is off, unreachable or denied. 401 / `enabled:false` / permission denied
+ * Firebase is off, unreachable, denied or disconnected for 30s after being live
+ * (back to live on reconnect). 401 / `enabled:false` / permission denied
  * are final; 429, 5xx and network errors retry with backoff.
  */
 export function useNotificationSignal(handlers: NotificationSignalHandlers): void {
@@ -41,6 +44,7 @@ export function useNotificationSignal(handlers: NotificationSignalHandlers): voi
         let connectedOnce = false
         let retryTimer: ReturnType<typeof setTimeout> | null = null
         let connectTimer: ReturnType<typeof setTimeout> | null = null
+        let disconnectTimer: ReturnType<typeof setTimeout> | null = null
         let cleanupFirebase: (() => void) | null = null
 
         let lastMode: SignalMode | null = null
@@ -94,7 +98,15 @@ export function useNotificationSignal(handlers: NotificationSignalHandlers): voi
                 unsubs.push(onValue(ref(client.db, data.userPath), () => handlersRef.current.onSignal(), onDenied))
                 unsubs.push(onValue(ref(client.db, data.broadcastPath), () => handlersRef.current.onBroadcast(), onDenied))
                 unsubs.push(onValue(ref(client.db, '.info/connected'), (snap) => {
-                    if (snap.val() !== true || denied) return
+                    if (denied) return
+                    if (snap.val() !== true) {
+                        // Dropped after being live: poll if the outage lasts, the SDK keeps reconnecting.
+                        if (connectedOnce && !disconnectTimer) {
+                            disconnectTimer = setTimeout(() => { disconnectTimer = null; mode('fallback') }, DISCONNECT_FALLBACK_MS)
+                        }
+                        return
+                    }
+                    if (disconnectTimer) { clearTimeout(disconnectTimer); disconnectTimer = null }
                     if (connectTimer) { clearTimeout(connectTimer); connectTimer = null }
                     mode('live')
                     if (connectedOnce) handlersRef.current.onReconnect()
@@ -117,6 +129,7 @@ export function useNotificationSignal(handlers: NotificationSignalHandlers): voi
             cancelled = true
             if (retryTimer) clearTimeout(retryTimer)
             if (connectTimer) clearTimeout(connectTimer)
+            if (disconnectTimer) clearTimeout(disconnectTimer)
             cleanupFirebase?.()
         }
     }, [])

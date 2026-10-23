@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { getFirebaseAdminApp, getFirebaseServerConfig } from '@/lib/firebase/firebase-admin-app'
-import { broadcastSignalPath, signalUid, userSignalPath } from '@/lib/notifications/notification-signal-env'
+import {
+    broadcastSignalPath,
+    getNotificationSignalEnv,
+    signalUid,
+    userSignalPath,
+} from '@/lib/notifications/notification-signal-env'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +19,8 @@ const NO_STORE = { 'Cache-Control': 'no-store' }
  * Issues a Firebase custom token (uid `pw2_{env}_{userId}`) so the browser can
  * listen to its own notification "doorbell" in RTDB. Also returns the public
  * web config and the exact paths to subscribe to, so the client needs no env vars.
- * `{ enabled: false }` => Firebase not configured; client falls back to polling.
+ * `{ enabled: false }` => Firebase not configured (or no env prefix on Vercel);
+ * client falls back to polling.
  */
 export const GET = withAuth(async (user) => {
     try {
@@ -32,8 +38,8 @@ export const GET = withAuth(async (user) => {
             )
         }
 
-        const cfg = getFirebaseServerConfig()
-        const app = getFirebaseAdminApp()
+        const cfg = getNotificationSignalEnv() ? getFirebaseServerConfig() : null
+        const app = cfg ? await getFirebaseAdminApp() : null
         if (!cfg || !app) return NextResponse.json({ enabled: false }, { headers: NO_STORE })
 
         const { getAuth } = await import('firebase-admin/auth')

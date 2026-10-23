@@ -4,17 +4,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockGetAccessToken = vi.fn()
 const mockInit = vi.fn()
+const loaded = vi.hoisted(() => ({ adminApp: 0 }))
 let apps: Array<{ name: string; options: unknown }> = []
-vi.mock('firebase-admin/app', () => ({
-    getApps: () => apps,
-    cert: (c: unknown) => c,
-    initializeApp: (opts: { credential: unknown }, name: string) => {
-        mockInit(opts, name)
-        const app = { name, options: { credential: { getAccessToken: () => mockGetAccessToken() } } }
-        apps.push(app)
-        return app
-    },
-}))
+vi.mock('firebase-admin/app', () => {
+    loaded.adminApp++ // factory runs only when the module is actually imported
+    return {
+        getApps: () => apps,
+        cert: (c: unknown) => c,
+        initializeApp: (opts: { credential: unknown }, name: string) => {
+            mockInit(opts, name)
+            const app = { name, options: { credential: { getAccessToken: () => mockGetAccessToken() } } }
+            apps.push(app)
+            return app
+        },
+    }
+})
 
 const ENV = {
     FIREBASE_PROJECT_ID: 'proj', FIREBASE_CLIENT_EMAIL: 'x@proj.iam',
@@ -30,6 +34,7 @@ async function load() {
 beforeEach(() => {
     vi.clearAllMocks()
     apps = []
+    loaded.adminApp = 0
     for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v)
     mockGetAccessToken.mockResolvedValue({ access_token: 'T1', expires_in: 3600 })
 })
@@ -55,8 +60,18 @@ describe('[TC-F16.56] getFirebaseServerConfig', () => {
         const { getFirebaseServerConfig, getFirebaseAdminApp, getFirebaseAccessToken } = await load()
 
         expect(getFirebaseServerConfig()).toBeNull()
-        expect(getFirebaseAdminApp()).toBeNull()
+        expect(await getFirebaseAdminApp()).toBeNull()
         expect(getFirebaseAccessToken()).toBeNull()
+    })
+
+    it('never loads firebase-admin while Firebase is off (Payload routes import this module)', async () => {
+        vi.stubEnv('FIREBASE_PROJECT_ID', '')
+        const { getFirebaseAdminApp, getFirebaseAccessToken } = await load()
+
+        await getFirebaseAdminApp()
+        getFirebaseAccessToken()
+
+        expect(loaded.adminApp).toBe(0)
     })
 })
 
@@ -64,8 +79,8 @@ describe('[TC-F16.56] getFirebaseAdminApp', () => {
     it('creates one named app and reuses it', async () => {
         const { getFirebaseAdminApp } = await load()
 
-        const a = getFirebaseAdminApp()
-        const b = getFirebaseAdminApp()
+        const a = await getFirebaseAdminApp()
+        const b = await getFirebaseAdminApp()
 
         expect(a).toBe(b)
         expect(mockInit).toHaveBeenCalledTimes(1)

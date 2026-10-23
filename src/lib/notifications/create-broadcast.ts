@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { sql } from 'drizzle-orm'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
 import { signalNotificationBroadcast } from './signal-notification'
 
 export type BroadcastTargetAudience = 'all' | 'free' | 'paid'
@@ -86,7 +87,8 @@ export async function createBroadcastNotifications({
         }
     } finally {
         // Signal even if a later batch failed: earlier batches are already committed.
-        if (totalNotified > 0) await signalNotificationBroadcast()
+        // After the response, so the admin request never waits on Firebase (up to ~6s).
+        if (totalNotified > 0) runAfterResponse('Broadcast signal', () => signalNotificationBroadcast())
     }
 
     return { notified: totalNotified }

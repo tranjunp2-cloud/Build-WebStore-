@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // ── TC-F16.47: GET /api/notifications/firebase-token (#1972) ──
@@ -43,6 +43,11 @@ beforeEach(() => {
     mockGetConfig.mockReturnValue(CFG)
     mockGetApp.mockReturnValue({ name: 'pw2-notif' })
     mockCreateCustomToken.mockResolvedValue('custom.jwt.token')
+})
+
+afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
 })
 
 describe('[TC-F16.47] GET /api/notifications/firebase-token', () => {
@@ -91,6 +96,18 @@ describe('[TC-F16.47] GET /api/notifications/firebase-token', () => {
 
         expect(res.status).toBe(200)
         expect(await res.json()).toEqual({ enabled: false })
+        expect(mockCreateCustomToken).not.toHaveBeenCalled()
+    })
+
+    it('returns { enabled: false } on Vercel without VERCEL_TARGET_ENV (fail-closed, no shared prefix)', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        vi.stubEnv('VERCEL_TARGET_ENV', '')
+        vi.stubEnv('VERCEL', '1')
+
+        const res = await GET(req(), undefined as never)
+
+        expect(await res.json()).toEqual({ enabled: false })
+        expect(mockGetApp).not.toHaveBeenCalled()
         expect(mockCreateCustomToken).not.toHaveBeenCalled()
     })
 
