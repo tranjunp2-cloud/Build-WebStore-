@@ -134,7 +134,6 @@ export function PageCard({
                     message={labels.deleteMessage}
                     cancelLabel={labels.cancel}
                     confirmLabel={labels.confirmDelete}
-                    isPending={isPending}
                     onCancel={cancelDelete}
                     onConfirm={onConfirmDelete}
                 />

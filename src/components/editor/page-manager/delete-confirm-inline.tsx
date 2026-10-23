@@ -1,17 +1,15 @@
 import { useEffect, useRef } from 'react'
-import { Loader2 } from 'lucide-react'
 
 interface DeleteConfirmInlineProps {
     message: string
     cancelLabel: string
     confirmLabel: string
-    isPending: boolean
     onCancel: () => void
     onConfirm: () => void
 }
 
 /** Red confirm box rendered inside the page card. Focus starts on Cancel; Esc cancels. */
-export function DeleteConfirmInline({ message, cancelLabel, confirmLabel, isPending, onCancel, onConfirm }: DeleteConfirmInlineProps) {
+export function DeleteConfirmInline({ message, cancelLabel, confirmLabel, onCancel, onConfirm }: DeleteConfirmInlineProps) {
     const cancelRef = useRef<HTMLButtonElement>(null)
     useEffect(() => { cancelRef.current?.focus() }, [])
 
@@ -34,11 +32,9 @@ export function DeleteConfirmInline({ message, cancelLabel, confirmLabel, isPend
                 </button>
                 <button
                     type="button"
-                    disabled={isPending}
                     onClick={onConfirm}
-                    className="flex h-[30px] items-center justify-center gap-2 rounded-lg bg-[hsl(var(--destructive))] text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-70"
+                    className="flex h-[30px] items-center justify-center rounded-lg bg-[hsl(var(--destructive))] text-[13px] font-medium text-white transition-opacity hover:opacity-90"
                 >
-                    {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                     {confirmLabel}
                 </button>
             </div>
