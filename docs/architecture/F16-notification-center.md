@@ -6,22 +6,38 @@
 
 ## 1. Overview
 
-Tài liệu này mô tả kiến trúc kỹ thuật cho tính năng Notification Center (F16). Bao gồm UI Dropdown trên thanh Navigation, hệ thống Badge để đếm số lượng thông báo chưa đọc, Popup/Toast xuất hiện realtime ở góc màn hình, và tích hợp Push Notification API trên trình duyệt Desktop. Hệ thống sử dụng cơ chế Server-Sent Events (SSE) hoặc WebSocket/Polling để nhận data realtime từ backend.
+Tài liệu này mô tả kiến trúc kỹ thuật cho tính năng Notification Center (F16). Bao gồm UI Dropdown trên thanh Navigation, hệ thống Badge để đếm số lượng thông báo chưa đọc, Popup/Toast xuất hiện realtime ở góc màn hình, và tích hợp Push Notification API trên trình duyệt Desktop. Realtime được giao bằng **Firebase Realtime Database làm "chuông báo" (signal-only)**: server ghi tín hiệu rất nhỏ, client nhận tín hiệu rồi gọi `GET /api/notifications` để lấy dữ liệu (xem §2a). Không còn polling định kỳ khi Firebase hoạt động (#1972).
 
 ## 2. System Context
 
 ```mermaid
 graph TD
-    A[System Event: Order/Admin Broadcast] --> B(Backend Notification Service)
-    B --> C[(Database - notifications)]
-    B -->|Realtime Trigger| D(WebSocket / SSE / FCM)
-    D --> E[Frontend Client]
-    
+    A[System Event: Order/Blog/Stock/Broadcast] --> B(runAfterResponse → notifyTenantOwners)
+    B --> C[(Postgres - notifications)]
+    B -->|1. signal ~1 HTTP call| R[(Firebase RTDB pw2/env/u/userId)]
+    B -->|2. Web Push| P[Service Worker]
+    R -->|onValue| E[Frontend NotificationProvider]
+    P -->|postMessage| E
+    E -->|HTTP GET /api/notifications?since=| C
     E -->|If online & tab active| F[Update Bell Badge & Show Live Popup]
-    E -->|If online & tab inactive| G[Native PC Browser Push]
-    
-    E -->|HTTP GET /api/notifications| B
+    P -->|tab closed| G[Native PC Browser Push]
 ```
+
+## 2a. Realtime delivery — Firebase RTDB signal (#1972)
+
+| Mảnh | Chi tiết |
+|------|---------|
+| Nguyên tắc | Postgres là nguồn sự thật. RTDB chỉ chứa `{at: serverTimestamp}` (không title/message/tenant/PII). |
+| Server ghi | `signalNotificationUsers(ids)` = 1 `PATCH pw2/{env}/u.json` (REST + access token service account); `signalNotificationBroadcast()` = `PUT pw2/{env}/broadcast.json`. Không bao giờ throw; Firebase lỗi chỉ log. |
+| Thứ tự | `notifyTenantOwners`: tạo rows (`context.skipPush`) → **signal** → **push** (timeout 5s). Push không chạy trong transaction của create (tránh cạn pool 25 conn). |
+| Chạy nền | Producer bọc `runAfterResponse()` (`after()` của Next, fallback chạy ngay ngoài request scope). Task không giữ `req`. ORDER_NEW kiểm tra đơn còn tồn tại (checkout có thể xoá đơn). |
+| Auth client | `GET /api/notifications/firebase-token` → custom token uid `pw2_{env}_{userId}` + config web + path cần nghe. `signInWithCustomToken`, `inMemoryPersistence` (đổi user trong cùng trình duyệt không dính session cũ). |
+| Rules | `firebase/pw2-database-rules.json`: chỉ đọc node của chính uid; broadcast đọc được bởi uid cùng env; không ai ghi từ client. |
+| `env` | `VERCEL_TARGET_ENV` (staging/production/preview), fallback `development`. |
+| Client | `useNotificationSignal` + `NotificationProvider`: fetch khi mount / tín hiệu / tab hiện lại / online / Firebase reconnect; tab ẩn không fetch (đánh dấu dirty); debounce 1s, giãn ≥3s; broadcast có jitter 0–5s; watermark `since` = `createdAt` server − 5s; push + signal dùng chung `seenIds` (1 toast/noti). |
+| Fallback | `enabled:false` / lỗi token / permission denied / 15s không connect → poll 60s (tạm dừng khi tab ẩn). Dừng khi Firebase connected lại. |
+| Env (server-only) | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_DATABASE_URL`, `FIREBASE_WEB_API_KEY`. Để trống = tắt, rollback = xoá env + redeploy. Cách lấy key: `docs/runbooks/f16-firebase-notification-keys.md`. |
+| Đã loại bỏ | Trigger `pg_notify('notification_channel')` (không có listener trên Neon + serverless) — migration `notifications.drop_pg_notify_trigger`. |
 
 ## 3. Component Tree
 
@@ -150,7 +166,7 @@ Response (success):
 ## 12. Migration / Rollback Plan
 
 - **Migration**: 
-  1. Frontend support fallback (Polling mỗi 5s) nếu Websocket chưa sẵn sàng.
+  1. Frontend fallback poll 60s khi Firebase chưa cấu hình/không khả dụng (xem §2a).
   2. Implement backend Notification Table + Service CRUD.
   3. Emit trigger ở các module F10, F15 sang module Notification.
 - **Rollback**: Disable feature toggle hiển thị icon `🔔` ở Header. API không bị ảnh hưởng.

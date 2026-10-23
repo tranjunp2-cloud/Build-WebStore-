@@ -15,6 +15,12 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F16 — Realtime notification qua Firebase RTDB signal, bỏ polling (GH-1972)
+
+- **Realtime:** server ghi "chuông báo" `{at}` lên Firebase RTDB (`pw2/{env}/u/{userId}`, `pw2/{env}/broadcast`); client nghe rồi gọi `GET /api/notifications`. Bỏ vòng poll 15s/60s; chỉ poll 60s khi Firebase tắt/lỗi. Auth bằng custom token (`/api/notifications/firebase-token`), rules `firebase/pw2-database-rules.json`.
+- **Độ tin cậy trên Vercel:** producer chạy trong `after()` (`runAfterResponse`); signal gửi trước push; push không còn chạy trong transaction của create; ORDER_NEW bỏ qua đơn đã bị checkout xoá.
+- **Dọn dẹp:** gỡ trigger `pg_notify` không có listener (`notifications.drop_pg_notify_trigger`). Env mới (server-only): `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_DATABASE_URL`, `FIREBASE_WEB_API_KEY`. Tests: TC-F16.45–.57.
+
 ### F23 — Sync Store Owner avatar from SSO (US-F23-05, GH-1723)
 
 - **Owner avatar is SSO-owned:** `POST /api/users/me/avatar` now returns 403 for Owners and the `users.avatar` field denies Owner updates through REST/GraphQL (`canUpdateAvatarField`). Staff upload is unchanged. TC-F23-SSO-10.

@@ -1,4 +1,6 @@
 import type { Payload } from 'payload'
+import { signalNotificationUsers } from './signal-notification'
+import { sendPushToUser } from './send-push'
 
 type NotificationType = 'ORDER_NEW' | 'SYSTEM_ALERT' | 'PRODUCT_LOW_STOCK' | 'BLOG_PUBLISHED'
 
@@ -99,7 +101,12 @@ export async function notifyTenantOwners(
     // allSettled, not all: a concurrent insert that loses the unique-index race
     // rejects for that one row — we swallow it (the row already exists) instead
     // of failing the whole batch.
-    await Promise.allSettled(
+    //
+    // `skipPush`: the Notifications afterChange hook runs INSIDE the create
+    // transaction; awaiting web-push there would hold a pooled connection while
+    // sendPushToUser asks for a second one (pool max 25 → deadlock under load).
+    // We send the realtime signal first (1 request), then push once rows are committed.
+    const results = await Promise.allSettled(
         recipients.map((user) =>
             payload.create({
                 collection: 'notifications',
@@ -115,7 +122,32 @@ export async function notifyTenantOwners(
                     isRead: false,
                     expiresAt,
                 },
+                context: { skipPush: true },
             }),
+        ),
+    )
+
+    const created = results.flatMap((r, i) =>
+        r.status === 'fulfilled' ? [{ user: recipients[i], doc: r.value }] : [],
+    )
+    if (created.length === 0) return
+
+    await signalNotificationUsers(created.map((c) => c.user.id))
+
+    await Promise.allSettled(
+        created.map(({ user, doc }) =>
+            sendPushToUser(
+                user.id,
+                tenantId,
+                {
+                    id: String(doc.id),
+                    title: data.title,
+                    body: data.message || undefined,
+                    tag: data.type,
+                    actionUrl: data.actionUrl || undefined,
+                },
+                payload,
+            ).catch((err) => console.error('[Push] send failed', err)),
         ),
     )
 }

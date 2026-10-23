@@ -27,6 +27,8 @@ const BUILT_IN_VARS = new Set([
     'NEXT_PUBLIC_PLATFORM_DOMAIN',
     'DATABASE_URI', 'DATABASE_URL',
     'NEXT_RUNTIME', 'NEXT_PHASE', 'npm_lifecycle_event',
+    // Vercel system vars (set by the platform, not by us).
+    'VERCEL_TARGET_ENV',
     '__NEXT_PRIVATE_PREBUNDLED_REACT',
     'BASE_URL', 'TEST_EMAIL', 'TEST_PASSWORD', 'HEADLESS',
     // Local dev override for Xendit webhook URL (ngrok/Cloudflare tunnel).

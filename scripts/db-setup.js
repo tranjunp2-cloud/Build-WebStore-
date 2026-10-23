@@ -2472,29 +2472,13 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
     name: 'notifications.updated_at',
     sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();`,
   },
-  // pg LISTEN/NOTIFY trigger — SSE realtime bridge
+  // pg LISTEN/NOTIFY trigger removed (#1972): nothing LISTENs on Neon + Vercel serverless.
+  // Realtime now goes through the Firebase RTDB signal (src/lib/notifications/signal-notification.ts).
+  // Trigger first, then the function it depends on. IF EXISTS keeps fresh DBs a no-op.
   {
-    name: 'notifications.notify_fn',
-    sql: `CREATE OR REPLACE FUNCTION notify_new_notification()
-      RETURNS trigger AS $$
-      BEGIN
-        PERFORM pg_notify(
-          'notification_channel',
-          json_build_object(
-            'userId', NEW.user_id,
-            'tenantId', NEW.tenant_id,
-            'id', NEW.id
-          )::text
-        );
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;`,
-  },
-  {
-    name: 'notifications.notify_trigger',
-    sql: `CREATE OR REPLACE TRIGGER after_notification_insert
-      AFTER INSERT ON notifications
-      FOR EACH ROW EXECUTE FUNCTION notify_new_notification();`,
+    name: 'notifications.drop_pg_notify_trigger',
+    sql: `DROP TRIGGER IF EXISTS after_notification_insert ON notifications;
+      DROP FUNCTION IF EXISTS notify_new_notification();`,
   },
   // ── F16-07: Push Subscriptions table ──────────────────────────────────────
   {

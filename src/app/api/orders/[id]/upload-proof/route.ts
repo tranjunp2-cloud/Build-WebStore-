@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { verifyOrderToken } from '@/lib/auth/order-token'
 import { notifyTenantOwners } from '@/lib/notifications/notify-tenant-owners'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
 
 const UPLOADABLE_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
 
@@ -92,19 +93,21 @@ export async function POST(
     }
 
     const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
-    notifyTenantOwners(payload, tenantId, {
-        type: 'ORDER_NEW',
-        title: `Payment Proof Uploaded — Order #${order.orderNumber}`,
-        message: `${order.customerName} submitted payment proof for order #${order.orderNumber}`,
-        actionUrl: '/orders',
-        metadata: {
-            orderNumber: order.orderNumber,
-            currency: order.currency ?? 'MYR',
-            total: String(order.total ?? 0),
-            customerName: order.customerName,
-        },
-        dedupeKey: `PROOF_UPLOADED:${order.orderNumber}`,
-    }).catch((err) => console.error('[upload-proof] notify failed', err))
+    runAfterResponse('upload-proof notify', async () => {
+        await notifyTenantOwners(payload, tenantId, {
+            type: 'ORDER_NEW',
+            title: `Payment Proof Uploaded — Order #${order.orderNumber}`,
+            message: `${order.customerName} submitted payment proof for order #${order.orderNumber}`,
+            actionUrl: '/orders',
+            metadata: {
+                orderNumber: order.orderNumber,
+                currency: order.currency ?? 'MYR',
+                total: String(order.total ?? 0),
+                customerName: order.customerName,
+            },
+            dedupeKey: `PROOF_UPLOADED:${order.orderNumber}`,
+        })
+    })
 
     return NextResponse.json({ success: true, data: { paymentStatus: 'pending_verification' } })
 }

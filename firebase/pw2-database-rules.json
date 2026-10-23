@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "pw2": {
+      "$env": {
+        "u": {
+          "$userId": {
+            ".read": "auth != null && auth.uid === 'pw2_' + $env + '_' + $userId",
+            ".write": false
+          }
+        },
+        "broadcast": {
+          ".read": "auth != null && auth.uid.beginsWith('pw2_' + $env + '_')",
+          ".write": false
+        }
+      }
+    }
+  }
+}

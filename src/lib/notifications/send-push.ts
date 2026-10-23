@@ -79,7 +79,7 @@ export async function sendPushToUser(
         }
 
         try {
-          await webpush.sendNotification(subscription, pushData)
+          await webpush.sendNotification(subscription, pushData, { timeout: 5000 })
           sent++
         } catch (err: unknown) {
           const statusCode = (err as { statusCode?: number }).statusCode
