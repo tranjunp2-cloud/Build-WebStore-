@@ -36,7 +36,7 @@ graph TD
 | `env` | `VERCEL_TARGET_ENV` (staging/production/preview), fallback `development`. |
 | Client | `useNotificationSignal` + `NotificationProvider`: fetch khi mount / tín hiệu / tab hiện lại / online / Firebase reconnect; tab ẩn không fetch (đánh dấu dirty); debounce 1s, giãn ≥3s; broadcast có jitter 0–5s; watermark `since` = `createdAt` server − 5s; push + signal dùng chung `seenIds` (1 toast/noti). |
 | Fallback | `enabled:false` / lỗi token / permission denied / 15s không connect → poll 60s (tạm dừng khi tab ẩn). Dừng khi Firebase connected lại. |
-| Env (server-only) | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_DATABASE_URL`, `FIREBASE_WEB_API_KEY`. Để trống = tắt, rollback = xoá env + redeploy. |
+| Env (server-only) | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_DATABASE_URL`, `FIREBASE_WEB_API_KEY`. Để trống = tắt, rollback = xoá env + redeploy. Cách lấy key: `docs/runbooks/f16-firebase-notification-keys.md`. |
 | Đã loại bỏ | Trigger `pg_notify('notification_channel')` (không có listener trên Neon + serverless) — migration `notifications.drop_pg_notify_trigger`. |
 
 ## 3. Component Tree
