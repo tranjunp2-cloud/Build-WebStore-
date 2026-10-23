@@ -16,6 +16,16 @@ export const pw1PlaceholderFilename = (tenantId: number | string, url: string) =
 /** An older migrate build stored the neutral placeholder under the plain media name (no `-placeholder` suffix); it is told apart by its exact 960x640 size and byte count. `$1` is `pw1-<tenant>-%`. */
 export const PLACEHOLDER_MEDIA_WHERE = `filename LIKE $1 AND (filename LIKE '%-placeholder.jpg' OR (width = 960 AND height = 640 AND filesize = 9447))`
 export const placeholderMediaPattern = (tenantId: number | string) => `pw1-${tenantId}-%`
+/**
+ * A media row holding the neutral placeholder: named `-placeholder` or (older builds) the plain name with the exact
+ * placeholder size. restorePw1Media returns such a row when the source still cannot be used (HTTP 403, a video, bytes
+ * that do not decode), so the repair must count it as broken instead of pointing the site at another placeholder.
+ */
+export function isPlaceholderMedia(media: { filename?: string | null; width?: unknown; height?: unknown; filesize?: unknown }): boolean {
+    if (media.filename?.endsWith('-placeholder.jpg')) return true
+    return Number(media.width) === 960 && Number(media.height) === 640 && Number(media.filesize) === 9447
+}
+
 /** The names a placeholder for this source URL can have, newest naming first. */
 export const pw1PlaceholderNames = (tenantId: number | string, url: string) => [pw1PlaceholderFilename(tenantId, url), pw1MediaFilename(tenantId, url)]
 
