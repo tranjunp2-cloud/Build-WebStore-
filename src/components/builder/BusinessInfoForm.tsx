@@ -3,7 +3,7 @@
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Pencil, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { BuilderField } from '@/components/builder/fields/BuilderField'
 import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
 import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
@@ -374,6 +374,9 @@ export default function BusinessInfoForm({
 
     // ── Render ───────────────────────────────────────────────────────────
 
+    // Hidden: this was the only tab left (the URL import tab is already hidden) and it did nothing.
+    // Restore together with `Pencil` in the lucide-react import and `{toggleTabs}` in `leftBody`.
+    /*
     const toggleTabs = (
         <div className="mb-6 flex" role="tablist" aria-label="Input method selection">
             <button
@@ -389,6 +392,7 @@ export default function BusinessInfoForm({
             </button>
         </div>
     )
+    */
 
     const urlInputSection = (
         <div id="panel-url" role="tabpanel" aria-labelledby="tab-url">
@@ -631,7 +635,7 @@ export default function BusinessInfoForm({
 
     const leftBody = (
         <>
-            {toggleTabs}
+            {/* {toggleTabs} */}
             {formFields}
         </>
     )
