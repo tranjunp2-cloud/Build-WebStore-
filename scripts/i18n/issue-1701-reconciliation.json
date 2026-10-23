@@ -85,6 +85,26 @@
       {
         "key": "help.qna.categories.aDashboardSeo",
         "reason": "The live help answer must match the staging CTA label AI Fix Issues; the CSV still references the removed AI Fix All Issues label."
+      },
+      {
+        "key": "editor.pageManager.deleteSuccess",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "editor.pageManager.pageNamePlaceholder",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "editor.pageManager.pageCreated",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "editor.pageManager.pageHidden",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "editor.pageManager.restored",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
       }
     ],
     "sourceContentConflictHold": [
@@ -272,6 +292,27 @@
       "keys": [
         "dashboard.blog.editor.blog",
         "dashboard.blog.editor.home"
+      ]
+    },
+    {
+      "classification": "superseded_context",
+      "evidenceCommit": "efee2d8e8",
+      "replacementPaths": [
+        "editor.pageManager.createPage",
+        "editor.pageManager.deleteInlineConfirm",
+        "editor.pageManager.hiddenBadge",
+        "editor.pageManager.pageShown",
+        "editor.pageManager.urlPreview"
+      ],
+      "reason": "Pages panel redesign (GH-1984) replaced the visible/hidden labels, slug preview, Create button, and delete confirm dialog with icon actions, status badges, a URL preview line, and an inline delete confirm.",
+      "keys": [
+        "editor.pageManager.create",
+        "editor.pageManager.deleteConfirmDesc",
+        "editor.pageManager.deleteConfirmMsg",
+        "editor.pageManager.deleteConfirmTitle",
+        "editor.pageManager.hidden",
+        "editor.pageManager.slugPreview",
+        "editor.pageManager.visible"
       ]
     },
     {
@@ -734,7 +775,12 @@
       "help.modules.data.blog.steps": { "valueType": "array", "en": "52a3243650f99b36a68dcaa9375be20865d94811147f5e61df454046b73ef983", "ms": "dc8c101526e2ca215628ec9e18b0667ca2b4435cdf038c8a6bf1797ba9ed116f" },
       "help.modules.data.builder.steps": { "valueType": "array", "en": "fb2d3b81fc6d7d1bd51b4460d32da8291fb459fc9ce736bfb8339e69094e4213", "ms": "80f492d9efdab47eac0e0b5f1cfbe02f0438a7b7c7e48977901a58c5bff76ad5" },
       "help.modules.data.dashboard.steps": { "valueType": "array", "en": "7e719c312b51582eb0132d8557abf3fddbc57190e92f80d286113176a5e2763a", "ms": "e43bb2ae9a380c7c997fe2d43f2d8e0b98a94b78e4434ae0eec54be6de0ba4a3" },
-      "help.modules.data.settings.steps": { "valueType": "array", "en": "7318bb2e9ba20d1beacbb48e49e4bbf83ce21e92e7c5381fda8a6fec1cff8172", "ms": "f586be55c2da900edb31a3eebca609c8ecacc9fd8199c9e864cca9090393dc72" }
+      "help.modules.data.settings.steps": { "valueType": "array", "en": "7318bb2e9ba20d1beacbb48e49e4bbf83ce21e92e7c5381fda8a6fec1cff8172", "ms": "f586be55c2da900edb31a3eebca609c8ecacc9fd8199c9e864cca9090393dc72" },
+      "editor.pageManager.deleteSuccess": { "valueType": "scalar", "en": "83d48c3fe3ec9728e76e345e2ce123b01aac9dbc2be3cc805edb7bf04f373f12", "ms": "a64fbfee2cd38b78d7b029cbf93afcd2add6d8a41c01eb2e5e940d3bfffa620e" },
+      "editor.pageManager.pageNamePlaceholder": { "valueType": "scalar", "en": "51cc0a6fafce4327577059afabe1abb1f3617601bcec4458443bd7742ab2c356", "ms": "3869c9c2e4688e87c36968636b1b27b33ea3d1ba4d6b2bfdc659257b4c8d1202" },
+      "editor.pageManager.pageCreated": { "valueType": "scalar", "en": "f8a7e1c23f6c71097d22d1eaf97ca83e5b13a5a2fe83d3aef271d2f8c39e2d21", "ms": "41ea8e606e2b37415a313b279025e6f6ee0031fc52ff919ade64dc5a0676e16a" },
+      "editor.pageManager.pageHidden": { "valueType": "scalar", "en": "02758b3e22bbf4d00bfd3a37aa9861f3beec136c31a2f2c91e3c98bed6b7f0b1", "ms": "963217fb1e99d5e6b156e9134b9e1f9ac619269265d720bc5ff3596433028bc6" },
+      "editor.pageManager.restored": { "valueType": "scalar", "en": "208fd4f2a2257e334044150d0999e6a57586c65dab1a1faaf93469dea437df98", "ms": "db4d2ac577f73742c220aa036c89ecad5cae3026e4fb721463869d0a1281b32d" }
     }
   },
   "contractOverrides": [
