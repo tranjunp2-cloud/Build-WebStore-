@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PLACEHOLDER_MEDIA_WHERE, placeholderCandidates, placeholderMediaPattern, pw1MediaFilename, pw1PlaceholderFilename, sourceUrls } from '@/lib/migration/pw1-placeholder-image-repair'
-import { repointMedia } from '@/lib/migration/pw1-media-repoint'
+import { isMediaReferenced, repointMedia } from '@/lib/migration/pw1-media-repoint'
 
 const URL_A = 'https://pw1.test/a.jpg'
 const URL_B = 'https://pw1.test/b.jpg'
@@ -43,5 +43,20 @@ describe('pw1 placeholder image repair', () => {
         const query = vi.fn(async () => ({ rows: [], rowCount: 0 }))
         await repointMedia(query as never, { id: 1, url: '/m/a.jpg' }, { id: 2, url: '/m/a.jpg' })
         expect(query).toHaveBeenCalledTimes(1)
+    })
+    it('reports a placeholder still used through a foreign key or a copied URL, and not one already repointed', async () => {
+        const schema = (text: string) => {
+            if (text.includes('pg_constraint')) return { rows: [{ tbl: 'pages_blocks_hero', col: 'image_id' }], rowCount: 1 }
+            if (text.includes('information_schema')) return { rows: [{ table_name: 'pages_blocks_hero', column_name: 'slides', data_type: 'jsonb' }], rowCount: 1 }
+            return undefined
+        }
+        const byKey = vi.fn(async (text: string) => schema(text) ?? (text.includes('"image_id" = $1') ? { rows: [{}], rowCount: 1 } : { rows: [], rowCount: 0 }))
+        expect(await isMediaReferenced(byKey as never, { id: 1, url: '/m/old.png' })).toBe(true)
+        expect(byKey).toHaveBeenCalledWith('SELECT 1 FROM pages_blocks_hero WHERE "image_id" = $1 LIMIT 1', [1])
+        const byUrl = vi.fn(async (text: string) => schema(text) ?? (text.includes('"slides"::text LIKE') ? { rows: [{}], rowCount: 1 } : { rows: [], rowCount: 0 }))
+        expect(await isMediaReferenced(byUrl as never, { id: 1, url: '/m/old.png' })).toBe(true)
+        const unused = vi.fn(async (text: string) => schema(text) ?? { rows: [], rowCount: 0 })
+        expect(await isMediaReferenced(unused as never, { id: 1, url: '/m/old.png' })).toBe(false)
+        expect(await isMediaReferenced(unused as never, { id: 1, url: null })).toBe(false)
     })
 })

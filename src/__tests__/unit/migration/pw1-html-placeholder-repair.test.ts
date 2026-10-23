@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { htmlImageUrls, htmlPlaceholders, swapHtmlImageSource, swapImageSource } from '@/lib/migration/pw1-html-placeholder-repair'
+import { htmlImageUrls, htmlPlaceholders, isHtmlImageInUse, swapHtmlImageSource, swapImageSource } from '@/lib/migration/pw1-html-placeholder-repair'
 import { pw1MediaFilename, pw1PlaceholderFilename } from '@/lib/migration/pw1-placeholder-image-repair'
 import { isPw1StorageUrl } from '@/lib/migration/pw1-image-origin'
 
@@ -74,6 +74,15 @@ describe('[TC-F35.M75] swapHtmlImageSource', () => {
         expect(calls[1].params).toEqual(['b1', swapImageSource(block.html, 'https://s.example/p.jpg', THIRD_PARTY), block.html])
         expect(calls[1].text).toContain('AND html = $3')
         expect(calls[2].params).toEqual([7, 'https://s.example/p.jpg', THIRD_PARTY.replace(/&/g, '&amp;')])
+    })
+    it('tells whether a rich-text block of the site still shows the copy (a rerun skips swapped images)', async () => {
+        const calls: Array<{ text: string; params?: unknown[] }> = []
+        const shown = (async (text: string, params?: unknown[]) => { calls.push({ text, params }); return { rows: [{}], rowCount: 1 } }) as never
+        expect(await isHtmlImageInUse(shown, 55, 'https://s.example/p.jpg')).toBe(true)
+        expect(calls[0].params).toEqual([55, 'https://s.example/p.jpg'])
+        expect(calls[0].text).toContain('p.site_id = $1 AND strpos(b.html, $2) > 0')
+        const gone = (async () => ({ rows: [], rowCount: 0 })) as never
+        expect(await isHtmlImageInUse(gone, 55, 'https://s.example/p.jpg')).toBe(false)
     })
     it('does nothing when no block shows the placeholder', async () => {
         const query = (async () => ({ rows: [], rowCount: 0 })) as never

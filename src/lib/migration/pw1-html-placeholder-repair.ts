@@ -42,6 +42,14 @@ export const swapImageSource = (html: string, from: string, to: string) => html.
 
 export type HtmlBlockRow = { id: string; page_id: number; html: string }
 
+/** Whether a rich-text block of the site still shows this image URL; once swapped back, a rerun has nothing to repair. */
+export async function isHtmlImageInUse(query: Query, siteId: number, url: string): Promise<boolean> {
+    const { rows } = await query(
+        `SELECT 1 FROM pages_blocks_custom_html b JOIN pages p ON p.id = b._parent_id
+         WHERE p.site_id = $1 AND strpos(b.html, $2) > 0 LIMIT 1`, [siteId, url])
+    return rows.length > 0
+}
+
 /**
  * Replaces one image URL in the html of a site's blocks and in the draft versions of those pages.
  * Only that URL changes, so edits elsewhere in the block survive; a block edited since the read is skipped.
