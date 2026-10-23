@@ -8,6 +8,14 @@ import { ToastContainer } from '@/components/notifications/ToastContainer'
 import { useNotificationStore } from '@/store/notificationStore'
 import { I18nProvider } from '@/i18n'
 
+// Firebase doorbell is simulated: tests ring it via `ring()` instead of connecting.
+type SignalHandlers = { onSignal: () => void; onModeChange: (m: 'live' | 'fallback') => void }
+let signalHandlers: SignalHandlers
+vi.mock('@/hooks/use-notification-signal', () => ({
+    useNotificationSignal: (h: SignalHandlers) => { signalHandlers = h },
+}))
+const ring = () => signalHandlers.onSignal()
+
 // ── Mocks ────────────────────────────────────────────────────────────────
 
 let fetchResponse: { unreadCount: number; items: Array<{ id: string; title: string; type?: string; message?: string }> } = {
@@ -41,7 +49,7 @@ async function advanceAndFlush(ms: number) {
 
 // ── Tests ────────────────────────────────────────────────────────────────
 
-describe('[TC-F16.06] Live Toast Polling Delivery', () => {
+describe('[TC-F16.06] Live Toast Delivery (Firebase signal)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.useFakeTimers({ shouldAdvanceTime: true })
@@ -65,14 +73,15 @@ describe('[TC-F16.06] Live Toast Polling Delivery', () => {
         vi.restoreAllMocks()
     })
 
-    it('displays a single toast when polling detects new notification', async () => {
+    it('displays a single toast when a signal-sync detects a new notification', async () => {
         renderLiveToastFeature()
 
-        // Initial poll — seed seen IDs with empty set
+        // Initial sync — seed seen IDs with empty set
         await advanceAndFlush(100)
+        act(() => signalHandlers.onModeChange('live'))
         expect(useNotificationStore.getState().unreadCount).toBe(0)
 
-        // Simulate new notification appearing on next poll
+        // New notification appears; the server rings the doorbell
         setupFetchMock({
             unreadCount: 1,
             items: [{
@@ -82,9 +91,8 @@ describe('[TC-F16.06] Live Toast Polling Delivery', () => {
                 message: 'You have a new order',
             }],
         })
-
-        // Advance past poll interval (15s for non-push-granted in jsdom)
-        await advanceAndFlush(16_000)
+        act(() => ring())
+        await advanceAndFlush(3_000)
 
         expect(useNotificationStore.getState().unreadCount).toBe(1)
         expect(screen.getByText('New Order #1024')).toBeInTheDocument()
@@ -93,10 +101,11 @@ describe('[TC-F16.06] Live Toast Polling Delivery', () => {
     it('groups multiple new notifications into burst toast', async () => {
         renderLiveToastFeature()
 
-        // Initial poll
+        // Initial sync
         await advanceAndFlush(100)
+        act(() => signalHandlers.onModeChange('live'))
 
-        // Next poll returns 3 new notifications
+        // Next sync returns 3 new notifications
         setupFetchMock({
             unreadCount: 3,
             items: [
@@ -106,13 +115,14 @@ describe('[TC-F16.06] Live Toast Polling Delivery', () => {
             ],
         })
 
-        await advanceAndFlush(16_000)
+        act(() => ring())
+        await advanceAndFlush(3_000)
 
         expect(useNotificationStore.getState().unreadCount).toBe(3)
         expect(screen.getByText('3 new notifications')).toBeInTheDocument()
     })
 
-    it('polls using fetch, not EventSource', async () => {
+    it('syncs using fetch, not EventSource', async () => {
         renderLiveToastFeature()
 
         await advanceAndFlush(100)

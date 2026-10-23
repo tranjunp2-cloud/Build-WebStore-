@@ -3,32 +3,28 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useNotificationStore } from '@/store/notificationStore'
 import { useI18n } from '@/i18n'
+import { useNotificationSignal, type SignalMode } from '@/hooks/use-notification-signal'
 import type { NotificationsResponse } from '@/types/notification'
 
-// Adaptive polling: fast for users without push, slow for users with push
-const POLL_FAST_MS = 15_000   // No push subscription → poll frequently
-const POLL_SLOW_MS = 60_000   // Has push → poll only for badge sync
-const POLL_BACKOFF_MAX_MS = 120_000
-const POLL_ERROR_MULTIPLIER = 2
+const SYNC_LIMIT = 50
+const SINCE_OVERLAP_MS = 5_000       // re-read a little history; seenIds dedupes
+const DEBOUNCE_MS = 1_000            // coalesce signal bursts
+const MIN_GAP_MS = 3_000             // protect the 60/min API rate limit across tabs/devices
+const BROADCAST_JITTER_MS = 5_000    // spread thundering herd after a broadcast
+const STALE_MS = 60_000              // refetch on tab focus if older than this
+const FALLBACK_POLL_MS = 60_000      // only when Firebase is unavailable
 const SEEN_IDS_MAX = 200
 
-function getBasePollInterval(): number {
-    if (typeof window === 'undefined') return POLL_FAST_MS
-    // If user granted push permission, push handles real-time → slow poll
-    if ('Notification' in window && Notification.permission === 'granted') return POLL_SLOW_MS
-    return POLL_FAST_MS
-}
-
 /**
- * Headless provider that:
- *  1. Listens for push messages from Service Worker (real-time, < 2s)
- *  2. Falls back to polling /api/notifications every 60s (badge sync)
+ * Headless provider that keeps the unread badge + toasts in sync.
  *
- * Push path: SW receives push → postMessage → this provider → emit toast + sync badge
- * Poll path: fetch /api/notifications?since=... → update badge + detect new items (if no push)
+ *  - Firebase RTDB "doorbell" (useNotificationSignal): server rings → we GET /api/notifications.
+ *  - Service Worker push messages: instant toast when the OS push arrives.
+ *  - Fetch also on mount, tab visible, network back, Firebase reconnect.
+ *  - NO interval polling while Firebase is live; 60s polling only as a fallback
+ *    when Firebase is off / unreachable / denied.
  *
- * Pauses polling when tab is hidden (Visibility API).
- * Resumes immediately on tab focus or network recovery.
+ * Hidden tabs never fetch: they mark themselves dirty and refresh when shown again.
  */
 export function NotificationProvider() {
     const { setUnreadCount } = useNotificationStore()
@@ -39,158 +35,174 @@ export function NotificationProvider() {
     tRef.current = t
     tiRef.current = ti
 
-    const lastPollRef = useRef<string>(new Date().toISOString())
-    const intervalRef = useRef(getBasePollInterval())
     const abortRef = useRef<AbortController | null>(null)
-    const pendingPollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-    // Track seen notification IDs to detect genuinely new items
+    const newestCreatedAtRef = useRef<string | null>(null) // server clock, never client's
     const seenIdsRef = useRef<Set<string>>(new Set())
-    const initialPollDoneRef = useRef(false)
+    const initialDoneRef = useRef(false)
+    const dirtyRef = useRef(false)
+    const stoppedRef = useRef(false)          // 401: session gone
+    const lastSyncAtRef = useRef(0)
+    const blockedUntilRef = useRef(0)         // 429 Retry-After
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const jitterTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
+    const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const modeRef = useRef<SignalMode | 'unknown'>('unknown')
 
     const emitToast = useCallback((detail: { id: string; title: string; type?: string; message?: string }) => {
         window.dispatchEvent(new CustomEvent('notification-toast', { detail }))
     }, [])
 
-    // Lightweight poll: sync badge count + detect new items (fallback for no-push browsers)
-    const poll = useCallback(async () => {
-        if (abortRef.current) abortRef.current.abort()
+    const markSeen = useCallback((id: string) => {
+        const seen = seenIdsRef.current
+        seen.add(id)
+        if (seen.size > SEEN_IDS_MAX) {
+            seenIdsRef.current = new Set([...seen].slice(-SEEN_IDS_MAX / 2))
+        }
+    }, [])
+
+    const sync = useCallback(async () => {
+        if (stoppedRef.current) return
+        abortRef.current?.abort()
         const controller = new AbortController()
         abortRef.current = controller
+        dirtyRef.current = false
+        lastSyncAtRef.current = Date.now()
 
         try {
-            const since = encodeURIComponent(lastPollRef.current)
-            const res = await fetch(`/api/notifications?since=${since}`, {
-                signal: controller.signal,
-            })
-
+            const params = new URLSearchParams({ limit: String(SYNC_LIMIT) })
+            if (newestCreatedAtRef.current) {
+                const since = new Date(Date.parse(newestCreatedAtRef.current) - SINCE_OVERLAP_MS)
+                params.set('since', since.toISOString())
+            }
+            const res = await fetch(`/api/notifications?${params}`, { signal: controller.signal })
+            if (res.status === 401) { stoppedRef.current = true; return }
+            if (res.status === 429) {
+                const wait = Number(res.headers.get('Retry-After')) || 30
+                blockedUntilRef.current = Date.now() + wait * 1000
+                dirtyRef.current = true
+                return
+            }
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
             const data = (await res.json()) as NotificationsResponse
             const items = data.items ?? []
-            const serverUnread = data.unreadCount ?? 0
+            setUnreadCount(data.unreadCount ?? 0)
 
-            setUnreadCount(serverUnread)
-
-            if (!initialPollDoneRef.current) {
-                // First poll: seed seen IDs, don't toast
-                for (const item of items) seenIdsRef.current.add(item.id)
-                initialPollDoneRef.current = true
-            } else {
-                // Subsequent polls: toast genuinely new items (fallback if push missed)
-                const newItems = items.filter((item) => !seenIdsRef.current.has(item.id))
-                for (const item of items) seenIdsRef.current.add(item.id)
-
-                // Cap seen IDs to prevent unbounded memory growth in long sessions
-                if (seenIdsRef.current.size > SEEN_IDS_MAX) {
-                    const arr = [...seenIdsRef.current]
-                    seenIdsRef.current = new Set(arr.slice(-SEEN_IDS_MAX / 2))
-                    // Advance watermark so evicted IDs are not re-fetched by next poll
-                    lastPollRef.current = new Date().toISOString()
-                }
-
-                if (newItems.length > 0) {
-                    if (newItems.length === 1) {
-                        const item = newItems[0]
-                        emitToast({ id: item.id, title: item.title, type: item.type, message: item.message })
-                    } else {
-                        const title = tiRef.current(tRef.current.notifications.toast.newCount, {
-                            count: newItems.length,
-                        })
-                        emitToast({ id: `burst-${Date.now()}`, title, type: 'BURST' })
-                    }
+            for (const item of items) {
+                if (item.createdAt && (!newestCreatedAtRef.current || item.createdAt > newestCreatedAtRef.current)) {
+                    newestCreatedAtRef.current = item.createdAt
                 }
             }
 
-            lastPollRef.current = new Date().toISOString()
-            intervalRef.current = getBasePollInterval()
+            // Only genuinely new AND still-unread items toast (first sync just seeds).
+            const fresh = initialDoneRef.current
+                ? items.filter((i) => !seenIdsRef.current.has(i.id) && !i.isRead)
+                : []
+            for (const item of items) markSeen(item.id)
+            initialDoneRef.current = true
+
+            if (fresh.length === 1) {
+                const item = fresh[0]
+                emitToast({ id: item.id, title: item.title, type: item.type, message: item.message })
+            } else if (fresh.length > 1) {
+                const title = tiRef.current(tRef.current.notifications.toast.newCount, { count: fresh.length })
+                emitToast({ id: `burst-${Date.now()}`, title, type: 'BURST' })
+            }
         } catch (err) {
             if ((err as Error).name === 'AbortError') return
-            intervalRef.current = Math.min(
-                intervalRef.current * POLL_ERROR_MULTIPLIER,
-                POLL_BACKOFF_MAX_MS,
-            )
+            dirtyRef.current = true // retry on next focus / online / reconnect / fallback tick
         }
-    }, [setUnreadCount, emitToast])
+    }, [setUnreadCount, emitToast, markSeen])
+
+    const requestSync = useCallback(() => {
+        if (stoppedRef.current) return
+        if (document.hidden) { dirtyRef.current = true; return }
+        if (debounceRef.current) return // a sync is already scheduled
+        const now = Date.now()
+        const delay = Math.max(
+            DEBOUNCE_MS,
+            MIN_GAP_MS - (now - lastSyncAtRef.current),
+            blockedUntilRef.current - now,
+        )
+        debounceRef.current = setTimeout(() => {
+            debounceRef.current = null
+            void sync()
+        }, delay)
+    }, [sync])
+
+    const scheduleFallback = useCallback(() => {
+        if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
+        fallbackTimerRef.current = setTimeout(() => {
+            fallbackTimerRef.current = null
+            if (modeRef.current !== 'fallback') return
+            if (document.hidden) dirtyRef.current = true
+            else void sync()
+            scheduleFallback()
+        }, FALLBACK_POLL_MS)
+    }, [sync])
+
+    const handleModeChange = useCallback((mode: SignalMode) => {
+        if (modeRef.current === mode) return
+        modeRef.current = mode
+        if (mode === 'fallback') scheduleFallback()
+        else if (fallbackTimerRef.current) { clearTimeout(fallbackTimerRef.current); fallbackTimerRef.current = null }
+    }, [scheduleFallback])
+
+    const handleBroadcast = useCallback(() => {
+        const timers = jitterTimersRef.current
+        const timer = setTimeout(() => { timers.delete(timer); requestSync() }, Math.random() * BROADCAST_JITTER_MS)
+        timers.add(timer)
+    }, [requestSync])
+
+    useNotificationSignal({
+        onSignal: requestSync,
+        onBroadcast: handleBroadcast,
+        onReconnect: requestSync,
+        onModeChange: handleModeChange,
+    })
 
     useEffect(() => {
-        let mounted = true
-        let timer: ReturnType<typeof setTimeout> | null = null
+        void sync() // initial load
 
-        function clearTimer() {
-            if (timer) {
-                clearTimeout(timer)
-                timer = null
-            }
-        }
-
-        function scheduleNext() {
-            if (!mounted) return
-            clearTimer()
-            timer = setTimeout(async () => {
-                await poll()
-                scheduleNext()
-            }, intervalRef.current)
-        }
-
-        // Initial poll immediately
-        poll().then(() => scheduleNext())
-
-        // ── Push message from Service Worker (real-time path) ──────────
+        // Push from Service Worker: instant toast, unless the signal-sync already showed it.
         function handlePushMessage(event: MessageEvent) {
             if (event.data?.type !== 'PUSH_NOTIFICATION') return
             const payload = event.data.payload
             if (!payload?.id) return
-
-            // Mark as seen so polling doesn't duplicate the toast
-            seenIdsRef.current.add(payload.id)
-
-            // Emit in-app toast
-            emitToast({
-                id: payload.id,
-                title: payload.title || tRef.current.notifications.toast.newNotification,
-                type: payload.type,
-                message: payload.message,
-            })
-
-            // Sync badge count from server (debounced — batches burst pushes)
-            if (pendingPollRef.current) clearTimeout(pendingPollRef.current)
-            pendingPollRef.current = setTimeout(() => {
-                pendingPollRef.current = null
-                poll()
-            }, 2_000)
+            const id = String(payload.id)
+            const alreadyShown = seenIdsRef.current.has(id)
+            markSeen(id)
+            if (!alreadyShown) {
+                emitToast({
+                    id,
+                    title: payload.title || tRef.current.notifications.toast.newNotification,
+                    type: payload.type,
+                    message: payload.message,
+                })
+            }
+            requestSync() // badge count
         }
         navigator.serviceWorker?.addEventListener('message', handlePushMessage)
 
-        // ── Visibility change (pause/resume polling) ──────────────────
         function handleVisibility() {
-            if (document.hidden) {
-                clearTimer()
-            } else {
-                clearTimer()
-                poll().then(() => scheduleNext())
-            }
+            if (document.hidden) return
+            if (dirtyRef.current || Date.now() - lastSyncAtRef.current > STALE_MS) requestSync()
         }
         document.addEventListener('visibilitychange', handleVisibility)
+        window.addEventListener('online', requestSync)
 
-        // ── Network recovery ──────────────────────────────────────────
-        function handleOnline() {
-            intervalRef.current = getBasePollInterval()
-            clearTimer()
-            poll().then(() => scheduleNext())
-        }
-        window.addEventListener('online', handleOnline)
-
+        const jitterTimers = jitterTimersRef.current
         return () => {
-            mounted = false
-            clearTimer()
-            if (pendingPollRef.current) clearTimeout(pendingPollRef.current)
-            if (abortRef.current) abortRef.current.abort()
+            abortRef.current?.abort()
+            if (debounceRef.current) clearTimeout(debounceRef.current)
+            if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
+            jitterTimers.forEach(clearTimeout)
+            jitterTimers.clear()
             navigator.serviceWorker?.removeEventListener('message', handlePushMessage)
             document.removeEventListener('visibilitychange', handleVisibility)
-            window.removeEventListener('online', handleOnline)
+            window.removeEventListener('online', requestSync)
         }
-    }, [poll, emitToast])
+    }, [sync, requestSync, emitToast, markSeen])
 
     return null
 }

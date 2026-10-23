@@ -1,5 +1,7 @@
 import type { Payload } from 'payload'
 import { sql } from 'drizzle-orm'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
+import { signalNotificationBroadcast } from './signal-notification'
 
 export type BroadcastTargetAudience = 'all' | 'free' | 'paid'
 
@@ -22,13 +24,13 @@ const MAX_RECIPIENTS = 10000
  * Create broadcast notifications for all tenant owners.
  *
  * Uses raw SQL with INSERT...SELECT for performance — avoids N+1 Payload API calls.
- * Each inserted row triggers pg NOTIFY via the `after_notification_insert` trigger,
- * which the SSE stream endpoint picks up for realtime delivery.
+ * Raw SQL bypasses Payload hooks, so realtime delivery is a single Firebase
+ * "doorbell" signal sent once the inserts finish (clients then fetch via the API).
  *
  * RBAC: Only users with role='owner' in users_tenants receive broadcasts.
  *
  * Batching: Inserts in chunks of BATCH_SIZE to avoid long-running transactions
- * and reduce pg NOTIFY storm pressure.
+ * and keep each statement short.
  */
 export async function createBroadcastNotifications({
     title,
@@ -49,38 +51,44 @@ export async function createBroadcastNotifications({
 
     const resolvedActionUrl = actionUrl ?? null
 
-    // Batch INSERT with pagination to avoid overwhelming the DB + pg NOTIFY
+    // Batch INSERT with pagination to avoid overwhelming the DB
     let totalNotified = 0
     let offset = 0
 
-    while (offset < MAX_RECIPIENTS) {
-        const result = await db.execute(
-            sql`INSERT INTO notifications (tenant_id, user_id, type, title, message, action_url, is_read, created_at, updated_at, expires_at)
-                SELECT
-                    ut.tenant_id,
-                    ut._parent_id,
-                    'SYSTEM_ALERT',
-                    ${title},
-                    ${message},
-                    ${resolvedActionUrl},
-                    false,
-                    NOW(),
-                    NOW(),
-                    ${expiresAtStr}::timestamptz
-                FROM users_tenants ut
-                WHERE ut.role = 'owner'
-                  AND ut.status = 'active'
-                ORDER BY ut._parent_id
-                LIMIT ${BATCH_SIZE}
-                OFFSET ${offset}`
-        )
+    try {
+        while (offset < MAX_RECIPIENTS) {
+            const result = await db.execute(
+                sql`INSERT INTO notifications (tenant_id, user_id, type, title, message, action_url, is_read, created_at, updated_at, expires_at)
+                    SELECT
+                        ut.tenant_id,
+                        ut._parent_id,
+                        'SYSTEM_ALERT',
+                        ${title},
+                        ${message},
+                        ${resolvedActionUrl},
+                        false,
+                        NOW(),
+                        NOW(),
+                        ${expiresAtStr}::timestamptz
+                    FROM users_tenants ut
+                    WHERE ut.role = 'owner'
+                      AND ut.status = 'active'
+                    ORDER BY ut._parent_id
+                    LIMIT ${BATCH_SIZE}
+                    OFFSET ${offset}`
+            )
 
-        const inserted = Number(result?.rowCount ?? 0)
-        totalNotified += inserted
+            const inserted = Number(result?.rowCount ?? 0)
+            totalNotified += inserted
 
-        // If we got fewer rows than BATCH_SIZE, we've processed everyone
-        if (inserted < BATCH_SIZE) break
-        offset += BATCH_SIZE
+            // If we got fewer rows than BATCH_SIZE, we've processed everyone
+            if (inserted < BATCH_SIZE) break
+            offset += BATCH_SIZE
+        }
+    } finally {
+        // Signal even if a later batch failed: earlier batches are already committed.
+        // After the response, so the admin request never waits on Firebase (up to ~6s).
+        if (totalNotified > 0) runAfterResponse('Broadcast signal', () => signalNotificationBroadcast())
     }
 
     return { notified: totalNotified }

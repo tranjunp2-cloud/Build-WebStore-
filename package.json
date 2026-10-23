@@ -65,7 +65,7 @@
     "migrate:pw1:users": "node --no-network-family-autoselection --dns-result-order=ipv4first --require ./scripts/seed-preload.cjs --import tsx scripts/import-pw1-users.ts",
     "migrate:pw1:test:local": "tsx --require ./scripts/seed-preload.cjs src/__tests__/integration/pw1-json-clone-rehearsal.ts",
     "migrate:pw1:repair": "tsx --require ./scripts/seed-preload.cjs scripts/repair-pw1-sites.ts --apply",
-    "migrate:pw1:website:qa-backfill":"tsx --require ./scripts/seed-preload.cjs scripts/backfill-pw1-qa.ts",
+    "migrate:pw1:website:qa-backfill": "tsx --require ./scripts/seed-preload.cjs scripts/backfill-pw1-qa.ts",
     "migrate:pw1:website": "tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts"
   },
   "dependencies": {
@@ -123,6 +123,8 @@
     "date-fns": "^4.1.0",
     "dompurify": "^3.4.0",
     "drizzle-orm": "0.44.7",
+    "firebase": "^12.19.0",
+    "firebase-admin": "^13.10.0",
     "framer-motion": "^11.12.0",
     "franc-min": "^6.2.0",
     "geist": "^1.7.0",

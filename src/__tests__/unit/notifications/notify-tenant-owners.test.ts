@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { notifyTenantOwners } from '@/lib/notifications/notify-tenant-owners'
 
+// Realtime signal + push are mocked so we can assert WHAT is sent and in WHICH order (#1972).
+const callOrder: string[] = []
+const mockSignal = vi.fn(async (..._a: unknown[]) => { callOrder.push('signal') })
+const mockPush = vi.fn(async (..._a: unknown[]) => { callOrder.push('push'); return { sent: 0, failed: 0 } })
+vi.mock('@/lib/notifications/signal-notification', () => ({
+    signalNotificationUsers: (...a: unknown[]) => mockSignal(...a),
+}))
+vi.mock('@/lib/notifications/send-push', () => ({
+    sendPushToUser: (...a: unknown[]) => mockPush(...a),
+}))
+
 // ── TC-F16.12, TC-F16.14, TC-F16.43: Notification trigger helper ──────
 
 const mockFind = vi.fn()
@@ -309,5 +320,62 @@ describe('notifyTenantOwners — dedupe / idempotency [TC-F16.29]', () => {
         ).resolves.toBeUndefined()
 
         expect(mockCreate).toHaveBeenCalledTimes(2)
+    })
+})
+
+
+// ── TC-F16.48: signal first, push second, rows created with skipPush (#1972) ──
+describe('notifyTenantOwners — realtime signal + push [TC-F16.48]', () => {
+    const data = { type: 'ORDER_NEW' as const, title: 'T', message: 'M', actionUrl: '/orders' }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        callOrder.length = 0
+        mockPush.mockImplementation(async () => { callOrder.push('push'); return { sent: 0, failed: 0 } })
+        mockFind.mockResolvedValue({ docs: [{ id: 1 }, { id: 2 }, { id: 3 }], totalDocs: 3 })
+    })
+
+    it('creates rows with context.skipPush so the hook does not push inside the transaction', async () => {
+        mockCreate.mockImplementation(async ({ data: d }: any) => ({ id: 100 + d.user }))
+
+        await notifyTenantOwners(mockPayload, 10, data)
+
+        expect(mockCreate).toHaveBeenCalledTimes(3)
+        for (const call of mockCreate.mock.calls) {
+            expect(call[0].context).toEqual({ skipPush: true })
+        }
+    })
+
+    it('sends ONE signal for the users that were actually created, BEFORE any push', async () => {
+        mockCreate.mockImplementation(async ({ data: d }: any) => {
+            if (d.user === 2) throw new Error('duplicate key (dedupe)')
+            return { id: 100 + d.user }
+        })
+
+        await notifyTenantOwners(mockPayload, 10, data)
+
+        expect(mockSignal).toHaveBeenCalledTimes(1)
+        expect(mockSignal).toHaveBeenCalledWith([1, 3])
+        expect(callOrder[0]).toBe('signal')
+        expect(mockPush).toHaveBeenCalledTimes(2)
+        expect(mockPush).toHaveBeenCalledWith(1, 10, expect.objectContaining({ id: '101', title: 'T', tag: 'ORDER_NEW' }), mockPayload)
+    })
+
+    it('does not signal or push when every insert was rejected', async () => {
+        mockCreate.mockRejectedValue(new Error('duplicate key'))
+
+        await notifyTenantOwners(mockPayload, 10, data)
+
+        expect(mockSignal).not.toHaveBeenCalled()
+        expect(mockPush).not.toHaveBeenCalled()
+    })
+
+    it('a failing push never rejects notifyTenantOwners', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        mockCreate.mockImplementation(async ({ data: d }: any) => ({ id: d.user }))
+        mockPush.mockRejectedValue(new Error('push down'))
+
+        await expect(notifyTenantOwners(mockPayload, 10, data)).resolves.toBeUndefined()
+        expect(mockSignal).toHaveBeenCalledTimes(1)
     })
 })

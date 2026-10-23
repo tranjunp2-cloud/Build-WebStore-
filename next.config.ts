@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
     process.env.ENABLE_HARNESS === '1'
       ? ['tsx', 'ts', 'jsx', 'js', 'harness.tsx']
       : ['tsx', 'ts', 'jsx', 'js'],
-  serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push', 'googleapis'],
+  serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push', 'googleapis', 'firebase-admin'],
   // Bundle runtime JSON files into serverless for /test-harness routes:
   //   1. .harness-out/*.json — matrix + rubric reports (built via vercel.json
   //      buildCommand when ENABLE_HARNESS=1)

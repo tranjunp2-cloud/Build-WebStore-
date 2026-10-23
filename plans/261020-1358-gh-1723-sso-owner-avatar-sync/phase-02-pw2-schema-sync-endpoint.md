@@ -42,7 +42,7 @@ Không thêm env mới (bỏ allow-list host theo quyết định 2026-10-20: t�
 |---|---|
 | TC-F23-SSO-07 | trùng `avatar_key` → unchanged; `changed_at` cũ → stale |
 | TC-F23-SSO-08 | http / >2MB / GIF / HTTP 3xx-4xx → 422; 5xx, 429, timeout, lỗi mạng → 502; không đổi avatar |
-| TC-F23-SSO-09 | map theo `sso_user_id`; bind email **chỉ khi `ALLOW_EMAIL_BIND`** (mặc định tắt → 409 `email_bind_disabled`) và đủ điều kiện; email trùng 2 user → 409 `ambiguous_email`; staff → 409 `not_owner`; sso_id đã gắn user khác → 409 |
+| TC-F23-SSO-09 | map theo `sso_user_id`; bind email **chỉ khi `ALLOW_EMAIL_BIND`** (mặc định bật từ GH-1979; tắt → 409 `email_bind_disabled`) và đủ điều kiện; email trùng 2 user → 409 `ambiguous_email`; staff → 409 `not_owner`; sso_id đã gắn user khác → 409 |
 | TC-F23-SSO-05/11 | ABSENT → avatar null + xóa Media cũ; PRESENT → Media mới + xóa cũ |
 | TC-F23-SSO-06 | tải lỗi → giữ avatar cũ, 502 |
 | auth | thiếu Bearer 401, không phải super-admin 403, payload sai 400 |

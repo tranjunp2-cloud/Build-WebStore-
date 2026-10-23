@@ -38,12 +38,22 @@ describe('resolveSsoOwner (GH-1723)', () => {
         await expect(resolveSsoOwner(payload as any, input, bindEnabled)).resolves.toEqual({ ok: false, reason: 'not_owner' })
     })
 
-    // TC-F23-SSO-11: email mapping is OFF by default until PO approves BR-23-04
-    it('does not bind by email by default and reports email_bind_disabled', async () => {
-        expect(ALLOW_EMAIL_BIND).toBe(false)
+    // TC-F23-SSO-09: GH-1979 — an Owner created before sso_user_id existed binds by email by default
+    it('binds an existing Owner by email by default', async () => {
+        expect(ALLOW_EMAIL_BIND).toBe(true)
         findResults([], [owner()])
 
         const result = await resolveSsoOwner(payload as any, input)
+
+        expect(result).toMatchObject({ ok: true, bound: true, user: { id: 7, ssoUserId: 1234 } })
+        expect(payload.db.pool.query).toHaveBeenCalledTimes(1)
+    })
+
+    // TC-F23-SSO-11: email mapping can still be switched off per call (reports email_bind_disabled)
+    it('does not bind by email when allowEmailBind is false and reports email_bind_disabled', async () => {
+        findResults([], [owner()])
+
+        const result = await resolveSsoOwner(payload as any, input, { allowEmailBind: false })
 
         expect(result).toEqual({ ok: false, reason: 'email_bind_disabled' })
         expect(payload.find).toHaveBeenCalledTimes(1) // only the ssoUserId lookup, never the email

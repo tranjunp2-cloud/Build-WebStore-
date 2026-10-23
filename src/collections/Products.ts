@@ -11,6 +11,7 @@ import {
     revalidateBadgeCountsAfterChange,
     revalidateBadgeCountsAfterDelete,
 } from '@/lib/dashboard/revalidate-badge-counts-hook'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
 
 const STABLE_AI_DRAFT_SLUG_PATTERN = /-ai-[a-f0-9]{32}$/
 
@@ -107,18 +108,18 @@ export const lowStockHook: CollectionAfterChangeHook = async ({ doc, previousDoc
 
     // Only notify when crossing threshold downward (anti-spam)
     if (prevInventory >= LOW_STOCK_THRESHOLD && currInventory < LOW_STOCK_THRESHOLD && currInventory >= 0) {
-        import('@/lib/notifications/notify-tenant-owners')
-            .then(({ notifyTenantOwners }) => {
-                const tenantId = doc.tenant && typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
-                return notifyTenantOwners(req.payload, tenantId, {
-                    type: 'PRODUCT_LOW_STOCK',
-                    title: 'Low Stock Alert',
-                    message: `${doc.name} is running low (${currInventory} units left)`,
-                    actionUrl: '/products',
-                    metadata: { productName: doc.name, quantity: String(currInventory) },
-                })
+        const payload = req.payload
+        const tenantId = doc.tenant && typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+        runAfterResponse('Notification PRODUCT_LOW_STOCK', async () => {
+            const { notifyTenantOwners } = await import('@/lib/notifications/notify-tenant-owners')
+            await notifyTenantOwners(payload, tenantId, {
+                type: 'PRODUCT_LOW_STOCK',
+                title: 'Low Stock Alert',
+                message: `${doc.name} is running low (${currInventory} units left)`,
+                actionUrl: '/products',
+                metadata: { productName: doc.name, quantity: String(currInventory) },
             })
-            .catch((err) => console.error('[Notification] PRODUCT_LOW_STOCK hook failed', err))
+        })
     }
     return doc
 }
