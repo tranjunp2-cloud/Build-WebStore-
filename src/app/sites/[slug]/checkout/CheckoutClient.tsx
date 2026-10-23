@@ -88,7 +88,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [stripeConnected, setStripeConnected] = useState(initialSiteData?.stripeConnected ?? false)
     const [showStripe, setShowStripe] = useState(initialSiteData?.stripeEnabled ?? false)
     const [xenditConnected, setXenditConnected] = useState(initialSiteData?.xenditConnected ?? false)
-    const [hasPaymentMethods, setHasPaymentMethods] = useState(initialSiteData?.hasPaymentMethods ?? true)
     const [stripeTooltipOpen, setStripeTooltipOpen] = useState(false)
     const stripeTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -118,7 +117,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const router = useRouter()
     const pathname = usePathname()
     const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
-    const [mounted, setMounted] = useState(false)
     const [isPlacing, setIsPlacing] = useState(false)
     const submitLockRef = useRef(false)
 
@@ -155,7 +153,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [fontHeading, setFontHeading] = useState(initialFontHeading)
     const [fontBody, setFontBody] = useState(initialFontBody)
 
-    useEffect(() => { setMounted(true) }, [])
 
     // Site-scoped cart storage must be activated before checkout reads persisted lines.
     useEffect(() => {
@@ -257,7 +254,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 if (data.stripeConnected === true) setStripeConnected(true)
                 if (data.stripeEnabled === true) setShowStripe(true)
                 if (data.xenditConnected === true) setXenditConnected(true)
-                if (data.hasPaymentMethods != null) setHasPaymentMethods(data.hasPaymentMethods)
                 if (data.theme) {
                     if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
                     if (data.theme.fontBody) setFontBody(data.theme.fontBody)
@@ -631,39 +627,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 setIsPlacing(false)
             }
         }
-    }
-
-    if (mounted && !hasPaymentMethods) {
-        return (
-            <div className="ck-empty">
-                <AlertCircle size={48} />
-                <h2>{ck.checkoutUnavailableTitle}</h2>
-                <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>{ck.checkoutUnavailableDesc}</p>
-                <Link href={shopBase || '/'}>{ck.browseProducts}</Link>
-                <style>{`
-                  .ck-empty{font-family:var(--bf);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#eff1f3;}
-                  .ck-empty svg{opacity:.2;}
-                  .ck-empty h2{font-size:20px;font-weight:600;margin:0;color:#0c1014;}
-                  .ck-empty a{color:var(--accent,#0e7556);font-size:14px;text-decoration:none;}
-                `}</style>
-            </div>
-        )
-    }
-
-    if (mounted && items.length === 0 && !isPlacing) {
-        return (
-            <div className="ck-empty">
-                <ShoppingBag size={48} />
-                <h2>{ck.cartEmpty}</h2>
-                <Link href={shopBase || '/'}>{ck.browseProducts}</Link>
-                <style>{`
-                  .ck-empty{font-family:var(--bf);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#eff1f3;}
-                  .ck-empty svg{opacity:.2;}
-                  .ck-empty h2{font-size:20px;font-weight:600;margin:0;color:#0c1014;}
-                  .ck-empty a{color:var(--accent,#0e7556);font-size:14px;text-decoration:none;}
-                `}</style>
-            </div>
-        )
     }
 
     const PlaceOrderBtn = (
