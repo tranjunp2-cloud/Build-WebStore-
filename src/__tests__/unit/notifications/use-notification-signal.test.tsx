@@ -34,6 +34,7 @@ const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
 let fetchMock: ReturnType<typeof vi.fn>
+let errorSpy: ReturnType<typeof vi.spyOn>
 let h: { onSignal: ReturnType<typeof vi.fn>; onBroadcast: ReturnType<typeof vi.fn>; onReconnect: ReturnType<typeof vi.fn>; onModeChange: ReturnType<typeof vi.fn> }
 const flush = (ms = 0) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
 const modes = () => h.onModeChange.mock.calls.map((c) => c[0])
@@ -43,6 +44,7 @@ beforeEach(() => {
     vi.useFakeTimers()
     listeners.clear()
     mockSignOut.mockClear()
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     h = { onSignal: vi.fn(), onBroadcast: vi.fn(), onReconnect: vi.fn(), onModeChange: vi.fn() }
     fetchMock = vi.fn(async () => json(TOKEN_OK))
     vi.stubGlobal('fetch', fetchMock)
@@ -53,6 +55,7 @@ beforeEach(() => {
 afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+    errorSpy.mockRestore()
 })
 
 const mount = () => renderHook(() => useNotificationSignal(h))
@@ -63,7 +66,9 @@ describe('[TC-F16.55] useNotificationSignal', () => {
 
         expect([...listeners.keys()].sort()).toEqual(['.info/connected', 'pw2/staging/broadcast', 'pw2/staging/u/7'])
         connected(true)
+        await flush(15_000) // connect timeout disarmed: no late fallback, no error log
         expect(modes()).toEqual(['live'])
+        expect(errorSpy).not.toHaveBeenCalled()
         expect(h.onReconnect).not.toHaveBeenCalled() // first connect is not a "reconnect"
     })
 
@@ -146,12 +151,14 @@ describe('[TC-F16.55] useNotificationSignal', () => {
 
         expect(modes()[0]).toBe('fallback')
         expect(fetchMock).toHaveBeenCalledTimes(2)
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[Signal] Firebase connect failed'), 'offline')
     })
 
     it('permission denied → fallback and STAYS in fallback even if Firebase later reports connected (AC-07)', async () => {
         mount(); await flush()
         listeners.get('pw2/staging/u/7')!.err!(new Error('permission_denied'))
         expect(modes()).toEqual(['fallback'])
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[Signal] Firebase listener denied'), 'permission_denied')
 
         connected(true)
 
@@ -163,6 +170,7 @@ describe('[TC-F16.55] useNotificationSignal', () => {
         mount(); await flush(15_000)
 
         expect(modes()).toEqual(['fallback'])
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[Signal] Firebase not connected within 15s'))
     })
 
     it('a hung token fetch also ends in fallback after 15s', async () => {
@@ -183,6 +191,7 @@ describe('[TC-F16.55] useNotificationSignal', () => {
         offs.forEach((off) => expect(off).toHaveBeenCalledTimes(1))
         expect(mockSignOut).toHaveBeenCalledTimes(1)
         expect(modes()).not.toContain('fallback')
+        expect(errorSpy).not.toHaveBeenCalled() // a denial after unmount is not an error
     })
 
     it('unmount while connecting: attaches nothing and does NOT sign out the shared auth (StrictMode / layout switch)', async () => {

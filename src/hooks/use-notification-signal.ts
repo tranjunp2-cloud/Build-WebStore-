@@ -63,7 +63,11 @@ export function useNotificationSignal(handlers: NotificationSignalHandlers): voi
             // Armed before any network step so a hung token fetch / sign-in also ends in
             // fallback polling instead of "unknown" (= no sync at all).
             if (connectTimer) clearTimeout(connectTimer)
-            connectTimer = setTimeout(() => { if (!connectedOnce) mode('fallback') }, CONNECT_TIMEOUT_MS)
+            connectTimer = setTimeout(() => {
+                if (connectedOnce || cancelled) return
+                console.error('[Signal] Firebase not connected within 15s; falling back to polling')
+                mode('fallback')
+            }, CONNECT_TIMEOUT_MS)
             try {
                 const res = await fetch('/api/notifications/firebase-token', { credentials: 'include' })
                 if (cancelled) return
