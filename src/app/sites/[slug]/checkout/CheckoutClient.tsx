@@ -76,6 +76,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const [enableCod, setEnableCod] = useState(initialSiteData?.enableCod ?? true)
     const [enableQrBanking, setEnableQrBanking] = useState(initialSiteData?.enableQrBanking ?? true)
+    const [hasPaymentMethods, setHasPaymentMethods] = useState(initialSiteData?.hasPaymentMethods ?? true)
     // Shipping rates in RM (shippingConfig stores sen; divide by 100)
     const sc = initialSiteData?.shippingConfig
     const [shippingWestRM, setShippingWestRM] = useState((sc?.westRate ?? 800) / 100)
@@ -152,7 +153,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [themeCSS, setThemeCSS] = useState(initialThemeCSS)
     const [fontHeading, setFontHeading] = useState(initialFontHeading)
     const [fontBody, setFontBody] = useState(initialFontBody)
-
 
     // Site-scoped cart storage must be activated before checkout reads persisted lines.
     useEffect(() => {
@@ -254,6 +254,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 if (data.stripeConnected === true) setStripeConnected(true)
                 if (data.stripeEnabled === true) setShowStripe(true)
                 if (data.xenditConnected === true) setXenditConnected(true)
+                if (data.hasPaymentMethods != null) setHasPaymentMethods(data.hasPaymentMethods)
                 if (data.theme) {
                     if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
                     if (data.theme.fontBody) setFontBody(data.theme.fontBody)
@@ -454,6 +455,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         siteId && form.name.trim() && form.email.trim() &&
         form.line1.trim() && form.city && form.postcode && items.length > 0 &&
         shippingSettled && cartResolved &&
+        // The store accepts no payment at all: the page stays reachable, but the server would 422 PAYMENT_METHOD_DISABLED
+        hasPaymentMethods &&
         (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe' || paymentMethod === 'xendit') &&
         // PD-021: COD not orderable on this route/amount (server would 422 COD_NOT_ELIGIBLE anyway)
         !(paymentMethod === 'cod' && codBlockReason)
@@ -603,7 +606,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 }
                 const confirmUrl = `${shopBase}/order/${data.data.orderId}/confirm`
                 dismissOverlay()
-                // Keep isPlacing=true via flag so empty-cart check doesn't trigger before unmount
+                // Keep isPlacing=true via flag so the form stays locked (not re-enabled) until the confirm page unmounts it
                 navigatedToConfirm = true
                 clearCart()
                 if ('startViewTransition' in document) {
@@ -796,6 +799,12 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 <h2 className="ck-ct">{ck.paymentMethod}</h2>
                                 <span className="ck-aux"><Lock size={12} /> {ck.encrypted}</span>
                             </div>
+                            {!hasPaymentMethods && (
+                                <div className="sum-cod-err" role="alert">
+                                    <AlertCircle size={14} />
+                                    <span><strong>{ck.checkoutUnavailableTitle}</strong> {ck.checkoutUnavailableDesc}</span>
+                                </div>
+                            )}
                             <div className="pm-list">
                                 {/* Stripe: show selectable when ready, disabled when connected but not ready, hidden when not connected */}
                                 {stripeConnected && showStripe && (
