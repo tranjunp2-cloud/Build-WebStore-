@@ -1,7 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import {
+    BarChart3, Blocks, BookOpen, Briefcase, Building2, ChevronDown, ChevronRight, CircleHelp, Eye, FileText,
+    FormInput, GalleryHorizontal, Globe, ImageIcon, Images, LayoutGrid, LayoutTemplate, Mail, MailPlus, Megaphone,
+    MessageCircle, MessageSquareQuote, Minus, MousePointerClick, Newspaper, Palette, PanelTop, Plus, Puzzle, Rows3,
+    Scale, Search, Share2, ShoppingBag, ShoppingCart, Star, Tag, Type, Users, UtensilsCrossed, Video, Wrench,
+} from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -14,50 +20,57 @@ import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 
 // ── Category display config (i18n labels + icons, Malay) ──────────────────────
 
-const CATEGORY_DISPLAY: Record<string, { icon: string; label: string }> = {
-    basics:   { icon: '📦', label: 'Asas' },
-    content:  { icon: '📄', label: 'Kandungan' },
-    media:    { icon: '🖼️', label: 'Media' },
-    store:    { icon: '💼', label: 'Perniagaan' },
-    commerce: { icon: '🛒', label: 'Perdagangan' },
-    form:     { icon: '📝', label: 'Borang & Hubungi' },
-    widgets:  { icon: '🔧', label: 'Widget' },
-    layout:   { icon: '📐', label: 'Susun Atur' },
+const CATEGORY_DISPLAY: Record<string, { icon: LucideIcon; label: string }> = {
+    basics:   { icon: LayoutTemplate, label: 'Asas' },
+    content:  { icon: FileText, label: 'Kandungan' },
+    media:    { icon: ImageIcon, label: 'Media' },
+    store:    { icon: Briefcase, label: 'Perniagaan' },
+    commerce: { icon: ShoppingCart, label: 'Perdagangan' },
+    form:     { icon: FormInput, label: 'Borang & Hubungi' },
+    widgets:  { icon: Puzzle, label: 'Widget' },
+    layout:   { icon: Rows3, label: 'Susun Atur' },
 }
 
 // Canonical display order — matches editor UX taxonomy
 const CATEGORY_ORDER = ['basics', 'content', 'media', 'store', 'commerce', 'form', 'widgets', 'layout'] as const
 
-// ── Icon overrides (slug → icon) ─────────────────────────────────────────────
-// Provides a curated icon experience for known blocks, overrides meta.icon
+// ── Block icons (slug → lucide icon) ─────────────────────────────────────────
+// Replaces the emoji in each block's meta.icon; unknown slugs fall back to their category icon.
 
-const BLOCK_ICON_OVERRIDES: Record<string, string> = {
-    'custom-html': '🧱',
-    hero: '🎯',
-    gallery: '🖼️',
-    cta: '🔘',
-    socialWidget: '💬',
-    pricing: '💰',
-    'pricing-table': '📊',
-    'gallery-masonry': '🧱',
-    'whatsapp-button': '💬',
-    'google-maps': '📍',
-    'social-proof': '⭐',
-    'countdown-timer': '⏰',
-    'before-after': '🔄',
-    'feature-comparison': '📋',
-    'download-cta': '📥',
-    'video-background': '🎬',
-    breadcrumb: '🔗',
-    divider: '➖',
-    'announcement-bar': '📢',
-    'client-logos': '🏢',
-    accordion: '📂',
-    'step-process': '🔢',
-    'portfolio-grid': '💼',
-    'menu-food': '🍽️',
-    'service-cards': '🛠️',
-    carousel: '🎠',
+const BLOCK_ICONS: Record<string, LucideIcon> = {
+    hero: PanelTop,
+    features: LayoutGrid,
+    about: BookOpen,
+    'service-cards': Wrench,
+    cta: MousePointerClick,
+    testimonials: MessageSquareQuote,
+    faq: CircleHelp,
+    'blog-list': Newspaper,
+    'custom-html': Type,
+    'portfolio-grid': Palette,
+    gallery: Images,
+    'gallery-masonry': Images,
+    video: Video,
+    'video-background': Video,
+    carousel: GalleryHorizontal,
+    pricing: Tag,
+    'pricing-table': Tag,
+    'feature-comparison': Scale,
+    'menu-food': UtensilsCrossed,
+    'products-grid': ShoppingBag,
+    'products-featured': Star,
+    'product-quick-view': Eye,
+    cartWidget: ShoppingCart,
+    contact: Mail,
+    newsletter: MailPlus,
+    'whatsapp-button': MessageCircle,
+    stats: BarChart3,
+    team: Users,
+    'logo-cloud': Building2,
+    'client-logos': Building2,
+    socialWidget: Share2,
+    divider: Minus,
+    'announcement-bar': Megaphone,
 }
 
 interface BlockLibraryPanelProps {
@@ -109,7 +122,7 @@ export function BlockLibraryPanel({
             .filter(cat => byCategory.has(cat))
             .map(cat => ({
                 id: cat,
-                icon: CATEGORY_DISPLAY[cat]?.icon ?? '📦',
+                icon: CATEGORY_DISPLAY[cat]?.icon ?? Blocks,
                 label: categoryLabels[cat] || CATEGORY_DISPLAY[cat]?.label || cat,
                 blocks: byCategory.get(cat)!,
             }))
@@ -149,7 +162,7 @@ export function BlockLibraryPanel({
                     description: baseDescription,
                     previewText,
                     needsTranslation,
-                    icon: BLOCK_ICON_OVERRIDES[b.slug] || b.icon || '🧩',
+                    icon: BLOCK_ICONS[b.slug] ?? category.icon,
                     defaultVariant: b.defaultVariant || b.variants?.[0] || 'default',
                     scope: b.scope ?? 'page',
                     scopeTooltip: blockTranslations?.[b.slug]?.scopeTooltip ?? b.scopeTooltip,
@@ -219,7 +232,7 @@ export function BlockLibraryPanel({
                                     className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-left transition-colors hover:bg-white/[0.04]"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm leading-none">{category.icon}</span>
+                                        <category.icon className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
                                         <span className="text-[13px] font-medium text-slate-200">{category.label}</span>
                                         <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{category.totalCount}</span>
                                     </div>
@@ -261,36 +274,26 @@ export function BlockLibraryPanel({
                                                         : "hover:border-white/[0.08] hover:bg-white/[0.06] cursor-grab active:cursor-grabbing active:scale-[0.98]",
                                                 )}
                                             >
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/15 to-cyan-500/15 text-lg">
-                                                    {item.icon}
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[var(--editor-text-muted)]">
+                                                    <item.icon className="h-4 w-4" aria-hidden />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5">
                                                         <p className="truncate text-[13px] font-medium text-slate-200">{item.name}</p>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                {item.scope === 'global' ? (
-                                                                    <span
-                                                                        className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
-                                                                        style={{ background: 'hsl(var(--info)/0.12)', color: 'hsl(var(--info))' }}
-                                                                    >
-                                                                        🌐 {bl.globalScopeLabel}
+                                                        {/* Page scope is the norm, so only the exception (shared on every page) gets a badge. */}
+                                                        {item.scope === 'global' ? (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span className="inline-flex shrink-0 cursor-default items-center gap-1 rounded bg-[hsl(var(--muted))] px-1.5 py-0.5 text-[10px] font-medium leading-none text-[var(--editor-text-muted)]">
+                                                                        <Globe className="h-2.5 w-2.5" aria-hidden />
+                                                                        {bl.globalScopeLabel}
                                                                     </span>
-                                                                ) : (
-                                                                    <span
-                                                                        className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
-                                                                        style={{ background: 'rgba(148,163,184,0.10)', color: 'var(--editor-text-muted)' }}
-                                                                    >
-                                                                        📄 {bl.pageScopeLabel}
-                                                                    </span>
-                                                                )}
-                                                            </TooltipTrigger>
-                                                            <TooltipContent side="right">
-                                                                {item.scope === 'global'
-                                                                    ? (item.scopeTooltip ?? bl.globalScopeTooltipDefault)
-                                                                    : (item.scopeTooltip ?? bl.pageScopeTooltipDefault)}
-                                                            </TooltipContent>
-                                                        </Tooltip>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent side="right">
+                                                                    {item.scopeTooltip ?? bl.globalScopeTooltipDefault}
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        ) : null}
                                                     </div>
                                                     {/* F26-03: locale-aware preview text (no interactive children in button) */}
                                                     <p className="truncate text-[11px] text-slate-500">{item.previewText}</p>
@@ -322,14 +325,6 @@ export function BlockLibraryPanel({
                     })}
                 </div>
             </div>
-
-            {!isCompact && (
-                <div className="border-t border-white/[0.06] bg-[var(--editor-bg)]/60 px-4 py-3">
-                    <p className="text-center text-[11px] text-slate-500">
-                        {bl.footerHint}
-                    </p>
-                </div>
-            )}
         </div>
         </TooltipProvider>
     )
