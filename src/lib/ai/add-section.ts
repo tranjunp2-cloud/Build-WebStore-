@@ -837,6 +837,14 @@ export function createAddSectionBlock({
 
 import { blockRegistry } from '@/blocks/registry'
 
+/**
+ * Blocks the library lets the user drop although the AI add-section flow hides them (BLOCKS_TEMP_HIDDEN),
+ * so they reach the registry path, where a required field without a schema default would stay missing.
+ */
+const LIBRARY_DROP_DEFAULTS: Record<string, Record<string, unknown>> = {
+    'custom-html': { html: '<p>Add your text here.</p>' },
+}
+
 /** Generate minimal default content for any block type using its Zod schema defaults */
 function createDefaultBlockFromRegistry(blockType: string, brandName: string): BlockData | null {
     try {
@@ -881,7 +889,7 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
             brandName,
         )
         if (registryBlock) {
-            const rb = { ...registryBlock, ...(block || {}) } as BlockData
+            const rb = { ...registryBlock, ...(LIBRARY_DROP_DEFAULTS[String(registryBlock.blockType)] || {}), ...(block || {}) } as BlockData
             const rbKey = String(rb.blockType || '')
             // Attach locale init slots for registry-backed blocks (AC: 1d coverage)
             // {n} tokens in testimonials are the caller's responsibility, not resolver's.

@@ -7,6 +7,7 @@ import { RichTextToolbar } from './RichTextToolbar'
 import { ImageToolbar } from './ImageToolbar'
 import { BlockActionBar } from './BlockActionBar'
 import { DeleteBlockConfirm } from './DeleteBlockConfirm'
+import { getBlockDisplayName } from './block-display-name'
 import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { cn } from '@/lib/utils'
@@ -1799,7 +1800,7 @@ function PreviewFrameInner({
                             }
                             onBlockSelect?.(null)
                             setDeleteConfirmIndex(null)
-                            toast.success(`Deleted ${deleteBlockType.replace(/-/g, ' ')}`, {
+                            toast.success(`Deleted ${getBlockDisplayName(deleteBlockType)}`, {
                                 duration: 5000,
                                 action: {
                                     label: 'Undo',

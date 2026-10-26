@@ -399,6 +399,15 @@ QA found 7 interaction bugs on the real Editor's mobile/compact view (`/editor/[
 
 ---
 
+### Rich text block: drop from library, click target, display name (4 Cases)
+
+| TC-ID | Layer | Description | Assertion |
+|-------|-------|-------------|-----------|
+| **TC-F05-RT-01** | Unit | Drop `custom-html` from the block library | Block gets starter `html`, caller-provided `html` wins |
+| **TC-F05-RT-02** | Unit | Empty Rich text block in the editor iframe | Click target has `min-height: 3rem`; none on published page |
+| **TC-F05-RT-03** | Unit | Delete dialog / tooltip / toast for Rich text | Shows "Rich text", not "Custom Html" / "custom-html" |
+| **TC-F05-RT-04** | Unit | `getBlockDisplayName` for other block types | Dashes replaced by spaces |
+
 ## 4. Hành Trình E2E UAT Flow
 
 | Bước | Hành Động | Kết Quả Mong Đợi |

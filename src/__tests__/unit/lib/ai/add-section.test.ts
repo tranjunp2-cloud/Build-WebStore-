@@ -788,3 +788,28 @@ describe('BUG-F05-04: Testimonials normalize', () => {
         expect(testimonials[0]).toHaveProperty('name')
     })
 })
+
+// Library drop of the hidden-from-AI "Rich text" block (custom-html): must not be created without html
+describe('normalizeAddSectionBlock — custom-html library drop [TC-F05-RT-01]', () => {
+    it('gives a dropped custom-html block starter text instead of leaving html missing', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'Add custom-html block', siteName: 'Test', requestedType: 'custom-html' },
+            { blockType: 'custom-html', variant: 'default' },
+        ) as Record<string, unknown>
+        expect(result.blockType).toBe('custom-html')
+        expect(typeof result.html).toBe('string')
+        expect((result.html as string).trim().length).toBeGreaterThan(0)
+    })
+
+    it('keeps html the caller already provides', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'Add custom-html block', siteName: 'Test', requestedType: 'custom-html' },
+            { blockType: 'custom-html', variant: 'default', html: '<p>Mine</p>' },
+        ) as Record<string, unknown>
+        expect(result.html).toBe('<p>Mine</p>')
+    })
+
+    it('still does not let the AI add-section flow create custom-html', () => {
+        expect(createAddSectionBlock({ instruction: 'Add custom-html block', requestedType: 'custom-html' })).toBeNull()
+    })
+})

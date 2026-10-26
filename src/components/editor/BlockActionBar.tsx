@@ -3,6 +3,7 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { GripVertical, ChevronUp, ChevronDown, Copy, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getBlockDisplayName } from './block-display-name'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface BlockActionBarProps {
@@ -128,8 +129,8 @@ export function BlockActionBar({
                     </TooltipTrigger>
                     <TooltipContent side="top">
                         {deleteDisabled
-                            ? (deleteDisabledTitle ?? `Delete ${blockName}`)
-                            : `Delete ${blockName}`}
+                            ? (deleteDisabledTitle ?? `Delete ${getBlockDisplayName(blockName)}`)
+                            : `Delete ${getBlockDisplayName(blockName)}`}
                     </TooltipContent>
                 </Tooltip>
             </TooltipProvider>
