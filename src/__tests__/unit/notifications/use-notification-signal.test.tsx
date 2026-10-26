@@ -130,12 +130,14 @@ describe('[TC-F16.55] useNotificationSignal', () => {
 
         expect(modes()).toEqual(['fallback'])
         expect(fetchMock).toHaveBeenCalledTimes(1)
+        expect(errorSpy).not.toHaveBeenCalled() // signed out is not an error
     })
 
     it('5xx → fallback now, retries with backoff and recovers', async () => {
         fetchMock.mockResolvedValueOnce(json({}, 503))
         mount(); await flush()
         expect(modes()).toEqual(['fallback'])
+        expect(errorSpy).toHaveBeenCalledWith('[Signal] firebase-token -> 503; falling back to polling')
 
         await flush(30_000) // first retry delay
         expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -152,6 +154,8 @@ describe('[TC-F16.55] useNotificationSignal', () => {
         expect(modes()[0]).toBe('fallback')
         expect(fetchMock).toHaveBeenCalledTimes(2)
         expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[Signal] Firebase connect failed'), 'offline')
+        // the 15s connect timer must not log again once already in fallback
+        expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('within 15s'))
     })
 
     it('permission denied → fallback and STAYS in fallback even if Firebase later reports connected (AC-07)', async () => {

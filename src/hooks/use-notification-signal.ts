@@ -65,6 +65,8 @@ export function useNotificationSignal(handlers: NotificationSignalHandlers): voi
             if (connectTimer) clearTimeout(connectTimer)
             connectTimer = setTimeout(() => {
                 if (connectedOnce || cancelled) return
+                // Already in fallback (error already logged, or off / signed out on purpose): no log per attempt.
+                if (lastMode === 'fallback') return
                 console.error('[Signal] Firebase not connected within 15s; falling back to polling')
                 mode('fallback')
             }, CONNECT_TIMEOUT_MS)
@@ -72,7 +74,10 @@ export function useNotificationSignal(handlers: NotificationSignalHandlers): voi
                 const res = await fetch('/api/notifications/firebase-token', { credentials: 'include' })
                 if (cancelled) return
                 if (res.status === 401) return mode('fallback')
-                if (!res.ok) return retry()
+                if (!res.ok) {
+                    console.error(`[Signal] firebase-token -> ${res.status}; falling back to polling`)
+                    return retry()
+                }
                 const data = (await res.json()) as TokenResponse
                 if (cancelled) return
                 if (!data.enabled || !data.token || !data.config || !data.userPath || !data.broadcastPath) {

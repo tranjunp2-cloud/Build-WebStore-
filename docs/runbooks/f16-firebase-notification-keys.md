@@ -89,7 +89,7 @@ FIREBASE_WEB_API_KEY=AIza...
    - Staging: **Custom Environment `staging`** (Preview **không** tự kế thừa).
    - Production: **Production**.
 2. `FIREBASE_PRIVATE_KEY`: dán chuỗi có `\n` dạng chữ, **không** bọc dấu ngoặc kép.
-3. Loại biến: để giống các secret hiện có của project (ví dụ `STRIPE_SECRET_KEY`). Không tự chuyển sang *Sensitive* khi team chưa dùng — giá trị Sensitive không xem lại được nên rất khó kiểm tra khi sai định dạng.
+3. `FIREBASE_PRIVATE_KEY` có quyền **admin** project → nên chọn loại *Sensitive*. Giá trị Sensitive không xem lại được trên Dashboard, nên **kiểm tra key bằng smoke script (mục 5, bước 1) trước khi dán**; sai định dạng thì dán lại giá trị mới (không cần xem giá trị cũ).
 4. **Deploy lại**: env chỉ áp dụng cho deployment tạo **sau** khi thêm biến. Repo tắt Git deploy của Vercel (`git.deploymentEnabled: false`), deploy chỉ chạy qua GitHub Actions:
    - Staging: GitHub → *Actions* → run **CI** của commit mới nhất trên `staging` → *Re-run jobs* → chọn **Deploy: Vercel (staging)**. (Hoặc chờ lần merge code tiếp theo vào `staging`; push chỉ đổi `docs/**` / `*.md` **không** kích hoạt deploy.)
    - Production: tương tự với run trên `main`.
