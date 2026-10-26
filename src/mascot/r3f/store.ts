@@ -56,12 +56,16 @@ export class MascotStore {
   private fpsFrames = 0;
   private fpsT0 = 0;
   readonly reduced = reducedMotion();
+  /** asks the canvas for a frame; the render loop sleeps while no mascot needs drawing */
+  wake: () => void = () => {};
 
   /* ---- external store cho React ---- */
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   getIds = () => this.ids;
   get(id: number) { return this.map.get(id); }
-  private emit() { this.ids = [...this.map.keys()]; this.listeners.forEach((f) => f()); }
+  private emit() { this.ids = [...this.map.keys()]; this.listeners.forEach((f) => f()); this.wake(); }
+  /** something about this mascot changed: draw it on the next frame */
+  markDirty(inst: MascotInstance) { inst.dirty = true; this.wake(); }
 
   register(o: RegisterOptions): MascotInstance {
     const dpr = Math.min(o.maxDpr ?? 2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
@@ -79,7 +83,7 @@ export class MascotStore {
     this.map.set(inst.id, inst);
     if (typeof IntersectionObserver !== 'undefined') {
       this.io ??= new IntersectionObserver((es) => es.forEach((e) => {
-        for (const it of this.map.values()) if (it.el === e.target) { it.visible = e.isIntersecting; it.dirty = true; }
+        for (const it of this.map.values()) if (it.el === e.target) { it.visible = e.isIntersecting; this.markDirty(it); }
       }), { rootMargin: '120px' });
       this.io.observe(o.el);
     }
@@ -96,22 +100,26 @@ export class MascotStore {
     inst.size = size;
     inst.el.width = Math.round(size * inst.dpr); inst.el.height = Math.round(size * inst.dpr);
     inst.el.style.width = size + 'px'; inst.el.style.height = size + 'px';
-    inst.dirty = true;
+    this.markDirty(inst);
   }
   /** frame cap; small avatars default to 30 fps, everything else to 60 */
   setFps(inst: MascotInstance, fps?: number) {
     inst.minDt = 1000 / (fps ?? (inst.kind === 'avatar' && inst.size <= 48 ? 30 : 60));
   }
   setDef(inst: MascotInstance, def: SceneDef) {
-    inst.state.setDef(def); inst.dirty = true;
+    inst.state.setDef(def); this.markDirty(inst);
     inst.defListeners.forEach((f) => f());
   }
 
-  /** gọi trong useFrame (priority 1) – tự render, R3F không render cảnh mặc định */
-  renderAll(gl: THREE.WebGLRenderer) {
+  /**
+   * gọi trong useFrame (priority 1) – tự render, R3F không render cảnh mặc định.
+   * Returns whether another frame is needed: a visible mascot is animating or still has to be drawn.
+   * With none on screen the canvas stops asking for frames (frameloop="demand").
+   */
+  renderAll(gl: THREE.WebGLRenderer): boolean {
     const ts = now(); this.frameNo++;
     const glCanvas = gl.domElement, H = glCanvas.height, maxPw = Math.min(glCanvas.width, H);
-    let n = 0, vis = 0;
+    let n = 0, vis = 0, pending = false;
     const t0 = now();
     gl.autoClear = false;
     gl.setScissorTest(true);
@@ -120,6 +128,7 @@ export class MascotStore {
       if (!it.rig || !it.visible) continue;
       vis++;
       const animate = !this.reduced;
+      if (animate || it.dirty) pending = true;
       if (!animate && !it.dirty) continue;
       if (animate && ts - it.last < it.minDt - 1.5) continue;
       if (animate && this.stride > 1 && (this.frameNo + it.id) % this.stride) continue;
@@ -153,5 +162,7 @@ export class MascotStore {
     this.fpsFrames++;
     if (ts - this.fpsT0 > 500) { this.stats.fps = Math.round((this.fpsFrames * 1000) / (ts - this.fpsT0)); this.fpsFrames = 0; this.fpsT0 = ts; }
     this.stats.visible = vis; this.stats.total = this.map.size; this.stats.stride = this.stride; this.stats.msPerMascot = +this.avgCost.toFixed(2);
+    if (!pending) this.stats.fps = 0;
+    return pending;
   }
 }

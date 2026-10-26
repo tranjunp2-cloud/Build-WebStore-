@@ -73,6 +73,8 @@ export const AVATAR_STATES = {
   speaking: { expr: 'speaking', ring: 'pulse' },
   listening: { expr: 'listening', ring: 'pulse' },
   happy: { expr: 'happy' },
+  // done / saved: the green ring carries the meaning at icon sizes (toasts)
+  success: { expr: 'happy', ringColor: '#2ecc8f' },
   love: { expr: 'love' },
   wow: { expr: 'wow' },
   error: { expr: 'error', ringColor: '#ff5d6c' },

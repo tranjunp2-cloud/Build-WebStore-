@@ -4,10 +4,12 @@ import { Toaster as Sonner } from 'sonner'
 import { useTheme } from '@/providers/theme-provider'
 import { MascotAvatar } from '@/mascot'
 
-// Success and error toasts carry the mascot's reaction (the lucide-like default until it loads).
+// Success and error toasts carry the mascot's reaction, ringed green / red so the outcome still reads
+// at 20px. Passive: a toast never downloads the 3D runtime — the check / alert icon stays unless a
+// robot elsewhere on the page already loaded it.
 const MASCOT_ICONS: ToasterProps['icons'] = {
-    success: <MascotAvatar state="happy" size={20} ring={false} follow={false} fallback={<SuccessDot />} />,
-    error: <MascotAvatar state="error" size={20} follow={false} fallback={<ErrorDot />} />,
+    success: <MascotAvatar state="success" size={20} follow={false} passive fallback={<SuccessDot />} />,
+    error: <MascotAvatar state="error" size={20} follow={false} passive fallback={<ErrorDot />} />,
 }
 
 function SuccessDot() {

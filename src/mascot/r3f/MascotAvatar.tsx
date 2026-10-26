@@ -4,7 +4,7 @@
 import { CSSProperties, ReactNode, useEffect, useRef, useState } from 'react';
 import { AVATAR_STATES, AvatarDef, AvatarState, avatarScene } from '../core/scenes';
 import type { MascotInstance } from './store';
-import { useMascotStore } from './MascotProvider';
+import { useMascotRuntime } from './MascotProvider';
 
 export interface MascotAvatarProps {
   state?: AvatarState;
@@ -22,6 +22,8 @@ export interface MascotAvatarProps {
   style?: CSSProperties;
   /** screen-reader label; without it the avatar is decorative (aria-hidden) */
   label?: string;
+  /** never download the 3D runtime for this mascot; show the robot only if it is already loaded */
+  passive?: boolean;
 }
 
 const BG = {
@@ -43,9 +45,9 @@ function injectKeyframes() {
   document.head.appendChild(el);
 }
 
-export function MascotAvatar({ state = 'idle', size = 40, theme = 'brand', dot, ring = true, follow = true, fps, fallback, className, style, label }: MascotAvatarProps) {
-  const store = useMascotStore();
+export function MascotAvatar({ state = 'idle', size = 40, theme = 'brand', dot, ring = true, follow = true, fps, fallback, className, style, label, passive = false }: MascotAvatarProps) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const store = useMascotRuntime(ref, passive);
   const inst = useRef<MascotInstance | null>(null);
   const [ready, setReady] = useState(false);
   useEffect(injectKeyframes, []);

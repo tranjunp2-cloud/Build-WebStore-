@@ -3,7 +3,7 @@
 import { CSSProperties, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { SCENES, SceneDef, SceneName } from '../core/scenes';
 import type { MascotInstance } from './store';
-import { useMascotStore } from './MascotProvider';
+import { useMascotRuntime } from './MascotProvider';
 
 export interface MascotProps {
   /** a built-in scene (see SCENE_NAMES) */
@@ -22,11 +22,13 @@ export interface MascotProps {
   style?: CSSProperties;
   /** screen-reader label; without it the mascot is decorative (aria-hidden) */
   label?: string;
+  /** never download the 3D runtime for this mascot; show the robot only if it is already loaded */
+  passive?: boolean;
 }
 
-export function Mascot({ scene = 'welcome', def, size = 240, follow = true, fps, fallback, className, style, label }: MascotProps) {
-  const store = useMascotStore();
+export function Mascot({ scene = 'welcome', def, size = 240, follow = true, fps, fallback, className, style, label, passive = false }: MascotProps) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const store = useMascotRuntime(ref, passive);
   const inst = useRef<MascotInstance | null>(null);
   const [ready, setReady] = useState(false);
   const defKey = def ? JSON.stringify(def) : scene;
