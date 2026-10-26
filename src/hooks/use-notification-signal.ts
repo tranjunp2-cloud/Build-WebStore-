@@ -63,12 +63,21 @@ export function useNotificationSignal(handlers: NotificationSignalHandlers): voi
             // Armed before any network step so a hung token fetch / sign-in also ends in
             // fallback polling instead of "unknown" (= no sync at all).
             if (connectTimer) clearTimeout(connectTimer)
-            connectTimer = setTimeout(() => { if (!connectedOnce) mode('fallback') }, CONNECT_TIMEOUT_MS)
+            connectTimer = setTimeout(() => {
+                if (connectedOnce || cancelled) return
+                // Already in fallback (error already logged, or off / signed out on purpose): no log per attempt.
+                if (lastMode === 'fallback') return
+                console.error('[Signal] Firebase not connected within 15s; falling back to polling')
+                mode('fallback')
+            }, CONNECT_TIMEOUT_MS)
             try {
                 const res = await fetch('/api/notifications/firebase-token', { credentials: 'include' })
                 if (cancelled) return
                 if (res.status === 401) return mode('fallback')
-                if (!res.ok) return retry()
+                if (!res.ok) {
+                    console.error(`[Signal] firebase-token -> ${res.status}; falling back to polling`)
+                    return retry()
+                }
                 const data = (await res.json()) as TokenResponse
                 if (cancelled) return
                 if (!data.enabled || !data.token || !data.config || !data.userPath || !data.broadcastPath) {
@@ -87,8 +96,9 @@ export function useNotificationSignal(handlers: NotificationSignalHandlers): voi
                 let detached = false
                 let denied = false // sticky: a later `connected` must not flip back to live
 
-                const onDenied = () => {
+                const onDenied = (err: Error) => {
                     if (detached || cancelled) return
+                    console.error('[Signal] Firebase listener denied; falling back to polling:', err.message)
                     denied = true
                     mode('fallback')
                 }
@@ -116,10 +126,12 @@ export function useNotificationSignal(handlers: NotificationSignalHandlers): voi
                 cleanupFirebase = () => {
                     detached = true // ignore cancel callbacks triggered by sign-out
                     unsubs.forEach((u) => u())
-                    void client.auth.signOut().catch(() => {})
+                    void client.auth.signOut().catch(() => {}) // best-effort on unmount
                 }
-            } catch {
-                if (!cancelled) retry()
+            } catch (err) {
+                if (cancelled) return
+                console.error('[Signal] Firebase connect failed; falling back to polling:', err instanceof Error ? err.message : 'unknown')
+                retry()
             }
         }
 

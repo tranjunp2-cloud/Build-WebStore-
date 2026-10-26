@@ -5,7 +5,7 @@
  *
  * Usage: node --env-file=.env.local scripts/firebase-signal-smoke.mjs [env-prefix]
  * Needs FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY/DATABASE_URL/WEB_API_KEY.
- * Writes + removes only pw2/<env-prefix>-smoke/*  (default prefix: "smoke").
+ * Writes + removes only pw2/<env-prefix>/*  (default prefix: "smoke").
  * Never prints secrets.
  */
 import crypto from 'node:crypto'
