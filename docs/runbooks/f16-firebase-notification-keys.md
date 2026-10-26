@@ -112,7 +112,7 @@ Placeholder đã có sẵn trong `.env.staging.example`, `.env.production.exampl
 | Triệu chứng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
 | `enabled:false`, không có log `[Signal]` | Thiếu 1 trong 5 biến ở **đúng scope**, hoặc đã thêm nhưng chưa deploy lại | Kiểm tra env theo scope → deploy lại (mục 4) |
-| `enabled:false` + log `[Signal] VERCEL_TARGET_ENV is not set at runtime; Firebase signal disabled` | Runtime Vercel không có `VERCEL_TARGET_ENV` | Báo dev: cần bổ sung biến dự phòng trong code (chưa có) |
+| `enabled:false` + log `[Signal] VERCEL_TARGET_ENV is not set at runtime; Firebase signal disabled` | Runtime Vercel không có `VERCEL_TARGET_ENV` | Biến do Vercel tự cấp, không tạo tay được → báo dev |
 | `enabled:false` + log `[Signal] Firebase admin init failed` | `FIREBASE_PRIVATE_KEY` sai định dạng (bị bọc ngoặc trên Vercel, mất `-----BEGIN…`, xuống dòng thật lẫn `\n`) | Dán lại đúng 1 dòng có `\n` → deploy lại |
 | Log `[Signal] RTDB write failed: …invalid_grant…` hoặc `[Signal] RTDB PATCH … -> 401` | Key đã bị xoá/thu hồi, hoặc email và key thuộc 2 service account khác nhau | Generate key mới, cập nhật cả 3 biến service account |
 | Log `[Signal] RTDB … -> 404` | Sai `FIREBASE_DATABASE_URL` (dùng `*.firebaseio.com` thay vì URL có region, hoặc sai tên DB) | Copy lại URL từ tab Data |
