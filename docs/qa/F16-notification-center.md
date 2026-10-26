@@ -108,6 +108,7 @@ Tài liệu chú trọng đánh giá các giới hạn biên (Boundary/Equivalen
 | **TC-F16.55** | `AC-06,07,10` | `Unit` | **[Negative]** `useNotificationSignal`: token, sign-in, listeners, fallback | enabled:false/401/5xx/mạng lỗi/permission denied/15s không connect/unmount khi đang connect | Fallback đúng lúc; denied không bị "live" ghi đè; retry backoff; unmount gỡ listener + signOut, không signOut chéo mount khác | Blocker | [x] |
 | **TC-F16.56** | `#1972` | `Unit` | **[Edge]** `firebase-admin-app`: cấu hình + cache access token | thiếu env, key `\n`, nhiều caller đồng thời, gần hết hạn, request lỗi | null khi thiếu; 1 request dùng chung; refresh trước hạn 60s; lỗi không bị cache | High | [x] |
 | **TC-F16.57** | `#1972` | `Unit` | **[Positive]** `Notifications.afterChange` cho row tạo tay (admin/REST) | create thủ công / `skipPush` / update | Tạo tay: signal rồi push; `skipPush` và update: không làm gì | High | [x] |
+| **TC-F16.58** | `#1972` | `Unit` | **[Regression]** Firebase client SDK chỉ có 1 bản `@firebase/app` (SDK thật, không mock) | `initializeApp` → `initializeAuth` + `getDatabase` | Không throw "Component auth has not been registered yet" (lỗi staging: có token nhưng không sign-in, rơi về poll 60s) | Blocker | [x] |
 
 ---
 
