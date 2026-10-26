@@ -441,6 +441,7 @@ export default function BlogListPage() {
                     <div className="md:col-span-2">
                         <TableEmptyState
                             icon={<SearchX />}
+                            scene="searchEmpty"
                             title={t.dashboard.blog.noMatches}
                         />
                     </div>
@@ -573,6 +574,7 @@ export default function BlogListPage() {
                 {posts.length === 0 ? (
                     <TableEmptyState
                         icon={<SearchX />}
+                        scene="searchEmpty"
                         title={t.dashboard.blog.noMatches}
                     />
                 ) : (

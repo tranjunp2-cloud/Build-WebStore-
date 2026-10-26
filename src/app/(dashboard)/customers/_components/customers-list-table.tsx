@@ -129,7 +129,7 @@ export function CustomersListTable({
         return !hasFilters ? (
             <TableEmptyState icon={<Users />} title={tb.emptyTitle} subtitle={tb.emptySubtitle} />
         ) : (
-            <TableEmptyState icon={<SearchX />} title={tb.filteredTitle} subtitle={tb.filteredSubtitle} />
+            <TableEmptyState icon={<SearchX />} scene="searchEmpty" title={tb.filteredTitle} subtitle={tb.filteredSubtitle} />
         )
     }
 

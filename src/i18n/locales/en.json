@@ -1,4 +1,29 @@
 {
+  "mascot": {
+    "statusPages": {
+      "notFound": {
+        "title": "Page not found",
+        "description": "The page you're looking for doesn't exist or has been moved.",
+        "cta": "Go to Dashboard"
+      },
+      "forbidden": {
+        "title": "Access denied",
+        "description": "You don't have permission to access this page. Contact your store owner to request access.",
+        "cta": "Go to Dashboard"
+      },
+      "error": {
+        "title": "Something went wrong",
+        "description": "This page hit a problem. Try again — if it keeps happening, reload the page.",
+        "cta": "Try again"
+      },
+      "offline": {
+        "title": "You're offline",
+        "description": "Check your connection, then try again. Nothing you saved is lost.",
+        "cta": "Try again"
+      }
+    },
+    "generationIllustration": "Website creation incomplete"
+  },
   "common": {
     "signIn": "Sign in",
     "signUp": "Sign up",

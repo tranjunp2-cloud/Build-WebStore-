@@ -15,6 +15,7 @@ import { PushOptInPrompt } from '@/components/notifications/PushOptInPrompt'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/providers/theme-provider'
 import { cookies } from 'next/headers'
+import { MascotProvider } from '@/mascot'
 
 export default async function DashboardLayout({
     children,
@@ -82,22 +83,24 @@ export default async function DashboardLayout({
         <AppShell>
             <ThemeProvider initialTheme={initialTheme}>
                 <I18nProvider defaultLocale="en">
-                    <TooltipProvider delayDuration={300}>
-                        <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} userPermissions={userPermissions} isSuperAdmin={isSuperAdmin} isProduction={isProduction} badgeCounts={badgeCounts} hasWebsite={hasWebsite}>
-                            {children}
-                        </CMSLayoutClient>
-                        {typedUser && (
-                            <>
-                                <NotificationProvider />
-                                <ToastContainer />
-                                <PushOptInPrompt />
-                            </>
-                        )}
-                        {/* Only evaluate and render if the user hasn't seen the wizard yet */}
-                        {!typedUser?.has_seen_ai_wizard && (
-                            <AIDiscoveryWizard userId={typedUser?.id} />
-                        )}
-                    </TooltipProvider>
+                    <MascotProvider>
+                        <TooltipProvider delayDuration={300}>
+                            <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} userPermissions={userPermissions} isSuperAdmin={isSuperAdmin} isProduction={isProduction} badgeCounts={badgeCounts} hasWebsite={hasWebsite}>
+                                {children}
+                            </CMSLayoutClient>
+                            {typedUser && (
+                                <>
+                                    <NotificationProvider />
+                                    <ToastContainer />
+                                    <PushOptInPrompt />
+                                </>
+                            )}
+                            {/* Only evaluate and render if the user hasn't seen the wizard yet */}
+                            {!typedUser?.has_seen_ai_wizard && (
+                                <AIDiscoveryWizard userId={typedUser?.id} />
+                            )}
+                        </TooltipProvider>
+                    </MascotProvider>
                 </I18nProvider>
             </ThemeProvider>
         </AppShell>

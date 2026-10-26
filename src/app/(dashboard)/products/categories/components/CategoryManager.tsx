@@ -688,6 +688,7 @@ export default function CategoryManager() {
                             {searchQuery ? (
                                 <TableEmptyState
                                     icon={<SearchX />}
+                                    scene="searchEmpty"
                                     title={t.dashboard?.products?.categories?.table?.noResults || 'No results found'}
                                     subtitle={t.dashboard?.products?.categories?.table?.tryAdjusting || 'Try adjusting your search terms.'}
                                 />

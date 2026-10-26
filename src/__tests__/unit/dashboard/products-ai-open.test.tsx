@@ -15,6 +15,7 @@ const { bulkCreateProps, mockRouterPush } = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(() => ({ push: mockRouterPush, refresh: vi.fn() })),
+    usePathname: vi.fn(() => '/products'),
 }))
 
 vi.mock('next/link', () => ({
