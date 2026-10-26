@@ -580,6 +580,18 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.260** | Browser | High | Mobile 375px không horizontal overflow | Product grid và filter drawer giữ `scrollWidth <= clientWidth` | GH-1665 Phase03 | [x] |
 | **TC-F09.261** | Unit | Critical | Rapid filter chỉ settle request mới nhất | Request A bị abort không clear reposition pending của request B | GH-1665 Phase02 | [x] |
 
+### TC-F09.262–264: Trang checkout luôn truy cập được, đặt hàng vẫn được bảo vệ
+
+> **File test nguồn:** `src/__tests__/unit/storefront/checkout-access.test.tsx`
+>
+> Trang `/sites/<slug>/checkout` không còn bị thay bằng màn hình "giỏ trống" hay "checkout không khả dụng". Việc đặt hàng vẫn bị chặn ở nút Place order (`canPlaceOrder`) và ở server (`PAYMENT_METHOD_DISABLED`, `items.min(1)`).
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.262** | Unit | High | Giỏ trống vẫn hiện form checkout | Có `Order Summary` và form; không có màn hình "giỏ trống"; nút Place order disabled | PR #1997 | [x] |
+| **TC-F09.263** | Unit | High | Tenant không có phương thức thanh toán: hiện thông báo trong trang, nút Place order vẫn disabled khi form đủ | Có `role="alert"` "Checkout unavailable"; form vẫn hiển thị; nút disabled | PR #1997 | [x] |
+| **TC-F09.264** | Unit | Medium | Control: tenant có phương thức thanh toán, form đủ | Không có thông báo; nút Place order enabled | PR #1997 | [x] |
+
 ### TC-F09.64: Product component variant guard
 
 | ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
