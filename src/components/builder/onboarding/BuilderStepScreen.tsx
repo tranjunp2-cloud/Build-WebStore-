@@ -29,7 +29,7 @@ export function BuilderStepScreen({
 }: BuilderStepScreenProps) {
     const leftPane = (
         <div className="mx-auto flex h-[100dvh] w-full max-w-[920px] flex-col px-6 sm:px-10 lg:ml-auto lg:mr-0 lg:max-w-[880px] lg:px-10">
-            <div className="sticky top-0 z-10 bg-[#0b1120] pb-11">
+            <div className="sticky top-0 z-10 bg-[#0b1120] pb-8">
                 <BuilderStepHeader
                     description={description}
                     subtitle={subtitle}
