@@ -9,11 +9,11 @@ const buttonVariants = cva(
     {
         variants: {
             variant: {
-                // Unified primary (design-system): blue→teal gradient (was blue→purple).
-                // `!text-white` survives the `.dash-shell .text-white` legacy remap so the
-                // label stays white on the gradient in both themes.
+                // Unified primary (design-system): solid brand teal, no gradient or glow.
+                // Label uses --primary-foreground (dark ink on teal in both themes), so the
+                // `.dash-shell .text-white` legacy remap does not apply here.
                 default:
-                    'bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white shadow-lg shadow-blue-500/25 hover:opacity-90 focus-visible:ring-cyan-500',
+                    'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary)/0.88)] focus-visible:ring-[hsl(var(--ring))]',
                 // `!text-white` keeps the label white on the red fill in BOTH themes —
                 // plain text-white gets remapped to --dash-text (dark) inside .dash-shell (GH-1192).
                 destructive:
@@ -28,11 +28,9 @@ const buttonVariants = cva(
                 // GH-1222 F33 page-header action pair (reference: Discounts screen).
                 // Theme-token colors via arbitrary values: preflight is OFF, so the border
                 // needs the full `[border:1px_solid_…]` shorthand to render. Pair with size="dash".
-                // GH-1192: `!text-white` is intentional — the `.dash-shell .text-white` legacy remap
-                // (globals.css) rewrites plain text-white to --dash-text (dark in light mode). The `!`
-                // keeps white on the blue→teal gradient. Drop the `!` once that remap is removed (Nhánh 2).
+                // Same solid teal as `default`; the label token is theme-aware, so no `!text-white`.
                 dashPrimary:
-                    'bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white font-semibold shadow-none hover:opacity-90 focus-visible:ring-cyan-500',
+                    'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold shadow-none hover:bg-[hsl(var(--primary)/0.88)] focus-visible:ring-[hsl(var(--ring))]',
                 dashSecondary:
                     '[border:1px_solid_hsl(var(--input-border))] bg-transparent text-[var(--dash-text)] font-medium hover:bg-white/[0.05] focus-visible:ring-zinc-400',
                 // GH-1192 dash ghost: subtle action inside .dash-shell (pairs with size="dash"/"sm").

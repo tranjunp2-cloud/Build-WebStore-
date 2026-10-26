@@ -356,7 +356,7 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
           <Button
             type="button"
             variant="dashPrimary"
-            className="h-10 flex-none px-4 !text-white"
+            className="h-10 flex-none px-4"
             onClick={handlePrint}
             disabled={active.status !== 'ok'}
           >

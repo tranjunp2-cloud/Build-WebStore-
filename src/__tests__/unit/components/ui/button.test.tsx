@@ -30,11 +30,14 @@ describe('TC-GH1290-BTN-02: disabled blocks clicks', () => {
     })
 })
 
-describe('TC-GH1290-BTN-03: dashPrimary variant applies gradient class', () => {
-    it('includes the dashPrimary gradient', () => {
-        render(<Button variant="dashPrimary">Go</Button>)
+describe('TC-GH1290-BTN-03: primary variants use the solid brand fill', () => {
+    it.each(['default', 'dashPrimary'] as const)('%s is solid --primary with --primary-foreground label, no gradient', (variant) => {
+        render(<Button variant={variant}>Go</Button>)
         const btn = screen.getByRole('button', { name: 'Go' })
-        expect(btn.className).toContain('linear-gradient')
+        expect(btn.className).toContain('bg-[hsl(var(--primary))]')
+        expect(btn.className).toContain('text-[hsl(var(--primary-foreground))]')
+        expect(btn.className).not.toContain('gradient')
+        expect(btn.className).not.toMatch(/shadow-(lg|blue)/)
     })
 })
 
