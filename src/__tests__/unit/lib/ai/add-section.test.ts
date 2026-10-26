@@ -809,6 +809,14 @@ describe('normalizeAddSectionBlock — custom-html library drop [TC-F05-RT-01]',
         expect(result.html).toBe('<p>Mine</p>')
     })
 
+    it.each([['empty string', ''], ['null', null]])('restores starter html when caller passes %s', (_label, html) => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'Add custom-html block', siteName: 'Test', requestedType: 'custom-html' },
+            { blockType: 'custom-html', variant: 'default', html },
+        ) as Record<string, unknown>
+        expect((result.html as string).trim().length).toBeGreaterThan(0)
+    })
+
     it('still does not let the AI add-section flow create custom-html', () => {
         expect(createAddSectionBlock({ instruction: 'Add custom-html block', requestedType: 'custom-html' })).toBeNull()
     })
