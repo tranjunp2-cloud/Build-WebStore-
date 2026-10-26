@@ -78,7 +78,8 @@ export function CustomHtmlBlock({ block }: BlockProps<CustomHtmlConfig>) {
                         onApply={finish} onCancel={() => finish()} /></Suspense>
                 </div>}
                 {(!editing || !editorReady) && (
-                    <div onClick={editorMode ? event => {
+                    // Min height in the editor: a block with no text must stay a click target to start editing
+                    <div style={editorMode ? { minHeight: '3rem' } : undefined} onClick={editorMode ? event => {
                         event.preventDefault()
                         event.stopPropagation()
                         if (editing) return

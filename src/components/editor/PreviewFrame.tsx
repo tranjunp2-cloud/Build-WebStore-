@@ -7,6 +7,7 @@ import { RichTextToolbar } from './RichTextToolbar'
 import { ImageToolbar } from './ImageToolbar'
 import { BlockActionBar } from './BlockActionBar'
 import { DeleteBlockConfirm } from './DeleteBlockConfirm'
+import { getBlockDisplayName } from './block-display-name'
 import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { cn } from '@/lib/utils'
@@ -1566,7 +1567,7 @@ function PreviewFrameInner({
                         }}
                     >
                         <span className="absolute left-0 top-0 -translate-y-full rounded-t-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white capitalize">
-                            {selectedGlobalBlockLayout.blockType?.replace(/-/g, ' ')}
+                            {selectedGlobalBlockLayout.blockType ? getBlockDisplayName(selectedGlobalBlockLayout.blockType) : ''}
                         </span>
                     </div>
                 ) : null}
@@ -1591,7 +1592,7 @@ function PreviewFrameInner({
                             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 rounded-lg bg-blue-600/90 px-3 py-1.5 shadow-lg">
                                 <GripVertical className="h-3.5 w-3.5 text-white/80" />
                                 <span className="text-xs font-semibold text-white capitalize">
-                                    {dragState.sourceRect.blockType?.replace(/-/g, ' ') || 'Block'}
+                                    {(dragState.sourceRect.blockType ? getBlockDisplayName(dragState.sourceRect.blockType) : 'Block')}
                                 </span>
                             </div>
                         </motion.div>
@@ -1799,7 +1800,7 @@ function PreviewFrameInner({
                             }
                             onBlockSelect?.(null)
                             setDeleteConfirmIndex(null)
-                            toast.success(`Deleted ${deleteBlockType.replace(/-/g, ' ')}`, {
+                            toast.success(`Deleted ${getBlockDisplayName(deleteBlockType)}`, {
                                 duration: 5000,
                                 action: {
                                     label: 'Undo',

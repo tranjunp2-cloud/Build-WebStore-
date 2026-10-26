@@ -12,6 +12,7 @@ import { EditorAdvisoryBanner } from './EditorAdvisoryBanner'
 import { EditorToolsSheet, type ToolsSheetPanelProps, type ToolsSheetTab } from './EditorToolsSheet'
 import { useEditorStore, type BlockData, type PageData, type SiteLocale } from '@/store/editorStore'
 import type { ThemeData } from '@/types/editor'
+import { getBlockDisplayName } from './block-display-name'
 import type { SiteData } from '@/app/(editor)/editor/[siteId]/page'
 
 /**
@@ -234,7 +235,7 @@ export function CompactEditorLayout({
         onCloseMobileSettings()
         // Mirrors the desktop BlockActionBar's delete confirm + undo toast (PreviewFrame.tsx)
         // so both entry points give the same feedback — reuses the store's own undo(), no forked logic.
-        toast.success(ti(cl.deletedBlock, { type: deletedType.replace(/-/g, ' ') }), {
+        toast.success(ti(cl.deletedBlock, { type: getBlockDisplayName(deletedType) }), {
             duration: 5000,
             action: { label: t.editor.aiChat.undo, onClick: () => useEditorStore.getState().undo() },
         })

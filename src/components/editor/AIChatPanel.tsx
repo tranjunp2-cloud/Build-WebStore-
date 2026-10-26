@@ -5,6 +5,7 @@ import React, { memo, useEffect, useRef, useState } from 'react'
 import DOMPurify from 'isomorphic-dompurify'
 import { RotateCcw, Send, Sparkles, Square, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getBlockDisplayName } from './block-display-name'
 import type { AIAction, BlockData, ThemeData } from '@/types/editor'
 import { useI18n } from '@/i18n'
 
@@ -310,7 +311,7 @@ function AIChatPanelInner({
         if (!input.trim() || isProcessing || externalProcessing) return
 
         appliedActionsRef.current = 0
-        const blockLabel = blockContext ? blockContext.blockType.replace(/-/g, ' ') : null
+        const blockLabel = blockContext ? getBlockDisplayName(blockContext.blockType) : null
         const userMsg = blockLabel
             ? `[${blockLabel}] ${input.trim()}`
             : input.trim()
@@ -532,7 +533,7 @@ function AIChatPanelInner({
                             <div className="mb-2 flex items-center gap-1.5">
                                 <span className="flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300 border border-amber-500/20">
                                     <Sparkles className="h-3 w-3" />
-                                    {blockContext.blockType.replace(/-/g, ' ')}
+                                    {getBlockDisplayName(blockContext.blockType)}
                                 </span>
                                 <button
                                     type="button"

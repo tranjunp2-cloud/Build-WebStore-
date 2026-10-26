@@ -2,6 +2,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog'
 import { AlertTriangle, Trash2 } from 'lucide-react'
+import { getBlockDisplayName } from './block-display-name'
 
 interface DeleteBlockConfirmProps {
     blockName: string
@@ -12,7 +13,7 @@ interface DeleteBlockConfirmProps {
 }
 
 export function DeleteBlockConfirm({ blockName, open, onConfirm, onCancel, scope = 'page' }: DeleteBlockConfirmProps) {
-    const label = blockName.replace(/-/g, ' ')
+    const label = getBlockDisplayName(blockName)
     const isGlobal = scope === 'global'
 
     return (
