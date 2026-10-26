@@ -1200,6 +1200,7 @@ export default function ProductsPage() {
                         {totalProducts === 0 && (
                             <TableEmptyState
                                 icon={<SearchX />}
+                                scene="searchEmpty"
                                 title={t.dashboard.products.list.noResults}
                             />
                         )}

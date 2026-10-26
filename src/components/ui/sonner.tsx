@@ -2,6 +2,29 @@
 
 import { Toaster as Sonner } from 'sonner'
 import { useTheme } from '@/providers/theme-provider'
+import { MascotAvatar } from '@/mascot'
+
+// Success and error toasts carry the mascot's reaction (the lucide-like default until it loads).
+const MASCOT_ICONS: ToasterProps['icons'] = {
+    success: <MascotAvatar state="happy" size={20} ring={false} follow={false} fallback={<SuccessDot />} />,
+    error: <MascotAvatar state="error" size={20} follow={false} fallback={<ErrorDot />} />,
+}
+
+function SuccessDot() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" aria-hidden="true">
+            <path d="M5 12.5 10 17l9-10" />
+        </svg>
+    )
+}
+
+function ErrorDot() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" aria-hidden="true">
+            <path d="M12 7v6M12 17h.01" />
+        </svg>
+    )
+}
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
@@ -11,6 +34,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         <Sonner
             theme={theme}
             className="toaster group"
+            icons={MASCOT_ICONS}
             style={{ '--width': 'min(420px, calc(100vw - 32px))' } as React.CSSProperties}
             toastOptions={{
                 classNames: {

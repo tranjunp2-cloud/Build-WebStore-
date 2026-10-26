@@ -1,8 +1,8 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { useI18n } from '@/i18n'
+import { Mascot } from '@/mascot'
 
 export function DashboardGenerationFailed() {
     const { t } = useI18n()
@@ -11,15 +11,7 @@ export function DashboardGenerationFailed() {
         <div className="flex w-full flex-col items-center justify-center p-8">
             <div className="flex flex-col items-center gap-[18px]">
                 {/* Illustration */}
-                <div className="relative size-[350px]">
-                    <Image
-                        src="/images/dashboard/generation-incomplete.png"
-                        alt="Website creation incomplete"
-                        fill
-                        className="object-contain"
-                        priority
-                    />
-                </div>
+                <Mascot scene="maintenance" size={260} className="max-w-full" label={t.mascot.generationIllustration} />
 
                 {/* Heading */}
                 <h2 className="m-0 text-center text-[30px] font-extrabold leading-[36px] tracking-[-0.75px] text-[hsl(var(--foreground))]">

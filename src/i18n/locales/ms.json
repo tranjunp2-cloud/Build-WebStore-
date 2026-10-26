@@ -1,4 +1,29 @@
 {
+  "mascot": {
+    "statusPages": {
+      "notFound": {
+        "title": "Halaman tidak ditemui",
+        "description": "Halaman yang anda cari tidak wujud atau telah dipindahkan.",
+        "cta": "Pergi ke Papan Pemuka"
+      },
+      "forbidden": {
+        "title": "Akses ditolak",
+        "description": "Anda tiada kebenaran untuk mengakses halaman ini. Hubungi pemilik kedai anda untuk meminta akses.",
+        "cta": "Pergi ke Papan Pemuka"
+      },
+      "error": {
+        "title": "Ada sesuatu yang tidak kena",
+        "description": "Halaman ini menghadapi masalah. Cuba lagi — jika masih berlaku, muat semula halaman.",
+        "cta": "Cuba lagi"
+      },
+      "offline": {
+        "title": "Anda di luar talian",
+        "description": "Semak sambungan anda, kemudian cuba lagi. Apa yang telah anda simpan tidak hilang.",
+        "cta": "Cuba lagi"
+      }
+    },
+    "generationIllustration": "Penciptaan laman web belum selesai"
+  },
   "common": {
     "signIn": "Log masuk",
     "signUp": "Daftar",

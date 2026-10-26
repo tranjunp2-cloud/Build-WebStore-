@@ -203,6 +203,7 @@ export function DiscountsClientLayout() {
                 hasFilters ? (
                     <TableEmptyState
                         icon={<SearchX />}
+                        scene="searchEmpty"
                         title={d.emptyNoResults}
                         subtitle={d.emptyNoResultsSubtitle}
                     />

@@ -6,6 +6,7 @@
  * this component prepends the "Hourly ·" / "Daily ·" prefix via i18n.
  */
 import { useI18n } from '@/i18n'
+import { MascotAvatar } from '@/mascot'
 import type { DashboardPeriodKey } from '@/lib/dashboard/dashboard-types'
 
 export function DashboardToolbarHeader({ period, rangeLabel }: {
@@ -21,9 +22,14 @@ export function DashboardToolbarHeader({ period, rangeLabel }: {
     )
 
     return (
-        <div className="dt-left">
-            <h1 className="dt-title">{r.title}</h1>
-            <span className="dt-sub">{sub}</span>
+        <div className="flex items-center gap-3">
+            <span className="hidden sm:flex">
+                <MascotAvatar state="happy" size={40} />
+            </span>
+            <div className="dt-left">
+                <h1 className="dt-title">{r.title}</h1>
+                <span className="dt-sub">{sub}</span>
+            </div>
         </div>
     )
 }

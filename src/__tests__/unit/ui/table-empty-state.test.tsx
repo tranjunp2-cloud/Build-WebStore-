@@ -55,13 +55,14 @@ describe('[TC-DS1222-07-03] TableEmptyState uses dash surface + border tokens', 
 
 // ── TC-DS1222-07-04 — compact padding ───────────────────────────────────────
 describe('[TC-DS1222-07-04] TableEmptyState compact padding', () => {
-    it('uses py-12 when compact', () => {
+    // the mascot (104px compact / 148px default) carries the height the old padding did
+    it('uses py-8 when compact', () => {
         const { container } = render(<TableEmptyState title="Empty" compact />)
-        expect(container.firstElementChild).toHaveClass('py-12')
+        expect(container.firstElementChild).toHaveClass('py-8')
     })
 
-    it('uses py-24 by default', () => {
+    it('uses py-12 (md:py-16) by default', () => {
         const { container } = render(<TableEmptyState title="Empty" />)
-        expect(container.firstElementChild).toHaveClass('py-24')
+        expect(container.firstElementChild).toHaveClass('py-12', 'md:py-16')
     })
 })
