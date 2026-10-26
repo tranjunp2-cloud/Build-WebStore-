@@ -17,6 +17,8 @@ Code hiện tại cần **5 biến, tất cả server-only** (không có `NEXT_P
 
 Thiếu bất kỳ biến nào → tính năng **tự tắt** (`enabled:false`), client quay về poll 60s. Không lỗi app.
 
+Trên Vercel còn cần `VERCEL_TARGET_ENV` (Vercel tự cấp, **không** tạo tay) để chọn prefix `pw2/staging` / `pw2/production`. Nếu runtime không có biến này, tín hiệu cũng tự tắt (fail-closed) để staging và production không ghi chung một prefix. Local (không phải Vercel) dùng prefix `development`.
+
 > ⚠️ **Không dùng project Firebase của PW1** (`primeweb-tm-development`, `prime-web-tm-production`): rules của PW1 mở `.read: true` ở root (đã kiểm tra cả dev và production) → rules `pw2` bị vô hiệu. Mỗi môi trường PW2 dùng project riêng.
 
 | Môi trường | Project Firebase | Gói |
@@ -87,18 +89,20 @@ FIREBASE_WEB_API_KEY=AIza...
    - Staging: **Custom Environment `staging`** (Preview **không** tự kế thừa).
    - Production: **Production**.
 2. `FIREBASE_PRIVATE_KEY`: dán chuỗi có `\n` dạng chữ, **không** bọc dấu ngoặc kép.
-3. Đánh dấu cả 5 biến là **Sensitive**.
-4. **Redeploy** (env gắn theo deployment — đổi env không có tác dụng cho bản đã deploy).
+3. Loại biến: để giống các secret hiện có của project (ví dụ `STRIPE_SECRET_KEY`). Không tự chuyển sang *Sensitive* khi team chưa dùng — giá trị Sensitive không xem lại được nên rất khó kiểm tra khi sai định dạng.
+4. **Deploy lại**: env chỉ áp dụng cho deployment tạo **sau** khi thêm biến. Repo tắt Git deploy của Vercel (`git.deploymentEnabled: false`), deploy chỉ chạy qua GitHub Actions:
+   - Staging: GitHub → *Actions* → run **CI** của commit mới nhất trên `staging` → *Re-run jobs* → chọn **Deploy: Vercel (staging)**. (Hoặc chờ lần merge code tiếp theo vào `staging`; push chỉ đổi `docs/**` / `*.md` **không** kích hoạt deploy.)
+   - Production: tương tự với run trên `main`.
 
 Placeholder đã có sẵn trong `.env.staging.example`, `.env.production.example`, `.env.example`.
 
 ## 5. Kiểm tra
 
-1. **Smoke script** (không in secret; chỉ ghi/xoá `pw2/smoke-smoke/*`):
+1. **Smoke script** (không in secret; chỉ ghi rồi xoá `pw2/smoke/*`, tạo rồi xoá 1 user Auth tạm):
    ```bash
    node --env-file=.env.local scripts/firebase-signal-smoke.mjs
    ```
-   Mọi dòng phải là `OK`: lấy access token, custom token sign-in, đọc node của mình, **bị chặn** đọc node user khác / env khác, client **không ghi được**.
+   Mọi dòng phải là `OK` (10 check): service account lấy được access token, server ghi được, đọc ẩn danh **bị chặn**, custom token sign-in (Auth đã bật), đọc node của mình + broadcast, **bị chặn** đọc user khác / liệt kê danh sách user / env khác, client **không ghi được**. Cuối cùng in `All checks passed`.
    Kiểm tra key staging/production: tạo file env tạm ngoài repo chứa 5 biến đó rồi trỏ `--env-file` vào, chạy xong xoá file.
 2. **Token endpoint**: đăng nhập dashboard → mở `/api/notifications/firebase-token` → phải thấy `"enabled": true` và `userPath` = `pw2/<env>/u/<userId>` (`<env>` = `development` ở local, `staging`/`production` trên Vercel).
 3. **End-to-end**: tạo 1 đơn COD → toast ORDER_NEW ≲1s; tab DevTools → Network không có request `/api/notifications` lặp định kỳ khi idle.
@@ -107,16 +111,18 @@ Placeholder đã có sẵn trong `.env.staging.example`, `.env.production.exampl
 
 | Triệu chứng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
-| `enabled:false` | Thiếu 1 trong 5 biến; hoặc trên Vercel thiếu `VERCEL_TARGET_ENV` (tín hiệu tự tắt, log `[Signal] VERCEL_TARGET_ENV is not set`) | Kiểm tra env đúng scope + redeploy |
-| Log `[Signal] Firebase admin init failed` | `FIREBASE_PRIVATE_KEY` sai định dạng (bị bọc ngoặc trên Vercel, mất `-----BEGIN…`, xuống dòng thật lẫn `\n`) | Dán lại đúng 1 dòng có `\n` |
-| Log `RTDB PATCH … -> 401` / `invalid_grant` | Key đã bị xoá/thu hồi, hoặc email và key thuộc 2 service account khác nhau | Generate key mới, cập nhật cả 3 biến service account |
-| Log `RTDB … -> 404` "Database lives in a different region" | Dùng URL `*.firebaseio.com` thay vì URL có region | Copy lại URL từ tab Data |
+| `enabled:false`, không có log `[Signal]` | Thiếu 1 trong 5 biến ở **đúng scope**, hoặc đã thêm nhưng chưa deploy lại | Kiểm tra env theo scope → deploy lại (mục 4) |
+| `enabled:false` + log `[Signal] VERCEL_TARGET_ENV is not set at runtime; Firebase signal disabled` | Runtime Vercel không có `VERCEL_TARGET_ENV` | Báo dev: cần bổ sung biến dự phòng trong code (chưa có) |
+| `enabled:false` + log `[Signal] Firebase admin init failed` | `FIREBASE_PRIVATE_KEY` sai định dạng (bị bọc ngoặc trên Vercel, mất `-----BEGIN…`, xuống dòng thật lẫn `\n`) | Dán lại đúng 1 dòng có `\n` → deploy lại |
+| Log `[Signal] RTDB write failed: …invalid_grant…` hoặc `[Signal] RTDB PATCH … -> 401` | Key đã bị xoá/thu hồi, hoặc email và key thuộc 2 service account khác nhau | Generate key mới, cập nhật cả 3 biến service account |
+| Log `[Signal] RTDB … -> 404` | Sai `FIREBASE_DATABASE_URL` (dùng `*.firebaseio.com` thay vì URL có region, hoặc sai tên DB) | Copy lại URL từ tab Data |
 | Client `permission_denied` → poll 60s | Chưa publish rules, hoặc rules khác file repo | Dán lại `firebase/pw2-database-rules.json` → Publish |
 | `auth/configuration-not-found` khi sign-in | Chưa bấm *Authentication → Get started* | Bật Authentication (bước 2.3) |
+| `auth/requests-from-referer-…-are-blocked` hoặc `API key not valid` khi sign-in | Web API key bị giới hạn (HTTP referrer / API restrictions) trong Google Cloud | Thêm domain staging/production vào referrer cho phép và cho phép *Identity Toolkit API* + *Token Service API* (hoặc bỏ giới hạn) |
 | Kết nối được một lúc rồi rớt hàng loạt (production) | Gói Spark hết ~100 kết nối | Lên Blaze |
 
 ## 7. Bảo mật & xoay key
 
 - Chỉ `FIREBASE_PRIVATE_KEY` là bí mật thật; nó cho quyền **admin** project → chỉ để ở Vercel Dashboard và `.env.local`.
-- Lộ key: *Google Cloud Console → IAM & Admin → Service accounts → (firebase-adminsdk) → Keys* → xoá key bị lộ → *Generate new private key* ở Firebase Console → cập nhật env → redeploy.
-- Rollback / tắt tính năng: xoá 5 biến trên Vercel → redeploy → client tự poll 60s như cũ.
+- Lộ key: *Google Cloud Console → IAM & Admin → Service accounts → (firebase-adminsdk) → Keys* → xoá key bị lộ → *Generate new private key* ở Firebase Console → cập nhật env → deploy lại.
+- Rollback / tắt tính năng: xoá 5 biến trên Vercel → deploy lại → client tự poll 60s như cũ.
