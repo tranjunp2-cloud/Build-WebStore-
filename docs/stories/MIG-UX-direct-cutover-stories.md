@@ -153,6 +153,7 @@ Persona: **Owner** (chủ cửa hàng, nhận email), **Staff** (tài khoản Te
 - [ ] Đổi trạng thái / điền "Trả lời cho user" trên Lark Base → webhook về V2 (xác thực chữ ký) → cập nhật DB + tạo thông báo (US-MIGX-19).
 - [ ] Ghi chú nội bộ trên Lark Base không bao giờ gửi về V2.
 - [ ] Bản ghi lỗi đồng bộ hiển thị cho Ops (log + trạng thái `lark_sync_status`), có cách đẩy lại thủ công.
+- [ ] Thiết lập Lark và 6 biến `LARK_FEEDBACK_*` theo PRD §13.5 (2 app + 2 bảng: Staging / Production); 6 bước kiểm thử chấp nhận ở §13.5 pass trên staging.
 
 ### US-MIGX-18: Lịch sử "Phản hồi của tôi" — ⏸ TẠM HOÃN (sau 29/10)
 Không build cho bản 29/10. Giữ để làm sau nếu PO mở lại (danh sách, lọc, chi tiết, dòng thời gian).

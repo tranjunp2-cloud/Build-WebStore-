@@ -304,10 +304,58 @@ Bảng Lark Base "Prime Web Feedback" — trường đề xuất:
 | Người phụ trách | Person | Support |
 | Link xem trong admin | URL | V2 |
 
-- Env mới (Vercel Dashboard + `.env.*.example`, theo `.claude/rules/env-vars.md`): `LARK_FEEDBACK_APP_ID`, `LARK_FEEDBACK_APP_SECRET`, `LARK_FEEDBACK_BASE_TOKEN`, `LARK_FEEDBACK_TABLE_ID`, `LARK_FEEDBACK_WEBHOOK_SECRET`.
-- Hiện repo **chưa có** tích hợp Lark Base (chỉ có Lark notify cho CI) → cần spike kỹ thuật: Lark Open API Bitable + automation/webhook khi đổi trạng thái.
+- Env và các bước thiết lập: xem §13.5.
+- Hiện repo **chưa có** tích hợp Lark Base (chỉ có Lark notify cho CI; `LARK_APP_*` trong `.env.*.example` là của bot khác, code app chưa dùng) → cần spike kỹ thuật (§13.5 bước D).
 
 Mọi cột/bảng mới → entry `scripts/db-setup.js` `MIGRATIONS` (CI gate).
+
+### 13.5 Thiết lập Lark & biến môi trường `LARK_FEEDBACK_*` (US-MIGX-20)
+
+> Chốt BA 2026-10-27. Workspace Lark của công ty là bản quốc tế (`primecommerce.sg.larksuite.com`) → API `https://open.larksuite.com/open-apis`. Hạn: **staging xong trước 28/10** để dev test; **production xong trước 29/10**.
+
+**Quyết định:**
+- Tạo **app Lark riêng** cho Feedback (không dùng chung app bot `LARK_APP_*` hiện có) → quyền tối thiểu, đổi secret không ảnh hưởng bot.
+- **2 app + 2 bảng**, mỗi môi trường một bộ: `Prime Web Feedback (Staging)` và `Prime Web Feedback`. Lý do: mỗi app Lark chỉ có **một** URL nhận sự kiện; dùng chung sẽ bắn sự kiện production sang staging và dữ liệu test lẫn vào bảng Support.
+- Môi trường `Preview` và local dev dùng bộ **Staging**.
+- Lark → V2 dùng **Event Subscription** của app (sự kiện bản ghi Base thay đổi), xác thực bằng Encrypt Key + Verification Token, theo cùng kiểu đặt tên với bot hiện có (`LARK_ENCRYPT_KEY`, `LARK_VERIFICATION_TOKEN`). Bỏ tên cũ `LARK_FEEDBACK_WEBHOOK_SECRET`.
+
+**Biến môi trường (6):**
+
+| Biến | Lấy ở đâu | Ví dụ định dạng | Bí mật? |
+|---|---|---|---|
+| `LARK_FEEDBACK_APP_ID` | Lark Developer Console › app › Credentials & Basic Info | `cli_a1b2c3…` | Không (vẫn để trong Vercel) |
+| `LARK_FEEDBACK_APP_SECRET` | Cùng trang trên | chuỗi 32 ký tự | **Có** |
+| `LARK_FEEDBACK_BASE_TOKEN` | URL của Base: `…larksuite.com/base/<BASE_TOKEN>?table=…` | `bascn…` / `Xyz…` | Không |
+| `LARK_FEEDBACK_TABLE_ID` | Cùng URL, tham số `table=` | `tbl…` | Không |
+| `LARK_FEEDBACK_ENCRYPT_KEY` | Developer Console › Events & Callbacks › Encryption Strategy | chuỗi ngẫu nhiên | **Có** |
+| `LARK_FEEDBACK_VERIFICATION_TOKEN` | Cùng trang trên | chuỗi ngẫu nhiên | **Có** |
+
+Không thêm biến cho API base: dùng hằng `https://open.larksuite.com/open-apis` (giống ghi chú `LARK_API_BASE` trong `.env.staging.example`).
+
+**Checklist thiết lập (ai làm gì):**
+
+| Bước | Việc | Người làm | Xong khi |
+|---|---|---|---|
+| A1 | Tạo 2 Base theo đúng trường ở §13.4 (Trạng thái là Single select với 4 giá trị `new`, `in_progress`, `resolved`, `closed`) | Support Lead (chủ bảng, GAP-D12) | Có 2 URL Base |
+| A2 | Tạo 2 Custom App trong Lark Developer Console: `Prime Web Feedback (Staging)`, `Prime Web Feedback` | Lark Admin (IT/Ops) | Có App ID + Secret |
+| A3 | Cấp quyền (scope) cho app: đọc/ghi Base (`bitable:app`) và tải tệp lên Base (Drive, cho ảnh đính kèm). Phát hành phiên bản app, Lark Admin duyệt | Lark Admin | App ở trạng thái Released |
+| A4 | Thêm app vào đúng Base với quyền **chỉnh sửa** (Base › ⋯ › thêm ứng dụng) | Support Lead | App ghi thử được 1 bản ghi |
+| B1 | Events & Callbacks: đặt Request URL = `{NEXT_PUBLIC_SERVER_URL}/api/v1/integrations/lark/feedback-webhook` (staging URL cho app Staging, production URL cho app Production); bật Encrypt Key; đăng ký sự kiện bản ghi Base thay đổi | Dev (sau khi endpoint deploy lên staging) | Lark báo URL hợp lệ |
+| C1 | Thêm 6 biến vào Vercel Dashboard đúng scope: bộ Staging → `staging` + `Preview` + `Development`; bộ Production → `Production` | Dev Lead (có quyền Vercel) | `vercel env ls` thấy đủ 6 biến mỗi môi trường |
+| C2 | Thêm 6 key placeholder vào `.env.staging.example` và `.env.production.example`; thêm dòng vào bảng secret trong `.claude/rules/env-vars.md` | Dev (trong PR code) | CI `check-env-vars` pass |
+| D1 | Spike: tạo bản ghi + tải ảnh qua API; nhận sự kiện đổi trạng thái về staging; xác nhận tên scope và tên sự kiện chính xác | Dev | Demo trên staging |
+
+Gửi secret: chỉ qua Vercel Dashboard hoặc trình quản lý mật khẩu của công ty. **Không** gửi qua chat, email hay commit vào git.
+
+**Phương án dự phòng (nếu B1/D1 không kịp trước 29/10):** cron Vercel 5 phút/lần đọc các bản ghi đã đổi từ Lark rồi tạo thông báo. Không cần 2 biến Encrypt Key / Verification Token. Đổi lại thông báo đến chậm tối đa 5 phút. PO chọn nếu cần.
+
+**Kiểm thử chấp nhận (staging):**
+1. Gửi phản hồi trên staging → trong 1 phút có bản ghi mới ở bảng Staging, đủ trường và ảnh.
+2. Đổi Trạng thái sang Đang xử lý → user nhận thông báo trong chuông.
+3. Điền "Trả lời cho user" rồi đổi sang Đã giải quyết → thông báo có dòng "Reply: …".
+4. Điền "Ghi chú nội bộ" → không xuất hiện ở V2.
+5. Gửi lại cùng sự kiện → không tạo thông báo trùng.
+6. Tắt app hoặc sai secret → phản hồi vẫn lưu ở V2, `lark_sync_status = failed`, user không thấy lỗi.
 
 ### 13.3 State machine theo store
 
@@ -349,7 +397,7 @@ scheduled ──T──▶ write_locked ──drain ok──▶ syncing ──re
 | GET | `/api/v1/migration/status` | Trả `cutoverState`, mốc thời gian, `daysLeft` (server time) cho store hiện tại |
 | POST | `/api/v1/migration/notices/:key/seen` | Đánh dấu modal đã xem |
 | POST | `/api/v1/feedback` | Header `Idempotency-Key`; multipart `{type, area, description, reference?, attachments[]≤3}`; server tự gắn context. 201 `{code}` · 400 validation · 403 ngoài khoảng 30/10–15/11 · 413 ảnh quá lớn · 429 rate limit |
-| POST | `/api/v1/integrations/lark/feedback-webhook` | Lark → V2; xác thực chữ ký `LARK_FEEDBACK_WEBHOOK_SECRET`; idempotent theo `lark_event_id`; tạo `Notifications` |
+| POST | `/api/v1/integrations/lark/feedback-webhook` | Lark → V2 (Event Subscription); giải mã và xác thực bằng `LARK_FEEDBACK_ENCRYPT_KEY` + `LARK_FEEDBACK_VERIFICATION_TOKEN` (§13.5); trả lời `challenge` khi Lark kiểm tra URL; idempotent theo `lark_event_id`; tạo `Notifications` |
 | POST | `/api/v1/archive/session` | Cấp token archive scoped; 403 nếu `now ≥ archiveExpiresAt` hoặc không có quyền |
 
 Mã lỗi khóa ghi V1: `423 Locked` + `{error: "v1_write_locked", frozenAt}` (đề xuất).
@@ -410,7 +458,7 @@ Chung: footer "Email thông báo hệ thống dành cho chủ cửa hàng [store
 | GAP-D2 | ✅ Chốt 2026-10-27 (bản cuối): Feedback MVP qua nút header 30/10–15/11, 3 loại, in-app + Lark Base, không SLA; lịch sử tạm hoãn (BR-08, §10.4) | Figma file Untitled | ✅ |
 | GAP-D12 | Ai quản trị bảng Lark Base, ai được đổi trạng thái; quy ước khi nào chuyển `resolved` → `closed`. **Cần có trước 29/10** để Support xử lý từ ngày 30/10 | US-MIGX-20 | 🔴 |
 | GAP-D13 | Ảnh chụp màn hình phản hồi lưu ở đâu, ai xem được (Media hiện tại ai có URL đều mở được); giữ bao lâu | US-MIGX-11, 20 | 🟠 |
-| GAP-D14 | Lark app + bảng Base + env `LARK_FEEDBACK_*` chưa tồn tại; repo chưa có tích hợp Lark Base → cần người tạo app/bảng và cấp quyền **trước khi dev test được** | US-MIGX-20 | 🔴 |
+| GAP-D14 | Lark app + bảng Base + env `LARK_FEEDBACK_*` chưa tồn tại. Đã có checklist §13.5; **cần chốt người làm A1–A4 (Support Lead, Lark Admin) và xong trước 28/10** | US-MIGX-20 | 🔴 |
 | GAP-D15 | Chưa có test case (TC-ID) cho Feedback trong `docs/qa/` — QC cần bổ sung để dev viết test theo `.claude/rules/testing.md` | US-MIGX-11, 19, 20 | 🟠 |
 | GAP-D3 | Dashboard V2 traffic/analytics = 0 sau chuyển | Thêm dòng giải thích "Số liệu truy cập bắt đầu từ [T]"; V1 analytics có export không | 🟡 |
 | GAP-D4 | Đơn V1 đang Pending/Shipping lúc `T` | Xử lý tiếp trên V2; email trạng thái đơn cho buyer gửi từ V2 với sender domain nào | 🟠 |
