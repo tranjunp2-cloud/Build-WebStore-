@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>@ech/agent-ui · assistant panel states</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./main.css" />
+<!-- Products page backdrop the panel floats over (same as the approved wireframe). -->
+<style>
+:root { --ech-ag-r-lg: 12px; --ech-ag-r-md: 8px; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font: 14px/1.5 Inter, system-ui, sans-serif; color: var(--ech-ag-ink); background: #f4f4f6; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+svg.lucide { width: 16px; height: 16px; stroke-width: 2; flex-shrink: 0; }
+
+/* ── Dashboard backdrop (the products page the dock floats over) ── */
+.app { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: calc(100vh - 56px); }
+body[data-frame] .app { min-height: 100vh; }
+.side { background: #fff; border-right: 1px solid var(--ech-ag-divider); padding: 16px 12px; }
+.side .brand { display: flex; align-items: center; gap: 8px; padding: 4px 8px 16px; font-weight: 700; }
+.side .brand i { width: 24px; height: 24px; border-radius: 6px; background: var(--ech-ag-ink); }
+.side { display: flex; flex-direction: column; gap: 4px; }
+.side a { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: var(--ech-ag-ink-2); text-decoration: none; }
+.side a[aria-current="page"] { background: var(--ech-ag-quiet); color: var(--ech-ag-ink); font-weight: 500; }
+.main { padding: 24px 32px; min-width: 0; }
+.page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.page-head h1 { margin: 0; font-size: 22px; font-weight: 600; flex: 1; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--ech-ag-r-md);
+	border: 1px solid var(--ech-ag-divider-strong); background: #fff; color: var(--ech-ag-ink); font-weight: 500; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--ech-ag-quiet); }
+.btn-primary { background: var(--ech-ag-indigo); border-color: transparent; color: var(--ech-ag-on-indigo); }
+.btn-primary:hover { background: var(--ech-ag-indigo-hover); }
+.btn-ghost { border-color: transparent; background: transparent; color: var(--ech-ag-ink-2); }
+.btn-ghost:hover { background: var(--ech-ag-quiet); color: var(--ech-ag-ink); }
+.btn-sm { height: 32px; padding: 0 12px; font-size: 13px; }
+.table { background: #fff; border: 1px solid var(--ech-ag-divider); border-radius: var(--ech-ag-r-lg); overflow: hidden; }
+.tr { display: grid; grid-template-columns: 48px minmax(0, 2.2fr) 1fr 1fr 1fr; align-items: center; gap: 12px; height: 56px; padding: 0 16px; border-top: 1px solid var(--ech-ag-divider); }
+.tr:first-child { border-top: 0; height: 40px; color: var(--ech-ag-ink-3); font-size: 12px; font-weight: 500; }
+.tr .th { width: 36px; height: 36px; border-radius: 6px; background: var(--ech-ag-quiet) center/cover; }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 12px; font-weight: 500; background: var(--ech-ag-green-tint); color: var(--ech-ag-green-ink); width: fit-content; }
+
+
+.app { min-height: 100vh; }
+@media (max-width: 640px) {
+	.app { grid-template-columns: 1fr; }
+	.side { display: none; }
+	.main { padding: 16px; }
+	.tr { grid-template-columns: 40px minmax(0, 1fr) auto; }
+	.tr > :nth-child(4), .tr > :nth-child(5) { display: none; }
+	.page-head .btn:not(.btn-primary) { display: none; }
+}
+</style>
+</head>
+<body>
+<main>
+	<div class="app">
+		<aside class="side">
+			<div class="brand"><i></i>ECH Prime</div>
+			<a href="#">Dashboard</a>
+			<a href="#" aria-current="page">Products</a>
+			<a href="#">Orders</a>
+			<a href="#">Inventory</a>
+			<a href="#">Channels</a>
+			<a href="#">Blog</a>
+			<a href="#">Settings</a>
+		</aside>
+		<section class="main">
+			<div class="page-head"><h1>Products</h1><button class="btn">Generate with AI</button><button class="btn btn-primary">New product</button></div>
+			<div class="table" id="bg-table"></div>
+		</section>
+	</div>
+	<div id="dock-host"></div>
+</main>
+<script>
+const IMG = (id, w = 400) => `https://images.unsplash.com/photo-${id}?w=${w}&q=70&auto=format&fit=crop`;
+document.getElementById("bg-table").innerHTML = `<div class="tr"><span></span><span>Product</span><span>Status</span><span>Price</span><span>Stock</span></div>` +
+	[["Linen Relaxed Trousers", "RM 119.00", "34", "1490481651871-ab68de25d43d"], ["Batik Silk Scarf — Hand-drawn Kelantan", "RM 159.00", "12", "1558769132-cb1aea458c5e"], ["Everyday Cotton Tee", "RM 39.00", "210", "1523381210434-271e8be1f52b"], ["Ivory Poplin Blouse", "RM 79.00", "0", "1617019114583-affb34d1b3cd"], ["Knit Cardigan", "RM 99.00", "18", "1556905055-8f358a7a47b2"], ["Grey Overshirt", "RM 109.00", "7", "1601762603339-fd61e28b698a"]]
+		.map(([n, p, q, id]) => `<div class="tr"><span class="th" style="background-image:url(${IMG(id)})"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${n}</span><span class="pill">Active</span><span>${p}</span><span>${q}</span></div>`).join("");
+</script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
