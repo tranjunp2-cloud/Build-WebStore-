@@ -1,0 +1,86 @@
+/**
+ * The delta's own ledger (`pw1_delta_runs`, `pw1_delta_map`). The original import ledger is only read.
+ */
+import { createRequire } from 'node:module'
+import path from 'node:path'
+import type { Pool, PoolClient } from 'pg'
+import type { QueryClient } from '../pw1-json/runtime'
+import { DeltaError } from './delta-options'
+
+const require = createRequire(import.meta.url)
+const LOCK_KEY = 'pw1-delta'
+
+export async function ensureDeltaSchema(pool: Pool): Promise<void> {
+  const schema = require(path.resolve(process.cwd(), 'scripts/pw1-delta-migration-schema.js')) as { runPw1DeltaMigrationSchema(pool: Pool): Promise<void> }
+  await schema.runPw1DeltaMigrationSchema(pool)
+}
+
+/** Session-level advisory lock held on a dedicated connection for the whole apply. */
+export async function acquireDeltaLock(pool: Pool): Promise<PoolClient> {
+  const client = await pool.connect()
+  const { rows: [row] } = await client.query<{ ok: boolean }>(`SELECT pg_try_advisory_lock(hashtext($1)) AS ok`, [LOCK_KEY])
+  if (!row?.ok) { client.release(); throw new DeltaError('DELTA_ALREADY_RUNNING') }
+  return client
+}
+
+export async function releaseDeltaLock(client: PoolClient): Promise<void> {
+  try { await client.query(`SELECT pg_advisory_unlock(hashtext($1))`, [LOCK_KEY]) } finally { client.release() }
+}
+
+export async function startRun(pool: Pool, run: { runId: string; asOf: string; snapshotId: string }): Promise<void> {
+  await pool.query(`INSERT INTO pw1_delta_runs (run_id, as_of, snapshot_id, state) VALUES ($1, $2::timestamptz, $3, 'APPLYING')`, [run.runId, run.asOf, run.snapshotId])
+}
+
+export async function finishRun(pool: Pool, runId: string, state: string, summary: unknown): Promise<void> {
+  await pool.query(`UPDATE pw1_delta_runs SET state=$2, summary=$3::jsonb, finished_at=now() WHERE run_id=$1`, [runId, state, JSON.stringify(summary)])
+}
+
+export interface MapEntry {
+  sourceEntity: string; sourceId: string; storeId: string; targetCollection: string; targetId: string
+  sourceChecksum: string; targetChecksum: string; action: 'CREATE' | 'UPDATE' | 'RETIRE' | 'REPORTED'
+  /** Resolved data written to PW2; null when nothing was written (retire/report). */
+  projection: Record<string, unknown> | null
+}
+
+/** Written in the same transaction as the business write, so a rerun never repeats a committed change. */
+export async function upsertMap(client: QueryClient, runId: string, entry: MapEntry): Promise<void> {
+  await client.query(`INSERT INTO pw1_delta_map (source_entity, source_id, store_id, target_collection, target_id, source_checksum, target_checksum, action, projection, run_id)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)
+    ON CONFLICT (source_entity, source_id) DO UPDATE SET store_id=EXCLUDED.store_id, target_collection=EXCLUDED.target_collection,
+      target_id=EXCLUDED.target_id, source_checksum=EXCLUDED.source_checksum, target_checksum=EXCLUDED.target_checksum,
+      action=EXCLUDED.action, projection=EXCLUDED.projection, run_id=EXCLUDED.run_id, updated_at=now()`,
+  [entry.sourceEntity, entry.sourceId, entry.storeId, entry.targetCollection, entry.targetId, entry.sourceChecksum, entry.targetChecksum, entry.action,
+    entry.projection ? JSON.stringify(entry.projection) : null, runId])
+}
+
+/**
+ * Data last written to PW2 for a source key: the delta's own projection, else the projection the original
+ * import recorded (`migration_entity_map.detail.projection`, SELECT only). Null when none is known.
+ */
+export async function priorProjection(client: QueryClient, sourceInstance: string, origin: 'import' | 'delta', sourceEntity: string, sourceId: string): Promise<Record<string, unknown> | null> {
+  const result = origin === 'delta'
+    ? await client.query(`SELECT projection FROM pw1_delta_map WHERE source_entity=$1 AND source_id=$2`, [sourceEntity, sourceId])
+    : await client.query(
+      `SELECT detail->'projection' AS projection FROM migration_entity_map
+        WHERE source_system='pw1' AND source_instance_id=$1 AND source_entity=$2 AND source_id=$3 AND claim_active=true AND action='CREATE'`,
+      [sourceInstance, sourceEntity, sourceId])
+  const projection = result.rows[0]?.projection
+  return projection && typeof projection === 'object' && !Array.isArray(projection) ? projection as Record<string, unknown> : null
+}
+
+/** External creator bindings of the original import (SKIP rows that point a PW1 actor to a PW2 user). */
+export async function externalActorTargets(pool: Pool, sourceInstance: string): Promise<Map<string, string>> {
+  const { rows } = await pool.query<{ source_id: string; target_id: string }>(
+    `SELECT source_id, target_id FROM migration_entity_map
+      WHERE source_system='pw1' AND source_instance_id=$1 AND source_entity='users' AND action='SKIP' AND claim_active=true AND target_id IS NOT NULL`,
+    [sourceInstance])
+  return new Map(rows.map(row => [`@users:users:${row.source_id}`, row.target_id]))
+}
+
+/** Stores whose website was already generated by the website migration; their site layout must not change. */
+export async function generatedWebsiteStores(pool: Pool): Promise<Set<string>> {
+  const { rows: [exists] } = await pool.query<{ ok: boolean }>(`SELECT to_regclass('public.pw1_migration_stores') IS NOT NULL AS ok`)
+  if (!exists?.ok) return new Set()
+  const { rows } = await pool.query<{ id: string }>(`SELECT source_store_id::text AS id FROM pw1_migration_stores WHERE status='completed'`)
+  return new Set(rows.map(row => row.id))
+}

@@ -21,6 +21,7 @@ const { bootstrapSeed } = require('./bootstrap-seed');
 const { seedMalaysiaGeo } = require('./seed-malaysia-geo-boot');
 const { runPw1MigrationSchema } = require('./pw1-migration-schema');
 const { runPw1JsonMigrationSchema } = require('./pw1-json-migration-schema');
+const { runPw1DeltaMigrationSchema } = require('./pw1-delta-migration-schema');
 const { runPw1EvidenceSchema } = require('./pw1-evidence-schema');
 const { runContentSlugTenantMigration } = require('./pw1-content-schema');
 // Matching collection DDL (atomic helper): ALTER TABLE products ALTER COLUMN short_description TYPE varchar;
@@ -5673,6 +5674,7 @@ async function runMigrations(pool) {
   await runPw1MigrationSchema(pool);
   await runPw1JsonMigrationSchema(pool);
   await runPw1EvidenceSchema(pool);
+  await runPw1DeltaMigrationSchema(pool);
 
   console.log(
     `[db-setup] Migration summary: skipped=${skipped}, applied=${ran}, always-run=${alwaysRan}, failed=${failed}, total=${MIGRATIONS.length}`,
