@@ -1013,7 +1013,7 @@ Thread user-supplied `phone`, `email`, `address`, `products`, `shortDescription`
 | TC ID | Test File | Mô tả | Status |
 |-------|-----------|-------|--------|
 | **TC-F01-W.01** | `business-info-mapper.test.ts` | Mapper parse + dedupe products string, normalize phone/email, derive tagline | ✅ |
-| **TC-F01-W.02** | `contact-override.test.ts` | Contact block dùng user phone/email/address verbatim khi provided; fallback canned khi empty; bizOverride deep-clone không pollute cache | ✅ |
+| **TC-F01-W.02** | `contact-override.test.ts` | Contact block dùng user phone/email/address verbatim khi provided; KHÔNG fallback canned khi empty (contact rỗng trên mọi page, kể cả Home padding); bizOverride deep-clone không pollute cache | ✅ |
 | **TC-F01-W.03** | `features-from-products.test.ts` | Features block emit cards từ user products khi ≥2; icons rotate từ `PRODUCT_FEATURE_ICONS[category]`; description dùng `FEATURE_BODY_TEMPLATES[category]`; fallback canned khi <2 | ✅ |
 | **TC-F01-W.04** | `service-cards-from-products.test.ts` | Service-cards emit user products khi provided; fallback canned khi empty | ✅ |
 | **TC-F01-W.05** | `service-cards-from-products.test.ts` | Product-quick-view emit user products, pad từ canned khi <3 | ✅ |
@@ -1021,6 +1021,7 @@ Thread user-supplied `phone`, `email`, `address`, `products`, `shortDescription`
 | **TC-F01-W.06b** | `product-translator.test.ts` + `image-keywords-products.test.ts` | `nasi lemak` → `malaysian coconut rice`; `phở` → `vietnamese pho noodle soup`; unknown vi/ms pass-through | ✅ |
 | **TC-F01-W.07** | `build-user-prompt.test.ts` | `buildUserPrompt` serialize phone/email/address/tagline khi provided; omit khi empty | ✅ |
 | **TC-F01-W.08** | `user-data-e2e-fixture.test.ts` | End-to-end: ramen shop + nasi lemak shop fixtures — composer + keywords + prompt đồng bộ | ✅ |
+| **TC-F01-W.09** | `user-contact-defaults.test.ts` | Account phone/email điền vào field rỗng của wizard (form thắng account); bỏ email `@primeweb.local`; không bịa phone; `sites.contactInfo` chỉ nhận field non-empty | ✅ |
 
 ### Files Modified
 

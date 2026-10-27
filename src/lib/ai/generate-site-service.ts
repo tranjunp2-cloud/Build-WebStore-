@@ -39,6 +39,7 @@ import {
     normalizeSupportedLocale,
 } from '@/lib/language-detection'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
+import { pickUserContactDefaults, withUserContactDefaults, buildSiteContactInfo } from '@/lib/ai/user-contact-defaults'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveBusinessCategory, normalizeComposerCategory } from '@/lib/ai/composer-category-resolver'
@@ -434,6 +435,10 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         }, targetInputLocale)
             .then((translated) => Object.assign(businessInfo, translated))
             .catch(() => businessInfo)
+
+        // Fill empty phone/email from the account AFTER the capture snapshot so
+        // admin reruns of a stored snapshot don't inherit the admin's contact info.
+        Object.assign(businessInfo, withUserContactDefaults(businessInfo, pickUserContactDefaults(user as { email?: unknown; phone?: unknown })))
 
         // F23: Sync tenant slug with builder — deferred to post-generation success (GH-1371).
         // Syncing before SSE caused "Already taken" on retry after interrupted generation
@@ -1322,6 +1327,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         const detectedLocale = (['ms', 'en'] as string[]).includes(generationLocale) ? generationLocale : 'en'
         const productsGridContentLocale = detectedLocale === 'ms' ? 'ms' : 'en'
         const pendingLocaleConfirm = false
+        const generatedContactInfo = buildSiteContactInfo(businessInfo)
         const siteGenerationData = {
             name: result.siteName,
             status: 'draft' as const,
@@ -1334,6 +1340,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 metaTitle: result.seo.title,
                 metaDescription: result.seo.description,
             },
+            ...(Object.keys(generatedContactInfo).length > 0 ? { contactInfo: generatedContactInfo } : {}),
             aiGenerationMetadata: {
                 generatedAt: new Date().toISOString(),
                 originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
