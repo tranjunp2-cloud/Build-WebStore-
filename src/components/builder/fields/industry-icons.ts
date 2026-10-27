@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react'
 import {
     Briefcase,
     Building2,
@@ -14,10 +15,10 @@ import {
     ShoppingBag,
     Stethoscope,
     UtensilsCrossed,
-    type LucideIcon,
 } from 'lucide-react'
 
-/** Industry value (TEMPLATE_CATEGORY_OPTIONS) → lucide icon shown in the picker badge. */
+// Industry value (TEMPLATE_CATEGORY_OPTIONS) → lucide icon, replacing the emoji
+// that /api/data/industries returns. Matches the AI Builder design prototype.
 const INDUSTRY_ICONS: Record<string, LucideIcon> = {
     restaurant: UtensilsCrossed,
     ecommerce: ShoppingBag,
@@ -35,8 +36,6 @@ const INDUSTRY_ICONS: Record<string, LucideIcon> = {
     travel: Plane,
 }
 
-export const DEFAULT_INDUSTRY = 'restaurant'
-
-export function getIndustryIcon(value: string | undefined): LucideIcon {
-    return (value && INDUSTRY_ICONS[value]) || Briefcase
+export function getIndustryIcon(value: string): LucideIcon {
+    return INDUSTRY_ICONS[value] ?? Briefcase
 }

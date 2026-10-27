@@ -415,8 +415,8 @@ function LoginFormContent() {
                         )}
                     </Button>
 
-                    {/* ─── Language Switcher — compact flag pill ─── */}
-                    <LanguageSwitcher variant="flags" />
+                    {/* ─── Language Switcher — Figma: globe + segmented pill ─── */}
+                    <LanguageSwitcher variant="segmented" />
                 </div>
             </form>
         </div>

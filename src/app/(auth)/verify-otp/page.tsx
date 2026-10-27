@@ -233,7 +233,7 @@ function VerifyOTPContent() {
                         {t.auth.otp.backLogin}
                     </Link>
                     <div className="w-full">
-                        <LanguageSwitcher variant="flags" />
+                        <LanguageSwitcher variant="segmented" />
                     </div>
                 </div>
             </div>
@@ -439,7 +439,7 @@ function VerifyOTPContent() {
 
                 {/* Language Switcher */}
                 <div className="w-full">
-                    <LanguageSwitcher variant="flags" />
+                    <LanguageSwitcher variant="segmented" />
                 </div>
             </div>
         </div>

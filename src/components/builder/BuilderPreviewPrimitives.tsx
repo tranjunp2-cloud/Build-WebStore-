@@ -109,8 +109,7 @@ function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShe
 
 interface BuilderPreviewSurfaceProps {
     mode: BuilderPreviewMode
-    /** `dock` — done-state preview: one iframe that narrows to 390px for mobile (no phone shell). */
-    variant: 'panel' | 'fullwidth' | 'dock'
+    variant: 'panel' | 'fullwidth'
     children?: ReactNode
     siteId?: string | null
 }
@@ -131,39 +130,10 @@ export function BuilderPreviewSurface({
     // Fallback: if iframe never fires onLoad (Vercel 504, CSP block, redirect loop),
     // force-dismiss spinner after 15s so user is not permanently stuck.
     useEffect(() => {
-        if ((mode === 'mobile' && variant !== 'dock') || !siteId || iframeReady) return
+        if (mode === 'mobile' || !siteId || iframeReady) return
         const id = setTimeout(() => setReadySiteId(siteId), 15_000)
         return () => clearTimeout(id)
-    }, [mode, variant, siteId, iframeReady])
-
-    if (variant === 'dock') {
-        if (!siteId) return <div className="h-full w-full overflow-y-auto">{children}</div>
-        return (
-            <div className="flex h-full justify-center">
-                <div
-                    className="relative h-full max-w-full flex-none transition-[width] duration-300 ease-out motion-reduce:transition-none"
-                    data-mode={mode}
-                    style={{ width: mode === 'mobile' ? 390 : '100%' }}
-                >
-                    <iframe
-                        src={`/preview/${siteId}?v=${vRef.current}&builder=1`}
-                        className={cn(
-                            'block h-full w-full border-0 bg-white',
-                            mode === 'mobile' && 'border-x border-solid border-white/[.08]',
-                            !iframeReady && 'invisible',
-                        )}
-                        title="Website preview"
-                        onLoad={() => setReadySiteId(siteId)}
-                    />
-                    {!iframeReady && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-[#06090F]">
-                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/10 border-t-white/50" />
-                        </div>
-                    )}
-                </div>
-            </div>
-        )
-    }
+    }, [mode, siteId, iframeReady])
 
     if (mode === 'mobile') {
         return (

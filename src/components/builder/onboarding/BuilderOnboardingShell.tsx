@@ -25,15 +25,22 @@ export function BuilderOnboardingShell({
                 className,
             )}
         >
-            <div className={cn('grid min-h-screen w-full lg:grid-cols-2', gridClassName)}>
-                <div className="min-w-0 overflow-y-auto bg-[#0a0e17]">{left}</div>
+            <div className={cn("grid min-h-screen w-full lg:grid-cols-2", gridClassName)}>
+                <div className="overflow-y-auto">{left}</div>
                 <div
                     className={cn(
-                        'relative hidden h-[100dvh] min-w-0 overflow-y-auto lg:flex',
+                        'relative hidden overflow-hidden lg:flex lg:items-center lg:justify-center',
                         rightPaneClassName,
                     )}
                 >
-                    <div className={cn('relative z-10 w-full', rightContentClassName)}>
+                    {/* Soft navy with faint teal corners (toned down from the prototype per design review). */}
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_100%_0%,rgba(20,90,90,0.14),transparent_55%),radial-gradient(ellipse_at_0%_100%,rgba(20,90,90,0.12),transparent_55%),linear-gradient(160deg,#0e1729_0%,#0c1626_50%,#0b1322_100%)]" />
+                    <div
+                        className={cn(
+                            'relative z-10 w-full max-w-[960px] px-10 xl:px-16',
+                            rightContentClassName,
+                        )}
+                    >
                         {right}
                     </div>
                 </div>

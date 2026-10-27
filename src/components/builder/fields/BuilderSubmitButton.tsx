@@ -3,26 +3,18 @@
 import type { ReactNode } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { cn } from '@/lib/utils'
 
 interface BuilderSubmitButtonProps {
     loading?: boolean
     disabled?: boolean
-    /** All required details are valid — only the colours change, size and shape stay. */
-    ready?: boolean
     children: ReactNode
     type?: 'button' | 'submit'
     onClick?: () => void
 }
 
-/**
- * Compact 200×36 generate button. Quiet slate until the form is ready (still
- * clickable so the user can see what is missing), then the primary gradient.
- */
 export function BuilderSubmitButton({
     loading,
     disabled,
-    ready,
     children,
     type = 'submit',
     onClick,
@@ -31,26 +23,21 @@ export function BuilderSubmitButton({
     return (
         <button
             aria-disabled={disabled}
-            className={cn(
-                'mx-auto box-border flex h-9 w-[200px] flex-none items-center justify-center gap-2 rounded-[10px] border border-solid text-[13px] font-medium transition-[background-color,color,border-color,filter] duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60',
-                ready
-                    ? 'border-transparent text-white [background-image:linear-gradient(90deg,#3b82f6,#2dd4bf)]'
-                    : 'border-[rgba(148,163,184,.1)] bg-[#1e293b] text-[#64748b]',
-            )}
-            data-ready={ready ? 'true' : 'false'}
+            // Compact design-system primary (36px, centered): blue→teal when active, dark muted surface when disabled.
+            className="mx-auto flex h-9 w-fit min-w-[200px] items-center justify-center gap-2 rounded-lg px-6 bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] text-[13px] font-semibold text-white shadow-md shadow-blue-500/20 transition-all duration-200 hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#1e293b] disabled:text-[#64748b] disabled:shadow-none disabled:hover:opacity-100 disabled:active:scale-100"
             disabled={disabled}
             onClick={onClick}
             type={type}
         >
             {loading ? (
                 <>
-                    <span className="size-3.5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                    <span className="size-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                     <span>{t.onboarding.form.initializing}</span>
                 </>
             ) : (
                 <>
-                    <span>{children}</span>
-                    <ArrowRight aria-hidden className="size-3.5" />
+                    <span className="leading-5">{children}</span>
+                    <ArrowRight aria-hidden className="size-4" />
                 </>
             )}
         </button>

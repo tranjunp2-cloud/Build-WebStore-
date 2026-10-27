@@ -21,8 +21,6 @@ import type { BuilderPreviewMode } from '../../../components/builder/BuilderPrev
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 
-// The done-state toolbar (BuilderPreviewToolbar) renders for real; only the
-// iframe surface is stubbed.
 vi.mock('@/components/builder/BuilderPreviewPrimitives', () => ({
     BuilderPreviewSurface: ({
         children,
@@ -75,7 +73,7 @@ const DEFAULT_PROPS = {
     isPublishing: false,
 }
 
-function renderCompletion(overrides: Partial<React.ComponentProps<typeof BuilderCompletionView>> = {}) {
+function renderCompletion(overrides: Partial<typeof DEFAULT_PROPS> = {}) {
     return render(<BuilderCompletionView {...DEFAULT_PROPS} {...overrides} />)
 }
 
@@ -120,6 +118,16 @@ describe('BuilderCompletionView', () => {
             expect(
                 screen.getByText(/See the preview.*open the editor.*publish now/i),
             ).toBeInTheDocument()
+        })
+    })
+
+    // ── TC-F01.12: Draft badge on the "is ready!" card ───────────────────
+    describe('Draft badge (TC-F01.12)', () => {
+        it('renders the Draft badge with the localized label next to the ready message', () => {
+            renderCompletion()
+            const badge = screen.getByTestId('completion-draft-badge')
+            expect(badge).toHaveTextContent(en.onboarding.completion.draftBadge)
+            expect(badge).toHaveClass('bg-yellow-500/20', 'text-yellow-400')
         })
     })
 
@@ -214,11 +222,9 @@ describe('BuilderCompletionView', () => {
             expect(screen.getByTestId('preview-content')).toBeInTheDocument()
         })
 
-        it('renders the one-capsule preview toolbar with the active mode pressed', () => {
-            renderCompletion({ previewMode: 'mobile' })
-            expect(screen.getByTestId('builder-preview-toolbar')).toBeInTheDocument()
-            expect(screen.getByRole('button', { name: en.common.mobile })).toHaveAttribute('aria-pressed', 'true')
-            expect(screen.getByRole('button', { name: en.common.desktop })).toHaveAttribute('aria-pressed', 'false')
+        it('renders preview mode toggle', () => {
+            renderCompletion()
+            expect(screen.getByTestId('preview-mode-toggle')).toBeInTheDocument()
         })
 
         it('displays "Website preview" heading in right pane', () => {
@@ -239,6 +245,15 @@ describe('BuilderCompletionView', () => {
             expect(onOpenPreview).toHaveBeenCalledTimes(1)
         })
 
+        it('slides the toggle thumb to the mobile slot only in mobile mode', () => {
+            const { rerender } = renderCompletion()
+            expect(screen.getByTestId('preview-mode-thumb')).toHaveClass('translate-x-0')
+            expect(screen.getByTestId('toggle-desktop')).toHaveAttribute('aria-pressed', 'true')
+            rerender(<BuilderCompletionView {...DEFAULT_PROPS} previewMode="mobile" />)
+            expect(screen.getByTestId('preview-mode-thumb')).toHaveClass('translate-x-[104px]')
+            expect(screen.getByTestId('toggle-mobile')).toHaveAttribute('aria-pressed', 'true')
+        })
+
         it('passes current previewMode to the preview surface', () => {
             renderCompletion({ previewMode: 'mobile' })
             expect(screen.getByTestId('preview-surface')).toHaveAttribute('data-mode', 'mobile')
@@ -247,34 +262,15 @@ describe('BuilderCompletionView', () => {
         it('calls onPreviewModeChange when toggling to mobile', () => {
             const onPreviewModeChange = vi.fn()
             renderCompletion({ onPreviewModeChange })
-            fireEvent.click(screen.getByRole('button', { name: en.common.mobile }))
+            fireEvent.click(screen.getByTestId('toggle-mobile'))
             expect(onPreviewModeChange).toHaveBeenCalledWith('mobile')
         })
 
         it('calls onPreviewModeChange when toggling to desktop', () => {
             const onPreviewModeChange = vi.fn()
             renderCompletion({ previewMode: 'mobile', onPreviewModeChange })
-            fireEvent.click(screen.getByRole('button', { name: en.common.desktop }))
+            fireEvent.click(screen.getByTestId('toggle-desktop'))
             expect(onPreviewModeChange).toHaveBeenCalledWith('desktop')
-        })
-    })
-
-    // ── Done-state status (Draft badge + Saved pill) ─────────────────────
-
-    describe('Draft badge and save status (TC-F01.12)', () => {
-        it('shows the dashboard-style Draft badge in the ready card', () => {
-            renderCompletion()
-            expect(screen.getByTestId('builder-ready-card')).toHaveTextContent(en.dashboard.sites.draft)
-        })
-
-        it('shows the save status as a pill over the preview', () => {
-            renderCompletion({ saveStatusLabel: 'Saved 2:12 PM' })
-            expect(screen.getByTestId('builder-save-status')).toHaveTextContent('Saved 2:12 PM')
-        })
-
-        it('renders no save pill when there is no status yet', () => {
-            renderCompletion()
-            expect(screen.queryByTestId('builder-save-status')).not.toBeInTheDocument()
         })
     })
 
