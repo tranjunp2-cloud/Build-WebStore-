@@ -118,8 +118,9 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 
 ## 6. Phản hồi (Feedback)
 
-> Chốt PO 2026-10-27 (bản cuối — MVP release 29/10): nút "Gửi phản hồi" trên header, hiện 30/10–15/11/2026 MYT; trả lời qua thông báo in-app; Lark Base; **không SLA** — không câu nào được hứa thời gian xử lý. Lịch sử phản hồi tạm hoãn. Spec UI: [PRD §10.4](./MIG-UX-direct-cutover.md#104-spec-chỉnh-figma--form-phản-hồi--lịch-sử).
+> Chốt PO 2026-10-27 (bản cuối — MVP release 29/10): nút "Gửi phản hồi" trên header, hiện 30/10–15/11/2026 MYT; trả lời qua thông báo in-app; Lark Base; **không SLA** — không câu nào được hứa thời gian xử lý. Lịch sử phản hồi tạm hoãn. Spec UI: [PRD §10.4](./MIG-UX-direct-cutover.md#104-feedback-mvp--spec-màn-hình-release-29102026).
 > Nút "Báo cáo sai lệch dữ liệu" trên banner Dashboard V2 giữ nguyên chữ (`migration.common.reportMismatch`) và mở form với Loại = Sai lệch dữ liệu.
+> **i18n:** CMS V2 chỉ có 2 locale `en` / `ms` (`src/i18n/locales/en.json`, `ms.json`; chọn qua `prefer_lang`). Cột **VI chỉ để team đối chiếu**, không đưa vào code. Key bên dưới thêm vào cả 2 file JSON theo cấu trúc lồng (`t.feedback.form.title`).
 
 ### 6.1 Form
 
@@ -131,6 +132,7 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.type.label` | Loại phản hồi | Feedback type | Jenis maklum balas |
 | `feedback.type.bug` | Báo lỗi | Report a problem | Laporkan masalah |
 | `feedback.type.mismatch` | Sai lệch dữ liệu | Data mismatch | Percanggahan data |
+| `feedback.type.mismatchShort` *(mobile <768px, segmented hẹp)* | Sai lệch | Data mismatch | Percanggahan |
 | `feedback.type.idea` | Góp ý | Suggestion | Cadangan |
 | `feedback.area.label` | Khu vực | Area | Bahagian |
 | `feedback.area.placeholder` | Chọn khu vực | Choose an area | Pilih bahagian |
@@ -171,7 +173,8 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.error.fileTooLarge` | Ảnh vượt quá 5 MB. | This image is larger than 5 MB. | Imej ini melebihi 5 MB. |
 | `feedback.error.fileType` | Chỉ hỗ trợ ảnh PNG hoặc JPG. | Only PNG or JPG images are supported. | Hanya imej PNG atau JPG disokong. |
 | `feedback.error.tooMany` | Bạn đã gửi nhiều phản hồi trong thời gian ngắn. Vui lòng thử lại sau ít phút. | You've sent a lot of feedback in a short time. Please try again in a few minutes. | Anda telah menghantar banyak maklum balas dalam masa yang singkat. Sila cuba lagi dalam beberapa minit. |
-| `feedback.error.sendFailed` | Chưa gửi được phản hồi. Nội dung của bạn vẫn được giữ. | Your feedback wasn't sent. What you entered has been kept. | Maklum balas anda tidak dihantar. Maklumat yang anda masukkan masih disimpan. |
+| `feedback.error.sendFailedTitle` | Chưa gửi được phản hồi | Your feedback wasn't sent | Maklum balas anda tidak dihantar |
+| `feedback.error.sendFailedBody` | Nội dung của bạn vẫn được giữ. Vui lòng thử lại. | What you entered has been kept. Please try again. | Maklumat yang anda masukkan masih disimpan. Sila cuba lagi. |
 | `feedback.cta.retry` | Thử lại | Try again | Cuba lagi |
 | `feedback.discard.title` | Bỏ nội dung đã nhập? | Discard what you've entered? | Buang maklumat yang telah dimasukkan? |
 | `feedback.discard.body` | Phản hồi của bạn chưa được gửi. | Your feedback hasn't been sent. | Maklum balas anda belum dihantar. |
@@ -206,6 +209,8 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.status.closed` | Đã đóng | Closed | Ditutup |
 
 ### 6.6 Thông báo in-app (chuông, F16)
+
+> Chuông F16 render chữ theo `notifications.types.<TYPE>.title/message` (xem `ORDER_NEW`, `SYSTEM_ALERT` trong `en.json`). Thêm 2 type: `FEEDBACK_UPDATE` (dùng 3 key `in_progress` / `resolved` / `closed` + `replyLine`) và `FEEDBACK_SUBMITTED` (key `staff`). Tiêu đề panel / "Mark all as read" / thời gian tương đối dùng key F16 sẵn có (`notifications.title`, `notifications.markAllRead`).
 
 | Key | VI | EN | BM |
 |---|---|---|---|
