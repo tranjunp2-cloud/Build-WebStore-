@@ -551,6 +551,24 @@
         "explore": "Explore CMS"
       }
     },
+    "v2Intro": {
+      "badge": "WebStore V2",
+      "title": "Your store has moved to Web Store",
+      "description": "V2 is now the only place to manage your store and receive new data. Your existing data has been moved to your current store.",
+      "getStarted": "Get started",
+      "close": "Close",
+      "videoComingSoon": "Video coming soon",
+      "video": {
+        "play": "Play video",
+        "pause": "Pause",
+        "replay": "Replay",
+        "seek": "Seek",
+        "mute": "Mute",
+        "unmute": "Unmute",
+        "fullScreen": "Full screen",
+        "exitFullScreen": "Exit full screen"
+      }
+    },
     "step1Description": "Share a few basics so AI can build the right website for you.",
     "generating": {
       "title": "Create website with AI",
