@@ -3362,6 +3362,73 @@
         "blockSeo": "SEO health",
         "blockOrders": "Pending orders"
       }
+    },
+    "feedback": {
+      "button": "Feedback",
+      "title": "Send feedback",
+      "description": "Your feedback and bug reports help us improve the Web Store.",
+      "context": {
+        "store": "Store: {store}"
+      },
+      "mismatchNotice": "V1 doesn't show data created after the freeze. Compare data from the same point in time.",
+      "fields": {
+        "type": "Feedback type",
+        "typeOptions": {
+          "problem": "Report a problem",
+          "mismatch": "Data mismatch",
+          "suggestion": "Suggestion"
+        },
+        "area": "Feature",
+        "areaPlaceholder": "Choose a feature",
+        "areaError": "Please choose a feature.",
+        "areaOptions": {
+          "products": "Products",
+          "orders": "Orders",
+          "payments": "Payments",
+          "customers": "Customers",
+          "design": "Design & pages",
+          "settings": "Settings",
+          "other": "Other"
+        },
+        "details": "Details",
+        "detailsPlaceholder": "What did you do, what did you expect, and what happened instead?",
+        "detailsPlaceholderMismatch": "What's different between V1 and V2? E.g. Order DH-1042 is RM120 in V1 but RM100 in V2.",
+        "detailsError": "Please add some details.",
+        "detailsHelper": "Don't enter passwords, payment details or your customers' personal data.",
+        "optional": "(optional)",
+        "screenshots": "Screenshots",
+        "addScreenshot": "Add screenshot",
+        "screenshotAlt": "Screenshot {n}",
+        "removeScreenshot": "Remove screenshot {n}",
+        "screenshotHelper": "Up to 3 images, PNG or JPG, max 5 MB each.",
+        "screenshotTooLarge": "This image is larger than 5 MB.",
+        "screenshotWrongType": "Only PNG or JPG images are supported."
+      },
+      "failed": {
+        "title": "Your feedback wasn't sent",
+        "description": "What you entered has been kept. Please try again."
+      },
+      "rateLimited": "You've sent a lot of feedback in a short time. Please try again later.",
+      "sendingNote": "Sending… Please don't send it again.",
+      "actions": {
+        "cancel": "Cancel",
+        "send": "Send feedback",
+        "sending": "Sending…",
+        "close": "Close"
+      },
+      "discard": {
+        "title": "Discard what you've entered?",
+        "description": "Your feedback hasn't been sent.",
+        "keep": "Keep editing",
+        "confirm": "Discard"
+      },
+      "success": {
+        "title": "Feedback sent",
+        "feedbackId": "Feedback ID",
+        "copy": "Copy",
+        "copied": "Copied",
+        "notifyNote": "We'll notify you in Prime Web (the bell icon) when there's an update."
+      }
     }
   },
   "auth": {

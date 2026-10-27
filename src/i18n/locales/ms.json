@@ -3362,6 +3362,73 @@
         "blockSeo": "Kesihatan SEO",
         "blockOrders": "Pesanan belum selesai"
       }
+    },
+    "feedback": {
+      "button": "Maklum balas",
+      "title": "Hantar maklum balas",
+      "description": "Maklum balas dan laporan pepijat anda membantu kami menambah baik Web Store.",
+      "context": {
+        "store": "Kedai: {store}"
+      },
+      "mismatchNotice": "V1 tidak memaparkan data yang dicipta selepas pembekuan. Bandingkan data pada titik masa yang sama.",
+      "fields": {
+        "type": "Jenis maklum balas",
+        "typeOptions": {
+          "problem": "Lapor masalah",
+          "mismatch": "Data tidak sepadan",
+          "suggestion": "Cadangan"
+        },
+        "area": "Ciri",
+        "areaPlaceholder": "Pilih ciri",
+        "areaError": "Sila pilih ciri.",
+        "areaOptions": {
+          "products": "Produk",
+          "orders": "Pesanan",
+          "payments": "Pembayaran",
+          "customers": "Pelanggan",
+          "design": "Reka bentuk & halaman",
+          "settings": "Tetapan",
+          "other": "Lain-lain"
+        },
+        "details": "Butiran",
+        "detailsPlaceholder": "Apa yang anda lakukan, apa yang anda jangkakan, dan apa yang berlaku sebaliknya?",
+        "detailsPlaceholderMismatch": "Apakah perbezaan antara V1 dan V2? Cth. Pesanan DH-1042 ialah RM120 dalam V1 tetapi RM100 dalam V2.",
+        "detailsError": "Sila tambah butiran.",
+        "detailsHelper": "Jangan masukkan kata laluan, butiran pembayaran atau data peribadi pelanggan anda.",
+        "optional": "(pilihan)",
+        "screenshots": "Tangkapan skrin",
+        "addScreenshot": "Tambah tangkapan skrin",
+        "screenshotAlt": "Tangkapan skrin {n}",
+        "removeScreenshot": "Buang tangkapan skrin {n}",
+        "screenshotHelper": "Sehingga 3 imej, PNG atau JPG, maksimum 5 MB setiap satu.",
+        "screenshotTooLarge": "Imej ini melebihi 5 MB.",
+        "screenshotWrongType": "Hanya imej PNG atau JPG disokong."
+      },
+      "failed": {
+        "title": "Maklum balas anda tidak dihantar",
+        "description": "Apa yang anda masukkan telah disimpan. Sila cuba lagi."
+      },
+      "rateLimited": "Anda telah menghantar banyak maklum balas dalam masa singkat. Sila cuba lagi kemudian.",
+      "sendingNote": "Menghantar… Sila jangan hantar lagi.",
+      "actions": {
+        "cancel": "Batal",
+        "send": "Hantar maklum balas",
+        "sending": "Menghantar…",
+        "close": "Tutup"
+      },
+      "discard": {
+        "title": "Buang apa yang anda masukkan?",
+        "description": "Maklum balas anda belum dihantar.",
+        "keep": "Teruskan menyunting",
+        "confirm": "Buang"
+      },
+      "success": {
+        "title": "Maklum balas dihantar",
+        "feedbackId": "ID maklum balas",
+        "copy": "Salin",
+        "copied": "Disalin",
+        "notifyNote": "Kami akan memaklumkan anda dalam Prime Web (ikon loceng) apabila ada kemas kini."
+      }
     }
   },
   "auth": {
