@@ -200,7 +200,8 @@ export async function recountStaffUsage(
 }
 
 /** Upserts the 'main' PlanSubscription for a tenant.
- *  On update: clears usage + recounts staff, syncs Tenants.plan tier.
+ *  On update: clears usage + recounts staff only when the plan or pack changes, so a repeated
+ *  call for the same plan (SSO retry or duplicate sync) keeps usage. Always syncs Tenants.plan tier.
  *  Note: these 3 steps are not wrapped in a DB transaction — partial failure (e.g. clearUsage
  *  succeeds but recountStaffUsage fails) leaves usage at 0 until next plan event. Acceptable
  *  tradeoff for now; revisit if Payload exposes cross-collection transaction API. */
@@ -238,15 +239,19 @@ export async function upsertPlanSubscription(
   })
 
   if (subs.docs.length > 0) {
-    const subId = Number(subs.docs[0].id)
+    const current = subs.docs[0] as { id: string | number; plan?: string | null; packCode?: string | null }
+    const subId = Number(current.id)
+    const planChanged = current.plan !== updateData.plan || current.packCode !== updateData.packCode
     await payload.update({
         overrideAccess: true,
       collection: 'plan-subscriptions',
       id: subId,
       data: updateData,
     })
-    await clearUsage(payload, subId)
-    await recountStaffUsage(payload, subId, tenantId)
+    if (planChanged) {
+      await clearUsage(payload, subId)
+      await recountStaffUsage(payload, subId, tenantId)
+    }
   } else {
     await payload.create({
     overrideAccess: true,

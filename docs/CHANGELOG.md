@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-10-22
+last_updated: 2026-10-27
 ---
 
 # Project Changelog
@@ -14,6 +14,10 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ---
 
 ## [Unreleased] — Staging
+
+### F34 — SSO upgrade/downgrade cùng gói không xóa usage (GH-2011)
+
+- `upsertPlanSubscription()` chỉ chạy `clearUsage()` + `recountStaffUsage()` khi `plan` hoặc `packCode` đổi. SSO retry hoặc gửi lại đúng gói hiện tại thì usage (vd. `template_limit`) giữ nguyên; subscription (`startsAt`/`endsAt`/`status`) và `Tenants.plan` vẫn được cập nhật. Khớp spec #1246 ("clearUsage gọi khi đổi plan"). Không đổi API/schema. Tests: TC-SUB-046, TC-SUB-047.
 
 ### F05 — Redesign Pages panel / Page library (US-F05-02, GH-1984)
 
