@@ -205,7 +205,7 @@ Tất cả frame là **Desktop**. Không có frame mobile cho V1 banner/modal, V
 | # | Frame | Nội dung chính |
 |---|---|---|
 | 01 | Header V2 — nút Gửi phản hồi | Nút cạnh chuông thông báo; mobile chỉ còn icon + tooltip; ẩn ngoài khoảng 30/10–15/11 |
-| 02 | Form — mặc định | 3 loại (Báo lỗi · Sai lệch dữ liệu · Góp ý), Khu vực 10 mục, Mô tả + bộ đếm, Ảnh ≤3 |
+| 02 | Form — mặc định | 3 loại (Báo lỗi · Sai lệch dữ liệu · Góp ý), Khu vực 10 mục, Mô tả + bộ đếm, Ảnh ≤9 (lưới 5 ảnh/hàng) |
 | 03 | Form — Sai lệch dữ liệu | Mở từ banner "Báo cáo sai lệch dữ liệu"; loại chọn sẵn (đổi được); hộp xanh nhắc so sánh cùng thời điểm |
 | 04 | Form — thiếu thông tin | Lỗi cạnh từng trường bắt buộc |
 | 05 | Form — lỗi tải ảnh | Thumbnail viền đỏ + "Ảnh vượt quá 5 MB" |
@@ -226,6 +226,7 @@ Badge / trạng thái: Đã nhận (`new`) · Đang xử lý (`in_progress`) · 
 **Chi tiết kỹ thuật cho dev (đề xuất, Dev Lead xác nhận khi review PR):**
 - Mã phản hồi (chỉ nội bộ, không trả về UI): `FB-{YY}-{6 số}` tăng dần, unique (VD `FB-26-004812`).
 - `isMigratedStore` = `Tenants.migrationStatus === 'migrated'` (field có sẵn) → quyết định hiện loại "Sai lệch dữ liệu".
+- Ảnh (PO chốt 27/10): **tối đa 9 ảnh**, PNG/JPG, ≤5 MB/ảnh, kiểm tra magic-byte ở server. Vercel giới hạn body request ~4.5 MB nên **không gửi ảnh chung request form**: tải từng ảnh lên S3 riêng (presigned URL hoặc endpoint upload từng ảnh), form chỉ gửi danh sách id ảnh. Ảnh tải lên mà không gửi form trong 24 giờ thì xoá. Dev Lead chọn cách tải khi review.
 - Rate limit (PO chốt 27/10): **5 phản hồi / 15 phút / user**, cửa sổ trượt 15 phút tính theo `created_by`, kiểm tra ở server. Vượt → 429 + header `Retry-After` (giây). Lần gửi lại cùng `Idempotency-Key` không tính thêm.
 - Thông báo: thêm option `FEEDBACK_UPDATE`, `FEEDBACK_SUBMITTED` vào `Notifications.type` (cột `varchar` → không cần ALTER TYPE); `dedupeKey` = `FEEDBACK:{code}:{lark_event_id}`; copy theo copy deck §6.6.
 - Ảnh chụp màn hình có thể chứa dữ liệu khách → **không** lưu dạng Media công khai; chỉ admin và Lark Base xem được (GAP-D13).
@@ -397,7 +398,7 @@ scheduled ──T──▶ write_locked ──drain ok──▶ syncing ──re
 | GET | `/api/v1/feedback/availability` | `{enabled, types[]}` — header dùng để quyết định hiện nút và loại "Sai lệch dữ liệu" |
 | GET | `/api/v1/migration/status` | Trả `cutoverState`, mốc thời gian, `daysLeft` (server time) cho store hiện tại |
 | POST | `/api/v1/migration/notices/:key/seen` | Đánh dấu modal đã xem |
-| POST | `/api/v1/feedback` | Header `Idempotency-Key`; multipart `{type, area, description, attachments[]≤3}`; server tự gắn context. 201 (không trả mã cho UI) · 400 validation · 403 ngoài khoảng 30/10–15/11 · 413 ảnh quá lớn · 429 quá 5 phản hồi / 15 phút |
+| POST | `/api/v1/feedback` | Header `Idempotency-Key`; body `{type, area, description, attachmentIds[]≤9}` (ảnh tải trước, xem §10.4); server tự gắn context. 201 (không trả mã cho UI) · 400 validation · 403 ngoài khoảng 30/10–15/11 · 413 ảnh quá lớn · 429 quá 5 phản hồi / 15 phút |
 | POST | `/api/v1/integrations/lark/feedback-webhook` | Lark → V2 (Event Subscription); giải mã và xác thực bằng `LARK_FEEDBACK_ENCRYPT_KEY` + `LARK_FEEDBACK_VERIFICATION_TOKEN` (§13.5); trả lời `challenge` khi Lark kiểm tra URL; idempotent theo `lark_event_id`; tạo `Notifications` |
 | POST | `/api/v1/archive/session` | Cấp token archive scoped; 403 nếu `now ≥ archiveExpiresAt` hoặc không có quyền |
 

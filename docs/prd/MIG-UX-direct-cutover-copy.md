@@ -155,7 +155,7 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.description.privacy` | Không nhập mật khẩu, thông tin thanh toán hoặc dữ liệu cá nhân của khách hàng. | Don't enter passwords, payment details or your customers' personal data. | Jangan masukkan kata laluan, butiran pembayaran atau data peribadi pelanggan anda. |
 | `feedback.attachments.label` | Ảnh chụp màn hình (tuỳ chọn) | Screenshots (optional) | Tangkapan skrin (pilihan) |
 | `feedback.attachments.add` | Thêm ảnh | Add image | Tambah imej |
-| `feedback.attachments.hint` | Tối đa 3 ảnh, PNG hoặc JPG, mỗi ảnh tối đa 5 MB. | Up to 3 images, PNG or JPG, max 5 MB each. | Sehingga 3 imej, PNG atau JPG, maksimum 5 MB setiap satu. |
+| `feedback.attachments.hint` | Tối đa 9 ảnh, PNG hoặc JPG, mỗi ảnh tối đa 5 MB. | Up to 9 images, PNG or JPG, max 5 MB each. | Sehingga 9 imej, PNG atau JPG, maksimum 5 MB setiap satu. |
 | `feedback.cta.cancel` | Huỷ | Cancel | Batal |
 | `feedback.cta.submit` | Gửi phản hồi | Send feedback | Hantar maklum balas |
 | `feedback.sending` | Đang gửi… Vui lòng không gửi lại. | Sending… Please don't send it again. | Menghantar… Jangan hantar semula. |
@@ -169,6 +169,7 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.error.descriptionRequired` | Vui lòng nhập mô tả. | Please add some details. | Sila masukkan butiran. |
 | `feedback.error.descriptionShort` | Vui lòng mô tả ít nhất 10 ký tự. | Please write at least 10 characters. | Sila tulis sekurang-kurangnya 10 aksara. |
 | `feedback.error.fileTooLarge` | Ảnh vượt quá 5 MB. | This image is larger than 5 MB. | Imej ini melebihi 5 MB. |
+| `feedback.error.tooManyFiles` | Chỉ tải được tối đa 9 ảnh. | You can add up to 9 images. | Anda boleh menambah sehingga 9 imej. |
 | `feedback.error.fileType` | Chỉ hỗ trợ ảnh PNG hoặc JPG. | Only PNG or JPG images are supported. | Hanya imej PNG atau JPG disokong. |
 | `feedback.error.tooMany` | Bạn đã gửi nhiều phản hồi trong thời gian ngắn. Vui lòng thử lại sau ít phút. | You've sent a lot of feedback in a short time. Please try again in a few minutes. | Anda telah menghantar banyak maklum balas dalam masa yang singkat. Sila cuba lagi dalam beberapa minit. |
 | `feedback.error.sendFailedTitle` | Chưa gửi được phản hồi | Your feedback wasn't sent | Maklum balas anda tidak dihantar |
