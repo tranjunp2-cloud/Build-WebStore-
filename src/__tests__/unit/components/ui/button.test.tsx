@@ -39,6 +39,15 @@ describe('TC-GH1290-BTN-03: primary variants use the solid brand fill', () => {
         expect(btn.className).not.toContain('gradient')
         expect(btn.className).not.toMatch(/shadow-(lg|blue)/)
     })
+
+    it.each(['default', 'dashPrimary'] as const)('%s darkens on hover and press, and its focus gap uses the page background', (variant) => {
+        render(<Button variant={variant}>Go</Button>)
+        const cls = screen.getByRole('button', { name: 'Go' }).className
+        expect(cls).toMatch(/hover:bg-\[color:color-mix\(.*black\)\]/)
+        expect(cls).toMatch(/active:bg-\[color:color-mix\(.*black\)\]/)
+        expect(cls).not.toContain('hover:opacity')
+        expect(cls).toContain('focus-visible:ring-offset-[hsl(var(--background))]')
+    })
 })
 
 describe('TC-GH1290-BTN-04: dash size applies h-9 (36px)', () => {

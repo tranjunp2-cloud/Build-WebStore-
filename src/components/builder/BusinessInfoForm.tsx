@@ -449,7 +449,7 @@ export default function BusinessInfoForm({
                         />
                     </div>
                     <button
-                        className="flex h-[44px] min-w-[120px] items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition-colors duration-200 hover:bg-[hsl(var(--primary)/0.88)] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-[44px] min-w-[120px] items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition-colors duration-200 bg-[hsl(var(--p-teal-400))] text-[hsl(var(--p-slate-950))] hover:bg-[color:color-mix(in_srgb,hsl(var(--p-teal-400))_90%,black)] active:bg-[color:color-mix(in_srgb,hsl(var(--p-teal-400))_80%,black)] disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={!isValidUrl(urlValue) || urlExtracting}
                         onClick={handleUrlExtract}
                         type="button"

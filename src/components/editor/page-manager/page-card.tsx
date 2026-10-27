@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Eye, EyeOff, House, Loader2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { FOCUS_RING } from '@/components/ui/focus-ring'
 import { getDisplayPageTitle } from '@/store/editorStore'
 import type { PageData } from '@/store/editorStore'
 import { getPagePath } from './page-manager-helpers'
@@ -40,7 +41,7 @@ interface PageCardProps {
     onConfirmDelete: () => void
 }
 
-const ICON_BTN = 'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[7px] text-[var(--editor-text)] transition-colors disabled:cursor-not-allowed disabled:opacity-35'
+const ICON_BTN = `flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[7px] text-[var(--editor-text)] transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${FOCUS_RING}`
 
 /** One row of the Page library: name + badges + quick actions, path/date meta, and the selected-state extras. */
 export function PageCard({
@@ -72,7 +73,7 @@ export function PageCard({
         >
             <div className="flex items-center gap-2">
                 <div className="flex min-w-0 items-center gap-2">
-                    <button type="button" onClick={onSelect} className="min-w-0 truncate text-left text-[15px] font-medium leading-[22px] text-[var(--editor-text)]">
+                    <button type="button" onClick={onSelect} className={cn('-mx-1 min-w-0 truncate rounded-[5px] px-1 text-left text-[15px] font-medium leading-[22px] text-[var(--editor-text)]', FOCUS_RING)}>
                         {getDisplayPageTitle(page, locale)}
                     </button>
                     {/* One badge per row: status. Home is a small icon; the current page is the highlighted row. */}
@@ -129,7 +130,7 @@ export function PageCard({
                 <button
                     type="button"
                     onClick={onEditWithAI}
-                    className="mt-2.5 flex h-[26px] items-center rounded-[7px] bg-transparent px-2.5 text-xs font-medium text-[var(--editor-text)] transition-colors [border:1px_solid_var(--editor-border)] hover:bg-[var(--editor-overlay-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+                    className={`mt-2.5 flex h-[26px] items-center rounded-[7px] bg-transparent px-2.5 text-xs font-medium text-[var(--editor-text)] transition-colors [border:1px_solid_var(--editor-border)] hover:bg-[var(--editor-overlay-hover)] ${FOCUS_RING}`}
                 >
                     {labels.editWithAI}
                 </button>

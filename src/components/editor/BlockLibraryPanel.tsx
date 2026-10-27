@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { FOCUS_RING } from '@/components/ui/focus-ring'
 import type { AIAction, BlockData } from '@/types/editor'
 import { useI18n } from '@/i18n'
 import { listAllBlocks } from '@/lib/admin/block-registry-reader'
@@ -229,7 +230,8 @@ export function BlockLibraryPanel({
                                 <button
                                     type="button"
                                     onClick={() => setExpandedCategory(prev => (prev === category.id ? prev : category.id))}
-                                    className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-left transition-colors hover:bg-white/[0.04]"
+                                    aria-expanded={isExpanded}
+                                    className={cn('flex h-9 w-full items-center justify-between rounded-lg px-2 text-left transition-colors hover:bg-[var(--editor-overlay-hover)]', FOCUS_RING)}
                                 >
                                     <div className="flex items-center gap-2">
                                         <category.icon className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
@@ -269,6 +271,7 @@ export function BlockLibraryPanel({
                                                 }}
                                                 className={cn(
                                                     "group flex w-full items-center gap-3 rounded-lg border border-transparent bg-white/[0.02] px-3 py-2.5 text-left transition-all",
+                                                    FOCUS_RING,
                                                     isAlreadyGlobal
                                                         ? "opacity-60 hover:border-white/[0.08] hover:bg-white/[0.06] cursor-pointer"
                                                         : "hover:border-white/[0.08] hover:bg-white/[0.06] cursor-grab active:cursor-grabbing active:scale-[0.98]",
@@ -302,7 +305,7 @@ export function BlockLibraryPanel({
                                                     isCompact ? (
                                                         <Plus className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
                                                     ) : (
-                                                        <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
+                                                        <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                                                             {bl.dragHint}
                                                         </span>
                                                     )

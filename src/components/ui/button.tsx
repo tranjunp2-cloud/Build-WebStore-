@@ -3,17 +3,22 @@ import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
+import { FOCUS_RING } from '@/components/ui/focus-ring'
+
+// Primary fill states: mixed toward black so hover/pressed get darker in BOTH themes (opacity would
+// lighten on a white page and darken on a dark one).
+const PRIMARY_FILL =
+    'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[color:color-mix(in_srgb,hsl(var(--primary))_90%,black)] active:bg-[color:color-mix(in_srgb,hsl(var(--primary))_80%,black)]'
 
 const buttonVariants = cva(
-    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+    `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-all duration-200 ${FOCUS_RING} disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0`,
     {
         variants: {
             variant: {
                 // Unified primary (design-system): solid brand teal, no gradient or glow.
                 // Label uses --primary-foreground (dark ink on teal in both themes), so the
                 // `.dash-shell .text-white` legacy remap does not apply here.
-                default:
-                    'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary)/0.88)] focus-visible:ring-[hsl(var(--ring))]',
+                default: PRIMARY_FILL,
                 // `!text-white` keeps the label white on the red fill in BOTH themes —
                 // plain text-white gets remapped to --dash-text (dark) inside .dash-shell (GH-1192).
                 destructive:
@@ -29,8 +34,7 @@ const buttonVariants = cva(
                 // Theme-token colors via arbitrary values: preflight is OFF, so the border
                 // needs the full `[border:1px_solid_…]` shorthand to render. Pair with size="dash".
                 // Same solid teal as `default`; the label token is theme-aware, so no `!text-white`.
-                dashPrimary:
-                    'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold shadow-none hover:bg-[hsl(var(--primary)/0.88)] focus-visible:ring-[hsl(var(--ring))]',
+                dashPrimary: `${PRIMARY_FILL} font-semibold shadow-none`,
                 dashSecondary:
                     '[border:1px_solid_hsl(var(--input-border))] bg-transparent text-[var(--dash-text)] font-medium hover:bg-white/[0.05] focus-visible:ring-zinc-400',
                 // GH-1192 dash ghost: subtle action inside .dash-shell (pairs with size="dash"/"sm").

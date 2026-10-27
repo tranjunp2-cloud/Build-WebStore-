@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { BUILDER_FOCUS_RING } from '@/components/ui/focus-ring'
+import { cn } from '@/lib/utils'
 
 interface BuilderSubmitButtonProps {
     loading?: boolean
@@ -27,7 +29,13 @@ export function BuilderSubmitButton({
         <button
             aria-describedby={describedBy}
             aria-disabled={disabled}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] text-sm font-semibold text-[hsl(var(--primary-foreground))] transition-colors duration-200 hover:bg-[hsl(var(--primary)/0.88)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1120] disabled:cursor-not-allowed disabled:bg-[rgba(148,163,184,0.16)] disabled:text-[#94a3b8]"
+            // The builder is always dark, so the teal is pinned to the dark-theme value instead of --primary.
+            className={cn(
+                'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-[background-color,transform] duration-200 active:scale-[0.98]',
+                'bg-[hsl(var(--p-teal-400))] text-[hsl(var(--p-slate-950))] hover:bg-[color:color-mix(in_srgb,hsl(var(--p-teal-400))_90%,black)] active:bg-[color:color-mix(in_srgb,hsl(var(--p-teal-400))_80%,black)]',
+                BUILDER_FOCUS_RING,
+                'disabled:cursor-not-allowed disabled:bg-[rgba(148,163,184,0.16)] disabled:text-[#94a3b8] disabled:active:scale-100',
+            )}
             disabled={disabled}
             onClick={onClick}
             type={type}

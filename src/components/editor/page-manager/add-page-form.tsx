@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Loader2, Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { FOCUS_RING } from '@/components/ui/focus-ring'
 import type { PageData } from '@/store/editorStore'
 import { validateNewPageTitle } from './page-manager-helpers'
 
@@ -46,7 +47,7 @@ export function AddPageForm({ labels, pages, locale, isSubmitting, onCreate, onO
             <button
                 type="button"
                 onClick={() => { setIsOpen(true); onOpen?.() }}
-                className="flex h-[38px] w-full shrink-0 items-center justify-center gap-2 rounded-[10px] border border-dashed border-slate-300 text-[13px] font-medium text-[var(--editor-text)] transition-colors hover:border-teal-600 hover:bg-teal-50 hover:text-teal-800 dark:border-[var(--editor-border)] dark:hover:border-[hsl(var(--primary)/0.55)] dark:hover:bg-[hsl(var(--primary)/0.05)] dark:hover:text-[hsl(var(--primary))]"
+                className={`${FOCUS_RING} flex h-[38px] w-full shrink-0 items-center justify-center gap-2 rounded-[10px] border border-dashed border-slate-300 text-[13px] font-medium text-[var(--editor-text)] transition-colors hover:border-teal-600 hover:bg-teal-50 hover:text-teal-800 dark:border-[var(--editor-border)] dark:hover:border-[hsl(var(--primary)/0.55)] dark:hover:bg-[hsl(var(--primary)/0.05)] dark:hover:text-[hsl(var(--primary))]`}
             >
                 <Plus className="h-[15px] w-[15px]" />
                 {labels.addNewPage}
