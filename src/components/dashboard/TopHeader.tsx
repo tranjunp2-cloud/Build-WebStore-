@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Menu, ChevronsLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from './NotificationBell'
+import { AiUsageChip } from '@/components/ai-quota/AiUsageChip'
 import { UserAvatarMenu } from './UserAvatarMenu'
 import { ThemeToggle } from './theme-toggle'
 import { AppSwitcher } from './AppSwitcher'
@@ -107,6 +108,7 @@ export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSi
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
+                <AiUsageChip />
                 <NotificationBell />
                 <ThemeToggle />
                 <UserAvatarMenu userName={userName} userInitial={userInitial} userEmail={userEmail} />

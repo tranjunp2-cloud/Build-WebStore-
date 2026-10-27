@@ -35,6 +35,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { AiUsageChip } from '@/components/ai-quota/AiUsageChip'
 import { useI18n } from '@/i18n'
 import type { PageData } from '@/store/editorStore'
 import { useWorkspaceStore, type WorkspacePreset } from '@/store/workspaceStore'
@@ -613,6 +614,7 @@ export function EditorToolbar({
 
             {/* RIGHT: status + actions. Text collapses at tier 1 (< 1366px). */}
             <div className="flex shrink-0 items-center gap-2.5">
+                <AiUsageChip variant="editor" />
                 <div
                     className="inline-flex shrink-0 items-center gap-0 text-[11px] transition-all min-[1366px]:gap-1.5"
                     title={saveStatusLabel}

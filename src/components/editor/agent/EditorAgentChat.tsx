@@ -21,6 +21,7 @@ import { editorUndoPhrases } from "./editor-undo-phrases";
 import { newerOverlapping } from "@/lib/agent-changes/undo-touches";
 import { CanvasPickTip, canvasPickTipText, useCanvasPickTip } from "./canvas-pick-tip";
 import { useChangeWalker } from "./change-walker-store";
+import { useAiChatQuota } from "@/components/ai-quota/ai-chat-quota";
 import {
 	EDITOR_AI_ASK_EVENT,
 	EDITOR_AI_CHANGED_EVENT,
@@ -139,6 +140,8 @@ function EditorChatSurface({ siteId }: { siteId: string }) {
 			},
 		};
 	}, [runtime, send]);
+	// the shop's AI allowance: a line when low; used up → closed box, no Ask AI (see ElementAskLayer)
+	const quota = useAiChatQuota({ busy: chat.busy, editor: true });
 	const allPending = useChangeSets({ status: "pending" });
 	const pending = useMemo(() => (allPending.data ?? []).filter((c) => isForSite(c, siteId)), [allPending.data, siteId]);
 	const decideChangeSet = useDecideChangeSet();
@@ -387,6 +390,8 @@ function EditorChatSurface({ siteId }: { siteId: string }) {
 			labels={panelLabels}
 			locale={locale}
 			singleChat
+			notice={quota.notice}
+			locked={quota.locked}
 		/>
 		{pickTip.place && (
 			<CanvasPickTip place={pickTip.place} text={canvasPickTipText(locale)} closeLabel={locale.startsWith("vi") ? "Đóng" : locale.startsWith("ms") ? "Tutup" : "Close"} onClose={pickTip.close} />

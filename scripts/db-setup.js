@@ -68,6 +68,40 @@ async function getTableCount(pool) {
 // Standalone server can't run Payload's pushDevSchema (missing Drizzle files).
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
+// Platform-wide AI config seeded into plan-features (feature ai_platform_config, once, under FREEMIUM). USD per 1M tokens;
+// keys are "provider:model". Insert-only: after the first run an admin owns it in Payload.
+const p = (input, output, cachedInput, cacheWrite, extra = {}) => ({ input, output, ...(cachedInput === undefined ? {} : { cachedInput }), ...(cacheWrite === undefined ? {} : { cacheWrite }), ...extra })
+const AI_PLATFORM_CONFIG_SEED = {
+  prices: {
+    'anthropic:claude-haiku-5-5': p(0.1, 0.5, 0.01, 0.125, { longContext: { aboveInputTokens: 100000, input: 0.5, output: 2.5, cachedInput: 0.05, cacheWrite: 0.625 } }),
+    'anthropic:claude-haiku-4-5': p(1, 5, 0.1, 1.25),
+    'anthropic:claude-sonnet-5-5': p(2, 10, 0.2, 2.5),
+    'anthropic:claude-sonnet-5': p(2, 10, 0.2, 2.5),
+    'anthropic:claude-sonnet-4-6': p(3, 15, 0.3, 3.75),
+    'anthropic:claude-opus-5-5': p(4, 20, 0.2, 5),
+    'anthropic:claude-opus-5': p(5, 25, 0.5, 6.25),
+    'anthropic:claude-opus-4-8': p(5, 25, 0.5, 6.25),
+    'anthropic:claude-opus-4-7': p(5, 25, 0.5, 6.25),
+    'anthropic:claude-opus-4-6': p(5, 25, 0.5, 6.25),
+    'anthropic:claude-fable-5-1': p(10, 50, 0.25, 12.5),
+    'anthropic:claude-fable-5': p(10, 50, 1, 12.5),
+    'openai:gpt-4.1-mini': p(0.4, 1.6, 0.1),
+    'openai:gpt-4.1-nano': p(0.1, 0.4, 0.025),
+    'openai:gpt-4o-mini': p(0.15, 0.6, 0.075),
+    'deepseek:deepseek-flash': p(0.3, 1.2, 0.006, undefined, { offPeakFactor: 0.5 }),
+    'deepseek:deepseek-v4-flash': p(0.3, 1.2, 0.006, undefined, { offPeakFactor: 0.5 }),
+    'deepseek:deepseek-v4-pro': p(1.32, 3.96, 0.044, undefined, { offPeakFactor: 0.5 }),
+    'typesafe:jev-latest': p(0.042, 0, 0.042),
+  },
+  images: { 'openai:gpt-image-1': 0.042, 'openai:gpt-image-1-mini': 0.011 },
+  models: {
+    fast: 'anthropic:claude-haiku-5-5, openai:gpt-4.1-nano',
+    balanced: 'anthropic:claude-haiku-5-5, openai:gpt-4.1-mini',
+    quality: 'anthropic:claude-sonnet-5-5, openai:gpt-5.4-mini',
+    image: 'openai:gpt-image-1',
+  },
+}
+
 const MIGRATIONS = [
   { name: 'pw1_migration.batch_ledger', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-batch.sql'), 'utf8') },
   { name: 'pw1_migration.qa_audits', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-qa.sql'), 'utf8') },
@@ -2665,6 +2699,53 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   {
     name: 'ai_usage_logs.user_idx',
     sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_user_idx ON ai_usage_logs (user_id) WHERE user_id IS NOT NULL;`,
+  },
+  // ── AI Usage Logs: copy of the ai-platform usage ledger (cron /api/cron/ai-usage-sync) ──
+  { name: 'ai_usage_logs.endpoint_nullable', sql: `ALTER TABLE IF EXISTS ai_usage_logs ALTER COLUMN endpoint DROP NOT NULL;` },
+  { name: 'ai_usage_logs.cost_usd_nullable', sql: `ALTER TABLE IF EXISTS ai_usage_logs ALTER COLUMN cost_usd DROP NOT NULL;` },
+  { name: 'ai_usage_logs.alter_source', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS source varchar NOT NULL DEFAULT 'prime-web';` },
+  { name: 'ai_usage_logs.alter_feature', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS feature varchar;` },
+  { name: 'ai_usage_logs.alter_task', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS task varchar;` },
+  { name: 'ai_usage_logs.alter_provider', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS provider varchar;` },
+  { name: 'ai_usage_logs.alter_outcome', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS outcome varchar;` },
+  { name: 'ai_usage_logs.alter_cached_tokens_in', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS cached_tokens_in numeric;` },
+  { name: 'ai_usage_logs.alter_run_id', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS run_id varchar;` },
+  { name: 'ai_usage_logs.alter_organization_id', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS organization_id varchar;` },
+  { name: 'ai_usage_logs.alter_platform_event_id', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS platform_event_id numeric;` },
+  { name: 'ai_usage_logs.platform_event_id_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS ai_usage_logs_platform_event_id_idx ON ai_usage_logs (platform_event_id);` },
+  { name: 'ai_usage_logs.tenant_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_tenant_idx ON ai_usage_logs (tenant_id);` },
+  { name: 'ai_usage_logs.source_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_source_idx ON ai_usage_logs (source);` },
+  { name: 'ai_usage_logs.feature_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_feature_idx ON ai_usage_logs (feature);` },
+  { name: 'ai_usage_logs.task_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_task_idx ON ai_usage_logs (task);` },
+  { name: 'ai_usage_logs.outcome_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_outcome_idx ON ai_usage_logs (outcome);` },
+  { name: 'payload_locked_documents_rels.ai_usage_logs_id', sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS ai_usage_logs_id integer;` },
+  // readable detail derived at copy time (lib/ai-platform/usage-sync-map); re-copy with /api/cron/ai-usage-sync?from=0
+  { name: 'ai_usage_logs.alter_summary', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS summary varchar;` },
+  { name: 'ai_usage_logs.alter_area', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS area varchar;` },
+  { name: 'ai_usage_logs.alter_task_label', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS task_label varchar;` },
+  { name: 'ai_usage_logs.alter_page_title', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS page_title varchar;` },
+  { name: 'ai_usage_logs.alter_page_path', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS page_path varchar;` },
+  { name: 'ai_usage_logs.alter_thread_id', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS thread_id varchar;` },
+  { name: 'ai_usage_logs.alter_total_tokens', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS total_tokens numeric;` },
+  { name: 'ai_usage_logs.alter_cache_hit_percent', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS cache_hit_percent numeric;` },
+  { name: 'ai_usage_logs.alter_battery_cost_usd', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS battery_cost_usd numeric;` },
+  { name: 'ai_usage_logs.alter_priced', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS priced boolean;` },
+  { name: 'ai_usage_logs.alter_error_label', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS error_label varchar;` },
+  { name: 'ai_usage_logs.area_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_area_idx ON ai_usage_logs (area);` },
+  {
+    // legacy prime-web rows: give them a readable title and totals (their cost was always priced)
+    name: 'ai_usage_logs.backfill_legacy_summary',
+    sql: `UPDATE ai_usage_logs SET
+      summary = COALESCE(summary, 'Legacy · ' || CASE endpoint::text
+        WHEN 'site-generation' THEN 'Site generation' WHEN 'chat-edit' THEN 'Chat edit (block)'
+        WHEN 'inline-edit' THEN 'Inline edit' WHEN 'seo-generation' THEN 'SEO generation'
+        WHEN 'content-rewrite' THEN 'Content rewrite' WHEN 'product-description' THEN 'Product description'
+        WHEN 'url-extraction' THEN 'URL extraction' WHEN 'bulk-parse' THEN 'Bulk parse'
+        WHEN 'brand-analysis' THEN 'Brand analysis' ELSE COALESCE(endpoint::text, 'AI call') END),
+      task_label = COALESCE(task_label, endpoint::text),
+      total_tokens = COALESCE(total_tokens, tokens_in + tokens_out),
+      priced = COALESCE(priced, cost_usd IS NOT NULL)
+      WHERE source = 'prime-web';`,
   },
   // ── Sites: AI generation status tracking ──
   {
@@ -5264,6 +5345,54 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
       DO $$ BEGIN
         IF (SELECT COUNT(*) FROM plan_features) < 140 THEN
           RAISE EXCEPTION 'plan_features seed incomplete: expected >= 140 rows (plans seed may have failed)';
+        END IF;
+      END $$;
+    `,
+  },
+  // ── AI limits per plan (read by lib/ai-platform/plan-limits → `lim` claim in the ai-platform context token) ──
+  // Insert-only: a row an admin already edited in Payload is never overwritten. "0" = AI off for that plan.
+  // Works on both table shapes: the one created above (plan_id + varchar plan_code + UNIQUE) and the one Payload
+  // created (no plan_id, enum plan_code, no unique index) — one literal INSERT per row (a literal coerces to the enum),
+  // guarded by NOT EXISTS instead of ON CONFLICT.
+  {
+    name: 'f-subscription-plan-features-ai-limits-seed',
+    sql: `
+      DO $$
+      DECLARE r record;
+      BEGIN
+        FOR r IN SELECT * FROM (VALUES
+          ('FREEMIUM','ai_budget_usd_daily','0.05'),
+          ('FREEMIUM','ai_pictures_daily','1'),
+          ('STARTER_TM_USER','ai_budget_usd_daily','0.15'),
+          ('STARTER_TM_USER','ai_pictures_daily','3'),
+          ('STARTER_NON_TM_USER','ai_budget_usd_daily','0.15'),
+          ('STARTER_NON_TM_USER','ai_pictures_daily','3'),
+          ('STANDARD_TM_USER','ai_budget_usd_daily','0.40'),
+          ('STANDARD_TM_USER','ai_pictures_daily','8'),
+          ('STANDARD_NON_TM_USER','ai_budget_usd_daily','0.40'),
+          ('STANDARD_NON_TM_USER','ai_pictures_daily','8'),
+          ('PROFESSIONAL_TM_USER','ai_budget_usd_daily','0.90'),
+          ('PROFESSIONAL_TM_USER','ai_pictures_daily','20'),
+          ('PROFESSIONAL_NON_TM_USER','ai_budget_usd_daily','0.90'),
+          ('PROFESSIONAL_NON_TM_USER','ai_pictures_daily','20')
+        ) AS v(plan_code, feature_code, value) LOOP
+          IF NOT EXISTS (SELECT 1 FROM plan_features WHERE plan_code::text = r.plan_code AND feature_code = r.feature_code) THEN
+            EXECUTE format('INSERT INTO plan_features (plan_code, feature_code, value, created_at, updated_at) VALUES (%L, %L, %L, now(), now())',
+              r.plan_code, r.feature_code, r.value);
+          END IF;
+        END LOOP;
+      END $$;
+    `,
+  },
+  {
+    // planCode is a required enum, so the platform-wide row lives under FREEMIUM; /api/internal/ai-config reads it by feature code only
+    name: 'f-subscription-plan-features-ai-platform-config-seed',
+    sql: `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM plan_features WHERE feature_code = 'ai_platform_config') THEN
+          EXECUTE format('INSERT INTO plan_features (plan_code, feature_code, value, settings, created_at, updated_at) VALUES (%L, %L, %L, %L::jsonb, now(), now())',
+            'FREEMIUM', 'ai_platform_config', 'YES', '${JSON.stringify(AI_PLATFORM_CONFIG_SEED).replace(/'/g, "''")}');
         END IF;
       END $$;
     `,

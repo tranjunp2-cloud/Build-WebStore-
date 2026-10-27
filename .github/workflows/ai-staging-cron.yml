@@ -61,6 +61,8 @@ jobs:
           if [ "$KIND" = "frequent" ] || [ "$KIND" = "all" ]; then
             # copilot changes applied / undone here whose record the AI platform missed
             call "$APP_URL/api/cron/ai-receipts"
+            # AI platform usage ledger → Payload ai-usage-logs
+            call "$APP_URL/api/cron/ai-usage-sync"
             if [ -n "$AI_PLATFORM_URL" ]; then
               # retention + closes runs a stopped function left "running"
               call "$AI_PLATFORM_URL/internal/cron/thread-retention"

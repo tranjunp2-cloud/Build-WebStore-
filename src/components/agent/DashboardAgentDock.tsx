@@ -16,6 +16,7 @@ import { dockShownOn } from "./agent-dock-routes";
 import { AGENT_OPEN_EVENT, dockStoppedListening, takeHeldAgentOpens } from "./agent-open-queue";
 import { agentStarters } from "./agent-starters";
 import { useAskParam } from "./use-ask-param";
+import { useAiChatQuota } from "@/components/ai-quota/ai-chat-quota";
 
 /**
  * Prime Web's assistant (the dashboard mascot). The gateway talks to /api/agent (BFF → apps/ai-platform). Approving a draft
@@ -37,6 +38,8 @@ function DockSurface() {
 	// work desk (the next to-do item), not on the newest chat.
 	// the site editor keeps its own chats: never listed or continued here
 	const chat = useAgentChatRuntime({ context: pin, page, scope: outsideWebBuilderChats, restoreLatest: false });
+	// the shop's AI allowance: a line when low, a closed box when used up
+	const quota = useAiChatQuota({ busy: chat.busy });
 	const pending = useChangeSets({ status: "pending" });
 	// the merchant's work queue: one number on the mascot, the dock's home is the next item
 	const workQueue = useWork();
@@ -145,6 +148,8 @@ function DockSurface() {
 			labels={agentPanelLabels(locale)}
 			locale={locale}
 			work={work}
+			notice={quota.notice}
+			locked={quota.locked}
 		/>
 	);
 }

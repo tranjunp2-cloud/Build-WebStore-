@@ -751,6 +751,10 @@ export interface AgentChatThreadProps {
 	helloHint?: string;
 	/** footer switch: drafts are approved as soon as they are staged */
 	autoApprove?: { on: boolean; onChange: (on: boolean) => void; notice?: (id: string) => AutoApproveNotice | undefined };
+	/** a line the host shows right above the composer (e.g. the AI allowance running low) */
+	notice?: ReactNode;
+	/** the host closed the chat for now: no starters or next-step chips, the composer can't send */
+	locked?: { placeholder: string };
 }
 
 /**
@@ -781,6 +785,8 @@ export function AgentChatThread({
 	draftLabels,
 	empty,
 	autoApprove,
+	notice,
+	locked,
 }: AgentChatThreadProps) {
 	const labels = { ...DEFAULT_CHAT_LABELS, ...overrides, phrases: { ...DEFAULT_CHAT_LABELS.phrases, ...overrides?.phrases } };
 	const streamRef = useRef<HTMLDivElement>(null);
@@ -875,7 +881,7 @@ export function AgentChatThread({
 											)}
 										</div>
 									)}
-									{suggestions.length > 0 && (
+									{!locked && suggestions.length > 0 && (
 										<div className="ech-ag-starters" role="group" aria-label={labels.tryHeading}>
 											{suggestions.slice(0, 4).map((s) => (
 												<button key={s.label} type="button" className="ech-ag-starter" title={s.prompt ?? s.label} onClick={() => (s.onSelect ? s.onSelect() : void chat.send(s.prompt ?? s.label))}>
@@ -947,6 +953,7 @@ export function AgentChatThread({
 					</button>
 				</div>
 			) : (
+				!locked &&
 				quick.length > 0 && (
 					<div className="ech-ag-quick" role="group" aria-label={labels.askNext}>
 						{quick.map((prompt) => (
@@ -957,6 +964,7 @@ export function AgentChatThread({
 					</div>
 				)
 			)}
+			{notice}
 			<ChatComposer
 				ref={setComposer}
 				attachments={chat.attachments}
@@ -979,6 +987,7 @@ export function AgentChatThread({
 				busy={chat.busy}
 				onStop={chat.stop ? () => void chat.stop?.() : undefined}
 				autoApprove={autoApprove}
+				locked={locked}
 				hint={next[0]}
 				onQueue={(text) => setQueued((prev) => (prev ? `${prev}\n${text}` : text))}
 				labels={photoQuestionOpen ? { ...composerLabels, placeholder: labels.searchPhotosHint } : composerLabels}

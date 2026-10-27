@@ -46,6 +46,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/ai-usage-sync",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/shop-automations",
       "schedule": "0 1,2,3 * * *"
     }
