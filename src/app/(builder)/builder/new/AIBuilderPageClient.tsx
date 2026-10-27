@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { GripVertical, Loader2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -9,6 +9,7 @@ import BusinessInfoForm from '@/components/builder/BusinessInfoForm'
 import BuilderCompletionView from '@/components/builder/BuilderCompletionView'
 import BuilderFullPreview from '@/components/builder/BuilderFullPreview'
 import BuilderGenerationView from '@/components/builder/BuilderGenerationView'
+import { builderSiteHost } from '@/components/builder/BuilderMiniBrowser'
 import { CongratsModal } from '@/components/builder/CongratsModal'
 import { LanguageConfirmBanner, type LanguageConfirmAction } from '@/components/editor/LanguageConfirmBanner'
 import { buildLanguageDetectionText, resolveGenerationLanguageDecision } from '@/lib/language-detection'
@@ -79,20 +80,27 @@ function LivePreview({
     onReorder,
     interactive = false,
     siteType,
+    scopeClassName,
 }: {
     blocks: any[]
     theme: ThemeConfig | null
     onReorder?: (newOrder: any[]) => void
     interactive?: boolean
     siteType?: string
+    /** Scope the theme variables to this class instead of :root, so a preview
+     *  rendered inside the builder UI cannot restyle the builder itself. */
+    scopeClassName?: string
 }) {
     if (!theme || blocks.length === 0) return null
 
     const resolved = resolveTheme(theme)
-    const themeCSS = generateThemeCSS(resolved)
+    const rootCSS = generateThemeCSS(resolved)
+    const themeCSS = scopeClassName ? rootCSS.replace(/:root\b/g, `.${scopeClassName}`) : rootCSS
 
+    // Unscoped previews keep the fragment so the canvas still fills its h-full scroller.
+    const Wrapper = scopeClassName ? 'div' : Fragment
     return (
-        <>
+        <Wrapper {...(scopeClassName ? { className: scopeClassName } : {})}>
         <style dangerouslySetInnerHTML={{ __html: themeCSS }} />
         <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
         <Reorder.Group
@@ -161,7 +169,7 @@ function LivePreview({
                 )
             })}
         </Reorder.Group>
-        </>
+        </Wrapper>
     )
 }
 
@@ -937,15 +945,30 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }
 
     if (shouldShowGenerationScreen) {
+        const industryLabels = t.onboarding.form.industryOptions as Record<string, string>
+        const industry = businessInfo?.industry ?? ''
         return (
             <>
                 {saveStatusBadge}
                 <BuilderGenerationView
+                    blockCount={blocks.length}
+                    brief={{
+                        businessName: businessInfo?.businessName ?? '',
+                        industryLabel: industryLabels[industry] || industry,
+                        products: businessInfo?.products ?? '',
+                        shortDescription: businessInfo?.shortDescription ?? '',
+                    }}
+                    compact={isMobileViewport}
                     elapsedSeconds={elapsedSeconds}
                     message={generationMessage}
                     onCancel={cancelGeneration}
+                    previewContent={blocks.length > 0 && theme ? (
+                        <LivePreview blocks={blocks} interactive={false} scopeClassName="builder-gen-preview" siteType={businessInfo?.industry} theme={theme} />
+                    ) : null}
                     progress={progress.progress || 52}
                     showTimeoutWarning={showTimeoutWarning}
+                    theme={theme}
+                    urlHost={builderSiteHost(businessInfo?.slug)}
                 />
             </>
         )
@@ -966,7 +989,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
         return (
             <>
-                {saveStatusBadge}
                 <BuilderCompletionView
                     blocks={blocks}
                     generationTimeLabel={generationTimeMs > 0 ? `${Math.round(generationTimeMs / 1000)}s` : '0s'}
@@ -980,6 +1002,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     onPreviewModeChange={setPreviewMode}
                     previewContent={readonlyPreviewContent}
                     previewMode={previewMode}
+                    saveState={draftSaveState}
+                    saveStatusLabel={saveStatusLabel}
                     siteId={siteId}
                     siteName={siteName || businessInfo?.businessName || 'your-site'}
                     totalBlocks={blocks.length || 7}

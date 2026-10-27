@@ -21,32 +21,9 @@ import type { BuilderPreviewMode } from '../../../components/builder/BuilderPrev
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 
+// The done-state toolbar (BuilderPreviewToolbar) renders for real; only the
+// iframe surface is stubbed.
 vi.mock('@/components/builder/BuilderPreviewPrimitives', () => ({
-    BuilderPreviewModeToggle: ({
-        mode,
-        onChange,
-    }: {
-        mode: string
-        onChange: (mode: string) => void
-    }) => (
-        <div data-testid="preview-mode-toggle">
-            <button
-                data-testid="toggle-desktop"
-                onClick={() => onChange('desktop')}
-                type="button"
-            >
-                Desktop
-            </button>
-            <button
-                data-testid="toggle-mobile"
-                onClick={() => onChange('mobile')}
-                type="button"
-            >
-                Mobile
-            </button>
-            <span data-testid="current-mode">{mode}</span>
-        </div>
-    ),
     BuilderPreviewSurface: ({
         children,
         mode,
@@ -98,7 +75,7 @@ const DEFAULT_PROPS = {
     isPublishing: false,
 }
 
-function renderCompletion(overrides: Partial<typeof DEFAULT_PROPS> = {}) {
+function renderCompletion(overrides: Partial<React.ComponentProps<typeof BuilderCompletionView>> = {}) {
     return render(<BuilderCompletionView {...DEFAULT_PROPS} {...overrides} />)
 }
 
@@ -237,9 +214,11 @@ describe('BuilderCompletionView', () => {
             expect(screen.getByTestId('preview-content')).toBeInTheDocument()
         })
 
-        it('renders preview mode toggle', () => {
-            renderCompletion()
-            expect(screen.getByTestId('preview-mode-toggle')).toBeInTheDocument()
+        it('renders the one-capsule preview toolbar with the active mode pressed', () => {
+            renderCompletion({ previewMode: 'mobile' })
+            expect(screen.getByTestId('builder-preview-toolbar')).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: en.common.mobile })).toHaveAttribute('aria-pressed', 'true')
+            expect(screen.getByRole('button', { name: en.common.desktop })).toHaveAttribute('aria-pressed', 'false')
         })
 
         it('displays "Website preview" heading in right pane', () => {
@@ -268,15 +247,34 @@ describe('BuilderCompletionView', () => {
         it('calls onPreviewModeChange when toggling to mobile', () => {
             const onPreviewModeChange = vi.fn()
             renderCompletion({ onPreviewModeChange })
-            fireEvent.click(screen.getByTestId('toggle-mobile'))
+            fireEvent.click(screen.getByRole('button', { name: en.common.mobile }))
             expect(onPreviewModeChange).toHaveBeenCalledWith('mobile')
         })
 
         it('calls onPreviewModeChange when toggling to desktop', () => {
             const onPreviewModeChange = vi.fn()
             renderCompletion({ previewMode: 'mobile', onPreviewModeChange })
-            fireEvent.click(screen.getByTestId('toggle-desktop'))
+            fireEvent.click(screen.getByRole('button', { name: en.common.desktop }))
             expect(onPreviewModeChange).toHaveBeenCalledWith('desktop')
+        })
+    })
+
+    // ── Done-state status (Draft badge + Saved pill) ─────────────────────
+
+    describe('Draft badge and save status (TC-F01.12)', () => {
+        it('shows the dashboard-style Draft badge in the ready card', () => {
+            renderCompletion()
+            expect(screen.getByTestId('builder-ready-card')).toHaveTextContent(en.dashboard.sites.draft)
+        })
+
+        it('shows the save status as a pill over the preview', () => {
+            renderCompletion({ saveStatusLabel: 'Saved 2:12 PM' })
+            expect(screen.getByTestId('builder-save-status')).toHaveTextContent('Saved 2:12 PM')
+        })
+
+        it('renders no save pill when there is no status yet', () => {
+            renderCompletion()
+            expect(screen.queryByTestId('builder-save-status')).not.toBeInTheDocument()
         })
     })
 

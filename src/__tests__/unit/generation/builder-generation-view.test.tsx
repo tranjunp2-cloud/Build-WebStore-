@@ -43,7 +43,7 @@ describe('[TC-S4-004] BuilderGenerationView', () => {
         )
 
         // Assert — progress bar div has style width matching progress
-        const progressBar = container.querySelector('[style*="width"]')
+        const progressBar = container.querySelector('[data-testid="builder-generation-progress-bar"]')
         expect(progressBar).toBeTruthy()
         expect(progressBar?.getAttribute('style')).toContain('65%')
     })
@@ -132,7 +132,7 @@ describe('[TC-S4-004] BuilderGenerationView', () => {
     // silent OpenAI call phase. See plans/260414-1630-phase-08-audit progress bug.
     describe('progress interpolation [TC-F01-PROG]', () => {
         function readBarWidth(container: HTMLElement): number {
-            const bar = container.querySelector('[style*="width"]') as HTMLElement | null
+            const bar = container.querySelector('[data-testid="builder-generation-progress-bar"]') as HTMLElement | null
             if (!bar) return 0
             const match = bar.getAttribute('style')?.match(/width:\s*([\d.]+)%/)
             return match ? parseFloat(match[1]!) : 0

@@ -3,13 +3,17 @@
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { ArrowRight, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react'
 import { BuilderField } from '@/components/builder/fields/BuilderField'
 import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
 import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
 import { BuilderSubmitButton } from '@/components/builder/fields/BuilderSubmitButton'
 import { BuilderTextInput } from '@/components/builder/fields/BuilderTextInput'
 import { BuilderTextarea } from '@/components/builder/fields/BuilderTextarea'
+import { DEFAULT_INDUSTRY, getIndustryIcon } from '@/components/builder/fields/builder-industry-icons'
+import { builderSiteHost } from '@/components/builder/BuilderMiniBrowser'
+import { BuilderTemplateCaption } from '@/components/builder/BuilderTemplateCaption'
+import { BuilderTemplatePreview, type BuilderTemplateField } from '@/components/builder/BuilderTemplatePreview'
 import { BuilderPromoCard } from '@/components/builder/onboarding/BuilderPromoCard'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
@@ -40,9 +44,6 @@ type ExtractionResult = {
     confidence: 'high' | 'medium' | 'low'
 }
 
-const BUILDER_TEXTAREA_BADGE_URL = '/assets/builder/builder-textarea-badge.svg'
-const BUILDER_TEXTAREA_HINT_ICON_URL = '/assets/builder/builder-hint-icon.svg'
-
 interface BusinessInfoFormProps {
     onSubmit?: (info: BusinessInfo) => void
     onRetry?: (info: BusinessInfo) => void
@@ -54,7 +55,7 @@ interface BusinessInfoFormProps {
 const DEFAULT_FORM: BusinessInfo = {
     businessName: '',
     shortDescription: '',
-    industry: '',
+    industry: DEFAULT_INDUSTRY,
     products: '',
     language: 'auto',
 }
@@ -75,6 +76,10 @@ export default function BusinessInfoForm({
     const [errors, setErrors] = useState<Record<string, string>>({})
     const [industryOptions, setIndustryOptions] = useState<IndustryOption[]>([])
     const [isLoadingIndustries, setIsLoadingIndustries] = useState(true)
+    // Drives the live template preview: the focused field's slots glow, a hovered
+    // industry is previewed in the hero.
+    const [focusedField, setFocusedField] = useState<BuilderTemplateField | null>(null)
+    const [hoveredIndustry, setHoveredIndustry] = useState<string | null>(null)
 
     // Slug picker state (F23)
     const [chosenSlug, setChosenSlug] = useState('')
@@ -96,12 +101,25 @@ export default function BusinessInfoForm({
     const [showReview, setShowReview] = useState(false)
     const abortControllerRef = useRef<AbortController | null>(null)
 
+    const validFields: Record<BuilderTemplateField, boolean> = {
+        businessName: form.businessName.trim().length >= 3,
+        industry: form.industry.trim().length > 0,
+        products: form.products.trim().length >= 3,
+        shortDescription: form.shortDescription.trim().length >= 3,
+    }
     const isFormReady =
-        form.businessName.trim().length >= 3 &&
-        form.industry.trim().length > 0 &&
-        form.shortDescription.trim().length >= 3 &&
-        form.products.trim().length >= 3 &&
+        validFields.businessName &&
+        validFields.industry &&
+        validFields.shortDescription &&
+        validFields.products &&
         slugAvailable // true by default; only false if user entered an unavailable slug
+    // A field turns red in the template only after a failed submit and while it is still missing.
+    const missingFields: Partial<Record<BuilderTemplateField, boolean>> = {
+        businessName: !!errors.businessName && !validFields.businessName,
+        industry: !!errors.industry && !validFields.industry,
+        products: !!errors.products && !validFields.products,
+        shortDescription: !!errors.shortDescription && !validFields.shortDescription,
+    }
 
     useEffect(() => {
         let isMounted = true
@@ -171,7 +189,8 @@ export default function BusinessInfoForm({
     }
 
     const submitForm = () => {
-        if (!validate() || isGenerating) return
+        // The button stays clickable while incomplete so validate() can surface what is missing.
+        if (!validate() || isGenerating || !slugAvailable) return
 
         const payload: BusinessInfo = {
             ...form,
@@ -510,10 +529,34 @@ export default function BusinessInfoForm({
         </div>
     )
 
+    const industryLabels = (t.onboarding.form as Record<string, unknown>).industryOptions as Record<string, string> | undefined
+    const labelForIndustry = (value: string) =>
+        industryLabels?.[value] || industryOptions.find((option) => option.value === value)?.label || value
+    const previewIndustry = hoveredIndustry && hoveredIndustry !== form.industry ? hoveredIndustry : form.industry
+    // Editing a field clears its error, so a fixed field stops showing red.
+    const updateField = (field: BuilderTemplateField, value: string) => {
+        setForm((current) => ({ ...current, [field]: value }))
+        setErrors((current) => {
+            if (!current[field]) return current
+            const { [field]: _cleared, ...rest } = current
+            return rest
+        })
+    }
+    const focusProps = (field: BuilderTemplateField) => ({
+        onFocus: () => setFocusedField(field),
+        onBlur: () => setFocusedField((current) => (current === field ? null : current)),
+    })
+    const hintLine = (text: string) => (
+        <div className="flex items-center gap-1.5">
+            <Sparkles aria-hidden className="size-3 flex-none" />
+            <span>{text}</span>
+        </div>
+    )
+
     const formFields = (
         <div>
             <form onSubmit={handleSubmit}>
-                <div className="flex flex-col gap-6">
+                <div className="grid gap-5 pb-6">
                     {errorMessage ? (
                         <div className="rounded-2xl border border-[rgba(248,113,113,0.35)] bg-[rgba(127,29,29,0.18)] px-4 py-3 text-sm text-[#fecaca]">
                             <p>{errorMessage}</p>
@@ -537,8 +580,9 @@ export default function BusinessInfoForm({
                         required
                     >
                         <BuilderTextInput
+                            {...focusProps('businessName')}
                             invalid={!!errors.businessName}
-                            onChange={(e) => setForm((current) => ({ ...current, businessName: e.target.value }))}
+                            onChange={(e) => updateField('businessName', e.target.value)}
                             placeholder={t.onboarding.form.businessNamePlaceholder}
                             type="text"
                             value={form.businessName}
@@ -558,21 +602,21 @@ export default function BusinessInfoForm({
                         error={errors.industry}
                         label={t.onboarding.form.industry}
                         required
+                        spacious
                     >
                         <BuilderOptionGrid>
-                            {industryOptions.map((option) => {
-                                const i18nLabels = (t.onboarding.form as Record<string, unknown>).industryOptions as Record<string, string> | undefined
-                                const translatedLabel = i18nLabels?.[option.value] || option.label
-                                return (
-                                    <BuilderOptionCard
-                                        icon={option.icon}
-                                        key={option.value}
-                                        label={translatedLabel}
-                                        onClick={() => setForm((current) => ({ ...current, industry: option.value }))}
-                                        selected={form.industry === option.value}
-                                    />
-                                )
-                            })}
+                            {industryOptions.map((option) => (
+                                <BuilderOptionCard
+                                    icon={getIndustryIcon(option.value)}
+                                    key={option.value}
+                                    label={labelForIndustry(option.value)}
+                                    onClick={() => updateField('industry', option.value)}
+                                    onHoverChange={(hovered) =>
+                                        setHoveredIndustry((current) => (hovered ? option.value : current === option.value ? null : current))
+                                    }
+                                    selected={form.industry === option.value}
+                                />
+                            ))}
                         </BuilderOptionGrid>
                         {isLoadingIndustries ? (
                             <p className="text-xs text-[#94a3b8]">{t.onboarding.form.loadingIndustries}</p>
@@ -580,24 +624,15 @@ export default function BusinessInfoForm({
                     </BuilderField>
 
                     <BuilderField
-                        hint={(
-                            <div className="flex items-center gap-2">
-                                <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
-                                <span>{t.onboarding.form.productsHint}</span>
-                            </div>
-                        )}
+                        hint={hintLine(t.onboarding.form.productsHint)}
                         error={errors.products}
                         label={t.onboarding.form.products}
                         required
                     >
                         <BuilderTextarea
-                            adornment={(
-                                <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
-                                    <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
-                                </div>
-                            )}
+                            {...focusProps('products')}
                             invalid={!!errors.products}
-                            onChange={(e) => setForm((current) => ({ ...current, products: e.target.value }))}
+                            onChange={(e) => updateField('products', e.target.value)}
                             placeholder={t.onboarding.form.productsPlaceholder}
                             rows={3}
                             value={form.products}
@@ -605,24 +640,15 @@ export default function BusinessInfoForm({
                     </BuilderField>
 
                     <BuilderField
-                        hint={(
-                            <div className="flex items-center gap-2">
-                                <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
-                                <span>{t.onboarding.form.shortDescriptionHint}</span>
-                            </div>
-                        )}
+                        hint={hintLine(t.onboarding.form.shortDescriptionHint)}
                         error={errors.shortDescription}
                         label={t.onboarding.form.shortDescription}
                         required
                     >
                         <BuilderTextarea
-                            adornment={(
-                                <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
-                                    <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
-                                </div>
-                            )}
+                            {...focusProps('shortDescription')}
                             invalid={!!errors.shortDescription}
-                            onChange={(e) => setForm((current) => ({ ...current, shortDescription: e.target.value }))}
+                            onChange={(e) => updateField('shortDescription', e.target.value)}
                             placeholder={t.onboarding.form.shortDescriptionPlaceholder}
                             rows={3}
                             value={form.shortDescription}
@@ -642,17 +668,21 @@ export default function BusinessInfoForm({
 
     const leftFooter = (
         <BuilderSubmitButton
-            disabled={!isFormReady || isGenerating}
+            disabled={isGenerating}
             loading={isGenerating}
             onClick={submitForm}
+            ready={isFormReady}
             type="button"
         >
             {t.onboarding.form.generateButton}
         </BuilderSubmitButton>
     )
 
+    const filledCount = Object.values(validFields).filter(Boolean).length
+
     const rightPane = (
         <BuilderPromoCard
+            connectorFill={[(filledCount / 4) * 100, 0]}
             description={t.onboarding.form.promoDescription}
             steps={[
                 { id: 1, label: t.onboarding.form.promoStep1, active: true },
@@ -660,12 +690,24 @@ export default function BusinessInfoForm({
                 { id: 3, label: t.onboarding.form.promoStep3 },
             ]}
             title={t.onboarding.form.promoTitle}
-        />
+        >
+            <BuilderTemplatePreview
+                businessName={form.businessName}
+                focus={focusedField}
+                industryHovered={previewIndustry !== form.industry}
+                industryIcon={getIndustryIcon(previewIndustry)}
+                industryLabel={previewIndustry ? labelForIndustry(previewIndustry) : t.onboarding.form.industry}
+                missing={missingFields}
+                products={form.products}
+                shortDescription={form.shortDescription}
+                urlHost={slugAvailable && chosenSlug && validFields.businessName ? builderSiteHost(chosenSlug) : null}
+            />
+            <BuilderTemplateCaption filled={validFields} focus={focusedField} missing={missingFields} />
+        </BuilderPromoCard>
     )
 
     return (
         <BuilderStepScreen
-            description={t.onboarding.step1Description}
             leftBody={leftBody}
             leftFooter={leftFooter}
             right={rightPane}

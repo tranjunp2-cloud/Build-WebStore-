@@ -5,6 +5,16 @@ interface BuilderTextInputProps extends Omit<InputHTMLAttributes<HTMLInputElemen
     invalid?: boolean
 }
 
+/** Shared look for builder inputs: slate-700 border, cyan focus glow, red when invalid. */
+export const BUILDER_CONTROL_CLASS =
+    'block w-full rounded-lg border bg-[#172033] text-base leading-6 text-white outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[#a9a9a9] md:text-[11px] md:leading-4'
+
+export function builderControlStateClass(invalid?: boolean) {
+    return invalid
+        ? 'border-[rgba(239,68,68,.6)] shadow-[0_4px_14px_rgba(0,0,0,.25)] focus:shadow-[0_0_0_3px_rgba(239,68,68,.15)]'
+        : 'border-[#334155] shadow-[0_4px_14px_rgba(0,0,0,.25)] focus:border-[#38BDF8] focus:shadow-[0_0_0_3px_rgba(56,189,248,.16),0_0_18px_rgba(56,189,248,.22)]'
+}
+
 export function BuilderTextInput({
     invalid,
     ...props
@@ -12,12 +22,8 @@ export function BuilderTextInput({
     return (
         <input
             {...props}
-            className={cn(
-                'h-11 w-full rounded-2xl border bg-[rgba(30,41,59,0.6)] px-3 py-2 text-base md:text-sm text-white outline-none transition-all duration-200 placeholder:text-[#94a3b8] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3),inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]',
-                invalid
-                    ? 'border-red-400/60 focus:border-red-400/70 focus:ring-1 focus:ring-red-400/20'
-                    : 'border-[rgba(59,130,246,0.15)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20',
-            )}
+            aria-invalid={invalid || undefined}
+            className={cn(BUILDER_CONTROL_CLASS, 'min-h-8 px-2.5 py-2', builderControlStateClass(invalid))}
         />
     )
 }

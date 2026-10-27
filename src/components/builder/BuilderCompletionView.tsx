@@ -1,10 +1,16 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { ArrowDown, ArrowUp, CheckCircle2, Clock3, ExternalLink, LayoutDashboard, Loader2, Rocket } from 'lucide-react'
-import { BuilderPreviewMode, BuilderPreviewModeToggle, BuilderPreviewSurface } from '@/components/builder/BuilderPreviewPrimitives'
+import { ArrowDown, ArrowUp } from 'lucide-react'
+import { BuilderChatBubble } from '@/components/builder/BuilderChatBubble'
+import { BuilderCompletionActions } from '@/components/builder/BuilderCompletionActions'
+import { BuilderPreviewMode, BuilderPreviewSurface } from '@/components/builder/BuilderPreviewPrimitives'
+import { BuilderPreviewToolbar } from '@/components/builder/BuilderPreviewToolbar'
+import { BuilderReadyCard } from '@/components/builder/BuilderReadyCard'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useI18n } from '@/i18n'
+
+export type BuilderSaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
 
 interface BuilderCompletionViewProps {
     siteName: string
@@ -25,6 +31,9 @@ interface BuilderCompletionViewProps {
     isBlocked?: boolean
     siteId?: string | null
     showBannerPad?: boolean
+    /** "Saved 2:12 PM" etc. — shown as a pill over the preview. */
+    saveStatusLabel?: string | null
+    saveState?: BuilderSaveState
 }
 
 function getBlockDisplayLabel(block: {
@@ -43,98 +52,6 @@ function getBlockDisplayLabel(block: {
     )
 }
 
-function CompletionPrimaryButton({
-    icon,
-    label,
-    onClick,
-    disabled = false,
-}: {
-    icon: ReactNode
-    label: string
-    onClick: () => void
-    disabled?: boolean
-}) {
-    return (
-        <button
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-4 text-sm font-semibold text-white shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),0px_4px_6px_0px_rgba(0,0,0,0.1)] transition-all duration-300 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={disabled}
-            onClick={onClick}
-            type="button"
-        >
-            {icon}
-            <span>{label}</span>
-        </button>
-    )
-}
-
-function CompletionSecondaryButton({
-    icon,
-    label,
-    onClick,
-    disabled = false,
-}: {
-    icon: ReactNode
-    label: string
-    onClick: () => void
-    disabled?: boolean
-}) {
-    return (
-        <button
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-[rgba(59,130,246,0.15)] bg-transparent px-4 text-sm font-medium text-[#f8fafc] transition-colors hover:border-[rgba(59,130,246,0.3)] hover:bg-white/[0.02] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={disabled}
-            onClick={onClick}
-            type="button"
-        >
-            {icon}
-            <span>{label}</span>
-        </button>
-    )
-}
-
-function CompletionStatusCard({
-    siteName,
-    totalBlocks,
-    generationTimeLabel,
-}: {
-    siteName: string
-    totalBlocks: number
-    generationTimeLabel: string
-}) {
-    const { t, ti } = useI18n()
-    const c = t.onboarding.completion
-    return (
-        <div className="relative h-auto min-h-[174px] w-full max-w-[448px] rounded-bl-2xl rounded-br-2xl rounded-tl-lg rounded-tr-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[21px] pb-4 pt-[17px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
-            <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />
-            <div className="relative flex flex-col items-start gap-4">
-                <p className="text-sm font-medium leading-5 text-[#f8fafc]">
-                    <span className="bg-[linear-gradient(158.2deg,#3b82f6_0%,#2dd4bf_100%)] bg-clip-text font-semibold text-transparent">&quot;{siteName}&quot;</span> {c.successMessage}
-                </p>
-
-                <div className="flex h-12 w-full flex-col items-start gap-2">
-                    <div className="flex h-5 w-full items-center gap-2">
-                        <LayoutDashboard className="size-4 text-[#94a3b8]" />
-                        <p className="text-sm leading-5 text-[#f8fafc]">
-                            <span className="font-medium">{ti(c.sectionsGenerated, { count: totalBlocks })}</span>
-                            <span className="text-[#94a3b8]"> {c.sectionsGeneratedLabel}</span>
-                        </p>
-                    </div>
-                    <div className="flex h-5 w-full items-center gap-2">
-                        <Clock3 className="size-4 text-[#94a3b8]" />
-                        <p className="text-sm leading-5 text-[#f8fafc]">
-                            <span className="font-medium">+{generationTimeLabel}</span>
-                            <span className="text-[#94a3b8]"> {c.generationTimeLabel}</span>
-                        </p>
-                    </div>
-                </div>
-
-                <p className="max-w-[377px] text-sm leading-5 text-[#94a3b8]">
-                    {c.description}
-                </p>
-            </div>
-        </div>
-    )
-}
-
 function CompletionPreviewPanel({
     mode,
     onModeChange,
@@ -142,6 +59,8 @@ function CompletionPreviewPanel({
     onOpenPreview,
     siteId,
     showBannerPad,
+    saveStatusLabel,
+    saveState,
 }: {
     mode: BuilderPreviewMode
     onModeChange: (mode: BuilderPreviewMode) => void
@@ -149,46 +68,35 @@ function CompletionPreviewPanel({
     onOpenPreview: () => void
     siteId?: string | null
     showBannerPad?: boolean
+    saveStatusLabel?: string | null
+    saveState?: BuilderSaveState
 }) {
     const { t } = useI18n()
     const c = t.onboarding.completion
+    const dot = saveState === 'error' ? 'bg-red-400' : saveState === 'dirty' || saveState === 'saving' ? 'bg-yellow-400' : 'bg-[#2dd4bf] shadow-[0_0_8px_rgba(45,212,191,.6)]'
     return (
-        <div className="relative h-screen overflow-hidden">
-            <div className="absolute inset-0 bg-[linear-gradient(104.73deg,#0b1120_0%,#0b1120_50%,rgba(59,130,246,0.05)_100%)]" />
-            <div className="relative flex h-full flex-col">
-                <div className="bg-[linear-gradient(174.85deg,#0b1120_0%,#0b1120_50%,rgba(59,130,246,0.05)_100%)] px-6 pt-5">
-                    <div className="grid min-h-[50px] grid-cols-[1fr_auto_1fr] items-center gap-4">
-                        <div className="flex min-w-0 flex-col gap-0.5">
-                            <h2 className="text-[18px] font-semibold leading-7 text-[#2dd4bf]">
-                                {c.previewTitle}
-                            </h2>
-                            <p className="text-xs leading-4 text-[rgba(248,250,252,0.7)]">
-                                {c.previewSubtitle}
-                            </p>
-                        </div>
-
-                        <div className="flex justify-center">
-                            <BuilderPreviewModeToggle mode={mode} onChange={onModeChange} />
-                        </div>
-
-                        <div className="flex justify-end">
-                            <button
-                                className="flex h-10 items-center gap-2 whitespace-nowrap rounded-full bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-4 text-sm font-semibold text-white shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),0px_4px_6px_0px_rgba(0,0,0,0.1)] transition-all hover:brightness-110"
-                                onClick={onOpenPreview}
-                                type="button"
-                            >
-                                <ExternalLink className="size-4" />
-                                <span>{c.viewFullPreview}</span>
-                            </button>
-                        </div>
-                    </div>
+        <div className={`bld-in flex h-full min-h-0 flex-col ${showBannerPad ? 'pb-[78px]' : ''}`} style={{ animationDuration: '.5s' }}>
+            <div className="flex flex-none flex-wrap items-center justify-between gap-x-4 gap-y-3 pb-4">
+                <div className="min-w-0">
+                    <h2 className="whitespace-nowrap text-lg font-semibold leading-[26px] text-[#2dd4bf]">{c.previewTitle}</h2>
+                    <p className="mt-0.5 whitespace-nowrap text-xs leading-4 text-[#cbd5e1]">{c.previewSubtitle}</p>
                 </div>
-
-                <div className={`relative flex-1 overflow-hidden px-6 pt-4 ${showBannerPad ? 'pb-[88px]' : 'pb-6'}`}>
-                    <BuilderPreviewSurface mode={mode} variant="panel" siteId={siteId}>
-                        {previewContent}
-                    </BuilderPreviewSurface>
-                </div>
+                <BuilderPreviewToolbar mode={mode} onModeChange={onModeChange} onOpenPreview={onOpenPreview} />
+            </div>
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-[#0a0a0a]">
+                <BuilderPreviewSurface mode={mode} siteId={siteId} variant="dock">
+                    {previewContent}
+                </BuilderPreviewSurface>
+                {saveStatusLabel ? (
+                    <span
+                        className="absolute bottom-3 right-3 box-border flex h-[30px] items-center gap-[7px] rounded-full border border-solid border-[rgba(148,163,184,.16)] bg-[rgba(15,23,42,.88)] px-3 text-xs text-[#cbd5e1] backdrop-blur-[8px]"
+                        data-testid="builder-save-status"
+                        role="status"
+                    >
+                        <span aria-hidden className={`size-1.5 rounded-full ${dot}`} />
+                        {saveStatusLabel}
+                    </span>
+                ) : null}
             </div>
         </div>
     )
@@ -213,6 +121,8 @@ export default function BuilderCompletionView({
     isBlocked = false,
     siteId,
     showBannerPad,
+    saveStatusLabel,
+    saveState,
 }: BuilderCompletionViewProps) {
     const { t } = useI18n()
     const c = t.onboarding.completion
@@ -222,31 +132,16 @@ export default function BuilderCompletionView({
     )
 
     const leftBody = (
-        <div className="flex flex-col gap-4">
-            <div className="flex items-start gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]">
-                    <Rocket className="h-4 w-4 text-white" aria-hidden />
-                </div>
-                <div className="relative rounded-bl-2xl rounded-br-2xl rounded-tl-lg rounded-tr-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[17px] py-[13px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
-                    <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />
-                    <p className="relative text-sm leading-5 text-[#f8fafc]">
-                        {g.startingMessage}
-                    </p>
-                </div>
-            </div>
+        <div className="flex flex-col gap-3.5">
+            <BuilderChatBubble>{g.startingMessage}</BuilderChatBubble>
 
-            <div className="flex items-start gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#00c950_0%,#00bc7d_100%)]">
-                    <CheckCircle2 className="h-4 w-4 text-white" aria-hidden />
-                </div>
-                <CompletionStatusCard
-                    generationTimeLabel={generationTimeLabel}
-                    siteName={siteName}
-                    totalBlocks={totalBlocks}
-                />
-            </div>
+            <BuilderReadyCard
+                generationTimeLabel={generationTimeLabel}
+                siteName={siteName}
+                totalBlocks={totalBlocks}
+            />
 
-            <div className="rounded-2xl border border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
+            <div className="rounded-2xl border border-solid border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-sm font-semibold text-[#f8fafc]">{c.mobilePreviewTitle}</p>
@@ -255,7 +150,7 @@ export default function BuilderCompletionView({
                         </p>
                     </div>
                     <button
-                        className="shrink-0 rounded-xl border border-[rgba(59,130,246,0.18)] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/[0.03]"
+                        className="shrink-0 rounded-xl border border-solid border-[rgba(59,130,246,0.18)] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/[0.03]"
                         onClick={onOpenPreview}
                         type="button"
                     >
@@ -265,7 +160,7 @@ export default function BuilderCompletionView({
             </div>
 
             {movableBlocks.length > 0 && onMoveBlock ? (
-                <div className="rounded-2xl border border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
+                <div className="rounded-2xl border border-solid border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
                     <div className="mb-3">
                         <p className="text-sm font-semibold text-[#f8fafc]">{c.arrangeSectionsTitle}</p>
                         <p className="mt-1 text-xs leading-5 text-[#94a3b8]">
@@ -276,7 +171,7 @@ export default function BuilderCompletionView({
                     <div className="flex flex-col gap-2">
                         {movableBlocks.map((block, index) => (
                             <div
-                                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3"
+                                className="flex items-center justify-between gap-3 rounded-2xl border border-solid border-white/10 bg-white/[0.03] px-3 py-3"
                                 key={block._id}
                             >
                                 <div className="min-w-0">
@@ -290,7 +185,7 @@ export default function BuilderCompletionView({
 
                                 <div className="flex items-center gap-2">
                                     <button
-                                        className="rounded-xl border border-white/10 p-2 text-white/80 transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="rounded-xl border border-solid border-white/10 p-2 text-white/80 transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
                                         disabled={index === 0}
                                         onClick={() => onMoveBlock(block._id!, 'up')}
                                         type="button"
@@ -298,7 +193,7 @@ export default function BuilderCompletionView({
                                         <ArrowUp className="size-4" />
                                     </button>
                                     <button
-                                        className="rounded-xl border border-white/10 p-2 text-white/80 transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="rounded-xl border border-solid border-white/10 p-2 text-white/80 transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
                                         disabled={index === movableBlocks.length - 1}
                                         onClick={() => onMoveBlock(block._id!, 'down')}
                                         type="button"
@@ -314,40 +209,20 @@ export default function BuilderCompletionView({
         </div>
     )
 
-    // Design 2026-04-14: two primary actions side-by-side (Open Editor + Publish Website)
-    // with a tertiary "Go To Dashboard" text link below. Matches the approved reference
-    // at docs/design/F01 completion screen.
     const leftFooter = (
-        <div className="flex flex-col items-center gap-4">
-            <div className="flex w-full gap-3">
-                <CompletionPrimaryButton
-                    icon={<ExternalLink className="size-4" />}
-                    label={c.openEditor}
-                    onClick={onOpenEditor}
-                    disabled={isPublishing || isNavigating}
-                />
-                <CompletionSecondaryButton
-                    icon={isPublishing ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
-                    label={isPublishing ? c.publishing : c.publishWebsite}
-                    onClick={onPublish}
-                    disabled={isPublishing}
-                />
-            </div>
-            <button
-                className="text-sm font-medium text-[#3b82f6] underline underline-offset-4 transition-colors hover:text-[#60a5fa] disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isPublishing || isNavigating}
-                onClick={onDashboard}
-                type="button"
-            >
-                {isNavigating ? c.loading : c.goToDashboard}
-            </button>
-        </div>
+        <BuilderCompletionActions
+            isNavigating={isNavigating}
+            isPublishing={isPublishing}
+            onDashboard={onDashboard}
+            onOpenEditor={onOpenEditor}
+            onPublish={onPublish}
+        />
     )
 
     return (
         <BuilderStepScreen
             floatingControls={floatingControls}
-            gridClassName="lg:grid-cols-[clamp(380px,28vw,460px)_1fr]"
+            layout="chat"
             leftBody={leftBody}
             leftFooter={isBlocked ? undefined : leftFooter}
             right={(
@@ -356,12 +231,12 @@ export default function BuilderCompletionView({
                     onModeChange={onPreviewModeChange}
                     onOpenPreview={onOpenPreview}
                     previewContent={previewContent}
-                    siteId={siteId}
+                    saveState={saveState}
+                    saveStatusLabel={saveStatusLabel}
                     showBannerPad={showBannerPad}
+                    siteId={siteId}
                 />
             )}
-            rightContentClassName="h-full max-w-none px-0 xl:px-0"
-            rightPaneClassName="lg:items-stretch lg:justify-stretch"
             subtitle={g.subtitle}
             title={g.title}
         />

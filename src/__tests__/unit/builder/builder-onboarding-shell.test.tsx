@@ -19,6 +19,8 @@ import { BuilderPromoCard } from '@/components/builder/onboarding/BuilderPromoCa
 
 // ── Fixtures ─────────────────────────────────────────────────────────────
 
+const GRADIENT = '[background-image:linear-gradient(135deg,#3b82f6,#2dd4bf)]'
+
 const THREE_STEPS = [
     { id: 1, label: 'Enter business information', active: true },
     { id: 2, label: 'AI creates content & design', active: false },
@@ -198,10 +200,9 @@ describe('[TC-F01.04] BuilderStepList — 3-step sidebar', () => {
         // Arrange + Act
         const { container } = render(<BuilderStepList steps={THREE_STEPS} />)
 
-        // Assert — the active step circle has gradient styling
-        const stepCircles = container.querySelectorAll('.flex.size-10')
-        // Step 1 is active
-        expect(stepCircles[0]).toHaveClass('bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]')
+        // Assert — the active step dot has the primary gradient
+        const dots = container.querySelectorAll('[data-testid="builder-step-dot"]')
+        expect(dots[0].className).toContain(GRADIENT)
     })
 
     it('TC-F01.04: inactive steps do not have gradient background', () => {
@@ -209,21 +210,22 @@ describe('[TC-F01.04] BuilderStepList — 3-step sidebar', () => {
         const { container } = render(<BuilderStepList steps={THREE_STEPS} />)
 
         // Assert — steps 2 and 3 (inactive) don't have the active gradient
-        const stepCircles = container.querySelectorAll('.flex.size-10')
-        expect(stepCircles[1]).not.toHaveClass('bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]')
-        expect(stepCircles[2]).not.toHaveClass('bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]')
+        const dots = container.querySelectorAll('[data-testid="builder-step-dot"]')
+        expect(dots[1].className).not.toContain(GRADIENT)
+        expect(dots[2].className).not.toContain(GRADIENT)
     })
 
     it('TC-F01.04: active step label uses bright text color', () => {
         // Arrange + Act
         const { container } = render(<BuilderStepList steps={THREE_STEPS} />)
 
-        // Assert — active label has bright white color class
+        // Assert — active label is white + semibold
         const spans = container.querySelectorAll('span')
         const activeLabel = Array.from(spans).find(
             (el) => el.textContent === 'Enter business information',
         )
-        expect(activeLabel).toHaveClass('text-[#f8fafc]')
+        expect(activeLabel).toHaveClass('text-white')
+        expect(activeLabel).toHaveClass('font-semibold')
     })
 
     it('TC-F01.04: inactive step labels use muted text color', () => {
@@ -248,9 +250,9 @@ describe('[TC-F01.04] BuilderStepList — 3-step sidebar', () => {
         // Act
         const { container } = render(<BuilderStepList steps={twoSteps} />)
 
-        // Assert — 2 step rows rendered
-        const rows = container.querySelectorAll('.flex.items-center.gap-4')
-        expect(rows).toHaveLength(2)
+        // Assert — 2 step items rendered, joined by 1 connector
+        expect(container.querySelectorAll('[data-state]')).toHaveLength(2)
+        expect(container.querySelectorAll('[data-testid="builder-step-connector-fill"]')).toHaveLength(1)
     })
 
     it('renders empty list without crashing when steps array is empty', () => {
@@ -272,13 +274,40 @@ describe('[TC-F01.04] BuilderStepList — 3-step sidebar', () => {
         // Act
         const { container } = render(<BuilderStepList steps={allInactive} />)
 
-        // Assert — no circle has gradient active class
-        const stepCircles = container.querySelectorAll('.flex.size-10')
-        stepCircles.forEach((circle) => {
-            expect(circle).not.toHaveClass(
-                'bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]',
-            )
+        // Assert — no dot has the gradient
+        container.querySelectorAll('[data-testid="builder-step-dot"]').forEach((dot) => {
+            expect(dot.className).not.toContain(GRADIENT)
         })
+    })
+
+    it('TC-F01.04: connectors fill to the given percentage (horizontal stepper)', () => {
+        // Arrange + Act
+        const { container } = render(<BuilderStepList connectorFill={[50, 0]} steps={THREE_STEPS} />)
+
+        // Assert
+        const fills = container.querySelectorAll<HTMLElement>('[data-testid="builder-step-connector-fill"]')
+        expect(fills).toHaveLength(2)
+        expect(fills[0].style.width).toBe('50%')
+        expect(fills[1].style.width).toBe('0%')
+    })
+
+    it('TC-F01.08: progress variant marks done steps with a check instead of the number', () => {
+        // Arrange
+        const steps = [
+            { id: 1, label: 'Reviewing', state: 'done' as const },
+            { id: 2, label: 'Creating', state: 'active' as const },
+            { id: 3, label: 'Preparing', state: 'todo' as const },
+        ]
+
+        // Act
+        const { container } = render(<BuilderStepList steps={steps} variant="progress" />)
+
+        // Assert — only the pending step still shows its number
+        const dots = container.querySelectorAll('[data-testid="builder-step-dot"]')
+        expect(dots[0]).not.toHaveTextContent('1')
+        expect(dots[1]).not.toHaveTextContent('2')
+        expect(dots[2]).toHaveTextContent('3')
+        expect(dots[0].className).toContain(GRADIENT)
     })
 })
 
@@ -362,7 +391,7 @@ describe('[TC-F01.04] BuilderStepHeader', () => {
         // Assert — img tag is rendered (alt="" makes it role="presentation", query by tag)
         const img = container.querySelector('img')
         expect(img).toBeInTheDocument()
-        expect(img).toHaveAttribute('src', '/assets/builder/builder-brand-logo.png')
+        expect(img).toHaveAttribute('src', '/assets/builder/builder-logo-webstore.webp')
     })
 
     it('title uses h1 heading element', () => {
@@ -442,14 +471,13 @@ describe('[TC-F01.04] BuilderPromoCard — right-pane promo display', () => {
             />,
         )
 
-        // Assert — active step circle has gradient class
-        const activeCircle = container.querySelector(
-            '.bg-\\[linear-gradient\\(135deg\\,\\#3b82f6_0\\%\\,\\#2dd4bf_100\\%\\)\\]',
-        )
-        expect(activeCircle).toBeInTheDocument()
+        // Assert — first dot has the gradient, the stepper is horizontal (3 columns)
+        const dots = container.querySelectorAll('[data-testid="builder-step-dot"]')
+        expect(dots[0].className).toContain(GRADIENT)
+        expect(screen.getByTestId('builder-step-list').style.gridTemplateColumns).toContain('repeat(3')
     })
 
-    it('renders promo icon image', () => {
+    it('renders the gradient-stroke sparkle header icon (no image tile)', () => {
         // Arrange + Act
         const { container } = render(
             <BuilderPromoCard
@@ -459,9 +487,21 @@ describe('[TC-F01.04] BuilderPromoCard — right-pane promo display', () => {
             />,
         )
 
-        // Assert — icon img rendered with correct src (alt="" makes it presentation role)
-        const img = container.querySelector('img[src="/assets/builder/builder-promo-icon.svg"]')
-        expect(img).toBeInTheDocument()
+        // Assert
+        expect(container.querySelector('img')).not.toBeInTheDocument()
+        expect(container.querySelector('svg linearGradient')).toBeInTheDocument()
+    })
+
+    it('TC-F01.04: renders the live template preview passed as children', () => {
+        // Arrange + Act
+        render(
+            <BuilderPromoCard description="description" steps={THREE_STEPS} title="title">
+                <div data-testid="template-slot">template</div>
+            </BuilderPromoCard>,
+        )
+
+        // Assert
+        expect(screen.getByTestId('template-slot')).toBeInTheDocument()
     })
 
     it('title uses h2 heading element', () => {

@@ -17,6 +17,8 @@ vi.mock('@/store/builderStore', () => ({
 // Mock i18n
 vi.mock('@/i18n', () => ({
     useI18n: () => ({
+        ti: (template: string, vars: Record<string, string | number>) =>
+            template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? '')),
         t: {
             onboarding: {
                 step1Title: 'Create Website with AI',
@@ -46,6 +48,10 @@ vi.mock('@/i18n', () => ({
                     },
                     errorMessage: 'Generation failed, please try again.',
                     retryWithCurrent: 'Retry with current information',
+                    templateCaption: 'AI builds this template from your details',
+                    templateReady: 'All set — AI is ready to build your website',
+                    templateCount: '{count} of 4 details added',
+                    templateAiChip: 'AI',
                 }
             }
         }
@@ -115,10 +121,11 @@ vi.mock('@/components/builder/fields/BuilderOptionGrid', () => ({
 
 vi.mock('@/components/builder/fields/BuilderSubmitButton', () => ({
     BuilderSubmitButton: (props: {
-        children: React.ReactNode; disabled?: boolean; loading?: boolean; onClick?: () => void; type?: string
+        children: React.ReactNode; disabled?: boolean; loading?: boolean; ready?: boolean; onClick?: () => void; type?: string
     }) => (
         <button
             data-testid="submit-button"
+            data-ready={props.ready ? 'true' : 'false'}
             disabled={props.disabled}
             data-loading={props.loading ? 'true' : 'false'}
             onClick={props.onClick}
@@ -146,14 +153,15 @@ vi.mock('@/components/builder/onboarding/BuilderStepScreen', () => ({
 }))
 
 vi.mock('@/components/builder/onboarding/BuilderPromoCard', () => ({
-    BuilderPromoCard: (props: { title: string; description: string }) => (
-        <div data-testid="promo-card">{props.title}</div>
+    BuilderPromoCard: (props: { title: string; description: string; children?: React.ReactNode }) => (
+        <div data-testid="promo-card">{props.title}{props.children}</div>
     ),
 }))
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 const MOCK_INDUSTRIES = [
+    { value: 'restaurant', label: 'Restaurant / Cafe / F&B', icon: '🍽️' },
     { value: 'food', label: 'Food & Beverage', icon: '🍕' },
     { value: 'beauty', label: 'Beauty & Spa', icon: '💅' },
     { value: 'tech', label: 'Technology', icon: '💻' },
@@ -252,7 +260,8 @@ describe('BusinessInfoForm Component', () => {
             await waitFor(() => {
                 expect(screen.getByText('Please enter your business name')).toBeInTheDocument()
             })
-            expect(screen.getByText('Please select an industry')).toBeInTheDocument()
+            // Industry is preselected (restaurant), so it never reports missing.
+            expect(screen.queryByText('Please select an industry')).not.toBeInTheDocument()
             expect(screen.getByText('Please describe your business')).toBeInTheDocument()
             expect(screen.getByText('Please describe your products / services')).toBeInTheDocument()
         })
@@ -267,14 +276,14 @@ describe('BusinessInfoForm Component', () => {
             const inputs = screen.getAllByTestId('builder-text-input')
             const textareas = screen.getAllByTestId('builder-textarea')
 
-            // Case 1: 0 characters (empty)
-            expect(screen.getByTestId('submit-button')).toBeDisabled()
+            // Case 1: 0 characters (empty) — quiet button
+            expect(screen.getByTestId('submit-button')).toHaveAttribute('data-ready', 'false')
 
             // Case 2: 2 characters
             fireEvent.change(inputs[0], { target: { value: 'ab' } })
             fireEvent.change(textareas[0], { target: { value: 'cd' } })
             fireEvent.change(textareas[1], { target: { value: 'ef' } })
-            expect(screen.getByTestId('submit-button')).toBeDisabled()
+            expect(screen.getByTestId('submit-button')).toHaveAttribute('data-ready', 'false')
 
             // Trigger submit manually to see validation errors
             const form = screen.getByTestId('left-body').querySelector('form')!
@@ -287,11 +296,11 @@ describe('BusinessInfoForm Component', () => {
             fireEvent.change(inputs[0], { target: { value: 'abc' } })
             fireEvent.change(textareas[0], { target: { value: 'cde' } })
             fireEvent.change(textareas[1], { target: { value: 'fgh' } })
-            expect(screen.getByTestId('submit-button')).not.toBeDisabled()
+            expect(screen.getByTestId('submit-button')).toHaveAttribute('data-ready', 'true')
 
             // Case 4: padding spaces (< 3 actual characters)
             fireEvent.change(inputs[0], { target: { value: ' a ' } }) // 1 char
-            expect(screen.getByTestId('submit-button')).toBeDisabled()
+            expect(screen.getByTestId('submit-button')).toHaveAttribute('data-ready', 'false')
         })
 
         it('does not call onSubmit when validation fails', async () => {
@@ -306,11 +315,77 @@ describe('BusinessInfoForm Component', () => {
             expect(onSubmit).not.toHaveBeenCalled()
         })
 
-        it('submit button is disabled when form is incomplete', async () => {
-            render(<BusinessInfoForm />)
+        it('TC-F01.05: incomplete form keeps the button clickable (quiet) and clicking shows the errors', async () => {
+            const onSubmit = vi.fn()
+            render(<BusinessInfoForm onSubmit={onSubmit} />)
             await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
 
-            expect(screen.getByTestId('submit-button')).toBeDisabled()
+            const btn = screen.getByTestId('submit-button')
+            expect(btn).not.toBeDisabled()
+            expect(btn).toHaveAttribute('data-ready', 'false')
+
+            fireEvent.click(btn)
+
+            expect(await screen.findByText('Please enter your business name')).toBeInTheDocument()
+            expect(onSubmit).not.toHaveBeenCalled()
+        })
+    })
+
+    // ── Prototype redesign: preselect, ready button, live template ───────
+
+    describe('Info step redesign (TC-F01.04 / TC-F01.06)', () => {
+        it('TC-F01.06: preselects the Restaurant / cafe / F&B industry', async () => {
+            const onSubmit = vi.fn()
+            render(<BusinessInfoForm onSubmit={onSubmit} />)
+
+            await waitFor(() => expect(screen.getByTestId('option-Restaurant / Cafe / F&B')).toBeInTheDocument())
+            expect(screen.getByTestId('option-Restaurant / Cafe / F&B')).toHaveAttribute('aria-pressed', 'true')
+            expect(screen.getByTestId('option-Food & Beverage')).toHaveAttribute('aria-pressed', 'false')
+
+            fillForm()
+            fireEvent.click(screen.getByTestId('submit-button'))
+            await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ industry: 'restaurant' })))
+        })
+
+        it('TC-F01.04: Generate button switches from quiet to ready once the 4 details are valid', async () => {
+            render(<BusinessInfoForm />)
+            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
+            expect(screen.getByTestId('submit-button')).toHaveAttribute('data-ready', 'false')
+
+            fillForm()
+
+            expect(screen.getByTestId('submit-button')).toHaveAttribute('data-ready', 'true')
+            expect(screen.getByTestId('builder-template-caption')).toHaveAttribute('data-ready', 'true')
+            expect(screen.getByText('All set — AI is ready to build your website')).toBeInTheDocument()
+        })
+
+        it('TC-F01.04: template slots fill live from the form and count the valid details', async () => {
+            render(<BusinessInfoForm />)
+            await waitFor(() => expect(screen.getByTestId('builder-template-preview')).toBeInTheDocument())
+
+            // Before typing: dashed slots carry the field labels, 1/4 (industry preselected)
+            expect(screen.queryByTestId('builder-template-headline')).not.toBeInTheDocument()
+            expect(screen.getByRole('img', { name: '1 of 4 details added' })).toBeInTheDocument()
+
+            fillForm()
+
+            expect(screen.getByTestId('builder-template-headline')).toHaveTextContent('My Coffee Shop')
+            expect(screen.getByTestId('builder-template-description')).toHaveTextContent('A cozy neighborhood coffee shop')
+            expect(screen.getAllByTestId('builder-template-product').map((el) => el.textContent)).toEqual(['Premium coffee', 'pastries'])
+            expect(screen.getByRole('img', { name: '4 of 4 details added' })).toBeInTheDocument()
+        })
+
+        it('TC-F01.05: a missing field turns its counter segment red after a failed submit', async () => {
+            render(<BusinessInfoForm onSubmit={vi.fn()} />)
+            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
+
+            fireEvent.click(screen.getByTestId('submit-button'))
+
+            await screen.findByText('Please enter your business name')
+            const segments = screen.getAllByTestId('builder-template-segment')
+            // order: business name, industry, products, description
+            expect(segments[0]).toHaveStyle({ backgroundColor: '#f87171' })
+            expect(segments[1]).toHaveStyle({ backgroundColor: '#2dd4bf' })
         })
     })
 
