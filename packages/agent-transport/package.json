@@ -1,0 +1,22 @@
+{
+	"name": "@ech/agent-transport",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./fixture": "./src/fixture/fixture-gateway.ts"
+	},
+	"scripts": {
+		"check-types": "tsc --noEmit",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write ./src",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@ech/agent-core": "file:../agent-core",
+		"zod": "^4.1.13"
+	}
+}
