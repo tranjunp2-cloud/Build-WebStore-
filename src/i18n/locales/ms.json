@@ -3400,7 +3400,7 @@
         "addScreenshot": "Tambah tangkapan skrin",
         "screenshotAlt": "Tangkapan skrin {n}",
         "removeScreenshot": "Buang tangkapan skrin {n}",
-        "screenshotHelper": "Sehingga 3 imej, PNG atau JPG, maksimum 5 MB setiap satu.",
+        "screenshotHelper": "Sehingga 9 imej, PNG atau JPG, maksimum 5 MB setiap satu.",
         "screenshotTooLarge": "Imej ini melebihi 5 MB.",
         "screenshotWrongType": "Hanya imej PNG atau JPG disokong."
       },

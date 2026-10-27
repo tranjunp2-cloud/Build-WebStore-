@@ -7,7 +7,7 @@ export const FEEDBACK_AREAS: readonly FeedbackArea[] = [
 ]
 
 export const MAX_DETAILS_LENGTH = 2000
-export const MAX_SCREENSHOTS = 3
+export const MAX_SCREENSHOTS = 9
 export const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024
 export const ACCEPTED_SCREENSHOT_TYPES = ['image/png', 'image/jpeg'] as const
 

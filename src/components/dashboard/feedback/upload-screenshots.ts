@@ -26,7 +26,7 @@ async function uploadOne(file: File): Promise<string> {
     return json.fileToken
 }
 
-/** Uploads screenshots to Lark one by one (max 3) and returns their attachment tokens in order. */
+/** Uploads screenshots to Lark one by one (max 9) and returns their attachment tokens in order. */
 export async function uploadScreenshots(files: File[]): Promise<string[]> {
     const tokens: string[] = []
     for (const file of files) tokens.push(await uploadOne(file))

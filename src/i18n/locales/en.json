@@ -3400,7 +3400,7 @@
         "addScreenshot": "Add screenshot",
         "screenshotAlt": "Screenshot {n}",
         "removeScreenshot": "Remove screenshot {n}",
-        "screenshotHelper": "Up to 3 images, PNG or JPG, max 5 MB each.",
+        "screenshotHelper": "Up to 9 images, PNG or JPG, max 5 MB each.",
         "screenshotTooLarge": "This image is larger than 5 MB.",
         "screenshotWrongType": "Only PNG or JPG images are supported."
       },

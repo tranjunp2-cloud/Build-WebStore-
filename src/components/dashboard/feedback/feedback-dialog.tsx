@@ -59,10 +59,10 @@ export function FeedbackDialog({ context, onClose, submit = submitFeedback }: Pr
                     showCloseButton={false}
                     aria-describedby={done ? undefined : `${uid}-desc`}
                     // Mobile (<sm): full-height sheet; form scrolls, footer button stays pinned.
-                    className="flex max-h-[90vh] max-w-[480px] flex-col gap-0 overflow-hidden rounded-xl p-0 max-sm:left-0 max-sm:top-0 max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none"
+                    className="flex max-h-[90vh] max-w-[480px] flex-col gap-0 overflow-hidden rounded-xl p-0 max-sm:left-0 max-sm:top-0 max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:border-0 max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none"
                     style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                 >
-                    <div className="flex items-start gap-3 px-6 pb-3 pt-5 max-sm:items-center max-sm:border-b max-sm:border-solid max-sm:border-[var(--dash-border)] max-sm:px-4 max-sm:py-3">
+                    <div className="flex items-start gap-3 px-6 pb-3 pt-5 max-sm:items-center max-sm:[border-bottom:1px_solid_var(--dash-border)] max-sm:px-4 max-sm:py-3">
                         <button
                             type="button"
                             onClick={requestClose}
@@ -83,7 +83,7 @@ export function FeedbackDialog({ context, onClose, submit = submitFeedback }: Pr
                         </div>
                     ) : (
                         <form onSubmit={onSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
-                            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-4 max-sm:px-4">
+                            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-4 max-sm:px-4 max-sm:pt-4">
                                 <div className="flex flex-col gap-0.5 text-xs leading-4">
                                     <DialogDescription id={`${uid}-desc`} className="text-xs text-[var(--dash-text-muted)] max-sm:hidden">
                                         {f.description}
@@ -115,7 +115,7 @@ export function FeedbackDialog({ context, onClose, submit = submitFeedback }: Pr
                                 />
                             </div>
 
-                            <div className="flex items-center justify-end gap-3 border-t border-solid border-[var(--dash-border)] px-6 py-4 max-sm:px-4">
+                            <div className="flex items-center justify-end gap-3 [border-top:1px_solid_var(--dash-border)] px-6 py-4 max-sm:px-4">
                                 {submitting && (
                                     <p aria-live="polite" className="mr-auto text-xs text-[var(--dash-text-muted)] max-sm:hidden">
                                         {f.sendingNote}

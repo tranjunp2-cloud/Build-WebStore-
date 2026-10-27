@@ -8,7 +8,7 @@ export const feedbackSchema = z.object({
     area: z.enum(['products', 'orders', 'payments', 'customers', 'design', 'settings', 'other']),
     details: z.string().trim().min(1).max(2000),
     // Lark attachment tokens from /api/feedback/screenshots/attach (Lark rejects tokens from another Base).
-    screenshotTokens: z.array(z.string().min(1).max(100)).max(3).optional(),
+    screenshotTokens: z.array(z.string().min(1).max(100)).max(9).optional(),
     context: z.object({
         storeName: z.string().trim().max(200).optional(),
     }),
