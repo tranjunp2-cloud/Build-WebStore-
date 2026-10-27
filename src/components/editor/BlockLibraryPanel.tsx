@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { ChevronRight, Globe, Plus, Search } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData } from '@/types/editor'
@@ -11,53 +11,37 @@ import { listAllBlocks } from '@/lib/admin/block-registry-reader'
 import { resolveBlockContent, hasLocaleContent } from '@/lib/ai/add-section-content'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
+import { BLOCK_ICONS, CATEGORY_ICONS, FALLBACK_BLOCK_ICON } from './block-library-icons'
 
-// ── Category display config (i18n labels + icons, Malay) ──────────────────────
-
-const CATEGORY_DISPLAY: Record<string, { icon: string; label: string }> = {
-    basics:   { icon: '📦', label: 'Asas' },
-    content:  { icon: '📄', label: 'Kandungan' },
-    media:    { icon: '🖼️', label: 'Media' },
-    store:    { icon: '💼', label: 'Perniagaan' },
-    commerce: { icon: '🛒', label: 'Perdagangan' },
-    form:     { icon: '📝', label: 'Borang & Hubungi' },
-    widgets:  { icon: '🔧', label: 'Widget' },
-    layout:   { icon: '📐', label: 'Susun Atur' },
+// Malay fallback labels when the i18n category label is missing
+const CATEGORY_FALLBACK_LABEL: Record<string, string> = {
+    basics: 'Asas',
+    content: 'Kandungan',
+    media: 'Media',
+    store: 'Perniagaan',
+    commerce: 'Perdagangan',
+    form: 'Borang & Hubungi',
+    widgets: 'Widget',
+    layout: 'Susun Atur',
 }
 
 // Canonical display order — matches editor UX taxonomy
 const CATEGORY_ORDER = ['basics', 'content', 'media', 'store', 'commerce', 'form', 'widgets', 'layout'] as const
 
-// ── Icon overrides (slug → icon) ─────────────────────────────────────────────
-// Provides a curated icon experience for known blocks, overrides meta.icon
-
-const BLOCK_ICON_OVERRIDES: Record<string, string> = {
-    'custom-html': '🧱',
-    hero: '🎯',
-    gallery: '🖼️',
-    cta: '🔘',
-    socialWidget: '💬',
-    pricing: '💰',
-    'pricing-table': '📊',
-    'gallery-masonry': '🧱',
-    'whatsapp-button': '💬',
-    'google-maps': '📍',
-    'social-proof': '⭐',
-    'countdown-timer': '⏰',
-    'before-after': '🔄',
-    'feature-comparison': '📋',
-    'download-cta': '📥',
-    'video-background': '🎬',
-    breadcrumb: '🔗',
-    divider: '➖',
-    'announcement-bar': '📢',
-    'client-logos': '🏢',
-    accordion: '📂',
-    'step-process': '🔢',
-    'portfolio-grid': '💼',
-    'menu-food': '🍽️',
-    'service-cards': '🛠️',
-    carousel: '🎠',
+/** Lucide icon in a slate badge; turns teal while its row/card is hovered (group-hover). */
+function IconBadge({ icon: Icon, size }: { icon: LucideIcon; size: 'group' | 'card' }) {
+    return (
+        <span
+            aria-hidden
+            className={cn(
+                'flex flex-none items-center justify-center border border-transparent text-slate-400 transition-[transform,color,background-color,border-color] duration-200',
+                'group-hover:scale-105 group-hover:border-[rgba(45,212,191,.35)] group-hover:bg-[rgba(45,212,191,.12)] group-hover:text-[#5eead4]',
+                size === 'group' ? 'h-6 w-6 rounded-[7px]' : 'h-9 w-9 rounded-lg bg-[#1e293b]',
+            )}
+        >
+            <Icon className={size === 'group' ? 'h-[15px] w-[15px]' : 'h-[18px] w-[18px]'} />
+        </span>
+    )
 }
 
 interface BlockLibraryPanelProps {
@@ -109,8 +93,8 @@ export function BlockLibraryPanel({
             .filter(cat => byCategory.has(cat))
             .map(cat => ({
                 id: cat,
-                icon: CATEGORY_DISPLAY[cat]?.icon ?? '📦',
-                label: categoryLabels[cat] || CATEGORY_DISPLAY[cat]?.label || cat,
+                icon: CATEGORY_ICONS[cat] ?? FALLBACK_BLOCK_ICON,
+                label: categoryLabels[cat] || CATEGORY_FALLBACK_LABEL[cat] || cat,
                 blocks: byCategory.get(cat)!,
             }))
     }, [categoryLabels])
@@ -149,7 +133,7 @@ export function BlockLibraryPanel({
                     description: baseDescription,
                     previewText,
                     needsTranslation,
-                    icon: BLOCK_ICON_OVERRIDES[b.slug] || b.icon || '🧩',
+                    icon: BLOCK_ICONS[b.slug] ?? FALLBACK_BLOCK_ICON,
                     defaultVariant: b.defaultVariant || b.variants?.[0] || 'default',
                     scope: b.scope ?? 'page',
                     scopeTooltip: blockTranslations?.[b.slug]?.scopeTooltip ?? b.scopeTooltip,
@@ -192,22 +176,21 @@ export function BlockLibraryPanel({
     return (
         <TooltipProvider delayDuration={200}>
         <div className="flex h-full flex-col bg-[var(--editor-surface)]">
-            <div className="border-b border-white/[0.06] px-4 py-3">
-                {/* Shared <Input> mặc định — bg theo --card (trắng ở light, tối ở dark) + viền --input-border. */}
+            <div className="flex-none px-3.5 pb-1.5 pt-3.5">
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-                    <Input
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-slate-400" />
+                    <input
                         type="text"
                         value={query}
                         onChange={e => setQuery(e.target.value)}
                         placeholder={bl.searchPlaceholder}
-                        className="pl-9 pr-3 text-[13px]"
+                        className="h-10 w-full rounded-[10px] border border-slate-400/[.18] bg-[#141d2e] pl-9 pr-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-teal-400/50"
                     />
                 </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-                <div className="space-y-1">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2.5 pb-3 pt-1.5">
+                <div className="flex flex-col gap-0.5">
                     {categories.map(category => {
                         const isExpanded = category.id === expandedCategory
 
@@ -216,22 +199,20 @@ export function BlockLibraryPanel({
                                 <button
                                     type="button"
                                     onClick={() => setExpandedCategory(prev => (prev === category.id ? prev : category.id))}
-                                    className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-left transition-colors hover:bg-white/[0.04]"
+                                    aria-expanded={isExpanded}
+                                    className="group flex h-10 w-full items-center gap-2.5 rounded-lg px-2 text-left text-sm font-medium text-white transition-colors hover:bg-white/[.03]"
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm leading-none">{category.icon}</span>
-                                        <span className="text-[13px] font-medium text-slate-200">{category.label}</span>
-                                        <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{category.totalCount}</span>
-                                    </div>
-                                    {isExpanded ? (
-                                        <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
-                                    ) : (
-                                        <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
-                                    )}
+                                    <IconBadge icon={category.icon} size="group" />
+                                    {category.label}
+                                    <span className="rounded-[5px] bg-[#1e293b] px-1.5 text-[11px] leading-[17px] text-slate-400">{category.totalCount}</span>
+                                    <ChevronRight
+                                        className={cn('ml-auto h-[15px] w-[15px] text-slate-400 transition-transform duration-200', isExpanded && 'rotate-90')}
+                                        aria-hidden
+                                    />
                                 </button>
 
                                 {isExpanded ? (
-                                    <div className="mt-1 space-y-1 pb-2">
+                                    <div className="flex flex-col gap-1 pb-2.5 pt-1">
                                         {category.items.map(item => {
                                             const globalKey = BLOCK_TYPE_TO_KEY[item.type]
                                             const isAlreadyGlobal = item.scope === 'global' && item.defaultVariant === 'floating'
@@ -255,51 +236,41 @@ export function BlockLibraryPanel({
                                                     else handleAddBlock(item.type, item.defaultVariant)
                                                 }}
                                                 className={cn(
-                                                    "group flex w-full items-center gap-3 rounded-lg border border-transparent bg-white/[0.02] px-3 py-2.5 text-left transition-all",
+                                                    "group flex w-full items-center gap-3 rounded-[10px] border border-transparent bg-[#141d2e] px-[11px] py-[7px] text-left transition-[background-color,border-color,transform] duration-200 hover:border-[rgba(45,212,191,.3)] hover:bg-[rgba(45,212,191,.08)]",
                                                     isAlreadyGlobal
-                                                        ? "opacity-60 hover:border-white/[0.08] hover:bg-white/[0.06] cursor-pointer"
-                                                        : "hover:border-white/[0.08] hover:bg-white/[0.06] cursor-grab active:cursor-grabbing active:scale-[0.98]",
+                                                        ? "cursor-pointer opacity-60"
+                                                        : "cursor-grab active:scale-[0.98] active:cursor-grabbing",
                                                 )}
                                             >
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/15 to-cyan-500/15 text-lg">
-                                                    {item.icon}
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <p className="truncate text-[13px] font-medium text-slate-200">{item.name}</p>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                {item.scope === 'global' ? (
+                                                <IconBadge icon={item.icon} size="card" />
+                                                <div className="flex min-w-0 flex-1 flex-col gap-px">
+                                                    <div className="flex min-w-0 items-center gap-2">
+                                                        <p className="truncate text-sm font-medium leading-5 text-white">{item.name}</p>
+                                                        {item.scope === 'global' && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
                                                                     <span
-                                                                        className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
+                                                                        className="inline-flex shrink-0 cursor-default items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
                                                                         style={{ background: 'hsl(var(--info)/0.12)', color: 'hsl(var(--info))' }}
                                                                     >
-                                                                        🌐 {bl.globalScopeLabel}
+                                                                        <Globe className="h-2.5 w-2.5" aria-hidden />
+                                                                        {bl.globalScopeLabel}
                                                                     </span>
-                                                                ) : (
-                                                                    <span
-                                                                        className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
-                                                                        style={{ background: 'rgba(148,163,184,0.10)', color: 'var(--editor-text-muted)' }}
-                                                                    >
-                                                                        📄 {bl.pageScopeLabel}
-                                                                    </span>
-                                                                )}
-                                                            </TooltipTrigger>
-                                                            <TooltipContent side="right">
-                                                                {item.scope === 'global'
-                                                                    ? (item.scopeTooltip ?? bl.globalScopeTooltipDefault)
-                                                                    : (item.scopeTooltip ?? bl.pageScopeTooltipDefault)}
-                                                            </TooltipContent>
-                                                        </Tooltip>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent side="right">
+                                                                    {item.scopeTooltip ?? bl.globalScopeTooltipDefault}
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
                                                     </div>
                                                     {/* F26-03: locale-aware preview text (no interactive children in button) */}
-                                                    <p className="truncate text-[11px] text-slate-500">{item.previewText}</p>
+                                                    <p className="truncate text-xs leading-4 text-slate-400">{item.previewText}</p>
                                                 </div>
                                                 {!isAlreadyGlobal && (
                                                     isCompact ? (
                                                         <Plus className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
                                                     ) : (
-                                                        <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
+                                                        <span className="shrink-0 whitespace-nowrap text-[10px] leading-[14px] text-slate-600 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                                                             {bl.dragHint}
                                                         </span>
                                                     )
@@ -324,11 +295,9 @@ export function BlockLibraryPanel({
             </div>
 
             {!isCompact && (
-                <div className="border-t border-white/[0.06] bg-[var(--editor-bg)]/60 px-4 py-3">
-                    <p className="text-center text-[11px] text-slate-500">
-                        {bl.footerHint}
-                    </p>
-                </div>
+                <p className="m-0 flex-none px-3.5 pb-3.5 pt-2.5 text-center text-[11px] leading-4 text-slate-400">
+                    {bl.footerHint}
+                </p>
             )}
         </div>
         </TooltipProvider>
