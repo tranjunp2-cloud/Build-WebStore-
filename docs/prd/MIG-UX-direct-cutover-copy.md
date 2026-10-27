@@ -153,8 +153,6 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.description.placeholder.idea` | Bạn muốn chúng tôi cải thiện điều gì? | What would you like us to improve? | Apakah yang anda mahu kami tambah baik? |
 | `feedback.description.counter` | {count}/2000 | {count}/2000 | {count}/2000 |
 | `feedback.description.privacy` | Không nhập mật khẩu, thông tin thanh toán hoặc dữ liệu cá nhân của khách hàng. | Don't enter passwords, payment details or your customers' personal data. | Jangan masukkan kata laluan, butiran pembayaran atau data peribadi pelanggan anda. |
-| `feedback.reference.label` | Mã tham chiếu (tuỳ chọn) | Reference ID (optional) | ID rujukan (pilihan) |
-| `feedback.reference.placeholder` | VD: DH-1042 | E.g. DH-1042 | Cth: DH-1042 |
 | `feedback.attachments.label` | Ảnh chụp màn hình (tuỳ chọn) | Screenshots (optional) | Tangkapan skrin (pilihan) |
 | `feedback.attachments.add` | Thêm ảnh | Add image | Tambah imej |
 | `feedback.attachments.hint` | Tối đa 3 ảnh, PNG hoặc JPG, mỗi ảnh tối đa 5 MB. | Up to 3 images, PNG or JPG, max 5 MB each. | Sehingga 3 imej, PNG atau JPG, maksimum 5 MB setiap satu. |
