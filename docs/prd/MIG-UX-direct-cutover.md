@@ -28,16 +28,16 @@
 | US-MIGX-08 | Modal first login V2 | 02 | Draft |
 | US-MIGX-09 | Dashboard V2: banner đối chiếu + checklist | 03 | Draft |
 | US-MIGX-10 | V1 archive chỉ đọc | 04 | Draft |
-| US-MIGX-11 | Gửi phản hồi (báo lỗi / sai lệch dữ liệu / góp ý) | 05 — cần vẽ lại | Draft |
+| US-MIGX-11 | Gửi phản hồi từ nút header (MVP 29/10) | Feedback 01–10, 12 | Ready |
 | US-MIGX-12 | Nhắc hạn đóng V1 + trạng thái sau đóng | 06 | Draft |
 | US-MIGX-13 | Phiên xem V1 hết hạn | 04 | Draft |
 | US-MIGX-14 | Login fallback token lỗi | 08 | Draft |
 | US-MIGX-15 | Store chuyển chậm / lỗi | ❌ | Draft (GAP-U2, E2) |
 | US-MIGX-16 | Email nhắc đóng V1 / V1 đã đóng | ❌ | Draft (GAP-E3) |
 | US-MIGX-17 | Staff nhận thông báo + vào đúng store | ❌ | Draft (GAP-R1) |
-| US-MIGX-18 | Lịch sử phản hồi "Phản hồi của tôi" | ❌ cần vẽ mới | Draft |
-| US-MIGX-19 | Thông báo in-app khi phản hồi được cập nhật | ❌ cần vẽ mới | Draft |
-| US-MIGX-20 | Đồng bộ phản hồi 2 chiều với Lark Base (nội bộ) | — | Draft |
+| US-MIGX-18 | Lịch sử phản hồi "Phản hồi của tôi" | — | ⏸ Tạm hoãn |
+| US-MIGX-19 | Thông báo in-app khi phản hồi được cập nhật (MVP) | Feedback 11 | Ready |
+| US-MIGX-20 | Đồng bộ phản hồi 2 chiều với Lark Base (nội bộ, MVP) | — | Ready |
 
 ---
 
@@ -72,7 +72,7 @@ So với các sản phẩm khác (research §17): Prime chọn cách nhanh nhấ
 - Toàn bộ email chuyển đổi (US-MIGX-01, 03, 07, 15, 16)
 - Modal first login, banner + checklist Dashboard V2 (US-MIGX-08, 09)
 - V1 archive chỉ đọc + hết phiên + đóng V1 (US-MIGX-10, 12, 13)
-- Form phản hồi chung trên CMS V2 + V1 archive, lịch sử phản hồi, thông báo in-app, đồng bộ Lark Base (US-MIGX-11, 18–20). *Tính năng này dùng lâu dài sau 15/11 — PM cân nhắc tách feature ID riêng.*
+- **Feedback MVP (release 29/10/2026):** nút "Gửi phản hồi" trên header V2 (30/10–15/11), form gửi phản hồi, đồng bộ Lark Base 2 chiều, thông báo in-app (US-MIGX-11, 19, 20). Lịch sử phản hồi (US-MIGX-18) tạm hoãn.
 - Login fallback (US-MIGX-14)
 
 ### Out of Scope
@@ -115,11 +115,11 @@ Xem bảng §0 và file stories. Nhóm A trước cutover · B trong cutover · 
 | FR-11 | V1 archive: domain/path riêng, token scoped `read_only_archive_mode + tenant + expiry`, gateway chặn POST/PUT/PATCH/DELETE | US-MIGX-10 | 04 note |
 | FR-12 | Re-auth archive qua SSO khi phiên hết hạn và `now < archiveExpiresAt` | US-MIGX-13 | 04 |
 | FR-13 | Sau `archiveExpiresAt`: không cấp token archive; edge/gateway 301 link V1 → Dashboard V2 (kể cả khi origin V1 đã tắt) | US-MIGX-12 | 06 note, 09 #5 |
-| FR-14 | Form phản hồi chung (Loại · Khu vực · Mô tả · Mã tham chiếu · Ảnh), auto-attach context, idempotency key, rate limit, trả mã phản hồi | US-MIGX-11 | 05 (vẽ lại, §10.4) |
+| FR-14 | Nút "Gửi phản hồi" trên header (chỉ 30/10–15/11 MYT) + form phản hồi (Loại · Khu vực · Mô tả · Mã tham chiếu · Ảnh), auto-attach context, idempotency key, rate limit, trả mã phản hồi | US-MIGX-11 | Feedback 01–10, 12 |
 | FR-15 | Login fallback `/login?error=invalid_token` + toast network riêng | US-MIGX-14 | 08 |
 | FR-16 | Màn hình V2 cho store `running` / `failed` + email chậm/lỗi | US-MIGX-15 | ❌ |
-| FR-17 | Trang "Phản hồi của tôi": danh sách, lọc, chi tiết, dòng thời gian, trả lời khi "Cần thêm thông tin" | US-MIGX-18 | ❌ (§10.4) |
-| FR-18 | Thông báo in-app (collection `Notifications`, F16) khi phản hồi đổi trạng thái / có trả lời public; không gửi email | US-MIGX-19 | ❌ (§10.4) |
+| FR-17 | ⏸ Tạm hoãn — trang "Phản hồi của tôi" (danh sách, chi tiết) | US-MIGX-18 | — |
+| FR-18 | Thông báo in-app (collection `Notifications`, F16) khi phản hồi đổi trạng thái; kèm dòng "Trả lời" nếu có; bấm = đánh dấu đã đọc; không gửi email | US-MIGX-19 | Feedback 11 |
 | FR-19 | Đồng bộ 2 chiều V2 ↔ Lark Base: tạo bản ghi + ảnh; nhận cập nhật trạng thái/trả lời qua webhook có xác thực; idempotent | US-MIGX-20 | — |
 
 ---
@@ -135,9 +135,9 @@ Xem bảng §0 và file stories. Nhóm A trước cutover · B trong cutover · 
 | **BR-05** | Modal V1 (trước T): hiện ở lần vào dashboard đầu tiên mỗi phiên đăng nhập; banner luôn hiện, không đóng được. *(Figma không ghi rõ — BA đề xuất, chờ Design xác nhận GAP-U3)* |
 | **BR-06** | V1 không nhận dữ liệu mới sau `T`; thay đổi trên V2 **không** đồng bộ ngược về V1. Không có user-driven rollback; recovery chỉ do Ops. |
 | **BR-07** | Email gửi theo store. Owner nhiều store nhận 1 email / store (cùng template) — *đề xuất; GAP-R2 nếu muốn gộp*. |
-| **BR-08** | *(Chốt 2026-10-27)* Form phản hồi chung, 3 loại: Báo lỗi · Sai lệch dữ liệu sau chuyển đổi · Góp ý. Loại "Sai lệch dữ liệu" chỉ hiện với store migrate từ V1, đến hết `archiveExpiresAt + 30 ngày` (15/12/2026 MYT). Kênh trả lời: **chỉ thông báo in-app + lịch sử phản hồi**, không email. **Không cam kết SLA** — không hiển thị bất kỳ thời hạn xử lý nào. Gửi phản hồi không khôi phục quyền ghi V1. |
-| **BR-13** | Quyền xem phản hồi: Staff thấy phản hồi mình gửi; Owner thấy mọi phản hồi của store. Thông báo in-app gửi cho người gửi, và cho Owner nếu người gửi là Staff. |
-| **BR-14** | Trạng thái phản hồi (user thấy) map 1–1 với trạng thái Lark Base: Đã nhận (`new`) · Đang xử lý (`in_progress`) · Cần thêm thông tin (`need_info`) · Đã giải quyết (`resolved`) · Đã đóng (`closed`). Chỉ trường "Trả lời cho user" trên Lark Base được hiện cho user; ghi chú nội bộ không bao giờ hiện. |
+| **BR-08** | *(Chốt 2026-10-27, bản cuối)* Nút "Gửi phản hồi" trên header chỉ hiện từ 30/10/2026 00:00 đến 15/11/2026 23:59:59 MYT (giờ server); ngoài khoảng này nút ẩn và `POST /api/v1/feedback` trả 403. 3 loại: Báo lỗi · Sai lệch dữ liệu · Góp ý; "Sai lệch dữ liệu" chỉ hiện với cửa hàng chuyển từ V1. Kênh trả lời: **chỉ thông báo in-app**, không email. **Không cam kết SLA** — không hiển thị bất kỳ thời hạn xử lý nào. |
+| **BR-13** | Thông báo in-app gửi cho người gửi phản hồi; nếu người gửi là Staff thì Owner nhận thêm thông báo khi Staff gửi và khi trạng thái đổi. |
+| **BR-14** | Trạng thái phản hồi map 1–1 với Lark Base: Đã nhận (`new`) · Đang xử lý (`in_progress`) · Đã giải quyết (`resolved`) · Đã đóng (`closed`). Chỉ trường "Trả lời cho user" trên Lark Base được gửi về V2; ghi chú nội bộ không bao giờ hiện. |
 | **BR-09** | Banner cam "V1 sẽ đóng sau X ngày" hiện từ `archiveExpiresAt - 7 ngày`; trước đó dùng banner xanh (03). *(Ngưỡng 7 ngày là đề xuất BA — GAP-U4)* |
 | **BR-10** | Banner storefront "Thanh toán đã sẵn sàng" hiện tối đa 24h sau khi mở checkout. *(đề xuất)* |
 | **BR-11** | Checklist sau chuyển: "Verify your products" ✓ khi Owner mở trang Products ít nhất 1 lần; "Customize your design" ✓ khi đã có theme migrate; "Set up shipping fees" ✓ khi có ≥1 shipping rate; "Kiểm tra trạng thái website" ✓ khi site published. Ẩn checklist khi 100% hoặc Owner đóng. *(đề xuất — GAP-U5)* |
@@ -174,7 +174,7 @@ flowchart TD
 | 02 | PW2 first login | Modal thành công Light/Dark | ✅ |
 | 03 | PW2 Dashboard | Banner đối chiếu + checklist 4 mục | ⚠️ Trộn EN/VI; dữ liệu analytics = 0 chưa giải thích |
 | 04 | PW1 Legacy Archive | Read-only state; phiên hết hạn | ✅ |
-| 05 | Báo cáo sai lệch → **Gửi phản hồi** | Mở form / thiếu thông tin / đang gửi / thành công / lỗi | ⚠️ Cần vẽ lại theo §10.4 (đã chốt 2026-10-27) |
+| 05 | Báo cáo sai lệch → **Gửi phản hồi (MVP)** | Thay bằng 12 frame mới ở file Untitled | ✅ Xem §10.4 |
 | 06 | Sunset | Nhắc trước hạn; V1 đã đóng | ✅ (thiếu mobile) |
 | 07 | Storefront + email | Checkout tạm dừng / sẵn sàng; 2 email | ⚠️ Tiền tệ "đ"; chỉ 2/7 email |
 | 08 | Login fallback | Invalid token Light/Dark | ✅ |
@@ -197,45 +197,29 @@ Tất cả frame là **Desktop**. Không có frame mobile cho V1 banner/modal, V
 | Storefront (07) | Cửa hàng đang nâng cấp hệ thống / Thanh toán đã sẵn sàng | Kiểm tra trạng thái đơn · Thử lại / Tiếp tục thanh toán |
 | Toast login (08) | — | "Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại." / "Chưa thể kết nối. Vui lòng thử lại." |
 
-### 10.4 Spec chỉnh Figma — Form phản hồi & lịch sử
+### 10.4 Feedback MVP — spec màn hình (release 29/10/2026)
 
-> Quyết định PO 2026-10-27: form chung · trả lời in-app · có lịch sử · Lark Base · không SLA. Copy EN/BM: [copy deck §6](./MIG-UX-direct-cutover-copy.md#6-phản-hồi-feedback).
-> Đề xuất đổi tên section Figma 05 thành **"05 · Phản hồi / Feedback"**.
-
-**A. Sửa 5 frame hiện có (section 05)**
-
-| Frame | Thay đổi |
-|---|---|
-| Tất cả | Tiêu đề modal "Báo cáo sai lệch dữ liệu" → **"Gửi phản hồi"**. Subtitle → "Thông tin cửa hàng và trang bạn đang xem được gửi kèm tự động." |
-| Tất cả | **Xóa** khối xám "Nguồn: V2 / frozenAt / Thông tin được tự đính kèm…". Thay bằng 1 dòng nhỏ "Cửa hàng: {tên}" dưới subtitle. |
-| Tất cả | Hộp xanh "V1 không hiển thị dữ liệu phát sinh sau thời điểm chốt…" chỉ hiện khi Loại = Sai lệch dữ liệu. |
-| Tất cả | Thêm trường **Loại phản hồi*** (segmented / radio 3 lựa chọn) trên cùng. |
-| Tất cả | "Nhóm dữ liệu" → **"Khu vực"**, dropdown 10 mục (US-MIGX-11). |
-| Tất cả | "Ghi chú" → **"Mô tả chi tiết"**, thêm bộ đếm "0/2000" góc phải dưới ô; dòng nhắc quyền riêng tư luôn hiện dưới ô. |
-| Tất cả | "Mã đơn/sản phẩm/khách hàng" → **"Mã tham chiếu"** (tuỳ chọn). |
-| Tất cả | Thêm **"Ảnh chụp màn hình"** (tuỳ chọn): vùng thả ảnh + thumbnail 64×64 có nút ✕, ghi chú "Tối đa 3 ảnh, PNG/JPG, ≤5 MB/ảnh". |
-| Thiếu thông tin | Lỗi riêng cạnh Loại, Khu vực, Mô tả (copy deck). Lỗi Mô tả ngắn: "Vui lòng mô tả ít nhất 10 ký tự." |
-| Đang gửi | Giữ như hiện tại; thêm trạng thái uploading cho thumbnail. |
-| Thành công | Bỏ "Support / Data Migration…", bỏ khối Nguồn/frozenAt, bỏ câu "chưa có thời gian xử lý cam kết" và "không khôi phục quyền ghi V1". Hiện: ✓ "Đã gửi phản hồi" · "Mã phản hồi" + nút **Sao chép** · "Chúng tôi sẽ thông báo cho bạn trong Prime Web khi có cập nhật. Bạn có thể theo dõi tại Phản hồi của tôi." · Nút **Xem phản hồi của tôi** (secondary) + **Đóng** (primary). |
-| Lỗi gửi | Giữ nội dung và ảnh; banner đỏ "Chưa gửi được phản hồi. Nội dung của bạn vẫn được giữ." + nút Thử lại. |
-
-**B. Frame mới cần vẽ**
+> **Chốt PO 2026-10-27 (bản cuối):** chỉ có nút "Gửi phản hồi" trên header, hiện 30/10–15/11/2026 MYT. Luồng MVP: tạo + gửi → Lark Base → đổi trạng thái → thông báo in-app. Không SLA.
+> **Figma:** file [Untitled](https://www.figma.com/design/Ni2MSoBtONKqMJjfgNF1g7/Untitled?node-id=0-1) › frame 01–12 dưới section 05 cũ. Copy EN/BM: [copy deck §6](./MIG-UX-direct-cutover-copy.md#6-phản-hồi-feedback).
 
 | # | Frame | Nội dung chính |
 |---|---|---|
-| B1 | Form · mở từ V1 archive | Loại "Sai lệch dữ liệu" được chọn sẵn + khóa; có hộp xanh; dòng "Gửi phản hồi không khôi phục quyền chỉnh sửa trên V1." |
-| B2 | Form · xác nhận đóng | Dialog "Bỏ nội dung đã nhập?" · Tiếp tục nhập / Bỏ |
-| B3 | Form · quá giới hạn gửi | Banner "Bạn đã gửi nhiều phản hồi trong thời gian ngắn. Vui lòng thử lại sau ít phút." Giữ nội dung. |
-| B4 | Form · lỗi tải ảnh | Thumbnail viền đỏ + "Ảnh vượt quá 5 MB" / "Chỉ hỗ trợ PNG, JPG" |
-| B5 | Menu Support | Thêm 2 mục dưới "Help Center": **Gửi phản hồi** (mở modal), **Phản hồi của tôi** (trang) |
-| B6 | Trang "Phản hồi của tôi" · danh sách | Header + nút "Gửi phản hồi"; lọc Trạng thái, Loại; ô tìm mã; bảng 6 cột (US-MIGX-18); badge màu theo trạng thái; phân trang |
-| B7 | Trang "Phản hồi của tôi" · trống | Icon + "Bạn chưa gửi phản hồi nào." + nút "Gửi phản hồi" |
-| B8 | Chi tiết phản hồi | Mã, loại, khu vực, ngày gửi, người gửi; nội dung + ảnh; **dòng thời gian** trạng thái; khối "Trả lời từ Prime Web" |
-| B9 | Chi tiết · Cần thêm thông tin | Banner vàng "Chúng tôi cần thêm thông tin để xử lý" + ô trả lời (text + ảnh) + nút Gửi trả lời |
-| B10 | Thông báo trong chuông (F16) | Item "Phản hồi {mã} — {trạng thái}" + thời gian; trạng thái chưa đọc |
-| B11 | Mobile 375px | Modal form full-screen; danh sách thành card |
+| 01 | Header V2 — nút Gửi phản hồi | Nút cạnh chuông thông báo; mobile chỉ còn icon + tooltip; ẩn ngoài khoảng 30/10–15/11 |
+| 02 | Form — mặc định | 3 loại (Báo lỗi · Sai lệch dữ liệu · Góp ý), Khu vực 10 mục, Mô tả + bộ đếm, Mã tham chiếu, Ảnh ≤3 |
+| 03 | Form — Sai lệch dữ liệu | Mở từ banner "Báo cáo sai lệch dữ liệu"; loại chọn sẵn (đổi được); hộp xanh nhắc so sánh cùng thời điểm |
+| 04 | Form — thiếu thông tin | Lỗi cạnh từng trường bắt buộc |
+| 05 | Form — lỗi tải ảnh | Thumbnail viền đỏ + "Ảnh vượt quá 5 MB" |
+| 06 | Form — đang gửi | Khoá trường + nút |
+| 07 | Form — gửi lỗi | Banner đỏ, giữ nội dung |
+| 08 | Form — quá giới hạn | Banner vàng (429) |
+| 09 | Xác nhận đóng | "Bỏ nội dung đã nhập?" |
+| 10 | Gửi thành công | Mã phản hồi + Sao chép; "Chúng tôi sẽ thông báo cho bạn trong Prime Web (biểu tượng chuông)…"; nút Đóng |
+| 11 | Thông báo trong chuông | Đang xử lý / Đã giải quyết (+ dòng Trả lời) / Đã đóng / Staff vừa gửi |
+| 12 | Mobile 375 | Modal full-screen |
 
-Badge trạng thái đề xuất: Đã nhận (xám) · Đang xử lý (xanh dương) · Cần thêm thông tin (vàng) · Đã giải quyết (xanh lá) · Đã đóng (xám nhạt).
+**Tạm hoãn (không vẽ, không build cho 29/10):** trang "Phản hồi của tôi", trang chi tiết, trạng thái "Cần thêm thông tin", lối vào từ V1 archive, mục trong sidebar.
+
+Badge / trạng thái: Đã nhận (`new`) · Đang xử lý (`in_progress`) · Đã giải quyết (`resolved`) · Đã đóng (`closed`).
 
 ---
 
@@ -290,9 +274,9 @@ Code staging hiện **chỉ có** `migrationStatus: migrated | pending | failed`
 | `Tenants.writeOwner` enum `v1 \| v2` | Tenants | BR-03 |
 | `user_migration_notices` (user_id, tenant_id, notice_key, seen_at) | bảng mới | Modal 1 lần (FR-08) |
 | `migration_email_log` (tenant_id, user_id, template, sent_at, status) | bảng mới | Idempotent FR-07 |
-| `feedback_reports` (id, code, tenant_id, created_by, type, area, description, reference, source, page_url, frozen_at, app_version, locale, status, public_reply, lark_record_id, lark_sync_status, created_at, updated_at) | collection mới | FR-14, 17, 19 |
+| `feedback_reports` (id, code, tenant_id, created_by, type, area, description, reference, is_migrated_store, page_url, app_version, locale, status, public_reply, lark_record_id, lark_sync_status, created_at, updated_at) | collection mới | FR-14, 18, 19 |
 | `feedback_reports_attachments` (array: media ref) | array table | FR-14 |
-| `feedback_report_events` (report_id, kind: status_change\|public_reply\|user_reply, payload, lark_event_id unique, created_at) | bảng mới | FR-17, 18, 19 — dòng thời gian + chống trùng sự kiện Lark |
+| `feedback_report_events` (report_id, kind: status_change\|public_reply, payload, lark_event_id unique, created_at) | bảng mới | FR-18, 19 — chống trùng sự kiện Lark |
 
 ### 13.4 Lark Base (US-MIGX-20)
 
@@ -306,8 +290,8 @@ Bảng Lark Base "Prime Web Feedback" — trường đề xuất:
 | Mã tham chiếu | Text | `reference` |
 | Ảnh | Attachment | upload từ V2 |
 | Cửa hàng · Tenant ID · Người gửi · Vai trò | Text | context |
-| Nguồn · URL trang · Ngôn ngữ · App version · frozenAt | Text | context |
-| Trạng thái | Single select (`new`, `in_progress`, `need_info`, `resolved`, `closed`) | Support cập nhật → sync về V2 |
+| Cửa hàng chuyển từ V1? · URL trang · Ngôn ngữ · App version | Text | context |
+| Trạng thái | Single select (`new`, `in_progress`, `resolved`, `closed`) | Support cập nhật → sync về V2 |
 | Trả lời cho user | Long text | Support nhập → hiện cho user |
 | Ghi chú nội bộ | Long text | **Không** sync về V2 |
 | Người phụ trách | Person | Support |
@@ -354,12 +338,10 @@ scheduled ──T──▶ write_locked ──drain ok──▶ syncing ──re
 
 | Method | Path | Mục đích |
 |---|---|---|
+| GET | `/api/v1/feedback/availability` | `{enabled, types[]}` — header dùng để quyết định hiện nút và loại "Sai lệch dữ liệu" |
 | GET | `/api/v1/migration/status` | Trả `cutoverState`, mốc thời gian, `daysLeft` (server time) cho store hiện tại |
 | POST | `/api/v1/migration/notices/:key/seen` | Đánh dấu modal đã xem |
-| POST | `/api/v1/feedback` | Header `Idempotency-Key`; multipart `{type, area, description, reference?, attachments[]≤3}`; server tự gắn context. 201 `{code}` · 400 validation · 413 ảnh quá lớn · 429 rate limit |
-| GET | `/api/v1/feedback?status=&type=&q=&page=` | Danh sách theo quyền BR-13 |
-| GET | `/api/v1/feedback/:code` | Chi tiết + dòng thời gian + `public_reply` |
-| POST | `/api/v1/feedback/:code/replies` | User trả lời khi `need_info` → trạng thái về `new`, ghi thêm vào Lark |
+| POST | `/api/v1/feedback` | Header `Idempotency-Key`; multipart `{type, area, description, reference?, attachments[]≤3}`; server tự gắn context. 201 `{code}` · 400 validation · 403 ngoài khoảng 30/10–15/11 · 413 ảnh quá lớn · 429 rate limit |
 | POST | `/api/v1/integrations/lark/feedback-webhook` | Lark → V2; xác thực chữ ký `LARK_FEEDBACK_WEBHOOK_SECRET`; idempotent theo `lark_event_id`; tạo `Notifications` |
 | POST | `/api/v1/archive/session` | Cấp token archive scoped; 403 nếu `now ≥ archiveExpiresAt` hoặc không có quyền |
 
@@ -418,8 +400,8 @@ Chung: footer "Email thông báo hệ thống dành cho chủ cửa hàng [store
 | ID | Case | Câu hỏi | Mức |
 |---|---|---|---|
 | GAP-D1 | Đơn tạo trên V1 trong khoảng drain (thanh toán xong sau `T`, webhook Billplz/Xendit/Stripe về muộn) | Webhook về V1 hay V2? Đơn có vào final sync không? | 🔴 |
-| GAP-D2 | ~~Báo cáo sai lệch chỉ có 3 nhóm~~ ✅ Chốt 2026-10-27: form phản hồi chung, 10 khu vực, in-app + lịch sử, Lark Base, không SLA (BR-08, §10.4). Còn lại: Design vẽ lại section 05 + 11 frame mới | Figma 05 | 🟠 |
-| GAP-D12 | Ai quản trị bảng Lark Base, ai được đổi trạng thái; quy ước khi nào chuyển `resolved` → `closed` | US-MIGX-20 | 🟡 |
+| GAP-D2 | ✅ Chốt 2026-10-27 (bản cuối): Feedback MVP qua nút header 30/10–15/11, 3 loại, in-app + Lark Base, không SLA; lịch sử tạm hoãn (BR-08, §10.4) | Figma file Untitled | ✅ |
+| GAP-D12 | Ai quản trị bảng Lark Base, ai được đổi trạng thái; quy ước khi nào chuyển `resolved` → `closed`. **Cần có trước 29/10** để Support xử lý từ ngày 30/10 | US-MIGX-20 | 🔴 |
 | GAP-D3 | Dashboard V2 traffic/analytics = 0 sau chuyển | Thêm dòng giải thích "Số liệu truy cập bắt đầu từ [T]"; V1 analytics có export không | 🟡 |
 | GAP-D4 | Đơn V1 đang Pending/Shipping lúc `T` | Xử lý tiếp trên V2; email trạng thái đơn cho buyer gửi từ V2 với sender domain nào | 🟠 |
 | GAP-D5 | Abandoned cart / email marketing V1 đang chạy trong cửa sổ cutover | Tắt job V1 tại `T` (FR-04 "jobs/integrations") — xác nhận danh sách job | 🟠 |

@@ -118,8 +118,8 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 
 ## 6. Phản hồi (Feedback)
 
-> Chốt PO 2026-10-27: form chung, trả lời in-app, có lịch sử, Lark Base, **không SLA** — không câu nào được hứa thời gian xử lý. Spec UI: [PRD §10.4](./MIG-UX-direct-cutover.md#104-spec-chỉnh-figma--form-phản-hồi--lịch-sử).
-> Nút "Báo cáo sai lệch dữ liệu" trên banner V2 / V1 archive / email E3 giữ nguyên chữ (`migration.common.reportMismatch`) và mở form với Loại = Sai lệch dữ liệu.
+> Chốt PO 2026-10-27 (bản cuối — MVP release 29/10): nút "Gửi phản hồi" trên header, hiện 30/10–15/11/2026 MYT; trả lời qua thông báo in-app; Lark Base; **không SLA** — không câu nào được hứa thời gian xử lý. Lịch sử phản hồi tạm hoãn. Spec UI: [PRD §10.4](./MIG-UX-direct-cutover.md#104-spec-chỉnh-figma--form-phản-hồi--lịch-sử).
+> Nút "Báo cáo sai lệch dữ liệu" trên banner Dashboard V2 giữ nguyên chữ (`migration.common.reportMismatch`) và mở form với Loại = Sai lệch dữ liệu.
 
 ### 6.1 Form
 
@@ -130,7 +130,7 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.form.store` | Cửa hàng: {storeName} | Store: {storeName} | Kedai: {storeName} |
 | `feedback.type.label` | Loại phản hồi | Feedback type | Jenis maklum balas |
 | `feedback.type.bug` | Báo lỗi | Report a problem | Laporkan masalah |
-| `feedback.type.mismatch` | Sai lệch dữ liệu sau chuyển đổi | Data mismatch after the move | Percanggahan data selepas pemindahan |
+| `feedback.type.mismatch` | Sai lệch dữ liệu | Data mismatch | Percanggahan data |
 | `feedback.type.idea` | Góp ý | Suggestion | Cadangan |
 | `feedback.area.label` | Khu vực | Area | Bahagian |
 | `feedback.area.placeholder` | Chọn khu vực | Choose an area | Pilih bahagian |
@@ -147,7 +147,7 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.mismatchHint` | V1 không hiển thị dữ liệu phát sinh sau thời điểm chốt. Hãy so sánh dữ liệu cùng thời điểm. | V1 doesn't show data created after the freeze. Compare data from the same point in time. | V1 tidak memaparkan data yang dicipta selepas pembekuan. Bandingkan data pada masa yang sama. |
 | `feedback.description.label` | Mô tả chi tiết | Details | Butiran |
 | `feedback.description.placeholder.bug` | Bạn đã làm gì, mong đợi điều gì, và điều gì đã xảy ra? | What did you do, what did you expect, and what happened instead? | Apa yang anda lakukan, apa yang anda jangkakan, dan apa yang berlaku? |
-| `feedback.description.placeholder.mismatch` | Dữ liệu nào khác nhau giữa V1 và V2? VD: Đơn DH-1042 tổng tiền V1 là RM120, V2 là RM100. | What's different between V1 and V2? E.g. Order DH-1042 total is RM120 in V1 but RM100 in V2. | Apakah yang berbeza antara V1 dan V2? Cth: Jumlah pesanan DH-1042 ialah RM120 dalam V1 tetapi RM100 dalam V2. |
+| `feedback.description.placeholder.mismatch` | Dữ liệu nào bị sai? VD: Đơn DH-1042 trên V1 là RM120, V2 là RM100 | What's different between V1 and V2? E.g. Order DH-1042 total is RM120 in V1 but RM100 in V2. | Apakah yang berbeza antara V1 dan V2? Cth: Jumlah pesanan DH-1042 ialah RM120 dalam V1 tetapi RM100 dalam V2. |
 | `feedback.description.placeholder.idea` | Bạn muốn chúng tôi cải thiện điều gì? | What would you like us to improve? | Apakah yang anda mahu kami tambah baik? |
 | `feedback.description.counter` | {count}/2000 | {count}/2000 | {count}/2000 |
 | `feedback.description.privacy` | Không nhập mật khẩu, thông tin thanh toán hoặc dữ liệu cá nhân của khách hàng. | Don't enter passwords, payment details or your customers' personal data. | Jangan masukkan kata laluan, butiran pembayaran atau data peribadi pelanggan anda. |
@@ -156,7 +156,6 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.attachments.label` | Ảnh chụp màn hình (tuỳ chọn) | Screenshots (optional) | Tangkapan skrin (pilihan) |
 | `feedback.attachments.add` | Thêm ảnh | Add image | Tambah imej |
 | `feedback.attachments.hint` | Tối đa 3 ảnh, PNG hoặc JPG, mỗi ảnh tối đa 5 MB. | Up to 3 images, PNG or JPG, max 5 MB each. | Sehingga 3 imej, PNG atau JPG, maksimum 5 MB setiap satu. |
-| `feedback.fromArchive.note` | Gửi phản hồi không khôi phục quyền chỉnh sửa trên V1. | Sending feedback doesn't restore editing in V1. | Menghantar maklum balas tidak memulihkan penyuntingan dalam V1. |
 | `feedback.cta.cancel` | Huỷ | Cancel | Batal |
 | `feedback.cta.submit` | Gửi phản hồi | Send feedback | Hantar maklum balas |
 | `feedback.sending` | Đang gửi… Vui lòng không gửi lại. | Sending… Please don't send it again. | Menghantar… Jangan hantar semula. |
@@ -187,32 +186,15 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.success.codeLabel` | Mã phản hồi | Feedback ID | ID maklum balas |
 | `feedback.success.copy` | Sao chép | Copy | Salin |
 | `feedback.success.copied` | Đã sao chép | Copied | Disalin |
-| `feedback.success.body` | Chúng tôi sẽ thông báo cho bạn trong Prime Web khi có cập nhật. Bạn có thể theo dõi tại Phản hồi của tôi. | We'll notify you in Prime Web when there's an update. You can follow it in My feedback. | Kami akan memaklumkan anda dalam Prime Web apabila ada kemas kini. Anda boleh menjejakinya di Maklum balas saya. |
-| `feedback.success.viewHistory` | Xem phản hồi của tôi | View my feedback | Lihat maklum balas saya |
+| `feedback.success.body` | Chúng tôi sẽ thông báo cho bạn trong Prime Web (biểu tượng chuông) khi có cập nhật. | We'll notify you in Prime Web (the bell icon) when there's an update. | Kami akan memaklumkan anda dalam Prime Web (ikon loceng) apabila ada kemas kini. |
 | `feedback.success.close` | Đóng | Close | Tutup |
 
-### 6.4 Trang "Phản hồi của tôi"
+### 6.4 Nút trên header
 
 | Key | VI | EN | BM |
 |---|---|---|---|
-| `feedback.nav.send` | Gửi phản hồi | Send feedback | Hantar maklum balas |
-| `feedback.nav.history` | Phản hồi của tôi | My feedback | Maklum balas saya |
-| `feedback.history.title` | Phản hồi của tôi | My feedback | Maklum balas saya |
-| `feedback.history.subtitle` | Theo dõi các phản hồi bạn đã gửi. | Track the feedback you've sent. | Jejaki maklum balas yang telah anda hantar. |
-| `feedback.history.subtitleOwner` | Theo dõi các phản hồi đã gửi cho cửa hàng này. | Track feedback sent for this store. | Jejaki maklum balas yang dihantar untuk kedai ini. |
-| `feedback.history.search` | Tìm theo mã phản hồi | Search by feedback ID | Cari mengikut ID maklum balas |
-| `feedback.history.filter.status` | Trạng thái | Status | Status |
-| `feedback.history.filter.type` | Loại | Type | Jenis |
-| `feedback.history.filter.all` | Tất cả | All | Semua |
-| `feedback.history.col.code` | Mã | ID | ID |
-| `feedback.history.col.type` | Loại | Type | Jenis |
-| `feedback.history.col.area` | Khu vực | Area | Bahagian |
-| `feedback.history.col.summary` | Nội dung | Details | Butiran |
-| `feedback.history.col.status` | Trạng thái | Status | Status |
-| `feedback.history.col.updated` | Cập nhật | Last updated | Kemas kini terakhir |
-| `feedback.history.empty.title` | Bạn chưa gửi phản hồi nào. | You haven't sent any feedback yet. | Anda belum menghantar sebarang maklum balas. |
-| `feedback.history.empty.body` | Gặp lỗi hoặc có ý tưởng? Hãy cho chúng tôi biết. | Found a problem or have an idea? Let us know. | Ada masalah atau idea? Beritahu kami. |
-| `feedback.history.noResults` | Không có phản hồi nào khớp bộ lọc. | No feedback matches your filters. | Tiada maklum balas yang sepadan dengan penapis anda. |
+| `feedback.header.button` | Gửi phản hồi | Send feedback | Hantar maklum balas |
+| `feedback.header.tooltip` *(mobile, chỉ icon)* | Gửi phản hồi | Send feedback | Hantar maklum balas |
 
 ### 6.5 Trạng thái
 
@@ -220,35 +202,17 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 |---|---|---|---|
 | `feedback.status.new` | Đã nhận | Received | Diterima |
 | `feedback.status.in_progress` | Đang xử lý | In progress | Sedang diproses |
-| `feedback.status.need_info` | Cần thêm thông tin | Needs more info | Perlukan maklumat lanjut |
 | `feedback.status.resolved` | Đã giải quyết | Resolved | Selesai |
 | `feedback.status.closed` | Đã đóng | Closed | Ditutup |
 
-### 6.6 Chi tiết phản hồi
-
-| Key | VI | EN | BM |
-|---|---|---|---|
-| `feedback.detail.sentAt` | Gửi lúc {date} | Sent {date} | Dihantar {date} |
-| `feedback.detail.sentBy` | Người gửi: {name} | Sent by {name} | Dihantar oleh {name} |
-| `feedback.detail.timeline` | Lịch sử cập nhật | Updates | Kemas kini |
-| `feedback.detail.timeline.created` | Đã gửi phản hồi | Feedback sent | Maklum balas dihantar |
-| `feedback.detail.timeline.statusChanged` | Trạng thái chuyển sang {status} | Status changed to {status} | Status ditukar kepada {status} |
-| `feedback.detail.timeline.userReplied` | Bạn đã bổ sung thông tin | You added more info | Anda telah menambah maklumat |
-| `feedback.detail.reply.title` | Trả lời từ Prime Web | Reply from Prime Web | Balasan daripada Prime Web |
-| `feedback.detail.needInfo.title` | Chúng tôi cần thêm thông tin để xử lý | We need more info to look into this | Kami perlukan maklumat lanjut untuk menyemak perkara ini |
-| `feedback.detail.needInfo.placeholder` | Nhập thông tin bổ sung… | Add more details… | Tambah butiran… |
-| `feedback.detail.needInfo.submit` | Gửi trả lời | Send reply | Hantar balasan |
-| `feedback.detail.back` | Quay lại danh sách | Back to list | Kembali ke senarai |
-
-### 6.7 Thông báo in-app (chuông, F16)
+### 6.6 Thông báo in-app (chuông, F16)
 
 | Key | VI | EN | BM |
 |---|---|---|---|
 | `notifications.feedback.in_progress` | Phản hồi {code} đang được xử lý. | Your feedback {code} is in progress. | Maklum balas {code} anda sedang diproses. |
-| `notifications.feedback.need_info` | Phản hồi {code} cần thêm thông tin từ bạn. | We need more info for your feedback {code}. | Kami perlukan maklumat lanjut untuk maklum balas {code} anda. |
 | `notifications.feedback.resolved` | Phản hồi {code} đã được giải quyết. | Your feedback {code} has been resolved. | Maklum balas {code} anda telah diselesaikan. |
 | `notifications.feedback.closed` | Phản hồi {code} đã đóng. | Your feedback {code} has been closed. | Maklum balas {code} anda telah ditutup. |
-| `notifications.feedback.reply` | Có trả lời mới cho phản hồi {code}. | There's a new reply to your feedback {code}. | Terdapat balasan baharu untuk maklum balas {code} anda. |
+| `notifications.feedback.replyLine` *(dòng phụ, khi Support điền trả lời)* | Trả lời: {reply} | Reply: {reply} | Balasan: {reply} |
 | `notifications.feedback.staff` *(gửi Owner khi Staff gửi)* | {name} vừa gửi phản hồi {code}. | {name} sent feedback {code}. | {name} telah menghantar maklum balas {code}. |
 
 ## 7. Storefront — buyer (Figma 07)
