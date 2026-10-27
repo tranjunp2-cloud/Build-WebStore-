@@ -116,39 +116,140 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `migration.archive.expired.body` | Phiên xác thực để xem V1 đã hết hạn. Bạn có thể xác thực lại để xem dữ liệu đã chốt đến [ngày đóng V1]. Việc này không khôi phục quyền chỉnh sửa trên V1. | Your session for viewing V1 has expired. Sign in again to view frozen data until {archiveCloseDate}. This doesn't restore editing in V1. | Sesi anda untuk melihat V1 telah tamat. Log masuk semula untuk melihat data yang dibekukan sehingga {archiveCloseDate}. Ini tidak memulihkan penyuntingan dalam V1. |
 | `migration.archive.expired.cta` | Xác thực lại để xem V1 | Sign in again to view V1 | Log masuk semula untuk melihat V1 |
 
-## 6. Báo cáo sai lệch dữ liệu (Figma 05)
+## 6. Phản hồi (Feedback)
+
+> Chốt PO 2026-10-27: form chung, trả lời in-app, có lịch sử, Lark Base, **không SLA** — không câu nào được hứa thời gian xử lý. Spec UI: [PRD §10.4](./MIG-UX-direct-cutover.md#104-spec-chỉnh-figma--form-phản-hồi--lịch-sử).
+> Nút "Báo cáo sai lệch dữ liệu" trên banner V2 / V1 archive / email E3 giữ nguyên chữ (`migration.common.reportMismatch`) và mở form với Loại = Sai lệch dữ liệu.
+
+### 6.1 Form
 
 | Key | VI | EN | BM |
 |---|---|---|---|
-| `migration.report.title` | Báo cáo sai lệch dữ liệu | Report a data mismatch | Laporkan percanggahan data |
-| `migration.report.subtitle` | Chọn dữ liệu cần kiểm tra. Đội ngũ hỗ trợ sẽ dùng ngữ cảnh cửa hàng để đối chiếu. | Choose the data to check. Our support team will use your store details to compare. | Pilih data untuk disemak. Pasukan sokongan kami akan menggunakan butiran kedai anda untuk membandingkan. |
-| `migration.report.context.source` | Nguồn: V1 · Chỉ đọc / Nguồn: V2 | Source: V1 · Read-only / Source: V2 | Sumber: V1 · Baca sahaja / Sumber: V2 |
-| `migration.report.context.store` | Cửa hàng: [store] | Store: {storeName} | Kedai: {storeName} |
-| `migration.report.context.frozenAt` | frozenAt: [thời điểm chốt] [múi giờ] | Frozen at: {frozenAt} | Dibekukan pada: {frozenAt} |
-| `migration.report.context.auto` | Thông tin được tự đính kèm, không cần nhập lại. | These details are attached automatically. | Butiran ini dilampirkan secara automatik. |
-| `migration.report.hint` | V1 không hiển thị dữ liệu phát sinh sau thời điểm chốt. Hãy đối chiếu dữ liệu cùng thời điểm. | V1 doesn't show data created after the freeze. Compare data from the same point in time. | V1 tidak memaparkan data yang dicipta selepas pembekuan. Bandingkan data pada masa yang sama. |
-| `migration.report.module.label` | Nhóm dữ liệu | Data type | Jenis data |
-| `migration.report.module.placeholder` | Chọn nhóm dữ liệu | Choose a data type | Pilih jenis data |
-| `migration.report.module.products` / `.orders` / `.customers` | Sản phẩm / Đơn hàng / Khách hàng | Products / Orders / Customers | Produk / Pesanan / Pelanggan |
-| `migration.report.note.label` | Ghi chú | Notes | Nota |
-| `migration.report.note.placeholder` | Mô tả dữ liệu sai lệch và kết quả đối chiếu cùng thời điểm... | Describe what doesn't match and what you compared… | Terangkan data yang tidak sepadan dan perkara yang anda bandingkan… |
-| `migration.report.note.privacy` | Chỉ mô tả sai lệch; không nhập tên, email, số điện thoại, địa chỉ, mật khẩu hoặc thông tin thanh toán. | Only describe the mismatch. Don't enter names, emails, phone numbers, addresses, passwords or payment details. | Terangkan percanggahan sahaja. Jangan masukkan nama, e-mel, nombor telefon, alamat, kata laluan atau butiran pembayaran. |
-| `migration.report.ref.label` | Mã đơn/sản phẩm/khách hàng (tùy chọn) | Order / product / customer ID (optional) | ID pesanan / produk / pelanggan (pilihan) |
-| `migration.report.ref.placeholder` | Nhập mã tham chiếu nếu có | Enter a reference ID if you have one | Masukkan ID rujukan jika ada |
-| `migration.report.error.module` | Vui lòng chọn Sản phẩm, Đơn hàng hoặc Khách hàng. | Please choose Products, Orders or Customers. | Sila pilih Produk, Pesanan atau Pelanggan. |
-| `migration.report.error.note` | Vui lòng nhập ghi chú về sai lệch cần kiểm tra. | Please describe the mismatch to check. | Sila terangkan percanggahan yang perlu disemak. |
-| `migration.report.cta.cancel` | Hủy | Cancel | Batal |
-| `migration.report.cta.submit` | Gửi báo cáo | Send report | Hantar laporan |
-| `migration.report.sending` | Đang gửi báo cáo… Vui lòng không gửi lại. | Sending your report… Please don't send it again. | Menghantar laporan anda… Jangan hantar semula. |
-| `migration.report.success.title` | Đã gửi báo cáo thành công | Report sent | Laporan dihantar |
-| `migration.report.success.body` | Support / Data Migration đã tiếp nhận báo cáo để ưu tiên kiểm tra. | Our support team has received your report and will check it. | Pasukan sokongan kami telah menerima laporan anda dan akan menyemaknya. |
-| `migration.report.success.codeLabel` | Mã yêu cầu | Request ID | ID permintaan |
-| `migration.report.success.codeHint` | Lưu mã này để trao đổi với hỗ trợ. Đội ngũ sẽ cập nhật khi có kết quả kiểm tra; chưa có thời gian xử lý cam kết. | Keep this ID when you talk to support. We'll update you once we've checked. There's no guaranteed response time yet. | Simpan ID ini semasa berhubung dengan sokongan. Kami akan memaklumkan anda selepas semakan. Belum ada masa respons yang dijamin. |
-| `migration.report.success.footer` | Tiếp tục quản lý trên V2. Báo cáo không khôi phục quyền ghi trên V1. | Keep managing your store in V2. Sending a report doesn't restore editing in V1. | Teruskan mengurus kedai anda dalam V2. Menghantar laporan tidak memulihkan penyuntingan dalam V1. |
-| `migration.report.success.close` | Đóng | Close | Tutup |
-| `migration.report.failed.title` | Chưa gửi được báo cáo | Your report wasn't sent | Laporan anda tidak dihantar |
-| `migration.report.failed.body` | — | Your details are kept. Please try again. | Butiran anda disimpan. Sila cuba lagi. |
-| `migration.report.failed.retry` | Thử lại | Try again | Cuba lagi |
+| `feedback.form.title` | Gửi phản hồi | Send feedback | Hantar maklum balas |
+| `feedback.form.subtitle` | Thông tin cửa hàng và trang bạn đang xem được gửi kèm tự động. | Your store details and the page you're on are attached automatically. | Butiran kedai anda dan halaman yang sedang dilihat dilampirkan secara automatik. |
+| `feedback.form.store` | Cửa hàng: {storeName} | Store: {storeName} | Kedai: {storeName} |
+| `feedback.type.label` | Loại phản hồi | Feedback type | Jenis maklum balas |
+| `feedback.type.bug` | Báo lỗi | Report a problem | Laporkan masalah |
+| `feedback.type.mismatch` | Sai lệch dữ liệu sau chuyển đổi | Data mismatch after the move | Percanggahan data selepas pemindahan |
+| `feedback.type.idea` | Góp ý | Suggestion | Cadangan |
+| `feedback.area.label` | Khu vực | Area | Bahagian |
+| `feedback.area.placeholder` | Chọn khu vực | Choose an area | Pilih bahagian |
+| `feedback.area.products` | Sản phẩm & tồn kho | Products & stock | Produk & stok |
+| `feedback.area.orders` | Đơn hàng | Orders | Pesanan |
+| `feedback.area.customers` | Khách hàng | Customers | Pelanggan |
+| `feedback.area.discounts` | Khuyến mãi | Discounts | Diskaun |
+| `feedback.area.design` | Giao diện & trang | Design & pages | Reka bentuk & halaman |
+| `feedback.area.payments` | Thanh toán | Payments | Pembayaran |
+| `feedback.area.shipping` | Vận chuyển | Shipping | Penghantaran |
+| `feedback.area.domains` | Tên miền | Domains | Domain |
+| `feedback.area.account` | Tài khoản & nhân viên | Account & staff | Akaun & kakitangan |
+| `feedback.area.other` | Khác | Other | Lain-lain |
+| `feedback.mismatchHint` | V1 không hiển thị dữ liệu phát sinh sau thời điểm chốt. Hãy so sánh dữ liệu cùng thời điểm. | V1 doesn't show data created after the freeze. Compare data from the same point in time. | V1 tidak memaparkan data yang dicipta selepas pembekuan. Bandingkan data pada masa yang sama. |
+| `feedback.description.label` | Mô tả chi tiết | Details | Butiran |
+| `feedback.description.placeholder.bug` | Bạn đã làm gì, mong đợi điều gì, và điều gì đã xảy ra? | What did you do, what did you expect, and what happened instead? | Apa yang anda lakukan, apa yang anda jangkakan, dan apa yang berlaku? |
+| `feedback.description.placeholder.mismatch` | Dữ liệu nào khác nhau giữa V1 và V2? VD: Đơn DH-1042 tổng tiền V1 là RM120, V2 là RM100. | What's different between V1 and V2? E.g. Order DH-1042 total is RM120 in V1 but RM100 in V2. | Apakah yang berbeza antara V1 dan V2? Cth: Jumlah pesanan DH-1042 ialah RM120 dalam V1 tetapi RM100 dalam V2. |
+| `feedback.description.placeholder.idea` | Bạn muốn chúng tôi cải thiện điều gì? | What would you like us to improve? | Apakah yang anda mahu kami tambah baik? |
+| `feedback.description.counter` | {count}/2000 | {count}/2000 | {count}/2000 |
+| `feedback.description.privacy` | Không nhập mật khẩu, thông tin thanh toán hoặc dữ liệu cá nhân của khách hàng. | Don't enter passwords, payment details or your customers' personal data. | Jangan masukkan kata laluan, butiran pembayaran atau data peribadi pelanggan anda. |
+| `feedback.reference.label` | Mã tham chiếu (tuỳ chọn) | Reference ID (optional) | ID rujukan (pilihan) |
+| `feedback.reference.placeholder` | VD: DH-1042 | E.g. DH-1042 | Cth: DH-1042 |
+| `feedback.attachments.label` | Ảnh chụp màn hình (tuỳ chọn) | Screenshots (optional) | Tangkapan skrin (pilihan) |
+| `feedback.attachments.add` | Thêm ảnh | Add image | Tambah imej |
+| `feedback.attachments.hint` | Tối đa 3 ảnh, PNG hoặc JPG, mỗi ảnh tối đa 5 MB. | Up to 3 images, PNG or JPG, max 5 MB each. | Sehingga 3 imej, PNG atau JPG, maksimum 5 MB setiap satu. |
+| `feedback.fromArchive.note` | Gửi phản hồi không khôi phục quyền chỉnh sửa trên V1. | Sending feedback doesn't restore editing in V1. | Menghantar maklum balas tidak memulihkan penyuntingan dalam V1. |
+| `feedback.cta.cancel` | Huỷ | Cancel | Batal |
+| `feedback.cta.submit` | Gửi phản hồi | Send feedback | Hantar maklum balas |
+| `feedback.sending` | Đang gửi… Vui lòng không gửi lại. | Sending… Please don't send it again. | Menghantar… Jangan hantar semula. |
+
+### 6.2 Lỗi & xác nhận
+
+| Key | VI | EN | BM |
+|---|---|---|---|
+| `feedback.error.type` | Vui lòng chọn loại phản hồi. | Please choose a feedback type. | Sila pilih jenis maklum balas. |
+| `feedback.error.area` | Vui lòng chọn khu vực. | Please choose an area. | Sila pilih bahagian. |
+| `feedback.error.descriptionRequired` | Vui lòng nhập mô tả. | Please add some details. | Sila masukkan butiran. |
+| `feedback.error.descriptionShort` | Vui lòng mô tả ít nhất 10 ký tự. | Please write at least 10 characters. | Sila tulis sekurang-kurangnya 10 aksara. |
+| `feedback.error.fileTooLarge` | Ảnh vượt quá 5 MB. | This image is larger than 5 MB. | Imej ini melebihi 5 MB. |
+| `feedback.error.fileType` | Chỉ hỗ trợ ảnh PNG hoặc JPG. | Only PNG or JPG images are supported. | Hanya imej PNG atau JPG disokong. |
+| `feedback.error.tooMany` | Bạn đã gửi nhiều phản hồi trong thời gian ngắn. Vui lòng thử lại sau ít phút. | You've sent a lot of feedback in a short time. Please try again in a few minutes. | Anda telah menghantar banyak maklum balas dalam masa yang singkat. Sila cuba lagi dalam beberapa minit. |
+| `feedback.error.sendFailed` | Chưa gửi được phản hồi. Nội dung của bạn vẫn được giữ. | Your feedback wasn't sent. What you entered has been kept. | Maklum balas anda tidak dihantar. Maklumat yang anda masukkan masih disimpan. |
+| `feedback.cta.retry` | Thử lại | Try again | Cuba lagi |
+| `feedback.discard.title` | Bỏ nội dung đã nhập? | Discard what you've entered? | Buang maklumat yang telah dimasukkan? |
+| `feedback.discard.body` | Phản hồi của bạn chưa được gửi. | Your feedback hasn't been sent. | Maklum balas anda belum dihantar. |
+| `feedback.discard.keep` | Tiếp tục nhập | Keep editing | Teruskan menyunting |
+| `feedback.discard.confirm` | Bỏ | Discard | Buang |
+
+### 6.3 Gửi thành công
+
+| Key | VI | EN | BM |
+|---|---|---|---|
+| `feedback.success.title` | Đã gửi phản hồi | Feedback sent | Maklum balas dihantar |
+| `feedback.success.codeLabel` | Mã phản hồi | Feedback ID | ID maklum balas |
+| `feedback.success.copy` | Sao chép | Copy | Salin |
+| `feedback.success.copied` | Đã sao chép | Copied | Disalin |
+| `feedback.success.body` | Chúng tôi sẽ thông báo cho bạn trong Prime Web khi có cập nhật. Bạn có thể theo dõi tại Phản hồi của tôi. | We'll notify you in Prime Web when there's an update. You can follow it in My feedback. | Kami akan memaklumkan anda dalam Prime Web apabila ada kemas kini. Anda boleh menjejakinya di Maklum balas saya. |
+| `feedback.success.viewHistory` | Xem phản hồi của tôi | View my feedback | Lihat maklum balas saya |
+| `feedback.success.close` | Đóng | Close | Tutup |
+
+### 6.4 Trang "Phản hồi của tôi"
+
+| Key | VI | EN | BM |
+|---|---|---|---|
+| `feedback.nav.send` | Gửi phản hồi | Send feedback | Hantar maklum balas |
+| `feedback.nav.history` | Phản hồi của tôi | My feedback | Maklum balas saya |
+| `feedback.history.title` | Phản hồi của tôi | My feedback | Maklum balas saya |
+| `feedback.history.subtitle` | Theo dõi các phản hồi bạn đã gửi. | Track the feedback you've sent. | Jejaki maklum balas yang telah anda hantar. |
+| `feedback.history.subtitleOwner` | Theo dõi các phản hồi đã gửi cho cửa hàng này. | Track feedback sent for this store. | Jejaki maklum balas yang dihantar untuk kedai ini. |
+| `feedback.history.search` | Tìm theo mã phản hồi | Search by feedback ID | Cari mengikut ID maklum balas |
+| `feedback.history.filter.status` | Trạng thái | Status | Status |
+| `feedback.history.filter.type` | Loại | Type | Jenis |
+| `feedback.history.filter.all` | Tất cả | All | Semua |
+| `feedback.history.col.code` | Mã | ID | ID |
+| `feedback.history.col.type` | Loại | Type | Jenis |
+| `feedback.history.col.area` | Khu vực | Area | Bahagian |
+| `feedback.history.col.summary` | Nội dung | Details | Butiran |
+| `feedback.history.col.status` | Trạng thái | Status | Status |
+| `feedback.history.col.updated` | Cập nhật | Last updated | Kemas kini terakhir |
+| `feedback.history.empty.title` | Bạn chưa gửi phản hồi nào. | You haven't sent any feedback yet. | Anda belum menghantar sebarang maklum balas. |
+| `feedback.history.empty.body` | Gặp lỗi hoặc có ý tưởng? Hãy cho chúng tôi biết. | Found a problem or have an idea? Let us know. | Ada masalah atau idea? Beritahu kami. |
+| `feedback.history.noResults` | Không có phản hồi nào khớp bộ lọc. | No feedback matches your filters. | Tiada maklum balas yang sepadan dengan penapis anda. |
+
+### 6.5 Trạng thái
+
+| Key | VI | EN | BM |
+|---|---|---|---|
+| `feedback.status.new` | Đã nhận | Received | Diterima |
+| `feedback.status.in_progress` | Đang xử lý | In progress | Sedang diproses |
+| `feedback.status.need_info` | Cần thêm thông tin | Needs more info | Perlukan maklumat lanjut |
+| `feedback.status.resolved` | Đã giải quyết | Resolved | Selesai |
+| `feedback.status.closed` | Đã đóng | Closed | Ditutup |
+
+### 6.6 Chi tiết phản hồi
+
+| Key | VI | EN | BM |
+|---|---|---|---|
+| `feedback.detail.sentAt` | Gửi lúc {date} | Sent {date} | Dihantar {date} |
+| `feedback.detail.sentBy` | Người gửi: {name} | Sent by {name} | Dihantar oleh {name} |
+| `feedback.detail.timeline` | Lịch sử cập nhật | Updates | Kemas kini |
+| `feedback.detail.timeline.created` | Đã gửi phản hồi | Feedback sent | Maklum balas dihantar |
+| `feedback.detail.timeline.statusChanged` | Trạng thái chuyển sang {status} | Status changed to {status} | Status ditukar kepada {status} |
+| `feedback.detail.timeline.userReplied` | Bạn đã bổ sung thông tin | You added more info | Anda telah menambah maklumat |
+| `feedback.detail.reply.title` | Trả lời từ Prime Web | Reply from Prime Web | Balasan daripada Prime Web |
+| `feedback.detail.needInfo.title` | Chúng tôi cần thêm thông tin để xử lý | We need more info to look into this | Kami perlukan maklumat lanjut untuk menyemak perkara ini |
+| `feedback.detail.needInfo.placeholder` | Nhập thông tin bổ sung… | Add more details… | Tambah butiran… |
+| `feedback.detail.needInfo.submit` | Gửi trả lời | Send reply | Hantar balasan |
+| `feedback.detail.back` | Quay lại danh sách | Back to list | Kembali ke senarai |
+
+### 6.7 Thông báo in-app (chuông, F16)
+
+| Key | VI | EN | BM |
+|---|---|---|---|
+| `notifications.feedback.in_progress` | Phản hồi {code} đang được xử lý. | Your feedback {code} is in progress. | Maklum balas {code} anda sedang diproses. |
+| `notifications.feedback.need_info` | Phản hồi {code} cần thêm thông tin từ bạn. | We need more info for your feedback {code}. | Kami perlukan maklumat lanjut untuk maklum balas {code} anda. |
+| `notifications.feedback.resolved` | Phản hồi {code} đã được giải quyết. | Your feedback {code} has been resolved. | Maklum balas {code} anda telah diselesaikan. |
+| `notifications.feedback.closed` | Phản hồi {code} đã đóng. | Your feedback {code} has been closed. | Maklum balas {code} anda telah ditutup. |
+| `notifications.feedback.reply` | Có trả lời mới cho phản hồi {code}. | There's a new reply to your feedback {code}. | Terdapat balasan baharu untuk maklum balas {code} anda. |
+| `notifications.feedback.staff` *(gửi Owner khi Staff gửi)* | {name} vừa gửi phản hồi {code}. | {name} sent feedback {code}. | {name} telah menghantar maklum balas {code}. |
 
 ## 7. Storefront — buyer (Figma 07)
 
@@ -319,7 +420,7 @@ Chung cho mọi email:
 
 ## 10. Việc cần làm với bản dịch
 
-- [ ] Native reviewer BM duyệt toàn bộ cột BM (đặc biệt email E1, E3 và storefront).
+- [ ] Native reviewer BM duyệt toàn bộ cột BM (đặc biệt email E1, E3, storefront và §6 Phản hồi).
 - [ ] Design cập nhật Figma: thay `[múi giờ]` → MYT, sửa "T-7" → "T-4", đổi "đ" → RM.
-- [ ] Dev thêm key `migration.*` vào `en.json` / `ms.json`; email template đăng ký trong `template-registry.ts`.
+- [ ] Dev thêm key `migration.*`, `feedback.*`, `notifications.feedback.*` vào `en.json` / `ms.json`; email template đăng ký trong `template-registry.ts`.
 - [ ] Xác nhận kênh hỗ trợ (GAP-S1) để điền vào dòng "Contact support" nếu cần link cụ thể.

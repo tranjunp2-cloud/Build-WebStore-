@@ -110,17 +110,59 @@ Persona: **Owner** (chủ cửa hàng, nhận email), **Staff** (tài khoản Te
 - [ ] Banner cố định "V1 — Chế độ chỉ xem / Dữ liệu được chốt lúc [frozenAt]" + "V1 sẽ đóng sau [X] ngày · [ngày đóng] ([múi giờ])". CTA "Mở Prime Web V2", "Báo cáo sai lệch dữ liệu".
 - [ ] Archive không bị redirect mặc định sang V2 (ngoại lệ có kiểm quyền).
 
-### US-MIGX-11: Owner báo cáo sai lệch dữ liệu từ V1 archive hoặc V2
-**Figma:** 05 (5 trạng thái: mở form, thiếu thông tin, đang gửi, thành công, lỗi)
+### US-MIGX-11: User gửi phản hồi (báo lỗi / sai lệch dữ liệu / góp ý) trên CMS
+> **Đã chốt 2026-10-27 (PO):** form phản hồi chung, "Sai lệch dữ liệu sau chuyển đổi" là một loại; trả lời qua thông báo in-app; có lịch sử phản hồi; Lark Base nhận phản hồi; không cam kết SLA.
+> Tính năng tồn tại lâu dài sau 15/11 — PM cân nhắc tách thành feature ID riêng.
+
+**As an** Owner hoặc Staff, **I want** gửi phản hồi từ bất kỳ đâu trong CMS V2 (và từ V1 archive), **so that** lỗi, sai lệch dữ liệu và góp ý của tôi đến đúng đội xử lý mà không phải mô tả lại cửa hàng của mình.
+**Figma:** 05 — cần vẽ lại theo [PRD §10.4](../prd/MIG-UX-direct-cutover.md#104-spec-chỉnh-figma--form-phản-hồi--lịch-sử)
 **AC:**
-- [ ] Cùng 1 form cho V1 archive và V2; tự đính kèm `source (V1|V2)`, `store`, `frozenAt`, module, `sourceVersion`, `tenant`.
-- [ ] Bắt buộc: Nhóm dữ liệu (Sản phẩm / Đơn hàng / Khách hàng) + Ghi chú. Tùy chọn: mã tham chiếu.
-- [ ] Hiển thị lỗi cạnh cả 2 trường bắt buộc, focus trường thiếu đầu tiên, giữ dữ liệu đã nhập.
-- [ ] Đang gửi: khóa trường + nút đóng/hủy/gửi; dùng idempotency key.
-- [ ] Thành công: hiện `[mã yêu cầu]`; câu "chưa có thời gian xử lý cam kết"; "Báo cáo không khôi phục quyền ghi trên V1".
-- [ ] Lỗi: "Chưa gửi được báo cáo", giữ nội dung, cho thử lại.
-- [ ] Không yêu cầu PII; hint cấm nhập mật khẩu/thanh toán.
-- [ ] Sau `archiveExpiresAt` vẫn gửi được từ V2.
+- [ ] Mở form từ: menu Support › "Gửi phản hồi", trang "Phản hồi của tôi", nút "Báo cáo sai lệch dữ liệu" trên banner V2/V1 archive (mở sẵn loại Sai lệch dữ liệu).
+- [ ] Trường: **Loại phản hồi*** (Báo lỗi / Sai lệch dữ liệu sau chuyển đổi / Góp ý) · **Khu vực*** · **Mô tả chi tiết*** (10–2000 ký tự, có bộ đếm) · Mã tham chiếu (tuỳ chọn) · Ảnh chụp màn hình (tuỳ chọn, ≤3 ảnh PNG/JPG, ≤5 MB/ảnh).
+- [ ] Khu vực: Sản phẩm & tồn kho · Đơn hàng · Khách hàng · Khuyến mãi · Giao diện & trang · Thanh toán · Vận chuyển · Tên miền · Tài khoản & nhân viên · Khác.
+- [ ] Loại "Sai lệch dữ liệu sau chuyển đổi" chỉ hiện với store migrate từ V1 và khi `now ≤ archiveExpiresAt + 30 ngày` (BR-08); khi mở từ V1 archive thì chọn sẵn và khóa loại.
+- [ ] Placeholder mô tả + mã tham chiếu đổi theo Loại / Khu vực (copy deck §6).
+- [ ] Tự đính kèm (không hiện trên UI ngoài tên cửa hàng): `tenant`, `store`, `user`, `role`, `source (V1_ARCHIVE|V2)`, URL trang đang xem, `frozenAt` (nếu có), app version, ngôn ngữ, user agent.
+- [ ] Lỗi validation cạnh từng trường bắt buộc; focus trường thiếu đầu tiên; giữ dữ liệu đã nhập.
+- [ ] Đang gửi: khóa trường + nút; idempotency key; chặn submit trùng.
+- [ ] Thành công: mã phản hồi + nút "Sao chép mã"; câu "Chúng tôi sẽ thông báo cho bạn trong Prime Web khi có cập nhật."; nút "Xem phản hồi của tôi" và "Đóng".
+- [ ] Lỗi gửi: giữ nội dung + ảnh đã tải, cho "Thử lại".
+- [ ] Đóng form khi đã nhập dở → xác nhận "Bỏ nội dung đã nhập?".
+- [ ] Rate limit 5 phản hồi / giờ / user → thông báo thân thiện, không mất nội dung.
+- [ ] Không có câu cam kết thời gian xử lý ở bất kỳ đâu (BR-08).
+- [ ] Dòng nhắc quyền riêng tư luôn hiện dưới ô mô tả.
+
+### US-MIGX-18: User xem lịch sử phản hồi đã gửi
+**As an** Owner hoặc Staff, **I want** xem lại các phản hồi tôi đã gửi và trạng thái của chúng, **so that** tôi biết phản hồi nào đã được xử lý mà không cần hỏi Support.
+**Figma:** ❌ chưa có — cần vẽ mới (PRD §10.4)
+**AC:**
+- [ ] Trang "Phản hồi của tôi" trong menu Support; danh sách sắp xếp mới nhất trước, phân trang 20 dòng.
+- [ ] Cột: Mã · Loại · Khu vực · Tóm tắt (60 ký tự đầu của mô tả) · Trạng thái · Cập nhật lần cuối.
+- [ ] Lọc theo Trạng thái và Loại; tìm theo mã.
+- [ ] Trạng thái hiển thị: **Đã nhận** · **Đang xử lý** · **Cần thêm thông tin** · **Đã giải quyết** · **Đã đóng**.
+- [ ] Chi tiết: toàn bộ nội dung đã gửi, ảnh, dòng thời gian trạng thái, phản hồi của đội hỗ trợ (chỉ trường public từ Lark Base).
+- [ ] Trạng thái "Cần thêm thông tin": user trả lời ngay trong chi tiết (text + ảnh) → trạng thái về "Đã nhận".
+- [ ] Phạm vi xem: Staff thấy phản hồi mình gửi; Owner thấy mọi phản hồi của store (BR-13).
+- [ ] Empty state: "Bạn chưa gửi phản hồi nào." + nút "Gửi phản hồi".
+
+### US-MIGX-19: User nhận thông báo in-app khi phản hồi được cập nhật
+**As an** Owner hoặc Staff, **I want** được báo trong Prime Web khi phản hồi của tôi đổi trạng thái hoặc có trả lời, **so that** tôi không phải tự kiểm tra.
+**Figma:** ❌ chưa có — item trong Notification center (chuông)
+**AC:**
+- [ ] Tạo bản ghi `Notifications` (F16) khi trạng thái đổi sang Đang xử lý / Cần thêm thông tin / Đã giải quyết / Đã đóng, hoặc có trả lời public mới.
+- [ ] Người nhận: người gửi phản hồi (và Owner nếu người gửi là Staff — BR-13).
+- [ ] Nội dung: "Phản hồi {mã} — {trạng thái mới}". Bấm vào → mở chi tiết phản hồi.
+- [ ] Không gửi email cho các cập nhật này.
+- [ ] Không tạo thông báo trùng khi Lark Base gửi lại cùng một sự kiện.
+
+### US-MIGX-20: Phản hồi được đồng bộ sang Lark Base để đội hỗ trợ xử lý (nội bộ)
+**As** Support, **I want** mọi phản hồi vào Lark Base kèm đủ ngữ cảnh, và cập nhật trạng thái trên Lark Base tự về lại Prime Web, **so that** tôi xử lý ở một nơi duy nhất.
+**AC:**
+- [ ] V2 lưu phản hồi vào DB trước (nguồn gốc), sau đó đẩy sang Lark Base bất đồng bộ, có retry; Lark Base lỗi không làm user thấy lỗi.
+- [ ] Bản ghi Lark Base có đủ trường ở PRD §13.4, ảnh là attachment.
+- [ ] Đổi trạng thái / thêm trả lời public trên Lark Base → gửi về V2 (webhook/automation, có xác thực chữ ký) → cập nhật lịch sử + tạo thông báo (US-MIGX-19).
+- [ ] Trả lời của user (trạng thái "Cần thêm thông tin") được ghi thêm vào bản ghi Lark Base.
+- [ ] Ghi chú nội bộ trên Lark Base không bao giờ hiện cho user.
 
 ### US-MIGX-12: Nhắc hạn đóng V1 và trạng thái sau khi đóng
 **Figma:** 06 › "Nhắc đóng V1 · Archive thời hạn đối soát" + "V1 đã đóng · Tiếp tục trên V2"
@@ -160,5 +202,5 @@ Persona: **Owner** (chủ cửa hàng, nhận email), **Staff** (tài khoản Te
 
 ### US-MIGX-17: Staff nhận thông báo và vào đúng store trên V2 — GAP-R1
 **AC (đề xuất):**
-- [ ] Staff thấy popup/banner V1 như Owner; nhận email riêng (không có CTA báo cáo sai lệch nếu không có quyền).
+- [ ] Staff thấy popup/banner V1 như Owner; nhận email riêng (không có CTA báo cáo sai lệch nếu không có quyền); gửi được phản hồi (US-MIGX-11).
 - [ ] Sau cutover, staff đăng nhập vào đúng store với role đã map từ V1 (US-MIGA-17).
