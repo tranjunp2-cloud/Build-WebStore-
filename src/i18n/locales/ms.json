@@ -551,6 +551,25 @@
         "explore": "Teroka CMS"
       }
     },
+    "v2Intro": {
+      "badge": "WebStore V2",
+      "title": "Kedai anda telah berpindah ke Web Store",
+      "description": "V2 kini satu-satunya tempat untuk mengurus kedai anda dan menerima data baharu. Data sedia ada anda telah dipindahkan ke kedai semasa anda.",
+      "getStarted": "Mula sekarang",
+      "close": "Tutup",
+      "videoComingSoon": "Video akan datang",
+      "loadingVideo": "Memuatkan video…",
+      "video": {
+        "play": "Main video",
+        "pause": "Jeda",
+        "replay": "Main semula",
+        "seek": "Cari kedudukan video",
+        "mute": "Senyapkan",
+        "unmute": "Nyahsenyap",
+        "fullScreen": "Skrin penuh",
+        "exitFullScreen": "Keluar skrin penuh"
+      }
+    },
     "step1Description": "Kongsi beberapa maklumat asas supaya AI boleh bina laman web yang sesuai untuk anda.",
     "generating": {
       "title": "Cipta laman web dengan AI",
