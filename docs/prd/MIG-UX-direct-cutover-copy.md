@@ -184,9 +184,6 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | Key | VI | EN | BM |
 |---|---|---|---|
 | `feedback.success.title` | Đã gửi phản hồi | Feedback sent | Maklum balas dihantar |
-| `feedback.success.codeLabel` | Mã phản hồi | Feedback ID | ID maklum balas |
-| `feedback.success.copy` | Sao chép | Copy | Salin |
-| `feedback.success.copied` | Đã sao chép | Copied | Disalin |
 | `feedback.success.body` | Chúng tôi sẽ thông báo cho bạn trong Prime Web (biểu tượng chuông) khi có cập nhật. | We'll notify you in Prime Web (the bell icon) when there's an update. | Kami akan memaklumkan anda dalam Prime Web (ikon loceng) apabila ada kemas kini. |
 | `feedback.success.close` | Đóng | Close | Tutup |
 
@@ -208,15 +205,15 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 
 ### 6.6 Thông báo in-app (chuông, F16)
 
-> Chuông F16 render chữ theo `notifications.types.<TYPE>.title/message` (xem `ORDER_NEW`, `SYSTEM_ALERT` trong `en.json`). Thêm 2 type: `FEEDBACK_UPDATE` (dùng 3 key `in_progress` / `resolved` / `closed` + `replyLine`) và `FEEDBACK_SUBMITTED` (key `staff`). Tiêu đề panel / "Mark all as read" / thời gian tương đối dùng key F16 sẵn có (`notifications.title`, `notifications.markAllRead`).
+> Chuông F16 render chữ theo `notifications.types.<TYPE>.title/message` (xem `ORDER_NEW`, `SYSTEM_ALERT` trong `en.json`). Thêm 2 type: `FEEDBACK_UPDATE` (dùng 3 key `in_progress` / `resolved` / `closed` + `replyLine`) và `FEEDBACK_SUBMITTED` (key `staff`). Tiêu đề panel / "Mark all as read" / thời gian tương đối dùng key F16 sẵn có (`notifications.title`, `notifications.markAllRead`). `{area}` = nhãn khu vực theo ngôn ngữ user (`feedback.area.*`); `{date}` = ngày gửi dạng `dd/MM` theo giờ MYT. Không hiện mã phản hồi (chỉ dùng nội bộ).
 
 | Key | VI | EN | BM |
 |---|---|---|---|
-| `notifications.feedback.in_progress` | Phản hồi {code} đang được xử lý. | Your feedback {code} is in progress. | Maklum balas {code} anda sedang diproses. |
-| `notifications.feedback.resolved` | Phản hồi {code} đã được giải quyết. | Your feedback {code} has been resolved. | Maklum balas {code} anda telah diselesaikan. |
-| `notifications.feedback.closed` | Phản hồi {code} đã đóng. | Your feedback {code} has been closed. | Maklum balas {code} anda telah ditutup. |
+| `notifications.feedback.in_progress` | Phản hồi về {area} ({date}) đang được xử lý. | Your feedback about {area} ({date}) is in progress. | Maklum balas anda tentang {area} ({date}) sedang diproses. |
+| `notifications.feedback.resolved` | Phản hồi về {area} ({date}) đã được giải quyết. | Your feedback about {area} ({date}) has been resolved. | Maklum balas anda tentang {area} ({date}) telah diselesaikan. |
+| `notifications.feedback.closed` | Phản hồi về {area} ({date}) đã đóng. | Your feedback about {area} ({date}) has been closed. | Maklum balas anda tentang {area} ({date}) telah ditutup. |
 | `notifications.feedback.replyLine` *(dòng phụ, khi Support điền trả lời)* | Trả lời: {reply} | Reply: {reply} | Balasan: {reply} |
-| `notifications.feedback.staff` *(gửi Owner khi Staff gửi)* | {name} vừa gửi phản hồi {code}. | {name} sent feedback {code}. | {name} telah menghantar maklum balas {code}. |
+| `notifications.feedback.staff` *(gửi Owner khi Staff gửi)* | {name} vừa gửi phản hồi về {area}. | {name} sent feedback about {area}. | {name} telah menghantar maklum balas tentang {area}. |
 
 ## 7. Storefront — buyer (Figma 07)
 

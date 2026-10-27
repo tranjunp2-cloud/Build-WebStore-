@@ -132,7 +132,7 @@ Persona: **Owner** (chủ cửa hàng, nhận email), **Staff** (tài khoản Te
 - [ ] Gửi lỗi: giữ nội dung + ảnh, banner đỏ, cho thử lại. (frame 07)
 - [ ] Rate limit 5 phản hồi / giờ / user → banner vàng, giữ nội dung. (frame 08)
 - [ ] Đóng form khi đã nhập dở → xác nhận "Bỏ nội dung đã nhập?". (frame 09)
-- [ ] Thành công: mã phản hồi + nút "Sao chép"; câu "Chúng tôi sẽ thông báo cho bạn trong Prime Web (biểu tượng chuông) khi có cập nhật."; nút "Đóng". Không có câu cam kết thời gian xử lý. (frame 10)
+- [ ] Thành công: thông báo "Đã gửi phản hồi"; **không hiện mã phản hồi** (PO chốt 27/10 — mã chỉ dùng nội bộ cho Lark/Support); câu "Chúng tôi sẽ thông báo cho bạn trong Prime Web (biểu tượng chuông) khi có cập nhật."; nút "Đóng". Không có câu cam kết thời gian xử lý. (frame 10)
 - [ ] Dòng nhắc quyền riêng tư luôn hiện dưới ô mô tả.
 
 ### US-MIGX-19: User nhận thông báo in-app khi phản hồi được cập nhật (MVP)
