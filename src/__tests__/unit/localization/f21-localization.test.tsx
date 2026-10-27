@@ -275,19 +275,18 @@ describe('[TC-F21.01] LanguageSwitcher renders inside Auth Form Card', () => {
         expect(screen.getByText('EN')).toBeInTheDocument()
     })
 
-    it('[TC-F21.01b] active button has cyan/mint background style', () => {
+    it('[TC-F21.01b] active button is marked pressed with teal selected style', () => {
         render(
             <I18nProvider defaultLocale="ms">
                 <LanguageSwitcher variant="segmented" />
             </I18nProvider>
         )
-        // MY button is the active locale — find its closest button ancestor
-        const myText = screen.getByText('MY')
-        const btn = myText.closest('button') || myText
-        // Active style applied via inline style object spread
-        const bg = btn.style.background || btn.style.backgroundColor
-        // Browser may convert #2DD4BF → rgb(45, 212, 191)
-        expect(bg).toMatch(/2DD4BF|rgb\(45,\s*212,\s*191\)/i)
+        const activeBtn = screen.getByText('MY').closest('button') as HTMLButtonElement
+        const inactiveBtn = screen.getByText('EN').closest('button') as HTMLButtonElement
+        expect(activeBtn).toHaveAttribute('aria-pressed', 'true')
+        expect(activeBtn.className).toContain('text-[#5eead4]')
+        expect(inactiveBtn).toHaveAttribute('aria-pressed', 'false')
+        expect(inactiveBtn.className).toContain('text-[#94a3b8]')
     })
 })
 

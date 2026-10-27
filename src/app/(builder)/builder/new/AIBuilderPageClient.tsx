@@ -879,7 +879,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                         : null
 
     const saveStatusBadge = saveStatusLabel ? (
-        <div className="fixed bottom-6 right-6 z-[70] rounded-2xl border border-white/10 bg-[#0b1120]/90 px-4 py-2 text-xs font-medium text-[#94a3b8] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+        <div className="fixed bottom-6 right-6 z-[70] rounded-full border border-white/10 bg-[#0b1120]/90 px-3 py-1 text-xs font-medium text-[#94a3b8] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.35)] backdrop-blur-xl">
             {saveStatusLabel}
         </div>
     ) : null
@@ -941,6 +941,9 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             <>
                 {saveStatusBadge}
                 <BuilderGenerationView
+                    blocks={blocks}
+                    businessInfo={businessInfo}
+                    theme={theme}
                     elapsedSeconds={elapsedSeconds}
                     message={generationMessage}
                     onCancel={cancelGeneration}

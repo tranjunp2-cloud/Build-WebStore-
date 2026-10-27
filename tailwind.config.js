@@ -128,6 +128,16 @@ module.exports = {
                 'scale-in': 'scaleIn 0.3s ease-out',
                 'shimmer': 'shimmer 2s linear infinite',
                 'slide-in-right': 'slideInRight 0.3s ease-out',
+                // AI Builder generating screen (docs/design/ai-builder/builder-v2.dc.html)
+                'pw-in': 'pwIn 0.4s ease-out both',
+                'pw-fade': 'pwFade 0.4s ease-out both',
+                'pw-scan': 'pwScan 1.6s ease-in-out infinite alternate',
+                'pw-shimmer': 'pwShimmer 1.4s linear infinite',
+                'pw-sweep': 'pwSweep 1.2s ease-out both',
+                'pw-shine': 'pwSweep 1s ease-in-out both',
+                'pw-caret': 'pwCaret 1s steps(1) infinite',
+                'pw-ring': 'pwRing 1.6s ease-out infinite',
+                'pw-glow': 'pwGlow 2.4s ease-out infinite',
             },
             keyframes: {
                 fadeIn: {
@@ -149,6 +159,33 @@ module.exports = {
                 slideInRight: {
                     '0%': { transform: 'translateX(24px)', opacity: '0' },
                     '100%': { transform: 'translateX(0)', opacity: '1' },
+                },
+                pwIn: {
+                    from: { opacity: '0', transform: 'translateY(10px)' },
+                    to: { opacity: '1', transform: 'none' },
+                },
+                pwFade: { from: { opacity: '0' }, to: { opacity: '1' } },
+                pwScan: {
+                    from: { transform: 'translateY(0)' },
+                    to: { transform: 'translateY(196px)' },
+                },
+                pwShimmer: {
+                    from: { backgroundPosition: '150% 0' },
+                    to: { backgroundPosition: '-50% 0' },
+                },
+                pwSweep: {
+                    from: { transform: 'translateX(-120%)' },
+                    to: { transform: 'translateX(330%)' },
+                },
+                pwCaret: { '50%': { opacity: '0' } },
+                pwRing: {
+                    from: { transform: 'scale(1)', opacity: '0.85' },
+                    to: { transform: 'scale(1.9)', opacity: '0' },
+                },
+                pwGlow: {
+                    '0%': { boxShadow: '0 0 0 0 rgba(56,189,248,.5), 0 0 12px rgba(45,212,191,.3)' },
+                    '70%': { boxShadow: '0 0 0 8px rgba(56,189,248,0), 0 0 18px rgba(45,212,191,.45)' },
+                    '100%': { boxShadow: '0 0 0 0 rgba(56,189,248,0), 0 0 12px rgba(45,212,191,.3)' },
                 },
             },
             backgroundImage: {
