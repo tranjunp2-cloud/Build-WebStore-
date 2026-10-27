@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import BusinessInfoForm from '../../../components/builder/BusinessInfoForm'
 
@@ -33,26 +33,11 @@ vi.mock('@/i18n', () => ({
                     shortDescriptionHint: 'What is your business about?',
                     shortDescriptionPlaceholder: 'e.g. We are a creative agency...',
                     generateButton: 'Continue',
-                    preview: {
-                        caption: 'Preview · updates as you type',
-                        placeholderName: 'Your business',
-                        placeholderSlug: 'your-business',
-                        textNote: 'Headline and text are written when you create the site.',
-                        menuTitle: 'Menu',
-                        productsTitle: 'Products',
-                        navHome: 'Home',
-                        navGallery: 'Gallery',
-                        navAbout: 'About',
-                        navContact: 'Contact',
-                        navBlog: 'Blog',
-                    },
-                    missing: {
-                        businessName: 'Add your business name to continue',
-                        industry: 'Choose an industry to continue',
-                        products: 'Add what you sell to continue',
-                        shortDescription: 'Add a short description to continue',
-                        slug: 'Choose an available website address to continue',
-                    },
+                    promoTitle: 'AI Builder',
+                    promoDescription: 'Let AI build your website.',
+                    promoStep1: 'Describe',
+                    promoStep2: 'Generate',
+                    promoStep3: 'Refine',
                     errors: {
                         businessName: 'Please enter your business name',
                         industry: 'Please select an industry',
@@ -160,6 +145,11 @@ vi.mock('@/components/builder/onboarding/BuilderStepScreen', () => ({
     ),
 }))
 
+vi.mock('@/components/builder/onboarding/BuilderPromoCard', () => ({
+    BuilderPromoCard: (props: { title: string; description: string }) => (
+        <div data-testid="promo-card">{props.title}</div>
+    ),
+}))
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -237,35 +227,11 @@ describe('BusinessInfoForm Component', () => {
             })
         })
 
-        it('TC-F01.04: right pane previews the site from what is typed', async () => {
+        it('renders promo card in right pane', async () => {
             render(<BusinessInfoForm />)
-            await waitFor(() => expect(screen.getByTestId('option-Food & Beverage')).toBeInTheDocument())
-
-            fillForm()
-
-            const rightPane = within(screen.getByTestId('right-pane'))
-            expect(rightPane.getByText('My Coffee Shop')).toBeInTheDocument()
-            expect(rightPane.getByText('Premium coffee')).toBeInTheDocument()
-            expect(rightPane.getByText('pastries')).toBeInTheDocument()
-            expect(rightPane.getByText('Headline and text are written when you create the site.')).toBeInTheDocument()
-        })
-
-        it('TC-F01.05: disabled submit says what is still missing, in form order', async () => {
-            render(<BusinessInfoForm />)
-            await waitFor(() => expect(screen.getByTestId('option-Food & Beverage')).toBeInTheDocument())
-            const footer = within(screen.getByTestId('left-footer'))
-
-            expect(footer.getByText('Add your business name to continue')).toBeInTheDocument()
-
-            fireEvent.change(screen.getAllByTestId('builder-text-input')[0], { target: { value: 'My Coffee Shop' } })
-            expect(footer.getByText('Choose an industry to continue')).toBeInTheDocument()
-
-            fireEvent.click(screen.getByTestId('option-Food & Beverage'))
-            expect(footer.getByText('Add what you sell to continue')).toBeInTheDocument()
-
-            fillForm()
-            expect(footer.queryByText(/to continue$/)).not.toBeInTheDocument()
-            expect(screen.getByTestId('submit-button')).not.toBeDisabled()
+            await waitFor(() => {
+                expect(screen.getByTestId('promo-card')).toBeInTheDocument()
+            })
         })
     })
 

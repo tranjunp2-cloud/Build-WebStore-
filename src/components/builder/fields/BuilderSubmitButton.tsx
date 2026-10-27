@@ -1,10 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { ArrowRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { BUILDER_FOCUS_RING } from '@/components/ui/focus-ring'
-import { cn } from '@/lib/utils'
 
 interface BuilderSubmitButtonProps {
     loading?: boolean
@@ -12,9 +9,9 @@ interface BuilderSubmitButtonProps {
     children: ReactNode
     type?: 'button' | 'submit'
     onClick?: () => void
-    /** Id of the helper line that explains why the button is disabled. */
-    describedBy?: string
 }
+
+const BUILDER_ARROW_URL = '/assets/builder/builder-arrow.svg'
 
 export function BuilderSubmitButton({
     loading,
@@ -22,33 +19,25 @@ export function BuilderSubmitButton({
     children,
     type = 'submit',
     onClick,
-    describedBy,
 }: BuilderSubmitButtonProps) {
     const { t } = useI18n()
     return (
         <button
-            aria-describedby={describedBy}
             aria-disabled={disabled}
-            // The builder is always dark, so the teal is pinned to the dark-theme value instead of --primary.
-            className={cn(
-                'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-[background-color,transform] duration-200 active:scale-[0.98]',
-                'bg-[hsl(var(--p-teal-400))] text-[hsl(var(--p-slate-950))] hover:bg-[color:color-mix(in_srgb,hsl(var(--p-teal-400))_90%,black)] active:bg-[color:color-mix(in_srgb,hsl(var(--p-teal-400))_80%,black)]',
-                BUILDER_FOCUS_RING,
-                'disabled:cursor-not-allowed disabled:bg-[rgba(148,163,184,0.16)] disabled:text-[#94a3b8] disabled:active:scale-100',
-            )}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] text-sm font-semibold shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),0px_4px_6px_0px_rgba(0,0,0,0.1)] transition-all duration-300 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={disabled}
             onClick={onClick}
             type={type}
         >
             {loading ? (
                 <>
-                    <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    <span>{t.onboarding.form.initializing}</span>
+                    <span className="size-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                    <span className="text-white">{t.onboarding.form.initializing}</span>
                 </>
             ) : (
                 <>
-                    <span className="leading-5">{children}</span>
-                    <ArrowRight className="size-4" aria-hidden />
+                    <span className="leading-5 text-white">{children}</span>
+                    <img alt="" className="size-4" src={BUILDER_ARROW_URL} />
                 </>
             )}
         </button>

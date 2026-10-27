@@ -159,7 +159,7 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
                         value={slug}
                         onChange={(e) => handleInputChange(e.target.value)}
                         placeholder={f.slugPlaceholder}
-                        className="h-12 w-full px-4 rounded-l-[12px] border border-r-0 border-white/[0.08] bg-[#1E293B]/40 text-[14px] text-[#F8FAFC] font-mono placeholder:text-slate-600 focus:outline-none focus:border-[hsl(var(--p-teal-400))] transition-colors"
+                        className="h-12 w-full px-4 rounded-l-[12px] border border-r-0 border-white/[0.08] bg-[#1E293B]/40 text-[14px] text-[#F8FAFC] font-mono placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 transition-colors"
                     />
                     {/* Status icon */}
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">

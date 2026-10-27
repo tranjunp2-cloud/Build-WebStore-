@@ -630,26 +630,6 @@
       "promoStep1": "Masukkan butiran perniagaan anda",
       "promoStep2": "AI mencipta kandungan dan reka bentuk",
       "promoStep3": "Pratonton dan terbitkan",
-      "preview": {
-        "caption": "Pratonton · dikemas kini semasa anda menaip",
-        "placeholderName": "Perniagaan anda",
-        "placeholderSlug": "perniagaan-anda",
-        "textNote": "Tajuk dan teks ditulis semasa anda mencipta laman.",
-        "menuTitle": "Menu",
-        "productsTitle": "Produk",
-        "navHome": "Utama",
-        "navGallery": "Galeri",
-        "navAbout": "Tentang",
-        "navContact": "Hubungi",
-        "navBlog": "Blog"
-      },
-      "missing": {
-        "businessName": "Tambah nama perniagaan anda untuk teruskan",
-        "industry": "Pilih industri untuk teruskan",
-        "products": "Tambah apa yang anda jual untuk teruskan",
-        "shortDescription": "Tambah penerangan ringkas untuk teruskan",
-        "slug": "Pilih alamat laman web yang tersedia untuk teruskan"
-      },
       "industryOptions": {
         "restaurant": "Restoran / kafe / F&B",
         "ecommerce": "Kedai / fesyen / e-dagang",

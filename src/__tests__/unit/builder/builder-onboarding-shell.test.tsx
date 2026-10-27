@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 
 // ── Mocks — must be at TOP before any imports ─────────────────────────────
@@ -13,8 +13,17 @@ vi.mock('@/lib/utils', () => ({
 // ── Source imports (AFTER mocks) ─────────────────────────────────────────
 
 import { BuilderOnboardingShell } from '@/components/builder/onboarding/BuilderOnboardingShell'
+import { BuilderStepList } from '@/components/builder/onboarding/BuilderStepList'
 import { BuilderStepHeader } from '@/components/builder/onboarding/BuilderStepHeader'
-import { BuilderSitePreview, splitPreviewItems } from '@/components/builder/onboarding/BuilderSitePreview'
+import { BuilderPromoCard } from '@/components/builder/onboarding/BuilderPromoCard'
+
+// ── Fixtures ─────────────────────────────────────────────────────────────
+
+const THREE_STEPS = [
+    { id: 1, label: 'Enter business information', active: true },
+    { id: 2, label: 'AI creates content & design', active: false },
+    { id: 3, label: 'Preview & Publish', active: false },
+]
 
 // ── TC-F01.04: BuilderOnboardingShell ────────────────────────────────────
 
@@ -158,6 +167,121 @@ describe('[TC-F01.04] BuilderOnboardingShell', () => {
     })
 })
 
+// ── TC-F01.04: BuilderStepList ────────────────────────────────────────────
+
+describe('[TC-F01.04] BuilderStepList — 3-step sidebar', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F01.04: renders all 3 steps in the sidebar', () => {
+        // Arrange + Act
+        render(<BuilderStepList steps={THREE_STEPS} />)
+
+        // Assert — all 3 step labels visible
+        expect(screen.getByText('Enter business information')).toBeInTheDocument()
+        expect(screen.getByText('AI creates content & design')).toBeInTheDocument()
+        expect(screen.getByText('Preview & Publish')).toBeInTheDocument()
+    })
+
+    it('TC-F01.04: renders step numbers 1, 2, 3', () => {
+        // Arrange + Act
+        render(<BuilderStepList steps={THREE_STEPS} />)
+
+        // Assert — each step shows its numeric ID
+        expect(screen.getByText('1')).toBeInTheDocument()
+        expect(screen.getByText('2')).toBeInTheDocument()
+        expect(screen.getByText('3')).toBeInTheDocument()
+    })
+
+    it('TC-F01.04: active step indicator uses gradient background class', () => {
+        // Arrange + Act
+        const { container } = render(<BuilderStepList steps={THREE_STEPS} />)
+
+        // Assert — the active step circle has gradient styling
+        const stepCircles = container.querySelectorAll('.flex.size-10')
+        // Step 1 is active
+        expect(stepCircles[0]).toHaveClass('bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]')
+    })
+
+    it('TC-F01.04: inactive steps do not have gradient background', () => {
+        // Arrange + Act
+        const { container } = render(<BuilderStepList steps={THREE_STEPS} />)
+
+        // Assert — steps 2 and 3 (inactive) don't have the active gradient
+        const stepCircles = container.querySelectorAll('.flex.size-10')
+        expect(stepCircles[1]).not.toHaveClass('bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]')
+        expect(stepCircles[2]).not.toHaveClass('bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]')
+    })
+
+    it('TC-F01.04: active step label uses bright text color', () => {
+        // Arrange + Act
+        const { container } = render(<BuilderStepList steps={THREE_STEPS} />)
+
+        // Assert — active label has bright white color class
+        const spans = container.querySelectorAll('span')
+        const activeLabel = Array.from(spans).find(
+            (el) => el.textContent === 'Enter business information',
+        )
+        expect(activeLabel).toHaveClass('text-[#f8fafc]')
+    })
+
+    it('TC-F01.04: inactive step labels use muted text color', () => {
+        // Arrange + Act
+        const { container } = render(<BuilderStepList steps={THREE_STEPS} />)
+
+        // Assert — inactive labels have muted color
+        const spans = container.querySelectorAll('span')
+        const inactiveLabel = Array.from(spans).find(
+            (el) => el.textContent === 'AI creates content & design',
+        )
+        expect(inactiveLabel).toHaveClass('text-[#94a3b8]')
+    })
+
+    it('renders correct number of step rows matching steps prop length', () => {
+        // Arrange — custom 2 steps
+        const twoSteps = [
+            { id: 1, label: 'Step Alpha', active: true },
+            { id: 2, label: 'Step Beta', active: false },
+        ]
+
+        // Act
+        const { container } = render(<BuilderStepList steps={twoSteps} />)
+
+        // Assert — 2 step rows rendered
+        const rows = container.querySelectorAll('.flex.items-center.gap-4')
+        expect(rows).toHaveLength(2)
+    })
+
+    it('renders empty list without crashing when steps array is empty', () => {
+        // Arrange + Act
+        const { container } = render(<BuilderStepList steps={[]} />)
+
+        // Assert
+        expect(container.firstChild).toBeInTheDocument()
+        expect(screen.queryByText('1')).not.toBeInTheDocument()
+    })
+
+    it('all steps inactive when none have active=true', () => {
+        // Arrange
+        const allInactive = [
+            { id: 1, label: 'Step One' },
+            { id: 2, label: 'Step Two' },
+        ]
+
+        // Act
+        const { container } = render(<BuilderStepList steps={allInactive} />)
+
+        // Assert — no circle has gradient active class
+        const stepCircles = container.querySelectorAll('.flex.size-10')
+        stepCircles.forEach((circle) => {
+            expect(circle).not.toHaveClass(
+                'bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]',
+            )
+        })
+    })
+})
+
 // ── TC-F01.04: BuilderStepHeader ─────────────────────────────────────────
 
 describe('[TC-F01.04] BuilderStepHeader', () => {
@@ -238,7 +362,7 @@ describe('[TC-F01.04] BuilderStepHeader', () => {
         // Assert — img tag is rendered (alt="" makes it role="presentation", query by tag)
         const img = container.querySelector('img')
         expect(img).toBeInTheDocument()
-        expect(img).toHaveAttribute('src', '/assets/builder/builder-logo.png')
+        expect(img).toHaveAttribute('src', '/assets/builder/builder-brand-logo.png')
     })
 
     it('title uses h1 heading element', () => {
@@ -257,53 +381,117 @@ describe('[TC-F01.04] BuilderStepHeader', () => {
     })
 })
 
-// ── TC-F01.04: BuilderSitePreview ─────────────────────────────────────────
+// ── TC-F01.04: BuilderPromoCard ───────────────────────────────────────────
 
-const PREVIEW_LABELS = {
-    caption: 'Preview · updates as you type',
-    placeholderName: 'Your business',
-    placeholderSlug: 'your-business',
-    textNote: 'Headline and text are written when you create the site.',
-    itemsTitle: 'Menu',
-    nav: ['Home', 'Menu', 'Gallery', 'About', 'Contact', 'Blog'],
-}
+describe('[TC-F01.04] BuilderPromoCard — right-pane promo display', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
 
-describe('[TC-F01.04] BuilderSitePreview — right-pane live preview', () => {
-    it('TC-F01.04: shows the business name, address and one card per item from the form', () => {
+    it('TC-F01.04: renders card title', () => {
         // Arrange + Act
         render(
-            <BuilderSitePreview
-                businessName="Kedai Kopi Pak Ali"
-                domain="webstore.my"
-                labels={PREVIEW_LABELS}
-                products={'Kopi Tarik, Nasi Lemak\nRoti Bakar'}
-                slug="kedai-kopi-pak-ali"
+            <BuilderPromoCard
+                description="Let AI do the heavy lifting"
+                steps={THREE_STEPS}
+                title="How It Works"
             />,
         )
 
         // Assert
-        expect(screen.getByText('Kedai Kopi Pak Ali')).toBeInTheDocument()
-        expect(screen.getByTestId('preview-address')).toHaveTextContent('kedai-kopi-pak-ali.webstore.my')
-        const items = within(screen.getByRole('list')).getAllByRole('listitem')
-        expect(items.map((item) => item.textContent)).toEqual(['Kopi Tarik', 'Nasi Lemak', 'Roti Bakar'])
-        expect(screen.getByText(PREVIEW_LABELS.textNote)).toBeInTheDocument()
+        expect(screen.getByText('How It Works')).toBeInTheDocument()
     })
 
-    it('TC-F01.04: falls back to placeholders while the form is empty', () => {
+    it('TC-F01.04: renders card description', () => {
         // Arrange + Act
-        render(<BuilderSitePreview businessName="  " domain="webstore.my" labels={PREVIEW_LABELS} products="" slug="" />)
+        render(
+            <BuilderPromoCard
+                description="Let AI do the heavy lifting"
+                steps={THREE_STEPS}
+                title="How It Works"
+            />,
+        )
 
         // Assert
-        expect(screen.getByText('Your business')).toBeInTheDocument()
-        expect(screen.getByTestId('preview-address')).toHaveTextContent('your-business.webstore.my')
-        expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(3)
+        expect(screen.getByText('Let AI do the heavy lifting')).toBeInTheDocument()
     })
 
-    it('TC-F01.04: splits items on commas and new lines, drops blanks, caps at 6', () => {
-        // Act
-        const items = splitPreviewItems('a, b,, c\n\nd, e, f, g')
+    it('TC-F01.04: renders 3-step list inside card', () => {
+        // Arrange + Act
+        render(
+            <BuilderPromoCard
+                description="description"
+                steps={THREE_STEPS}
+                title="title"
+            />,
+        )
+
+        // Assert — all 3 step labels from BuilderStepList are rendered
+        expect(screen.getByText('Enter business information')).toBeInTheDocument()
+        expect(screen.getByText('AI creates content & design')).toBeInTheDocument()
+        expect(screen.getByText('Preview & Publish')).toBeInTheDocument()
+    })
+
+    it('TC-F01.04: step 1 is highlighted (active) in promo card', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderPromoCard
+                description="description"
+                steps={THREE_STEPS}
+                title="title"
+            />,
+        )
+
+        // Assert — active step circle has gradient class
+        const activeCircle = container.querySelector(
+            '.bg-\\[linear-gradient\\(135deg\\,\\#3b82f6_0\\%\\,\\#2dd4bf_100\\%\\)\\]',
+        )
+        expect(activeCircle).toBeInTheDocument()
+    })
+
+    it('renders promo icon image', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderPromoCard
+                description="description"
+                steps={THREE_STEPS}
+                title="title"
+            />,
+        )
+
+        // Assert — icon img rendered with correct src (alt="" makes it presentation role)
+        const img = container.querySelector('img[src="/assets/builder/builder-promo-icon.svg"]')
+        expect(img).toBeInTheDocument()
+    })
+
+    it('title uses h2 heading element', () => {
+        // Arrange + Act
+        render(
+            <BuilderPromoCard
+                description="desc"
+                steps={THREE_STEPS}
+                title="Section Title"
+            />,
+        )
 
         // Assert
-        expect(items).toEqual(['a', 'b', 'c', 'd', 'e', 'f'])
+        const h2 = screen.getByRole('heading', { level: 2 })
+        expect(h2).toHaveTextContent('Section Title')
+    })
+
+    it('renders card within a centered container', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderPromoCard
+                description="desc"
+                steps={THREE_STEPS}
+                title="title"
+            />,
+        )
+
+        // Assert — outer div has centering classes
+        const outer = container.firstChild as HTMLElement
+        expect(outer).toHaveClass('mx-auto')
+        expect(outer).toHaveClass('flex')
     })
 })

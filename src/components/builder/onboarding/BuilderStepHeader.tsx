@@ -4,7 +4,7 @@ interface BuilderStepHeaderProps {
     description: string
 }
 
-const BUILDER_LOGO_URL = '/assets/builder/builder-logo.png'
+const BUILDER_LOGO_URL = '/assets/builder/builder-brand-logo.png'
 
 export function BuilderStepHeader({
     title,
@@ -12,24 +12,24 @@ export function BuilderStepHeader({
     description,
 }: BuilderStepHeaderProps) {
     return (
-        <div className="flex flex-col gap-3 pt-8">
+        <div className="flex flex-col gap-5">
             <div className="flex items-center gap-3">
                 <img
                     alt="Builder Logo"
-                    className="size-10 shrink-0 object-contain"
+                    className="h-auto w-40 shrink-0 object-contain translate-x-[-30%]"
                     src={BUILDER_LOGO_URL}
                 />
-                <div className="flex flex-col">
+                <div className="flex flex-col -ml-20">
                     <h1 className="font-['Inter'] text-[20px] font-semibold leading-7 text-white">
                         {title}
                     </h1>
-                    <p className="text-sm leading-5 text-[#94a3b8]">
+                    <p className="text-xs leading-4 text-[#94a3b8]">
                         {subtitle}
                     </p>
                 </div>
             </div>
             {description ? (
-                <p className="text-sm leading-5 text-[#94a3b8]">
+                <p className="text-sm leading-5 text-[#94a3b8] -mt-11">
                     {description}
                 </p>
             ) : null}

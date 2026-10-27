@@ -630,26 +630,6 @@
       "promoStep1": "Enter your business details",
       "promoStep2": "AI creates content and design",
       "promoStep3": "Preview and publish",
-      "preview": {
-        "caption": "Preview · updates as you type",
-        "placeholderName": "Your business",
-        "placeholderSlug": "your-business",
-        "textNote": "Headline and text are written when you create the site.",
-        "menuTitle": "Menu",
-        "productsTitle": "Products",
-        "navHome": "Home",
-        "navGallery": "Gallery",
-        "navAbout": "About",
-        "navContact": "Contact",
-        "navBlog": "Blog"
-      },
-      "missing": {
-        "businessName": "Add your business name to continue",
-        "industry": "Choose an industry to continue",
-        "products": "Add what you sell to continue",
-        "shortDescription": "Add a short description to continue",
-        "slug": "Choose an available website address to continue"
-      },
       "industryOptions": {
         "restaurant": "Restaurant / cafe / F&B",
         "ecommerce": "Shop / fashion / e-commerce",

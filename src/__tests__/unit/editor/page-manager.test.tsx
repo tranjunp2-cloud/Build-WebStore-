@@ -66,11 +66,9 @@ describe('PageManagerPanel', () => {
         // Assert
         expect(screen.getByText('Trang chủ')).toBeInTheDocument() // page title from store data
         expect(screen.getByText('About Us')).toBeInTheDocument()
-        // Every row shows exactly one status badge; the current page is marked by the row itself
-        expect(getCard('page-1')).toHaveAttribute('aria-current', 'page')
-        expect(within(getCard('page-1')).getAllByText('Draft')).toHaveLength(1)
-        expect(getCard('page-2')).not.toHaveAttribute('aria-current')
-        expect(within(getCard('page-2')).getAllByText('Draft')).toHaveLength(1)
+        // Check badges — current page shows "Editing", others show status
+        expect(screen.getByText('Editing')).toBeInTheDocument() // Page 1 (current)
+        expect(screen.getByText('Draft')).toBeInTheDocument() // Page 2
     })
 
     // TC-F05-02-14: GH-864 panel header + micro-copy + no search
@@ -448,7 +446,7 @@ describe('PageManagerPanel', () => {
         expect(global.fetch).not.toHaveBeenCalled()
     })
 
-    it('TC-F05-02-22: current page row is marked current and "Edit with AI chat" calls onEditPage', () => {
+    it('TC-F05-02-22: current page shows Editing badge and "Edit with AI chat" calls onEditPage', () => {
         // Arrange
         const onEditPage = vi.fn()
         render(
@@ -462,8 +460,7 @@ describe('PageManagerPanel', () => {
         fireEvent.click(card.getByRole('button', { name: 'Edit with AI chat' }))
 
         // Assert
-        expect(getCard('page-2')).toHaveAttribute('aria-current', 'page')
-        expect(card.getByText('Editing')).toHaveClass('sr-only')
+        expect(card.getByText('Editing')).toBeInTheDocument()
         expect(onEditPage).toHaveBeenCalledWith('page-2')
         expect(within(getCard('page-1')).queryByRole('button', { name: 'Edit with AI chat' })).not.toBeInTheDocument()
     })

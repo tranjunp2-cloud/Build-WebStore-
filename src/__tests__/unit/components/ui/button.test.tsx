@@ -30,23 +30,11 @@ describe('TC-GH1290-BTN-02: disabled blocks clicks', () => {
     })
 })
 
-describe('TC-GH1290-BTN-03: primary variants use the solid brand fill', () => {
-    it.each(['default', 'dashPrimary'] as const)('%s is solid --primary with --primary-foreground label, no gradient', (variant) => {
-        render(<Button variant={variant}>Go</Button>)
+describe('TC-GH1290-BTN-03: dashPrimary variant applies gradient class', () => {
+    it('includes the dashPrimary gradient', () => {
+        render(<Button variant="dashPrimary">Go</Button>)
         const btn = screen.getByRole('button', { name: 'Go' })
-        expect(btn.className).toContain('bg-[hsl(var(--primary))]')
-        expect(btn.className).toContain('text-[hsl(var(--primary-foreground))]')
-        expect(btn.className).not.toContain('gradient')
-        expect(btn.className).not.toMatch(/shadow-(lg|blue)/)
-    })
-
-    it.each(['default', 'dashPrimary'] as const)('%s darkens on hover and press, and its focus gap uses the page background', (variant) => {
-        render(<Button variant={variant}>Go</Button>)
-        const cls = screen.getByRole('button', { name: 'Go' }).className
-        expect(cls).toMatch(/hover:bg-\[color:color-mix\(.*black\)\]/)
-        expect(cls).toMatch(/active:bg-\[color:color-mix\(.*black\)\]/)
-        expect(cls).not.toContain('hover:opacity')
-        expect(cls).toContain('focus-visible:ring-offset-[hsl(var(--background))]')
+        expect(btn.className).toContain('linear-gradient')
     })
 })
 

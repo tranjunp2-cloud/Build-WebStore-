@@ -3,34 +3,14 @@
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import type { LucideIcon } from 'lucide-react'
-import {
-    AlertTriangle,
-    ArrowRight,
-    Briefcase,
-    Building2,
-    CalendarHeart,
-    CheckCircle2,
-    Coffee,
-    Dumbbell,
-    GraduationCap,
-    House,
-    Laptop,
-    Newspaper,
-    Palette,
-    Plane,
-    Scissors,
-    ShoppingBag,
-    Stethoscope,
-    UtensilsCrossed,
-} from 'lucide-react'
+import { ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { BuilderField } from '@/components/builder/fields/BuilderField'
 import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
 import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
 import { BuilderSubmitButton } from '@/components/builder/fields/BuilderSubmitButton'
 import { BuilderTextInput } from '@/components/builder/fields/BuilderTextInput'
 import { BuilderTextarea } from '@/components/builder/fields/BuilderTextarea'
-import { BuilderSitePreview } from '@/components/builder/onboarding/BuilderSitePreview'
+import { BuilderPromoCard } from '@/components/builder/onboarding/BuilderPromoCard'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
 import { useI18n } from '@/i18n'
@@ -60,27 +40,8 @@ type ExtractionResult = {
     confidence: 'high' | 'medium' | 'low'
 }
 
-// Industry values come from TEMPLATE_CATEGORY_OPTIONS (labels carry an emoji the form no longer shows).
-const INDUSTRY_ICONS: Record<string, LucideIcon> = {
-    restaurant: UtensilsCrossed,
-    ecommerce: ShoppingBag,
-    beauty: Scissors,
-    tech: Laptop,
-    health: Stethoscope,
-    education: GraduationCap,
-    realestate: House,
-    fitness: Dumbbell,
-    creative: Palette,
-    business: Building2,
-    fnb: Coffee,
-    events: CalendarHeart,
-    blog: Newspaper,
-    travel: Plane,
-}
-
-const FOOD_INDUSTRIES = new Set(['restaurant', 'fnb'])
-const MISSING_HINT_ID = 'builder-submit-missing'
-const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+const BUILDER_TEXTAREA_BADGE_URL = '/assets/builder/builder-textarea-badge.svg'
+const BUILDER_TEXTAREA_HINT_ICON_URL = '/assets/builder/builder-hint-icon.svg'
 
 interface BusinessInfoFormProps {
     onSubmit?: (info: BusinessInfo) => void
@@ -449,7 +410,7 @@ export default function BusinessInfoForm({
                         />
                     </div>
                     <button
-                        className="flex h-[44px] min-w-[120px] items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition-colors duration-200 bg-[hsl(var(--p-teal-400))] text-[hsl(var(--p-slate-950))] hover:bg-[color:color-mix(in_srgb,hsl(var(--p-teal-400))_90%,black)] active:bg-[color:color-mix(in_srgb,hsl(var(--p-teal-400))_80%,black)] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-[44px] min-w-[120px] items-center justify-center gap-2 rounded-xl bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={!isValidUrl(urlValue) || urlExtracting}
                         onClick={handleUrlExtract}
                         type="button"
@@ -458,7 +419,7 @@ export default function BusinessInfoForm({
                     >
                         {urlExtracting ? (
                             <>
-                                <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                <span className="size-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                                 <span>{t.onboarding.form.extracting}</span>
                             </>
                         ) : (
@@ -602,10 +563,9 @@ export default function BusinessInfoForm({
                             {industryOptions.map((option) => {
                                 const i18nLabels = (t.onboarding.form as Record<string, unknown>).industryOptions as Record<string, string> | undefined
                                 const translatedLabel = i18nLabels?.[option.value] || option.label
-                                const Icon = INDUSTRY_ICONS[option.value] ?? Briefcase
                                 return (
                                     <BuilderOptionCard
-                                        icon={<Icon />}
+                                        icon={option.icon}
                                         key={option.value}
                                         label={translatedLabel}
                                         onClick={() => setForm((current) => ({ ...current, industry: option.value }))}
@@ -620,12 +580,22 @@ export default function BusinessInfoForm({
                     </BuilderField>
 
                     <BuilderField
-                        hint={t.onboarding.form.productsHint}
+                        hint={(
+                            <div className="flex items-center gap-2">
+                                <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
+                                <span>{t.onboarding.form.productsHint}</span>
+                            </div>
+                        )}
                         error={errors.products}
                         label={t.onboarding.form.products}
                         required
                     >
                         <BuilderTextarea
+                            adornment={(
+                                <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
+                                    <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
+                                </div>
+                            )}
                             invalid={!!errors.products}
                             onChange={(e) => setForm((current) => ({ ...current, products: e.target.value }))}
                             placeholder={t.onboarding.form.productsPlaceholder}
@@ -635,12 +605,22 @@ export default function BusinessInfoForm({
                     </BuilderField>
 
                     <BuilderField
-                        hint={t.onboarding.form.shortDescriptionHint}
+                        hint={(
+                            <div className="flex items-center gap-2">
+                                <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
+                                <span>{t.onboarding.form.shortDescriptionHint}</span>
+                            </div>
+                        )}
                         error={errors.shortDescription}
                         label={t.onboarding.form.shortDescription}
                         required
                     >
                         <BuilderTextarea
+                            adornment={(
+                                <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
+                                    <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
+                                </div>
+                            )}
                             invalid={!!errors.shortDescription}
                             onChange={(e) => setForm((current) => ({ ...current, shortDescription: e.target.value }))}
                             placeholder={t.onboarding.form.shortDescriptionPlaceholder}
@@ -660,63 +640,32 @@ export default function BusinessInfoForm({
         </>
     )
 
-    // First thing still missing, in form order — shown under the disabled button.
-    const missing = t.onboarding.form.missing
-    const missingHint = isGenerating ? null
-        : form.businessName.trim().length < 3 ? missing.businessName
-        : !form.industry.trim() ? missing.industry
-        : form.products.trim().length < 3 ? missing.products
-        : form.shortDescription.trim().length < 3 ? missing.shortDescription
-        : !slugAvailable ? missing.slug
-        : null
-
     const leftFooter = (
-        <div className="flex flex-col gap-2">
-            <BuilderSubmitButton
-                describedBy={missingHint ? MISSING_HINT_ID : undefined}
-                disabled={!isFormReady || isGenerating}
-                loading={isGenerating}
-                onClick={submitForm}
-                type="button"
-            >
-                {t.onboarding.form.generateButton}
-            </BuilderSubmitButton>
-            {missingHint ? (
-                <p className="text-center text-xs leading-4 text-[#94a3b8]" id={MISSING_HINT_ID} aria-live="polite">
-                    {missingHint}
-                </p>
-            ) : null}
-        </div>
+        <BuilderSubmitButton
+            disabled={!isFormReady || isGenerating}
+            loading={isGenerating}
+            onClick={submitForm}
+            type="button"
+        >
+            {t.onboarding.form.generateButton}
+        </BuilderSubmitButton>
     )
 
-    const preview = t.onboarding.form.preview
-    const isFood = FOOD_INDUSTRIES.has(form.industry)
     const rightPane = (
-        <BuilderSitePreview
-            businessName={form.businessName}
-            domain={PLATFORM_DOMAIN}
-            labels={{
-                caption: preview.caption,
-                placeholderName: preview.placeholderName,
-                placeholderSlug: preview.placeholderSlug,
-                textNote: preview.textNote,
-                itemsTitle: isFood ? preview.menuTitle : preview.productsTitle,
-                nav: [
-                    preview.navHome,
-                    isFood ? preview.menuTitle : preview.productsTitle,
-                    preview.navGallery,
-                    preview.navAbout,
-                    preview.navContact,
-                    preview.navBlog,
-                ],
-            }}
-            products={form.products}
-            slug={form.businessName.trim().length >= 3 ? chosenSlug : ''}
+        <BuilderPromoCard
+            description={t.onboarding.form.promoDescription}
+            steps={[
+                { id: 1, label: t.onboarding.form.promoStep1, active: true },
+                { id: 2, label: t.onboarding.form.promoStep2 },
+                { id: 3, label: t.onboarding.form.promoStep3 },
+            ]}
+            title={t.onboarding.form.promoTitle}
         />
     )
 
     return (
         <BuilderStepScreen
+            description={t.onboarding.step1Description}
             leftBody={leftBody}
             leftFooter={leftFooter}
             right={rightPane}
