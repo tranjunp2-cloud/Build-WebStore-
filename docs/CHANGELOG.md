@@ -17,7 +17,7 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ### F34 — SSO upgrade/downgrade cùng gói không xóa usage (GH-2011)
 
-- `upsertPlanSubscription()` chỉ chạy `clearUsage()` + `recountStaffUsage()` khi `plan` hoặc `packCode` đổi. SSO retry hoặc gửi lại đúng gói hiện tại thì usage (vd. `template_limit`) giữ nguyên; subscription (`startsAt`/`endsAt`/`status`) và `Tenants.plan` vẫn được cập nhật. Khớp spec #1246 ("clearUsage gọi khi đổi plan"). Không đổi API/schema. Tests: TC-SUB-046, TC-SUB-047.
+- `upsertPlanSubscription()` chỉ chạy `clearUsage()` + `recountStaffUsage()` khi `plan` đổi (`plan` đã gồm gói + loại TM; row migrate từ PW1 không có `packCode` nên không so `packCode`). SSO retry hoặc gửi lại đúng gói hiện tại thì usage (vd. `template_limit`) giữ nguyên; subscription (`startsAt`/`endsAt`/`status`) và `Tenants.plan` vẫn được cập nhật. Khớp spec #1246 ("clearUsage gọi khi đổi plan"). Không đổi API/schema. Tests: TC-SUB-046, TC-SUB-047, TC-SUB-048.
 
 ### F05 — Redesign Pages panel / Page library (US-F05-02, GH-1984)
 

@@ -200,7 +200,7 @@ export async function recountStaffUsage(
 }
 
 /** Upserts the 'main' PlanSubscription for a tenant.
- *  On update: clears usage + recounts staff only when the plan or pack changes, so a repeated
+ *  On update: clears usage + recounts staff only when the plan code changes, so a repeated
  *  call for the same plan (SSO retry or duplicate sync) keeps usage. Always syncs Tenants.plan tier.
  *  Note: these 3 steps are not wrapped in a DB transaction — partial failure (e.g. clearUsage
  *  succeeds but recountStaffUsage fails) leaves usage at 0 until next plan event. Acceptable
@@ -239,9 +239,10 @@ export async function upsertPlanSubscription(
   })
 
   if (subs.docs.length > 0) {
-    const current = subs.docs[0] as { id: string | number; plan?: string | null; packCode?: string | null }
+    const current = subs.docs[0] as { id: string | number; plan?: string | null }
     const subId = Number(current.id)
-    const planChanged = current.plan !== updateData.plan || current.packCode !== updateData.packCode
+    // plan already encodes pack + TM type; PW1-migrated rows have no packCode, so never compare it
+    const planChanged = current.plan !== updateData.plan
     await payload.update({
         overrideAccess: true,
       collection: 'plan-subscriptions',

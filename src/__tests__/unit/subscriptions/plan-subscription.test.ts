@@ -267,6 +267,7 @@ describe('upsertPlanSubscription', () => {
       }),
     )
   })
+
   it('[TC-SUB-046] update-path keeps usage when the same plan is sent again (SSO retry)', async () => {
     const payload = {
       find: vi.fn().mockResolvedValueOnce({
@@ -296,6 +297,31 @@ describe('upsertPlanSubscription', () => {
     )
     expect(payload.update).toHaveBeenCalledWith(
       expect.objectContaining({ collection: 'tenants', id: 42, data: { plan: 'business' } }),
+    )
+  })
+
+  it('[TC-SUB-048] update-path keeps usage for a PW1-migrated row without packCode on the same plan', async () => {
+    const payload = {
+      find: vi.fn().mockResolvedValueOnce({ docs: [{ id: 99, plan: 'PROFESSIONAL_TM_USER' }] }),
+      create: vi.fn().mockResolvedValue({ id: 1 }),
+      update: vi.fn().mockResolvedValue({}),
+      delete: vi.fn().mockResolvedValue({}),
+    }
+
+    await upsertPlanSubscription(payload as any, 42, {
+      subscriptionCode: 'professional',
+      subscriptionType: 1,
+    })
+
+    expect(payload.find).toHaveBeenCalledTimes(1)
+    expect(payload.delete).not.toHaveBeenCalled()
+    expect(payload.create).not.toHaveBeenCalled()
+    expect(payload.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'plan-subscriptions',
+        id: 99,
+        data: expect.objectContaining({ plan: 'PROFESSIONAL_TM_USER', packCode: 'PROFESSIONAL' }),
+      }),
     )
   })
 
