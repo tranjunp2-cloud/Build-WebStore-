@@ -211,7 +211,7 @@ Tất cả frame là **Desktop**. Không có frame mobile cho V1 banner/modal, V
 | 05 | Form — lỗi tải ảnh | Thumbnail viền đỏ + "Ảnh vượt quá 5 MB" |
 | 06 | Form — đang gửi | Khoá trường + nút |
 | 07 | Form — gửi lỗi | Banner đỏ, giữ nội dung |
-| 08 | Form — quá giới hạn | Banner vàng (429) |
+| 08 | Form — quá giới hạn | Banner vàng (429) khi vượt 5 phản hồi / 15 phút |
 | 09 | Xác nhận đóng | "Bỏ nội dung đã nhập?" |
 | 10 | Gửi thành công | "Đã gửi phản hồi" + "Chúng tôi sẽ thông báo cho bạn trong Prime Web (biểu tượng chuông)…"; nút Đóng |
 | 11 | Thông báo trong chuông | Đang xử lý / Đã giải quyết (+ dòng Trả lời) / Đã đóng / Staff vừa gửi |
@@ -226,7 +226,7 @@ Badge / trạng thái: Đã nhận (`new`) · Đang xử lý (`in_progress`) · 
 **Chi tiết kỹ thuật cho dev (đề xuất, Dev Lead xác nhận khi review PR):**
 - Mã phản hồi (chỉ nội bộ, không trả về UI): `FB-{YY}-{6 số}` tăng dần, unique (VD `FB-26-004812`).
 - `isMigratedStore` = `Tenants.migrationStatus === 'migrated'` (field có sẵn) → quyết định hiện loại "Sai lệch dữ liệu".
-- Rate limit: 5 phản hồi / giờ / user (429).
+- Rate limit (PO chốt 27/10): **5 phản hồi / 15 phút / user**, cửa sổ trượt 15 phút tính theo `created_by`, kiểm tra ở server. Vượt → 429 + header `Retry-After` (giây). Lần gửi lại cùng `Idempotency-Key` không tính thêm.
 - Thông báo: thêm option `FEEDBACK_UPDATE`, `FEEDBACK_SUBMITTED` vào `Notifications.type` (cột `varchar` → không cần ALTER TYPE); `dedupeKey` = `FEEDBACK:{code}:{lark_event_id}`; copy theo copy deck §6.6.
 - Ảnh chụp màn hình có thể chứa dữ liệu khách → **không** lưu dạng Media công khai; chỉ admin và Lark Base xem được (GAP-D13).
 
@@ -397,7 +397,7 @@ scheduled ──T──▶ write_locked ──drain ok──▶ syncing ──re
 | GET | `/api/v1/feedback/availability` | `{enabled, types[]}` — header dùng để quyết định hiện nút và loại "Sai lệch dữ liệu" |
 | GET | `/api/v1/migration/status` | Trả `cutoverState`, mốc thời gian, `daysLeft` (server time) cho store hiện tại |
 | POST | `/api/v1/migration/notices/:key/seen` | Đánh dấu modal đã xem |
-| POST | `/api/v1/feedback` | Header `Idempotency-Key`; multipart `{type, area, description, attachments[]≤3}`; server tự gắn context. 201 (không trả mã cho UI) · 400 validation · 403 ngoài khoảng 30/10–15/11 · 413 ảnh quá lớn · 429 rate limit |
+| POST | `/api/v1/feedback` | Header `Idempotency-Key`; multipart `{type, area, description, attachments[]≤3}`; server tự gắn context. 201 (không trả mã cho UI) · 400 validation · 403 ngoài khoảng 30/10–15/11 · 413 ảnh quá lớn · 429 quá 5 phản hồi / 15 phút |
 | POST | `/api/v1/integrations/lark/feedback-webhook` | Lark → V2 (Event Subscription); giải mã và xác thực bằng `LARK_FEEDBACK_ENCRYPT_KEY` + `LARK_FEEDBACK_VERIFICATION_TOKEN` (§13.5); trả lời `challenge` khi Lark kiểm tra URL; idempotent theo `lark_event_id`; tạo `Notifications` |
 | POST | `/api/v1/archive/session` | Cấp token archive scoped; 403 nếu `now ≥ archiveExpiresAt` hoặc không có quyền |
 
