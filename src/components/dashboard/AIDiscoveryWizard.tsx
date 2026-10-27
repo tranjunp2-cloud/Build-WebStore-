@@ -1,11 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { preload } from 'react-dom'
 import { ArrowRight, X } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { V2IntroVideo } from './V2IntroVideo'
+import { V2_INTRO_MEDIA } from './v2-intro-media'
 
 /**
  * "Your store has moved to Web Store" announcement with the V2 intro video.
@@ -20,6 +22,9 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   const dialogRef = useRef<HTMLDivElement>(null)
   // Esc that exits video full screen must not also close the popup
   const fullscreenChangedAt = useRef(0)
+
+  // The poster is the largest paint inside the popup — fetch it with the page, before the player mounts
+  preload(V2_INTRO_MEDIA.posterWebp, { as: 'image', type: 'image/webp', fetchPriority: 'high' })
 
   useLockBodyScroll(isOpen)
 
@@ -74,11 +79,11 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
           onClick={(e) => e.stopPropagation()}
           // Width follows the viewport height so the 16:9 video + copy fit without scrolling
           style={{ maxWidth: 'clamp(560px, calc((100vh - 360px) * 1.7778 + 66px), 960px)' }}
-          className="relative m-auto w-full flex-none overflow-hidden rounded-[20px] border border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[0_25px_50px_-12px_rgba(0,0,0,.5)] outline-none animate-[wizardFadeIn_.25s_ease-out]"
+          className="relative m-auto w-full flex-none overflow-hidden rounded-[20px] border border-solid border-[var(--dash-border)] bg-[var(--dash-surface)] shadow-[0_25px_50px_-12px_rgba(0,0,0,.5)] outline-none animate-[wizardFadeIn_.25s_ease-out]"
         >
           <div className="px-8 pt-7">
             <div className="flex items-center justify-between gap-3">
-              <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-blue-500/[.28] bg-blue-500/[.12] px-2.5 text-xs font-semibold leading-4 tracking-[.02em] text-blue-700 dark:text-blue-400">
+              <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-solid border-blue-500/[.28] bg-blue-500/[.12] px-2.5 text-xs font-semibold leading-4 tracking-[.02em] text-blue-700 dark:text-blue-400">
                 <span aria-hidden className="size-1.5 rounded-full bg-current" />
                 {copy.badge}
               </span>
@@ -100,7 +105,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
           </div>
 
           <div className="px-8 pt-6">
-            <div className="overflow-hidden rounded-[14px] border border-[var(--dash-border)] bg-[var(--dash-bg)]">
+            <div className="overflow-hidden rounded-[14px] border border-solid border-[var(--dash-border)] bg-[var(--dash-bg)]">
               <V2IntroVideo onFullscreenChange={onFullscreenChange} />
             </div>
           </div>

@@ -49,6 +49,7 @@ vi.mock('@/i18n', () => ({
                     getStarted: "Get started",
                     close: "Close",
                     videoComingSoon: "Video coming soon",
+                    loadingVideo: "Loading video…",
                     video: {
                         play: "Play video",
                         pause: "Pause",
@@ -72,6 +73,7 @@ vi.mock('@/lib/auth', () => ({
 
 import { WelcomeScreenClient } from '@/app/(frontend)/onboarding/_components/WelcomeScreenClient'
 import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
+import { V2_INTRO_MEDIA } from '@/components/dashboard/v2-intro-media'
 
 // ── TC-F06.02 & TC-F06.03: Welcome Screen ──────────────────────────────
 describe('WelcomeScreenClient', () => {
@@ -133,8 +135,8 @@ describe('AIDiscoveryWizard', () => {
         expect(screen.getByRole('button', { name: /Get started/ })).toBeVisible()
 
         const video = container.querySelector('video')
-        expect(video).toHaveAttribute('src', '/videos/v2-intro.mp4')
-        expect(video).toHaveAttribute('poster', '/videos/v2-intro-poster.jpg')
+        expect([...container.querySelectorAll('video source')].map(s => s.getAttribute('src'))).toEqual([V2_INTRO_MEDIA.webm, V2_INTRO_MEDIA.mp4])
+        expect(container.querySelector('picture img')).toHaveAttribute('src', V2_INTRO_MEDIA.posterJpg)
         expect(video).toHaveAttribute('preload', 'metadata')
         // Never autoplays with sound
         expect(video).not.toHaveAttribute('autoplay')

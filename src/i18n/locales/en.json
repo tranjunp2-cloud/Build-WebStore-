@@ -558,6 +558,7 @@
       "getStarted": "Get started",
       "close": "Close",
       "videoComingSoon": "Video coming soon",
+      "loadingVideo": "Loading video…",
       "video": {
         "play": "Play video",
         "pause": "Pause",

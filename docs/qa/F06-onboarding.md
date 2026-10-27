@@ -72,6 +72,8 @@
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | **TC-F06.15** | `Locale` | `NLU` | **[Positive]** Đa ngôn ngữ Wizard (EN, VN, BM) | 1. Chuyển ngôn ngữ sang Tiếng Mã Lai (BM).<br>2. Mở Wizard. | - Toàn bộ Title, Description, Buttons chuyển sang BM formal chuẩn. | High | [ ] |
 | **TC-F06.16** | `Perf` | `Media` | **[Positive]** Media fallback | 1. Chặn tải `/videos/v2-intro.mp4`.<br>2. Quan sát popup. | - Hiện "Video coming soon" trên khung video.<br>- Không crash, nút `Get started` vẫn dùng được.<br>- Video ~19 MB, chỉ tải metadata cho tới khi bấm Play. | Medium | [x] |
+| **TC-F06.24** | `Perf` | `Media` | **[Positive]** Chiến lược tải video V2 intro | 1. Mở popup.<br>2. Chờ 2 giây.<br>3. Bật Save-Data / mạng 2G rồi mở lại. | - Chỉ tải khi popup hiện; mở với `preload=metadata`, khi trình duyệt rảnh chuyển `preload=auto`.<br>- Save-Data hoặc 2G: giữ `metadata`, chỉ tải khi hover/focus/bấm Play.<br>- Nguồn AV1 WebM trước, MP4 H.264 sau; tên file có hash, cache `immutable`. | Medium | [x] |
+| **TC-F06.25** | `Perf` | `UX` | **[Positive]** Trạng thái tải video | 1. Mở popup trên mạng chậm.<br>2. Bấm Play trước khi video tải xong. | - Khung 16:9 hiện shimmer cho tới khi poster tải xong (không nhảy layout).<br>- Bấm Play khi chưa đủ dữ liệu: spinner giữa khung (`role=status`, "Loading video…"), ẩn khi video chạy; giảm chuyển động → vòng tĩnh.<br>- Thanh seek hiện đoạn đã tải (nhạt hơn). | Medium | [x] |
 | **TC-F06.17** | `Sec` | `Auth` | **[Negative]** Chặn Unauthorized PATCH | 1. Dùng ID user khác để gọi `/api/users/{id}` PATCH. | - Server trả về **HTTP 403 Forbidden**.<br>- Không cho phép sửa flag của tài khoản khác. | Blocker | [x] |
 
 ---

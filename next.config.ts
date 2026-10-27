@@ -81,6 +81,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Video assets carry a content hash in their file names, so they can be cached forever
+  async headers() {
+    return [
+      {
+        source: '/videos/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+    ]
+  },
 }
 
 const sentryWebpackOptions = {
