@@ -134,18 +134,19 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | `feedback.type.mismatch` | Sai lệch dữ liệu | Data mismatch | Percanggahan data |
 | `feedback.type.mismatchShort` *(mobile <768px, segmented hẹp)* | Sai lệch | Data mismatch | Percanggahan |
 | `feedback.type.idea` | Góp ý | Suggestion | Cadangan |
-| `feedback.area.label` | Khu vực | Area | Bahagian |
-| `feedback.area.placeholder` | Chọn khu vực | Choose an area | Pilih bahagian |
-| `feedback.area.products` | Sản phẩm & tồn kho | Products & stock | Produk & stok |
-| `feedback.area.orders` | Đơn hàng | Orders | Pesanan |
-| `feedback.area.customers` | Khách hàng | Customers | Pelanggan |
-| `feedback.area.discounts` | Khuyến mãi | Discounts | Diskaun |
-| `feedback.area.design` | Giao diện & trang | Design & pages | Reka bentuk & halaman |
-| `feedback.area.payments` | Thanh toán | Payments | Pembayaran |
-| `feedback.area.shipping` | Vận chuyển | Shipping | Penghantaran |
-| `feedback.area.domains` | Tên miền | Domains | Domain |
-| `feedback.area.account` | Tài khoản & nhân viên | Account & staff | Akaun & kakitangan |
-| `feedback.area.other` | Khác | Other | Lain-lain |
+| `feedback.feature.label` | Tính năng | Feature | Ciri |
+| `feedback.feature.placeholder` | Chọn tính năng (có thể chọn nhiều) | Choose features (you can pick more than one) | Pilih ciri (boleh pilih lebih daripada satu) |
+| `feedback.feature.moreCount` *(tag rút gọn khi nhiều mục)* | +{count} | +{count} | +{count} |
+| `feedback.feature.products` | Sản phẩm & tồn kho | Products & stock | Produk & stok |
+| `feedback.feature.orders` | Đơn hàng | Orders | Pesanan |
+| `feedback.feature.customers` | Khách hàng | Customers | Pelanggan |
+| `feedback.feature.discounts` | Khuyến mãi | Discounts | Diskaun |
+| `feedback.feature.design` | Giao diện & trang | Design & pages | Reka bentuk & halaman |
+| `feedback.feature.payments` | Thanh toán | Payments | Pembayaran |
+| `feedback.feature.shipping` | Vận chuyển | Shipping | Penghantaran |
+| `feedback.feature.domains` | Tên miền | Domains | Domain |
+| `feedback.feature.account` | Tài khoản & nhân viên | Account & staff | Akaun & kakitangan |
+| `feedback.feature.other` | Khác | Other | Lain-lain |
 | `feedback.mismatchHint` | V1 không hiển thị dữ liệu phát sinh sau thời điểm chốt. Hãy so sánh dữ liệu cùng thời điểm. | V1 doesn't show data created after the freeze. Compare data from the same point in time. | V1 tidak memaparkan data yang dicipta selepas pembekuan. Bandingkan data pada masa yang sama. |
 | `feedback.description.label` | Mô tả chi tiết | Details | Butiran |
 | `feedback.description.placeholder.bug` | Bạn đã làm gì, mong đợi điều gì, và điều gì đã xảy ra? | What did you do, what did you expect, and what happened instead? | Apa yang anda lakukan, apa yang anda jangkakan, dan apa yang berlaku? |
@@ -165,7 +166,7 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 | Key | VI | EN | BM |
 |---|---|---|---|
 | `feedback.error.type` | Vui lòng chọn loại phản hồi. | Please choose a feedback type. | Sila pilih jenis maklum balas. |
-| `feedback.error.area` | Vui lòng chọn khu vực. | Please choose an area. | Sila pilih bahagian. |
+| `feedback.error.feature` | Vui lòng chọn ít nhất 1 tính năng. | Please choose at least one feature. | Sila pilih sekurang-kurangnya satu ciri. |
 | `feedback.error.descriptionRequired` | Vui lòng nhập mô tả. | Please add some details. | Sila masukkan butiran. |
 | `feedback.error.descriptionShort` | Vui lòng mô tả ít nhất 10 ký tự. | Please write at least 10 characters. | Sila tulis sekurang-kurangnya 10 aksara. |
 | `feedback.error.fileTooLarge` | Ảnh vượt quá 5 MB. | This image is larger than 5 MB. | Imej ini melebihi 5 MB. |
@@ -206,15 +207,15 @@ Figma đang trộn EN/VI; bảng dưới chuẩn hóa cả hai ngôn ngữ.
 
 ### 6.6 Thông báo in-app (chuông, F16)
 
-> Chuông F16 render chữ theo `notifications.types.<TYPE>.title/message` (xem `ORDER_NEW`, `SYSTEM_ALERT` trong `en.json`). Thêm 2 type: `FEEDBACK_UPDATE` (dùng 3 key `in_progress` / `resolved` / `closed` + `replyLine`) và `FEEDBACK_SUBMITTED` (key `staff`). Tiêu đề panel / "Mark all as read" / thời gian tương đối dùng key F16 sẵn có (`notifications.title`, `notifications.markAllRead`). `{area}` = nhãn khu vực theo ngôn ngữ user (`feedback.area.*`); `{date}` = ngày gửi dạng `dd/MM` theo giờ MYT. Không hiện mã phản hồi (chỉ dùng nội bộ).
+> Chuông F16 render chữ theo `notifications.types.<TYPE>.title/message` (xem `ORDER_NEW`, `SYSTEM_ALERT` trong `en.json`). Thêm 2 type: `FEEDBACK_UPDATE` (dùng 3 key `in_progress` / `resolved` / `closed` + `replyLine`) và `FEEDBACK_SUBMITTED` (key `staff`). Tiêu đề panel / "Mark all as read" / thời gian tương đối dùng key F16 sẵn có (`notifications.title`, `notifications.markAllRead`). `{feature}` = nhãn tính năng **đầu tiên** user đã chọn theo ngôn ngữ user (`feedback.feature.*`), thêm ` +N` nếu chọn nhiều hơn (VD "Orders +2"); `{date}` = ngày gửi dạng `dd/MM` theo giờ MYT. Không hiện mã phản hồi (chỉ dùng nội bộ).
 
 | Key | VI | EN | BM |
 |---|---|---|---|
-| `notifications.feedback.in_progress` | Phản hồi về {area} ({date}) đang được xử lý. | Your feedback about {area} ({date}) is in progress. | Maklum balas anda tentang {area} ({date}) sedang diproses. |
-| `notifications.feedback.resolved` | Phản hồi về {area} ({date}) đã được giải quyết. | Your feedback about {area} ({date}) has been resolved. | Maklum balas anda tentang {area} ({date}) telah diselesaikan. |
-| `notifications.feedback.closed` | Phản hồi về {area} ({date}) đã đóng. | Your feedback about {area} ({date}) has been closed. | Maklum balas anda tentang {area} ({date}) telah ditutup. |
+| `notifications.feedback.in_progress` | Phản hồi về {feature} ({date}) đang được xử lý. | Your feedback about {feature} ({date}) is in progress. | Maklum balas anda tentang {feature} ({date}) sedang diproses. |
+| `notifications.feedback.resolved` | Phản hồi về {feature} ({date}) đã được giải quyết. | Your feedback about {feature} ({date}) has been resolved. | Maklum balas anda tentang {feature} ({date}) telah diselesaikan. |
+| `notifications.feedback.closed` | Phản hồi về {feature} ({date}) đã đóng. | Your feedback about {feature} ({date}) has been closed. | Maklum balas anda tentang {feature} ({date}) telah ditutup. |
 | `notifications.feedback.replyLine` *(dòng phụ, khi Support điền trả lời)* | Trả lời: {reply} | Reply: {reply} | Balasan: {reply} |
-| `notifications.feedback.staff` *(gửi Owner khi Staff gửi)* | {name} vừa gửi phản hồi về {area}. | {name} sent feedback about {area}. | {name} telah menghantar maklum balas tentang {area}. |
+| `notifications.feedback.staff` *(gửi Owner khi Staff gửi)* | {name} vừa gửi phản hồi về {feature}. | {name} sent feedback about {feature}. | {name} telah menghantar maklum balas tentang {feature}. |
 
 ## 7. Storefront — buyer (Figma 07)
 

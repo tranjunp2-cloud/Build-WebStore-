@@ -120,9 +120,9 @@ Persona: **Owner** (chủ cửa hàng, nhận email), **Staff** (tài khoản Te
 - [ ] Nút **"Gửi phản hồi"** trên header ở mọi trang CMS V2, cho mọi user (Owner + Staff), chỉ hiện trong `[30/10/2026 00:00, 15/11/2026 23:59:59]` MYT, kiểm tra theo giờ server. Ngoài khoảng này nút ẩn và API trả 403. (frame 01)
 - [ ] Dưới 768px nút chỉ còn icon, có tooltip.
 - [ ] Nút "Báo cáo sai lệch dữ liệu" trên banner Dashboard V2 mở cùng modal, loại chọn sẵn = Sai lệch dữ liệu, user vẫn đổi được. (frame 03)
-- [ ] Trường: **Loại phản hồi*** · **Khu vực*** · **Mô tả chi tiết*** (10–2000 ký tự, có bộ đếm) · Ảnh chụp màn hình (tuỳ chọn, **≤9 ảnh** PNG/JPG, ≤5 MB/ảnh — PO chốt 27/10). Đủ 9 ảnh thì ẩn ô thêm ảnh; chọn quá 9 thì chỉ nhận 9 ảnh đầu và báo lỗi.
+- [ ] Trường: **Loại phản hồi*** · **Tính năng*** (chọn nhiều) · **Mô tả chi tiết*** (10–2000 ký tự, có bộ đếm) · Ảnh chụp màn hình (tuỳ chọn, **≤9 ảnh** PNG/JPG, ≤5 MB/ảnh — PO chốt 27/10). Đủ 9 ảnh thì ẩn ô thêm ảnh; chọn quá 9 thì chỉ nhận 9 ảnh đầu và báo lỗi.
 - [ ] Loại: **Báo lỗi** · **Sai lệch dữ liệu** · **Góp ý**. "Sai lệch dữ liệu" chỉ hiện với cửa hàng chuyển từ V1; cửa hàng mới chỉ thấy 2 loại.
-- [ ] Khu vực (10): Sản phẩm & tồn kho · Đơn hàng · Khách hàng · Khuyến mãi · Giao diện & trang · Thanh toán · Vận chuyển · Tên miền · Tài khoản & nhân viên · Khác.
+- [ ] **Tính năng** (PO chốt 27/10, theo [Figma TM_Prime-Web-V2.0 node 35028-968](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=35028-968)): dropdown **chọn nhiều** (checkbox), bắt buộc ít nhất 1 mục, không giới hạn số mục; mục đã chọn hiện dạng tag trong ô, bấm ✕ trên tag để bỏ. Danh sách (10): Sản phẩm & tồn kho · Đơn hàng · Khách hàng · Khuyến mãi · Giao diện & trang · Thanh toán · Vận chuyển · Tên miền · Tài khoản & nhân viên · Khác.
 - [ ] Hộp xanh "V1 không hiển thị dữ liệu phát sinh sau thời điểm chốt…" chỉ hiện khi loại = Sai lệch dữ liệu.
 - [ ] Placeholder mô tả đổi theo loại (copy deck §6). Không có trường "Mã tham chiếu" (PO chốt 27/10) — user ghi mã đơn/sản phẩm ngay trong mô tả nếu cần.
 - [ ] Tự đính kèm (không hiện trên UI ngoài tên cửa hàng): `tenant`, `store`, `user`, `role`, `isMigratedStore`, URL trang đang xem, app version, ngôn ngữ, user agent.

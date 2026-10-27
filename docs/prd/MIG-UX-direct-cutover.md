@@ -115,7 +115,7 @@ Xem bảng §0 và file stories. Nhóm A trước cutover · B trong cutover · 
 | FR-11 | V1 archive: domain/path riêng, token scoped `read_only_archive_mode + tenant + expiry`, gateway chặn POST/PUT/PATCH/DELETE | US-MIGX-10 | 04 note |
 | FR-12 | Re-auth archive qua SSO khi phiên hết hạn và `now < archiveExpiresAt` | US-MIGX-13 | 04 |
 | FR-13 | Sau `archiveExpiresAt`: không cấp token archive; edge/gateway 301 link V1 → Dashboard V2 (kể cả khi origin V1 đã tắt) | US-MIGX-12 | 06 note, 09 #5 |
-| FR-14 | Nút "Gửi phản hồi" trên header (chỉ 30/10–15/11 MYT) + form phản hồi (Loại · Khu vực · Mô tả · Ảnh), auto-attach context, idempotency key, rate limit; mã phản hồi chỉ dùng nội bộ, không hiện cho user | US-MIGX-11 | Feedback 01–10, 12 |
+| FR-14 | Nút "Gửi phản hồi" trên header (chỉ 30/10–15/11 MYT) + form phản hồi (Loại · Tính năng [chọn nhiều] · Mô tả · Ảnh), auto-attach context, idempotency key, rate limit; mã phản hồi chỉ dùng nội bộ, không hiện cho user | US-MIGX-11 | Feedback 01–10, 12 |
 | FR-15 | Login fallback `/login?error=invalid_token` + toast network riêng | US-MIGX-14 | 08 |
 | FR-16 | Màn hình V2 cho store `running` / `failed` + email chậm/lỗi | US-MIGX-15 | ❌ |
 | FR-17 | ⏸ Tạm hoãn — trang "Phản hồi của tôi" (danh sách, chi tiết) | US-MIGX-18 | — |
@@ -205,7 +205,7 @@ Tất cả frame là **Desktop**. Không có frame mobile cho V1 banner/modal, V
 | # | Frame | Nội dung chính |
 |---|---|---|
 | 01 | Header V2 — nút Gửi phản hồi | Nút cạnh chuông thông báo; mobile chỉ còn icon + tooltip; ẩn ngoài khoảng 30/10–15/11 |
-| 02 | Form — mặc định | 3 loại (Báo lỗi · Sai lệch dữ liệu · Góp ý), Khu vực 10 mục, Mô tả + bộ đếm, Ảnh ≤9 (lưới 5 ảnh/hàng) |
+| 02 | Form — mặc định | 3 loại (Báo lỗi · Sai lệch dữ liệu · Góp ý), Tính năng 10 mục — **dropdown chọn nhiều** ([Figma TM_Prime-Web-V2.0 node 35028-968](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=35028-968)), Mô tả + bộ đếm, Ảnh ≤9 (lưới 5 ảnh/hàng) |
 | 03 | Form — Sai lệch dữ liệu | Mở từ banner "Báo cáo sai lệch dữ liệu"; loại chọn sẵn (đổi được); hộp xanh nhắc so sánh cùng thời điểm |
 | 04 | Form — thiếu thông tin | Lỗi cạnh từng trường bắt buộc |
 | 05 | Form — lỗi tải ảnh | Thumbnail viền đỏ + "Ảnh vượt quá 5 MB" |
@@ -217,7 +217,7 @@ Tất cả frame là **Desktop**. Không có frame mobile cho V1 banner/modal, V
 | 11 | Thông báo trong chuông | Đang xử lý / Đã giải quyết (+ dòng Trả lời) / Đã đóng / Staff vừa gửi |
 | 12 | Mobile 375 | Modal full-screen |
 
-**Bỏ khỏi UI (PO chốt 27/10):** (1) trường "Mã tham chiếu" trong form; (2) mã phản hồi + nút Sao chép ở màn gửi thành công — mã vẫn sinh ở server để dùng nội bộ (Lark Base, chống trùng thông báo, Support tra cứu), thông báo trong chuông nhận diện phản hồi bằng **khu vực + ngày gửi**. User ghi mã đơn/sản phẩm trong ô Mô tả nếu cần (placeholder loại Sai lệch dữ liệu đã gợi ý). Frame Figma vẫn còn 2 phần này cho tới khi vẽ lại — **dev làm theo doc, không build**.
+**Bỏ khỏi UI (PO chốt 27/10):** (1) trường "Mã tham chiếu" trong form; (2) mã phản hồi + nút Sao chép ở màn gửi thành công — mã vẫn sinh ở server để dùng nội bộ (Lark Base, chống trùng thông báo, Support tra cứu), thông báo trong chuông nhận diện phản hồi bằng **tính năng + ngày gửi**. (3) Trường "Khu vực" (chọn 1) đổi thành **"Tính năng" (chọn nhiều)**. User ghi mã đơn/sản phẩm trong ô Mô tả nếu cần (placeholder loại Sai lệch dữ liệu đã gợi ý). Frame Figma vẫn còn 2 phần này cho tới khi vẽ lại — **dev làm theo doc, không build**.
 
 **Tạm hoãn (không vẽ, không build cho 29/10):** trang "Phản hồi của tôi", trang chi tiết, trạng thái "Cần thêm thông tin", lối vào từ V1 archive, mục trong sidebar.
 
@@ -284,7 +284,7 @@ Code staging hiện **chỉ có** `migrationStatus: migrated | pending | failed`
 | `Tenants.writeOwner` enum `v1 \| v2` | Tenants | BR-03 |
 | `user_migration_notices` (user_id, tenant_id, notice_key, seen_at) | bảng mới | Modal 1 lần (FR-08) |
 | `migration_email_log` (tenant_id, user_id, template, sent_at, status) | bảng mới | Idempotent FR-07 |
-| `feedback_reports` (id, code, tenant_id, created_by, type, area, description, is_migrated_store, page_url, app_version, locale, status, public_reply, lark_record_id, lark_sync_status, created_at, updated_at) | collection mới | FR-14, 18, 19 |
+| `feedback_reports` (id, code, tenant_id, created_by, type, features (select hasMany: bảng `feedback_reports_features` — `serial` id + `parent_id` + `order`, theo rule schema), description, is_migrated_store, page_url, app_version, locale, status, public_reply, lark_record_id, lark_sync_status, created_at, updated_at) | collection mới | FR-14, 18, 19 |
 | `feedback_reports_attachments` (array: media ref) | array table | FR-14 |
 | `feedback_report_events` (report_id, kind: status_change\|public_reply, payload, lark_event_id unique, created_at) | bảng mới | FR-18, 19 — chống trùng sự kiện Lark |
 
@@ -295,7 +295,8 @@ Bảng Lark Base "Prime Web Feedback" — trường đề xuất:
 | Trường Lark | Kiểu | Nguồn |
 |---|---|---|
 | Mã phản hồi | Text (primary) | `code` |
-| Loại · Khu vực | Single select | `type`, `area` |
+| Loại | Single select | `type` |
+| Tính năng | **Multi select** | `features` |
 | Mô tả | Long text | `description` |
 | Ảnh | Attachment | upload từ V2 |
 | Cửa hàng · Tenant ID · Người gửi · Vai trò | Text | context |
@@ -398,7 +399,7 @@ scheduled ──T──▶ write_locked ──drain ok──▶ syncing ──re
 | GET | `/api/v1/feedback/availability` | `{enabled, types[]}` — header dùng để quyết định hiện nút và loại "Sai lệch dữ liệu" |
 | GET | `/api/v1/migration/status` | Trả `cutoverState`, mốc thời gian, `daysLeft` (server time) cho store hiện tại |
 | POST | `/api/v1/migration/notices/:key/seen` | Đánh dấu modal đã xem |
-| POST | `/api/v1/feedback` | Header `Idempotency-Key`; body `{type, area, description, attachmentIds[]≤9}` (ảnh tải trước, xem §10.4); server tự gắn context. 201 (không trả mã cho UI) · 400 validation · 403 ngoài khoảng 30/10–15/11 · 413 ảnh quá lớn · 429 quá 5 phản hồi / 15 phút |
+| POST | `/api/v1/feedback` | Header `Idempotency-Key`; body `{type, features[]≥1, description, attachmentIds[]≤9}` (ảnh tải trước, xem §10.4); server tự gắn context. 201 (không trả mã cho UI) · 400 validation · 403 ngoài khoảng 30/10–15/11 · 413 ảnh quá lớn · 429 quá 5 phản hồi / 15 phút |
 | POST | `/api/v1/integrations/lark/feedback-webhook` | Lark → V2 (Event Subscription); giải mã và xác thực bằng `LARK_FEEDBACK_ENCRYPT_KEY` + `LARK_FEEDBACK_VERIFICATION_TOKEN` (§13.5); trả lời `challenge` khi Lark kiểm tra URL; idempotent theo `lark_event_id`; tạo `Notifications` |
 | POST | `/api/v1/archive/session` | Cấp token archive scoped; 403 nếu `now ≥ archiveExpiresAt` hoặc không có quyền |
 
