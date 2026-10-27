@@ -8,10 +8,56 @@ import { LocaleFlag } from '@/components/locale-flag'
 const LABEL: Record<Locale, string> = { en: 'EN', ms: 'MY' }
 const LANGUAGE_NAME: Record<Locale, string> = { en: 'English', ms: 'Bahasa Melayu' }
 const LOCALES: Locale[] = ['en', 'ms']
+const FLAG_SRC: Record<Locale, string> = { en: '/images/flags/flag-gb.svg', ms: '/images/flags/flag-my.svg' }
 
-export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill' | 'minimal' | 'globe' | 'segmented' }) {
+export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill' | 'minimal' | 'globe' | 'segmented' | 'flags' }) {
     const { locale, toggleLocale, setLocale } = useI18n()
     const nextLocale = locale === 'en' ? 'ms' : 'en'
+
+    // Auth pages (login, verify-otp): compact centred pill, SVG flag + EN/MY, teal-tinted selected option
+    if (variant === 'flags') {
+        return (
+            <div className="flex justify-center">
+                <div
+                    role="group"
+                    aria-label="Language"
+                    className="inline-flex items-center gap-0.5 rounded-full border border-slate-400/[.16] bg-[#131a26] p-[3px]"
+                >
+                    {LOCALES.map((lang) => {
+                        const on = locale === lang
+                        return (
+                            <button
+                                key={lang}
+                                type="button"
+                                onClick={() => setLocale(lang)}
+                                aria-label={`Switch to ${LANGUAGE_NAME[lang]}`}
+                                aria-pressed={on}
+                                className={cn(
+                                    'inline-flex h-7 items-center gap-1.5 rounded-full border-0 pl-2 pr-[11px] text-xs font-semibold leading-4 tracking-[.04em] transition-all duration-200 hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50',
+                                    on
+                                        ? 'bg-teal-400/[.14] text-teal-300 shadow-[inset_0_0_0_1px_rgba(45,212,191,.32)]'
+                                        : 'bg-transparent text-slate-400'
+                                )}
+                            >
+                                {/* eslint-disable-next-line @next/next/no-img-element -- 16×12 static flag, next/image adds nothing */}
+                                <img
+                                    src={FLAG_SRC[lang]}
+                                    alt=""
+                                    width={16}
+                                    height={12}
+                                    className={cn(
+                                        'block h-3 w-4 flex-none rounded-[2px] object-cover shadow-[0_0_0_1px_rgba(255,255,255,.1)] transition-opacity duration-200',
+                                        on ? 'opacity-100' : 'opacity-70'
+                                    )}
+                                />
+                                <span>{LABEL[lang]}</span>
+                            </button>
+                        )
+                    })}
+                </div>
+            </div>
+        )
+    }
 
     if (variant === 'globe') {
         return (
