@@ -7,8 +7,12 @@ import { AgentError } from "../agent/agent-errors";
 import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
+import { ORG_BATTERY, type OrgBattery } from "../cost/org-battery";
+import { aiBudgetMicros } from "../cost/shop-limits";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { estimateCostMicros } from "../ledger/price-book";
+import { anthropicEffortOptions } from "../models/anthropic-effort";
+import { errorUsage, tokenUsageOf } from "../ledger/sdk-usage";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { isProviderBillingError, runWithFallback } from "../models/fallback";
 import type { ModelRegistry } from "../models/model-registry";
@@ -45,6 +49,7 @@ export class TaskEngine {
 		@Inject(USAGE_LEDGER) private readonly ledger: UsageLedger,
 		@Inject(ENV) private readonly env: Env,
 		@Optional() @Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
+		@Optional() @Inject(ORG_BATTERY) private readonly battery?: OrgBattery,
 	) {}
 
 	async run(ctx: AiRequestContext, taskId: string, rawInput: unknown, requestId?: string): Promise<RunTaskResponse> {
@@ -103,6 +108,7 @@ export class TaskEngine {
 					maxOutputTokens: sampling.maxOutputTokens ?? definition.maxOutputTokens,
 					timeout: attemptTimeout(),
 					maxRetries: definition.maxRetries ?? 1,
+					...anthropicEffortOptions(candidate, definition.alias),
 				});
 				const answer = textMode
 					? validateTextOutput(schema, result)
@@ -117,6 +123,7 @@ export class TaskEngine {
 					const billing = isProviderBillingError(error);
 					if (billing) billingFailures++;
 					return record("error", candidate, ms, {
+						...errorUsage(error),
 						errorCode: billing ? "provider_insufficient_quota" : error instanceof Error ? error.name : "unknown",
 					});
 				},
@@ -134,11 +141,7 @@ export class TaskEngine {
 			throw new AgentError("The AI could not complete this task.", 503);
 		});
 
-		const usage = {
-			inputTokens: value.totalUsage.inputTokens,
-			outputTokens: value.totalUsage.outputTokens,
-			cachedInputTokens: value.totalUsage.inputTokenDetails?.cacheReadTokens,
-		};
+		const usage = tokenUsageOf(value.totalUsage);
 		await record("ok", model, latencyMs, usage);
 		return {
 			taskId,
@@ -160,8 +163,11 @@ export class TaskEngine {
 	private async assertQuota(ctx: AiRequestContext): Promise<void> {
 		// the platform's daily spend cap (AI_DAILY_BUDGET_USD) before the org's own quota
 		await this.spend?.assertWithinBudget();
+		// then the shop's AI battery (its plan's budget, else AI_DAILY_BUDGET_USD_PER_ORG)
+		await this.battery?.assertAvailable(ctx.organizationId, aiBudgetMicros(ctx, this.env));
 		const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-		const used = await this.ledger.countSince(ctx.organizationId, since);
+		// only task calls (surface 'system'): copilot steps, decisions, suggestions and pictures have their own limits
+		const used = await this.ledger.countSince(ctx.organizationId, since, { surface: "system" });
 		if (used >= this.env.AI_DAILY_TASK_LIMIT_PER_ORG) {
 			throw new AgentError("Your workspace reached today's AI limit. Try again tomorrow.", 429);
 		}

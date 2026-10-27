@@ -88,7 +88,7 @@ describe("opportunistic stale-run sweep [TC-AISEC-026]", () => {
 		const nudge = vi.fn(() => new Promise<number>(() => undefined)); // a sweep that never ends
 		const threads = { list: vi.fn(async () => []), detail: vi.fn(async () => ({ changeSets: [] })) };
 		const work = { work: vi.fn(async () => ({})) };
-		const controller = new AgentController({} as never, {} as never, {} as never, threads as never, {} as never, testEnv(), work as never, { nudge } as never);
+		const controller = new AgentController({} as never, {} as never, {} as never, threads as never, {} as never, testEnv(), work as never, { nudge } as never, {} as never);
 
 		// Act
 		await controller.listThreads(ctx);

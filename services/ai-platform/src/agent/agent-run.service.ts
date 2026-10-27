@@ -19,6 +19,10 @@ import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { runMaxRunningMs } from "../config/limits";
+import { ORG_BATTERY, type OrgBattery } from "../cost/org-battery";
+import { aiBudgetMicros } from "../cost/shop-limits";
+import { tokenUsageOf, UsageTally } from "../ledger/sdk-usage";
+import { anthropicEffortOptions } from "../models/anthropic-effort";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { runWithFallback } from "../models/fallback";
@@ -338,6 +342,7 @@ export class AgentRunService {
 		@Optional() @Inject(SHOP_TOOLS) private readonly shop?: ShopTools,
 		@Optional() private readonly pictures?: ImageService,
 		@Optional() @Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
+		@Optional() @Inject(ORG_BATTERY) private readonly battery?: OrgBattery,
 	) {}
 
 	/** What each driving run already fed the model (repeated parts of reads become pointers). */
@@ -377,6 +382,8 @@ export class AgentRunService {
 	): Promise<ReservedStart> {
 		// the platform's daily spend cap (AI_DAILY_BUDGET_USD): 503 before anything is reserved
 		await this.spend?.assertWithinBudget();
+		// the shop's own AI battery (its plan's budget, else AI_DAILY_BUDGET_USD_PER_ORG): 429 with the time it is back
+		await this.battery?.assertAvailable(ctx.organizationId, aiBudgetMicros(ctx, this.env));
 		const runId = newId("run");
 		const caps = queueCaps(this.env);
 		const reserved = await this.store.reserveRunStart(
@@ -1019,12 +1026,15 @@ export class AgentRunService {
 				);
 				const messages = await this.hydrate(ctx, state.messages, attachments);
 				const chain = this.models.resolveChain("balanced");
+				let attemptUsage = new UsageTally();
 				const { value: result, model, latencyMs } = await runWithFallback(
 					chain,
 					(candidate) => {
 						lastModel = candidate;
 						// a fallback attempt only has the reads of earlier, successful calls in its messages
 						attemptMemory = new Map(committedMemory);
+						const tally = new UsageTally();
+						attemptUsage = tally;
 						return generateText({
 							// routed: the provider gets only the loaded groups' tools (every tool still runs if called)
 							model: routed && router ? routedModel(candidate.model, () => router.sentTools(toolNames)) : candidate.model,
@@ -1050,6 +1060,9 @@ export class AgentRunService {
 							timeout: { totalMs: budget.callTimeoutMs(this.env.AI_MODEL_TIMEOUT_MS + this.env.AI_IMAGE_TIMEOUT_MS) },
 							maxRetries: 1,
 							abortSignal: abort.signal,
+							// steps finished before a failure were billed: the error row carries them
+							onStepFinish: (step) => tally.add(step.usage),
+							...anthropicEffortOptions(candidate, "balanced"),
 						});
 					},
 					{
@@ -1060,6 +1073,7 @@ export class AgentRunService {
 								...ledgerBase,
 								provider: candidate.provider,
 								model: candidate.modelId,
+								...attemptUsage.forFailure(error),
 								latencyMs: ms,
 								outcome: "error",
 								errorCode: error instanceof Error ? error.name : "unknown",
@@ -1071,9 +1085,7 @@ export class AgentRunService {
 					...ledgerBase,
 					provider: model.provider,
 					model: model.modelId,
-					inputTokens: result.totalUsage.inputTokens,
-					outputTokens: result.totalUsage.outputTokens,
-					cachedInputTokens: result.totalUsage.inputTokenDetails?.cacheReadTokens,
+					...tokenUsageOf(result.totalUsage),
 					latencyMs,
 					outcome: staged.length > 0 || ask ? "ok" : "refused",
 				});
@@ -1273,9 +1285,7 @@ export class AgentRunService {
 				task: SUGGEST_NEXT_TASK,
 				provider: model.provider,
 				model: model.modelId,
-				inputTokens: result.totalUsage.inputTokens,
-				outputTokens: result.totalUsage.outputTokens,
-				cachedInputTokens: result.totalUsage.inputTokenDetails?.cacheReadTokens,
+				...tokenUsageOf(result.totalUsage),
 				latencyMs: Date.now() - t0,
 				outcome: "ok",
 			});

@@ -1,3 +1,4 @@
+import { picturesPerDay } from "../cost/shop-limits";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { generateImage } from "ai";
 import { z } from "zod";
@@ -79,7 +80,9 @@ export class ImageService {
 
 		const now = options.now ?? new Date();
 		const reservation = await this.quota.reserve(ctx, { pictures: input.count, since: new Date(now.getTime() - DAY_MS), now }, (used) => {
-			const left = this.env.AI_DAILY_IMAGE_LIMIT_PER_ORG - used;
+			const limit = picturesPerDay(ctx, this.env);
+			if (limit === null) return; // the plan has no picture cap
+			const left = limit - used;
 			if (left >= input.count) return;
 			throw new AgentError(
 				left > 0 ? `Only ${left} more picture${left === 1 ? "" : "s"} can be generated today.` : "Your workspace reached today's picture limit. Try again tomorrow.",

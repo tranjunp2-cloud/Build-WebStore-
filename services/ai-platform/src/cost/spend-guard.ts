@@ -70,6 +70,17 @@ export class SpendGuard {
 		throw new AgentError(PAUSED_MESSAGE, 503);
 	}
 
+	/** True when today's spend reached the budget; never throws or logs, false when off or unreadable (the /agent/usage read). */
+	async isPaused(): Promise<boolean> {
+		if (!this.enabled) return false;
+		try {
+			const spent = await this.spentToday();
+			return spent !== null && spent >= Math.round((this.budgetUsd as number) * 1_000_000);
+		} catch {
+			return false;
+		}
+	}
+
 	/** Today's cost in micros (cached 60 s; a new day starts at 0); null when it could not be read. */
 	private async spentToday(): Promise<number | null> {
 		const now = this.clock();

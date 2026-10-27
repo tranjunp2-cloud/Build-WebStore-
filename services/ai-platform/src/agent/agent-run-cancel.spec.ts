@@ -151,6 +151,7 @@ describe("SSE stream closing", () => {
 			env,
 			{} as never,
 			{ nudge: vi.fn(() => null) } as never,
+			{} as never,
 		);
 		const request = { headers: { accept: "text/event-stream" } } as unknown as FastifyRequest;
 		const started = controller.startRun(ctx, { prompt: "hello" }, request, reply);

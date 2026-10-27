@@ -138,3 +138,28 @@ describe("whole-chain deadline [TC-AIWB-91]", () => {
 		expect(unbounded.every((id) => id.startsWith("migration."))).toBe(true);
 	});
 });
+
+describe("failed attempts keep their tokens [TC-AIPRC-06]", () => {
+	it("a reply that did not match the schema is ledgered with the usage the provider billed", async () => {
+		const billed = {
+			inputTokens: { total: 500, noCache: 50, cacheRead: 100, cacheWrite: 350 },
+			outputTokens: { total: 80, text: 80, reasoning: undefined },
+		};
+		const bad = new MockLanguageModelV4({
+			doGenerate: async () => ({ content: [{ type: "text", text: "{\"nope\":1}" }], finishReason: { unified: "stop", raw: undefined }, usage: billed, warnings: [] }),
+		});
+		const { engine, recorded } = setup([{ provider: "anthropic", modelId: "claude-haiku-5-5", model: bad }]);
+
+		await expect(run(engine)).rejects.toBeInstanceOf(Error);
+
+		expect(recorded).toEqual([
+			expect.objectContaining({ outcome: "error", inputTokens: 500, outputTokens: 80, cachedInputTokens: 100, cacheWriteTokens: 350 }),
+		]);
+	});
+
+	it("an error with no usage records none", async () => {
+		const { engine, recorded } = setup([{ provider: "openai", modelId: "gpt-4.1-nano", model: failing(apiError(500, "down")) }]);
+		await expect(run(engine)).rejects.toBeInstanceOf(Error);
+		expect(recorded[0]?.inputTokens).toBeUndefined();
+	});
+});
