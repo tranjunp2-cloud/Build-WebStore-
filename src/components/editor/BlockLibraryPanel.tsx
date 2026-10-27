@@ -11,54 +11,23 @@ import { listAllBlocks } from '@/lib/admin/block-registry-reader'
 import { resolveBlockContent, hasLocaleContent } from '@/lib/ai/add-section-content'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
+import { BLOCK_ICONS, CATEGORY_ICONS, FALLBACK_BLOCK_ICON, FALLBACK_CATEGORY_ICON } from './block-library-icons'
 
-// ── Category display config (i18n labels + icons, Malay) ──────────────────────
+// ── Category display config (i18n labels, Malay) ──────────────────────
 
-const CATEGORY_DISPLAY: Record<string, { icon: string; label: string }> = {
-    basics:   { icon: '📦', label: 'Asas' },
-    content:  { icon: '📄', label: 'Kandungan' },
-    media:    { icon: '🖼️', label: 'Media' },
-    store:    { icon: '💼', label: 'Perniagaan' },
-    commerce: { icon: '🛒', label: 'Perdagangan' },
-    form:     { icon: '📝', label: 'Borang & Hubungi' },
-    widgets:  { icon: '🔧', label: 'Widget' },
-    layout:   { icon: '📐', label: 'Susun Atur' },
+const CATEGORY_DISPLAY: Record<string, { label: string }> = {
+    basics:   { label: 'Asas' },
+    content:  { label: 'Kandungan' },
+    media:    { label: 'Media' },
+    store:    { label: 'Perniagaan' },
+    commerce: { label: 'Perdagangan' },
+    form:     { label: 'Borang & Hubungi' },
+    widgets:  { label: 'Widget' },
+    layout:   { label: 'Susun Atur' },
 }
 
 // Canonical display order — matches editor UX taxonomy
 const CATEGORY_ORDER = ['basics', 'content', 'media', 'store', 'commerce', 'form', 'widgets', 'layout'] as const
-
-// ── Icon overrides (slug → icon) ─────────────────────────────────────────────
-// Provides a curated icon experience for known blocks, overrides meta.icon
-
-const BLOCK_ICON_OVERRIDES: Record<string, string> = {
-    'custom-html': '🧱',
-    hero: '🎯',
-    gallery: '🖼️',
-    cta: '🔘',
-    socialWidget: '💬',
-    pricing: '💰',
-    'pricing-table': '📊',
-    'gallery-masonry': '🧱',
-    'whatsapp-button': '💬',
-    'google-maps': '📍',
-    'social-proof': '⭐',
-    'countdown-timer': '⏰',
-    'before-after': '🔄',
-    'feature-comparison': '📋',
-    'download-cta': '📥',
-    'video-background': '🎬',
-    breadcrumb: '🔗',
-    divider: '➖',
-    'announcement-bar': '📢',
-    'client-logos': '🏢',
-    accordion: '📂',
-    'step-process': '🔢',
-    'portfolio-grid': '💼',
-    'menu-food': '🍽️',
-    'service-cards': '🛠️',
-    carousel: '🎠',
-}
 
 interface BlockLibraryPanelProps {
     blocks: BlockData[]
@@ -109,7 +78,7 @@ export function BlockLibraryPanel({
             .filter(cat => byCategory.has(cat))
             .map(cat => ({
                 id: cat,
-                icon: CATEGORY_DISPLAY[cat]?.icon ?? '📦',
+                icon: CATEGORY_ICONS[cat] ?? FALLBACK_CATEGORY_ICON,
                 label: categoryLabels[cat] || CATEGORY_DISPLAY[cat]?.label || cat,
                 blocks: byCategory.get(cat)!,
             }))
@@ -149,7 +118,7 @@ export function BlockLibraryPanel({
                     description: baseDescription,
                     previewText,
                     needsTranslation,
-                    icon: BLOCK_ICON_OVERRIDES[b.slug] || b.icon || '🧩',
+                    icon: BLOCK_ICONS[b.slug] ?? FALLBACK_BLOCK_ICON,
                     defaultVariant: b.defaultVariant || b.variants?.[0] || 'default',
                     scope: b.scope ?? 'page',
                     scopeTooltip: blockTranslations?.[b.slug]?.scopeTooltip ?? b.scopeTooltip,
@@ -216,10 +185,12 @@ export function BlockLibraryPanel({
                                 <button
                                     type="button"
                                     onClick={() => setExpandedCategory(prev => (prev === category.id ? prev : category.id))}
-                                    className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-left transition-colors hover:bg-white/[0.04]"
+                                    className="group/cat flex h-9 w-full items-center justify-between rounded-lg px-2 text-left transition-colors hover:bg-white/[0.04]"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm leading-none">{category.icon}</span>
+                                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] border border-transparent text-[#94a3b8] transition-all duration-200 group-hover/cat:scale-105 group-hover/cat:border-[rgba(45,212,191,.35)] group-hover/cat:bg-[rgba(45,212,191,.12)] group-hover/cat:text-[#5eead4]">
+                                            <category.icon className="h-[15px] w-[15px]" aria-hidden />
+                                        </span>
                                         <span className="text-[13px] font-medium text-slate-200">{category.label}</span>
                                         <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{category.totalCount}</span>
                                     </div>
@@ -255,42 +226,33 @@ export function BlockLibraryPanel({
                                                     else handleAddBlock(item.type, item.defaultVariant)
                                                 }}
                                                 className={cn(
-                                                    "group flex w-full items-center gap-3 rounded-lg border border-transparent bg-white/[0.02] px-3 py-2.5 text-left transition-all",
+                                                    "group flex w-full items-center gap-3 rounded-lg border border-transparent bg-white/[0.02] px-3 py-2.5 text-left transition-all hover:border-[rgba(45,212,191,.3)] hover:bg-[rgba(45,212,191,.08)]",
                                                     isAlreadyGlobal
-                                                        ? "opacity-60 hover:border-white/[0.08] hover:bg-white/[0.06] cursor-pointer"
-                                                        : "hover:border-white/[0.08] hover:bg-white/[0.06] cursor-grab active:cursor-grabbing active:scale-[0.98]",
+                                                        ? "opacity-60 cursor-pointer"
+                                                        : "cursor-grab active:cursor-grabbing active:scale-[0.98]",
                                                 )}
                                             >
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/15 to-cyan-500/15 text-lg">
-                                                    {item.icon}
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent bg-[#1e293b] text-[#94a3b8] transition-all duration-200 group-hover:scale-105 group-hover:border-[rgba(45,212,191,.35)] group-hover:bg-[rgba(45,212,191,.12)] group-hover:text-[#5eead4]">
+                                                    <item.icon className="h-[18px] w-[18px]" aria-hidden />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5">
                                                         <p className="truncate text-[13px] font-medium text-slate-200">{item.name}</p>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                {item.scope === 'global' ? (
+                                                        {item.scope === 'global' && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
                                                                     <span
                                                                         className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
                                                                         style={{ background: 'hsl(var(--info)/0.12)', color: 'hsl(var(--info))' }}
                                                                     >
                                                                         🌐 {bl.globalScopeLabel}
                                                                     </span>
-                                                                ) : (
-                                                                    <span
-                                                                        className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
-                                                                        style={{ background: 'rgba(148,163,184,0.10)', color: 'var(--editor-text-muted)' }}
-                                                                    >
-                                                                        📄 {bl.pageScopeLabel}
-                                                                    </span>
-                                                                )}
-                                                            </TooltipTrigger>
-                                                            <TooltipContent side="right">
-                                                                {item.scope === 'global'
-                                                                    ? (item.scopeTooltip ?? bl.globalScopeTooltipDefault)
-                                                                    : (item.scopeTooltip ?? bl.pageScopeTooltipDefault)}
-                                                            </TooltipContent>
-                                                        </Tooltip>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent side="right">
+                                                                    {item.scopeTooltip ?? bl.globalScopeTooltipDefault}
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
                                                     </div>
                                                     {/* F26-03: locale-aware preview text (no interactive children in button) */}
                                                     <p className="truncate text-[11px] text-slate-500">{item.previewText}</p>

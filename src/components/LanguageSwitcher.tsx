@@ -41,74 +41,38 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
     }
 
     if (variant === 'segmented') {
-        const activeStyle: React.CSSProperties = {
-            background: '#2DD4BF',
-            color: '#0B1120',
-            boxShadow: '0px 0px 12px 0px rgba(45, 212, 191, 0.4)',
-        }
-        const inactiveStyle: React.CSSProperties = {
-            background: 'transparent',
-            color: 'var(--auth-text-muted)',
-        }
-        const tabBase: React.CSSProperties = {
-            display: 'flex',
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '8px 12px',
-            height: 32,
-            borderRadius: 12,
-            border: 'none',
-            outline: 'none',
-            cursor: 'pointer',
-            fontFamily: 'Inter, sans-serif',
-            fontSize: 12,
-            fontWeight: 600,
-            lineHeight: '16px',
-            textAlign: 'center' as const,
-            transition: 'all 0.2s ease',
-        }
-
         return (
-            <div
-                style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    width: '100%',
-                    height: 'auto',
-                }}
-            >
-                <Globe
-                    style={{ width: 16, height: 16, flexShrink: 0, color: 'var(--auth-text)' }}
-                />
+            <div className="flex w-full justify-center">
                 <div
-                    style={{
-                        display: 'flex',
-                        flex: 1,
-                        alignItems: 'center',
-                        padding: '0 4px',
-                        height: 42,
-                        borderRadius: 16,
-                        background: 'var(--auth-input-bg)',
-                        border: '1px solid var(--auth-input-border)',
-                    }}
+                    className="inline-flex items-center gap-[2px] rounded-full border border-[rgba(148,163,184,.16)] bg-[#131a26] p-[3px]"
                 >
-                    {LOCALES.map((lang) => (
-                        <button
-                            key={lang}
-                            type="button"
-                            onClick={() => setLocale(lang)}
-                            style={{
-                                ...tabBase,
-                                ...(locale === lang ? activeStyle : inactiveStyle),
-                            }}
-                            aria-label={`Switch to ${LANGUAGE_NAME[lang]}`}
-                        >
-                            {LABEL[lang]}
-                        </button>
-                    ))}
+                    {LOCALES.map((lang) => {
+                        const selected = locale === lang
+                        return (
+                            <button
+                                key={lang}
+                                type="button"
+                                onClick={() => setLocale(lang)}
+                                aria-label={`Switch to ${LANGUAGE_NAME[lang]}`}
+                                aria-pressed={selected}
+                                className={cn(
+                                    'inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full border-0 py-0 pl-2 pr-[11px] text-xs font-semibold leading-4 tracking-[.04em] outline-none transition-all duration-200 hover:brightness-[1.2] focus-visible:ring-2 focus-visible:ring-[rgba(45,212,191,.5)]',
+                                    selected
+                                        ? 'bg-[rgba(45,212,191,.14)] text-[#5eead4] shadow-[inset_0_0_0_1px_rgba(45,212,191,.32)]'
+                                        : 'bg-transparent text-[#94a3b8]',
+                                )}
+                            >
+                                <LocaleFlag
+                                    locale={lang}
+                                    className={cn(
+                                        'h-3 w-4 rounded-[2px] ring-1 ring-white/10',
+                                        selected ? 'opacity-100' : 'opacity-70',
+                                    )}
+                                />
+                                {LABEL[lang]}
+                            </button>
+                        )
+                    })}
                 </div>
             </div>
         )

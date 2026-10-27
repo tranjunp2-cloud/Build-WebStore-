@@ -422,7 +422,7 @@ export function EditorToolbar({
                                     type="button"
                                     size="sm"
                                     className={cn(
-                                        'h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4',
+                                        'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-teal-400/15 hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4',
                                         (hasUnsavedChanges || hasUnpublishedChanges) && 'hidden min-[768px]:inline-flex',
                                     )}
                                 >
@@ -692,7 +692,7 @@ export function EditorToolbar({
                                 <Button
                                     type="button"
                                     size="sm"
-                                    className="h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-emerald-500/15 hover:shadow-emerald-500/25 hover:opacity-95"
+                                    className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-teal-400/15 hover:shadow-teal-400/25 hover:opacity-95"
                                 >
                                     <Globe className="h-3.5 w-3.5" />
                                     {et.viewLive}
