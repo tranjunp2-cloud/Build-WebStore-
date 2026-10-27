@@ -110,50 +110,8 @@ Persona: **Owner** (chủ cửa hàng, nhận email), **Staff** (tài khoản Te
 - [ ] Banner cố định "V1 — Chế độ chỉ xem / Dữ liệu được chốt lúc [frozenAt]" + "V1 sẽ đóng sau [X] ngày · [ngày đóng] ([múi giờ])". CTA "Mở Prime Web V2", "Báo cáo sai lệch dữ liệu".
 - [ ] Archive không bị redirect mặc định sang V2 (ngoại lệ có kiểm quyền).
 
-### US-MIGX-11: User gửi phản hồi từ nút trên header (MVP — release 29/10/2026)
-> **Chốt PO 2026-10-27 (bản cuối):** chỉ build luồng cơ bản: tạo + gửi phản hồi → Lark Base → cập nhật trạng thái → thông báo in-app. Không SLA.
-> **Tạm hoãn (không build cho 29/10):** trang lịch sử "Phản hồi của tôi", trang chi tiết, trạng thái "Cần thêm thông tin", lối vào từ V1 archive, mục trong sidebar.
-
-**As an** Owner hoặc Staff đang dùng CMS V2 trong giai đoạn chuyển đổi, **I want** gửi báo lỗi, báo sai lệch dữ liệu hoặc góp ý ngay trên header, **so that** vấn đề của tôi đến đúng đội xử lý mà không phải mô tả lại cửa hàng.
-**Figma:** file Untitled › "05 · Phản hồi / Feedback — MVP" (frame 01–12)
-**AC:**
-- [ ] Nút **"Gửi phản hồi"** trên header ở mọi trang CMS V2, cho mọi user (Owner + Staff), chỉ hiện trong `[30/10/2026 00:00, 15/11/2026 23:59:59]` MYT, kiểm tra theo giờ server. Ngoài khoảng này nút ẩn và API trả 403. (frame 01)
-- [ ] Dưới 768px nút chỉ còn icon, có tooltip.
-- [ ] Nút "Báo cáo sai lệch dữ liệu" trên banner Dashboard V2 mở cùng modal, loại chọn sẵn = Sai lệch dữ liệu, user vẫn đổi được. (frame 03)
-- [ ] Trường: **Loại phản hồi*** · **Tính năng*** (chọn nhiều) · **Mô tả chi tiết*** (10–2000 ký tự, có bộ đếm) · Ảnh chụp màn hình (tuỳ chọn, **≤9 ảnh** PNG/JPG, ≤5 MB/ảnh — PO chốt 27/10). Đủ 9 ảnh thì ẩn ô thêm ảnh; chọn quá 9 thì chỉ nhận 9 ảnh đầu và báo lỗi.
-- [ ] Loại: **Báo lỗi** · **Sai lệch dữ liệu** · **Góp ý**. "Sai lệch dữ liệu" chỉ hiện với cửa hàng chuyển từ V1; cửa hàng mới chỉ thấy 2 loại.
-- [ ] **Tính năng** (PO chốt 27/10, theo [Figma TM_Prime-Web-V2.0 node 35028-968](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=35028-968)): dropdown **chọn nhiều** (checkbox), bắt buộc ít nhất 1 mục, không giới hạn số mục; mục đã chọn hiện dạng tag trong ô, bấm ✕ trên tag để bỏ. Danh sách (10): Sản phẩm & tồn kho · Đơn hàng · Khách hàng · Khuyến mãi · Giao diện & trang · Thanh toán · Vận chuyển · Tên miền · Tài khoản & nhân viên · Khác.
-- [ ] Hộp xanh "V1 không hiển thị dữ liệu phát sinh sau thời điểm chốt…" chỉ hiện khi loại = Sai lệch dữ liệu.
-- [ ] Placeholder mô tả đổi theo loại (copy deck §6). Không có trường "Mã tham chiếu" (PO chốt 27/10) — user ghi mã đơn/sản phẩm ngay trong mô tả nếu cần.
-- [ ] Tự đính kèm (không hiện trên UI ngoài tên cửa hàng): `tenant`, `store`, `user`, `role`, `isMigratedStore`, URL trang đang xem, app version, ngôn ngữ, user agent.
-- [ ] Thiếu thông tin: lỗi cạnh từng trường bắt buộc, focus trường lỗi đầu tiên, giữ dữ liệu. (frame 04)
-- [ ] Ảnh lỗi (sai định dạng / >5 MB): viền đỏ + thông báo, không chặn ảnh hợp lệ. (frame 05)
-- [ ] Đang gửi: khoá trường + nút; Idempotency-Key; chặn submit trùng. (frame 06)
-- [ ] Gửi lỗi: giữ nội dung + ảnh, banner đỏ, cho thử lại. (frame 07)
-- [ ] Rate limit **5 phản hồi / 15 phút / user** (PO chốt 27/10; cửa sổ trượt, kiểm tra ở server) → API 429, banner vàng, giữ nội dung, không khoá form. (frame 08)
-- [ ] Đóng form khi đã nhập dở → xác nhận "Bỏ nội dung đã nhập?". (frame 09)
-- [ ] Thành công: thông báo "Đã gửi phản hồi"; **không hiện mã phản hồi** (PO chốt 27/10 — mã chỉ dùng nội bộ cho Lark/Support); câu "Chúng tôi sẽ thông báo cho bạn trong Prime Web (biểu tượng chuông) khi có cập nhật."; nút "Đóng". Không có câu cam kết thời gian xử lý. (frame 10)
-- [ ] Dòng nhắc quyền riêng tư luôn hiện dưới ô mô tả.
-
-### US-MIGX-19: User nhận thông báo in-app khi phản hồi được cập nhật (MVP)
-**As an** Owner hoặc Staff, **I want** được báo trong chuông thông báo khi phản hồi của tôi đổi trạng thái, **so that** tôi không phải hỏi Support.
-**Figma:** frame 11
-**AC:**
-- [ ] Tạo bản ghi `Notifications` (F16) khi trạng thái trên Lark Base đổi sang **Đang xử lý** / **Đã giải quyết** / **Đã đóng**.
-- [ ] Nếu Support điền "Trả lời cho user" trên Lark Base: nội dung thông báo có thêm dòng "Trả lời: …" (tối đa 2 dòng, cắt bằng "…").
-- [ ] Người nhận: người gửi; thêm Owner nếu người gửi là Staff (Owner cũng nhận thông báo "{name} vừa gửi phản hồi {mã}" khi Staff gửi).
-- [ ] MVP: bấm thông báo chỉ đánh dấu đã đọc (chưa có trang chi tiết).
-- [ ] Không gửi email. Không tạo thông báo trùng khi Lark gửi lại cùng sự kiện.
-
-### US-MIGX-20: Đồng bộ phản hồi 2 chiều với Lark Base (nội bộ, MVP)
-**As** Support, **I want** mọi phản hồi vào Lark Base kèm đủ ngữ cảnh, và đổi trạng thái trên Lark Base tự báo về Prime Web, **so that** tôi xử lý ở một nơi duy nhất.
-**AC:**
-- [ ] V2 lưu phản hồi vào DB trước, rồi đẩy sang Lark Base bất đồng bộ có retry; Lark Base lỗi không làm user thấy lỗi.
-- [ ] Bản ghi Lark Base có đủ trường ở PRD §13.4; ảnh là attachment.
-- [ ] Đổi trạng thái / điền "Trả lời cho user" trên Lark Base → webhook về V2 (xác thực chữ ký) → cập nhật DB + tạo thông báo (US-MIGX-19).
-- [ ] Ghi chú nội bộ trên Lark Base không bao giờ gửi về V2.
-- [ ] Bản ghi lỗi đồng bộ hiển thị cho Ops (log + trạng thái `lark_sync_status`), có cách đẩy lại thủ công.
-- [ ] Thiết lập Lark và 6 biến `LARK_FEEDBACK_*` theo PRD §13.5 (2 app + 2 bảng: Staging / Production); 6 bước kiểm thử chấp nhận ở §13.5 pass trên staging.
+### US-MIGX-11, US-MIGX-19, US-MIGX-20 → chuyển sang F44
+Feedback MVP đã chuyển thành **US-F44-01** (gửi phản hồi), **US-F44-02** (thông báo in-app), **US-F44-03** (đồng bộ Lark Base) trong [F44-feedback-mvp-stories.md](./F44-feedback-mvp-stories.md) để Story Sync tạo issue (workflow chỉ đọc file `F<số>-*-stories.md`). AC và TC-ID ([docs/qa/F44-feedback-mvp.md](../qa/F44-feedback-mvp.md)) chỉ cập nhật ở F44.
 
 ### US-MIGX-18: Lịch sử "Phản hồi của tôi" — ⏸ TẠM HOÃN (sau 29/10)
 Không build cho bản 29/10. Giữ để làm sau nếu PO mở lại (danh sách, lọc, chi tiết, dòng thời gian).

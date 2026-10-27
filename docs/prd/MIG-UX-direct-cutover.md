@@ -199,6 +199,8 @@ Tất cả frame là **Desktop**. Không có frame mobile cho V1 banner/modal, V
 
 ### 10.4 Feedback MVP — spec màn hình (release 29/10/2026)
 
+> **Story / QA:** [F44 stories](../stories/F44-feedback-mvp-stories.md) (US-F44-01/02/03 thay US-MIGX-11/19/20) · [F44 QA plan](../qa/F44-feedback-mvp.md) (TC-F44-01 → 24).
+
 > **Chốt PO 2026-10-27 (bản cuối):** chỉ có nút "Gửi phản hồi" trên header, hiện 30/10–15/11/2026 MYT. Luồng MVP: tạo + gửi → Lark Base → đổi trạng thái → thông báo in-app. Không SLA.
 > **Figma:** file [Untitled](https://www.figma.com/design/Ni2MSoBtONKqMJjfgNF1g7/Untitled?node-id=0-1) › ngay dưới section 05 cũ có 3 bộ frame 00–12: **VI** (có ghi chú Quy tắc cho dev), **EN** và **BM** (chữ đúng copy deck, dùng để build UI). CMS V2 chỉ có locale `en` / `ms` → user chỉ thấy EN/BM. Copy: [copy deck §6](./MIG-UX-direct-cutover-copy.md#6-phản-hồi-feedback).
 
@@ -462,7 +464,7 @@ Chung: footer "Email thông báo hệ thống dành cho chủ cửa hàng [store
 | GAP-D12 | Ai quản trị bảng Lark Base, ai được đổi trạng thái; quy ước khi nào chuyển `resolved` → `closed`. **Cần có trước 29/10** để Support xử lý từ ngày 30/10 | US-MIGX-20 | 🔴 |
 | GAP-D13 | Ảnh chụp màn hình phản hồi lưu ở đâu, ai xem được (Media hiện tại ai có URL đều mở được); giữ bao lâu | US-MIGX-11, 20 | 🟠 |
 | GAP-D14 | Lark app + bảng Base + env `LARK_FEEDBACK_*` chưa tồn tại. Đã có checklist §13.5; **cần chốt người làm A1–A4 (Support Lead, Lark Admin) và xong trước 28/10** | US-MIGX-20 | 🔴 |
-| GAP-D15 | Chưa có test case (TC-ID) cho Feedback trong `docs/qa/` — QC cần bổ sung để dev viết test theo `.claude/rules/testing.md` | US-MIGX-11, 19, 20 | 🟠 |
+| GAP-D15 | ✅ Đã có TC-F44-01 → 24 trong `docs/qa/F44-feedback-mvp.md` (BA soạn) — QC review và nhận | US-F44-01..03 | 🟡 |
 | GAP-D3 | Dashboard V2 traffic/analytics = 0 sau chuyển | Thêm dòng giải thích "Số liệu truy cập bắt đầu từ [T]"; V1 analytics có export không | 🟡 |
 | GAP-D4 | Đơn V1 đang Pending/Shipping lúc `T` | Xử lý tiếp trên V2; email trạng thái đơn cho buyer gửi từ V2 với sender domain nào | 🟠 |
 | GAP-D5 | Abandoned cart / email marketing V1 đang chạy trong cửa sổ cutover | Tắt job V1 tại `T` (FR-04 "jobs/integrations") — xác nhận danh sách job | 🟠 |
