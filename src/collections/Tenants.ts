@@ -74,12 +74,14 @@ export const Tenants: CollectionConfig = {
         create: ({ req }) => Boolean(req.user),
         update: ({ req }) => {
             if (req.user?.roles?.includes('super-admin')) return true
-            // Tenant owners can update their own tenant
+            // Active owners and admins only: a viewer or pending member must not change the plan, status or payout
+            // accounts over REST. Dashboard settings write through the Local API after their own role checks.
             return {
                 id: {
-                    in: req.user?.tenants?.map((t: any) =>
-                        t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
-                    ) ?? [],
+                    in: req.user?.tenants
+                        ?.filter((t: any) => (t.role === 'owner' || t.role === 'admin') && (t.status ?? 'active') === 'active')
+                        .map((t: any) => (t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant))
+                        .filter(Boolean) ?? [],
                 },
             }
         },
@@ -200,6 +202,12 @@ export const Tenants: CollectionConfig = {
             type: 'json',
             admin: {
                 description: 'Full raw SSO payload stored for future analytics',
+            },
+            // `platformOrgId` here picks the AI platform org the workspace's tokens carry (lib/auth/bridge-token.ts),
+            // so a member must never write it. SSO provision writes it through the Local API.
+            access: {
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
             },
         },
         // ────────────────────────────
@@ -333,6 +341,14 @@ export const Tenants: CollectionConfig = {
                     name: 'dashboardPreferences',
                     type: 'json',
                     admin: { description: 'User widget layout configuration for Dashboard' },
+                },
+                {
+                    name: 'automations',
+                    type: 'json',
+                    admin: {
+                        description:
+                            'Scheduled copilot reminders: { enabled: {<automation>: boolean}, digest: { enabled, frequency }, lastRunDay, lastDigestDay }. Edited in Settings > Email templates > Automations; the markers are written by /api/cron/shop-automations.',
+                    },
                 },
             ],
         },

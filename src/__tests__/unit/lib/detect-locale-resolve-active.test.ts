@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { detectLocaleFromText, resolveInitialActiveLocale } from '@/lib/detect-locale'
+import { siteLanguages, siteLanguagesOf } from '@/lib/site-languages'
 
 describe('TC-F26-01-01: detectLocaleFromText distinguishes CJK languages', () => {
     it('Japanese text (kanji + kana) → ja, not zh (the reported bug)', () => {
@@ -102,5 +103,23 @@ describe('TC-F26-02-05: non-standard base language keeps native view', () => {
 
     it('el-base site → keeps el regardless of persisted slot', () => {
         expect(resolveInitialActiveLocale('el', 'en')).toBe('el')
+    })
+})
+
+// TC-AIWB-107 — the site's languages are Quick language's (primary + the added secondary);
+// a language last viewed in the editor (Sites.locale) but never added does not open the canvas
+describe('TC-AIWB-107: the editor opens only in a language the site has', () => {
+    it('lists primary, then the secondary once it was added; the edited header first', () => {
+        expect(siteLanguages({ generationLocale: 'en', siteLocale: 'ms' })).toEqual(['en'])
+        expect(siteLanguages({ primaryLocale: 'en', secondaryLocale: 'ms' })).toEqual(['en', 'ms'])
+        expect(siteLanguages({ primaryLocale: 'ms', secondaryLocale: 'ms' })).toEqual(['ms'])
+        expect(siteLanguagesOf({ generationLocale: 'en', locale: 'ms', headerBlock: {} })).toEqual(['en'])
+        expect(siteLanguagesOf({ generationLocale: 'en', headerBlock: {}, pendingHeaderBlock: { secondaryLocale: 'ms' } })).toEqual(['en', 'ms'])
+    })
+
+    it('falls back to the first language when the saved view is not one of them', () => {
+        expect(resolveInitialActiveLocale('en', 'ms', ['en'])).toBe('en')
+        expect(resolveInitialActiveLocale('en', 'ms', ['en', 'ms'])).toBe('ms')
+        expect(resolveInitialActiveLocale('vi', 'en', ['vi'])).toBe('vi')
     })
 })

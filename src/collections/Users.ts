@@ -1,4 +1,5 @@
 import type {
+    FieldAccess,
     CollectionConfig,
     CollectionAfterChangeHook,
     CollectionBeforeChangeHook,
@@ -7,7 +8,7 @@ import type {
 import { APIError } from 'payload'
 import { isMigrationContext } from '@/lib/migration/pw1-json/runtime'
 import { randomBytes } from 'crypto'
-import { sendEmail } from '@/lib/email/send'
+import type { sendEmail as SendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
 import { staffInvitationEmail } from '@/lib/email/templates/staff-invitation'
 import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
@@ -18,9 +19,17 @@ import { normalizeTenants } from '@/lib/normalize-tenants'
 import { canUpdateAvatarField } from '@/lib/profile/avatar-field-access'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
-import { getTemplateConfig } from '@/lib/email/get-template-config'
+import type { getTemplateConfig as GetTemplateConfig } from '@/lib/email/get-template-config'
 import { getActivePlanSubscription, canUseWithinLimit, recordUsage, reduceUsage } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+
+// Loaded on use: both modules import the Payload config, which imports this collection.
+// A static import makes a cycle that breaks production builds (config reads Users before it exists).
+const sendEmail: typeof SendEmail = async (...args) => (await import('@/lib/email/send')).sendEmail(...args)
+const getTemplateConfig: typeof GetTemplateConfig = async (...args) =>
+    (await import('@/lib/email/get-template-config')).getTemplateConfig(...args)
+
+const isSuperAdminField: FieldAccess = ({ req }) => Boolean(req.user?.roles?.includes('super-admin'))
 
 /**
  * Single source of truth for the `roles` select options — reused by the field
@@ -1192,6 +1201,10 @@ export const Users: CollectionConfig = {
             admin: {
                 description: 'Which tenants this user has access to',
             },
+            // Every tenant check (dashboard, copilot, appliers) trusts this list, so no request may write it
+            // except a super-admin's. Server flows (SSO provision, staff endpoints, site generation) write it
+            // through the Local API, which field access does not apply to.
+            access: { create: isSuperAdminField, update: isSuperAdminField },
             fields: [
                 {
                     name: 'tenant',
@@ -1322,22 +1335,26 @@ export const Users: CollectionConfig = {
             relationTo: 'users',
             admin: { hidden: true, description: 'User who last updated this record (audit trail)' },
         },
-        // ── OTP 2FA fields (hidden from admin) ──
+        // ── OTP 2FA fields (hidden from admin) ── server-managed: send-otp / verify-otp write them through the
+        // Local API. Closed to requests: a readable or writable hash (sha256 of 6 digits) would skip the OTP step.
         {
             name: 'otpHash',
             type: 'text',
             admin: { hidden: true },
+            access: { read: () => false, create: () => false, update: () => false },
         },
         {
             name: 'otpExpiresAt',
             type: 'date',
             admin: { hidden: true },
+            access: { create: () => false, update: () => false },
         },
         {
             name: 'otpAttempts',
             type: 'number',
             defaultValue: 0,
             admin: { hidden: true },
+            access: { create: () => false, update: () => false },
         },
         {
             name: 'keyString',

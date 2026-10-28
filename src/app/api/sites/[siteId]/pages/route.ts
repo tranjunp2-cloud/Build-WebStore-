@@ -9,6 +9,7 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { z } from 'zod'
 import { sql } from 'drizzle-orm'
+import { homepageFrame, type LayoutBlock } from '@/lib/sites/new-page-layout'
 
 const MAX_PAGES_PER_SITE = 100
 
@@ -203,38 +204,12 @@ export const POST = withFeatureGuard('website_builder')(withAuth<RouteContext>(a
         }
 
         // Build default layout: nav + hero + footer (inherited from homepage)
-        type LayoutBlock = Record<string, unknown> & { blockType: string }
         const defaultLayout: LayoutBlock[] = []
 
-        // Recursively strip Payload system fields so Payload creates fresh records
-        const STRIP_KEYS = new Set(['id', '_order', '_parent_id', '_path', '_uuid', 'createdAt', 'updatedAt'])
-        function stripSystemFields(obj: unknown): unknown {
-            if (Array.isArray(obj)) return obj.map(stripSystemFields)
-            if (obj && typeof obj === 'object') {
-                const result: Record<string, unknown> = {}
-                for (const [key, val] of Object.entries(obj)) {
-                    if (STRIP_KEYS.has(key)) continue
-                    result[key] = stripSystemFields(val)
-                }
-                return result
-            }
-            return obj
-        }
-
         try {
-            const homepageResult = await payload.find({
-                collection: 'pages',
-                where: { site: { equals: siteId }, isHomepage: { equals: true } },
-                limit: 1,
-                depth: 2,
-            })
-            const homepage = homepageResult.docs[0] as { layout?: LayoutBlock[] } | undefined
-            if (homepage?.layout) {
-                const navBlock = homepage.layout.find(b => b.blockType === 'navigation')
-                const footerBlock = homepage.layout.find(b => b.blockType === 'footer')
-                if (navBlock) {
-                    defaultLayout.push(stripSystemFields(navBlock) as LayoutBlock)
-                }
+            const frame = await homepageFrame(payload, siteId)
+            if (frame.found) {
+                if (frame.nav) defaultLayout.push(frame.nav)
                 defaultLayout.push({
                     blockType: 'hero',
                     variant: 'centered',
@@ -242,9 +217,7 @@ export const POST = withFeatureGuard('website_builder')(withAuth<RouteContext>(a
                     subheadline: '',
                     ctaButtons: [{ label: 'Get Started', url: '#contact', style: 'primary' }],
                 } as LayoutBlock)
-                if (footerBlock) {
-                    defaultLayout.push(stripSystemFields(footerBlock) as LayoutBlock)
-                }
+                if (frame.footer) defaultLayout.push(frame.footer)
             }
         } catch {
             defaultLayout.push({

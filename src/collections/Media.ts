@@ -1,6 +1,6 @@
 import { basename, resolve } from 'path'
 
-import type { AccessArgs, CollectionConfig, PayloadHandler } from 'payload'
+import type { AccessArgs, CollectionBeforeChangeHook, CollectionConfig, PayloadHandler, Where } from 'payload'
 import { APIError } from 'payload'
 import { hasValidEvidenceVideoSignature, hasValidImageSignature } from '@/lib/media/image-signature'
 
@@ -78,20 +78,76 @@ const SYSTEM_PROVENANCE_FIELD_ACCESS = {
     update: () => false,
 }
 
-function tenantWritableMedia({ req }: AccessArgs) {
+/**
+ * Who may edit or delete a media row (update / delete).
+ * - Any signed-in user: files that are not stock-provider rows (unchanged).
+ * - Stock-provider rows (Pixabay / Wikimedia): only when the row's tenant is one of the user's workspaces.
+ *   Stock pictures the copilot saved for a shop carry that shop's tenant, so its merchant can remove them.
+ *   Rows with no tenant are the shared stock library: nobody here can touch them.
+ * The provenance fields (`sourceProvider`, license, attribution…) stay system-only whoever may update the row.
+ */
+function tenantWritableMedia({ req }: AccessArgs): false | Where {
     if (!req.user) return false
+    const own = memberTenantIds(req.user).map((id) => (/^\d+$/.test(String(id)) ? Number(id) : id))
     return {
         or: [
             { sourceProvider: { exists: false } },
             { sourceProvider: { not_in: [...STOCK_SOURCE_PROVIDERS] } },
+            ...(own.length > 0 ? [{ and: [{ sourceProvider: { in: [...STOCK_SOURCE_PROVIDERS] } }, { tenant: { in: own } }] }] : []),
         ],
     }
+}
+
+function unwrapId(value: unknown): string | number | null {
+    if (value == null || value === '') return null
+    if (typeof value === 'object') {
+        const id = (value as { id?: unknown }).id
+        return typeof id === 'string' || typeof id === 'number' ? id : null
+    }
+    return typeof value === 'string' || typeof value === 'number' ? value : null
+}
+
+/** Tenant ids the signed-in user belongs to, first = their default workspace (same rule as Blogs/Products). */
+function memberTenantIds(user: unknown): Array<string | number> {
+    const entries = (user as { tenants?: Array<{ tenant?: unknown }> } | null | undefined)?.tenants ?? []
+    return entries.flatMap((entry) => {
+        const id = unwrapId(entry?.tenant)
+        return id == null ? [] : [id]
+    })
+}
+
+/**
+ * A new file belongs to the workspace of whoever uploads it. The tenant is what lets the AI copilot list
+ * "this shop's library" and refuse another shop's picture (`lib/ai-platform/media-access.ts`).
+ * - Signed-in tenant user: one of their own workspaces (the one asked for if they belong to it, else their first).
+ * - Signed-in platform admin: whatever was asked for, else their first workspace, else none.
+ * - No user (Local API: copilot ingest, scripts, migrations): the caller's explicit tenant is kept as given.
+ * Rows created before this field existed stay without a tenant (legacy; see media-access.ts).
+ */
+export function resolveMediaTenant(user: unknown, requested: unknown): string | number | null {
+    const asked = unwrapId(requested)
+    if (!user) return asked
+    const members = memberTenantIds(user)
+    const isSuperAdmin = Boolean((user as { roles?: string[] }).roles?.includes('super-admin'))
+    if (isSuperAdmin && asked != null) return asked
+    if (asked != null && members.some((id) => String(id) === String(asked))) return asked
+    return members[0] ?? null
+}
+
+const assignTenant: CollectionBeforeChangeHook = ({ data, req, operation }) => {
+    // the owner never changes after the upload
+    if (operation !== 'create') return data
+    const tenant = resolveMediaTenant(req.user, data?.tenant)
+    if (tenant != null) data.tenant = tenant
+    else delete data.tenant
+    return data
 }
 
 export const Media: CollectionConfig = {
     slug: 'media',
     hooks: {
         beforeChange: [
+            assignTenant,
             async ({ req }) => {
                 if (!req.file) return
                 // Images are always validated. Ticket evidence additionally
@@ -152,6 +208,20 @@ export const Media: CollectionConfig = {
         delete: tenantWritableMedia,
     },
     fields: [
+        {
+            // Owner workspace. Nullable on purpose: rows uploaded before this field existed have none.
+            // Reads of the file itself stay public (storefront); the field is only shown to signed-in users.
+            name: 'tenant',
+            type: 'relationship',
+            relationTo: 'tenants',
+            index: true,
+            access: {
+                read: ({ req }) => Boolean(req.user),
+                create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+                update: () => false,
+            },
+            admin: { description: 'The workspace that uploaded this file (set automatically)', readOnly: true },
+        },
         {
             name: 'alt',
             type: 'text',
