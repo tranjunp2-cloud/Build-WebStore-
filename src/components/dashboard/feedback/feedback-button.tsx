@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { MessageSquareText } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { FeedbackDialog } from './feedback-dialog'
+import { useFeedbackAvailability } from './use-feedback-availability'
 import type { FeedbackContext } from './types'
 
 type FeedbackButtonProps = {
@@ -19,6 +20,10 @@ export function FeedbackButton({ storeName }: FeedbackButtonProps) {
     const [open, setOpen] = useState(false)
     const context = useMemo<FeedbackContext>(() => ({ storeName }), [storeName])
     const label = t.dashboard.feedback.button
+    const availability = useFeedbackAvailability()
+
+    // Hidden after the feedback window closes (15/11/2026 MYT); the server decides.
+    if (!availability.enabled) return null
 
     return (
         <>
@@ -26,6 +31,7 @@ export function FeedbackButton({ storeName }: FeedbackButtonProps) {
                 type="button"
                 onClick={() => setOpen(true)}
                 aria-label={label}
+                title={label}
                 aria-haspopup="dialog"
                 // Preflight is OFF → full border shorthand. Label hides below md (header is tight
                 // on mobile: ☰ + logo + bell + theme + avatar); the aria-label keeps it accessible.
@@ -34,7 +40,7 @@ export function FeedbackButton({ storeName }: FeedbackButtonProps) {
                 <MessageSquareText aria-hidden className="h-3.5 w-3.5 shrink-0" />
                 <span className="hidden md:inline">{label}</span>
             </button>
-            {open && <FeedbackDialog context={context} onClose={() => setOpen(false)} />}
+            {open && <FeedbackDialog context={context} types={availability.types} onClose={() => setOpen(false)} />}
         </>
     )
 }

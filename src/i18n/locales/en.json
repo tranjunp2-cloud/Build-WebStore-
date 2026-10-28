@@ -3364,9 +3364,9 @@
       }
     },
     "feedback": {
-      "button": "Feedback",
+      "button": "Send feedback",
       "title": "Send feedback",
-      "description": "Your feedback and bug reports help us improve the Web Store.",
+      "description": "Your store details and the page you're on are attached automatically.",
       "context": {
         "store": "Store: {store}"
       },
@@ -3379,37 +3379,44 @@
           "suggestion": "Suggestion"
         },
         "area": "Feature",
-        "areaPlaceholder": "Choose a feature",
-        "areaError": "Please choose a feature.",
+        "areaPlaceholder": "Choose features (you can pick more than one)",
+        "areaError": "Please choose at least one feature.",
+        "areaMore": "+{count}",
+        "removeArea": "Remove {name}",
         "areaOptions": {
-          "products": "Products",
+          "products": "Products & stock",
           "orders": "Orders",
-          "payments": "Payments",
           "customers": "Customers",
+          "discounts": "Discounts",
           "design": "Design & pages",
-          "settings": "Settings",
+          "payments": "Payments",
+          "shipping": "Shipping",
+          "domains": "Domains",
+          "account": "Account & staff",
           "other": "Other"
         },
         "details": "Details",
         "detailsPlaceholder": "What did you do, what did you expect, and what happened instead?",
         "detailsPlaceholderMismatch": "What's different between V1 and V2? E.g. Order DH-1042 is RM120 in V1 but RM100 in V2.",
         "detailsError": "Please add some details.",
+        "detailsShortError": "Please write at least 10 characters.",
         "detailsHelper": "Don't enter passwords, payment details or your customers' personal data.",
         "optional": "(optional)",
         "screenshots": "Screenshots",
-        "addScreenshot": "Add screenshot",
+        "addScreenshot": "Add image",
         "screenshotAlt": "Screenshot {n}",
         "removeScreenshot": "Remove screenshot {n}",
         "screenshotHelper": "Up to 9 images, PNG or JPG, max 5 MB each.",
         "screenshotTooLarge": "This image is larger than 5 MB.",
-        "screenshotWrongType": "Only PNG or JPG images are supported."
+        "screenshotWrongType": "Only PNG or JPG images are supported.",
+        "screenshotTooMany": "You can add up to 9 images."
       },
       "failed": {
         "title": "Your feedback wasn't sent",
         "description": "What you entered has been kept. Please try again.",
         "screenshotTooLarge": "A screenshot is still too large to upload even after compression. Remove it or use a smaller image, then try again."
       },
-      "rateLimited": "You've sent a lot of feedback in a short time. Please try again later.",
+      "rateLimited": "You've sent a lot of feedback in a short time. Please try again in a few minutes.",
       "sendingNote": "Sending… Please don't send it again.",
       "actions": {
         "cancel": "Cancel",

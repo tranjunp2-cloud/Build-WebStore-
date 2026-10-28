@@ -1,6 +1,6 @@
 import { MAX_UPLOAD_BYTES, compressScreenshot } from './compress-screenshot'
 
-export const SCREENSHOT_ENDPOINT = '/api/feedback/screenshots'
+export const SCREENSHOT_ENDPOINT = '/api/v1/feedback/screenshots'
 
 // A retry after a failed submit must not push already-uploaded files to Lark again.
 const uploaded = new WeakMap<File, string>()

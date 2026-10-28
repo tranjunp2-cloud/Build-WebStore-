@@ -11,13 +11,15 @@ type Props = {
     items: ScreenshotItem[]
     onAdd: (files: File[]) => void
     onRemove: (id: string) => void
+    /** More files were picked than fit: only the first ones were kept. */
+    overflow?: boolean
     disabled?: boolean
 }
 
 const TILE = 'relative h-16 w-16 shrink-0 rounded-lg'
 
 /** Screenshot tiles + add button (Figma "Screenshots"). Flagged files show a red tile and the error below. */
-export function ScreenshotField({ items, onAdd, onRemove, disabled }: Props) {
+export function ScreenshotField({ items, onAdd, onRemove, overflow, disabled }: Props) {
     const { t, ti } = useI18n()
     const f = t.dashboard.feedback.fields
     const inputRef = useRef<HTMLInputElement>(null)
@@ -80,6 +82,7 @@ export function ScreenshotField({ items, onAdd, onRemove, disabled }: Props) {
                     {ERROR_TEXT[firstError]}
                 </p>
             )}
+            {overflow && <p role="alert" className="text-xs leading-4 text-[hsl(var(--destructive))]">{f.screenshotTooMany}</p>}
             <p className="text-[11px] leading-4 text-[var(--dash-text-muted)]">{f.screenshotHelper}</p>
         </div>
     )

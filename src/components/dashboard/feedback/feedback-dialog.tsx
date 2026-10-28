@@ -1,32 +1,28 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
-import { Info, Loader2, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { useId, useRef, useState } from 'react'
+import { Loader2, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { cn } from '@/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { DiscardConfirmDialog } from './discard-confirm-dialog'
 import { FeedbackSuccessView } from './feedback-success-view'
 import { FeedbackFormFields } from './feedback-form-fields'
 import { submitFeedback } from './submit-feedback'
 import { useFeedbackForm } from './use-feedback-form'
-import { FEEDBACK_AREAS, MAX_DETAILS_LENGTH, type FeedbackArea, type FeedbackContext, type SubmitFeedback } from './types'
+import { FEEDBACK_TYPES, type FeedbackContext, type FeedbackType, type SubmitFeedback } from './types'
 
 type Props = {
     context: FeedbackContext
+    /** Types this store may use; defaults to all. */
+    types?: readonly FeedbackType[]
     onClose: () => void
     /** Override for tests / alternate transports. Defaults to the REST adapter. */
     submit?: SubmitFeedback
 }
 
-export function FeedbackDialog({ context, onClose, submit = submitFeedback }: Props) {
+export function FeedbackDialog({ context, types = FEEDBACK_TYPES, onClose, submit = submitFeedback }: Props) {
     const { t, ti } = useI18n()
     const f = t.dashboard.feedback
     const form = useFeedbackForm({ context, submit })
@@ -34,11 +30,6 @@ export function FeedbackDialog({ context, onClose, submit = submitFeedback }: Pr
     const areaRef = useRef<HTMLButtonElement>(null)
     const detailsRef = useRef<HTMLTextAreaElement>(null)
     const [confirmDiscard, setConfirmDiscard] = useState(false)
-
-    // Spam block: surfaced as a toast; the entered data stays so the user can resend later.
-    useEffect(() => {
-        if (form.failure === 'rate_limited') toast.error(f.rateLimited)
-    }, [form.failure, f.rateLimited])
 
     const submitting = form.status === 'submitting'
     const done = form.status === 'success'
@@ -110,9 +101,17 @@ export function FeedbackDialog({ context, onClose, submit = submitFeedback }: Pr
                                     </Alert>
                                 )}
 
+                                {form.failure === 'rate_limited' && (
+                                    // Too many feedbacks: yellow banner, form stays open with its content.
+                                    <Alert variant="warning" role="alert">
+                                        <AlertDescription className="text-xs text-[var(--dash-text)]">{f.rateLimited}</AlertDescription>
+                                    </Alert>
+                                )}
+
                                 <FeedbackFormFields
                                     form={form}
                                     submitting={submitting}
+                                    types={types}
                                     ids={ids}
                                     areaRef={areaRef}
                                     detailsRef={detailsRef}

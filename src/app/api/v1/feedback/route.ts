@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 import { extractTenantId, tenantIdForQuery, withAuth } from '@/lib/auth'
+import { feedbackTypesFor, isFeedbackWindowOpen, lookupTenantInfo } from '@/lib/feedback/feedback-availability'
 import { feedbackGuardKey, getFeedbackBlockSeconds, recordFeedbackSubmit } from '@/lib/feedback/feedback-spam-guard'
 import { LarkApiError } from '@/lib/lark/lark-base-client'
 import {
@@ -16,27 +15,16 @@ export const dynamic = 'force-dynamic'
 const errorResponse = (status: number, code: string, message: string, headers?: HeadersInit) =>
     NextResponse.json({ error: { code, message } }, { status, headers })
 
-/** Store name from the DB (never the client). Fail-open: a lookup error only leaves the Store column empty. */
-async function lookupStoreName(tenantId: string | number | null): Promise<string | null> {
-    if (!tenantId) return null
-    try {
-        const payload = await getPayload({ config })
-        const tenant = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, select: { name: true } })
-        return (tenant as { name?: string }).name?.trim() || null
-    } catch (err) {
-        console.error('[feedback] store name lookup failed', err instanceof Error ? err.message : err)
-        return null
-    }
-}
-
 /**
- * POST /api/feedback
+ * POST /api/v1/feedback
  * Headers: Idempotency-Key (UUID v4). Body: FeedbackInput (without screenshots).
  * Writes one record to the Lark Base report table and returns `{ feedbackId }`.
  * Only responds 2xx after Lark accepted the record (the UI shows the ID as confirmation).
  */
 export const POST = withAuth(async (user, request) => {
-    const guardKey = feedbackGuardKey(extractTenantId(user), user.id)
+    if (!isFeedbackWindowOpen()) return errorResponse(403, 'FEEDBACK_CLOSED', 'Feedback is not open right now')
+
+    const guardKey = feedbackGuardKey(user.id)
     const blockedFor = await getFeedbackBlockSeconds(guardKey)
     if (blockedFor) {
         return errorResponse(429, 'RATE_LIMITED', 'Too many submissions. Please try again later.', {
@@ -59,17 +47,28 @@ export const POST = withAuth(async (user, request) => {
     }
 
     const tenantId = extractTenantId(user)
-    const storeName = await lookupStoreName(tenantIdForQuery(user))
+    const { storeName, isMigratedStore } = await lookupTenantInfo(tenantIdForQuery(user))
+    if (!feedbackTypesFor(isMigratedStore).includes(parsed.data.type)) {
+        return errorResponse(400, 'INVALID_BODY', 'Feedback type not available for this store')
+    }
 
     try {
-        const { feedbackId } = await submitFeedbackToLarkBase(
+        const { feedbackId, replayed } = await submitFeedbackToLarkBase(
             parsed.data,
             key.data,
             // Tenant and reporter come from the session, never from the client body.
-            { tenantId, storeName, ...extractReporter(user) },
+            {
+                tenantId,
+                storeName,
+                isMigratedStore,
+                appVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
+                userAgent: request.headers.get('user-agent')?.slice(0, 300) ?? null,
+                ...extractReporter(user),
+            },
             { appToken, tableId },
         )
-        await recordFeedbackSubmit(guardKey)
+        // A retry of a request that already landed does not count against the limit.
+        if (!replayed) await recordFeedbackSubmit(guardKey)
         return NextResponse.json({ feedbackId })
     } catch (err) {
         const larkCode = err instanceof LarkApiError ? err.code : null

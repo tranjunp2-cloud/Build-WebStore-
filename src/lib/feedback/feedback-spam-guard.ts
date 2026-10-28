@@ -1,20 +1,18 @@
 import { checkRateLimit } from '@/lib/rateLimit'
 import { redis } from '@/lib/redis'
 
-/** SUBMIT_LIMIT successful submits from one store within SUBMIT_WINDOW_MS block the store for BLOCK_SECONDS (10 min). */
+/** PRD §10.4: at most SUBMIT_LIMIT feedbacks per user in a sliding SUBMIT_WINDOW_MS; the next one gets 429. */
 export const SUBMIT_LIMIT = 5
-export const SUBMIT_WINDOW_MS = 5 * 60_000
-export const BLOCK_SECONDS = 10 * 60
+export const SUBMIT_WINDOW_MS = 15 * 60_000
 
 const memoryBlocks = new Map<string, number>()
 
-/** Feedback is limited per store (tenant); users without a tenant fall back to their own id. */
-export const feedbackGuardKey = (tenantId: string | null, userId: string | number) =>
-    tenantId ? `tenant:${tenantId}` : `user:${userId}`
+/** Feedback is limited per user (`created_by`). */
+export const feedbackGuardKey = (userId: string | number) => `user:${userId}`
 
 const blockKey = (key: string) => `feedback:block:${key}`
 
-/** Seconds left on the block, or null when the store may submit. */
+/** Seconds until the user may submit again, or null when they may submit now. */
 export async function getFeedbackBlockSeconds(key: string): Promise<number | null> {
     if (redis) {
         try {
@@ -29,23 +27,24 @@ export async function getFeedbackBlockSeconds(key: string): Promise<number | nul
     return Math.ceil((until - Date.now()) / 1000)
 }
 
-async function blockStore(key: string): Promise<void> {
-    memoryBlocks.set(key, Date.now() + BLOCK_SECONDS * 1000)
+async function blockUntil(key: string, resetAt: number): Promise<void> {
+    const seconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))
+    memoryBlocks.set(key, Date.now() + seconds * 1000)
     if (!redis) return
     try {
-        await redis.set(blockKey(key), '1', { ex: BLOCK_SECONDS })
+        await redis.set(blockKey(key), '1', { ex: seconds })
     } catch {
         // The in-memory block above still applies on this instance.
     }
 }
 
 /**
- * Counts one *successful* submit for the store and blocks it once SUBMIT_LIMIT is reached, so the
- * next request is rejected. Failed attempts (bad input, Lark outage) never count against the store.
+ * Counts one *successful* new submit and blocks the user once SUBMIT_LIMIT is reached, until the
+ * window frees up. Failed attempts (bad input, Lark outage) and idempotent replays never count.
  */
 export async function recordFeedbackSubmit(key: string): Promise<void> {
     const rate = await checkRateLimit(`feedback:submit:${key}`, SUBMIT_LIMIT, SUBMIT_WINDOW_MS)
-    if (!rate.allowed || rate.remaining <= 0) await blockStore(key)
+    if (!rate.allowed || rate.remaining <= 0) await blockUntil(key, rate.resetAt)
 }
 
 /** Test helper. */

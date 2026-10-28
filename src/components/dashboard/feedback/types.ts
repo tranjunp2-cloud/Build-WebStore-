@@ -1,11 +1,14 @@
 export type FeedbackType = 'problem' | 'mismatch' | 'suggestion'
 export const FEEDBACK_TYPES: readonly FeedbackType[] = ['problem', 'mismatch', 'suggestion']
 
-export type FeedbackArea = 'products' | 'orders' | 'payments' | 'customers' | 'design' | 'settings' | 'other'
+export type FeedbackArea =
+    | 'products' | 'orders' | 'customers' | 'discounts' | 'design'
+    | 'payments' | 'shipping' | 'domains' | 'account' | 'other'
 export const FEEDBACK_AREAS: readonly FeedbackArea[] = [
-    'products', 'orders', 'payments', 'customers', 'design', 'settings', 'other',
+    'products', 'orders', 'customers', 'discounts', 'design', 'payments', 'shipping', 'domains', 'account', 'other',
 ]
 
+export const MIN_DETAILS_LENGTH = 10
 export const MAX_DETAILS_LENGTH = 2000
 export const MAX_SCREENSHOTS = 9
 export const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024
@@ -17,9 +20,13 @@ export type FeedbackContext = {
     storeName?: string
 }
 
+/** Where the user was when opening the form; sent as report context. */
+export type FeedbackPageContext = { pageUrl: string; locale: string }
+
 export type FeedbackInput = {
     type: FeedbackType
-    area: FeedbackArea
+    /** One or more features the feedback relates to (at least one). */
+    areas: FeedbackArea[]
     details: string
     /** Screenshots held in the browser; the submit adapter uploads them. */
     screenshots: File[]

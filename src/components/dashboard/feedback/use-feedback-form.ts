@@ -7,12 +7,13 @@ import {
     type FeedbackArea,
     type FeedbackContext,
     type FeedbackType,
+    MIN_DETAILS_LENGTH,
     type SubmitFailureKind,
     type SubmitFeedback,
 } from './types'
 
 export type FormStatus = 'idle' | 'submitting' | 'success'
-export type FormErrors = { area?: true; details?: true }
+export type FormErrors = { area?: true; details?: 'required' | 'short' }
 export type InvalidField = keyof FormErrors | 'screenshots'
 
 type Options = {
@@ -29,7 +30,7 @@ type Options = {
  */
 export function useFeedbackForm({ context, submit }: Options) {
     const [type, setType] = useState<FeedbackType>('problem')
-    const [area, setAreaState] = useState<FeedbackArea | ''>('')
+    const [areas, setAreasState] = useState<FeedbackArea[]>([])
     const [details, setDetailsState] = useState('')
     const [errors, setErrors] = useState<FormErrors>({})
     const [status, setStatus] = useState<FormStatus>('idle')
@@ -42,8 +43,8 @@ export function useFeedbackForm({ context, submit }: Options) {
     const idempotencyKey = useRef('')
     const keyedPayload = useRef('')
 
-    const setArea = useCallback((value: FeedbackArea) => {
-        setAreaState(value)
+    const setAreas = useCallback((value: FeedbackArea[]) => {
+        setAreasState(value)
         setErrors((e) => ({ ...e, area: undefined }))
     }, [])
 
@@ -52,15 +53,16 @@ export function useFeedbackForm({ context, submit }: Options) {
         setErrors((e) => ({ ...e, details: undefined }))
     }, [])
 
-    const isDirty = !!(area || details.trim() || screenshots.items.length)
+    const isDirty = !!(areas.length || details.trim() || screenshots.items.length)
 
     /** Returns the first invalid field, or null when the feedback was accepted (or blocked in flight). */
     const handleSubmit = useCallback(async (): Promise<InvalidField | null> => {
         if (inFlight.current) return null
 
-        if (!area || !details.trim()) {
-            setErrors({ area: !area || undefined, details: !details.trim() || undefined })
-            return !area ? 'area' : 'details'
+        const detailsError = !details.trim() ? 'required' : details.trim().length < MIN_DETAILS_LENGTH ? 'short' : undefined
+        if (!areas.length || detailsError) {
+            setErrors({ area: !areas.length || undefined, details: detailsError })
+            return !areas.length ? 'area' : 'details'
         }
         if (screenshots.hasError) return 'screenshots'
 
@@ -70,7 +72,7 @@ export function useFeedbackForm({ context, submit }: Options) {
         // Same payload → same key (a landed-but-unanswered request is not duplicated on retry).
         // Edited payload → fresh key, otherwise the server would treat the edit as the old request.
         const payloadSignature = JSON.stringify([
-            type, area, details.trim(),
+            type, areas, details.trim(),
             screenshots.items.map(({ file }) => [file.name, file.size, file.lastModified]),
         ])
         if (!idempotencyKey.current || keyedPayload.current !== payloadSignature) {
@@ -81,7 +83,7 @@ export function useFeedbackForm({ context, submit }: Options) {
             const result = await submit(
                 {
                     type,
-                    area,
+                    areas,
                     details: details.trim(),
                     screenshots: screenshots.items.map((i) => i.file),
                     context,
@@ -98,11 +100,11 @@ export function useFeedbackForm({ context, submit }: Options) {
             inFlight.current = false
         }
         return null
-    }, [type, area, details, screenshots.items, screenshots.hasError, context, submit])
+    }, [type, areas, details, screenshots.items, screenshots.hasError, context, submit])
 
     return {
         type, setType,
-        area, setArea,
+        areas, setAreas,
         details, setDetails,
         screenshots,
         errors, status, failure, feedbackId, isDirty,

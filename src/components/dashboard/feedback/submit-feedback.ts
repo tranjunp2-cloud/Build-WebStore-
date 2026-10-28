@@ -1,7 +1,13 @@
 import { ScreenshotUploadError, uploadScreenshots } from './upload-screenshots'
 import { SubmitFeedbackError, type SubmitFeedback } from './types'
 
-export const FEEDBACK_ENDPOINT = '/api/feedback'
+/** Where the form was opened; the server cannot see the client route. */
+function pageContext() {
+    const lang = localStorage.getItem('prefer_lang')
+    return { pageUrl: location.pathname + location.search, locale: lang === 'ms' ? 'ms' : 'en' }
+}
+
+export const FEEDBACK_ENDPOINT = '/api/v1/feedback'
 
 /**
  * Default transport: POST JSON with an `Idempotency-Key` header so the API can de-duplicate
@@ -22,7 +28,7 @@ export const submitFeedback: SubmitFeedback = async (input, idempotencyKey) => {
     const res = await fetch(FEEDBACK_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
-        body: JSON.stringify({ ...rest, screenshotTokens }),
+        body: JSON.stringify({ ...rest, ...pageContext(), screenshotTokens }),
     })
     const body = await res.json().catch(() => null)
     if (res.status === 429) throw new SubmitFeedbackError('rate_limited', 'Too many requests')

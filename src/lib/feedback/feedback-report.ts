@@ -2,12 +2,19 @@ import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { LARK_CLIENT_TOKEN_CONFLICT, LarkApiError, createBaseRecord } from '@/lib/lark/lark-base-client'
 
+const AREA_KEYS = [
+    'products', 'orders', 'customers', 'discounts', 'design', 'payments', 'shipping', 'domains', 'account', 'other',
+] as const
+
 /** Body accepted by POST /api/feedback (mirrors the client FeedbackInput minus screenshots). */
 export const feedbackSchema = z.object({
     type: z.enum(['problem', 'mismatch', 'suggestion']),
-    area: z.enum(['products', 'orders', 'payments', 'customers', 'design', 'settings', 'other']),
-    details: z.string().trim().min(1).max(2000),
-    // Lark attachment tokens from /api/feedback/screenshots/attach (Lark rejects tokens from another Base).
+    areas: z.array(z.enum(AREA_KEYS)).min(1).max(AREA_KEYS.length).refine((a) => new Set(a).size === a.length),
+    details: z.string().trim().min(10).max(2000),
+    // Lark attachment tokens from /api/feedback/screenshots (Lark rejects tokens from another Base).
+    // Context the client reports about where the form was opened.
+    pageUrl: z.string().max(500).optional(),
+    locale: z.enum(['en', 'ms']).optional(),
     screenshotTokens: z.array(z.string().min(1).max(100)).max(9).optional(),
 })
 export type FeedbackBody = z.infer<typeof feedbackSchema>
@@ -19,7 +26,7 @@ export const uuidV4Schema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]
 export const LARK_FEEDBACK_FIELDS = {
     feedbackId: 'Feedback ID',
     type: 'Type',
-    area: 'Feature',
+    areas: 'Feature',
     details: 'Details',
     screenshots: 'Screenshots',
     store: 'Store',
@@ -27,12 +34,19 @@ export const LARK_FEEDBACK_FIELDS = {
     reporter: 'Reporter',
     role: 'Role',
     status: 'Status',
+    migrated: 'Migrated store',
+    pageUrl: 'Page URL',
+    locale: 'Language',
+    appVersion: 'App version',
+    userAgent: 'User agent',
 } as const
 
 const TYPE_LABEL = { problem: 'Report a problem', mismatch: 'Data mismatch', suggestion: 'Suggestion' } as const
+/** Option names of the Lark "Feature" multi-select; must match the Base exactly. */
 const AREA_LABEL = {
-    products: 'Products', orders: 'Orders', payments: 'Payments', customers: 'Customers',
-    design: 'Design & pages', settings: 'Settings', other: 'Other',
+    products: 'Products & stock', orders: 'Orders', customers: 'Customers', discounts: 'Discounts',
+    design: 'Design & pages', payments: 'Payments', shipping: 'Shipping', domains: 'Domains',
+    account: 'Account & staff', other: 'Other',
 } as const
 
 /**
@@ -49,6 +63,9 @@ type Meta = {
     feedbackId: string
     tenantId: string | null
     storeName: string | null
+    isMigratedStore: boolean
+    appVersion: string | null
+    userAgent: string | null
     reporterName: string | null
     reporterRole: string | null
 }
@@ -65,7 +82,7 @@ export function toLarkFields(body: FeedbackBody, meta: Meta): Record<string, unk
     const fields: Record<string, unknown> = {
         [f.feedbackId]: meta.feedbackId,
         [f.type]: TYPE_LABEL[body.type],
-        [f.area]: AREA_LABEL[body.area],
+        [f.areas]: body.areas.map((a) => AREA_LABEL[a]),
         [f.details]: body.details,
         [f.status]: 'New',
     }
@@ -75,6 +92,11 @@ export function toLarkFields(body: FeedbackBody, meta: Meta): Record<string, unk
     if (meta.reporterRole) fields[f.role] = meta.reporterRole
     if (body.screenshotTokens?.length) fields[f.screenshots] = body.screenshotTokens.map((file_token) => ({ file_token }))
     if (meta.storeName) fields[f.store] = meta.storeName
+    fields[f.migrated] = meta.isMigratedStore ? 'Yes' : 'No'
+    if (body.pageUrl) fields[f.pageUrl] = body.pageUrl
+    if (body.locale) fields[f.locale] = body.locale === 'ms' ? 'Bahasa Melayu' : 'English'
+    if (meta.appVersion) fields[f.appVersion] = meta.appVersion
+    if (meta.userAgent) fields[f.userAgent] = meta.userAgent
     return fields
 }
 
@@ -82,14 +104,14 @@ export type SubmitConfig = { appToken: string; tableId: string }
 
 /**
  * Pushes one feedback into the Lark Base table. Idempotent per key: a conflict on the
- * client_token means the first attempt already landed, so the same feedback id is returned.
+ * client_token means the first attempt already landed (`replayed`), so the same feedback id is returned.
  */
 export async function submitFeedbackToLarkBase(
     body: FeedbackBody,
     idempotencyKey: string,
     meta: Omit<Meta, 'feedbackId'>,
     config: SubmitConfig,
-): Promise<{ feedbackId: string }> {
+): Promise<{ feedbackId: string; replayed: boolean }> {
     const feedbackId = buildFeedbackId(idempotencyKey)
     try {
         await createBaseRecord({
@@ -99,8 +121,8 @@ export async function submitFeedbackToLarkBase(
             fields: toLarkFields(body, { ...meta, feedbackId }),
         })
     } catch (err) {
-        if (err instanceof LarkApiError && err.code === LARK_CLIENT_TOKEN_CONFLICT) return { feedbackId }
+        if (err instanceof LarkApiError && err.code === LARK_CLIENT_TOKEN_CONFLICT) return { feedbackId, replayed: true }
         throw err
     }
-    return { feedbackId }
+    return { feedbackId, replayed: false }
 }

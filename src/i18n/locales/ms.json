@@ -3364,9 +3364,9 @@
       }
     },
     "feedback": {
-      "button": "Maklum balas",
+      "button": "Hantar maklum balas",
       "title": "Hantar maklum balas",
-      "description": "Maklum balas dan laporan pepijat anda membantu kami menambah baik Web Store.",
+      "description": "Butiran kedai anda dan halaman yang sedang dilihat dilampirkan secara automatik.",
       "context": {
         "store": "Kedai: {store}"
       },
@@ -3374,42 +3374,49 @@
       "fields": {
         "type": "Jenis maklum balas",
         "typeOptions": {
-          "problem": "Lapor masalah",
-          "mismatch": "Data tidak sepadan",
+          "problem": "Laporkan masalah",
+          "mismatch": "Percanggahan data",
           "suggestion": "Cadangan"
         },
         "area": "Ciri",
-        "areaPlaceholder": "Pilih ciri",
-        "areaError": "Sila pilih ciri.",
+        "areaPlaceholder": "Pilih ciri (boleh pilih lebih daripada satu)",
+        "areaError": "Sila pilih sekurang-kurangnya satu ciri.",
+        "areaMore": "+{count}",
+        "removeArea": "Buang {name}",
         "areaOptions": {
-          "products": "Produk",
+          "products": "Produk & stok",
           "orders": "Pesanan",
-          "payments": "Pembayaran",
           "customers": "Pelanggan",
+          "discounts": "Diskaun",
           "design": "Reka bentuk & halaman",
-          "settings": "Tetapan",
+          "payments": "Pembayaran",
+          "shipping": "Penghantaran",
+          "domains": "Domain",
+          "account": "Akaun & kakitangan",
           "other": "Lain-lain"
         },
         "details": "Butiran",
-        "detailsPlaceholder": "Apa yang anda lakukan, apa yang anda jangkakan, dan apa yang berlaku sebaliknya?",
-        "detailsPlaceholderMismatch": "Apakah perbezaan antara V1 dan V2? Cth. Pesanan DH-1042 ialah RM120 dalam V1 tetapi RM100 dalam V2.",
-        "detailsError": "Sila tambah butiran.",
+        "detailsPlaceholder": "Apa yang anda lakukan, apa yang anda jangkakan, dan apa yang berlaku?",
+        "detailsPlaceholderMismatch": "Apakah yang berbeza antara V1 dan V2? Cth: Jumlah pesanan DH-1042 ialah RM120 dalam V1 tetapi RM100 dalam V2.",
+        "detailsError": "Sila masukkan butiran.",
+        "detailsShortError": "Sila tulis sekurang-kurangnya 10 aksara.",
         "detailsHelper": "Jangan masukkan kata laluan, butiran pembayaran atau data peribadi pelanggan anda.",
         "optional": "(pilihan)",
         "screenshots": "Tangkapan skrin",
-        "addScreenshot": "Tambah tangkapan skrin",
+        "addScreenshot": "Tambah imej",
         "screenshotAlt": "Tangkapan skrin {n}",
         "removeScreenshot": "Buang tangkapan skrin {n}",
         "screenshotHelper": "Sehingga 9 imej, PNG atau JPG, maksimum 5 MB setiap satu.",
         "screenshotTooLarge": "Imej ini melebihi 5 MB.",
-        "screenshotWrongType": "Hanya imej PNG atau JPG disokong."
+        "screenshotWrongType": "Hanya imej PNG atau JPG disokong.",
+        "screenshotTooMany": "Anda boleh menambah sehingga 9 imej."
       },
       "failed": {
         "title": "Maklum balas anda tidak dihantar",
         "description": "Apa yang anda masukkan telah disimpan. Sila cuba lagi.",
         "screenshotTooLarge": "Satu tangkapan skrin masih terlalu besar untuk dimuat naik walaupun selepas pemampatan. Alih keluarnya atau gunakan imej yang lebih kecil, kemudian cuba lagi."
       },
-      "rateLimited": "Anda telah menghantar banyak maklum balas dalam masa singkat. Sila cuba lagi kemudian.",
+      "rateLimited": "Anda telah menghantar banyak maklum balas dalam masa yang singkat. Sila cuba lagi dalam beberapa minit.",
       "sendingNote": "Menghantar… Sila jangan hantar lagi.",
       "actions": {
         "cancel": "Batal",

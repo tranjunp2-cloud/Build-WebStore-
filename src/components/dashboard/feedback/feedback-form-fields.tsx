@@ -6,12 +6,12 @@ import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { Alert } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { FeedbackTypeControl } from './feedback-type-control'
 import { ScreenshotField } from './screenshot-field'
 import type { useFeedbackForm } from './use-feedback-form'
-import { FEEDBACK_AREAS, MAX_DETAILS_LENGTH, type FeedbackArea } from './types'
+import { FeedbackAreaSelect } from './feedback-area-select'
+import { MAX_DETAILS_LENGTH, type FeedbackType } from './types'
 
 const ERROR_BORDER = 'border-[hsl(var(--destructive))]'
 // Figma "sending": every control muted + dimmed while the request runs.
@@ -24,13 +24,14 @@ const REQUIRED = <span aria-hidden className="text-[hsl(var(--destructive))]">*<
 type Props = {
     form: ReturnType<typeof useFeedbackForm>
     submitting: boolean
+    types: readonly FeedbackType[]
     ids: { type: string; area: string; details: string }
     areaRef: RefObject<HTMLButtonElement | null>
     detailsRef: RefObject<HTMLTextAreaElement | null>
 }
 
 /** Scrollable field list of the feedback form (type, area, details, reference, screenshots). */
-export function FeedbackFormFields({ form, submitting, ids, areaRef, detailsRef }: Props) {
+export function FeedbackFormFields({ form, submitting, types, ids, areaRef, detailsRef }: Props) {
     const { t } = useI18n()
     const f = t.dashboard.feedback
 
@@ -41,6 +42,7 @@ export function FeedbackFormFields({ form, submitting, ids, areaRef, detailsRef 
             <FeedbackTypeControl
                 value={form.type}
                 onChange={form.setType}
+                types={types}
                 disabled={submitting}
                 labelledBy={ids.type}
             />
@@ -54,23 +56,15 @@ export function FeedbackFormFields({ form, submitting, ids, areaRef, detailsRef 
 
         <div className="flex flex-col gap-1.5">
             <Label htmlFor={ids.area} className={LABEL}>{f.fields.area} {REQUIRED}</Label>
-            <Select value={form.area} onValueChange={(v) => form.setArea(v as FeedbackArea)} disabled={submitting}>
-                <SelectTrigger
-                    ref={areaRef}
-                    id={ids.area}
-                    aria-required
-                    aria-invalid={!!form.errors.area}
-                    aria-describedby={form.errors.area ? `${ids.area}-error` : undefined}
-                    className={cn(LOCKED, form.errors.area && ERROR_BORDER)}
-                >
-                    <SelectValue placeholder={f.fields.areaPlaceholder} />
-                </SelectTrigger>
-                <SelectContent>
-                    {FEEDBACK_AREAS.map((a) => (
-                        <SelectItem key={a} value={a}>{f.fields.areaOptions[a]}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            <FeedbackAreaSelect
+                ref={areaRef}
+                id={ids.area}
+                value={form.areas}
+                onChange={form.setAreas}
+                disabled={submitting}
+                describedBy={form.errors.area ? `${ids.area}-error` : undefined}
+                className={cn(LOCKED, form.errors.area && ERROR_BORDER)}
+            />
             {form.errors.area && (
                 <p id={`${ids.area}-error`} role="alert" className={ERROR_TEXT}>{f.fields.areaError}</p>
             )}
@@ -96,7 +90,11 @@ export function FeedbackFormFields({ form, submitting, ids, areaRef, detailsRef 
                     {form.details.length}/{MAX_DETAILS_LENGTH}
                 </span>
             </div>
-            {form.errors.details && <p role="alert" className={ERROR_TEXT}>{f.fields.detailsError}</p>}
+            {form.errors.details && (
+                <p role="alert" className={ERROR_TEXT}>
+                    {form.errors.details === 'short' ? f.fields.detailsShortError : f.fields.detailsError}
+                </p>
+            )}
             <p id={`${ids.details}-help`} className={HELPER}>{f.fields.detailsHelper}</p>
         </div>
 
@@ -109,6 +107,7 @@ export function FeedbackFormFields({ form, submitting, ids, areaRef, detailsRef 
                 items={form.screenshots.items}
                 onAdd={form.screenshots.add}
                 onRemove={form.screenshots.remove}
+                overflow={form.screenshots.overflow}
                 disabled={submitting}
             />
         </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { extractTenantId, withAuth } from '@/lib/auth'
+import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { feedbackGuardKey, getFeedbackBlockSeconds } from '@/lib/feedback/feedback-spam-guard'
 import { LarkApiError, uploadBaseImage } from '@/lib/lark/lark-base-client'
@@ -22,13 +22,13 @@ function sniffImage(b: Uint8Array): { ext: 'png' | 'jpg'; mime: string } | null 
 }
 
 /**
- * POST /api/feedback/screenshots  (multipart, field `file`)
+ * POST /api/v1/feedback/screenshots  (multipart, field `file`)
  * Uploads one screenshot into the Lark Base as attachment media and returns its file_token,
  * which the feedback submit later writes into the Attachment cell. Nothing is stored on our side.
  */
 export const POST = withAuth(async (user, request) => {
-    // A store blocked for spamming submits cannot keep pushing media into the Base either.
-    const blockedFor = await getFeedbackBlockSeconds(feedbackGuardKey(extractTenantId(user), user.id))
+    // A user blocked for spamming submits cannot keep pushing media into the Base either.
+    const blockedFor = await getFeedbackBlockSeconds(feedbackGuardKey(user.id))
     if (blockedFor) {
         return NextResponse.json(
             { error: { code: 'RATE_LIMITED', message: 'Too many submissions. Please try again later.' } },

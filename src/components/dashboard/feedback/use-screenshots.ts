@@ -23,9 +23,14 @@ const validate = (file: File): ScreenshotError | undefined => {
  */
 export function useScreenshots() {
     const [items, setItems] = useState<ScreenshotItem[]>([])
+    const [overflow, setOverflow] = useState(false)
+    const count = useRef(0)
     const urls = useRef(new Set<string>())
+    count.current = items.length
 
     const add = useCallback((files: File[]) => {
+        // Only the first files that fit are kept; the rest are dropped with a notice.
+        setOverflow(files.length > MAX_SCREENSHOTS - count.current)
         setItems((prev) => {
             const room = MAX_SCREENSHOTS - prev.length
             const next = files.slice(0, Math.max(0, room)).map((file) => {
@@ -38,6 +43,7 @@ export function useScreenshots() {
     }, [])
 
     const remove = useCallback((id: string) => {
+        setOverflow(false)
         setItems((prev) => {
             const gone = prev.find((i) => i.id === id)
             if (gone) {
@@ -53,5 +59,5 @@ export function useScreenshots() {
         return () => { set.forEach((u) => URL.revokeObjectURL(u)); set.clear() }
     }, [])
 
-    return { items, add, remove, hasError: items.some((i) => i.error) }
+    return { items, add, remove, overflow, hasError: items.some((i) => i.error) }
 }
