@@ -3588,8 +3588,23 @@
     "overview": {
       "title": "Help center",
       "subtitle": "Learn how to use your website management system.",
-      "welcomeTitle": "Welcome to EchPrime!",
-      "welcomeDesc": "EchPrime helps you build and manage your professional website — from creating sites with AI and writing SEO-optimized blog posts to tracking traffic and engagement. Here's an overview of the main features.",
+      "welcomeTitle": "Welcome to Web Store!",
+      "intro": {
+        "desc": "Web Store helps you build and manage your professional website with AI in minutes.",
+        "lead1": "Watch the 1-minute video to quickly learn how to:",
+        "leadN": "Watch the {n}-minute video to quickly learn how to:",
+        "points": [
+          "Create a website & write SEO-friendly blog posts",
+          "Track traffic and leads automatically",
+          "Connect your own domain in 3 steps"
+        ],
+        "durationChip": "{d} min",
+        "tag": "Overview tour",
+        "title": "Web Store overview tour",
+        "resume": "Resume video",
+        "error": "Couldn’t load the video.",
+        "retry": "Try again"
+      },
       "featuresTitle": "Key features",
       "features": {
         "dashboardTitle": "Dashboard",
@@ -3600,9 +3615,7 @@
         "blogDesc": "Write SEO-friendly blog posts to bring in more customers.",
         "settingsTitle": "Settings",
         "settingsDesc": "Set up your domain and invite admin staff."
-      },
-      "needHelpTitle": "Need more help?",
-      "needHelpDesc": "Can't find the answer? Contact our support team on WhatsApp or by email."
+      }
     },
     "modules": {
       "lazyScreenshot": {

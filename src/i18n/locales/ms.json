@@ -3588,8 +3588,23 @@
     "overview": {
       "title": "Pusat bantuan",
       "subtitle": "Pelajari cara menggunakan sistem pengurusan laman web anda.",
-      "welcomeTitle": "Selamat datang ke EchPrime!",
-      "welcomeDesc": "EchPrime membantu anda membina dan mengurus laman web profesional dengan AI. Cipta laman web, tulis artikel blog mesra SEO, serta jejak trafik dan prestasi laman web anda. Berikut ialah gambaran keseluruhan ciri-ciri utamanya.",
+      "welcomeTitle": "Selamat datang ke Web Store!",
+      "intro": {
+        "desc": "Web Store membantu anda membina dan mengurus laman web profesional dengan AI dalam beberapa minit.",
+        "lead1": "Tonton video 1 minit ini untuk mengetahui cara:",
+        "leadN": "Tonton video {n} minit ini untuk mengetahui cara:",
+        "points": [
+          "Cipta laman web & tulis blog mesra SEO",
+          "Jejak trafik dan prospek secara automatik",
+          "Sambungkan domain anda sendiri dalam 3 langkah"
+        ],
+        "durationChip": "{d} min",
+        "tag": "Lawatan ringkas",
+        "title": "Lawatan ringkas Web Store",
+        "resume": "Sambung video",
+        "error": "Video tidak dapat dimuatkan.",
+        "retry": "Cuba lagi"
+      },
       "featuresTitle": "Ciri utama",
       "features": {
         "dashboardTitle": "Papan pemuka",
@@ -3600,9 +3615,7 @@
         "blogDesc": "Tulis artikel blog mesra SEO untuk menarik lebih ramai pelanggan.",
         "settingsTitle": "Tetapan",
         "settingsDesc": "Sediakan domain anda dan jemput pentadbir lain."
-      },
-      "needHelpTitle": "Perlukan bantuan lanjut?",
-      "needHelpDesc": "Masih perlukan bantuan? Hubungi pasukan sokongan kami melalui WhatsApp atau email. "
+      }
     },
     "modules": {
       "lazyScreenshot": {

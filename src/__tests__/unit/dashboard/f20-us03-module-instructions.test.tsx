@@ -197,3 +197,38 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// US-F20-05 (#2065): AI Website Builder guide screenshots refreshed from the V2 prototype
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('[TC-F20-05-11] AI Website Builder screenshots (V2)', () => {
+    const originalHash = window.location.hash
+
+    afterEach(() => {
+        window.location.hash = originalHash
+    })
+
+    it('TC-F20-05-11: every builder step image exists in /public and declares its real width/height', async () => {
+        // Arrange
+        const path = await import('node:path')
+        const sharp = (await import('sharp')).default
+        window.location.hash = '#builder'
+
+        // Act
+        render(
+            <I18nProvider>
+                <ModuleGuidesTab />
+            </I18nProvider>
+        )
+        const imgs = screen.getAllByTestId('next-image').filter(i => i.getAttribute('src')?.startsWith('/help/builder-'))
+
+        // Assert
+        expect(imgs).toHaveLength(6)
+        // Steps 1–4 and 6 use the V2 WebP screenshots; step 5 (templates) is unchanged
+        expect(imgs.map(i => i.getAttribute('src')!.split('.').pop())).toEqual(['webp', 'webp', 'webp', 'webp', 'jpg', 'webp'])
+        for (const img of imgs) {
+            const meta = await sharp(path.join(process.cwd(), 'public', img.getAttribute('src')!)).metadata()
+            expect([Number(img.getAttribute('width')), Number(img.getAttribute('height'))]).toEqual([meta.width, meta.height])
+        }
+    })
+})
