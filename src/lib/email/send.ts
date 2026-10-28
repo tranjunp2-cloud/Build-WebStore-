@@ -12,13 +12,15 @@ interface SendEmailOptions {
     to: string
     subject: string
     html: string
+    // Optional: where a reply to this email goes (nodemailer passes it through Payload's sendEmail)
+    replyTo?: string
     // Optional: when all 3 present, lookup tenant config + check enabled flag
     templateType?: EmailTemplateType
     recipient?: EmailRecipient
     tenantId?: string | number
 }
 
-export async function sendEmail({ to, subject, html, templateType, recipient, tenantId }: SendEmailOptions): Promise<boolean> {
+export async function sendEmail({ to, subject, html, replyTo, templateType, recipient, tenantId }: SendEmailOptions): Promise<boolean> {
     try {
         const payload = await getPayload({ config })
 
@@ -36,7 +38,7 @@ export async function sendEmail({ to, subject, html, templateType, recipient, te
         const MAX_ATTEMPTS = 3
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                await payload.sendEmail({ to, subject, html })
+                await payload.sendEmail({ to, subject, html, ...(replyTo ? { replyTo } : {}) })
                 console.log(`[Email] Sent to ${to}: ${subject}${attempt > 1 ? ` (attempt ${attempt})` : ''}`)
                 return true
             } catch (err) {
