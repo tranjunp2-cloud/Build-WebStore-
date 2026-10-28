@@ -21,13 +21,12 @@ const PW1_DELTA_MIGRATION_SQL = [
     source_checksum varchar NOT NULL,
     target_checksum varchar NOT NULL,
     action varchar NOT NULL,
+    -- Projection written by the delta: compared with the live document before a later update (edit guard).
     projection jsonb,
     run_id varchar NOT NULL REFERENCES pw1_delta_runs(run_id) ON DELETE RESTRICT,
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (source_entity, source_id)
   )`,
-  // Projection written by the delta: compared with the live document before a later update (edit guard).
-  `ALTER TABLE pw1_delta_map ADD COLUMN IF NOT EXISTS projection jsonb`,
   // PW1 credentials already carried to PW2 (fingerprint only, never the secret) and the salt written,
   // so a later run neither repeats the sync nor overwrites a password changed in PW2.
   `CREATE TABLE IF NOT EXISTS pw1_delta_credentials (

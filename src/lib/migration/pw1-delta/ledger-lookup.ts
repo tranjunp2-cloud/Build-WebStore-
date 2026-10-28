@@ -18,8 +18,19 @@ export interface LedgerClaim {
 
 export const ledgerKey = (sourceEntity: string, sourceId: string) => `${sourceEntity}\u0000${sourceId}`
 
+/**
+ * Neon's pooled endpoint (`-pooler` host) runs PgBouncer in transaction mode: the session advisory lock
+ * that keeps one delta at a time may not hold there, so only the direct endpoint is accepted.
+ */
+export function assertDirectConnection(uri: string): void {
+  let host: string
+  try { host = new URL(uri).hostname } catch { return } // pg reports an unparseable URI itself
+  if (host.includes('-pooler')) throw new DeltaError('POOLED_DATABASE_URI', `${host}: use the direct (non -pooler) connection string`)
+}
+
 export function readOnlyPool(uri: string | undefined): Pool {
   if (!uri) throw new DeltaError('DATABASE_URI_REQUIRED')
+  assertDirectConnection(uri)
   return new Pool({ connectionString: uri, max: 2, connectionTimeoutMillis: 10_000,
     options: '-c default_transaction_read_only=on -c statement_timeout=120000' })
 }

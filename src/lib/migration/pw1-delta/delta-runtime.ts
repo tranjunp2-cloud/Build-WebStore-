@@ -13,6 +13,7 @@ import { migrationContext, transactionClient, type QueryClient } from '../pw1-js
 import type { CollectionName } from '../pw1-json/types'
 import { guardedPayloadConfig } from './collection-configs'
 import { DeltaError } from './delta-options'
+import { assertDirectConnection } from './ledger-lookup'
 
 interface Adapter {
   pool: Pool
@@ -32,6 +33,7 @@ export interface DeltaRuntime {
 
 export async function createDeltaRuntime(uri: string | undefined): Promise<DeltaRuntime> {
   if (!uri) throw new DeltaError('DATABASE_URI_REQUIRED')
+  assertDirectConnection(uri)
   process.env.PAYLOAD_PUSH_SCHEMA = 'false'
   const config = await guardedPayloadConfig()
   config.typescript.autoGenerate = false

@@ -67,6 +67,22 @@ function cleanOnSignal(out: string): void {
   process.once('SIGTERM', handler)
 }
 
+/**
+ * SIGKILL / out-of-memory skip every cleanup: point out PW1 data copies left by earlier runs in the same
+ * delta-runs folder. Warn only, a run against another database may still be using its folder.
+ */
+async function warnLeftoverCopies(out: string): Promise<void> {
+  const parent = path.dirname(path.resolve(out))
+  if (path.basename(parent) !== 'delta-runs') return
+  const left: string[] = []
+  for (const run of await readdir(parent).catch(() => [] as string[])) {
+    if (path.join(parent, run) === path.resolve(out)) continue
+    for (const name of ['old', 'new', 'source-old', 'source-new'])
+      if (await lstat(path.join(parent, run, name)).then(() => true, () => false)) left.push(path.join(parent, run, name))
+  }
+  if (left.length) log(`Warning: PW1 data copies (incl. password hashes) left by an interrupted run. If no other delta is running, delete them:\n  rm -rf ${left.join(' ')}`)
+}
+
 /** New PW1 users get their password re-encrypted; check the keys before anything is confirmed. */
 function credentialKeyIssue(changes: { kind: string; collection: string }[], passwordChanges: number): string | null {
   if (!passwordChanges && !changes.some(change => change.kind === 'NEW' && change.collection === 'users')) return null
@@ -91,6 +107,7 @@ async function main(): Promise<number> {
     await createRunDir(options.out)
     runDirCreated = true
     cleanOnSignal(options.out)
+    await warnLeftoverCopies(options.out)
     log(`Run directory: ${options.out}\nTarget: ${describeTarget(process.env.DATABASE_URI)}\nImported snapshot: ${snapshot.sourceInstance}:${snapshot.snapshotId}`)
     const disk = await diskIssues(options.out)
     if (disk.length) { log(formatIssues(disk)); return 2 }

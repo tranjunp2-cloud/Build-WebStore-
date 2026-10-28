@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeCsvText, snapshotTableName, type CsvTableStats } from '@/lib/migration/pw1-delta/csv-normalize'
 import { snapshotIssues } from '@/lib/migration/pw1-delta/input-guards'
+import { assertDirectConnection } from '@/lib/migration/pw1-delta/ledger-lookup'
 
 describe('[TC-F42-DELTA-01] CSV quote-prefix normalization', () => {
   it('strips the spreadsheet quote only before = + - @ and keeps every other byte', () => {
@@ -99,5 +100,17 @@ describe('[TC-F42-DELTA-02] Snapshot input guards', () => {
     const issues = snapshotIssues(old, next, ['role_has_permissions'])
     // Assert
     expect(issues).toEqual([])
+  })
+})
+
+describe('[TC-F42-DELTA-02] Database connection guard', () => {
+  it('rejects a Neon pooled (-pooler) DATABASE_URI and accepts the direct one', () => {
+    // Arrange
+    const pooled = 'postgresql://u:p@ep-cool-name-123456-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
+    const direct = 'postgresql://u:p@ep-cool-name-123456.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
+    // Act + Assert
+    expect(() => assertDirectConnection(pooled)).toThrow('POOLED_DATABASE_URI')
+    expect(() => assertDirectConnection(direct)).not.toThrow()
+    expect(() => assertDirectConnection('postgresql://u:p@localhost:5433/primeweb')).not.toThrow()
   })
 })
