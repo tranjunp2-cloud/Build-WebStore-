@@ -42,6 +42,7 @@ import * as actions from '@/app/(dashboard)/blog/actions'
 import { I18nProvider } from '@/i18n'
 import en from '@/i18n/locales/en.json'
 import { announceAgentChange, resetAgentChangeBus } from '@/lib/agent-changes/bus'
+import { COALESCE_MS } from '@/lib/agent-changes/use-agent-changes'
 import { isStaleVersion } from '@/lib/save-version/save-version'
 
 const V1 = '2026-10-22T01:00:00.000Z'
@@ -56,6 +57,8 @@ const copilotRetitles = async () => {
     db.updatedAt = V2
     await act(async () => {
         announceAgentChange({ action: 'applied', kind: 'blog.update', entities: [{ kind: 'blog_post', id: 'p1' }], changeSetId: `cs-${Math.random()}`, at: Date.now() })
+        // the screen hears it once the change window closes: let that land before the next step
+        await new Promise((resolve) => setTimeout(resolve, COALESCE_MS + 20))
     })
 }
 
