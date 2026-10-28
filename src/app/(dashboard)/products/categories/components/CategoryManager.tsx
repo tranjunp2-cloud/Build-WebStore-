@@ -36,6 +36,7 @@ import {
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 import { getCategoriesAction, saveCategoryAction, deleteCategoryAction, checkCategoryNameAvailable } from '../actions'
 
 // Types
@@ -268,22 +269,28 @@ export default function CategoryManager() {
     const [isDeleting, setIsDeleting] = useState(false)
 
     // Fetch Categories
-    const fetchCategories = async () => {
+    const fetchRequestId = useRef(0)
+    // `silent`: a refresh in the background (the copilot changed categories) — rows stay, search/page/expanded stay, no toast on failure
+    const fetchCategories = async ({ silent = false }: { silent?: boolean } = {}) => {
+        const requestId = ++fetchRequestId.current
         try {
-            setIsLoading(true)
+            if (!silent) setIsLoading(true)
             const docs = await getCategoriesAction()
+            if (requestId !== fetchRequestId.current) return
             setCategories(docs as Category[] || [])
         } catch (error) {
             console.error(error)
-            toast.error(t.dashboard.products.categories.toast.loadError)
+            if (!silent && requestId === fetchRequestId.current) toast.error(t.dashboard.products.categories.toast.loadError)
         } finally {
-            setIsLoading(false)
+            if (requestId === fetchRequestId.current) setIsLoading(false)
         }
     }
 
     useEffect(() => {
         fetchCategories()
     }, [])
+
+    useAgentChanges({ kinds: ['store_category'] }, () => { void fetchCategories({ silent: true }) })
 
     // Build Tree
     const tree = useMemo(() => {

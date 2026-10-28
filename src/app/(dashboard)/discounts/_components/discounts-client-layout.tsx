@@ -11,6 +11,7 @@ import { DiscountsToolbar, type StatusFilter } from './discounts-toolbar'
 import { DiscountsTable, type Discount } from './discounts-table'
 import { DiscountDeleteDialog } from './discount-delete-dialog'
 import { useI18n } from '@/i18n'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 import { DiscountsTabNav } from './discounts-tab-nav'
 import { useUrlPagination } from './use-url-pagination'
 
@@ -43,9 +44,10 @@ export function DiscountsClientLayout() {
     // Disabled while loading so the URL-restored ?page=N isn't clobbered before data arrives.
     useTablePageClamp(page, total, limit, setPage, !loading)
 
-    const load = useCallback(async () => {
+    // silent = an assistant-driven refetch: keep the rows on screen, no spinner, no toast on failure
+    const load = useCallback(async (silent = false) => {
         const gen = ++genRef.current
-        setLoading(true)
+        if (!silent) setLoading(true)
         try {
             const sort = sortDir === 'desc' ? `-${sortBy}` : sortBy
             const params = new URLSearchParams({
@@ -72,7 +74,7 @@ export function DiscountsClientLayout() {
         } catch (err) {
             if (gen !== genRef.current) return
             console.error('[Discounts load]', err)
-            toast.error(d.loadFailed)
+            if (!silent) toast.error(d.loadFailed)
         } finally {
             if (gen === genRef.current) setLoading(false)
         }
@@ -86,6 +88,9 @@ export function DiscountsClientLayout() {
     // page as the newest gen (GH-1579 re-review M1).
     const loadRef = useRef(load)
     loadRef.current = load
+
+    // The assistant approved / undid a discount change: fetch the current page again (same filters, sort, page)
+    useAgentChanges({ kinds: ['store_discount'] }, () => { void loadRef.current(true) })
 
     // Stable handlers — reset page on filter/sort change
     const handleSearch       = useCallback((q: string)              => { setSearch(q);        setPage(1) }, [])

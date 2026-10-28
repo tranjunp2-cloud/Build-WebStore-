@@ -7,6 +7,8 @@ import type { Where } from 'payload'
 import { sql } from 'drizzle-orm'
 import { mapCustomer, toCsv } from './_lib/shop-customer-record'
 import type { ShopCustomerFilters, SortKey, UpdateCustomerData } from './_lib/shop-customer-record'
+import { isVersionConflict, withVersionGuard } from '@/lib/save-version/save-version'
+import { assertCustomerTenant, fetchCustomerOrderStats as fetchOrderStats, rate, updateCustomerAs } from '@/lib/customers/customer-service'
 
 async function requireTenantId(): Promise<string> {
     const tenantId = await getCurrentTenantId()
@@ -14,13 +16,7 @@ async function requireTenantId(): Promise<string> {
     return tenantId
 }
 
-function assertTenantOwnership(doc: Record<string, unknown>, tenantId: string): void {
-    const docTenantId =
-        typeof doc.tenant === 'object' && doc.tenant !== null
-            ? String((doc.tenant as Record<string, unknown>).id)
-            : String(doc.tenant)
-    if (docTenantId !== tenantId) throw new Error('Unauthorized')
-}
+const assertTenantOwnership = assertCustomerTenant
 
 function buildCustomerWhere(tenantId: string, filters: ShopCustomerFilters): Where {
     const conditions: Where[] = [{ tenant: { equals: tenantId } }]
@@ -106,65 +102,6 @@ function rowToCustomerDoc(row: Record<string, unknown>): Record<string, unknown>
         firstOrderAt: row.first_order_at,
         addresses: [], // list view doesn't display addresses; detail view uses getShopCustomerDetailAction
     }
-}
-
-type OrderStats = { count: number; total: number; completed: number; cancelled: number }
-
-// 2-decimal rounding (prime-web-api parity); 0 when no orders
-function rate(numerator: number, count: number): number {
-    if (count <= 0) return 0
-    return Math.round((numerator / count) * 10000) / 100
-}
-
-async function fetchOrderStats(
-    payload: Awaited<ReturnType<typeof getPayload>>,
-    customerIds: number[],
-    tenantId: string,
-    orderLimit?: number,
-): Promise<Map<number, OrderStats>> {
-    const map = new Map<number, OrderStats>()
-    if (customerIds.length === 0) return map
-
-    // Single-customer detail: 5 000 cap (handles high-volume buyers).
-    // List page (25–100 customers): 200×N cap, max 10 000 (fast, accurate for typical stores).
-    // Export (up to 1 000 customers): caller passes explicit limit — default to 200×N, max 100 000.
-    const defaultLimit = customerIds.length === 1
-        ? 5_000
-        : Math.min(customerIds.length * 200, 10_000)
-
-    const res = await payload.find({
-        collection: 'orders',
-        where: {
-            and: [
-                { customer: { in: customerIds } },
-                { tenant: { equals: tenantId } },
-            ],
-        },
-        limit: orderLimit ?? defaultLimit,
-        depth: 0,
-        overrideAccess: true,
-    })
-
-    if (res.totalDocs > res.docs.length) {
-        console.warn(
-            `[fetchOrderStats] truncated: ${res.docs.length}/${res.totalDocs} orders for ${customerIds.length} customers (limit=${customerIds.length === 1 ? 5_000 : Math.min(customerIds.length * 200, 10_000)})`,
-        )
-    }
-
-    for (const doc of res.docs) {
-        const raw = doc.customer as number | { id: number } | null
-        const custId = typeof raw === 'object' && raw !== null ? raw.id : (raw as number)
-        if (!custId) continue
-
-        const s = map.get(custId) ?? { count: 0, total: 0, completed: 0, cancelled: 0 }
-        s.count++
-        s.total += (doc.total as number) ?? 0
-        if (doc.status === 'completed') s.completed++
-        if (doc.status === 'cancelled') s.cancelled++
-        map.set(custId, s)
-    }
-
-    return map
 }
 
 export async function getShopCustomersAction(filters: ShopCustomerFilters = {}) {
@@ -290,32 +227,12 @@ export async function getShopCustomerDetailAction(id: number) {
     return JSON.parse(JSON.stringify(mapped))
 }
 
-const VALID_RANKS = new Set(['bronze', 'silver', 'gold', 'vip'])
-
-export async function updateShopCustomerAction(id: number, data: UpdateCustomerData) {
+/** `expectedUpdatedAt`: the version the page loaded. Stale → `{ ok: false, code: 'VERSION_CONFLICT', current }`, nothing written. */
+export async function updateShopCustomerAction(id: number, data: UpdateCustomerData, expectedUpdatedAt?: string | null) {
     const tenantId = await requireTenantId()
-    const payload = await getPayload({ config: configPromise })
-
-    const existing = await payload.findByID({ collection: 'customers', id, depth: 0 })
-    assertTenantOwnership(existing as Record<string, unknown>, tenantId)
-
-    if (data.rank !== undefined && data.rank !== null && !VALID_RANKS.has(data.rank)) {
-        throw new Error('Invalid rank value')
-    }
-
-    const updated = await payload.update({
-        collection: 'customers',
-        id,
-        data: {
-            ...(data.name !== undefined && { name: data.name }),
-            ...(data.rank !== undefined && { rank: data.rank }),
-            ...(data.notes !== undefined && { notes: data.notes }),
-            ...(data.addresses !== undefined && { addresses: data.addresses }),
-        },
-        depth: 0,
-    })
-
-    return JSON.parse(JSON.stringify(mapCustomer(updated as Record<string, unknown>)))
+    // the write core is shared with the dashboard assistant (lib/customers/customer-service)
+    const result = await withVersionGuard(() => updateCustomerAs({ tenantId }, id, data, expectedUpdatedAt))
+    return JSON.parse(JSON.stringify(isVersionConflict(result) ? result : mapCustomer(result)))
 }
 
 export async function exportShopCustomersCsvAction(

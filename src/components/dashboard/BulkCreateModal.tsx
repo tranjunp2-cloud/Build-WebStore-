@@ -5,10 +5,8 @@ import { createPortal } from 'react-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import { AlertTriangle, Copy, ImageIcon, Loader2, RotateCcw, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-    saveAiProductAction,
-    type AiProductSaveResult,
-} from '@/app/(dashboard)/products/actions'
+import { saveAiProductAction } from '@/app/(dashboard)/products/actions'
+import type { AiProductSaveResult } from '@/lib/products/save-ai-product'
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'

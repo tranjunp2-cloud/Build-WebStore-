@@ -4,11 +4,48 @@ import { useState } from 'react'
 import { useFormContext } from 'react-hook-form'
 import { toast } from 'sonner'
 import { ProductFormValues } from './schema'
-import { Sparkles, Loader2 } from 'lucide-react'
+import { Check, Sparkles, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
+
+type SuggestionRow = { label: string; now: string; next: string }
+
+/** An AI result shown before→after; the form only changes on "Use this". */
+function AiSuggestionPanel({ rows, onUse, onDiscard }: { rows: SuggestionRow[]; onUse: () => void; onDiscard: () => void }) {
+    const { t } = useI18n()
+    const s = t.dashboard.products.form.sections
+    const single = rows.length === 1
+    return (
+        <div role="region" aria-label={s?.aiSuggestion || 'AI suggestion'} className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <p className="m-0 text-[12px] font-semibold text-primary">{s?.aiSuggestion || 'AI suggestion'}</p>
+            <dl className="m-0 mt-3 flex flex-col gap-3">
+                {rows.map(row => (
+                    <div key={row.label} className="flex flex-col gap-1">
+                        {!single && <dt className="text-[12px] font-medium text-foreground/60">{row.label}</dt>}
+                        {!single && (
+                            <dd className="m-0 text-[13px] leading-relaxed text-foreground/50">
+                                {s?.aiSuggestionNow || 'Now'}: {row.now || (s?.aiSuggestionEmpty || '(empty)')}
+                            </dd>
+                        )}
+                        <dd className="m-0 max-h-64 overflow-y-auto whitespace-pre-wrap text-[14px] leading-relaxed text-foreground">{row.next}</dd>
+                    </div>
+                ))}
+            </dl>
+            <div className="mt-4 flex items-center justify-end gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={onDiscard}>
+                    {s?.aiSuggestionDiscard || 'Discard'}
+                </Button>
+                <Button type="button" size="sm" onClick={onUse}>
+                    <Check className="h-3.5 w-3.5" />
+                    {s?.aiSuggestionUse || 'Use this'}
+                </Button>
+            </div>
+        </div>
+    )
+}
 
 export function DescriptionSeoSection() {
     const { register, watch, setValue, getValues, formState: { errors } } = useFormContext<ProductFormValues>()
@@ -16,6 +53,9 @@ export function DescriptionSeoSection() {
     
     const [isGeneratingDesc, setIsGeneratingDesc] = useState(false)
     const [isGeneratingSeo, setIsGeneratingSeo] = useState(false)
+    const [descSuggestion, setDescSuggestion] = useState<string | null>(null)
+    const [seoSuggestion, setSeoSuggestion] = useState<{ title: string; description: string; slug: string } | null>(null)
+    const sections = t.dashboard.products.form.sections
 
     const productName = watch('name')
     const categoryIds = watch('categoryIds')
@@ -44,8 +84,8 @@ export function DescriptionSeoSection() {
             })
             const result = await res.json()
             if (result.success && result.data?.description) {
-                setValue('description', result.data.description, { shouldDirty: true, shouldValidate: true })
-                toast.success(t.dashboard.products.messages?.descSuccess || 'Description generated successfully!', { id: loadingId })
+                setDescSuggestion(String(result.data.description))
+                toast.dismiss(loadingId)
             } else {
                 throw new Error(result.error || t.dashboard.products.messages?.generateFailed || 'Failed to generate')
             }
@@ -75,10 +115,12 @@ export function DescriptionSeoSection() {
             })
             const result = await res.json()
             if (result.success && result.data) {
-                setValue('metaTitle', result.data.title, { shouldDirty: true, shouldValidate: true })
-                setValue('metaDescription', result.data.description, { shouldDirty: true, shouldValidate: true })
-                setValue('urlSlug', result.data.slug, { shouldDirty: true, shouldValidate: true })
-                toast.success(t.dashboard.products.messages?.seoSuccess || 'SEO optimized successfully!', { id: loadingId })
+                setSeoSuggestion({
+                    title: String(result.data.title ?? ''),
+                    description: String(result.data.description ?? ''),
+                    slug: String(result.data.slug ?? ''),
+                })
+                toast.dismiss(loadingId)
             } else {
                 throw new Error(result.error || t.dashboard.products.messages?.generateFailed || 'Failed to generate')
             }
@@ -87,6 +129,23 @@ export function DescriptionSeoSection() {
         } finally {
             setIsGeneratingSeo(false)
         }
+    }
+
+    const applyDescSuggestion = () => {
+        if (descSuggestion === null) return
+        setValue('description', descSuggestion, { shouldDirty: true, shouldValidate: true })
+        setDescSuggestion(null)
+        toast.success(t.dashboard.products.messages?.descSuccess || 'Description generated successfully!')
+    }
+
+    const applySeoSuggestion = () => {
+        if (!seoSuggestion) return
+        setValue('metaTitle', seoSuggestion.title, { shouldDirty: true, shouldValidate: true })
+        setValue('metaDescription', seoSuggestion.description, { shouldDirty: true, shouldValidate: true })
+        // an empty suggested slug keeps the current one
+        if (seoSuggestion.slug) setValue('urlSlug', seoSuggestion.slug, { shouldDirty: true, shouldValidate: true })
+        setSeoSuggestion(null)
+        toast.success(t.dashboard.products.messages?.seoSuccess || 'SEO optimized successfully!')
     }
 
     return (
@@ -117,6 +176,13 @@ export function DescriptionSeoSection() {
                         rows={6}
                         className="resize-y min-h-[144px]"
                     />
+                    {descSuggestion !== null && (
+                        <AiSuggestionPanel
+                            rows={[{ label: t.dashboard.products.form.seoDescription || 'Product Description', now: watch('description') ?? '', next: descSuggestion }]}
+                            onUse={applyDescSuggestion}
+                            onDiscard={() => setDescSuggestion(null)}
+                        />
+                    )}
                 </div>
 
                 {/* SEO Toggle Banner -> AI Optimization Button in Design */}
@@ -142,6 +208,18 @@ export function DescriptionSeoSection() {
                         <span className="text-[14px] font-semibold text-primary">{t.dashboard.products.form.sections?.aiOpt || 'AI Optimization'}</span>
                     </button>
                 </div>
+
+                {seoSuggestion && (
+                    <AiSuggestionPanel
+                        rows={[
+                            { label: sections?.metaTitle || 'Meta Title', now: watch('metaTitle') ?? '', next: seoSuggestion.title },
+                            { label: sections?.metaDesc || 'Meta Description', now: watch('metaDescription') ?? '', next: seoSuggestion.description },
+                            ...(seoSuggestion.slug ? [{ label: sections?.urlSlug || 'URL Slug', now: watch('urlSlug') ?? '', next: seoSuggestion.slug }] : []),
+                        ]}
+                        onUse={applySeoSuggestion}
+                        onDiscard={() => setSeoSuggestion(null)}
+                    />
+                )}
 
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2">

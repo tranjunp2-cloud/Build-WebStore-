@@ -21,6 +21,7 @@ import { CancelOrderModal } from './CancelOrderModal'
 import { getMobileOrderActions } from './mobile-order-actions'
 import type { CreateLabelFlowHandle } from './detail/create-label-flow'
 import { useI18n } from '@/i18n'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 
 // ── Status badge mapping ──────────────────────────────────────────────────────
 type StatusCls = 'ok' | 'blue' | 'warn' | 'danger'
@@ -89,6 +90,10 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
     }, [orderId, t.dashboard.orders.toast.loadFailed])
 
     useEffect(() => { fetchOrder() }, [fetchOrder])
+
+    // The assistant changed this order: re-read it in place (the same silent path the webhook poll uses). Child cards
+    // take it as props; their own forms (reject reason, weight...) are local state and stay as typed.
+    useAgentChanges({ kinds: ['store_order'], ids: [orderId] }, () => { void fetchOrder({ silent: true }) })
 
     const mobileActions = getMobileOrderActions(order?.status ?? '')
 

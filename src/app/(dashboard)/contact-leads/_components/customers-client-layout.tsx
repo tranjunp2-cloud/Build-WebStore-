@@ -15,6 +15,7 @@ import {
     exportCustomersCsvAction,
 } from '../actions'
 import type { CustomerRecord } from '../_lib/customer-record'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 
 export function CustomersClientLayout() {
     const { t } = useI18n()
@@ -36,17 +37,19 @@ export function CustomersClientLayout() {
     // loads are otherwise last-resolve-wins, which can commit stale records.
     const genRef = useRef(0)
 
-    const load = useCallback(async () => {
+    // silent = an assistant-driven refetch: keep the rows on screen, no spinner, no toast on failure
+    const load = useCallback(async (silent = false) => {
         const gen = ++genRef.current
-        setLoading(true)
+        if (!silent) setLoading(true)
         try {
             const res = await getCustomersAction({ search, status, source, page, limit })
             if (gen !== genRef.current) return
             setRecords(res.data)
             setTotal(res.meta.total)
-        } catch {
+        } catch (err) {
             if (gen !== genRef.current) return
-            toast.error(c.loadFailed)
+            if (silent) console.error('[Contact leads refresh]', err)
+            else toast.error(c.loadFailed)
         } finally {
             if (gen === genRef.current) setLoading(false)
         }
@@ -62,6 +65,9 @@ export function CustomersClientLayout() {
     // GH-1579: snap back when deletions strand page past the last page
     useTablePageClamp(page, total, limit, setPage, !loading)
     useEffect(() => { load() }, [load])
+
+    // The assistant approved / undid a change (a status, a reply): fetch the current page again (same filters, page)
+    useAgentChanges({ kinds: ['contact_lead', 'lead_reply'] }, () => { void loadRef.current(true) })
 
     async function confirmDelete() {
         if (!pendingDelete) return
