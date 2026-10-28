@@ -196,6 +196,10 @@ jobs:
 
       - name: Upload coverage artifact
         if: always()
+        # The org-wide artifact storage quota can be full (it is shared by every
+        # repo and recalculated every 6-12 h). Coverage is a report, not a gate:
+        # a failed upload must not turn a green test run red.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -262,6 +266,9 @@ jobs:
       contents: read
     steps:
       - name: Download coverage
+        # Missing when the upload hit the artifact quota; the parse step below
+        # already handles a missing coverage-summary.json.
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: coverage-report
