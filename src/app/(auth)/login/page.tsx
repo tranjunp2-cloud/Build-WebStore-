@@ -12,7 +12,7 @@ import { useI18n } from '@/i18n'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { parseOtpSendFailure, seedOtpTimers } from '@/lib/auth/login-otp-cooldown'
+import { OTP_EXPIRY_END_KEY, OTP_RESEND_END_KEY, parseOtpSendFailure, seedOtpTimers } from '@/lib/auth/login-otp-cooldown'
 
 function createLoginSchema() {
     return z.object({
@@ -291,8 +291,8 @@ function LoginFormContent() {
             }
 
             // Clear previous OTP countdowns so verify-otp starts fresh
-            sessionStorage.removeItem('otp_resend_end')
-            sessionStorage.removeItem('otp_expiry_end')
+            sessionStorage.removeItem(OTP_RESEND_END_KEY)
+            sessionStorage.removeItem(OTP_EXPIRY_END_KEY)
 
             if (otpEmailSent) {
                 toast.success(t.auth.otpSentTitle, {

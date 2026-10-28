@@ -117,6 +117,8 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 | **TC-F02.44** | `Func` | Login đúng trong 60s sau lần gửi OTP trước (GH-2053) | 1. Đăng nhập đúng → sang `/verify-otp`.<br>2. Quay lại `/login` trong 60s, đăng nhập đúng lần nữa. | - `send-otp` trả 429 `OTP_COOLDOWN` + `retryAfter`.<br>- Không hiện "Connection problem"; tự chuyển sang `/verify-otp` với toast "mã đã gửi".<br>- Countdown resend/expiry khớp OTP cũ. | High |
 | **TC-F02.45** | `Func` | Tài khoản bị khóa hiện đúng thông báo khóa (GH-2053) | 1. Nhập đúng email, sai mật khẩu 5 lần.<br>2. Nhập đúng mật khẩu. | - API `423` `ACCOUNT_LOCKED` (lần sai thứ 5 và các lần sau trong 15 phút).<br>- Hiện câu `auth.errors.accountLocked` ("Your account is locked after too many failed sign-in attempts…").<br>- Không chuyển sang `/verify-otp`. | High |
 | **TC-F02.46** | `Reg` | Sai mật khẩu < 5 lần vẫn báo sai thông tin (GH-2053) | 1. Nhập đúng email, sai mật khẩu 1-4 lần. | - `401 Login failed`; hiện "Incorrect email or password. Please try again." (không nhắc khóa); nút Sign In trở lại bình thường. | Medium |
+| **TC-F02.47** | `Func` | Component test: trang login chuyển `/verify-otp` khi `send-otp` 429 `OTP_COOLDOWN` (GH-2053) | Unit `login-page-otp-lockout.test.tsx`: mock fetch login 200 → send-otp 429. | - `router.replace('/verify-otp?email=…')`; toast info; không toast lỗi.<br>- sessionStorage `otp_resend_end` / `otp_expiry_end` được seed theo `retryAfter` / `expiresIn`. | High |
+| **TC-F02.48** | `Func` | Component test: login 423 `ACCOUNT_LOCKED` hiện câu khóa, không refocus password (GH-2053) | Unit `login-page-otp-lockout.test.tsx`: mock fetch login 423. | - Toast `auth.errors.accountLocked`, không phải `incorrect`.<br>- Không gọi `send-otp`, không chuyển trang. | High |
 
 ---
 

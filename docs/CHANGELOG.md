@@ -25,7 +25,7 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ### F02 — Login: đúng thông báo khi OTP cooldown và khóa tài khoản (GH-2053)
 
 - `send-otp` 429 trả thêm `code: 'OTP_COOLDOWN'` + `retryAfter` (giây) + header `Retry-After`. Login page không còn báo "Connection problem" khi OTP vừa gửi <60s: chuyển sang `/verify-otp` với countdown khớp mã cũ (`src/lib/auth/login-otp-cooldown.ts`). Lỗi gửi OTP khác dùng `auth.errors.otpSendFailed`.
-- Login endpoint trả `423` + `code: 'ACCOUNT_LOCKED'` khi `payload.login` thất bại và `lockUntil` còn hiệu lực (tra qua `isAccountLocked`, lỗi tra cứu → fallback `401 Login failed`). Login page hiện `auth.errors.accountLocked` (copy GH-1701 đã duyệt, giữ nguyên), sai mật khẩu thường giữ "Incorrect email or password". Cooldown send-otp tính theo `OTP_TTL_MS` (trước đây cứng 5 phút → dev TTL 30 phút bị cooldown ~26 phút). Không đổi schema. Tests: TC-F02.44, TC-F02.45, TC-F02.46.
+- Login endpoint trả `423` + `code: 'ACCOUNT_LOCKED'` khi `payload.login` thất bại và `lockUntil` còn hiệu lực (tra qua `isAccountLocked`, lỗi tra cứu → fallback `401 Login failed`). Login page hiện `auth.errors.accountLocked` (copy GH-1701 đã duyệt, giữ nguyên), sai mật khẩu thường giữ "Incorrect email or password". Cooldown send-otp tính theo `OTP_TTL_MS` (trước đây cứng 5 phút → dev TTL 30 phút bị cooldown ~26 phút). Không đổi schema. Tests: TC-F02.44 – TC-F02.48.
 
 ### F34 — SSO upgrade/downgrade cùng gói không xóa usage (GH-2011)
 
