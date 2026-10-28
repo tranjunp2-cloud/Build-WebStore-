@@ -38,6 +38,7 @@ import ProductEditPage from '@/app/(dashboard)/products/[id]/page'
 import { I18nProvider } from '@/i18n'
 import en from '@/i18n/locales/en.json'
 import { announceAgentChange, resetAgentChangeBus } from '@/lib/agent-changes/bus'
+import { COALESCE_MS } from '@/lib/agent-changes/use-agent-changes'
 import { isStaleVersion } from '@/lib/save-version/save-version'
 
 Element.prototype.scrollIntoView = vi.fn()
@@ -56,6 +57,8 @@ const copilotChangesPrice = async () => {
     server.updatedAt = V2
     await act(async () => {
         announceAgentChange({ action: 'applied', kind: 'shop_product.update', entities: [{ kind: 'product', id: '5' }], changeSetId: `cs-${Math.random()}`, at: Date.now() })
+        // the screen hears it once the change window closes: let that land before the next step
+        await new Promise((resolve) => setTimeout(resolve, COALESCE_MS + 20))
     })
 }
 const nameInput = async () => (await screen.findByLabelText('name')) as HTMLInputElement
@@ -101,6 +104,18 @@ describe('product page against a stale save [TC-AICP-331]', () => {
         expect(actions.saveProductAction).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Second edit' }), '5', afterFirst)
         expect(screen.queryByRole('status')).toBeNull()
         expect(server.name).toBe('Second edit')
+    })
+
+    it('TC-AICP-357: a page left right after a save does not go to the product list later', async () => {
+        mount()
+        type(await nameInput(), 'Saved name')
+        save()
+        await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
+
+        cleanup()
+        await new Promise((resolve) => setTimeout(resolve, 1600))
+
+        expect(router.push).not.toHaveBeenCalled()
     })
 
     it('TC-AICP-331: Keep mine, then Save is refused: one conflict notice, the name edit stays, no toast', async () => {
