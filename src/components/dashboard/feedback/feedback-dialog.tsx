@@ -1,7 +1,8 @@
 'use client'
 
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Info, Loader2, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -33,6 +34,11 @@ export function FeedbackDialog({ context, onClose, submit = submitFeedback }: Pr
     const areaRef = useRef<HTMLButtonElement>(null)
     const detailsRef = useRef<HTMLTextAreaElement>(null)
     const [confirmDiscard, setConfirmDiscard] = useState(false)
+
+    // Spam block: surfaced as a toast; the entered data stays so the user can resend later.
+    useEffect(() => {
+        if (form.failure === 'rate_limited') toast.error(f.rateLimited)
+    }, [form.failure, f.rateLimited])
 
     const submitting = form.status === 'submitting'
     const done = form.status === 'success'
@@ -95,13 +101,11 @@ export function FeedbackDialog({ context, onClose, submit = submitFeedback }: Pr
                                     )}
                                 </div>
 
-                                {form.failure && (
-                                    <Alert variant={form.failure === 'rate_limited' ? 'warning' : 'destructive'} role="alert">
-                                        {form.failure === 'failed' && (
-                                            <AlertTitle className="text-[hsl(var(--destructive))]">{f.failed.title}</AlertTitle>
-                                        )}
+                                {form.failure === 'failed' && (
+                                    <Alert variant="destructive" role="alert">
+                                        <AlertTitle className="text-[hsl(var(--destructive))]">{f.failed.title}</AlertTitle>
                                         <AlertDescription className="text-xs text-[var(--dash-text)]">
-                                            {form.failure === 'failed' ? f.failed.description : f.rateLimited}
+                                            {f.failed.description}
                                         </AlertDescription>
                                     </Alert>
                                 )}
