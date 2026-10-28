@@ -5710,12 +5710,10 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   {
     name: 'sites.editor_last_save_id',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS editor_last_save_id varchar(64);`,
-    required: true,
   },
   {
     name: 'pages.editor_last_save_id',
     sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS editor_last_save_id varchar(64);`,
-    required: true,
   },
   // ── Featured Products: the section's own pictures (shown while no product is on sale, and
   // for a product without a photo) instead of the industry sample pictures — same rows as a gallery ──
