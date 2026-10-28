@@ -3,7 +3,6 @@
  * Mocks getPayload + withAuth; tests tenant forcing, usageCount strip, duplicate handling.
  *
  * TC-F33-10, TC-F33-11, TC-F33-12: create (tenant forced, usageCount=0), list (tenant-scoped), duplicate rejection
- * TC-AICP-350: create refuses a viewer and an inactive membership (same gate as PUT / DELETE)
  *
  * TC-F33-30..34 deferred — order-create integration tests (usage history, idempotency) live
  * with the Phase 4 order route tests once those routes are implemented.
@@ -72,25 +71,6 @@ describe('POST /api/v1/discounts — TC-AICP-260: role check', () => {
 
         expect(res.status).toBe(403)
         expect((await res.json()).error.code).toBe('FORBIDDEN')
-        expect(mockCreate).not.toHaveBeenCalled()
-    })
-
-    it('[TC-AICP-350] refuses a viewer (read only), and a pending member, and writes nothing', async () => {
-        // Arrange
-        const members = [
-            { tenant: { id: 'tenant-abc' }, role: 'viewer', status: 'active' },
-            { tenant: { id: 'tenant-abc' }, role: 'owner', status: 'pending' },
-        ]
-
-        for (const member of members) {
-            mockUser.tenants = [member] as never
-
-            // Act
-            const res = await post()
-
-            // Assert
-            expect(res.status).toBe(403)
-        }
         expect(mockCreate).not.toHaveBeenCalled()
     })
 

@@ -6,7 +6,6 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { updateDiscountSchema } from '@/lib/validations/discounts'
 import { VersionConflictError } from '@/lib/save-version/save-version'
 import { deleteDiscountAs, DiscountServiceError, updateDiscountAs, type DiscountWriteData } from '@/lib/discounts/discount-service'
-import { discountWriteRefusal } from '../discount-write-access'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -49,12 +48,9 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
  *
  * Update a discount. usageCount and tenant are stripped — never client-writable.
  * Optional `expectedUpdatedAt`: a discount changed since is refused, 409 `{ ok: false, code: 'VERSION_CONFLICT', current }`.
- * Same role gate as create (Orders permission, active membership, not a viewer): 403 FORBIDDEN.
  */
 export const PUT = withAuth<RouteContext>(async (user, request, ctx) => {
     try {
-        const refusal = discountWriteRefusal(user)
-        if (refusal) return refusal
         const { id } = await ctx.params
         const { data, errorResponse } = await parseRequest(request, updateDiscountSchema)
         if (errorResponse) return errorResponse
@@ -96,12 +92,9 @@ export const PUT = withAuth<RouteContext>(async (user, request, ctx) => {
 
 /**
  * DELETE /api/v1/discounts/[id]
- * Same role gate as create (Orders permission, active membership, not a viewer): 403 FORBIDDEN.
  */
 export const DELETE = withAuth<RouteContext>(async (user, _request, ctx) => {
     try {
-        const refusal = discountWriteRefusal(user)
-        if (refusal) return refusal
         const { id } = await ctx.params
         try {
             await deleteDiscountAs({ user: user as unknown as User, tenantId: extractTenantId(user) ?? '' }, id)

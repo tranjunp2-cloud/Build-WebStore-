@@ -7,7 +7,7 @@ import { extractTenantId } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { createDiscountSchema } from '@/lib/validations/discounts'
 import { createDiscountAs, DiscountServiceError, type DiscountWriteData } from '@/lib/discounts/discount-service'
-import { discountWriteRefusal } from './discount-write-access'
+import { canAccessArea } from '@/lib/insights/area-access'
 
 type CreateBody = DiscountWriteData & { code: string; type: 'percentage' | 'fixed'; value: number }
 
@@ -121,14 +121,18 @@ export const POST = withAuth(async (user, request) => {
         const { data, errorResponse } = await parseRequest(request, createDiscountSchema)
         if (errorResponse) return errorResponse
 
-        // Discounts belong to the Orders permission (the sidebar entry's `permissionId`): a custom role without it
-        // (e.g. products only), a viewer or an inactive membership can not create codes. Same gate as PUT / DELETE.
-        const refusal = discountWriteRefusal(user)
-        if (refusal) return refusal
         const tenantId = extractTenantId(user)
         if (!tenantId) {
             return NextResponse.json(
                 { success: false, error: { code: 'FORBIDDEN', message: 'No tenant associated with this user' } },
+                { status: 403 },
+            )
+        }
+        // Discounts belong to the Orders permission (the sidebar entry's `permissionId`): a custom role without it
+        // (e.g. products only) can not create codes, same rule as the copilot's discount tools.
+        if (!canAccessArea(user, tenantId, 'orders')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Your role cannot manage discounts' } },
                 { status: 403 },
             )
         }

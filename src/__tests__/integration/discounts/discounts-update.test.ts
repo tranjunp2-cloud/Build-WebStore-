@@ -5,16 +5,11 @@
  * (client-writable fields defence-in-depth) and that the route forwards only
  * safe fields to payload.update.
  *
- * TC-AICP-349 — PUT and DELETE have the same role gate as create: the Orders permission on an ACTIVE membership
- * of the dashboard's workspace; anything else is 403 FORBIDDEN and nothing is read or written. A platform
- * super-admin keeps Payload's own access rules.
- * TC-AICP-350 — a viewer can not change or delete a discount (read only).
- *
  * Mock strategy: mirrors discounts-api.test.ts — getPayload + withAuth mocked
- * at top-level; parseRequest, the gate (discount-write-access + area-access) and the discount service are real.
+ * at top-level; parseRequest is real (via the actual validation schema).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // ── Top-level mocks ────────────────────────────────────────────────────────
@@ -25,10 +20,10 @@ vi.mock('payload', () => ({
     getPayload: vi.fn(),
 }))
 
-const mockUser: { id: string; email: string; tenants: unknown[]; roles?: string[] } = {
+const mockUser = {
     id: 'user-123',
     email: 'owner@example.com',
-    tenants: [{ tenant: { id: 'tenant-abc' }, role: 'owner', status: 'active' }],
+    tenants: [{ tenant: { id: 'tenant-abc' }, role: 'owner' }],
 }
 
 vi.mock('@/lib/auth', () => ({
@@ -45,7 +40,7 @@ vi.mock('@/lib/auth', () => ({
     }),
 }))
 
-import { DELETE, PUT } from '@/app/api/v1/discounts/[id]/route'
+import { PUT } from '@/app/api/v1/discounts/[id]/route'
 import { getPayload } from 'payload'
 
 const mockGetPayload = vi.mocked(getPayload)
@@ -256,111 +251,5 @@ describe('PUT /api/v1/discounts/[id] — TC-F33-02-03: Protected field stripping
         // Assert
         expect(response.status).toBe(409)
         expect(responseData.error.code).toBe('DUPLICATE_CODE')
-    })
-})
-
-// ── TC-AICP-349 / TC-AICP-350: PUT / DELETE role gate (same as create) ─────────────────────────────
-describe('PUT / DELETE /api/v1/discounts/[id] — TC-AICP-349: role gate', () => {
-    const original = mockUser.tenants
-    const ctx = { params: Promise.resolve({ id: 'disc-1' }) }
-    const put = () =>
-        PUT(new NextRequest('http://localhost/api/v1/discounts/disc-1', {
-            method: 'PUT',
-            body: JSON.stringify({ value: 15 }),
-            headers: { 'Content-Type': 'application/json' },
-        }) as any, ctx)
-    const del = () => DELETE(new NextRequest('http://localhost/api/v1/discounts/disc-1', { method: 'DELETE' }) as any, ctx)
-    let mockFindByID: ReturnType<typeof vi.fn>
-    let mockUpdate: ReturnType<typeof vi.fn>
-    let mockDelete: ReturnType<typeof vi.fn>
-
-    beforeEach(() => {
-        vi.clearAllMocks()
-        mockFindByID = vi.fn().mockResolvedValue({ id: 'disc-1', code: 'OLD', tenant: 'tenant-abc', updatedAt: '2026-10-01T00:00:00.000Z' })
-        mockUpdate = vi.fn().mockResolvedValue({ id: 'disc-1', value: 15 })
-        mockDelete = vi.fn().mockResolvedValue({ id: 'disc-1' })
-        mockGetPayload.mockResolvedValue({ findByID: mockFindByID, update: mockUpdate, delete: mockDelete } as any)
-    })
-    afterEach(() => {
-        mockUser.tenants = original
-        delete mockUser.roles
-    })
-
-    it.each([
-        ['a custom role without Orders', { tenant: { id: 'tenant-abc' }, role: 'custom', status: 'active', permissions: ['products'] }],
-        ['a pending owner', { tenant: { id: 'tenant-abc' }, role: 'owner', status: 'pending' }],
-        ['a suspended admin', { tenant: { id: 'tenant-abc' }, role: 'admin', status: 'suspended' }],
-    ])('[TC-AICP-349] refuses %s on PUT and DELETE and touches nothing', async (_label, membership) => {
-        // Arrange
-        mockUser.tenants = [membership]
-
-        // Act
-        const [putRes, delRes] = [await put(), await del()]
-
-        // Assert
-        expect(putRes.status).toBe(403)
-        expect((await putRes.json()).error.code).toBe('FORBIDDEN')
-        expect(delRes.status).toBe(403)
-        expect(mockFindByID).not.toHaveBeenCalled()
-        expect(mockUpdate).not.toHaveBeenCalled()
-        expect(mockDelete).not.toHaveBeenCalled()
-    })
-
-    it('[TC-AICP-349] refuses a user without any workspace', async () => {
-        // Arrange
-        mockUser.tenants = []
-
-        // Act
-        const res = await put()
-
-        // Assert
-        expect(res.status).toBe(403)
-        expect(mockUpdate).not.toHaveBeenCalled()
-    })
-
-    it.each([
-        ['an owner', { tenant: { id: 'tenant-abc' }, role: 'owner', status: 'active' }],
-        ['an editor', { tenant: { id: 'tenant-abc' }, role: 'editor', status: 'active' }],
-        ['a custom role holding Orders', { tenant: { id: 'tenant-abc' }, role: 'custom', status: 'active', permissions: ['orders'] }],
-    ])('[TC-AICP-349] lets %s change and delete a code', async (_label, membership) => {
-        // Arrange
-        mockUser.tenants = [membership]
-
-        // Act
-        const [putRes, delRes] = [await put(), await del()]
-
-        // Assert
-        expect(putRes.status).toBe(200)
-        expect(delRes.status).toBe(204)
-        expect(mockUpdate).toHaveBeenCalledTimes(1)
-        expect(mockDelete).toHaveBeenCalledTimes(1)
-    })
-
-    it('[TC-AICP-349] a platform super-admin keeps Payload access (no membership needed)', async () => {
-        // Arrange
-        mockUser.tenants = []
-        mockUser.roles = ['super-admin']
-
-        // Act
-        const res = await put()
-
-        // Assert
-        expect(res.status).toBe(200)
-        expect(mockUpdate).toHaveBeenCalledTimes(1)
-    })
-
-    it('[TC-AICP-350] a viewer can not change or delete a discount', async () => {
-        // Arrange
-        mockUser.tenants = [{ tenant: { id: 'tenant-abc' }, role: 'viewer', status: 'active' }]
-
-        // Act
-        const [putRes, delRes] = [await put(), await del()]
-
-        // Assert
-        expect(putRes.status).toBe(403)
-        expect((await putRes.json()).error.message).toBe('Viewers cannot change discounts')
-        expect(delRes.status).toBe(403)
-        expect(mockUpdate).not.toHaveBeenCalled()
-        expect(mockDelete).not.toHaveBeenCalled()
     })
 })
