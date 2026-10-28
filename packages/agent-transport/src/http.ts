@@ -43,6 +43,7 @@ import type {
 	ChangeSetDecision,
 	ChangeSetQuery,
 	ConversationQuery,
+	DecideOptions,
 	InsightQuery,
 	MediaQuery,
 	RunStreamLost,
@@ -332,7 +333,7 @@ export class HttpGateway implements AgentGateway {
 		decision: ChangeSetDecision,
 		actor: string,
 		note?: string,
-		options?: { confirm?: string },
+		options?: DecideOptions,
 	): Promise<ChangeSet> {
 		this.cache.invalidate("changesets");
 		// No pool signal: approving applies a domain write that can outlast the
@@ -345,6 +346,7 @@ export class HttpGateway implements AgentGateway {
 					actor,
 					note,
 					...(options?.confirm !== undefined ? { confirm: options.confirm } : {}),
+					...(options?.manual === true ? { manual: true } : {}),
 				}),
 			);
 		} catch (error) {

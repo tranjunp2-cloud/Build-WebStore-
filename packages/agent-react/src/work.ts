@@ -1,5 +1,5 @@
 import type { WorkItem, WorkList, WorkStateInput } from "@ech/agent-core";
-import type { AgentGateway } from "@ech/agent-transport";
+import { type AgentGateway, AgentGatewayError } from "@ech/agent-transport";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useGateway } from "./context";
 import { workStoreFor } from "./work-store";
@@ -35,7 +35,16 @@ export async function discardOnPlatform(gateway: AgentGateway, item: WorkItem): 
 	if (item.kind !== "review") return;
 	const detail = await gateway.getThread(item.threadId);
 	const waiting = (detail?.changeSets ?? []).filter((changeSet) => changeSet.status === "pending");
-	for (const changeSet of waiting) await gateway.decideChangeSet(changeSet.id, "reject", "self", "Discarded from Issues");
+	// one card refused (409: it was applied or decided meanwhile) does not keep the others waiting
+	let failure: unknown;
+	for (const changeSet of waiting) {
+		try {
+			await gateway.decideChangeSet(changeSet.id, "reject", "self", "Discarded from Issues");
+		} catch (error) {
+			if (!(error instanceof AgentGatewayError && error.status === 409)) failure ??= error;
+		}
+	}
+	if (failure !== undefined) throw failure;
 }
 
 /**

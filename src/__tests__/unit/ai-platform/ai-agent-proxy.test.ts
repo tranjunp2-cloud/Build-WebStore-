@@ -260,3 +260,31 @@ describe('handleAgentProxy approvals [TC-AICP-12]', () => {
         expect(realApplyChangeSet).toHaveBeenCalled()
     })
 })
+
+describe('a card flagged requiresClick needs the merchant\'s own click, checked on the server [TC-AISEC-141]', () => {
+    const flagged = { ...changeSet, requiresClick: true }
+
+    it('refuses an approve without `manual: true` (Auto-approve, an old bundle, a script) before claiming anything', async () => {
+        vi.mocked(realApplyChangeSet).mockClear()
+        vi.mocked(aiPlatformJson).mockResolvedValue(flagged)
+
+        const auto = await handleAgentProxy(request('change-sets/cs_1/decision', { method: 'POST', body: { decision: 'approve' } }), ['change-sets', 'cs_1', 'decision'])
+        const truthy = await handleAgentProxy(request('change-sets/cs_1/decision', { method: 'POST', body: { decision: 'approve', manual: 'yes' } }), ['change-sets', 'cs_1', 'decision'])
+
+        expect([auto.status, truthy.status]).toEqual([409, 409])
+        expect((await auto.json()).detail).toBe('This change needs your own click: press Approve on the card. If you just updated, reload the page.')
+        expect(vi.mocked(aiPlatformJson).mock.calls.map((c) => c[0].path)).toEqual(['/agent/change-sets/cs_1', '/agent/change-sets/cs_1'])
+        expect(realApplyChangeSet).not.toHaveBeenCalled()
+    })
+
+    it('applies it when the approve says it was a hand click', async () => {
+        vi.mocked(aiPlatformJson).mockResolvedValueOnce(flagged).mockResolvedValueOnce(flagged).mockResolvedValueOnce({ ...flagged, status: 'applied' })
+        vi.mocked(realApplyChangeSet).mockResolvedValue({ entities: [], links: [] })
+
+        const res = await handleAgentProxy(request('change-sets/cs_1/decision', { method: 'POST', body: { decision: 'approve', manual: true } }), ['change-sets', 'cs_1', 'decision'])
+
+        expect(res.status).toBe(200)
+        expect(vi.mocked(aiPlatformJson).mock.calls.map((c) => c[0].path)).toContain('/agent/change-sets/cs_1/claim')
+        expect(realApplyChangeSet).toHaveBeenCalled()
+    })
+})

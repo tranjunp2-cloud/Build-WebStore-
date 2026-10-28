@@ -10,7 +10,7 @@ import type {
 	ReconcileResult,
 	StartRunInput,
 } from "@ech/agent-core";
-import type { ChangeSetDecision, ChangeSetQuery, ConversationQuery, InsightQuery } from "@ech/agent-transport";
+import type { ChangeSetDecision, ChangeSetQuery, ConversationQuery, DecideOptions, InsightQuery } from "@ech/agent-transport";
 import { useCallback, useMemo, useEffect, useRef, useState } from "react";
 import { useGateway } from "./context";
 
@@ -147,7 +147,7 @@ export function useDecideChangeSet(): (
 	decision: ChangeSetDecision,
 	actor: string,
 	note?: string,
-	options?: { confirm?: string },
+	options?: DecideOptions,
 ) => Promise<ChangeSet> {
 	const gateway = useGateway();
 	return useCallback(

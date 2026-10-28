@@ -68,7 +68,7 @@ function DockSurface() {
 	const undoChangeSet = useUndoChangeSet();
 	// the gateway tells the open screens what changed (lib/agent-changes); nothing to refresh here
 	const decide = useCallback(
-		async (changeSet: ChangeSet, decision: "approve" | "reject", options?: { confirm?: string }) => {
+		async (changeSet: ChangeSet, decision: "approve" | "reject", options?: { confirm?: string; manual?: boolean }) => {
 			const decided = await decideChangeSet(changeSet.id, decision, "self", undefined, options);
 			pending.refresh();
 			return decided;

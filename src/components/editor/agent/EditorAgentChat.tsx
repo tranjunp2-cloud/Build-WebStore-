@@ -200,12 +200,12 @@ function EditorChatSurface({ siteId }: { siteId: string }) {
 	}, []);
 
 	const decide = useCallback(
-		async (changeSet: ChangeSet, decision: "approve" | "reject", options?: { confirm?: string; auto?: boolean }) => {
+		async (changeSet: ChangeSet, decision: "approve" | "reject", options?: { confirm?: string; auto?: boolean; manual?: boolean }) => {
 			const held = decision === "approve" && isSiteChange(changeSet) ? await holdEditor(options?.auto === true) : null;
 			// applied here: the page timeline has it (or will in a moment) — nothing to ask the server about
 			if (decision === "approve") checked.current.add(changeSet.id);
 			try {
-				const decided = await decideChangeSet(changeSet.id, decision, "self", undefined, options?.confirm !== undefined ? { confirm: options.confirm } : undefined);
+				const decided = await decideChangeSet(changeSet.id, decision, "self", undefined, options && { confirm: options.confirm, manual: options.manual });
 				allPending.refresh();
 				if (held && decided.status === "applied") announce(decided, held);
 				else held?.resume();

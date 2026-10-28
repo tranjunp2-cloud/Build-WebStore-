@@ -63,6 +63,13 @@ export interface AgentPanelLabels {
 	work: Partial<WorkLabels>;
 }
 
+/** How a card was decided: `confirm` echoes the typed confirmation, `auto` is Auto-approve, `manual` the merchant's click. */
+export interface PanelDecideOptions {
+	confirm?: string;
+	auto?: boolean;
+	manual?: boolean;
+}
+
 export interface AgentAssistantPanelProps {
 	chat: AgentChatView & { history?: AgentPanelHistory };
 	/** page the merchant is on, e.g. "Products page" — the context chip and header line */
@@ -72,7 +79,11 @@ export interface AgentAssistantPanelProps {
 	onRemoveContext?: () => void;
 	/** drafts waiting for approval across chats (the panel lists the open chat's; all on a new chat) */
 	pending: ChangeSet[];
-	onDecide: (changeSet: ChangeSet, decision: "approve" | "reject", options?: { confirm?: string; auto?: boolean }) => Promise<ChangeSet>;
+	/**
+	 * `auto`: Auto-approve applies it; `manual`: the merchant's own click (sent on every decision that is not `auto`, the
+	 * server refuses a `requiresClick` card without it) — the host passes both on to the gateway
+	 */
+	onDecide: (changeSet: ChangeSet, decision: "approve" | "reject", options?: PanelDecideOptions) => Promise<ChangeSet>;
 	/** applied change with undo data → put the record back */
 	onUndo?: (changeSet: ChangeSet) => Promise<ChangeSet>;
 	/** the host's word on an applied change's Undo (site editor: blocked with a reason, relabelled, annotated) */
@@ -415,8 +426,10 @@ export function AgentAssistantPanel({
 	// that same call (and shows its outcome) instead of a second claim answered "already being applied"
 	const inFlight = useRef(new Map<string, Promise<ChangeSet>>());
 	const decide = useCallback(
-		(changeSet: ChangeSet, decision: "approve" | "reject", options?: { confirm?: string; auto?: boolean }) => {
-			return joinInFlight(inFlight.current, `${changeSet.id}:${decision}`, () => onDecide(changeSet, decision, options));
+		(changeSet: ChangeSet, decision: "approve" | "reject", options?: PanelDecideOptions) => {
+			// every decision but Auto-approve's is a click of the merchant
+			const how: PanelDecideOptions = options?.auto ? options : { ...options, manual: true };
+			return joinInFlight(inFlight.current, `${changeSet.id}:${decision}`, () => onDecide(changeSet, decision, how));
 		},
 		[onDecide],
 	);
@@ -467,7 +480,7 @@ export function AgentAssistantPanel({
 		async (changeSet: ChangeSet) => {
 			const open = pendingEditHref(changeSet);
 			if (open) return onNavigate?.(open);
-			const decided = changeSet.status === "pending" ? await onDecide(changeSet, "approve") : changeSet;
+			const decided = changeSet.status === "pending" ? await onDecide(changeSet, "approve", { manual: true }) : changeSet;
 			const href = decided.result?.links[0]?.href;
 			if (href) onNavigate?.(href);
 		},
