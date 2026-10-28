@@ -317,6 +317,8 @@ export async function persistBlogPosts(
                 collection: 'blogs',
                 where: { slug: { equals: finalSlug }, tenant: { equals: tenantId } },
                 limit: 1,
+                // a trashed post can be restored: its slug is still taken
+                trash: true,
             })
             if (slugCheck.totalDocs > 0) finalSlug = `${finalSlug}-${Math.random().toString(36).slice(2, 8)}`
         } catch { /* proceed with original slug */ }
