@@ -4245,6 +4245,7 @@
       "createPage": "Create page",
       "duplicatePage": "A page with this name or URL already exists",
       "invalidPageName": "Use at least one letter or number",
+      "reservedPage": "This URL is used by the system. Please choose another page name.",
       "editing404Page": "Editing 404 page",
       "deleteInlineConfirm": "Delete “{name}”? You can undo for a few seconds.",
       "pageShown": "{name} is now visible",

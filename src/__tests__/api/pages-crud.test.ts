@@ -142,6 +142,16 @@ describe('POST /api/sites/[siteId]/pages [TC-F05.02]', () => {
         expect(res.status).toBe(409)
     })
 
+    it.each(['checkout', '/checkout', 'checkout/', 'orders', '/orders', '404'])('TC-F05-02-28: returns 400 for reserved slug %s', async (slug) => {
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'site-1', tenant: 'tenant-1' }] })
+
+        const req = { json: () => Promise.resolve({ title: 'Checkout', slug }) } as unknown as Request
+        const res = await POST(req, ctx as { params: Promise<{ siteId: string }> })
+
+        expect(res.status).toBe(400)
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
     it('returns 400 for invalid slug', async () => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: 'site-1', tenant: 'tenant-1' }] })
 

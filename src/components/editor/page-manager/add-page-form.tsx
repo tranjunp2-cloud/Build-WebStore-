@@ -13,6 +13,7 @@ export interface AddPageLabels {
     createPage: string
     duplicatePage: string
     invalidPageName: string
+    reservedPage: string
 }
 
 interface AddPageFormProps {
@@ -33,7 +34,8 @@ export function AddPageForm({ labels, pages, locale, isSubmitting, onCreate, onO
     const validation = validateNewPageTitle(title, pages, locale)
     const canSubmit = !validation.error && !isSubmitting
     const errorText = validation.error === 'duplicate' ? labels.duplicatePage
-        : validation.error === 'invalid' ? labels.invalidPageName : null
+        : validation.error === 'invalid' ? labels.invalidPageName
+        : validation.error === 'reserved' ? labels.reservedPage : null
 
     const close = () => { setIsOpen(false); setTitle('') }
     const submit = async () => {

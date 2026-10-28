@@ -4245,6 +4245,7 @@
       "createPage": "Cipta halaman",
       "duplicatePage": "Halaman dengan nama atau URL ini sudah wujud",
       "invalidPageName": "Gunakan sekurang-kurangnya satu huruf atau nombor",
+      "reservedPage": "URL ini digunakan oleh sistem. Sila pilih nama halaman lain.",
       "editing404Page": "Menyunting halaman 404",
       "deleteInlineConfirm": "Padam “{name}”? Anda boleh buat asal dalam beberapa saat.",
       "pageShown": "{name} kini boleh dilihat",
