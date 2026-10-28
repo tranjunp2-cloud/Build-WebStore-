@@ -5,7 +5,7 @@
  *            → extractMetadata (OGS) → extractMainContent (Readability)
  *            → extractStructure (cheerio) → preprocessForAI
  *
- * Security:  SSRF prevention via DNS resolve + `isPublicIp` (globally routable unicast only). EVERY resolved address
+ * Security:  SSRF prevention via DNS resolve + private IP blocklist. EVERY resolved address
  *            (v4 + v6) must be public, and the socket is pinned to the vetted addresses so a
  *            second (rebinding) DNS answer can never reach the connection.
  */
@@ -16,7 +16,6 @@ import * as cheerio from 'cheerio'
 import ogs from 'open-graph-scraper'
 import { Readability } from '@mozilla/readability'
 import { JSDOM } from 'jsdom'
-import { isPublicIp } from '@/lib/net/is-public-ip'
 import { FetchGuardError, readBodyCapped } from './fetch-capped'
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -53,6 +52,22 @@ const MAX_RESPONSE_BYTES = 5 * 1024 * 1024 // 5 MB
 const MAX_BODY_CHARS = 15_000  // v2: increased from 6,000 for richer extraction
 const MAX_META_CHARS = 1_500   // v2: increased from 500
 const MAX_REDIRECTS = 3
+
+const BLOCKED_IP_RANGES = [
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^169\.254\./,
+    /^0\./,
+    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, // carrier-grade NAT 100.64/10
+    /^::1$/,
+    /^::$/,
+    /^f[cd][0-9a-f]{2}:/i, // unique local fc00::/7
+    /^fe[89ab][0-9a-f]:/i, // link-local fe80::/10
+    // IPv4-mapped IPv6 (dotted or hex form): public sites never resolve to these
+    /^::ffff:/i,
+]
 
 // ── URL Validation ───────────────────────────────────────────────────────
 
@@ -95,9 +110,7 @@ export async function resolvePublicAddresses(hostname: string): Promise<Resolved
     }
     if (addresses.length === 0) throw new Error(`Could not resolve hostname: ${hostname}`)
 
-    // only globally routable unicast (lib/net/is-public-ip): private, loopback, link-local, CGNAT, multicast,
-    // reserved, benchmarking, documentation, and IPv4 embedded in IPv6 (mapped, NAT64, 6to4) are refused
-    if (addresses.some(({ address }) => !isPublicIp(address))) {
+    if (addresses.some(({ address }) => BLOCKED_IP_RANGES.some((r) => r.test(address)))) {
         throw new Error('URL resolves to a blocked IP range')
     }
     return addresses

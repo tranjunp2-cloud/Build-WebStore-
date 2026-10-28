@@ -2,7 +2,7 @@ import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import sharp from 'sharp'
 import { AVATAR_MAX_BYTES } from '@/lib/profile/schemas'
-import { isPublicIp } from '@/lib/net/is-public-ip'
+import { isPublicIp } from './is-public-ip'
 
 const DOWNLOAD_TIMEOUT_MS = 10_000
 /** Pixel cap (not a side cap): rejects decompression-bomb images but keeps well-compressed phone photos. */
