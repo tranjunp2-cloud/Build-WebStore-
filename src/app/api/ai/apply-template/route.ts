@@ -552,7 +552,9 @@ export const POST = withAuth(async (user, req) => {
             }
 
             // the revision the applying tab now holds (it renders the applied state), so its next save is not refused
-            const draftPageId = appliedPage ? Number(appliedPage.id) : pageId && /^\d+$/.test(pageId) ? Number(pageId) : null
+            // (assigned inside the transaction callback: TS can't see it, hence the widening)
+            const appliedPageId = (appliedPage as { id: string | number } | null)?.id
+            const draftPageId = appliedPageId != null ? Number(appliedPageId) : pageId != null && /^\d+$/.test(String(pageId)) ? Number(pageId) : null
             const draftVersion = await readEditorRevision(poolExec(payload), Number(siteId), draftPageId)
                 .then(revision => (draftPageId === null ? null : formatDraftVersion(revision)))
                 .catch(() => null)
