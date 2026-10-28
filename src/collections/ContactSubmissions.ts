@@ -78,6 +78,23 @@ export const ContactSubmissions: CollectionConfig = {
             ],
         },
         {
+            // Emails the shop sent to this person from this message (the dashboard assistant's "reply to a lead").
+            // Written by lib/leads/lead-reply.ts only (field access closes it to requests); shown read-only in the Contact leads panel.
+            name: 'replies',
+            type: 'array',
+            // Closed to every request: create is public (anyone can POST /api/contact-submissions), so without this a
+            // visitor could forge "Reply sent" entries. Payload drops the value from a request that cannot write the
+            // field; lib/leads/lead-reply.ts writes it through the Local API with overrideAccess.
+            access: { create: () => false, update: () => false },
+            admin: { readOnly: true, description: 'Replies the shop emailed to this person.' },
+            fields: [
+                { name: 'subject', type: 'text', required: true, maxLength: 200 },
+                { name: 'body', type: 'textarea', required: true, maxLength: 4000 },
+                { name: 'sentAt', type: 'date', required: true },
+                { name: 'sentBy', type: 'text', admin: { description: 'Email of the user who approved the reply.' } },
+            ],
+        },
+        {
             name: 'ipAddress',
             type: 'text',
             required: false,

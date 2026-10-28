@@ -1,6 +1,10 @@
 import type { Block, CollectionConfig, CollectionAfterChangeHook } from 'payload'
-import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
+import type { queueSEOAutoGeneration as QueueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import { revalidatePageAfterChange, revalidatePageAfterDelete } from '../lib/cache/revalidate-storefront'
+
+// Loaded on use: it imports the Payload config, which imports this collection (a static import is a cycle that breaks production builds).
+const queueSEOAutoGeneration: typeof QueueSEOAutoGeneration = async (...args) => (await import('../lib/ai/seo-queue')).queueSEOAutoGeneration(...args)
+
 // Block definitions — each block is a section of a page
 const HeroBlock = {
     slug: 'hero',
@@ -465,7 +469,7 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
         }
 
         // Trigger background generation
-        queueSEOAutoGeneration('pages', doc.id, siteId, doc.title, textContext)
+        queueSEOAutoGeneration('pages', doc.id, siteId, doc.title, textContext, req.user)
     }
 }
 
@@ -837,6 +841,16 @@ const ProductsFeaturedBlock = {
         },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
+        // the section's own pictures: shown while no product is on sale (instead of sample
+        // pictures) and for a product without a photo
+        {
+            name: 'images',
+            type: 'array',
+            fields: [
+                { name: 'image', type: 'upload', relationTo: 'media', required: false },
+                { name: 'caption', type: 'text' },
+            ],
+        },
     ],
 }
 

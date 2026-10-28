@@ -274,6 +274,8 @@ const KNOWN_GROUP_PREFIXES = [
   'payment_config', 'shipping_config', 'local_business',
   // F36 EasyParcel (GH-1333): Tenants.easyParcelIntegration group → prefixed columns
   'easy_parcel_integration',
+  // Tenants.settings group (AI shop automations) → settings_* columns
+  'settings',
 ]
 
 function getMigrationColumns() {

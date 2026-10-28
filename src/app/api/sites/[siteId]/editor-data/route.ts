@@ -7,6 +7,7 @@ import { withAuth } from '@/lib/auth'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 import { getCachedSidebarBadgeCounts } from '@/lib/dashboard/sidebar-badge-counts-cached'
 import type { SidebarBadgeKey } from '@/config/sidebar-nav'
+import { formatDraftVersion, poolExec, readEditorRevision, type EditorRevision } from '@/lib/sites/editor-revision'
 
 function normalizeEditorLayout(layout: unknown) {
     if (!Array.isArray(layout)) return []
@@ -46,6 +47,13 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
         if (!site) {
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
+
+        // The draft revision is read BEFORE the content: a write landing in between leaves the editor
+        // with an older revision than its content (its next save is refused), never the reverse.
+        const revisionExec = poolExec(payload)
+        const revisionBefore: EditorRevision | null = Number.isSafeInteger(numericSiteId) && numericSiteId > 0
+            ? await readEditorRevision(revisionExec, numericSiteId, pageId && /^\d+$/.test(pageId) ? Number(pageId) : null).catch(() => null)
+            : null
 
         type TenantRef = string | number | { id: string | number } | null | undefined
         const resolveTenantId = (t: TenantRef): string | null =>
@@ -128,6 +136,17 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             page = pagesResult.docs[0] || null
         }
 
+        // the homepage fallback (no or unknown pageId): its revision is read now
+        let draftVersion: string | undefined
+        if (revisionBefore) {
+            const pagePart = !page
+                ? null
+                : String(page.id) === pageId
+                    ? revisionBefore.page
+                    : (await readEditorRevision(revisionExec, numericSiteId, Number(page.id)).catch(() => null))?.page ?? null
+            draftVersion = formatDraftVersion({ site: revisionBefore.site, page: pagePart })
+        }
+
         // F-26: Fetch locale_content from pages table (raw SQL — not a Payload field)
         let localeContent: Record<string, unknown> = {}
         if (page) {
@@ -190,6 +209,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                     return null
                 })(),
             },
+            /** The editor draft revision — sent back as `base` with each save (lib/sites/editor-revision) */
+            ...(draftVersion ? { draftVersion } : {}),
             page: page ? {
                 id: page.id,
                 title: page.title || 'Homepage',
@@ -198,6 +219,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 updatedAt: page.updatedAt,
                 /** F-26: Per-block locale content map for multilingual editor */
                 localeContent,
+                /** The page draft's SEO (the copilot's SEO proposals land here) */
+                seo: { title: (page.seo as { title?: string | null } | undefined)?.title ?? null, description: (page.seo as { description?: string | null } | undefined)?.description ?? null },
             } : null,
             user: {
                 firstName: (user as Record<string, unknown>).firstName as string || null,

@@ -508,13 +508,23 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         // The deleted-id query must target the right column + value — serialize the
         // drizzle SQL so a broken WHERE clause (wrong column / NaN site_id) fails here
         // instead of silently passing on the mocked rows.
-        expect(executeSpy).toHaveBeenCalledTimes(1)
+        // three statements: the soft-deleted ids, then the translations going live with the pages: read the live
+        // pages' drafts, write each one's published copy (template text left out) [TC-AIWB-108] [TC-AIREL-253]
+        expect(executeSpy).toHaveBeenCalledTimes(3)
         const { sql: deletedQuerySql, params: deletedQueryParams } = new PgDialect().sqlToQuery(
             executeSpy.mock.calls[0][0],
         )
         expect(deletedQuerySql).toContain('site_id =')
         expect(deletedQuerySql).toContain('deleted_at IS NOT NULL')
         expect(deletedQueryParams).toContain(Number(siteId)) // 123, never NaN
+        const { sql: readSql, params: readParams } = new PgDialect().sqlToQuery(executeSpy.mock.calls[1][0])
+        expect(readSql).toContain('SELECT id, locale_content FROM pages')
+        expect(readSql).toContain('deleted_at IS NULL')
+        expect(readParams).toEqual([Number(siteId)])
+        const { sql: snapshotSql, params: snapshotParams } = new PgDialect().sqlToQuery(executeSpy.mock.calls[2][0])
+        expect(snapshotSql).toContain('SET published_locale_content =')
+        expect(snapshotSql).toContain('site_id =')
+        expect(snapshotParams).toEqual(['{}', 11, Number(siteId)])
 
         // The soft-deleted page must NEVER be promoted...
         const pageUpdates = updateSpy.mock.calls.filter(c => c[0].collection === 'pages')
@@ -522,6 +532,40 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(promotedIds).not.toContain(11)
         // ...while the live recreated page IS promoted.
         expect(promotedIds).toContain(12)
+    })
+
+    it('TC-AIREL-253: the translations that go live leave out a copy that is the editor\'s template text, and keep a real one', async () => {
+        const { getPayload } = await import('payload')
+        const { resolveBlockContent } = await import('@/lib/ai/add-section-content')
+        const siteId = '124'
+        mockSiteRecord = { id: siteId, name: 'My Coffee Site', status: 'draft', tenant: 'tenant-1', publishedAt: null }
+        const filler = resolveBlockContent('hero', 'ms', 'My Coffee Site').content
+        const real = { headline: 'Kopi setiap hari' }
+        const executeSpy = vi.fn().mockImplementation(async (query: unknown) => {
+            const { sql: text } = new PgDialect().sqlToQuery(query as Parameters<PgDialect['sqlToQuery']>[0])
+            if (text.includes('deleted_at IS NOT NULL')) return { rows: [] }
+            if (/^\s*select/i.test(text)) return { rows: [{ id: 21, locale_content: { 'hero-a': { ms: filler }, 'cta-a': { ms: real } } }] }
+            return { rows: [] }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return depth === 1 ? { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } } : mockSiteRecord
+                return null
+            }),
+            find: vi.fn().mockResolvedValue({
+                docs: [{ id: 21, _status: 'draft', site: siteId, slug: '/', layout: [{ id: 'hero-a', blockType: 'hero', headline: 'Coffee' }, { id: 'cta-a', blockType: 'cta', headline: 'Order' }] }],
+                hasNextPage: false,
+            }),
+            update: vi.fn().mockImplementation(async ({ collection, id, data }) => (collection === 'sites' ? (mockSiteRecord = { ...mockSiteRecord, ...data }) : { id, ...data })),
+            db: { drizzle: { execute: executeSpy } },
+        })
+
+        const res = await PublishPATCH(makePatchReq(siteId), { params: Promise.resolve({ siteId }) })
+
+        expect(res.status).toBe(200)
+        const written = executeSpy.mock.calls.map((c) => new PgDialect().sqlToQuery(c[0])).find((q) => q.sql.includes('SET published_locale_content'))!
+        expect(JSON.parse(String(written.params[0]))).toEqual({ 'cta-a': { ms: real } })
     })
 
     it('TC-F01-pub-14: promote never writes deletedAt — 2nd-layer guard so a page soft-deleted mid-publish (race) cannot reset deleted_at and trip the unique index', async () => {
