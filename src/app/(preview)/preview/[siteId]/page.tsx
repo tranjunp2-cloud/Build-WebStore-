@@ -3,6 +3,10 @@ import type { Viewport } from 'next'
 import payloadConfig from '@payload-config'
 import { getPayload } from 'payload'
 import { PreviewSiteRenderer } from './PreviewSiteRenderer'
+import { resolveInitialActiveLocale } from '@/lib/detect-locale'
+import { localizedSiteAndPage, siteBrand } from '@/lib/i18n/locale-display'
+import { readPageTranslations } from '@/lib/i18n/page-translations'
+import { siteLanguagesOf } from '@/lib/site-languages'
 import { PreviewScripts, BuilderLinkScripts } from '@/components/editor/PreviewScripts'
 import { AppShell } from '@/components/AppShell'
 import { getCurrentUser } from '@/lib/auth'
@@ -262,19 +266,28 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
 
         const imageLibraryS3 = await resolveImageLibraryS3Map(payload, siteId)
 
+        // One language of the draft: the editor canvas opens in the language the editor opens in
+        // (first paint = what the editor shows), Preview in the site's primary one (what visitors
+        // will get). The sections stay as written; the language's copy goes over them.
+        const draftSite = {
+            ...site,
+            headerBlock: (site as Record<string, unknown>).pendingHeaderBlock ?? site.headerBlock,
+            footerBlock: (site as Record<string, unknown>).pendingFooterBlock ?? site.footerBlock,
+            globalBlocks: (site as Record<string, unknown>).pendingGlobalBlocks ?? site.globalBlocks,
+        }
+        const languages = siteLanguagesOf(site as Parameters<typeof siteLanguagesOf>[0])
+        const generationLocale = String((site as Record<string, unknown>).generationLocale || site.locale || 'en')
+        const language = editor ? resolveInitialActiveLocale(generationLocale, site.locale ?? undefined, languages) : languages[0]!
+        const shown = localizedSiteAndPage(draftSite, page, language, await readPageTranslations(page.id, 'draft'), siteBrand(site))
+
         return (
             <AppShell>
                 <div className="min-h-screen">
                     {/* Render with true SiteRenderer in Editor Mode */}
                     <PreviewSiteRenderer
                         site={{
-                            ...site,
-                            // F26-04: override headerBlock / footerBlock / globalBlocks with the
-                            // DRAFT (pending) versions so /preview reflects the latest editor save,
-                            // including locale switches that haven't been published yet.
-                            headerBlock: (site as Record<string, unknown>).pendingHeaderBlock ?? site.headerBlock,
-                            footerBlock: (site as Record<string, unknown>).pendingFooterBlock ?? site.footerBlock,
-                            globalBlocks: (site as Record<string, unknown>).pendingGlobalBlocks ?? site.globalBlocks,
+                            // the DRAFT (pending) header / footer / widgets, in the language shown
+                            ...shown.site,
                             tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
                                 ? (site.tenant as { slug?: string }).slug || ''
                                 : '',
@@ -285,7 +298,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                             blogPreviewPath: `/preview/${siteId}/blog`,
                             imageLibraryS3,
                         }}
-                        page={page}
+                        page={shown.page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
                         isBuilderPreview={!!builder}
                         isEditorIframe={isEditorIframe}

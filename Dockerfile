@@ -4,6 +4,8 @@ WORKDIR /app
 ENV HUSKY=0
 COPY package.json package-lock.json* ./
 COPY scripts ./scripts
+# npm workspaces (packages/*) must exist before npm ci
+COPY packages ./packages
 RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
 
 # ── Stage 2: Builder ────────────────────────────────────────────────────
@@ -12,6 +14,8 @@ WORKDIR /app
 ENV HUSKY=0
 COPY package.json package-lock.json* ./
 COPY scripts ./scripts
+# npm workspaces (packages/*) must exist before npm ci
+COPY packages ./packages
 RUN npm ci 2>/dev/null || npm install
 
 COPY . .

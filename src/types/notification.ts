@@ -8,6 +8,7 @@ export type NotificationType =
     | 'SYSTEM_ALERT'
     | 'PRODUCT_LOW_STOCK'
     | 'BLOG_PUBLISHED'
+    | 'AUTOMATION_REMINDER'
 
 export interface NotificationItem {
     id: string

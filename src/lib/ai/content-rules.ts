@@ -118,6 +118,47 @@ export const GENERIC_PHRASE_BLACKLIST: ReadonlyArray<string> = [
     'we specialize in',
 ] as const
 
+/**
+ * Filler that fits any shop, per language (the English list above is
+ * GENERIC_PHRASE_BLACKLIST). Used by the site editor copilot's copy check:
+ * one match is enough there, because the copilot writes a few lines at a
+ * time and the merchant can keep the words on purpose.
+ */
+export const GENERIC_PHRASES_BY_LANG: Readonly<Record<ContentLang, ReadonlyArray<string>>> = {
+    en: [
+        'elevate your', 'unlock the', 'look no further', 'in today\'s fast-paced', 'seamless experience',
+        'take your', 'to the next level', 'embark on', 'a journey of', 'why choose us', 'what our customers say',
+        'we pride ourselves', 'second to none', 'unparalleled', 'top-notch', 'best-in-class',
+    ],
+    vi: [
+        'vì sao chọn chúng tôi', 'tại sao chọn chúng tôi', 'khách hàng nói gì về chúng tôi', 'chúng tôi luôn nỗ lực',
+        'mang đến những điều tốt nhất', 'mang đến trải nghiệm tuyệt vời', 'trải nghiệm tuyệt vời', 'nâng tầm',
+        'hành trình', 'đẳng cấp', 'chất lượng cao cấp', 'chất lượng hàng đầu', 'dịch vụ tận tâm', 'tận tâm và chuyên nghiệp',
+        'uy tín và chất lượng', 'sự hài lòng của khách hàng', 'đáp ứng mọi nhu cầu', 'không ngừng nỗ lực',
+        'hoàn thiện phong cách của bạn', 'khám phá ngay',
+    ],
+    ms: [
+        'mengapa memilih kami', 'kenapa pilih kami', 'apa kata pelanggan kami', 'perkhidmatan terbaik',
+        'kualiti terbaik', 'pengalaman yang luar biasa', 'kepuasan pelanggan', 'kami komited',
+    ],
+} as const
+
+/**
+ * Claims a visitor can't check (superlatives, guarantees). The copilot may only
+ * write them when the merchant gave them. Facts stay out ("Best sellers", "100% cotton").
+ */
+export const UNVERIFIABLE_CLAIMS: ReadonlyArray<RegExp> = [
+    /\bthe best\b/i, /\bbest (quality|price|service)\b/i, /#\s?1\b/, /\bno\.? ?1\b/i, /\bnumber one\b/i,
+    /\b100 ?% (satisfaction|satisfied|quality|guarantee)/i, /\bguaranteed\b/i,
+    /tốt nhất/i, /số 1\b/i, /hàng đầu/i, /rẻ nhất/i, /uy tín nhất/i, /cam kết 100/i, /100 ?% hài lòng/i,
+    /\bterbaik\b/i, /\bnombor 1\b/i, /\bdijamin\b/i,
+] as const
+
+/** A vague button label (submit, click here, xem thêm…) in any of the shop languages. */
+export function isVagueCTALabel(label: unknown): boolean {
+    return (['en', 'vi', 'ms'] as const).some((lang) => isBlockedCTALabel(label, lang))
+}
+
 // ── Multi-language Blocked CTA Labels ───────────────────────────────────────
 
 /**

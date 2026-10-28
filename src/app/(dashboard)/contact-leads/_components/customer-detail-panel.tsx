@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { X, User, Mail, Loader2, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
@@ -9,6 +9,7 @@ import { CustomerAvatar } from './customer-avatar'
 import { CustomerStatusBadge } from './customer-status-badge'
 import { getCustomerDetailAction, updateContactStatusAction } from '../actions'
 import { useI18n } from '@/i18n'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 import { cn } from '@/lib/utils'
 import type { CustomerRecord, CustomerStatus } from '../_lib/customer-record'
 import { STATUS_COLORS } from '../_lib/badge-tokens'
@@ -109,6 +110,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
     const [updating, setUpdating] = useState(false)
     // Tracks the last status saved to server (after auto-transition or Update)
     const serverStatusRef = useRef<CustomerStatus>('new')
+    const localStatusRef = useRef(localStatus)
+    localStatusRef.current = localStatus
 
     useEffect(() => {
         if (!record) return
@@ -131,6 +134,27 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
             .catch(() => toast.error(c.loadDetailsFailed))
             .finally(() => setLoadingDetail(false))
     }, [record?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // The assistant changed this lead (status) or replied to it: read the thread and status again. A status picked in
+    // the dropdown and not yet saved stays; the thread has no draft to protect. A failed background read keeps the panel.
+    const rawId = record?.rawId
+    const refreshDetail = useCallback(async () => {
+        if (rawId == null) return
+        try {
+            const res = await getCustomerDetailAction(rawId, 'contact-form')
+            setTimeline(res.timeline as CustomerRecord[])
+            if (res.record && localStatusRef.current === serverStatusRef.current) {
+                setLocalStatus(res.record.status)
+                serverStatusRef.current = res.record.status
+            }
+        } catch (err) {
+            console.error('[Lead panel refresh]', err)
+        }
+    }, [rawId])
+    useAgentChanges(
+        { kinds: ['contact_lead', 'lead_reply'], ids: rawId == null ? undefined : [String(rawId)], enabled: record?.source === 'contact-form' },
+        () => { void refreshDetail() },
+    )
 
     if (!record) return null
 
@@ -314,6 +338,23 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                                         <p className="text-xs text-[var(--dash-text-muted)] leading-[19.5px]">{t.message}</p>
                                                     </div>
                                                 )}
+                                                {/* Replies the shop emailed to this person (read-only) */}
+                                                {(t.replies ?? []).map((r, i) => (
+                                                    <div
+                                                        key={`${t.id}:reply:${i}`}
+                                                        className="flex flex-col gap-1 rounded-[12px] p-[17px]"
+                                                        style={{ background: 'hsl(var(--primary)/0.06)', border: '1px solid var(--dash-border)' }}
+                                                    >
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs font-bold text-[var(--dash-text)]">{c.replySent}</span>
+                                                            <span className="text-[10px]" style={{ color: 'var(--dash-text-muted)' }}>
+                                                                {formatLatestDate(r.sentAt)}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs font-semibold text-[var(--dash-text)] leading-[19.5px]">{r.subject}</p>
+                                                        <p className="text-xs text-[var(--dash-text-muted)] leading-[19.5px] whitespace-pre-wrap">{r.body}</p>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     ))}

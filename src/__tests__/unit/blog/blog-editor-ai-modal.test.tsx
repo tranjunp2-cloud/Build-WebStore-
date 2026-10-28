@@ -236,289 +236,9 @@ const setupMocks = () => {
     vi.mocked(actions.saveBlogAction).mockResolvedValue({ id: 'new-post-id' } as any)
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// TC-F17-03-07 — AI Modal bottom sheet on mobile (Blocker)
-// ═══════════════════════════════════════════════════════════════════════════
-describe('[TC-F17-03-07] AI Modal — Bottom sheet renders with drag handle on mobile', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        localStorage.clear()
-        setupMocks()
-    })
+// The legacy "Generate a blog idea" modal (TC-F17-03-06/07) was replaced by the copilot's inline
+// AI writer (TC-F17-AI-01..03, blog-ai-draft.test.ts); its tests went with it.
 
-    afterEach(() => {
-        vi.useRealTimers()
-    })
-
-    it('AI modal does not render until "AI Assistant" button is clicked', async () => {
-        // Arrange + Act
-        await act(async () => {
-            render(<BlogEditorPage />)
-        })
-
-        // Assert — modal not present before trigger
-        expect(screen.queryByText('Generate Blog Idea with AI')).not.toBeInTheDocument()
-    })
-
-    it('clicking "AI Assistant" button opens the AI generator modal', async () => {
-        // Arrange
-        await act(async () => {
-            render(<BlogEditorPage />)
-        })
-
-        // Act — click the AI assistant button (gradient button with sparkles icon)
-        const aiButton = screen.getByLabelText
-            ? screen.queryByRole('button', { name: /ai assistant/i })
-            : null
-
-        // Find button by accessible text or by visible label span
-        const buttons = screen.getAllByRole('button')
-        const aiBtn = buttons.find(btn => {
-            const span = btn.querySelector('span')
-            return span?.textContent?.includes('AI Assistant') || btn.querySelector('svg')
-        })
-
-        await act(async () => {
-            if (aiBtn) fireEvent.click(aiBtn)
-        })
-
-        // Assert — modal content appears (via portal rendered inline in tests)
-        await waitFor(() => {
-            const aiModalTitle = screen.queryByText('Generate Blog Idea with AI')
-            // Portal renders inline so it may or may not be in DOM depending on createPortal mock
-            // Since we mock createPortal to return node directly, it should be rendered
-            if (aiModalTitle) {
-                expect(aiModalTitle).toBeInTheDocument()
-            }
-        }, { timeout: 1000 })
-    })
-
-    it('AI modal renders mobile drag handle when open', async () => {
-        // Arrange
-        await act(async () => {
-            render(<BlogEditorPage />)
-        })
-
-        // Act — open AI modal
-        const buttons = screen.getAllByRole('button')
-        const aiBtn = buttons.find(btn => {
-            const span = btn.querySelector('span')
-            return span?.textContent?.includes('AI Assistant')
-        })
-
-        if (aiBtn) {
-            await act(async () => {
-                fireEvent.click(aiBtn)
-            })
-        }
-
-        // Assert — the modal has drag handle with class "flex xl:hidden"
-        // (rendered when showAIGenerator is true)
-        const dragHandles = document.querySelectorAll('.flex.xl\\:hidden')
-        // At minimum the DOM should have been updated
-        expect(screen.queryByText('Create Blog Post')).toBeInTheDocument()
-    })
-})
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TC-F17-03-06 + AI Generate button disabled when topic empty
-// ═══════════════════════════════════════════════════════════════════════════
-describe('[TC-F17-03-06] AI Modal — Generate button disabled when topic is empty', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        localStorage.clear()
-        setupMocks()
-    })
-
-    afterEach(() => {
-        vi.useRealTimers()
-    })
-
-    it('Generate button is disabled when aiPrompt is empty string', async () => {
-        // Arrange
-        await act(async () => {
-            render(<BlogEditorPage />)
-        })
-
-        // Open AI modal
-        const buttons = screen.getAllByRole('button')
-        const aiBtn = buttons.find(btn =>
-            btn.querySelector('span')?.textContent?.includes('AI Assistant')
-        )
-
-        if (aiBtn) {
-            await act(async () => {
-                fireEvent.click(aiBtn)
-            })
-        }
-
-        // Assert — Generate Blog Idea button should be disabled
-        await waitFor(() => {
-            const generateBtn = screen.queryByRole('button', { name: /generate blog idea/i })
-            if (generateBtn) {
-                expect(generateBtn).toBeDisabled()
-            }
-        }, { timeout: 500 })
-    })
-
-    it('Generate button becomes enabled when topic is typed', async () => {
-        // Arrange
-        await act(async () => {
-            render(<BlogEditorPage />)
-        })
-
-        // Open AI modal
-        const buttons = screen.getAllByRole('button')
-        const aiBtn = buttons.find(btn =>
-            btn.querySelector('span')?.textContent?.includes('AI Assistant')
-        )
-
-        if (aiBtn) {
-            await act(async () => {
-                fireEvent.click(aiBtn)
-            })
-        }
-
-        // Act — there are two inputs with same placeholder (title input + AI topic input)
-        // The AI topic input uses text-[16px] class (different from title input text-[14px])
-        // Use getAllByPlaceholderText and pick the one inside the AI modal
-        const allTopicInputs = screen.queryAllByPlaceholderText('e.g., E-commerce Marketing Strategies')
-        // AI topic input is the second one (first is post title field) — it has text-[16px] class
-        const topicInput = allTopicInputs.find(el =>
-            el.className.includes('text-[16px]')
-        ) || allTopicInputs[allTopicInputs.length - 1]
-
-        if (topicInput) {
-            await act(async () => {
-                fireEvent.change(topicInput, { target: { value: 'How to do blog marketing' } })
-            })
-        }
-
-        // Assert
-        await waitFor(() => {
-            const generateBtn = screen.queryByRole('button', { name: /generate blog idea/i })
-            if (generateBtn && topicInput) {
-                expect(generateBtn).not.toBeDisabled()
-            }
-        }, { timeout: 500 })
-    })
-
-    it('X button in AI modal header dismisses the modal', async () => {
-        // Arrange
-        await act(async () => {
-            render(<BlogEditorPage />)
-        })
-
-        // Open AI modal
-        const allButtons = screen.getAllByRole('button')
-        const aiBtn = allButtons.find(btn =>
-            btn.querySelector('span')?.textContent?.includes('AI Assistant')
-        )
-
-        if (aiBtn) {
-            await act(async () => {
-                fireEvent.click(aiBtn)
-            })
-        }
-
-        const modalTitle = screen.queryByText('Generate Blog Idea with AI')
-        if (modalTitle) {
-            // Find close button near title
-            const closeButtons = screen.getAllByRole('button')
-            const xClose = closeButtons.find(btn =>
-                btn.className.includes('rounded-[12px]') && btn.querySelector('svg') &&
-                btn.closest('[class*="fixed inset-0"]')
-            )
-            if (xClose) {
-                await act(async () => {
-                    fireEvent.click(xClose)
-                })
-                // Assert
-                expect(screen.queryByText('Generate Blog Idea with AI')).not.toBeInTheDocument()
-            }
-        }
-
-        // Always assert that the editor page itself is still intact
-        expect(screen.getByText('Create Blog Post')).toBeInTheDocument()
-    })
-})
-
-// ═══════════════════════════════════════════════════════════════════════════
-// AI Modal — Tone buttons
-// ═══════════════════════════════════════════════════════════════════════════
-describe('[TC-F17-03-07] AI Modal — Tone buttons have correct structure', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        localStorage.clear()
-        setupMocks()
-    })
-
-    afterEach(() => {
-        vi.useRealTimers()
-    })
-
-    it('three tone buttons (Professional, Friendly, Persuasive) are rendered when AI modal is open', async () => {
-        // Arrange
-        await act(async () => {
-            render(<BlogEditorPage />)
-        })
-
-        const buttons = screen.getAllByRole('button')
-        const aiBtn = buttons.find(btn =>
-            btn.querySelector('span')?.textContent?.includes('AI Assistant')
-        )
-
-        if (aiBtn) {
-            await act(async () => {
-                fireEvent.click(aiBtn)
-            })
-        }
-
-        // Assert — all three tones should be visible
-        await waitFor(() => {
-            const professional = screen.queryByText('Professional')
-            const friendly = screen.queryByText('Friendly')
-            const persuasive = screen.queryByText('Persuasive')
-            if (professional && friendly && persuasive) {
-                expect(professional).toBeInTheDocument()
-                expect(friendly).toBeInTheDocument()
-                expect(persuasive).toBeInTheDocument()
-            }
-        }, { timeout: 500 })
-    })
-
-    it('tone buttons on mobile have fixed h-[70px] height (not flex-stretched)', async () => {
-        // Arrange
-        await act(async () => {
-            render(<BlogEditorPage />)
-        })
-
-        const buttons = screen.getAllByRole('button')
-        const aiBtn = buttons.find(btn =>
-            btn.querySelector('span')?.textContent?.includes('AI Assistant')
-        )
-
-        if (aiBtn) {
-            await act(async () => {
-                fireEvent.click(aiBtn)
-            })
-        }
-
-        // Assert — tone buttons should have h-[70px] class (mobile fixed height)
-        await waitFor(() => {
-            const toneContainer = document.querySelector('.h-\\[70px\\]')
-            if (toneContainer) {
-                expect(toneContainer).not.toBeNull()
-            }
-            // At minimum the page renders correctly
-            expect(screen.getByText('Create Blog Post')).toBeInTheDocument()
-        }, { timeout: 500 })
-    })
-})
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TC-F17-02-01 — Editor page renders for new post (Blocker)
-// ═══════════════════════════════════════════════════════════════════════════
 describe('[TC-F17-02-01] Blog editor page — Create new post flow', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -550,21 +270,22 @@ describe('[TC-F17-02-01] Blog editor page — Create new post flow', () => {
         expect(screen.getByPlaceholderText('e.g., E-commerce Marketing Strategies')).toBeInTheDocument()
     })
 
-    it('renders AI Assistant, Save Draft and Publish buttons in header', async () => {
-        // Arrange + Act
+    it('renders Save Draft and Publish in the header, and no AI button while the copilot is off [TC-F17-AI-01]', async () => {
+        // Arrange + Act — agentEnabled defaults to false (the copilot is switched off)
         await act(async () => {
             render(<BlogEditorPage />)
         })
 
-        // Assert — all three action buttons visible
+        // Assert — no dead AI button; the old modal is gone
         const allButtons = screen.getAllByRole('button')
         const buttonTexts = allButtons.map(b => b.querySelector('span')?.textContent || b.textContent || '')
-        expect(buttonTexts.some(t => t.includes('AI Assistant'))).toBe(true)
+        expect(buttonTexts.some(t => t.includes('AI Assistant'))).toBe(false)
         expect(buttonTexts.some(t => t.includes('Save Draft'))).toBe(true)
         expect(buttonTexts.some(t => t.includes('Publish'))).toBe(true)
+        expect(screen.queryByText('Generate Blog Idea with AI')).not.toBeInTheDocument()
     })
 
-    it('AI and Save Draft buttons are icon-only on mobile (hidden text spans with sm:inline)', async () => {
+    it('Save Draft is icon-only on mobile (hidden text span with sm:inline)', async () => {
         // Arrange + Act
         await act(async () => {
             render(<BlogEditorPage />)
@@ -573,7 +294,7 @@ describe('[TC-F17-02-01] Blog editor page — Create new post flow', () => {
         // Assert — text spans inside AI and Save Draft buttons use "hidden sm:inline"
         // (text shows from the sm breakpoint; icon-only below)
         const hiddenSmSpans = document.querySelectorAll('span.hidden.sm\\:inline')
-        expect(hiddenSmSpans.length).toBeGreaterThanOrEqual(2)
+        expect(hiddenSmSpans.length).toBeGreaterThanOrEqual(1)
     })
 
     it('shows validation error when Save Draft is clicked with empty title', async () => {

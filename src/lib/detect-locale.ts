@@ -12,10 +12,10 @@ export function detectLocaleFromText(text: string): string {
 export function resolveInitialActiveLocale(
     generationLocale: string,
     persistedLocale: string | undefined,
+    /** the site's languages (Quick language): a saved view outside them opens in the first one */
+    languages?: readonly string[],
 ): string {
     const genIsStandard = generationLocale === 'en' || generationLocale === 'ms'
-    if (genIsStandard && (persistedLocale === 'en' || persistedLocale === 'ms')) {
-        return persistedLocale
-    }
-    return generationLocale
+    const resolved = genIsStandard && (persistedLocale === 'en' || persistedLocale === 'ms') ? persistedLocale : generationLocale
+    return languages?.length && !languages.includes(resolved) ? languages[0]! : resolved
 }

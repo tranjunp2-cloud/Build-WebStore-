@@ -9,6 +9,10 @@ import { z } from 'zod'
 import { parseRequest } from '@/lib/validations/helpers'
 import { generateAutoSEOMeta } from '@/lib/ai/generate-meta'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
+import { describeAiTaskFailure } from '@/lib/ai-platform/ai-tasks'
+import { isAiTasksEnabled } from '@/lib/ai-platform/config'
+import { type AgentActor, resolveActorForUser } from '@/lib/ai-platform/context'
+import type { PlatformUser } from '@/types/user'
 import {
     evaluateAuthoritativeLocalSeo,
     type LocalSeoPayload,
@@ -239,7 +243,21 @@ export const POST = withFeatureGuard('content_management')(
                 )
             }
 
-            const siteName = site.businessName || site.name || 'Website'
+            // Platform task engine runs as the signed-in member of the active workspace.
+            let actor: AgentActor | undefined
+            if (isAiTasksEnabled()) {
+                try {
+                    actor = await resolveActorForUser(_user as unknown as PlatformUser, request, { tenantId: siteTenantId })
+                } catch (error) {
+                    const failure = describeAiTaskFailure(error)
+                    return NextResponse.json(
+                        { success: false, error: { code: 'AI_ERROR', message: failure.message } },
+                        { status: failure.status },
+                    )
+                }
+            }
+
+            const siteName = site.name || 'Website'
             const trackedKeywords =
                 (
                     site.seo as
@@ -322,6 +340,7 @@ export const POST = withFeatureGuard('content_management')(
                                         item.context,
                                         trackedKeywords,
                                         generationController.signal,
+                                        actor,
                                     )
 
                                 if (generationController.signal.aborted) return

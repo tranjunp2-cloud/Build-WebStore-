@@ -7,22 +7,23 @@
  */
 
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { rewriteTextSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { describeAiTaskFailure, resolveSiteBillingTenant, runAiTaskForUser } from '@/lib/ai-platform/ai-tasks'
+import { z } from 'zod'
+import { AI_UNAVAILABLE_MESSAGE, isAiTasksEnabled } from '@/lib/ai-platform/config'
 
-function getOpenAI(): OpenAI | null {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
-    return new OpenAI({ apiKey: key })
-}
+// A site-scoped caller (the website editor) names its site so usage bills that site's workspace.
+const rewriteTextRequestSchema = rewriteTextSchema.extend({
+    siteId: z.union([z.string().min(1), z.number()]).optional().transform((v) => (v != null ? String(v) : undefined)),
+})
 
 export const POST = withAuth(async (user, req) => {
     try {
         // Rate Limit: 20 AI tasks per hour
-        const rateLimit = await checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(`ai:rewrite-text:${user.id}`, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },
@@ -30,52 +31,39 @@ export const POST = withAuth(async (user, req) => {
             )
         }
 
-        const { data, errorResponse } = await parseRequest(req, rewriteTextSchema)
+        const { data, errorResponse } = await parseRequest(req, rewriteTextRequestSchema)
         if (errorResponse) return errorResponse
         
-        const { text, instruction, context, language = 'en' } = data!
+        const { text, instruction, context, language = 'en', siteId } = data!
 
-        const openai = getOpenAI()
-        if (!openai) {
-            return NextResponse.json({
-                rewritten: text,
-                message: 'AI rewriting requires OPENAI_API_KEY',
-            })
+        if (!isAiTasksEnabled()) {
+            return NextResponse.json({ error: AI_UNAVAILABLE_MESSAGE }, { status: 503 })
         }
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini', // Faster, cheaper for small text edits
-            messages: [
-                {
-                    role: 'system',
-                    content: `You are a professional copywriter. Rewrite the given text based on the instruction.
+        let billingTenantId: string | undefined
+        if (siteId) {
+            const billing = await resolveSiteBillingTenant(user, siteId)
+            if (!billing.ok) return NextResponse.json({ error: billing.error }, { status: billing.status })
+            billingTenantId = billing.tenantId
+        }
 
-RULES:
-1. Respond ONLY with the rewritten text, no explanation
-2. Keep the same language as the original (${language === 'vi' ? 'Vietnamese' : 'English'})
-3. Maintain the same general meaning unless instructed otherwise
-4. Keep it concise and professional
-${context ? `5. Context: This text is for a ${context} section of a website` : ''}`,
-                },
-                {
-                    role: 'user',
-                    content: `Original text: "${text}"
-
-Instruction: ${instruction}`,
-                },
-            ],
-            temperature: 0.7,
-            max_tokens: 500,
-        })
-
-        const rewritten = completion.choices[0]?.message?.content?.trim() || text
-
-        return NextResponse.json({ rewritten })
+        try {
+            const { output } = await runAiTaskForUser(user, req, 'copy.rewrite-text', {
+                text,
+                instruction,
+                context,
+                language,
+            }, { tenantId: billingTenantId })
+            return NextResponse.json({ rewritten: output.rewritten.trim() || text })
+        } catch (error) {
+            const failure = describeAiTaskFailure(error)
+            return NextResponse.json({ error: failure.message }, { status: failure.status })
+        }
     } catch (error: any) {
         console.error('[AI Rewrite Error]', error)
         return NextResponse.json(
-            { error: error?.message || 'Rewrite failed' },
+            { error: 'Rewrite failed' },
             { status: 500 },
         )
     }
-})
+}, { csrf: true })

@@ -9,7 +9,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('openai', () => ({ default: vi.fn() }))
 vi.mock('@/blocks/registry', () => ({
     blockRegistry: {
         getAllMeta: () => [],
@@ -58,7 +57,7 @@ describe('[TC-F01D-04.08] sanitizeBlockData wires content-rules validation', () 
             ctaButtons: [{ label: 'Submit', url: '/' }],
         }
         const result = sanitizeBlockData(raw, undefined, 'en')
-        const btns = result.ctaButtons as Array<Record<string, unknown>>
+        const btns = result.ctaButtons as unknown as Array<Record<string, unknown>>
         expect(btns[0]!.label).toBe('Get Started')
         expect(warnSpy).toHaveBeenCalledWith(
             expect.stringContaining('[design-quality] hero CTA "Submit" blocked'),
@@ -74,7 +73,7 @@ describe('[TC-F01D-04.08] sanitizeBlockData wires content-rules validation', () 
             ctaButtons: [{ label: 'Gửi', url: '/' }],
         }
         const result = sanitizeBlockData(raw, undefined, 'vi')
-        const btns = result.ctaButtons as Array<Record<string, unknown>>
+        const btns = result.ctaButtons as unknown as Array<Record<string, unknown>>
         expect(btns[0]!.label).toBe('Đăng ký ngay')
     })
 
@@ -112,7 +111,7 @@ describe('[TC-F01D-04.08] sanitizeBlockData wires content-rules validation', () 
         }
         const result = sanitizeBlockData(raw, undefined, 'en')
         expect(result.headline).toBe('Build Your Dream Website Today')
-        const btns = result.ctaButtons as Array<Record<string, unknown>>
+        const btns = result.ctaButtons as unknown as Array<Record<string, unknown>>
         expect(btns[0]!.label).toBe('Book Now')
     })
 
@@ -130,7 +129,7 @@ describe('[TC-F01D-04.08] sanitizeBlockData wires content-rules validation', () 
             ctaButtons: [{ label: 'Submit', url: '/' }],
         }
         const result = sanitizeBlockData(raw)
-        const btns = result.ctaButtons as Array<Record<string, unknown>>
+        const btns = result.ctaButtons as unknown as Array<Record<string, unknown>>
         expect(btns[0]!.label).toBe('Get Started')
     })
 })
@@ -159,14 +158,14 @@ describe('[TC-F01D-04.09] Template path applyContentValidation smoke test', () =
         const validated = applyContentValidation(heroFromComposer, 'en')
 
         // Auto-fixed
-        const btns = validated.ctaButtons as Array<Record<string, unknown>>
+        const btns = validated.ctaButtons as unknown as Array<Record<string, unknown>>
         expect(btns[0]!.label).not.toBe('Learn More')
         expect(btns[0]!.label).toBe('Get Started')
         // Preserved other fields
         expect(btns[0]!.url).toBe('/about')
         expect(btns[0]!.style).toBe('primary')
         // Input never mutated
-        expect((heroFromComposer.ctaButtons as Array<Record<string, unknown>>)[0]!.label).toBe('Learn More')
+        expect((heroFromComposer.ctaButtons as unknown as Array<Record<string, unknown>>)[0]!.label).toBe('Learn More')
         expect(warnSpy).toHaveBeenCalled()
     })
 

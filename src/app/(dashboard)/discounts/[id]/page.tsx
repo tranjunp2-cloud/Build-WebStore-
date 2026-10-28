@@ -6,7 +6,8 @@ import type { Metadata } from 'next'
 import { getCurrentUser } from '@/lib/auth'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
-import { DiscountForm, type DiscountDoc } from '../_components/discount-form'
+import { DiscountForm } from '../_components/discount-form'
+import { toDiscountDoc } from '../_lib/to-discount-doc'
 
 export const metadata: Metadata = { title: 'Edit Discount | Web Store' }
 
@@ -37,19 +38,7 @@ export default async function EditDiscountPage({ params }: { params: Promise<{ i
         ? (discount.tenant as { name?: string }).name
         : undefined
 
-    const doc: DiscountDoc = {
-        id: String(discount.id),
-        code: discount.code,
-        description: discount.description ?? null,
-        type: discount.type,
-        value: discount.value,
-        status: discount.status,
-        usageCount: discount.usageCount ?? 0,
-        usageLimit: discount.usageLimit ?? null,
-        startsAt: discount.startsAt ?? null,
-        expiresAt: discount.expiresAt ?? null,
-        createdAt: discount.createdAt,
-    }
+    const doc = toDiscountDoc(discount)
 
     return (
         <Suspense>

@@ -20,7 +20,11 @@ import {
     normalizeLocaleStructuralStrings,
 } from '@/lib/ai/post-ai-swap'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
-import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
+import { bindAiActor, enterAiActorScope } from '@/lib/ai-platform/actor-scope'
+import { isAiTasksEnabled } from '@/lib/ai-platform/config'
+import { actorForUserInTenant } from '@/lib/ai-platform/context'
+import { classifyActorFailure, type ActorResolution, type AiSkipReason } from './generation-actor'
+import type { PlatformUser } from '@/types/user'
 import { planImageNeeds, fulfillImageNeeds, injectPixabayUrlsIntoBlocks, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes, computePoolTargetsForNeeds, computePoolTargetsForBlocks } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
@@ -145,7 +149,14 @@ function collectGenerationBlockBuckets(result: GenerationResult): Record<string,
     return buckets
 }
 
-function buildWebsiteCaptureOutput(result: GenerationResult): {
+type GenerationModeSummary = {
+    requestedGenMode: SiteGenerationMode
+    effectiveGenMode: SiteGenerationMode
+    modeReason?: SiteGenerationModeReason
+    aiSkipReason?: AiSkipReason
+}
+
+function buildWebsiteCaptureOutput(result: GenerationResult, mode: GenerationModeSummary): {
     selectedBlocks: string[]
     outputSnapshot: Record<string, unknown>
     fieldsTotal: number
@@ -155,7 +166,17 @@ function buildWebsiteCaptureOutput(result: GenerationResult): {
     const fieldCounts = countSnapshotFields({ blocks })
     return {
         selectedBlocks: blocks.map((block) => String(block.blockType ?? '')),
-        outputSnapshot: { siteName: result.siteName, totalBlocks: blocks.length },
+        outputSnapshot: {
+            siteName: result.siteName,
+            totalBlocks: blocks.length,
+            // Admin-visible: why a run was not AI-first (quota, provider credit, no billable actor…).
+            generationMode: {
+                requested: mode.requestedGenMode,
+                effective: mode.effectiveGenMode,
+                ...(mode.modeReason ? { reason: mode.modeReason } : {}),
+                ...(mode.aiSkipReason ? { aiSkipReason: mode.aiSkipReason } : {}),
+            },
+        },
         ...fieldCounts,
     }
 }
@@ -167,6 +188,32 @@ function resolveTerminalCapturePhase(timings: GenerationTimings): TerminalErrorP
     return failedPhases.includes('site_write') || failedPhases.includes('pages_write') || failedPhases.includes('site_complete')
         ? 'site_persist'
         : 'composition'
+}
+
+/**
+ * The generating user acting in the site's workspace. A workspace created a
+ * moment ago (legacy account recovery) is not on the session user yet, so the
+ * user is re-read once. No actor → no AI for this run (rule-based site), with
+ * the reason so the outcome can say why instead of looking like a plain success.
+ */
+async function resolveGenerationActor(
+    payload: Awaited<ReturnType<typeof getPayload>>,
+    user: GenerateSiteServiceContext['user'],
+    tenantId: number | string | undefined,
+): Promise<ActorResolution> {
+    if (!isAiTasksEnabled()) return { actor: null, skipReason: 'ai_unconfigured' }
+    if (tenantId == null) return { actor: null, skipReason: 'no_workspace' }
+    try {
+        return { actor: actorForUserInTenant(user as unknown as PlatformUser, String(tenantId)) }
+    } catch {
+        try {
+            const fresh = await payload.findByID({ collection: 'users', id: user.id, depth: 1 })
+            return { actor: actorForUserInTenant(fresh as unknown as PlatformUser, String(tenantId)) }
+        } catch (error) {
+            console.warn('[generate-site] AI unavailable for this workspace:', error instanceof Error ? error.message : error)
+            return { actor: null, skipReason: classifyActorFailure(error) }
+        }
+    }
 }
 
 /** Trusted server-side entry point. HTTP callers authenticate in the route adapter. */
@@ -192,8 +239,10 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
     const backgroundTasks: Promise<unknown>[] = []
     const after = (task: () => Promise<unknown>) => {
         if (migration) return
-        if (context.scheduleBackground) context.scheduleBackground(task)
-        else backgroundTasks.push(task())
+        // Background steps (blog seeding…) keep running as this request's AI actor.
+        const bound = bindAiActor(task)
+        if (context.scheduleBackground) context.scheduleBackground(bound)
+        else backgroundTasks.push(bound())
     }
     const startTime = Date.now()
     const generationRequestId = normalizeGenerationRequestId(context.requestId)
@@ -346,6 +395,8 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                     data: {
                         name: tenantName,
                         slug: tenantSlug,
+                        plan: 'free',
+                        status: 'active',
                     },
                 })
                 // Provision FREEMIUM subscription so subsequent subscription checks pass for new tenants.
@@ -402,10 +453,15 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             )
         }
 
-        // This is the first OpenAI request in the generation flow and only runs
+        // Every model call below is an AI platform task run as this user in the
+        // site's workspace (quota + ledger land there). No actor → rule-based site.
+        const { actor: aiActor, skipReason: aiSkipReason } = await resolveGenerationActor(payload, user, resolvedTenantId)
+        if (aiActor) enterAiActorScope(aiActor)
+
+        // This is the first AI request in the generation flow and only runs
         // after auth, rate limiting, safety, and subscription checks. Translation
         // may also use AI, so start it only after the request-local mode is known.
-        const modeDecision: SiteGenerationModeDecision = await resolveSiteGenerationMode()
+        const modeDecision: SiteGenerationModeDecision = await resolveSiteGenerationMode(aiSkipReason)
         // CLI migration tracks attempts and commit receipts in its own ledger.
         // Keep web-generation recovery tracking scoped to the HTTP flow.
         if (!migration) _siteCapture = await startCapture({
@@ -505,12 +561,11 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         // Default: Pixabay pipeline (free, 8+ images per gen). Runs AFTER AI
         // returns blocks so we know exactly which fields need images.
         //
-        // Legacy: DALL-E hero-only ($0.04/gen). Enable via ENABLE_DALLE_HERO=true.
-        // Kept for research/rollback. Plan 260414-1400-ai-gen-unsplash-pipeline.
-        const ENABLE_DALLE_HERO = !migration && process.env.ENABLE_DALLE_HERO === 'true'
-        const heroImagePromise = ENABLE_DALLE_HERO
-            ? generateAndUploadHeroImage(businessInfo, String(resolvedTenantId), payload)
-            : Promise.resolve(null)
+        // The legacy DALL-E hero path (ENABLE_DALLE_HERO) called OpenAI in-process
+        // and was removed with the AI platform cutover; the Pixabay pool is the only
+        // path. The flag stays a constant so the pool branches below read unchanged.
+        const ENABLE_DALLE_HERO = false as boolean
+        const heroImagePromise: Promise<{ id: string } | null> = Promise.resolve(null)
 
         // Build reference prompt from ContentBrief (if provided from URL/Image extraction)
         let referencePrompt: string | undefined
@@ -602,7 +657,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 || Boolean(extraInstructions?.trim())
                 || Boolean(referencePrompt?.trim())
             )
-        const usesTemplatePresetForPool = !process.env.OPENAI_API_KEY
+        const usesTemplatePresetForPool = !aiActor
             || modeDecision.modeReason === 'insufficient_quota'
             || (!isAiFirstPath && effectiveGenerationLocale === 'en')
         if (isAiFirstPath) {
@@ -2305,7 +2360,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                             () => runGenPipeline(onEvent),
                         )
                         if (_siteCapture) {
-                            const captureOutput = buildWebsiteCaptureOutput(result)
+                            const captureOutput = buildWebsiteCaptureOutput(result, { requestedGenMode, effectiveGenMode, modeReason, aiSkipReason })
                             const finalized = await finishWebsiteCapture(_siteCapture, {
                                 expectedPages: _expectedPagesCount,
                                 persistedPages: _persistedPageOutcomes,
@@ -2484,7 +2539,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             () => runGenPipeline(context.onEvent),
         )
         if (_siteCapture) {
-            const captureOutput = buildWebsiteCaptureOutput(result)
+            const captureOutput = buildWebsiteCaptureOutput(result, { requestedGenMode, effectiveGenMode, modeReason, aiSkipReason })
             const finalized = await finishWebsiteCapture(_siteCapture, {
                 expectedPages: _expectedPagesCount,
                 persistedPages: _persistedPageOutcomes,
@@ -2545,6 +2600,8 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             timeMs,
             pixabayImageStatus: pixabaySummary.status,
             pixabayUsedImages: pixabaySummary.usedImages,
+            ...(modeReason ? { modeReason } : {}),
+            ...(aiSkipReason ? { aiSkipReason } : {}),
         })
 
     } catch (error: unknown) {

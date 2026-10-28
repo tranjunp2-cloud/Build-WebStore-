@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AIFixModal } from '@/components/dashboard/AIFixModal'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 import { SeoHealthCard } from './seo-health-card'
 import { createSeoHealthBucketViewModel } from '@/lib/dashboard/seo-health-view-model'
 import type {
@@ -118,6 +119,9 @@ export function seoHealthActionHref(
     }
 }
 
+// what the score reads: the site and its pages, active products, published posts
+const SCORE_ENTITY_KINDS = ['site', 'site_page', 'product', 'blog_post']
+
 export function SeoHealthClient({ siteId }: { siteId: string }) {
     const router = useRouter()
     const [data, setData] = useState<SeoHealthCardLoadState>({
@@ -130,13 +134,17 @@ export function SeoHealthClient({ siteId }: { siteId: string }) {
     const revisionToken = useRef<string | null>(null)
     const fixSettledSinceOpen = useRef(false)
 
-    const loadScore = useCallback(async () => {
+    // `silent`: the assistant changed pages, products or posts the score reads. Keep the card and the token as they
+    // are until the new score arrives, and keep them if it never does.
+    const loadScore = useCallback(async (silent = false) => {
         const requestGeneration = ++generation.current
         scoreRequest.current?.abort()
         const controller = new AbortController()
         scoreRequest.current = controller
-        revisionToken.current = null
-        setData({ state: 'loading' })
+        if (!silent) {
+            revisionToken.current = null
+            setData({ state: 'loading' })
+        }
 
         try {
             const response = await fetch(
@@ -172,7 +180,8 @@ export function SeoHealthClient({ siteId }: { siteId: string }) {
                     ? error.message
                     : 'Invalid score response',
             )
-            setData({ state: 'error' })
+            // a silent refetch that cut short the first load must not leave the card loading
+            setData((current) => (silent && current.state !== 'loading' ? current : { state: 'error' }))
         }
     }, [siteId])
 
@@ -186,6 +195,11 @@ export function SeoHealthClient({ siteId }: { siteId: string }) {
             detailRequest.current?.abort()
         }
     }, [loadScore])
+
+    // an open fix modal holds the current revision; closing it reloads the score
+    useAgentChanges({ kinds: SCORE_ENTITY_KINDS, enabled: fixItems === null }, () => {
+        void loadScore(true)
+    })
 
     const loadMetadataDetails = useCallback(
         async (field?: 'title' | 'description') => {

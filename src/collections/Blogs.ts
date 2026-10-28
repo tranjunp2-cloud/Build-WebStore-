@@ -103,6 +103,8 @@ export function validateBlogSlug(value: unknown): true | string {
 
 export const Blogs: CollectionConfig = {
     slug: 'blogs',
+    // "Delete" moves a post to the trash (deletedAt); reads skip trashed posts and it can be restored
+    trash: true,
     indexes: [{ fields: ['tenant', 'slug'], unique: true }],
     hooks: {
         beforeChange: [beforeChangeHook],
@@ -246,6 +248,18 @@ export const Blogs: CollectionConfig = {
             type: 'relationship',
             relationTo: 'users',
             required: true,
+        },
+        {
+            // The copilot change that created this draft: its replay key (a retried approval finds this post
+            // instead of making a second one). Set by the server only (saveBlogForUser), never by a request.
+            name: 'aiChangeSetId',
+            type: 'text',
+            index: true,
+            admin: { hidden: true },
+            access: {
+                create: () => false,
+                update: () => false,
+            },
         },
         {
             name: 'seo',

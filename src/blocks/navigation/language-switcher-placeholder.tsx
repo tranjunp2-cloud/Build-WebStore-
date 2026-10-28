@@ -1,6 +1,7 @@
 // F26-07: Language switcher dropdown in nav header.
 // Opens on hover. Adapts to site Color Mode (dark: variants).
-// Sends SWITCH_LOCALE postMessage to parent editor on selection.
+// Sends SWITCH_LOCALE postMessage to parent editor on selection. On the live site (LiveLanguageProvider)
+// it offers the site's real languages and a choice is kept in a cookie and served again in that language.
 // Dynamically reflects the site's actual language pair (generationLocale + activeLocale).
 
 'use client'
@@ -10,6 +11,7 @@ import { ChevronDown } from 'lucide-react'
 import { useEditorStore } from '@/store/editorStore'
 import { getLocaleLabel } from '@/lib/locale-labels'
 import { LocaleFlag } from '@/components/locale-flag'
+import { chooseVisitorLanguage, useLiveLanguage } from '@/components/site-renderer/live-language'
 
 type NavLangSwitcherPlaceholderProps = {
     className?: string
@@ -20,6 +22,7 @@ export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPl
     const primaryLocale    = useEditorStore(state => state.primaryLocale)
     const secondaryLocale  = useEditorStore(state => state.secondaryLocale)
     const activeLocale     = useEditorStore(state => state.activeLocale)
+    const live             = useLiveLanguage()
     const [open, setOpen]  = useState(false)
     const closeTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -38,16 +41,23 @@ export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPl
     // source of truth shared with the Quick Language panel, so visitor + editor always agree.
     // Legacy fallback: sites that enabled the switcher before secondaryLocale was persisted
     // have no stored secondary — keep the old [primary, EN, MS] list so they don't break.
-    const codes = (secondaryLocale
-        ? [effectivePrimary, secondaryLocale]
-        : [effectivePrimary, 'en', 'ms']
+    const codes = (live
+        ? live.languages
+        : secondaryLocale
+            ? [effectivePrimary, secondaryLocale]
+            : [effectivePrimary, 'en', 'ms']
     ).filter((c, i, arr) => !!c && arr.indexOf(c) === i)
     const locales = codes.map(code => ({ code, visual: getLocaleLabel(code) }))
 
-    const active = locales.find(l => l.code === activeLocale) ?? locales[0]
+    const shownLocale = live ? live.active : activeLocale
+    const active = locales.find(l => l.code === shownLocale) ?? locales[0]
 
     const handleSelect = (code: string) => {
         setOpen(false)
+        if (live) {
+            if (code !== live.active) chooseVisitorLanguage(code)
+            return
+        }
         window.parent.postMessage(
             { type: 'SWITCH_LOCALE', locale: code },
             window.location.origin,
@@ -82,7 +92,7 @@ export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPl
                                dark:bg-[#1E293B] dark:border-white/10"
                 >
                     {locales.map(({ code, visual }) => {
-                        const isActive = code === activeLocale
+                        const isActive = code === shownLocale
                         return (
                             <button
                                 key={code}

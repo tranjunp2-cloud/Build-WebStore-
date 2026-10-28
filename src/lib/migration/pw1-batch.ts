@@ -5,6 +5,9 @@ import { prepareSourceLinks } from './pw1-source-link-check'
 import { applyCarouselEvidence } from './pw1-carousel-evidence'
 import { verifyMigrationDestination, resolveDeclaredCategories } from './pw1-destination'
 import { analyzePw1Brand } from './pw1-brand-analysis'
+import { pw1MigrationActor } from './pw1-ai-actor'
+import { runWithAiActor } from '@/lib/ai-platform/actor-scope'
+import { isAiTasksEnabled } from '@/lib/ai-platform/config'
 import { selectPw1TenantSlug } from './pw1-tenant-slug'
 import { scanPw1Brand } from './pw1-brand-scan'
 import { registerBrowserImageFetcher } from './pw1-media'
@@ -60,7 +63,7 @@ export async function provisionMigrationStore(payload:Payload, entry:BatchEntry)
                 const tenants = await payload.find({ collection: 'tenants', where: { or: [{ slug: { equals: candidate } }, { 'previousSlugs.slug': { equals: candidate } }] }, limit: 1, req })
                 return tenants.totalDocs > 0
             })
-            const tenant=await payload.create({collection:'tenants',data:{name:entry.website.name,slug,plan:'free'},req})
+            const tenant=await payload.create({collection:'tenants',data:{name:entry.website.name,slug,plan:'free',status:'active'},req})
             const membership={tenant:tenant.id,role:'owner' as const,status:'active' as const}
             user=await payload.update({collection:'users',id:user.id,data:{tenants:[...(user.tenants??[]),membership]},req})
             await payload.create({collection:'plan-subscriptions',data:{tenant:tenant.id,name:'main',plan:'FREEMIUM',status:'active',startsAt:new Date().toISOString(),endsAt:new Date(Date.now()+365*86400000).toISOString(),packCode:'FREEMIUM'},req})
@@ -96,7 +99,7 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
     }
     const publishBaseUrl = publishOrigin(process.env.NEXT_PUBLIC_SERVER_URL)
     const connectionString = process.env.DATABASE_URI || process.env.DATABASE_URL
-    if (!connectionString || !process.env.PAYLOAD_SECRET || !process.env.OPENAI_API_KEY) throw new Error('Configure database, Payload secret and OpenAI credentials')
+    if (!connectionString || !process.env.PAYLOAD_SECRET || !isAiTasksEnabled()) throw new Error('Configure database, Payload secret and the AI platform (AI_PLATFORM_URL, AI_PLATFORM_CONTEXT_SECRET)')
     process.env.PAYLOAD_PUSH_SCHEMA = 'false'
     const controller = new AbortController()
     const stop = () => controller.abort(new MigrationError('INTERRUPTED', 'Migration interrupted; safe to retry'))
@@ -219,7 +222,10 @@ export async function runPw1Batch(entries: BatchEntry[], options: BatchOptions =
                             if (!brand) {
                                 const scanned = await scanPw1Brand(entry.source.websiteUrl, controller.signal, blueprint.nativeContract.site.settings?.branding.logo)
                                 await onStage('brand-analysis')
-                                brand = await analyzePw1Brand(scanned, controller.signal)
+                                const aiActor = await pw1MigrationActor(activePayload, entry.owner.email, mapping.tenant_id)
+                                brand = aiActor
+                                    ? await runWithAiActor(aiActor, () => analyzePw1Brand(scanned, controller.signal))
+                                    : await analyzePw1Brand(scanned, controller.signal)
                                 blueprint.nativeContract.site.brandEvidence = brand
                                 await save('brand-evidence.json', brand)
                                 controls.recordDesignTokens(brand.analysisTokens ?? 0)

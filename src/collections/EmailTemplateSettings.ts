@@ -1,8 +1,12 @@
 import type { CollectionConfig } from 'payload'
 import { EMAIL_TEMPLATE_TYPES } from '../lib/email/types'
-import { invalidateTemplateConfigCache } from '../lib/email/get-template-config'
+import type { invalidateTemplateConfigCache as InvalidateTemplateConfigCache } from '../lib/email/get-template-config'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+
+// Loaded on use: it imports the Payload config, which imports this collection (a static import is a cycle that breaks production builds).
+const invalidateTemplateConfigCache: typeof InvalidateTemplateConfigCache = async (...args) =>
+    (await import('../lib/email/get-template-config')).invalidateTemplateConfigCache(...args)
 
 // Security-critical templates — disabling via any API path is rejected at collection level
 const CRITICAL_TYPES = ['otp-verification', 'forgot-password', 'password-changed'] as const

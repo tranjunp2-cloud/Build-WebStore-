@@ -8,7 +8,7 @@
  * with the Phase 4 order route tests once those routes are implemented.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // ── Top-level mocks ────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ vi.mock('payload', () => ({
 const mockUser = {
     id: 'user-123',
     email: 'owner@example.com',
-    tenants: [{ tenant: { id: 'tenant-abc' }, role: 'owner' }],
+    tenants: [{ tenant: { id: 'tenant-abc' }, role: 'owner', status: 'active' }],
 }
 
 vi.mock('@/lib/auth', () => ({
@@ -43,6 +43,49 @@ import { POST as createDiscount, GET as listDiscounts } from '@/app/api/v1/disco
 import { getPayload } from 'payload'
 
 const mockGetPayload = vi.mocked(getPayload)
+
+// ── TC-AICP-260: Create needs the Orders permission (the sidebar permission of Discounts) ─────────────
+describe('POST /api/v1/discounts — TC-AICP-260: role check', () => {
+    const post = () =>
+        createDiscount(new NextRequest('http://localhost/api/v1/discounts', {
+            method: 'POST',
+            body: JSON.stringify({ code: 'ROLE10', type: 'percentage', value: 10 }),
+            headers: { 'Content-Type': 'application/json' },
+        }))
+    const original = mockUser.tenants
+    let mockCreate: any
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockCreate = vi.fn().mockResolvedValue({ id: 'disc-9', tenant: 'tenant-abc', code: 'ROLE10', usageCount: 0 })
+        mockGetPayload.mockResolvedValue({ create: mockCreate } as any)
+    })
+    afterEach(() => {
+        mockUser.tenants = original
+    })
+
+    it('refuses a custom role without Orders (e.g. products only) and writes nothing', async () => {
+        mockUser.tenants = [{ tenant: { id: 'tenant-abc' }, role: 'custom', status: 'active', permissions: ['products'] }] as never
+
+        const res = await post()
+
+        expect(res.status).toBe(403)
+        expect((await res.json()).error.code).toBe('FORBIDDEN')
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('lets the owner, an editor and a custom role holding Orders create a code', async () => {
+        for (const member of [
+            { tenant: { id: 'tenant-abc' }, role: 'owner', status: 'active' },
+            { tenant: { id: 'tenant-abc' }, role: 'editor', status: 'active' },
+            { tenant: { id: 'tenant-abc' }, role: 'custom', status: 'active', permissions: ['orders'] },
+        ]) {
+            mockUser.tenants = [member] as never
+            expect((await post()).status).toBe(201)
+        }
+        expect(mockCreate).toHaveBeenCalledTimes(3)
+    })
+})
 
 // ── TC-F33-10: Create discount forces tenant + zeros usage ──────────────────
 describe('POST /api/v1/discounts — TC-F33-10: Create discount', () => {

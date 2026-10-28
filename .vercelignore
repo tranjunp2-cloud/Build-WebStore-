@@ -16,3 +16,5 @@ e2e
 scripts/seed-templates-v3.ts
 scripts/seed-ngoc-dzung-tea.ts
 scripts/test-apply-t*
+# ai-platform is its own Vercel project (deploy-ai-platform job) — never upload it with prime-web
+/services

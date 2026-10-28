@@ -6,10 +6,13 @@ import { resolveSiteType } from './site-type'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { contentBriefToReferencePrompt, type ContentBrief } from './content-brief'
 import { normalizeGenerationIncident } from './generation-outcome'
+import type { Payload } from 'payload'
+import { resolveGenerationRecordActor } from './generation-actor'
+import { runWithAiActor } from '@/lib/ai-platform/actor-scope'
 
 type Id = string | number
 type Relation = Id | { id: Id } | null | undefined
-type PayloadLike = {
+export type RecoveryWorkerPayloadLike = {
     findByID(args: Record<string, unknown>): Promise<Record<string, unknown>>
     find?(args: Record<string, unknown>): Promise<{ docs: Array<Record<string, unknown>> }>
     create(args: Record<string, unknown>): Promise<Record<string, unknown>>
@@ -72,7 +75,7 @@ function referencePromptFromSnapshot(contentBrief: unknown): string | undefined 
 class LeaseLostError extends Error {}
 
 /** Executes a claimed job only. This function never loads or mutates the parent's site/pages. */
-export async function runGenerationRecoveryJob(payload: PayloadLike, input: { jobId: Id; leaseToken: string }) {
+export async function runGenerationRecoveryJob(payload: RecoveryWorkerPayloadLike, input: { jobId: Id; leaseToken: string }) {
     const job = await payload.findByID({ collection: 'generation_recovery_jobs', id: input.jobId, depth: 0, overrideAccess: true })
     if (job.status !== 'running' || job.leaseToken !== input.leaseToken) return { status: 'skipped' as const }
     const childId = relationId(job.childGeneration as Relation)
@@ -149,8 +152,22 @@ export async function runGenerationRecoveryJob(payload: PayloadLike, input: { jo
         await payload.update({ collection: 'ai-generation-records', id: childId, overrideAccess: true, data: { lifecycle: 'running', status: 'running', startedAt: now, lastHeartbeatAt: now } })
         await heartbeat()
 
-        const generated = await generateSiteWithAI(frozen.businessInfo, frozen.extraInstructions, frozen.language, referencePromptFromSnapshot(frozen.contentBrief))
+        // Runs as the merchant who made the request, billed to their workspace.
+        const { actor, skipReason: aiSkipReason } = await resolveGenerationRecordActor(payload as unknown as Payload, child)
+        const regenerate = () => generateSiteWithAI(frozen.businessInfo, frozen.extraInstructions, frozen.language, referencePromptFromSnapshot(frozen.contentBrief))
+        const generated = actor ? await runWithAiActor(actor, regenerate) : await regenerate()
         const result = generated.result
+        // A recovery that ran without AI says why (no user/workspace on the record, lapsed membership…)
+        // instead of ending as an ordinary success.
+        const generationMode = {
+            requested: generated.requestedGenMode,
+            effective: generated.effectiveGenMode,
+            ...(generated.modeReason ? { reason: generated.modeReason } : {}),
+            ...(aiSkipReason ? { aiSkipReason } : {}),
+        }
+        const priorSnapshot = child.outputSnapshot && typeof child.outputSnapshot === 'object' && !Array.isArray(child.outputSnapshot)
+            ? child.outputSnapshot as Record<string, unknown>
+            : {}
         await assertOwnership()
         // Save the isolated draft id immediately. If an invocation dies later,
         // a reclaimed lease resumes this child instead of creating a second site.
@@ -184,7 +201,7 @@ export async function runGenerationRecoveryJob(payload: PayloadLike, input: { jo
         const pages = result.pages?.length
             ? result.pages.map((page, index) => ({ title: page.title || `Page ${index + 1}`, slug: page.slug || (index === 0 ? '/' : `/page-${index + 1}`), isHomepage: index === 0, layout: page.blocks, seo: page.seo }))
             : [{ title: 'Home', slug: '/', isHomepage: true, layout: result.blocks, seo: result.seo }]
-        const outcomes = Array.isArray(child.pageOutcomes) ? [...child.pageOutcomes as Array<Record<string, unknown>>] : []
+        const outcomes = Array.isArray(child.pageOutcomes) ? [...child.pageOutcomes as unknown as Array<Record<string, unknown>>] : []
         const persistedKeys = new Set(outcomes.filter((page) => page.status === 'persisted').map((page) => String(page.pageKey)))
         for (const page of pages) {
             await heartbeat()
@@ -203,7 +220,7 @@ export async function runGenerationRecoveryJob(payload: PayloadLike, input: { jo
                 const existingPages = payload.find
                     ? await payload.find({ collection: 'pages', where: { and: [{ site: { equals: site.id } }, { slug: { equals: page.slug } }] }, limit: 1, depth: 0, overrideAccess: true })
                     : { docs: [] }
-                const created = existingPages.docs[0] ?? await payload.create({ collection: 'pages', overrideAccess: true, data: { title: page.title, slug: page.slug, site: site.id, isHomepage: page.isHomepage, _status: 'draft', layout: sanitizeBlocksForPayload(page.layout as Record<string, unknown>[]), seo: page.seo } })
+                const created = existingPages.docs[0] ?? await payload.create({ collection: 'pages', overrideAccess: true, data: { title: page.title, slug: page.slug, site: site.id, isHomepage: page.isHomepage, _status: 'draft', layout: sanitizeBlocksForPayload(page.layout as unknown as Record<string, unknown>[]), seo: page.seo } })
                 outcomes.push({ pageKey: page.slug, title: page.title, slug: page.slug, pageId: String(created.id), status: 'persisted', blockCount: page.layout.length })
             } catch (error) {
                 if (error instanceof LeaseLostError) throw error
@@ -223,7 +240,7 @@ export async function runGenerationRecoveryJob(payload: PayloadLike, input: { jo
         await assertOwnership()
         await Promise.all([
             payload.update({ collection: 'sites', id: site.id, overrideAccess: true, data: { generationStatus: failed.length ? 'failed' : 'completed' } }),
-            payload.update({ collection: 'ai-generation-records', id: childId, overrideAccess: true, data: { site: site.id, recoveredSite: site.id, lifecycle: 'terminal', outcome, status: failed.length ? 'failed' : 'success', recoveryStatus: failed.length ? 'ticket_required' : 'none', pageSummary: { expected: pages.length, persisted: outcomes.length - failed.length, failed: failed.length }, pageOutcomes: outcomes, terminalAt, lastHeartbeatAt: terminalAt, userSafeMessage: failed.length ? 'Một số trang recovery chưa thể lưu.' : 'Đã tạo website recovery dạng bản nháp.' } }),
+            payload.update({ collection: 'ai-generation-records', id: childId, overrideAccess: true, data: { site: site.id, recoveredSite: site.id, lifecycle: 'terminal', outcome, status: failed.length ? 'failed' : 'success', outputSnapshot: { ...priorSnapshot, generationMode }, recoveryStatus: failed.length ? 'ticket_required' : 'none', pageSummary: { expected: pages.length, persisted: outcomes.length - failed.length, failed: failed.length }, pageOutcomes: outcomes, terminalAt, lastHeartbeatAt: terminalAt, userSafeMessage: failed.length ? 'Một số trang recovery chưa thể lưu.' : 'Đã tạo website recovery dạng bản nháp.' } }),
             payload.update({ collection: 'generation_recovery_jobs', id: input.jobId, overrideAccess: true, data: { status: failed.length ? 'failed' : 'succeeded', finishedAt: terminalAt, lastHeartbeatAt: terminalAt, userSafeMessage: failed.length ? 'Một số trang chưa thể tạo.' : 'Đã tạo bản nháp recovery.' } }),
             payload.update({ collection: 'ai-generation-records', id: parentId, overrideAccess: true, data: { recoveryStatus: failed.length ? 'ticket_required' : 'none' } }),
         ])

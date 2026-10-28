@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { ORDER_STATUS_LABEL_KEY, type OrderStatus } from '@/lib/orders/status-groups'
 import { getBrowserViewerTimeZone } from '@/lib/viewer-timezone'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 
 // ───────── TYPES ─────────
 export type { OrderStatus }
@@ -278,6 +279,20 @@ function OrdersTableInner({ orders, loading, selectedRows, onSelectionChange, ne
     )
 }
 
+function ordersUrl(
+    page: number,
+    limit: number,
+    sortOrder: string,
+    f: { searchQuery: string; statusFilter: string; dateFilter: string; paymentMethodFilter: string },
+): string {
+    let url = `/api/orders?page=${page}&limit=${limit}&sort=${encodeURIComponent(sortOrder)}`
+    if (f.searchQuery) url += `&search=${encodeURIComponent(f.searchQuery)}`
+    if (f.statusFilter && f.statusFilter !== 'all') url += `&status=${encodeURIComponent(f.statusFilter)}`
+    if (f.dateFilter && f.dateFilter !== 'all') url += `&date=${encodeURIComponent(f.dateFilter)}`
+    if (f.paymentMethodFilter) url += `&paymentMethod=${encodeURIComponent(f.paymentMethodFilter)}`
+    return url
+}
+
 export function OrdersTable({
     refreshCounter = 0,
     silentRefreshTrigger = 0,
@@ -328,6 +343,9 @@ export function OrdersTable({
     useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
     useEffect(() => { onOrdersLoadedRef.current = onOrdersLoaded }, [onOrdersLoaded])
 
+    // Stale-response guard: the newest of the page fetch and the assistant refetch is the one that lands
+    const genRef = useRef(0)
+
     // Track previous filter values to detect changes and compute effectivePage in one effect,
     // avoiding the double-fetch race condition that arises from a separate page-reset effect.
     const prevFiltersRef = useRef({ searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder })
@@ -347,14 +365,11 @@ export function OrdersTable({
         const effectivePage = filtersChanged ? 1 : page
         if (filtersChanged && page !== 1) setPage(1)
 
+        const gen = ++genRef.current
         async function fetchOrders() {
             try {
                 setLoading(true)
-                let url = `/api/orders?page=${effectivePage}&limit=${limit}&sort=${encodeURIComponent(sortOrder)}`
-                if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
-                if (statusFilter && statusFilter !== 'all') url += `&status=${encodeURIComponent(statusFilter)}`
-                if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
-                if (paymentMethodFilter) url += `&paymentMethod=${encodeURIComponent(paymentMethodFilter)}`
+                const url = ordersUrl(effectivePage, limit, sortOrder, { searchQuery, statusFilter, dateFilter, paymentMethodFilter })
 
                 const res = await fetch(url, {
                     headers: {
@@ -363,6 +378,7 @@ export function OrdersTable({
                 })
                 if (!res.ok) throw new Error('Failed to fetch')
                 const data = await res.json()
+                if (gen !== genRef.current) return
 
                 if (data.success && data.docs) {
                     setOrders(data.docs)
@@ -385,12 +401,12 @@ export function OrdersTable({
 
         async function silentFetch() {
             try {
-                let url = `/api/orders?page=1&limit=${limit}&sort=${encodeURIComponent(sortOrderRef.current)}`
-                // Use refs to read latest filter values — avoids stale closure without triggering full reload on filter change
-                if (searchQueryRef.current) url += `&search=${encodeURIComponent(searchQueryRef.current)}`
-                if (statusFilterRef.current && statusFilterRef.current !== 'all') url += `&status=${encodeURIComponent(statusFilterRef.current)}`
-                if (dateFilterRef.current && dateFilterRef.current !== 'all') url += `&date=${encodeURIComponent(dateFilterRef.current)}`
-                if (paymentMethodFilterRef.current) url += `&paymentMethod=${encodeURIComponent(paymentMethodFilterRef.current)}`
+                const url = ordersUrl(1, limit, sortOrderRef.current, {
+                    searchQuery: searchQueryRef.current,
+                    statusFilter: statusFilterRef.current,
+                    dateFilter: dateFilterRef.current,
+                    paymentMethodFilter: paymentMethodFilterRef.current,
+                })
 
                 const res = await fetch(url, {
                     headers: {
@@ -431,6 +447,24 @@ export function OrdersTable({
         }
         silentFetch()
     }, [silentRefreshTrigger])
+
+    // The assistant changed an order (confirm, ship, cancel, refund...): fetch the page on screen again, in place
+    useAgentChanges({ kinds: ['store_order'] }, async () => {
+        const gen = ++genRef.current
+        try {
+            const res = await fetch(ordersUrl(page, limit, sortOrder, { searchQuery, statusFilter, dateFilter, paymentMethodFilter }), {
+                headers: { 'X-Viewer-Time-Zone': getBrowserViewerTimeZone() },
+            })
+            if (!res.ok) throw new Error('Failed to fetch')
+            const data = await res.json()
+            if (gen !== genRef.current || !data.success || !data.docs) return
+            setOrders(data.docs)
+            setTotal(data.totalDocs ?? data.total ?? data.docs.length)
+            onOrdersLoadedRef.current?.(data.docs)
+        } catch (err) {
+            console.error('[Orders] Assistant refresh failed:', err)
+        }
+    })
 
     return (
         // No outer card here — the base Table provides the single card; the pager is

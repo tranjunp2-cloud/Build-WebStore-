@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { startOfDayKL, endOfDayKL } from '@/lib/discounts/date-boundaries'
+import { startOfDayKL, endOfDayKL, klDateKey } from '@/lib/discounts/date-boundaries'
 
 // ─── TC-F33-10-01: startOfDayKL — start of KL calendar day ───────────────
 
@@ -190,5 +190,22 @@ describe('[TC-F33-10-01/02] Roundtrip: startOfDayKL + endOfDayKL same day', () =
 
         // Act & Assert
         expect(day2Start.getTime() - day1End.getTime()).toBe(1)
+    })
+})
+
+// ─── TC-AICP-150: klDateKey — the KL calendar day a stored boundary stands for ───
+
+describe('[TC-AICP-150] klDateKey — the seller\'s calendar day of a stored instant', () => {
+    it('reads both boundaries of a KL day, and a date-only input, as that same day', () => {
+        // Arrange: the instants the Discounts hook stores for a code valid on 2026-12-31
+        const starts = startOfDayKL('2026-12-31')
+        const ends = endOfDayKL('2026-12-31')
+
+        // Act & Assert
+        expect(klDateKey(starts)).toBe('2026-12-31')
+        expect(klDateKey(ends.toISOString())).toBe('2026-12-31')
+        expect(klDateKey('2026-12-31')).toBe('2026-12-31')
+        // 16:00Z is already the next KL day
+        expect(klDateKey('2026-12-31T16:00:00Z')).toBe('2027-01-01')
     })
 })

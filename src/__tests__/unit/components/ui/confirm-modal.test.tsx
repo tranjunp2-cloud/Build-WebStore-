@@ -1,6 +1,6 @@
 /**
  * GH-1290 Bug 5 — Shared ConfirmModal (src/components/ui/confirm-modal.tsx)
- * TC-IDs: TC-GH1290-CM-01 → TC-GH1290-CM-06
+ * TC-IDs: TC-GH1290-CM-01 → TC-GH1290-CM-08
  *
  * Replaces the per-page hand-built delete popups. Verifies a11y title/description,
  * confirm/cancel wiring, conditional render, and the loading (disabled) state.
@@ -91,5 +91,17 @@ describe('TC-GH1290-CM-07: hideCancel (GH-1458 publish-gate alert modal)', () =>
         setup()
         expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy()
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
+    })
+})
+
+describe('TC-GH1290-CM-08: a description with a list renders as valid HTML (no list inside a <p>)', () => {
+    it('wraps the description in a <div> that still describes the dialog', () => {
+        setup({ description: <span><span>Check these fields:</span><ul><li>Price</li></ul></span> })
+        const list = screen.getByRole('list')
+        expect(list.closest('p')).toBeNull()
+        const dialog = screen.getByRole('dialog')
+        const described = document.getElementById(dialog.getAttribute('aria-describedby') ?? '')
+        expect(described?.tagName).toBe('DIV')
+        expect(described?.contains(list)).toBe(true)
     })
 })

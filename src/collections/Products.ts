@@ -2,7 +2,7 @@ import type { CollectionConfig, CollectionAfterChangeHook, FieldHook, Collection
 import { APIError } from 'payload'
 import { validateProductImages } from '@/lib/products/image-limit-validation'
 import { MAX_PRODUCT_IMAGES } from '@/lib/products/image-limit'
-import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
+import type { queueSEOAutoGeneration as QueueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import slugify from 'slugify'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
@@ -12,6 +12,9 @@ import {
     revalidateBadgeCountsAfterDelete,
 } from '@/lib/dashboard/revalidate-badge-counts-hook'
 import { runAfterResponse } from '@/lib/runtime/run-after-response'
+
+// Loaded on use: it imports the Payload config, which imports this collection (a static import is a cycle that breaks production builds).
+const queueSEOAutoGeneration: typeof QueueSEOAutoGeneration = async (...args) => (await import('../lib/ai/seo-queue')).queueSEOAutoGeneration(...args)
 
 const STABLE_AI_DRAFT_SLUG_PATTERN = /-ai-[a-f0-9]{32}$/
 
@@ -95,7 +98,7 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
         } catch { /* proceed if can't check */ }
 
         // Trigger background generation
-        queueSEOAutoGeneration('products', doc.id, siteId, doc.name, doc.shortDescription)
+        queueSEOAutoGeneration('products', doc.id, siteId, doc.name, doc.shortDescription, req.user)
     }
 }
 

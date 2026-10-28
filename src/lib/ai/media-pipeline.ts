@@ -172,13 +172,18 @@ export async function uploadBufferToMedia(
         mimetype: string
         alt: string
         tenantId: string
+        /** defaults to true: this pipeline stores AI-sourced site imagery */
+        aiGenerated?: boolean
     },
 ): Promise<number> {
+    // the owner workspace, so the shop's library (AI copilot) lists it; an id that isn't one is left off
+    const tenant = /^\d+$/.test(String(args.tenantId)) ? Number(args.tenantId) : undefined
     const createArgs = {
         collection: 'media',
         data: {
             alt: args.alt,
-            aiGenerated: true,
+            aiGenerated: args.aiGenerated ?? true,
+            ...(tenant !== undefined ? { tenant } : {}),
         },
         file: {
             data: args.buffer,

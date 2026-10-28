@@ -33,7 +33,8 @@ interface PageCardProps {
     isPending: boolean
     isConfirmingDelete: boolean
     onSelect: () => void
-    onEditWithAI: () => void
+    /** absent: no AI here (the editor copilot is off) — the button is hidden */
+    onEditWithAI?: () => void
     onToggleVisibility: () => void
     onRequestDelete: () => void
     onCancelDelete: () => void
@@ -118,7 +119,7 @@ export function PageCard({
                 {page.updatedAt ? ` · ${new Date(page.updatedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}` : ''}
             </p>
 
-            {isCurrent ? (
+            {isCurrent && onEditWithAI ? (
                 <button
                     type="button"
                     onClick={onEditWithAI}

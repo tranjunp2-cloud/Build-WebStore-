@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, FormProvider } from 'react-hook-form'
@@ -20,23 +20,59 @@ import { ShippingDimensionsSection } from './ShippingDimensionsSection'
 import { DescriptionSeoSection } from './DescriptionSeoSection'
 import { AttributesSection } from './AttributesSection'
 import { useMemo } from 'react'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
+import { useAgentRecordSync } from '@/lib/agent-changes/use-agent-record-sync'
+import { AgentChangedNotice, SaveConflictNotice } from '@/components/agent/agent-changed-notice'
+import type { SaveVersion } from '@/lib/save-version/use-save-version'
 
 interface ProductFormProps {
     initialData?: Partial<ProductFormValues>;
     isEdit?: boolean;
-    onSubmitForm?: (data: ProductFormValues) => Promise<void>;
+    /** Resolves `{ conflict: true }` when the save was refused because the product changed after it was opened. */
+    onSubmitForm?: (data: ProductFormValues) => Promise<{ conflict: true } | void>;
     /** GH-1032 legacy variant-price bug — product was saved with a variant matrix
      * but a base price of RM 0. Same warning as before, just relocated: rendered
      * in the header's right slot (next to the title) instead of a full-width block
      * above the form, so it no longer pushes the form sections down. */
     showLegacyPriceWarning?: boolean;
+    /** The product being edited. With `onReload`, the form follows the copilot's changes to it. */
+    recordId?: string;
+    /** Loads the product again. Return null (or fail) to leave the form as is; call `isStillClean` after the fetch and
+     * return null when the merchant typed meanwhile, so nothing they entered is replaced. */
+    onReload?: (isStillClean: () => boolean) => Promise<Partial<ProductFormValues> | null>;
+    /** The version of the product the form was loaded from; its conflict notice (Load the latest / Save mine anyway) shows here. */
+    version?: SaveVersion;
 }
 
-export function ProductForm({ initialData, isEdit, onSubmitForm, showLegacyPriceWarning }: ProductFormProps) {
+/** Existing products that predate the required-slug constraint get a slug derived from the name. */
+function withDerivedSlug(values: Partial<ProductFormValues>): Partial<ProductFormValues> {
+    return {
+        ...values,
+        urlSlug: values.urlSlug ||
+            (values.name ?? '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .slice(0, 60),
+    }
+}
+
+export function ProductForm({ initialData, isEdit, onSubmitForm, showLegacyPriceWarning, recordId, onReload, version }: ProductFormProps) {
     const router = useRouter()
     const { t } = useI18n()
     const [isSaving, setIsSaving] = useState(false)
     const [categories, setCategories] = useState<import('../CategorySelect').Category[]>([])
+    const fetchCategories = useCallback(async () => {
+        try {
+            const { getCategoriesAction } = await import('@/app/(dashboard)/products/categories/actions')
+            const docs = await getCategoriesAction()
+            setCategories(docs || [])
+        } catch (err) {
+            console.error('Failed to fetch categories:', err)
+        }
+    }, [])
 
     const schema = useMemo(() => getProductFormSchema(t, isEdit ? initialData?.images : undefined), [t, isEdit, initialData?.images])
 
@@ -47,18 +83,7 @@ export function ProductForm({ initialData, isEdit, onSubmitForm, showLegacyPrice
                 : values;
             return zodResolver(schema)(payload, context, options);
         },
-        defaultValues: initialData ? {
-            ...initialData,
-            // Derive slug from product name for existing products that predate the required-slug constraint
-            urlSlug: initialData.urlSlug ||
-                (initialData.name ?? '')
-                    .toLowerCase()
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .replace(/[^a-z0-9]+/g, '-')
-                    .replace(/^-+|-+$/g, '')
-                    .slice(0, 60),
-        } : {
+        defaultValues: initialData ? withDerivedSlug(initialData) : {
             name: '',
             categoryIds: [],
             images: [],
@@ -100,17 +125,35 @@ export function ProductForm({ initialData, isEdit, onSubmitForm, showLegacyPrice
         methods.register('categoryIds')
         methods.register('images')
 
-        const fetchCategories = async () => {
+        void fetchCategories()
+    }, [methods.register, fetchCategories])
+
+    // The assistant created, renamed or re-parented categories: the picker lists them without a reload
+    useAgentChanges({ kinds: ['store_category'] }, () => { void fetchCategories() })
+
+    // The assistant changed this product: with no unsaved edits the form is replaced in place (the sections, scroll and
+    // open fields stay); with edits, the notice asks first. "Keep mine" keeps the edits, and the next save is refused
+    // as a conflict (the form's version is the old one) until the merchant loads the latest or saves anyway.
+    const dirtyRef = useRef(false)
+    dirtyRef.current = methods.formState.isDirty
+    // the merchant chose Reload in the notice: their edits are meant to be replaced
+    const discardEdits = useRef(false)
+    const sync = useAgentRecordSync({
+        kind: 'product',
+        id: isEdit && onReload ? recordId : undefined,
+        dirty: methods.formState.isDirty,
+        reload: async () => {
+            const force = discardEdits.current
+            discardEdits.current = false
+            const stillClean = () => force || !dirtyRef.current
             try {
-                const { getCategoriesAction } = await import('@/app/(dashboard)/products/categories/actions')
-                const docs = await getCategoriesAction()
-                setCategories(docs || [])
+                const next = await onReload?.(stillClean)
+                if (next && stillClean()) methods.reset(withDerivedSlug(next))
             } catch (err) {
-                console.error('Failed to fetch categories:', err)
+                console.error('Failed to reload product:', err)
             }
-        }
-        fetchCategories()
-    }, [methods.register])
+        },
+    })
 
     const onSubmit = async (data: ProductFormValues) => {
         setIsSaving(true)
@@ -121,7 +164,8 @@ export function ProductForm({ initialData, isEdit, onSubmitForm, showLegacyPrice
         }
         try {
             if (onSubmitForm) {
-                await onSubmitForm(payload);
+                const outcome = await onSubmitForm(payload);
+                if (outcome?.conflict) return
             } else {
                 console.log('Form data:', data)
                 toast.success(t.dashboard.products.form.draftSaved)
@@ -208,7 +252,20 @@ export function ProductForm({ initialData, isEdit, onSubmitForm, showLegacyPrice
     return (
         <FormProvider {...methods}>
             <form onSubmit={methods.handleSubmit(onSubmit, onInvalid)} onKeyDown={handleFormKeyDown} className="relative flex flex-col w-full">
-                
+                {version?.conflicted ? (
+                    <div className="mb-6">
+                        <SaveConflictNotice
+                            record="product"
+                            onLoadLatest={() => { discardEdits.current = true; sync.reloadNow() }}
+                            onSaveAnyway={() => { version.overwrite(); void methods.handleSubmit(onSubmit, onInvalid)() }}
+                        />
+                    </div>
+                ) : sync.stale && (
+                    <div className="mb-6">
+                        <AgentChangedNotice record="product" onReload={() => { discardEdits.current = true; sync.reloadNow() }} onKeep={sync.keepMine} />
+                    </div>
+                )}
+
                 {/* Header — `flex-wrap` so the legacy-price warning (below) drops to its own
                     full-width row on narrow viewports instead of squeezing the title into a
                     cramped column; unaffected on desktop where both sit on one row. */}

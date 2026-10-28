@@ -6,7 +6,7 @@ import { I18nProvider } from '@/i18n'
 import { NotificationProvider } from '@/providers/NotificationProvider'
 import { ThemeProvider } from '@/providers/theme-provider'
 import { QueryProvider } from '@/providers/query-provider'
-import { MascotProvider } from '@/mascot'
+import { AppMascotProvider } from '@/components/mascot/app-mascot-provider'
 
 // Editor uses 100dvh — needs viewport-fit=cover so env(safe-area-inset-bottom)
 // returns the actual iOS home indicator height instead of 0.
@@ -30,11 +30,11 @@ export default async function EditorLayout({
             <ThemeProvider initialTheme={initialTheme}>
                 <QueryProvider>
                     <I18nProvider defaultLocale="en">
-                        <MascotProvider>
+                        <AppMascotProvider>
                             <NotificationProvider />
                             {children}
                             <Toaster position="bottom-right" />
-                        </MascotProvider>
+                        </AppMascotProvider>
                     </I18nProvider>
                 </QueryProvider>
             </ThemeProvider>

@@ -1,44 +1,12 @@
 /**
- * Unit Tests: AI URL Extraction — prompt building, response parsing, Zod validation
+ * Unit Tests: AI URL Extraction — response schema and request validation
+ * (the extraction prompt moved to ai-platform: see apps/ai-platform/src/tasks/catalog/sitegen-tasks.spec.ts, TC-AIMV-08)
  * TC-IDs from: docs/testcases/url-to-website.md
  * Convention: docs/TEST_CONVENTION.md
  */
 
 import { describe, it, expect } from 'vitest'
-import { buildExtractionPrompt } from '@/lib/ai/url-extraction-prompt'
 import { extractionResultSchema } from '@/lib/validations/ai'
-
-// ── Prompt Building ──────────────────────────────────────────────────────
-
-describe('buildExtractionPrompt', () => {
-    it('returns system and user prompts', () => {
-        const input = '--- META ---\nTitle: Test\n\n--- CONTENT ---\nSome content here'
-        const { system, user } = buildExtractionPrompt(input)
-
-        expect(system).toContain('business information')
-        expect(system).toContain('businessName')
-        expect(system).toContain('industry')
-        expect(system.toLowerCase()).toContain('json')
-        expect(user).toContain(input)
-    })
-
-    it('system prompt includes industry enum values', () => {
-        const { system } = buildExtractionPrompt('test')
-
-        expect(system).toContain('business')
-        expect(system).toContain('ecommerce')
-        expect(system).toContain('restaurant')
-        expect(system).toContain('tech')
-        expect(system).toContain('health')
-    })
-
-    it('system prompt includes suggestedTheme fields', () => {
-        const { system } = buildExtractionPrompt('test')
-
-        expect(system).toContain('primaryColor')
-        expect(system).toContain('secondaryColor')
-    })
-})
 
 // ── Zod Validation ───────────────────────────────────────────────────────
 

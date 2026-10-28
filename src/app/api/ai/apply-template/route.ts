@@ -146,7 +146,7 @@ export const POST = withAuth(async (user, req) => {
 
     try {
         // Rate Limit: 20 template applications per hour
-        const rateLimit = await checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(`ai:apply-template:${user.id}`, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },
@@ -235,7 +235,7 @@ export const POST = withAuth(async (user, req) => {
 
                 const newTenant = await payload.create({
                     collection: 'tenants',
-                    data: { name: tenantName, slug: tenantSlug },
+                    data: { name: tenantName, slug: tenantSlug, plan: 'free', status: 'active' },
                 })
                 // Provision FREEMIUM before linking user — fail-safe ordering.
                 await payload.create({
@@ -699,4 +699,4 @@ export const POST = withAuth(async (user, req) => {
             { status: 500 },
         )
     }
-})
+}, { csrf: true })

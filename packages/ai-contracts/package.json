@@ -1,0 +1,19 @@
+{
+	"name": "@ech/ai-contracts",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"sideEffects": false,
+	"description": "Shared contracts + client for the ECH AI platform: task catalog, task I/O schemas, usage shape. Framework-free.",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"check-types": "tsc --noEmit",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"zod": "^4.1.13"
+	}
+}

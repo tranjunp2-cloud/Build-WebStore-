@@ -4,16 +4,30 @@
  *
  * Body: { blockType: string, targetLocale: string, content: Record<string, unknown> }
  * Returns: { translated: Record<string, unknown>, cached: boolean }
- * On fail: { translated: <original content>, status: 'fallback' }
+ * On fail: a non-2xx `{ ok: false, status: 'fallback', error }` and NO `translated`: a failed
+ * translation is never answered with the original text, because a caller would store that as
+ * the translation (staging answered 200 + the original, and the editor kept the template
+ * defaults it showed instead). 429 keeps the legacy rate-limit shape.
+ *
+ * The model call is the AI platform task `i18n.translate-blocks`; without the
+ * platform configured the answer is 503.
+ * The cache key is derived on the server (workspace + prompt version + locale +
+ * content hash); `blockType` is validated but no longer part of the key.
  */
 
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { z } from 'zod'
+import { applyTranslatedStrings, flattenTranslatableStrings, I18N_TRANSLATE_BLOCKS_PROMPT_VERSION } from '@ech/ai-contracts'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { parseRequest } from '@/lib/validations/helpers'
-import { getCachedTranslation, setCachedTranslation } from '@/lib/ai/translate-cache'
+import { getCachedTranslation, setCachedTranslation, translationCacheKey } from '@/lib/ai/translate-cache'
+import { describeAiTaskFailure, resolveSiteBillingTenant } from '@/lib/ai-platform/ai-tasks'
+import { isAiTasksEnabled } from '@/lib/ai-platform/config'
+import { type AgentActor, resolveActorForUser } from '@/lib/ai-platform/context'
+import { getAiTaskClient } from '@/lib/ai-platform/task-client'
+import type { User } from 'payload'
+import type { PlatformUser } from '@/types/user'
 import { sanitizeText } from '@/utils/sanitize'
 
 // Allowlisted locales — F26 Phase 1 is EN + BM only (BR-06). Reject anything else with 400.
@@ -31,6 +45,8 @@ function sanitizeTranslated(value: unknown): unknown {
 }
 
 const translateSchema = z.object({
+    // A site-scoped caller names its site so the usage and the cache scope are that site's workspace.
+    siteId: z.union([z.string().min(1), z.number()]).optional().transform((v) => (v != null ? String(v) : undefined)),
     blockType: z.string().min(1).max(64),
     targetLocale: z.enum(SUPPORTED_TARGET_LOCALES),
     // Bound total serialized size to ~10KB to cap OpenAI input tokens (cost attack).
@@ -41,27 +57,77 @@ const translateSchema = z.object({
     ),
 })
 
-const LOCALE_NAMES: Record<string, string> = {
-    en: 'English',
-    ms: 'Bahasa Malaysia (Malaysian Malay)',
-    zh: 'Simplified Chinese',
-    th: 'Thai',
-    id: 'Bahasa Indonesia',
+type TargetLocale = (typeof SUPPORTED_TARGET_LOCALES)[number]
+
+/** The verified workspace, or the access error that stopped it (no workspace → user-scoped cache). */
+async function resolveWorkspace(user: User | PlatformUser, req: Request, tenantId?: string): Promise<{ actor: AgentActor | null; error: unknown }> {
+    try {
+        return { actor: await resolveActorForUser(user as PlatformUser, req, { tenantId }), error: null }
+    } catch (error) {
+        return { actor: null, error }
+    }
 }
 
-function getOpenAI(): OpenAI | null {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
-    return new OpenAI({ apiKey: key })
+/** A translation that could not be made: `status: 'fallback'` stays for older clients, `translated` is never sent. */
+function translationFailed(status: 502 | 503, error: string) {
+    return NextResponse.json({ ok: false, status: 'fallback', error }, { status })
+}
+
+/** Runs i18n.translate-blocks; returns the merged content or the failure response. */
+async function translateOnPlatform(
+    workspace: { actor: AgentActor | null; error: unknown },
+    content: Record<string, unknown>,
+    targetLocale: TargetLocale,
+): Promise<Record<string, unknown> | NextResponse> {
+    const { fields, paths } = flattenTranslatableStrings(content)
+    if (Object.keys(fields).length === 0) return content
+    try {
+        if (!workspace.actor) throw workspace.error
+        const { output } = await getAiTaskClient(workspace.actor).runTask('i18n.translate-blocks', { targetLocale, fields })
+        return applyTranslatedStrings(content, paths, output.fields)
+    } catch (error) {
+        const failure = describeAiTaskFailure(error)
+        // Workspace quota keeps the legacy rate-limit shape; anything else never crashes (AC-3).
+        if (failure.status === 429) return NextResponse.json({ error: failure.message }, { status: 429 })
+        console.warn('[translate] platform task failed:', failure.status, failure.message)
+        return translationFailed(502, failure.message)
+    }
 }
 
 export const POST = withAuth(async (user, req) => {
-    // Track parsed content for safe fallback in catch block
-    let parsedContent: Record<string, unknown> = {}
-
     try {
+        const { data, errorResponse } = await parseRequest(req, translateSchema)
+        if (errorResponse) return errorResponse
+
+        const { targetLocale, content, siteId } = data!
+
+        let siteTenantId: string | undefined
+        if (siteId) {
+            const billing = await resolveSiteBillingTenant(user, siteId)
+            if (!billing.ok) return NextResponse.json({ error: billing.error }, { status: billing.status })
+            siteTenantId = billing.tenantId
+        }
+
+        if (!isAiTasksEnabled()) {
+            // No AI configured — nothing was translated, so there is nothing to return
+            return translationFailed(503, 'Translation is not available right now.')
+        }
+        const workspace = await resolveWorkspace(user, req, siteTenantId)
+        const cacheKey = translationCacheKey({
+            scope: workspace.actor ? `org:${workspace.actor.organizationId}` : `user:${user.id}`,
+            promptVersion: I18N_TRANSLATE_BLOCKS_PROMPT_VERSION,
+            locale: targetLocale,
+            content,
+        })
+
+        // AC-4: Cache hit → skip AI call. Checked before the rate limit so hits cost no quota.
+        const cached = getCachedTranslation(cacheKey)
+        if (cached) {
+            return NextResponse.json({ translated: cached, cached: true })
+        }
+
         // Rate limit: 30 translate calls per hour (cheaper than generate-site)
-        const rateLimit = await checkRateLimit(String(user.id), 30)
+        const rateLimit = await checkRateLimit(`ai:translate:${user.id}`, 30)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },
@@ -69,82 +135,14 @@ export const POST = withAuth(async (user, req) => {
             )
         }
 
-        const { data, errorResponse } = await parseRequest(req, translateSchema)
-        if (errorResponse) return errorResponse
-
-        const { blockType, targetLocale, content } = data!
-        parsedContent = content
-
-        // AC-4: Cache hit → skip AI call
-        const cached = getCachedTranslation(blockType, targetLocale)
-        if (cached) {
-            return NextResponse.json({ translated: cached, cached: true })
-        }
-
-        const openai = getOpenAI()
-        if (!openai) {
-            // No API key — return original content as safe fallback
-            return NextResponse.json({ translated: content, status: 'fallback' })
-        }
-
-        // targetLocale is enum-validated — always present in LOCALE_NAMES
-        const localeName = LOCALE_NAMES[targetLocale]!
-
-        // Source-agnostic — site content may be in any language (EN, MS, VI, EL, etc.)
-        const translationInstruction = `Translate ALL string values in the given JSON into natural, idiomatic ${localeName}. The source may be in any language — detect and translate automatically.`
-
-        const systemPrompt = [
-            `You are a professional translator specializing in marketing and e-commerce copy.`,
-            translationInstruction,
-            `Rules:`,
-            `- Return ONLY valid JSON with exactly the same structure and keys.`,
-            `- Translate only string leaf values. Preserve numbers, booleans, nulls, and object/array shapes.`,
-            `- Keep brand placeholder tokens like {brand} and {n} unchanged.`,
-            `- Use natural, friendly tone appropriate for Malaysian small businesses.`,
-            `- Do NOT add any explanation or markdown — just the JSON.`,
-        ].join('\n')
-
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            temperature: 0.3,
-            // F26: content is capped at 10_000 chars (schema). Translated JSON can be larger than the
-            // source, so 1024 truncated big blocks (e.g. hero with badge/cta/image fields) → invalid
-            // JSON → silent English fallback. 4096 comfortably covers the 10KB content ceiling.
-            max_tokens: 4096,
-            response_format: { type: 'json_object' },
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: JSON.stringify(content) },
-            ],
-        })
-
-        const raw = completion.choices[0]?.message?.content?.trim() ?? ''
-
-        // Parse and validate returned JSON
-        let translated: Record<string, unknown>
-        try {
-            // Strip markdown code fences if the model wraps in ```json ... ```
-            const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
-            const parsed = JSON.parse(cleaned)
-            if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-                throw new Error('Unexpected shape')
-            }
-            translated = parsed as Record<string, unknown>
-        } catch {
-            // Malformed JSON → safe fallback
-            return NextResponse.json({ translated: content, status: 'fallback' })
-        }
-
-        // TC-F26-04-08: strip any HTML the model may have injected before it is stored/rendered.
-        translated = sanitizeTranslated(translated) as Record<string, unknown>
-
-        // Cache for subsequent calls (same block type + locale)
-        setCachedTranslation(blockType, targetLocale, translated)
-
+        const result = await translateOnPlatform(workspace, content, targetLocale)
+        if (result instanceof NextResponse) return result
+        const translated = sanitizeTranslated(result) as Record<string, unknown>
+        setCachedTranslation(cacheKey, translated)
         return NextResponse.json({ translated, cached: false })
     } catch (err) {
         console.error('[translate] error:', err)
-        // AC-3: Never crash — return original content (captured before await chain) as fallback
-        return NextResponse.json({ translated: parsedContent, status: 'fallback' })
+        // AC-3: Never crash — answer the failure; the original text is not a translation
+        return translationFailed(502, 'The translation could not be made right now. Try again in a moment.')
     }
-})
+}, { csrf: true })

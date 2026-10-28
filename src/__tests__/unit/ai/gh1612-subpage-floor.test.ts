@@ -4,15 +4,15 @@ import { enforceSubpageStructure, getSubpageContentTarget } from '@/lib/ai/struc
 import type { BusinessInfoInput } from '@/lib/ai/system-prompt'
 
 // Mock OpenAI client
-vi.mock('openai', () => ({
-    default: vi.fn().mockImplementation(() => ({
-        chat: {
-            completions: {
-                create: vi.fn(),
-            },
-        },
-    })),
-}))
+import { scripted } from '@/__tests__/helpers/scripted-ai-platform'
+vi.mock('@/lib/ai-platform/actor-scope', async (importOriginal) => {
+    const { scriptedActorScope } = await import('@/__tests__/helpers/scripted-ai-platform')
+    return scriptedActorScope(await importOriginal<any>())
+})
+// No AI actor unless a test installs a scripted model.
+beforeEach(() => {
+    scripted.create = null
+})
 
 // Mock blockRegistry so we don't depend on actual database/registry initialization
 vi.mock('@/blocks/registry', () => ({
@@ -84,7 +84,6 @@ describe('GH-1612 subpage floor and thickness tests (AC-10 / AC-01 / AC-03)', ()
     })
 
     afterAll(() => {
-        delete process.env.OPENAI_API_KEY
         delete process.env.GEN_MODE
     })
 
@@ -155,10 +154,9 @@ describe('GH-1612 subpage floor and thickness tests (AC-10 / AC-01 / AC-03)', ()
                 })
 
                 it('AI-first (generateSiteWithAI path): enforceSubpageStructure is correctly invoked in the generator loop', async () => {
-                    process.env.OPENAI_API_KEY = 'test-key'
                     process.env.GEN_MODE = 'ai-first'
 
-                    const OpenAIClient = (await import('openai')).default as any
+                    const OpenAIClient = scripted as any
 
                     // Model response returns a very thin subpage (only 1 content block)
                     const mockSiteData = {

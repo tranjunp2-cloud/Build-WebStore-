@@ -7,8 +7,10 @@ import type { CollectionConfig } from 'payload'
  * (1) attribute cost overages to specific users/flows, (2) verify phase-03/04
  * cost savings land in production, (3) feed a billing/usage UI later.
  *
- * Write pattern: fire-and-forget from `logAiUsage()` helper in src/lib/ai/log-usage.ts
- * — a failed log MUST NOT break the AI request, so all writes use `.catch(() => {})`.
+ * Historical: prime-web wrote these rows while it called OpenAI in-process. Since
+ * the AI platform cutover (plan 261021) every model call is metered in the
+ * ai-platform ledger instead; nothing writes here any more and the rows are kept
+ * read-only for history (never dropped).
  *
  * Retention: no TTL at DB level; ops can run a cleanup cron later if storage grows.
  *
@@ -28,7 +30,7 @@ export const AiUsageLogs: CollectionConfig = {
     access: {
         // Only super-admins can see aggregate AI usage (cost data is sensitive).
         read: ({ req }) => req.user?.roles?.includes('super-admin') || false,
-        create: () => false, // Written via logAiUsage() helper, not the admin API
+        create: () => false, // Read-only history; usage is metered in the ai-platform ledger
         update: () => false,
         delete: ({ req }) => req.user?.roles?.includes('super-admin') || false,
     },

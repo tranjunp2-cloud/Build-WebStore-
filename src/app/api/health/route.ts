@@ -67,7 +67,8 @@ export async function GET(req: NextRequest) {
     "STRIPE_SECRET_KEY",
     "S3_ENDPOINT",
     "S3_ACCESS_KEY_ID",
-    "OPENAI_API_KEY",
+    "AI_PLATFORM_URL",
+    "AI_PLATFORM_CONTEXT_SECRET",
   ];
   result.envCheck = requiredEnvs.reduce(
     (acc, key) => {

@@ -9,13 +9,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockSearchPhotos, mockUploadImageUrl, mockFindOrCreateCartonMedia, mockFindByID, mockGetProductImages, mockOpenAICreate } = vi.hoisted(() => ({
+const { mockSearchPhotos, mockUploadImageUrl, mockFindOrCreateCartonMedia, mockFindByID, mockGetProductImages, mockRunTask } = vi.hoisted(() => ({
     mockSearchPhotos: vi.fn(),
     mockUploadImageUrl: vi.fn(),
     mockFindOrCreateCartonMedia: vi.fn(),
     mockFindByID: vi.fn(),
     mockGetProductImages: vi.fn(),
-    mockOpenAICreate: vi.fn(),
+    mockRunTask: vi.fn(),
 }))
 
 vi.mock('@/lib/ai/pixabay-client', () => ({
@@ -65,22 +65,22 @@ vi.mock('@/lib/images/industry-images', () => ({
 // while never running. businessInfo.industry = 'business' below, and the real
 // resolver returns 'business' for it — same category the spy used to force.
 
-vi.mock('@/lib/ai/config', () => ({
-    selectModel: vi.fn().mockReturnValue('gpt-4.1-nano'),
-}))
 
 // Prototype-based (not mockImplementation returning an object) — survives vi.clearAllMocks()
 // in beforeEach, matching the proven pattern in src/__tests__/api/ai.test.ts.
-vi.mock('openai', () => {
-    const OpenAI = vi.fn()
-    OpenAI.prototype.chat = { completions: { create: mockOpenAICreate } }
-    return { default: OpenAI }
-})
+vi.mock('@/lib/ai-platform/task-client', () => ({ getAiTaskClient: () => ({ runTask: mockRunTask }) }))
 
 import {
-    generateSampleProducts,
-    prepareSampleProducts,
+    generateSampleProducts as generateSampleProductsInScope,
+    prepareSampleProducts as prepareSampleProductsInScope,
 } from '@/lib/ai/generate-sample-products'
+import { runWithAiActor } from '@/lib/ai-platform/actor-scope'
+
+// The AI steps run only inside an AI actor scope (the migrated site's workspace owner).
+const ACTOR = { user: { id: 7 }, tenantId: '1', organizationId: 'org_1', role: 'owner' } as never
+const PLATFORM_USAGE = { model: 'test', inputTokens: 10, outputTokens: 5 }
+const generateSampleProducts: typeof generateSampleProductsInScope = (...args) => runWithAiActor(ACTOR, () => generateSampleProductsInScope(...args))
+const prepareSampleProducts: typeof prepareSampleProductsInScope = (...args) => runWithAiActor(ACTOR, () => prepareSampleProductsInScope(...args))
 
 const mockPayload = {
     findByID: mockFindByID,
@@ -108,14 +108,15 @@ beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     delete process.env.PIXABAY_FALLBACK_ONLY
     // Default: Tier-1 AI call fails, forcing the Tier-2 curated fallback path — matches this file's
-    // original behavior before mockOpenAICreate was extracted to a hoisted, per-test-overridable mock.
-    process.env.OPENAI_API_KEY = 'test-key'
-    mockOpenAICreate.mockRejectedValue(new Error('no openai'))
+    // original behavior before mockRunTask was extracted to a hoisted, per-test-overridable mock.
+    vi.stubEnv('AI_PLATFORM_URL', 'http://ai.internal:8300')
+    vi.stubEnv('AI_PLATFORM_CONTEXT_SECRET', 'test-context-secret-at-least-32-characters')
+    mockRunTask.mockRejectedValue(new Error('no openai'))
 })
 
 afterEach(() => {
     vi.restoreAllMocks()
-    delete process.env.OPENAI_API_KEY
+    vi.unstubAllEnvs()
 })
 
 describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
@@ -288,15 +289,13 @@ describe('[TC-F38-RES-08] deferred product image assignment', () => {
 
 describe('[TC-GENPERF-W3] bounded sample-product preparation', () => {
     it('[TC-GENPERF-W3-06] fills a partial AI result from curated data without a second model call', async () => {
-        mockOpenAICreate.mockResolvedValueOnce({
-            choices: [{ message: { content: JSON.stringify({ products: [{
+        mockRunTask.mockResolvedValueOnce({ output: { products: [{
                 name: 'AI Product',
                 shortDescription: 'Short desc',
                 description: 'Full desc',
                 price: 50,
                 imageKeyword: 'ai product',
-            }] }) } }],
-        })
+            }] }, usage: PLATFORM_USAGE })
         mockSearchPhotos.mockResolvedValue([])
         mockUploadImageUrl.mockResolvedValue(77)
         mockFindByID.mockResolvedValue({ id: 77 })
@@ -305,7 +304,7 @@ describe('[TC-GENPERF-W3] bounded sample-product preparation', () => {
 
         expect(products).toHaveLength(6)
         expect(products[0]!.name).toBe('AI Product')
-        expect(mockOpenAICreate).toHaveBeenCalledTimes(1)
+        expect(mockRunTask).toHaveBeenCalledTimes(1)
     })
 
     it('[TC-GENPERF-W3-07] caps image search at two six-second queries per product', async () => {
@@ -382,9 +381,7 @@ describe('[TC-GH1458-P2] AI-estimated weight/dimensions', () => {
     function mockAIResponse(products: Record<string, unknown>[]) {
         // 6 products so aiSucceeded=true with no top-up call needed (generateSampleProductsAI is
         // always called with count=6 first).
-        mockOpenAICreate.mockResolvedValueOnce({
-            choices: [{ message: { content: JSON.stringify({ products }) } }],
-        })
+        mockRunTask.mockResolvedValueOnce({ output: { products }, usage: PLATFORM_USAGE })
     }
 
     it('[TC-GH1458-P2-01] passes through AI-estimated weight/dimensions per product', async () => {
@@ -463,13 +460,13 @@ describe('[TC-GH1458-P2] AI-estimated weight/dimensions', () => {
         await generateSampleProducts(businessInfo, 'it', 'tenant-1', mockPayload)
 
         // Assert
-        const request = mockOpenAICreate.mock.calls[0]?.[0] as { messages?: Array<{ content?: string }> }
-        expect(request.messages?.[1]?.content).toContain('Write product names and customer-facing descriptions in Italian.')
+        const request = mockRunTask.mock.calls[0]?.[1] as { user?: string }
+        expect(request?.user).toContain('Write product names and customer-facing descriptions in Italian.')
     })
 
     it('[TC-F26-11-04] does not inject English curated products when Italian AI generation fails', async () => {
         // Arrange
-        mockOpenAICreate.mockRejectedValue(new Error('OpenAI unavailable'))
+        mockRunTask.mockRejectedValue(new Error('OpenAI unavailable'))
 
         // Act
         const { products } = await generateSampleProducts(businessInfo, 'it', 'tenant-1', mockPayload)
