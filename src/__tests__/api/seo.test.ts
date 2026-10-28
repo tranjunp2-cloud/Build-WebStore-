@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { POST as AnalyzePOST } from '@/app/api/seo/analyze/route'
 import { POST as FixPOST } from '@/app/api/seo/fix/route'
 import { NextRequest } from 'next/server'
+import { AI_UNAVAILABLE_MESSAGE } from '@/lib/ai-platform/config'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -25,25 +26,26 @@ vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     canUseWithinLimit: vi.fn().mockResolvedValue(true),
 }))
 
-// Giả lập OpenAI cho tính năng SEO Fix
-vi.mock('openai', () => {
-    const OpenAI = vi.fn()
-    OpenAI.prototype.chat = {
-        completions: {
-            create: vi.fn().mockResolvedValue({
-                choices: [{
-                    message: {
-                        content: JSON.stringify({
-                            metaTitle: "AI SEO Title",
-                            metaDescription: "AI generated SEO description for testing"
-                        })
-                    }
-                }]
-            })
-        }
-    }
-    return { default: OpenAI }
-})
+// seo/fix generates meta through the AI platform as the caller in the site's workspace.
+vi.mock('@/lib/ai-platform/context', () => ({
+    AgentAccessError: class AgentAccessError extends Error {
+        constructor(message: string, readonly status: number) { super(message) }
+    },
+    resolveActorForUser: vi.fn(async () => ({ user: { id: 'user-1' }, tenantId: 'tenant-1', organizationId: 'org_1', role: 'owner' })),
+    signAgentContextToken: vi.fn(async () => 'ctx-token'),
+}))
+
+const fetchMock = vi.fn<typeof fetch>()
+
+function seoFixTaskResponse(output: unknown) {
+    return Response.json({
+        taskId: 'seo.fix-meta',
+        promptVersion: 'seo.fix-meta@1',
+        requestId: 'req_1',
+        output,
+        usage: { provider: 'openai', model: 'gpt-4.1-nano', costUsdMicros: 12, latencyMs: 900, fallbacks: [] },
+    })
+}
 
 // Giả lập Payload CMS cho cả 2 APIs (Analyze và Fix)
 vi.mock('payload', () => {
@@ -51,7 +53,7 @@ vi.mock('payload', () => {
         getPayload: vi.fn().mockResolvedValue({
             findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
                 if (collection === 'sites' && id === 'site-valid') {
-                    return { id: 'site-valid', name: 'Mock Site', seo: {} }
+                    return { id: 'site-valid', name: 'Mock Site', seo: {}, tenant: 'tenant-1' }
                 }
                 return null
             }),
@@ -84,7 +86,18 @@ vi.mock('payload', () => {
 
 
 describe('SEO APIs', () => {
-    
+    beforeEach(() => {
+        vi.stubEnv('AI_PLATFORM_URL', 'http://ai.internal:8300')
+        vi.stubEnv('AI_PLATFORM_CONTEXT_SECRET', 'test-context-secret-at-least-32-characters')
+        vi.stubGlobal('fetch', fetchMock)
+        fetchMock.mockReset()
+    })
+
+    afterEach(() => {
+        vi.unstubAllEnvs()
+        vi.unstubAllGlobals()
+    })
+
     describe('POST /api/seo/analyze', () => {
         it('returns 400 if siteId is omitted', async () => {
             const req = new NextRequest('http://localhost:3000/api/seo/analyze', {
@@ -125,7 +138,11 @@ describe('SEO APIs', () => {
             expect(res.status).toBe(404)
         })
 
-        it('returns 200 and fixes pages using OpenAI if missing SEO info', async () => {
+        it('returns 200 and fixes pages through the AI platform if missing SEO info', async () => {
+            fetchMock.mockResolvedValue(seoFixTaskResponse({
+                metaTitle: 'AI SEO Title',
+                metaDescription: 'AI generated SEO description for testing',
+            }))
             const req = new NextRequest('http://localhost:3000/api/seo/fix', {
                 method: 'POST',
                 body: JSON.stringify({ siteId: 'site-valid' })
@@ -136,10 +153,26 @@ describe('SEO APIs', () => {
             expect(res.status).toBe(200)
             expect(result.success).toBe(true)
             expect(result.data.totalPages).toBeGreaterThan(0)
-            
-            // OpenAI phải fix được ít nhất 1 trang vì mock có trang thiếu info
+
+            // Platform must fix at least 1 page because the mock has pages with missing info
             expect(result.data.fixedPages).toBeGreaterThan(0)
             expect(result.data.results[0].metaTitle).toBe("AI SEO Title")
+            const [url] = fetchMock.mock.calls[0]!
+            expect(url).toBe('http://ai.internal:8300/v1/tasks/seo.fix-meta/run')
+        })
+
+        it('returns 503 AI_UNAVAILABLE when pages need fixing and the platform is not configured [TC-AISEC-01]', async () => {
+            vi.stubEnv('AI_PLATFORM_URL', '')
+            const req = new NextRequest('http://localhost:3000/api/seo/fix', {
+                method: 'POST',
+                body: JSON.stringify({ siteId: 'site-valid' })
+            })
+
+            const res = await FixPOST(req)
+
+            expect(res.status).toBe(503)
+            expect(await res.json()).toEqual({ success: false, error: { code: 'AI_UNAVAILABLE', message: AI_UNAVAILABLE_MESSAGE } })
+            expect(fetchMock).not.toHaveBeenCalled()
         })
     })
 

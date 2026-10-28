@@ -1,17 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock OpenAI
-vi.mock('openai', () => ({
-    default: vi.fn(),
-}))
-
 // Mock config
-vi.mock('@/lib/ai/config', () => ({
-    SYSTEM_PROMPTS: {
-        'seo-generation': 'You are an SEO expert.',
-    },
-}))
-
 import { generateAutoSEOMeta } from '@/lib/ai/generate-meta'
 
 // ─── TC-F08-03-01: SEO auto-generation ──────────────────────────────────
