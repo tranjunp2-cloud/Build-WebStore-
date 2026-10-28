@@ -37,6 +37,7 @@ import { FlowError, type FlowOutcome, type FlowState, QuestionFlowService } from
 import type { KnownImage, ProductKnowledge, SeenProduct } from "./change-set-builders";
 import { type CampaignState, createCampaignRun } from "./campaign-group";
 import { seesTeamDrafts, stampRequester } from "./change-set-access";
+import { settledStatus } from "./change-set-decision.service";
 import { newId } from "./ids";
 import { type CapabilitySet, effectiveCapabilities } from "./merchant-capabilities";
 import { merchantInstructions } from "./merchant-instructions";
@@ -96,6 +97,9 @@ const PENDING_START_MS = 60_000;
 
 /** Statuses a Stop still changes: working, waiting for a slot, or paused on a question. */
 const STOPPABLE: ReadonlySet<AgentRun["status"]> = new Set(["queued", "planning", "running", "applying", "awaiting_input"]);
+const ALREADY_ANSWERED = "This question was already answered.";
+/** The run still waits, but a newer message was sent in its chat: the question was left. */
+const QUESTION_LEFT = "This question is no longer open: a newer message was sent in this chat.";
 /** What an owner / admin may stop of a teammate's: only what takes or waits for a slot. */
 const TEAMMATE_STOPPABLE: ReadonlySet<AgentRun["status"]> = new Set(["queued", "planning", "running", "applying"]);
 
@@ -596,19 +600,35 @@ export class AgentRunService {
 		return new RunBudget(startedAt, this.env.AI_RUN_BUDGET_MS, this.env.AI_RUN_TOKEN_BUDGET);
 	}
 
+	/** The platform's daily spend cap (AI_DAILY_BUDGET_USD): 503 before anything calls a model. */
+	private async assertCanSpend(_ctx: AiRequestContext): Promise<void> {
+		await this.spend?.assertWithinBudget();
+	}
+
 	/**
 	 * The merchant answered the open question: the flow either asks the next
 	 * one (no model call) or returns the `ask_user` result and the run continues.
+	 * The run is claimed first (`awaiting_input` → `running` in one conditional write): a second answer
+	 * (double click, two tabs, a retry) gets 409 and no model call; while it works the chat is busy
+	 * and the stale-run sweep closes it if the process is killed.
 	 */
 	async answer(ctx: AiRequestContext, runId: string, input: AnswerInput, emit: (frame: RunFrame) => void): Promise<AgentRun> {
 		const budget = this.budget(Date.now());
-		const stored = await this.store.getRunWithState(ctx.organizationId, runId, ctx.userId);
-		if (!stored) throw new AgentError("Run not found.", 404);
-		const state = stored.state as RunState | null;
-		if (stored.run.status !== "awaiting_input" || !state?.flow || !this.flows) {
-			throw new AgentError("This question was already answered.", 409);
+		await this.assertCanSpend(ctx);
+		const stored = await this.store.claimAwaitingInput(ctx.organizationId, runId, ctx.userId, new Date());
+		if (!stored) {
+			const current = await this.store.getRun(ctx.organizationId, runId, ctx.userId);
+			if (!current) throw new AgentError("Run not found.", 404);
+			throw new AgentError(current.status === "awaiting_input" ? QUESTION_LEFT : ALREADY_ANSWERED, 409);
 		}
-		let run: AgentRun = { ...stored.run, status: "running" };
+		// the claim undone: the question waits again, as it was (unless a Stop closed it meanwhile)
+		const reopen = () => this.store.saveRunIfStatus(ctx.organizationId, { ...stored.run, status: "awaiting_input" }, ["running"]);
+		const state = stored.state as RunState | null;
+		if (!state?.flow || !this.flows) {
+			await reopen();
+			throw new AgentError(ALREADY_ANSWERED, 409);
+		}
+		let run: AgentRun = stored.run;
 		emit({ type: "run.started", run });
 		if (input.text) state.merchantText += `\n${input.text.toLowerCase()}`;
 		const push = (event: RunEvent) => {
@@ -619,8 +639,14 @@ export class AgentRunService {
 		try {
 			outcome = await this.flows.answer(ctx, run.id, state.flow, input);
 		} catch (error) {
-			if (error instanceof FlowError) throw new AgentError(error.message, 409);
-			throw error;
+			if (error instanceof FlowError) {
+				await reopen();
+				throw new AgentError(error.message, 409);
+			}
+			// anything else ends the run: it must not stay claimed as `running` until the sweep finds it
+			this.logger.warn(`run ${run.id} answer failed: ${error instanceof Error ? error.message : String(error)}`);
+			push({ type: "run.status", runId: run.id, status: "failed", error: userFacingError(error, state.language ?? flowLanguage(null, ctx.locale)) });
+			return this.finish(ctx, run);
 		}
 		return this.afterFlow(ctx, () => run, state, outcome, emit, push, budget);
 	}
@@ -629,10 +655,11 @@ export class AgentRunService {
 	async searchOptions(ctx: AiRequestContext, runId: string, questionId: string, query: string): Promise<QuestionOption[]> {
 		const stored = await this.store.getRunWithState(ctx.organizationId, runId, ctx.userId);
 		const state = stored?.state as RunState | null;
-		if (!stored || !state?.flow || !this.flows || !query.trim()) return [];
+		if (!stored || stored.run.status !== "awaiting_input" || !state?.flow || !this.flows || !query.trim()) return [];
 		const options = await this.flows.searchOptions(ctx, state.flow, questionId, query.slice(0, 80));
-		// picture searches are remembered so the answer can name what was found
-		if (options.some((o) => o.imageUrl)) await this.store.saveRunState(ctx.organizationId, runId, state);
+		// picture searches are remembered so the answer can name what was found — only while the question is
+		// still open: an answer claimed meanwhile owns the state (this read is older than its run)
+		if (options.some((o) => o.imageUrl)) await this.store.saveRunState(ctx.organizationId, runId, state, "awaiting_input");
 		return options;
 	}
 
@@ -1231,7 +1258,14 @@ export class AgentRunService {
 		await this.store.saveRun(ctx.organizationId, run);
 		// the run is over: its private state is no longer needed
 		await this.store.saveRunState(ctx.organizationId, run.id, null);
-		return run;
+		if (run.status !== "awaiting_approval") return run;
+		// its cards may all have been decided while it worked (a decision leaves a working run alone): settle now.
+		// Read after the write above, so a decision landing in between settles it itself.
+		const status = settledStatus(await this.store.listRunChangeSets(ctx.organizationId, run.id));
+		if (!status) return run;
+		const finishedAt = run.finishedAt ?? new Date().toISOString();
+		const settled = await this.store.settleRunStatus(ctx.organizationId, run.id, status, finishedAt, ["awaiting_approval"]);
+		return settled ? { ...run, status, finishedAt } : run;
 	}
 
 	/**
@@ -1314,7 +1348,8 @@ export class AgentRunService {
 	 */
 	async cancel(ctx: AiRequestContext, runId: string): Promise<AgentRun> {
 		const own = await this.store.getRun(ctx.organizationId, runId, ctx.userId);
-		const teammate = own ? null : seesTeamDrafts(ctx) ? await this.store.getRun(ctx.organizationId, runId) : null;
+		// a teammate's run of another shop sharing the organization is not theirs to see (404)
+		const teammate = own ? null : seesTeamDrafts(ctx) ? await this.store.getRun(ctx.organizationId, runId, undefined, ctx.tenantId) : null;
 		const run = own ?? teammate;
 		// someone else's run, finished or not the caller's to stop: the same answer as a missing one
 		if (!run || (teammate && !TEAMMATE_STOPPABLE.has(run.status))) throw new AgentError("Run not found.", 404);
@@ -1328,7 +1363,12 @@ export class AgentRunService {
 			return shown(stopped);
 		}
 		if (!STOPPABLE.has(run.status)) return run;
-		return shown(await this.finish(ctx, stopped));
+		// only while it is still stoppable: a run that finished (or was answered and finished) since the read keeps its end
+		if (!(await this.store.saveRunIfStatus(ctx.organizationId, stopped, [...STOPPABLE]))) {
+			return shown((await this.store.getRun(ctx.organizationId, runId)) ?? run);
+		}
+		await this.store.saveRunState(ctx.organizationId, runId, null);
+		return shown(stopped);
 	}
 
 	/**

@@ -29,6 +29,8 @@ import { failedStaleRun, IN_FLIGHT_RUN_STATUSES, QUEUED_RUN_STATUS, STALE_RUN_BA
 
 type RunRow = {
 	orgId: string;
+	/** ai_runs.tenant_id: the shop the run was asked in */
+	tenantId?: string | null;
 	userId: string;
 	createdAt: Date;
 	/** last write of the run row (Drizzle's ai_runs.updated_at) */
@@ -39,6 +41,8 @@ type RunRow = {
 };
 type ThreadRow = { orgId: string; userId: string; thread: AgentThread; titleSource?: "auto" | "user" | "task" };
 
+/** A run without a tenant, or no tenant asked for, matches (as the Drizzle store's `ofTenant`). */
+const sameTenant = (rowTenant: string | null | undefined, tenantId: string | undefined) => !tenantId || !rowTenant || rowTenant === tenantId;
 const unexpired = (changeSet: ChangeSet, now: Date) => changeSet.status === "pending" && Date.parse(changeSet.expiresAt) > now.getTime();
 /** the oldest waiting draft: what approving does (as the Drizzle store reads it from the rows) */
 const oldestChange = (waiting: ChangeSet[]) => {
@@ -69,6 +73,7 @@ export class InMemoryAgentStore implements AgentStore {
 	async createRun(ctx: AiRequestContext, run: AgentRun, userMessage?: string) {
 		this.runs.set(run.id, {
 			orgId: ctx.organizationId,
+			tenantId: ctx.tenantId ?? null,
 			userId: ctx.userId,
 			createdAt: new Date(),
 			updatedAt: new Date(),
@@ -83,9 +88,35 @@ export class InMemoryAgentStore implements AgentStore {
 			row.updatedAt = new Date();
 		}
 	}
-	async getRun(organizationId: string, id: string, userId?: string) {
+	async getRun(organizationId: string, id: string, userId?: string, tenantId?: string) {
 		const row = this.runs.get(id);
-		return row && row.orgId === organizationId && (!userId || row.userId === userId) ? row.run : null;
+		return row && row.orgId === organizationId && (!userId || row.userId === userId) && sameTenant(row.tenantId, tenantId) ? row.run : null;
+	}
+	/** No await between the check and the write: a compare-and-set like the Drizzle store's guarded update. */
+	async saveRunIfStatus(organizationId: string, run: AgentRun, from: readonly AgentRun["status"][]) {
+		const row = this.runs.get(run.id);
+		if (!row || row.orgId !== organizationId || !from.includes(row.run.status)) return false;
+		row.run = run;
+		row.updatedAt = new Date();
+		return true;
+	}
+	async settleRunStatus(organizationId: string, runId: string, status: AgentRun["status"], finishedAt: string, from: readonly AgentRun["status"][]) {
+		const row = this.runs.get(runId);
+		if (!row || row.orgId !== organizationId || !from.includes(row.run.status)) return false;
+		row.run = { ...row.run, status, finishedAt };
+		row.updatedAt = new Date();
+		return true;
+	}
+	/** Synchronous check-and-set: two answers in parallel, one claim (like the Drizzle store's conditional update). */
+	async claimAwaitingInput(organizationId: string, runId: string, userId: string, now: Date) {
+		const row = this.runs.get(runId);
+		if (!row || row.orgId !== organizationId || row.userId !== userId || row.run.status !== "awaiting_input") return null;
+		const threadId = row.run.threadId;
+		// a newer run in the chat: the question was left open
+		if (threadId && [...this.runs.values()].some((r) => r.orgId === organizationId && r.run.threadId === threadId && r.createdAt > row.createdAt)) return null;
+		row.run = { ...row.run, status: "running" };
+		row.updatedAt = now;
+		return { run: row.run, state: row.state ?? null, userMessage: row.userMessage };
 	}
 	async getRunStatus(organizationId: string, id: string) {
 		const row = this.runs.get(id);
@@ -161,6 +192,7 @@ export class InMemoryAgentStore implements AgentStore {
 				.map(([id, r]) => ({
 					runId: id,
 					userId: r.userId,
+					tenantId: r.tenantId ?? null,
 					threadId: r.run.threadId ?? null,
 					threadTitle: (r.run.threadId ? this.threads.get(r.run.threadId)?.thread.title : undefined) ?? null,
 					prompt: r.run.prompt,
@@ -194,6 +226,11 @@ export class InMemoryAgentStore implements AgentStore {
 		const run = this.runs.get(runId);
 		return run && run.orgId === organizationId ? run.userId : null;
 	}
+	/** The run's tenant (same org), as the Drizzle store joins it. */
+	private runTenantOf(organizationId: string, runId: string): string | null {
+		const run = this.runs.get(runId);
+		return run && run.orgId === organizationId ? (run.tenantId ?? null) : null;
+	}
 	/** `requestedBy` filled from the run's user, like DrizzleAgentStore's reads. */
 	private withRequester(organizationId: string, changeSet: ChangeSet): ChangeSet {
 		const requestedBy = requesterOf(changeSet, this.runUserOf(organizationId, changeSet.runId));
@@ -204,12 +241,15 @@ export class InMemoryAgentStore implements AgentStore {
 	}
 	async getChangeSet(organizationId: string, id: string): Promise<StoredChangeSet | null> {
 		const row = this.changeSets.get(id);
-		return row && row.orgId === organizationId ? { changeSet: this.withRequester(organizationId, row.changeSet), claimedAt: row.claimedAt } : null;
+		return row && row.orgId === organizationId
+			? { changeSet: this.withRequester(organizationId, row.changeSet), claimedAt: row.claimedAt, tenantId: this.runTenantOf(organizationId, row.changeSet.runId) }
+			: null;
 	}
 	async listChangeSets(organizationId: string, query: ChangeSetListQuery) {
 		return [...this.changeSets.values()]
 			.filter((r) => r.orgId === organizationId && (!query.status || r.changeSet.status === query.status))
 			.filter((r) => !query.requestedBy || this.runUserOf(organizationId, r.changeSet.runId) === query.requestedBy)
+			.filter((r) => sameTenant(this.runTenantOf(organizationId, r.changeSet.runId), query.tenantId))
 			.slice(0, query.limit)
 			.map((r) => this.withRequester(organizationId, r.changeSet));
 	}
@@ -310,7 +350,7 @@ export class InMemoryAgentStore implements AgentStore {
 		const runIds = new Set(this.threadRunIds(organizationId, threadId));
 		return [...this.changeSets.values()]
 			.filter((r) => r.orgId === organizationId && runIds.has(r.changeSet.runId))
-			.map((r) => ({ changeSet: this.withRequester(organizationId, r.changeSet), claimedAt: r.claimedAt }));
+			.map((r) => ({ changeSet: this.withRequester(organizationId, r.changeSet), claimedAt: r.claimedAt, tenantId: this.runTenantOf(organizationId, r.changeSet.runId) }));
 	}
 	async deleteThread(owner: ThreadOwner, id: string, claimedSince: Date): Promise<DeleteThreadOutcome> {
 		if (!this.owned(owner, id)) return "not_found";
@@ -416,9 +456,9 @@ export class InMemoryAgentStore implements AgentStore {
 		this.workStates.set(id, { orgId: owner.organizationId, userId: owner.userId, state });
 		return state;
 	}
-	async saveRunState(organizationId: string, runId: string, state: unknown) {
+	async saveRunState(organizationId: string, runId: string, state: unknown, onlyWhile?: AgentRun["status"]) {
 		const row = this.runs.get(runId);
-		if (row && row.orgId === organizationId) row.state = state ?? null;
+		if (row && row.orgId === organizationId && (!onlyWhile || row.run.status === onlyWhile)) row.state = state ?? null;
 	}
 	async getRunWithState(organizationId: string, runId: string, userId: string) {
 		const row = this.runs.get(runId);
@@ -466,5 +506,15 @@ export class InMemoryAgentStore implements AgentStore {
 	}
 	async putDecision(organizationId: string, fingerprint: string, decision: StoredDecision) {
 		this.decisions.set(`${organizationId}:${fingerprint}`, decision);
+	}
+	async pruneDecisions(before: Date) {
+		let pruned = 0;
+		for (const [key, decision] of this.decisions) {
+			if (decision.createdAt < before) {
+				this.decisions.delete(key);
+				pruned += 1;
+			}
+		}
+		return pruned;
 	}
 }
