@@ -9,6 +9,12 @@
  * TC-AISEC-102 — undo: the receipt goes `reverted` with the undo's result before the revert is recorded; an undo that
  *   already ran (receipt `reverted`) re-sends its result without putting anything back again; the editor's Redo
  *   (reconcile → reinstate) turns the receipt back to applied.
+ * TC-AISEC-138 — Reject of a change that has a receipt here is refused (409), never forwarded: applied with a result →
+ *   the approve is recorded on the way (the card gets its Undo); applying → "being applied" while fresh, "Approve again"
+ *   once stale. No receipt (or an undone one) → the reject goes through.
+ * TC-AISEC-139 — a version guard refusal on a try that took over a dead attempt keeps the card pending (409, not final):
+ *   receipt dropped, claim given back, reported, no reject sent.
+ * TC-AISEC-140 — a receipt `applied` whose result can't be read: never applied again, 409, claim given back, reported fatal.
  * Real: handleAgentProxy. Faked: the AI platform, the appliers, the receipt store (its SQL runs on PostgreSQL in
  * integration/ai-apply-receipts-postgres.test.ts), next/cache.
  */
@@ -43,6 +49,7 @@ vi.mock('@/lib/ai-platform/apply-receipts', () => ({
     markRecorded: vi.fn(),
     markReinstated: vi.fn(),
     readReceipt: vi.fn(),
+    STALE_APPLYING_MS: 6 * 60 * 1000,
 }))
 
 import { handleAgentProxy } from '@/lib/ai-platform/agent-proxy'
@@ -104,7 +111,7 @@ beforeEach(() => {
         order.push('undo')
         return { entities: [], links: [] }
     })
-    vi.mocked(beginApply).mockReset().mockResolvedValue({ kind: 'started' })
+    vi.mocked(beginApply).mockReset().mockResolvedValue({ kind: 'started', takeover: false })
     vi.mocked(abandonApply).mockReset().mockResolvedValue(undefined)
     vi.mocked(markApplied).mockReset().mockImplementation(async () => {
         order.push('receipt applied')
@@ -275,5 +282,90 @@ describe('undo keeps a receipt too [TC-AISEC-102]', () => {
 
         expect(res.status).toBe(200)
         expect(markReinstated).toHaveBeenCalledWith('cs_1')
+    })
+})
+
+describe('reject of a change that already ran here [TC-AISEC-138]', () => {
+    const decisions = () => vi.mocked(aiPlatformJson).mock.calls.filter(([arg]) => arg.path.endsWith('/decision')).map(([arg]) => JSON.parse(String(arg.body)))
+
+    it('applied with a result: 409 "use Undo", the approve is recorded with the stored result and note, no reject sent', async () => {
+        vi.mocked(readReceipt).mockResolvedValue(receipt('applied', { note: 'first approve' }) as never)
+
+        const res = await post('decision', { decision: 'reject', note: 'nope' })
+
+        expect(res.status).toBe(409)
+        expect((await res.json()).detail).toBe('This change was already applied — use Undo to take it back.')
+        expect(readReceipt).toHaveBeenCalledWith('cs_1', '7')
+        expect(decisions()).toEqual([{ decision: 'approve', note: 'first approve', result }])
+        expect(markRecorded).toHaveBeenCalledWith('cs_1', 'applied')
+    })
+
+    it('applied without a readable result: 409 and nothing sent to the platform', async () => {
+        vi.mocked(readReceipt).mockResolvedValue(receipt('applied', { result: null }) as never)
+
+        const res = await post('decision', { decision: 'reject' })
+
+        expect(res.status).toBe(409)
+        expect(calls()).toEqual([])
+    })
+
+    it('applying: "being applied" while fresh, "Approve again" once the attempt is stale; nothing forwarded', async () => {
+        vi.mocked(readReceipt).mockResolvedValueOnce(receipt('applying', { result: null, updatedAt: new Date(Date.now() - 60_000).toISOString() }) as never)
+        const fresh = await post('decision', { decision: 'reject' })
+        vi.mocked(readReceipt).mockResolvedValueOnce(receipt('applying', { result: null, updatedAt: new Date(Date.now() - 7 * 60_000).toISOString() }) as never)
+        const stale = await post('decision', { decision: 'reject' })
+
+        expect([fresh.status, stale.status]).toEqual([409, 409])
+        expect((await fresh.json()).detail).toBe('This change is being applied right now.')
+        expect((await stale.json()).detail).toBe('An earlier approve stopped part way — Approve again to finish it.')
+        expect(calls()).toEqual([])
+    })
+
+    it('no receipt, or an undone change: the reject is forwarded as before', async () => {
+        vi.mocked(readReceipt).mockResolvedValueOnce(null).mockResolvedValueOnce(receipt('reverted') as never)
+
+        const none = await post('decision', { decision: 'reject', note: 'no' })
+        const undone = await post('decision', { decision: 'reject' })
+
+        expect([none.status, undone.status]).toEqual([200, 200])
+        expect(decisions()).toEqual([{ decision: 'reject', note: 'no' }, { decision: 'reject' }])
+    })
+})
+
+describe('a stale refusal on a takeover keeps the card pending [TC-AISEC-139]', () => {
+    it('409 "may already have made this change", receipt dropped, claim given back, no reject sent', async () => {
+        vi.mocked(beginApply).mockResolvedValue({ kind: 'started', takeover: true })
+        vi.mocked(applyChangeSet).mockRejectedValue(new ChangeSetApplyError('This lead changed after the assistant drafted this.', 409, true, { stale: true }))
+
+        const res = await post('decision', { decision: 'approve' })
+
+        expect(res.status).toBe(409)
+        expect((await res.json()).detail).toBe("An earlier try of this approval stopped part way and may already have made this change. Open the record to check; if it's there, Reject this card.")
+        expect(abandonApply).toHaveBeenCalledWith('cs_1', 'req-approve-0001')
+        expect(calls()).toContain('POST /agent/change-sets/cs_1/release')
+        expect(calls().some((c) => c.endsWith('/decision'))).toBe(false)
+    })
+
+    it('a stale refusal on a first try still closes the card (unchanged)', async () => {
+        vi.mocked(beginApply).mockResolvedValue({ kind: 'started', takeover: false })
+        vi.mocked(applyChangeSet).mockRejectedValue(new ChangeSetApplyError('This lead changed after the assistant drafted this.', 409, true, { stale: true }))
+
+        await post('decision', { decision: 'approve' })
+
+        expect(calls()).toContain('POST /agent/change-sets/cs_1/decision')
+    })
+})
+
+describe('an applied receipt without a readable result [TC-AISEC-140]', () => {
+    it('is never applied again: 409, claim given back, no decision sent', async () => {
+        vi.mocked(beginApply).mockResolvedValue({ kind: 'applied', receipt: receipt('applied', { result: null }) } as never)
+
+        const res = await post('decision', { decision: 'approve' })
+
+        expect(res.status).toBe(409)
+        expect((await res.json()).detail).toBe('This change was already applied. Its card will update shortly.')
+        expect(applyChangeSet).not.toHaveBeenCalled()
+        expect(calls()).toContain('POST /agent/change-sets/cs_1/release')
+        expect(calls().some((c) => c.endsWith('/decision'))).toBe(false)
     })
 })
