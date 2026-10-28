@@ -12,6 +12,7 @@ import { useI18n } from '@/i18n'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { OTP_EXPIRY_END_KEY, OTP_RESEND_END_KEY, parseOtpSendFailure, seedOtpTimers } from '@/lib/auth/login-otp-cooldown'
 
 function createLoginSchema() {
     return z.object({
@@ -224,7 +225,7 @@ function LoginFormContent() {
                 if (message === 'Email and password are required' || message === 'Missing credentials') {
                     errorCode = 'missingCredentials'
                     localizedMsg = authErrors.missingCredentials || message
-                } else if (message.includes('locked due to having too many failed login attempts')) {
+                } else if (res.status === 423 || errorData?.errors?.[0]?.code === 'ACCOUNT_LOCKED' || message.includes('locked due to having too many failed login attempts')) {
                     errorCode = 'accountLocked'
                     localizedMsg = authErrors.accountLocked || message
                 } else if (message === 'Email or password incorrect' || message === 'Login failed') {
@@ -234,6 +235,8 @@ function LoginFormContent() {
 
                 setFormError('root', { message: errorCode })
                 toast.error(localizedMsg)
+                // Locked account: re-typing the password won't help, so don't pull focus back to it
+                if (errorCode === 'accountLocked') return
                 setTimeout(() => {
                     const pwdInput = document.getElementById('password') as HTMLInputElement | null
                     if (pwdInput) {
@@ -252,6 +255,8 @@ function LoginFormContent() {
             // Get correct post-login destination (e.g. /onboarding for new users)
             const actualReturnUrl = user ? getRedirectByRole(user, returnUrl) : returnUrl
 
+            const returnParam = actualReturnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(actualReturnUrl)}` : ''
+
             // Trigger OTP send — distinguish server error (OTP not stored) from delivery failure (OTP stored)
             let otpEmailSent = true
             try {
@@ -261,8 +266,17 @@ function LoginFormContent() {
                     body: JSON.stringify({ email: userEmail }),
                 })
                 if (!otpRes.ok) {
+                    const failure = parseOtpSendFailure(otpRes.status, await otpRes.json().catch(() => null))
+                    if (failure.kind === 'cooldown') {
+                        // A code was sent <60s ago and is still valid — continue to verify-otp
+                        // with countdowns matching that code instead of showing an error.
+                        seedOtpTimers(failure.retryAfter, failure.expiresIn)
+                        toast.info(t.auth.otpAlreadySentTitle, { description: t.auth.otpAlreadySentDesc })
+                        router.replace(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
+                        return
+                    }
                     // Server error — OTP was NOT stored, user cannot proceed to verify-otp
-                    toast.error(t.auth.errors.connection)
+                    toast.error(t.auth.errors.otpSendFailed)
                     return
                 }
                 const otpData = await otpRes.json().catch(() => ({}))
@@ -277,8 +291,8 @@ function LoginFormContent() {
             }
 
             // Clear previous OTP countdowns so verify-otp starts fresh
-            sessionStorage.removeItem('otp_resend_end')
-            sessionStorage.removeItem('otp_expiry_end')
+            sessionStorage.removeItem(OTP_RESEND_END_KEY)
+            sessionStorage.removeItem(OTP_EXPIRY_END_KEY)
 
             if (otpEmailSent) {
                 toast.success(t.auth.otpSentTitle, {
@@ -292,7 +306,6 @@ function LoginFormContent() {
             }
 
             // Redirect to OTP verification page
-            const returnParam = actualReturnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(actualReturnUrl)}` : ''
             router.replace(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
         } catch {
             setFormError('root', { message: 'connection' })

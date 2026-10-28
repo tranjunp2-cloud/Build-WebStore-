@@ -3420,6 +3420,7 @@
       "passwordMinLength": "Password must be at least 8 characters",
       "timeout": "This is taking too long. Please try again.",
       "incorrect": "Incorrect email or password. Please try again.",
+      "otpSendFailed": "Couldn't send the verification code. Please try again.",
       "connection": "Connection problem. Please check your internet and try again.",
       "serviceAccountUI": "Service accounts can't sign in here. Use a personal account instead.",
       "missingCredentials": "Please enter your email and password",
@@ -3432,6 +3433,8 @@
     "loading": "Loading...",
     "otpSentTitle": "Verification code sent.",
     "otpSentDesc": "Check your email for the 6-digit code.",
+    "otpAlreadySentTitle": "Verification code already sent.",
+    "otpAlreadySentDesc": "Use the code we emailed you a moment ago.",
     "otpEmailIssue": "Email might be delayed",
     "otpEmailIssueDesc": "Your code was saved, but the email may not arrive. Tap \"Resend code\" on the next screen.",
     "success": {

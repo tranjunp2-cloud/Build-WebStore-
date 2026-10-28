@@ -3420,6 +3420,7 @@
       "passwordMinLength": "Kata laluan mestilah mengandungi sekurang-kurangnya 8 aksara",
       "timeout": "Proses mengambil masa terlalu lama. Sila cuba lagi.",
       "incorrect": "Email atau kata laluan tidak tepat. Sila cuba lagi.",
+      "otpSendFailed": "Tidak dapat menghantar kod pengesahan. Sila cuba lagi.",
       "connection": "Masalah rangkaian. Sila semak semula sambungan internet anda dan cuba lagi.",
       "serviceAccountUI": "Akaun perkhidmatan tidak boleh di log masuk. Sila gunakan akaun peribadi.",
       "missingCredentials": "Sila masukkan email dan kata laluan anda",
@@ -3432,6 +3433,8 @@
     "loading": "Memuat Naik.....",
     "otpSentTitle": "Kod pengesahan telah dihantar.",
     "otpSentDesc": "Semak email anda untuk mendapatkan kod 6 digit.",
+    "otpAlreadySentTitle": "Kod pengesahan telah dihantar.",
+    "otpAlreadySentDesc": "Gunakan kod yang kami e-melkan sebentar tadi.",
     "otpEmailIssue": "Penghantaran e-mel tertunda",
     "otpEmailIssueDesc": "Kod berjaya disimpan, namun sekiranya tidak mendapat E-mel. Sila klik semula \"Hantar Semula Kod\" pada skrin di halaman seterusnya.",
     "success": {
