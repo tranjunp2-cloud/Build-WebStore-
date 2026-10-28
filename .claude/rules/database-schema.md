@@ -15,6 +15,7 @@ When modifying Payload CMS collections (adding/removing fields), you MUST follow
 ## 1. Add migration to `scripts/db-setup.js`
 
 Every new column or table must have a matching entry in the `MIGRATIONS` array.
+A Payload-backed column/table whose absence breaks queries gets `required: true` (cached like any entry, but a failure fails the build instead of a warning); `critical: true` re-runs every deploy — only for function bodies / idempotent safety nets, never `ALTER TABLE` on hot tables.
 
 ## 2. Follow Payload Drizzle naming convention
 
