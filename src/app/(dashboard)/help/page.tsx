@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { BarChart3, Bot, PenLine, Settings, ArrowUpRight, Mail } from 'lucide-react';
+import { BarChart3, Bot, PenLine, Settings, ArrowUpRight } from 'lucide-react';
 import { useI18n } from '@/i18n';
+import { HelpIntroHero } from '@/components/help/HelpIntroHero';
 
 export default function GuidelinePage() {
   const { t } = useI18n();
@@ -36,19 +37,12 @@ export default function GuidelinePage() {
   ];
 
   return (
-    // PANEL: OVERVIEW — bg:card, border:1px solid border (matches discounts/new form panel), border-radius:12px, padding:24px
-    <div className="w-full bg-[hsl(var(--card))] border border-solid border-[hsl(var(--border))] rounded-xl p-4 sm:p-6">
+    // PANEL: OVERVIEW — bg:card, border:1px solid border (matches discounts/new form panel), border-radius:16px, padding:24px
+    <div className="w-full bg-[hsl(var(--card))] border border-solid border-[hsl(var(--border))] rounded-2xl p-4 sm:p-6">
       <div className="flex flex-col gap-[17px]">
 
-        {/* Section 1: Welcome */}
-        <div className="flex flex-col gap-[8px]">
-          <h2 className="text-[24px] font-bold text-white leading-[32px] m-0 p-0 tracking-tight">
-            {t.help.overview.welcomeTitle}
-          </h2>
-          <p className="text-[14px] font-normal text-[hsl(var(--muted-foreground))] leading-[22px] m-0 p-0">
-            {t.help.overview.welcomeDesc}
-          </p>
-        </div>
+        {/* Section 1: Welcome — copy + replayable V2 intro video (US-F20-05) */}
+        <HelpIntroHero />
 
         {/* Section 2: Key Features */}
         <div className="flex flex-col gap-[12px]">
@@ -99,29 +93,6 @@ export default function GuidelinePage() {
             ))}
           </div>
         </div>
-
-        {/* Section 3: Need more help — distinct support card with a clear email CTA */}
-        <div className="flex flex-col gap-[8px]">
-          <div className="pt-[8px]">
-            {/* Sub-title: smaller than the main Welcome title for clearer hierarchy */}
-            <h3 className="text-[18px] font-bold text-white leading-[24px] m-0 p-0 tracking-tight">
-              {t.help.overview.needHelpTitle}
-            </h3>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-[8px] border border-[hsl(var(--border))] bg-[hsl(var(--secondary)/0.4)] p-[16px]">
-            <p className="text-[14px] font-normal text-[hsl(var(--muted-foreground))] leading-[22px] m-0 p-0">
-              {t.help.overview.needHelpDesc}
-            </p>
-            <a
-              href="mailto:support@echprime.com"
-              className="inline-flex shrink-0 items-center gap-2 rounded-[8px] bg-[hsl(var(--primary))] px-4 py-2 text-[14px] font-semibold !text-white transition-colors hover:bg-[hsl(var(--primary)/0.9)]"
-            >
-              <Mail className="w-4 h-4 shrink-0" aria-hidden />
-              support@echprime.com
-            </a>
-          </div>
-        </div>
-
       </div>
     </div>
   )
