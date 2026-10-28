@@ -24,8 +24,8 @@ type Options = {
  * Form state for the feedback dialog.
  * - Validation keeps the entered values and exposes which required field is missing.
  * - `handleSubmit` returns the first invalid field so the view can move focus there.
- * - The idempotency key is created once per mounted dialog and reused on retry, so a request
- *   that landed but whose response was lost is not duplicated.
+ * - The idempotency key is reused on retry of the same payload, so a request that landed but
+ *   whose response was lost is not duplicated; editing the form rotates it.
  */
 export function useFeedbackForm({ context, submit }: Options) {
     const [type, setType] = useState<FeedbackType>('problem')
@@ -40,6 +40,7 @@ export function useFeedbackForm({ context, submit }: Options) {
     // Ref guard: state updates are async, a double click could pass a `status` check twice.
     const inFlight = useRef(false)
     const idempotencyKey = useRef('')
+    const keyedPayload = useRef('')
 
     const setArea = useCallback((value: FeedbackArea) => {
         setAreaState(value)
@@ -66,7 +67,16 @@ export function useFeedbackForm({ context, submit }: Options) {
         inFlight.current = true
         setStatus('submitting')
         setFailure(null)
-        if (!idempotencyKey.current) idempotencyKey.current = crypto.randomUUID()
+        // Same payload → same key (a landed-but-unanswered request is not duplicated on retry).
+        // Edited payload → fresh key, otherwise the server would treat the edit as the old request.
+        const payloadSignature = JSON.stringify([
+            type, area, details.trim(),
+            screenshots.items.map(({ file }) => [file.name, file.size, file.lastModified]),
+        ])
+        if (!idempotencyKey.current || keyedPayload.current !== payloadSignature) {
+            idempotencyKey.current = crypto.randomUUID()
+            keyedPayload.current = payloadSignature
+        }
         try {
             const result = await submit(
                 {

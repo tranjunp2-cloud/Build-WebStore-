@@ -1,4 +1,4 @@
-import { compressScreenshot } from './compress-screenshot'
+import { MAX_UPLOAD_BYTES, compressScreenshot } from './compress-screenshot'
 
 export const SCREENSHOT_ENDPOINT = '/api/feedback/screenshots'
 
@@ -17,7 +17,10 @@ async function uploadOne(file: File): Promise<string> {
     if (cached) return cached
 
     const form = new FormData()
-    form.append('file', await compressScreenshot(file)) // large images shrink to fit the serverless body limit
+    const prepared = await compressScreenshot(file) // large images shrink to fit the serverless body limit
+    // Compression can fail or not shrink enough; the server would only answer 413, so stop here.
+    if (prepared.size > MAX_UPLOAD_BYTES) throw new ScreenshotUploadError(413, 'Screenshot is too large')
+    form.append('file', prepared)
     const res = await fetch(SCREENSHOT_ENDPOINT, { method: 'POST', body: form })
     const json = await res.json().catch(() => null)
     if (!res.ok) throw new ScreenshotUploadError(res.status, json?.error?.message ?? `Screenshot upload failed (${res.status})`)

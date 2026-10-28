@@ -28,8 +28,12 @@ function sniffImage(b: Uint8Array): { ext: 'png' | 'jpg'; mime: string } | null 
  */
 export const POST = withAuth(async (user, request) => {
     // A store blocked for spamming submits cannot keep pushing media into the Base either.
-    if (await getFeedbackBlockSeconds(feedbackGuardKey(extractTenantId(user), user.id))) {
-        return errorResponse(429, 'RATE_LIMITED', 'Too many submissions. Please try again later.')
+    const blockedFor = await getFeedbackBlockSeconds(feedbackGuardKey(extractTenantId(user), user.id))
+    if (blockedFor) {
+        return NextResponse.json(
+            { error: { code: 'RATE_LIMITED', message: 'Too many submissions. Please try again later.' } },
+            { status: 429, headers: { 'Retry-After': String(blockedFor) } },
+        )
     }
 
     const rate = await checkRateLimit(`feedback:screenshot:${user.id}`, 30, 60_000)

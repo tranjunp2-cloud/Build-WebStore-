@@ -3406,7 +3406,8 @@
       },
       "failed": {
         "title": "Your feedback wasn't sent",
-        "description": "What you entered has been kept. Please try again."
+        "description": "What you entered has been kept. Please try again.",
+        "screenshotTooLarge": "A screenshot is still too large to upload even after compression. Remove it or use a smaller image, then try again."
       },
       "rateLimited": "You've sent a lot of feedback in a short time. Please try again later.",
       "sendingNote": "Sending… Please don't send it again.",

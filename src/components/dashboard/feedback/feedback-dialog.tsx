@@ -101,11 +101,11 @@ export function FeedbackDialog({ context, onClose, submit = submitFeedback }: Pr
                                     )}
                                 </div>
 
-                                {form.failure === 'failed' && (
+                                {(form.failure === 'failed' || form.failure === 'screenshot_too_large') && (
                                     <Alert variant="destructive" role="alert">
                                         <AlertTitle className="text-[hsl(var(--destructive))]">{f.failed.title}</AlertTitle>
                                         <AlertDescription className="text-xs text-[var(--dash-text)]">
-                                            {f.failed.description}
+                                            {form.failure === 'screenshot_too_large' ? f.failed.screenshotTooLarge : f.failed.description}
                                         </AlertDescription>
                                     </Alert>
                                 )}

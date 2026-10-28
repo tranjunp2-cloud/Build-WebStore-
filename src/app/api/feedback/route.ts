@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { extractTenantId, tenantIdForQuery, withAuth } from '@/lib/auth'
-import { feedbackGuardKey, registerFeedbackSubmit } from '@/lib/feedback/feedback-spam-guard'
+import { feedbackGuardKey, getFeedbackBlockSeconds, recordFeedbackSubmit } from '@/lib/feedback/feedback-spam-guard'
 import { LarkApiError } from '@/lib/lark/lark-base-client'
 import {
     extractReporter,
@@ -37,7 +37,7 @@ async function lookupStoreName(tenantId: string | number | null): Promise<string
  */
 export const POST = withAuth(async (user, request) => {
     const guardKey = feedbackGuardKey(extractTenantId(user), user.id)
-    const blockedFor = await registerFeedbackSubmit(guardKey)
+    const blockedFor = await getFeedbackBlockSeconds(guardKey)
     if (blockedFor) {
         return errorResponse(429, 'RATE_LIMITED', 'Too many submissions. Please try again later.', {
             'Retry-After': String(blockedFor),
@@ -69,6 +69,7 @@ export const POST = withAuth(async (user, request) => {
             { tenantId, storeName, ...extractReporter(user) },
             { appToken, tableId },
         )
+        await recordFeedbackSubmit(guardKey)
         return NextResponse.json({ feedbackId })
     } catch (err) {
         const larkCode = err instanceof LarkApiError ? err.code : null

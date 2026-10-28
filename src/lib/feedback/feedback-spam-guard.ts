@@ -1,7 +1,7 @@
 import { checkRateLimit } from '@/lib/rateLimit'
 import { redis } from '@/lib/redis'
 
-/** More than SUBMIT_LIMIT submits from one store within SUBMIT_WINDOW_MS blocks the store for BLOCK_SECONDS (10 min). */
+/** SUBMIT_LIMIT successful submits from one store within SUBMIT_WINDOW_MS block the store for BLOCK_SECONDS (10 min). */
 export const SUBMIT_LIMIT = 5
 export const SUBMIT_WINDOW_MS = 5 * 60_000
 export const BLOCK_SECONDS = 10 * 60
@@ -40,18 +40,12 @@ async function blockStore(key: string): Promise<void> {
 }
 
 /**
- * Counts one submit for the store. Returns the seconds the store is blocked for
- * (already blocked, or this submit tripped the limit), or null when the submit is allowed.
+ * Counts one *successful* submit for the store and blocks it once SUBMIT_LIMIT is reached, so the
+ * next request is rejected. Failed attempts (bad input, Lark outage) never count against the store.
  */
-export async function registerFeedbackSubmit(key: string): Promise<number | null> {
-    const existing = await getFeedbackBlockSeconds(key)
-    if (existing) return existing
-
+export async function recordFeedbackSubmit(key: string): Promise<void> {
     const rate = await checkRateLimit(`feedback:submit:${key}`, SUBMIT_LIMIT, SUBMIT_WINDOW_MS)
-    if (rate.allowed) return null
-
-    await blockStore(key)
-    return BLOCK_SECONDS
+    if (!rate.allowed || rate.remaining <= 0) await blockStore(key)
 }
 
 /** Test helper. */

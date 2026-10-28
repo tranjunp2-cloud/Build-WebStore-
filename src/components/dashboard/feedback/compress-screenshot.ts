@@ -1,5 +1,7 @@
 // Vercel limits request bodies to ~4.5 MB; the dialog still accepts originals up to 5 MB, so
 // anything above this target is re-encoded as JPEG before upload.
+/** Hard cap enforced by POST /api/feedback/screenshots; a file still above it cannot be uploaded. */
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 const TARGET_BYTES = 3.5 * 1024 * 1024
 const MAX_EDGE = 2560
 const QUALITIES = [0.85, 0.7, 0.55]

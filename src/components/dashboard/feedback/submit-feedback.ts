@@ -15,8 +15,9 @@ export const submitFeedback: SubmitFeedback = async (input, idempotencyKey) => {
     try {
         screenshotTokens = await uploadScreenshots(screenshots)
     } catch (err) {
-        const limited = err instanceof ScreenshotUploadError && err.status === 429
-        throw new SubmitFeedbackError(limited ? 'rate_limited' : 'failed', (err as Error).message)
+        const status = err instanceof ScreenshotUploadError ? err.status : null
+        const kind = status === 429 ? 'rate_limited' : status === 413 ? 'screenshot_too_large' : 'failed'
+        throw new SubmitFeedbackError(kind, (err as Error).message)
     }
     const res = await fetch(FEEDBACK_ENDPOINT, {
         method: 'POST',

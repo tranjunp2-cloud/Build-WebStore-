@@ -3406,7 +3406,8 @@
       },
       "failed": {
         "title": "Maklum balas anda tidak dihantar",
-        "description": "Apa yang anda masukkan telah disimpan. Sila cuba lagi."
+        "description": "Apa yang anda masukkan telah disimpan. Sila cuba lagi.",
+        "screenshotTooLarge": "Satu tangkapan skrin masih terlalu besar untuk dimuat naik walaupun selepas pemampatan. Alih keluarnya atau gunakan imej yang lebih kecil, kemudian cuba lagi."
       },
       "rateLimited": "Anda telah menghantar banyak maklum balas dalam masa singkat. Sila cuba lagi kemudian.",
       "sendingNote": "Menghantar… Sila jangan hantar lagi.",

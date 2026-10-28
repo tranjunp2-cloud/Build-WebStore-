@@ -31,8 +31,9 @@ export type FeedbackResult = {
     feedbackId: string
 }
 
-/** `rate_limited` = server said slow down; `failed` = any other failure. Entered data is kept in both. */
-export type SubmitFailureKind = 'failed' | 'rate_limited'
+/** `rate_limited` = server said slow down; `screenshot_too_large` = an image stays above the upload cap
+ * even after compression; `failed` = any other failure. Entered data is kept in all of them. */
+export type SubmitFailureKind = 'failed' | 'rate_limited' | 'screenshot_too_large'
 
 export class SubmitFeedbackError extends Error {
     constructor(public readonly kind: SubmitFailureKind, message: string) {
