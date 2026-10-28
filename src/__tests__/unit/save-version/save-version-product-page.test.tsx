@@ -106,6 +106,18 @@ describe('product page against a stale save [TC-AICP-331]', () => {
         expect(server.name).toBe('Second edit')
     })
 
+    it('TC-AICP-357: a page left right after a save does not go to the product list later', async () => {
+        mount()
+        type(await nameInput(), 'Saved name')
+        save()
+        await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
+
+        cleanup()
+        await new Promise((resolve) => setTimeout(resolve, 1600))
+
+        expect(router.push).not.toHaveBeenCalled()
+    })
+
     it('TC-AICP-331: Keep mine, then Save is refused: one conflict notice, the name edit stays, no toast', async () => {
         mount()
         const input = await nameInput()

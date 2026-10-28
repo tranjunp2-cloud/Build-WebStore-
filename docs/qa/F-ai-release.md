@@ -413,6 +413,7 @@ The OpenAI-in-process behaviour these cases covered no longer exists. Their rows
 | TC-AICP-338 | src | `getProductAction` returns the version after clearing the AI-review flag (that clear is a write), so the first save of an AI draft is not refused | Unit | `src/__tests__/unit/save-version/save-version-products.test.ts` |
 | TC-AICP-339 | src | Canvas pick tip: every single pick (canvas click or Ask AI) shows "Shift + click to add more" above the chip, auto-hides after 6 s, until the merchant has used Shift + click | Unit | `src/__tests__/unit/editor/canvas-pick-tip.test.ts` |
 | TC-AICP-340 | src | Canvas pick tip: closing it (×) stops it from showing again | Unit | `src/__tests__/unit/editor/canvas-pick-tip.test.ts` |
+| TC-AICP-357 | src | Product page: after a save the page goes back to the list in 1.5 s; leaving the page first cancels that (it no longer pulls the user back to `/products` from another page) | Unit | `src/__tests__/unit/save-version/save-version-product-page.test.tsx` |
 
 ## Editor Undo / Redo and the assistant's cards (TC-AIREL-300..329)
 
