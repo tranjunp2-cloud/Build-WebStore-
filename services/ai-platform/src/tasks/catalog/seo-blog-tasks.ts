@@ -1,0 +1,133 @@
+import type { SEO_BLOG_TASKS } from "@ech/ai-contracts";
+import { defineTask, type TaskDefinition } from "../task-definition";
+
+/** Legacy routes: "ms" → Malay, anything else (or nothing) → English. */
+const malayOrEnglish = (language: string | undefined, malay: string, english: string) =>
+	language === "ms" ? malay : english;
+
+/**
+ * Prompts ported from prime-web /api/ai/seo-generate, lib/ai/generate-meta,
+ * /api/seo/fix and /api/ai/generate-blog. Only the JSON output-format lines
+ * changed ("return X in field Y"): the engine enforces the shape itself.
+ */
+export const SEO_BLOG_TASK_DEFINITIONS: { [K in keyof typeof SEO_BLOG_TASKS]: TaskDefinition<K> } = {
+	"seo.page-meta": defineTask({
+		id: "seo.page-meta",
+		alias: "fast",
+		promptVersion: "seo-page-meta@1",
+		temperature: 0.6,
+		maxOutputTokens: 400,
+		instructions: (input) => {
+			const lang = malayOrEnglish(input.language, "Malay", "English");
+			return `You are an expert SEO copywriter for Malaysian e-commerce (Bahasa Melayu and English market).
+Your job is to generate SEO metadata for a product listing.
+
+The output MUST be in ${malayOrEnglish(input.language, "Bahasa Melayu (Malay)", "English")}.
+
+Return these fields:
+- "title": SEO-optimized product title in ${lang} (MUST be ≤ 70 characters, include product name, add a compelling attribute)
+- "description": Compelling meta description in ${lang} (MUST be between 150 and 160 characters, action-oriented, include a call to action like '${malayOrEnglish(input.language, "Beli sekarang", "Shop now")}', mention price context if relevant)
+- "slug": url-friendly-slug (kebab-case, romanized if in Malay/Vietnamese, no special chars, all lowercase, no trailing/leading hyphens)
+
+IMPORTANT RULES:
+1. title MUST NOT exceed 70 characters — count carefully.
+2. description MUST be between 150 and 160 characters — count carefully and pad if needed.
+3. slug is derived from the product name only — pure ASCII kebab-case.
+4. Do NOT include store brand name in title or description.
+5. Use natural, friendly language appropriate for Malaysian SME market.`;
+		},
+		prompt: (input) => {
+			const categoryContext = input.category ? ` in the "${input.category}" category` : "";
+			const keywords = input.keywords ?? [];
+			const keywordContext = keywords.length
+				? `\nTarget Keywords: ${keywords.join(", ")}\n- Naturally incorporate 1-2 keywords if relevant (keyword density ≤ 2%)`
+				: "";
+			return `Generate SEO metadata for this product:
+Product Name: "${input.name}"${categoryContext}${keywordContext}
+
+Remember: title ≤ 70 chars, description 150-160 chars, slug kebab-case ASCII.`;
+		},
+	}),
+	"seo.generate-meta": defineTask({
+		id: "seo.generate-meta",
+		alias: "fast",
+		promptVersion: "seo-generate-meta@1",
+		temperature: 0.7,
+		maxOutputTokens: 300,
+		// prime-web gives up after 15 s (META_TIMEOUT_MS); don't keep spending quota past that.
+		timeoutMs: 14_000,
+		maxRetries: 0,
+		deadlineMs: 14_000,
+		// prime-web SYSTEM_PROMPTS['seo-generation']; only metaTitle/metaDescription were ever read.
+		instructions: () => `You are an SEO expert. Generate metadata for a website.
+Return the meta title (<60 chars) in "metaTitle" and the meta description (150-160 chars) in "metaDescription".`,
+		prompt: (input) => {
+			const keywords = input.keywords ?? [];
+			const keywordLine = keywords.length
+				? `\nTarget Keywords: ${keywords.join(", ")}\n- Naturally incorporate 1-2 target keywords if provided\n- Keyword density must not exceed 2%\n- Do NOT force keywords unnaturally`
+				: "";
+			if (input.type === "product") {
+				return `Generate SEO meta tags for a product named "${input.itemName}" sold by "${input.siteName}".
+Context/Description: ${input.context || "No description provided."}${keywordLine}
+Rules:
+- Meta Title: Max 60 characters, include product name + "${input.siteName}" + "Buy Online Malaysia" if possible.
+- Meta Description: 150-160 characters, compelling, highlight benefits, end with a call-to-action to buy.`;
+			}
+			return `Generate SEO meta tags for a web page named "${input.itemName}" for the business "${input.siteName}".
+Context/Content: ${input.context || "No content provided."}${keywordLine}
+Rules:
+- Meta Title: Max 60 characters, include page name + "${input.siteName}" + "Malaysia".
+- Meta Description: 150-160 characters, professional and engaging, explain what the page is about.`;
+		},
+	}),
+	"seo.fix-meta": defineTask({
+		id: "seo.fix-meta",
+		alias: "fast",
+		// @2: the business name moved from the instructions to the prompt (cache-stable system prompt).
+		promptVersion: "seo-fix-meta@2",
+		temperature: 0.3,
+		maxOutputTokens: 200,
+		instructions: () =>
+			`You are an SEO specialist for Malaysian businesses. Generate optimized meta title (max 60 chars) and meta description (max 155 chars) for the website page described. Return the meta title in "metaTitle" and the meta description in "metaDescription".`,
+		prompt: (input) => `The business is called "${input.siteName}".\n\n${input.pageContent}`,
+	}),
+	"seo.blog-meta": defineTask({
+		id: "seo.blog-meta",
+		alias: "fast",
+		promptVersion: "seo-blog-meta@1",
+		temperature: 0.4,
+		maxOutputTokens: 300,
+		timeoutMs: 14_000,
+		maxRetries: 0,
+		deadlineMs: 14_000,
+		instructions: () => `You write search metadata for one blog post of an online shop.
+Write in the SAME language as the post (its title and text) — Vietnamese stays Vietnamese, Malay stays Malay. Only when the post has no text, use the fallback language given.
+Return the meta title (at most 60 characters, the post's main topic first) in "metaTitle" and the meta description (140-160 characters, what the reader gets, no clickbait) in "metaDescription".
+Never invent facts, prices or claims the post does not make.`,
+		prompt: (input) =>
+			`Fallback language: ${input.fallbackLanguage}\n\n<post>\nTitle: ${input.title || "(none)"}\n\n${input.content || "(no text yet)"}\n</post>`,
+	}),
+	"copy.blog-post": defineTask({
+		id: "copy.blog-post",
+		alias: "fast",
+		promptVersion: "copy-blog-post@1",
+		temperature: 0.7,
+		maxOutputTokens: 3000,
+		instructions: (input) => `You are an expert copywriter and SEO specialist.
+Your task is to write a comprehensive, high-quality, and deeply engaging blog post based on the user's topic.
+The blog post should be well-structured with an introduction, multiple detailed body sections with clear subheadings (<h2>, <h3>), bullet points where appropriate, and a strong conclusion.
+Target length: Around 800 to 1200 words. Make it incredibly detailed, adding real-world examples, actionable advice, and deep insights.
+The tone of voice MUST be: ${input.tone ?? "Professional"}. Adapt your writing style, vocabulary, and structure to perfectly match this tone.
+The output MUST be strictly in ${malayOrEnglish(input.language, "Malay", "English")}. NO MATTER WHAT LANGUAGE THE USER PROMPT IS WRITTEN IN, YOUR ENTIRE RESPONSE (INCLUDING TITLE, CONTENT, AND SEO) MUST BE TRANSLATED AND WRITTEN EXCLUSIVELY IN ${malayOrEnglish(input.language, "Malay (Bahasa Melayu)", "English")}. Do not include any text in the user's input language if it differs from the required output language.
+
+CRITICAL CONSTRAINT: You can ONLY assist with text generation. If the user's prompt asks you to generate, create, or provide an image/picture, you MUST politely explain in the "content" field that you only generate text and suggest they upload images manually using the thumbnail upload feature.
+
+Return these fields:
+- "title": A catchy, SEO-friendly title (max 90 chars)
+- "content": The full blog post content in rich HTML format (use strictly <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>). The content MUST be comprehensive and detailed (at least 800 words). If the user asked for an image, put the refusal message here instead as a single paragraph.
+- "seoTitle": SEO optimized title (max 60 chars)
+- "seoDescription": SEO optimized meta description (max 155 chars)`,
+		prompt: (input) =>
+			`Please write a blog post about: ${input.prompt}\n\nIMPORTANT: Write the entire response strictly in ${malayOrEnglish(input.language, "Malay", "English")}, regardless of the language used in this prompt.`,
+	}),
+};
