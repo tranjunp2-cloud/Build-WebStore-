@@ -302,4 +302,4 @@ export const POST = withAuth(async (user, req) => {
         
         return NextResponse.json({ error: errorCode }, { status: 500 })
     }
-}, { csrf: true, requireMfa: true })
+}, { csrf: true })

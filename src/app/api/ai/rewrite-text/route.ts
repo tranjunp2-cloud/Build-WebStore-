@@ -66,4 +66,4 @@ export const POST = withAuth(async (user, req) => {
             { status: 500 },
         )
     }
-}, { csrf: true, requireMfa: true })
+}, { csrf: true })
