@@ -2,8 +2,9 @@
  * TC-AICP-263 — cancelling an order that was not paid (lib/orders/cancel-order.ts, the plain cancel path used by
  * POST /api/orders/[id]/cancel and the copilot) moves the payment status to `cancelled` too, as the Orders
  * `update-payment-status` hook does for a Payload update (this path writes by SQL and bypassed it): a bank
- * transfer cancelled while its proof was "pending verification" no longer reads "Payment proof to check".
- * A paid manual order keeps `paid` (the merchant pays the buyer back by hand).
+ * A paid manual order keeps `paid`, and a bank transfer whose proof is "pending verification" keeps that state
+ * (TC-AICP-343): the buyer may have paid, so the proof block stays as a refund reminder.
+ * The CASE writes a bare 'cancelled' literal (no enum cast) so it works on enum and varchar columns.
  * Real: the route, the cancel service, drizzle's SQL rendering. Faked: auth, Payload, mail, Stripe / Xendit, plan.
  */
 import { PgDialect } from 'drizzle-orm/pg-core'
@@ -45,7 +46,7 @@ beforeEach(() => {
 })
 
 describe('cancelling an order nothing was paid for [TC-AICP-263]', () => {
-    it.each([['pending_verification'], ['unpaid'], ['awaiting_payment']])('moves payment status %s to cancelled, in the same atomic write and in the answer', async (paymentStatus) => {
+    it.each([['unpaid'], ['awaiting_payment']])('moves payment status %s to cancelled, in the same atomic write and in the answer', async (paymentStatus) => {
         mockFindByID.mockResolvedValue({ id: 'order-1', status: 'pending', paymentMethod: 'bank_transfer', paymentStatus, items: [] })
 
         const res = await POST(req, ctx as any)
@@ -54,7 +55,8 @@ describe('cancelling an order nothing was paid for [TC-AICP-263]', () => {
         expect(res.status).toBe(200)
         expect(body.data).toMatchObject({ status: 'cancelled', paymentStatus: 'cancelled', cancelReason: 'Buyer never paid' })
         const text = casSql()
-        expect(text).toContain("payment_status = CASE WHEN payment_status IN ('unpaid', 'awaiting_payment', 'pending_verification') THEN 'cancelled'::enum_orders_payment_status ELSE payment_status END")
+        expect(text).toContain("payment_status = CASE WHEN payment_status IN ('unpaid', 'awaiting_payment') THEN 'cancelled' ELSE payment_status END")
+        expect(text).not.toContain('::enum_orders_payment_status')
         expect(text).toContain("SET status = 'cancelled'")
     })
 
@@ -68,5 +70,20 @@ describe('cancelling an order nothing was paid for [TC-AICP-263]', () => {
         expect(body.data.paymentStatus).toBe('paid')
         // the CASE only rewrites the unpaid states, so a paid row is written back as it is
         expect(casSql()).toContain('ELSE payment_status END')
+    })
+
+    it('[TC-AICP-343] pending_verification stays pending_verification: the proof may mean the buyer paid', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue({ id: 'order-1', status: 'pending', paymentMethod: 'bank_transfer', paymentStatus: 'pending_verification', items: [] })
+
+        // Act
+        const res = await POST(req, ctx as any)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(body.data).toMatchObject({ status: 'cancelled', paymentStatus: 'pending_verification' })
+        // the CASE leaves it alone: only the two unpaid states are rewritten
+        expect(casSql()).not.toContain('pending_verification')
     })
 })
