@@ -2,6 +2,7 @@ import type { CollectionConfig, AccessResult } from 'payload'
 import { runAfterResponse } from '@/lib/runtime/run-after-response'
 import { sendPushToUser } from '@/lib/notifications/send-push'
 import { signalNotificationUsers } from '@/lib/notifications/signal-notification'
+import { pushWanted } from '@/lib/automations/automation-push'
 
 /**
  * F16 — Notifications Collection
@@ -66,6 +67,8 @@ export const Notifications: CollectionConfig = {
                     const tenantId = typeof doc.tenant === 'object' ? doc.tenant?.id : doc.tenant
                     if (!userId || !tenantId) return
                     await signalNotificationUsers([userId]) // doorbell first, then push
+                    // reminders from the automations reach the phone only when important (orders waiting); the bell shows all
+                    if (!pushWanted(doc)) return
                     await sendPushToUser(userId, tenantId, {
                         id: String(doc.id),
                         title: doc.title,
@@ -105,6 +108,7 @@ export const Notifications: CollectionConfig = {
                 { label: 'System Alert', value: 'SYSTEM_ALERT' },
                 { label: 'Product Low Stock', value: 'PRODUCT_LOW_STOCK' },
                 { label: 'Blog Published', value: 'BLOG_PUBLISHED' },
+                { label: 'Automation Reminder', value: 'AUTOMATION_REMINDER' },
             ],
         },
         {
