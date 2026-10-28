@@ -19,7 +19,7 @@ vi.mock('@/lib/subscriptions/plan-subscription', () => ({
 }))
 vi.mock('server-only', () => ({}))
 vi.mock('@/lib/auth', () => ({
-    withAuth: (handler: (user: unknown, req: unknown, ctx: unknown) => unknown) => (req: unknown, ctx: unknown) => handler({ id: 'u1', tenants: [{ tenant: { id: 't1' } }] }, req, ctx),
+    withAuth: (handler: (user: unknown, req: unknown, ctx: unknown) => unknown) => (req: unknown, ctx: unknown) => handler({ id: 'u1', tenants: [{ tenant: { id: 't1' }, role: 'owner', status: 'active' }] }, req, ctx),
     extractTenantId: () => 't1',
 }))
 
