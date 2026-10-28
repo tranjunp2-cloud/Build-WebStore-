@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { extractTenantId, tenantIdForQuery, withAuth } from '@/lib/auth'
 import { feedbackTypesFor, isFeedbackWindowOpen, lookupTenantInfo } from '@/lib/feedback/feedback-availability'
-import { feedbackGuardKey, getFeedbackBlockSeconds, recordFeedbackSubmit } from '@/lib/feedback/feedback-spam-guard'
+import { claimFeedbackKey, feedbackGuardKey, getFeedbackBlockSeconds, recordFeedbackSubmit } from '@/lib/feedback/feedback-spam-guard'
 import { LarkApiError } from '@/lib/lark/lark-base-client'
 import {
     extractReporter,
@@ -53,15 +53,15 @@ export const POST = withAuth(async (user, request) => {
     }
 
     try {
-        const { feedbackId, replayed } = await submitFeedbackToLarkBase(
+        const { feedbackId } = await submitFeedbackToLarkBase(
             parsed.data,
             key.data,
             // Tenant and reporter come from the session, never from the client body.
             { tenantId, storeName, ...extractReporter(user) },
             { appToken, tableId },
         )
-        // A retry of a request that already landed does not count against the limit.
-        if (!replayed) await recordFeedbackSubmit(guardKey)
+        // Lark cannot tell us a retry from a new submit, so we remember the key: a retry does not count.
+        if (await claimFeedbackKey(key.data)) await recordFeedbackSubmit(guardKey)
         return NextResponse.json({ feedbackId })
     } catch (err) {
         const larkCode = err instanceof LarkApiError ? err.code : null

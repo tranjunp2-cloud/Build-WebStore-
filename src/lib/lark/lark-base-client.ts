@@ -12,9 +12,6 @@ const UPLOAD_TIMEOUT_MS = 30_000
 // Refresh this long before the reported expiry (token lives ≤ 2h; Lark rotates in the last 30 min).
 const TOKEN_REFRESH_MARGIN_MS = 5 * 60_000
 
-/** Lark error code: client_token already used → the record from the first call exists. */
-export const LARK_CLIENT_TOKEN_CONFLICT = 1255006
-
 export class LarkApiError extends Error {
     constructor(
         message: string,
@@ -70,7 +67,7 @@ export type CreateBaseRecordInput = {
     appToken: string
     tableId: string
     fields: Record<string, unknown>
-    /** UUID v4. Reusing it makes Lark reject the duplicate with LARK_CLIENT_TOKEN_CONFLICT. */
+    /** UUID v4. Lark answers a reused one with success and the same record (no duplicate, no error). */
     clientToken: string
 }
 

@@ -13,7 +13,7 @@ vi.mock('@/lib/lark/lark-base-client', async () => {
             super('lark')
         }
     }
-    return { LARK_CLIENT_TOKEN_CONFLICT: 1255006, LarkApiError, createBaseRecord: vi.fn() }
+    return { LarkApiError, createBaseRecord: vi.fn() }
 })
 
 import { feedbackTypesFor, isFeedbackWindowOpen } from '@/lib/feedback/feedback-availability'
@@ -27,12 +27,13 @@ import {
 } from '@/lib/feedback/feedback-report'
 import {
     SUBMIT_LIMIT,
+    claimFeedbackKey,
     clearFeedbackBlocks,
     feedbackGuardKey,
     getFeedbackBlockSeconds,
     recordFeedbackSubmit,
 } from '@/lib/feedback/feedback-spam-guard'
-import { LarkApiError, createBaseRecord } from '@/lib/lark/lark-base-client'
+import { createBaseRecord } from '@/lib/lark/lark-base-client'
 
 const KEY = '3f2b8c1e-5d4a-4b6f-9a7e-1c2d3e4f5a6b'
 const valid = { type: 'problem', areas: ['orders', 'payments'], details: 'The order total is wrong' } as const
@@ -109,24 +110,26 @@ describe('TC-F44-19: Lark record fields', () => {
 describe('TC-F44-12: idempotent submit', () => {
     const meta = { tenantId: '7', storeName: null, reporterId: '1', reporterName: null, reporterRole: null }
     const cfg = { appToken: 'a', tableId: 't' }
-    beforeEach(() => vi.mocked(createBaseRecord).mockReset())
+    beforeEach(() => {
+        vi.mocked(createBaseRecord).mockReset()
+        clearFeedbackBlocks()
+    })
 
-    it('reports replayed=false on a fresh write and sends the key as client_token', async () => {
-        vi.mocked(createBaseRecord).mockResolvedValue(undefined as never)
-        const r = await submitFeedbackToLarkBase(valid, KEY, meta, cfg)
-        expect(r.replayed).toBe(false)
-        expect(vi.mocked(createBaseRecord).mock.calls[0][0]).toMatchObject({ clientToken: KEY })
-    })
-    it('treats a client_token conflict as a replay with the same feedback id', async () => {
-        vi.mocked(createBaseRecord).mockResolvedValueOnce(undefined as never)
+    it('sends the key as client_token and returns the same feedback id on a retry', async () => {
+        vi.mocked(createBaseRecord).mockResolvedValue({ recordId: 'rec1' })
         const first = await submitFeedbackToLarkBase(valid, KEY, meta, cfg)
-        vi.mocked(createBaseRecord).mockRejectedValueOnce(new (LarkApiError as never as new (c: number) => Error)(1255006))
         const again = await submitFeedbackToLarkBase(valid, KEY, meta, cfg)
-        expect(again).toEqual({ feedbackId: first.feedbackId, replayed: true })
+        expect(again).toEqual(first)
+        expect(vi.mocked(createBaseRecord).mock.calls[1][0]).toMatchObject({ clientToken: KEY })
     })
-    it('rethrows other Lark errors', async () => {
-        vi.mocked(createBaseRecord).mockRejectedValueOnce(new (LarkApiError as never as new (c: number) => Error)(1254045))
+    it('rethrows Lark errors', async () => {
+        vi.mocked(createBaseRecord).mockRejectedValueOnce(new Error('lark'))
         await expect(submitFeedbackToLarkBase(valid, KEY, meta, cfg)).rejects.toThrow()
+    })
+    it('lets only the first claim of a key count against the rate limit', async () => {
+        expect(await claimFeedbackKey(KEY)).toBe(true)
+        expect(await claimFeedbackKey(KEY.toUpperCase())).toBe(false)
+        expect(await claimFeedbackKey('0a1b2c3d-5d4a-4b6f-9a7e-1c2d3e4f5a6b')).toBe(true)
     })
 })
 

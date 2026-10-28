@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
-import { LARK_CLIENT_TOKEN_CONFLICT, LarkApiError, createBaseRecord } from '@/lib/lark/lark-base-client'
+import { createBaseRecord } from '@/lib/lark/lark-base-client'
 
 const AREA_KEYS = [
     'products', 'orders', 'customers', 'discounts', 'design', 'payments', 'shipping', 'domains', 'account', 'other',
@@ -90,26 +90,21 @@ export function toLarkFields(body: FeedbackBody, meta: Meta): Record<string, unk
 export type SubmitConfig = { appToken: string; tableId: string }
 
 /**
- * Pushes one feedback into the Lark Base table. Idempotent per key: a conflict on the
- * client_token means the first attempt already landed (`replayed`), so the same feedback id is returned.
+ * Pushes one feedback into the Lark Base table. Idempotent per key: Lark answers a reused
+ * client_token with success and the same record, and the feedback id derives from the key too.
  */
 export async function submitFeedbackToLarkBase(
     body: FeedbackBody,
     idempotencyKey: string,
     meta: Omit<Meta, 'feedbackId'>,
     config: SubmitConfig,
-): Promise<{ feedbackId: string; replayed: boolean }> {
+): Promise<{ feedbackId: string }> {
     const feedbackId = buildFeedbackId(idempotencyKey)
-    try {
-        await createBaseRecord({
-            appToken: config.appToken,
-            tableId: config.tableId,
-            clientToken: idempotencyKey,
-            fields: toLarkFields(body, { ...meta, feedbackId }),
-        })
-    } catch (err) {
-        if (err instanceof LarkApiError && err.code === LARK_CLIENT_TOKEN_CONFLICT) return { feedbackId, replayed: true }
-        throw err
-    }
-    return { feedbackId, replayed: false }
+    await createBaseRecord({
+        appToken: config.appToken,
+        tableId: config.tableId,
+        clientToken: idempotencyKey,
+        fields: toLarkFields(body, { ...meta, feedbackId }),
+    })
+    return { feedbackId }
 }

@@ -6,6 +6,10 @@ export const SUBMIT_LIMIT = 5
 export const SUBMIT_WINDOW_MS = 15 * 60_000
 
 const memoryBlocks = new Map<string, number>()
+const memoryClaims = new Map<string, number>()
+
+/** How long a submitted Idempotency-Key is remembered (a retry arrives within seconds/minutes). */
+const CLAIM_TTL_SECONDS = 24 * 60 * 60
 
 /** Feedback is limited per user (`created_by`). */
 export const feedbackGuardKey = (userId: string | number) => `user:${userId}`
@@ -47,7 +51,28 @@ export async function recordFeedbackSubmit(key: string): Promise<void> {
     if (!rate.allowed || rate.remaining <= 0) await blockUntil(key, rate.resetAt)
 }
 
+/**
+ * Marks an Idempotency-Key as submitted. True only for the first caller, so a retried (or concurrent
+ * duplicate) request of an already-landed feedback is not counted again against the limit.
+ */
+export async function claimFeedbackKey(idempotencyKey: string): Promise<boolean> {
+    const k = idempotencyKey.toLowerCase()
+    if (redis) {
+        try {
+            return (await redis.set(`feedback:key:${k}`, '1', { nx: true, ex: CLAIM_TTL_SECONDS })) === 'OK'
+        } catch {
+            // Redis down: fall through to the per-instance map.
+        }
+    }
+    const now = Date.now()
+    for (const [id, until] of memoryClaims) if (until <= now) memoryClaims.delete(id)
+    if (memoryClaims.has(k)) return false
+    memoryClaims.set(k, now + CLAIM_TTL_SECONDS * 1000)
+    return true
+}
+
 /** Test helper. */
 export function clearFeedbackBlocks(): void {
     memoryBlocks.clear()
+    memoryClaims.clear()
 }
