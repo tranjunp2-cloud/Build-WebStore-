@@ -1775,6 +1775,16 @@
         "aiChatSuggestion2": "Sports set: t-shirt RM 80, shorts RM 60, 20 in stock each",
         "aiChatSuggestion3Label": "+ Bulk cosmetics",
         "aiChatSuggestion3": "Bulk cosmetics: lipstick RM 35, face cream RM 90, 15 in stock each",
+        "askAiLabel": "Describe products to add",
+        "askAiPlaceholder": "Describe products to add, e.g. Leather jacket RM 500, 10 in stock; Baseball cap RM 50…",
+        "askAiPlaceholderShort": "Describe products to add…",
+        "askAiSend": "Ask AI",
+        "askAiTry": "Try:",
+        "askAiFromPhotos": "From photos",
+        "askAiFromPhotosPrompt": "Create a product from the photos I attach.",
+        "askAiExample": "3 summer dresses, RM 120 each",
+        "askAiExamplePrompt": "3 summer dresses, RM 120 each, sizes S–L",
+        "askAiDraftNote": "Saved as drafts for you to review — nothing goes on sale until you approve",
         "aiChatBtn": "Generate Drafts",
         "aiReviewTooltip": "Created by AI — needs review",
         "aiReviewAriaLabel": "AI-created draft pending review"
@@ -2005,6 +2015,11 @@
           "metaDescMax": "(max 160 characters)",
           "urlSlug": "URL slug",
           "urlSlugHint": "Leave blank to create one from the title",
+          "aiSuggestion": "AI suggestion",
+          "aiSuggestionNow": "Now",
+          "aiSuggestionEmpty": "(empty)",
+          "aiSuggestionUse": "Use this",
+          "aiSuggestionDiscard": "Discard",
           "color": "Color",
           "size": "Size",
           "attributes": "Extended information (attributes)",
@@ -2226,6 +2241,7 @@
       "fieldEmail": "Email",
       "fieldLatestDate": "Latest date",
       "timelineEntry": "Message",
+      "replySent": "Reply sent",
       "loadDetailsFailed": "Couldn't load these details. Please try again.",
       "sourceBadgeContact": "Contact forms",
       "sourceBadgeNewsletter": "Newsletter subscriptions",
@@ -2669,6 +2685,42 @@
           "topUp": "Top up"
         }
       },
+      "automations": {
+        "title": "Automations",
+        "subtitle": "Every morning (9:00 Malaysia time) the assistant checks your shop and leaves a reminder in the bell. Tap a reminder to fix it together with the assistant.",
+        "ownerOnly": "Only the owner or an admin can change the automations.",
+        "items": {
+          "discounts": { "title": "Discount codes", "desc": "Codes that end within 3 days, or are used up but still switched on." },
+          "stock": { "title": "Stock", "desc": "Live products that are out of stock or running low." },
+          "orders_waiting": { "title": "Orders waiting", "desc": "Orders to confirm, payment proofs to check, and confirmed orders not shipped after a day." },
+          "leads": { "title": "Unanswered messages", "desc": "Contact form messages nobody has answered for two days." },
+          "site_health": { "title": "Website health", "desc": "Broken links, changes not published and pages without a search title. Checked on Mondays." }
+        },
+        "digestTitle": "Email digest",
+        "digestDesc": "One email with everything that needs you, sent to the owner and admins. Off by default.",
+        "frequency": "How often",
+        "daily": "Every day",
+        "weekly": "Mondays only",
+        "quiet": "Quiet by design: at most one reminder per check per day, and one digest email.",
+        "save": "Save",
+        "saving": "Saving...",
+        "saved": "Automations saved.",
+        "saveFirst": "Save your changes first.",
+        "runNow": "Run now",
+        "running": "Checking...",
+        "previewTitle": "What would be sent right now",
+        "previewNote": "Preview only: nothing is sent and no email goes out.",
+        "previewEmpty": "Nothing needs you right now, so no reminder would be sent.",
+        "fix": "Fix with the assistant",
+        "mondayOnly": "Left for Monday: {names}.",
+        "errors": {
+          "unauthorized": "Please sign in again.",
+          "forbidden": "Only the owner or an admin can change the automations.",
+          "invalid": "Those settings are not valid.",
+          "rate_limited": "Too many checks. Try again in a little while.",
+          "failed": "Something went wrong. Please try again."
+        }
+      },
       "emailTemplates": {
         "title": "Email templates",
         "subtitle": "Customize the order and account emails your store sends to buyers and to you. Changes apply to your store only — defaults stay safe and you can revert anytime.",
@@ -3075,7 +3127,40 @@
         "generateFailed": "Couldn't generate content. Please try again.",
         "noContentGenerated": "No content was generated. Please try again.",
         "authorLoading": "Loading...",
-        "authorFallback": "User"
+        "authorFallback": "User",
+        "aiTab": "AI writer",
+        "settingsTab": "Settings",
+        "aiMarkTag": "AI",
+        "aiUndoPart": "Undo this part",
+        "aiKeepPart": "Keep",
+        "aiDraftTitle": "AI draft in the editor",
+        "aiEditTitle": "AI changes to this post",
+        "aiPendingNote": "nothing is saved until you keep it.",
+        "aiAppliedTitle": "AI changes applied",
+        "aiAppliedNote": "undo any part, or everything.",
+        "aiSavedTitle": "AI draft saved as a draft post",
+        "aiSavedNote": "highlighted parts are from AI; change anything, then save.",
+        "aiKeepAll": "Keep all",
+        "aiDiscard": "Discard",
+        "aiAskChanges": "Ask for changes",
+        "aiUndoAll": "Undo all",
+        "aiDone": "Done",
+        "aiPartTitle": "title",
+        "aiPartContent": "article",
+        "aiPartCover": "cover photo",
+        "aiPartSeo": "SEO",
+        "aiLocked": "Keep or discard the AI draft first",
+        "aiWriting": "AI is writing — the draft lands here",
+        "aiSeoFill": "Write with AI",
+        "aiSeoWriting": "Writing in the post's language…",
+        "aiSeoFilled": "Filled by AI",
+        "aiSeoUndo": "Undo",
+        "aiSeoFailed": "Couldn't write the SEO text. Try again.",
+        "aiSeoNeedsText": "Write a title or some text first",
+        "aiKeepFailed": "Couldn't apply the AI change. Try again.",
+        "aiStale": "This AI change was made from an older version of the post, so nothing was changed.",
+        "aiAskAgain": "Ask again",
+        "aiSaveFirst": "Save your edits first — the AI change was made from the saved post."
       },
       "categoryModal": {
         "title": "Manage categories",
@@ -3134,6 +3219,25 @@
       },
       "noMatches": "No posts match your filters",
       "resetFilters": "Reset filters"
+    },
+    "agentChanged": {
+      "product": "The assistant updated this product.",
+      "post": "The assistant updated this post.",
+      "discount": "The assistant updated this discount.",
+      "customer": "The assistant updated this customer.",
+      "template": "The assistant updated this email template.",
+      "reload": "Reload",
+      "keepMine": "Keep mine",
+      "loadLatest": "Load the latest",
+      "saveAnyway": "Save mine anyway (replaces their changes)",
+      "conflict": {
+        "product": "This product was changed after you opened it.",
+        "post": "This post was changed after you opened it.",
+        "discount": "This discount was changed after you opened it.",
+        "customer": "This customer was changed after you opened it.",
+        "template": "This email template was changed after you opened it."
+      },
+      "changedElsewhere": "Changed elsewhere — refreshed"
     },
     "tenantAccessWatcher": {
       "sessionExpiredTitle": "Session expired",
@@ -3380,6 +3484,35 @@
           "other": "{count} items"
         }
       },
+      "todo": {
+        "title": "Issues",
+        "subtitle": "What needs your attention right now",
+        "count": {
+          "one": "{count} issue",
+          "other": "{count} issues"
+        },
+        "emptyTitle": "No issues right now",
+        "emptyDesc": "Orders, stock and website checks that need you will show up here.",
+        "unavailableTitle": "Issues are unavailable",
+        "unavailableDesc": "We couldn't load your issues right now. Please try again later.",
+        "askAi": "Ask AI",
+        "askAiLabel": "Ask AI to help with: {title}",
+        "open": "Open",
+        "openLabel": "Open the page for: {title}",
+        "more": "and {count} more",
+        "openChat": "Open chat",
+        "openChatLabel": "Open the chat for: {title}",
+        "group": {
+          "now": "Urgent",
+          "you": "Needs you",
+          "week": "Soon"
+        },
+        "severity": {
+          "high": "Urgent",
+          "medium": "Soon",
+          "low": "Later"
+        }
+      },
       "customize": {
         "button": "Customize",
         "title": "Customize dashboard",
@@ -3395,6 +3528,7 @@
         "moveDown": "Move down",
         "close": "Close",
         "blockOnboarding": "Onboarding checklist",
+        "blockTodo": "Issues",
         "blockGlance": "At-a-glance stats",
         "blockTraffic": "Traffic & performance",
         "blockSeo": "SEO health",
@@ -4101,13 +4235,17 @@
       "dismiss": "Dismiss"
     },
     "compactLayout": {
-      "aiEditing": "AI is editing your design…",
+      "aiEditing": "AI is editing…",
       "openAIChat": "Open AI Chat",
       "openChatAndTools": "Open AI Chat & Tools",
       "moveUp": "Move Up",
       "moveDown": "Move Down",
       "deleteBlock": "Delete Block",
-      "deletedBlock": "Deleted {type}"
+      "deletedBlock": "Deleted {type}",
+      "openTools": "Open Tools",
+      "stopFailed": "Could not stop the AI. Try again.",
+      "busy": "Updating your design…",
+      "stopAI": "Stop AI"
     },
     "toolbar": {
       "publish": "Publish",
@@ -4129,6 +4267,8 @@
       "redo": "Redo",
       "undoShortcut": "Undo (Cmd/Ctrl+Z)",
       "redoShortcut": "Redo (Cmd/Ctrl+Shift+Z)",
+      "undoStepTooltip": "Undo: {label} (Ctrl/Cmd+Z)",
+      "redoStepTooltip": "Redo: {label} (Ctrl/Cmd+Shift+Z)",
       "openMenu": "Open menu",
       "desktop": "Desktop",
       "mobile": "Mobile",
@@ -4203,7 +4343,11 @@
       "viewAction": "View",
       "saveSuccess": "Changes saved",
       "manualSaveSuccess": "Saved!",
-      "saveFailed": "Couldn't save. Try again."
+      "saveFailed": "Couldn't save. Try again.",
+      "publishNeedsFix": "Fill this in before publishing",
+      "publishShowField": "Show",
+      "draftChanged": "This page was changed somewhere else (another tab or an approved AI change). Your latest edits were not saved — reload to continue from the newest version.",
+      "reloadAction": "Reload"
     },
     "maintenance": {
       "banner": "Your website is in maintenance mode. Visitors see a maintenance page instead.",
@@ -4272,7 +4416,27 @@
       "inputPlaceholder": "Tell AI what to change...",
       "send": "Send",
       "newLine": "new line",
-      "stopAI": "Stop AI"
+      "stopAI": "Stop AI",
+      "agentPageUpdated": "The assistant updated this page",
+      "agentChangeUndone": "Undid: {title}",
+      "themeUndoneLive": "Theme went back on your live site. Redo brings it back.",
+      "themeRedoneLive": "Theme changed on your live site again. Undo takes it back.",
+      "agentPagesUpdated": "The assistant changed several pages",
+      "agentPagesListUpdated": "The assistant updated your pages and menu",
+      "agentNavUpdated": "The assistant changed the menu and footer",
+      "agentLanguagesUpdated": "The assistant changed the website languages",
+      "agentPublished": "Your site is live",
+      "agentThemeUpdated": "The assistant updated your theme",
+      "agentEditsReplaced": "The assistant's change is in. Edits you made while it was being applied were replaced — redo them if you still need them.",
+      "agentSeoUpdated": "The assistant updated this page's SEO",
+      "agentTranslationUpdated": "The assistant translated this page",
+      "agentTranslationShown": "The assistant translated this page — now showing the translation",
+      "agentTranslationNotAdded": "The assistant translated this page into {language}. Add {language} as a second language (Menu → Quick language) to see it on the page.",
+      "agentLocateMissing": "This section shows on the page once you approve the change.",
+      "localeAutoTranslated": "AI translated {count} sections into {language}. Check names and prices before you publish.",
+      "undoTranslation": "Undo translation",
+      "translationUndone": "Translation removed. Those sections show the original text again.",
+      "localeTranslateFailed": "Could not translate {count} parts of the page into {language}. They keep their original text for now. Try again in a moment, or ask the assistant to translate the page."
     },
     "menu": {
       "dashboard": "Dashboard",
@@ -4983,6 +5147,72 @@
     },
     "menuDrawer": {
       "defaultUserName": "User"
+    },
+    "elementAsk": {
+      "title": "Ask AI",
+      "placeholder": "What should change?",
+      "now": "Now:",
+      "hint": "Enter to send · Esc",
+      "send": "Send to AI chat",
+      "close": "Close",
+      "kinds": {
+        "text": "Text",
+        "button": "Button",
+        "image": "Picture",
+        "section": "Section",
+        "seo": "SEO",
+        "menu": "Menu",
+        "footer": "Footer",
+        "page": "Page"
+      },
+      "suggestions": {
+        "text": [
+          "Shorter",
+          "Friendlier",
+          "Translate to Malay"
+        ],
+        "button": [
+          "Shorter",
+          "Say what happens on click",
+          "Translate to Malay"
+        ],
+        "image": [
+          "Find a better photo",
+          "Generate a new picture",
+          "Write the alt text"
+        ],
+        "section": [
+          "Rewrite this section",
+          "Add pictures",
+          "Translate to Malay"
+        ],
+        "seo": [
+          "Write the title and description",
+          "Shorter",
+          "Translate to Malay"
+        ],
+        "menu": [
+          "Add a menu item",
+          "Reorder the menu"
+        ],
+        "footer": [
+          "Add contact links",
+          "Rewrite the tagline"
+        ],
+        "page": [
+          "Improve this page",
+          "Write the SEO",
+          "Translate to Malay"
+        ]
+      },
+      "walker": {
+        "label": "Changes by the assistant",
+        "prev": "Previous change",
+        "next": "Next change",
+        "done": "Done",
+        "changed": "AI changed",
+        "missing": "Not on the page any more — it may have been removed."
+      }
     }
   },
   "previewPage": {

@@ -1775,6 +1775,16 @@
         "aiChatSuggestion2": "Set sukan: kemeja-T RM 80, seluar pendek RM 60, 20 dalam stok setiap satu",
         "aiChatSuggestion3Label": "+ Kosmetik pukal",
         "aiChatSuggestion3": "Kosmetik pukal: gincu RM 35, krim muka RM 90, 15 dalam stok setiap satu",
+        "askAiLabel": "Terangkan produk untuk ditambah",
+        "askAiPlaceholder": "Terangkan produk untuk ditambah, cth. Jaket kulit RM 500, 10 dalam stok; Topi besbol RM 50…",
+        "askAiPlaceholderShort": "Terangkan produk untuk ditambah…",
+        "askAiSend": "Tanya AI",
+        "askAiTry": "Cuba:",
+        "askAiFromPhotos": "Daripada foto",
+        "askAiFromPhotosPrompt": "Cipta produk daripada foto yang saya lampirkan.",
+        "askAiExample": "3 gaun musim panas, RM 120 setiap satu",
+        "askAiExamplePrompt": "3 gaun musim panas, RM 120 setiap satu, saiz S–L",
+        "askAiDraftNote": "Disimpan sebagai draf untuk anda semak — tiada yang dijual sehingga anda luluskan",
         "aiChatBtn": "Jana Draf",
         "aiReviewTooltip": "Dicipta oleh AI — perlu semakan",
         "aiReviewAriaLabel": "Draf ciptaan AI menunggu semakan"
@@ -2005,6 +2015,11 @@
           "metaDescMax": "(maksimum 160 aksara)",
           "urlSlug": "URL slug",
           "urlSlugHint": "Biarkan kosong untuk jana daripada tajuk",
+          "aiSuggestion": "Cadangan AI",
+          "aiSuggestionNow": "Sekarang",
+          "aiSuggestionEmpty": "(kosong)",
+          "aiSuggestionUse": "Guna ini",
+          "aiSuggestionDiscard": "Buang",
           "color": "Warna",
           "size": "Saiz",
           "attributes": "Maklumat terperinci (atribut)",
@@ -2226,6 +2241,7 @@
       "fieldEmail": "Email",
       "fieldLatestDate": "Tarikh terkini",
       "timelineEntry": "Mesej",
+      "replySent": "Balasan dihantar",
       "loadDetailsFailed": "Gagal memuatkan butiran ini. Sila cuba lagi.",
       "sourceBadgeContact": "Borang maklum balas",
       "sourceBadgeNewsletter": "Langganan buletin utama",
@@ -2669,6 +2685,42 @@
           "topUp": "Tambah nilai"
         }
       },
+      "automations": {
+        "title": "Automasi",
+        "subtitle": "Setiap pagi (9:00 waktu Malaysia) pembantu menyemak kedai anda dan meninggalkan peringatan di loceng. Ketik peringatan untuk menyelesaikannya bersama pembantu.",
+        "ownerOnly": "Hanya pemilik atau admin boleh menukar automasi.",
+        "items": {
+          "discounts": { "title": "Kod diskaun", "desc": "Kod yang tamat dalam 3 hari, atau sudah habis digunakan tetapi masih dihidupkan." },
+          "stock": { "title": "Stok", "desc": "Produk aktif yang kehabisan stok atau hampir habis." },
+          "orders_waiting": { "title": "Pesanan menunggu", "desc": "Pesanan untuk disahkan, bukti pembayaran untuk disemak, dan pesanan disahkan yang belum dihantar selepas sehari." },
+          "leads": { "title": "Mesej belum dibalas", "desc": "Mesej borang hubungan yang tiada siapa balas selama dua hari." },
+          "site_health": { "title": "Kesihatan laman web", "desc": "Pautan rosak, perubahan belum diterbitkan dan halaman tanpa tajuk carian. Disemak pada hari Isnin." }
+        },
+        "digestTitle": "Ringkasan e-mel",
+        "digestDesc": "Satu e-mel dengan semua yang memerlukan anda, dihantar kepada pemilik dan admin. Dimatikan secara lalai.",
+        "frequency": "Kekerapan",
+        "daily": "Setiap hari",
+        "weekly": "Hari Isnin sahaja",
+        "quiet": "Senyap secara reka bentuk: paling banyak satu peringatan setiap semakan sehari, dan satu e-mel ringkasan.",
+        "save": "Simpan",
+        "saving": "Menyimpan...",
+        "saved": "Automasi disimpan.",
+        "saveFirst": "Simpan perubahan anda dahulu.",
+        "runNow": "Jalankan sekarang",
+        "running": "Menyemak...",
+        "previewTitle": "Apa yang akan dihantar sekarang",
+        "previewNote": "Pratonton sahaja: tiada apa dihantar dan tiada e-mel keluar.",
+        "previewEmpty": "Tiada apa yang memerlukan anda sekarang, jadi tiada peringatan akan dihantar.",
+        "fix": "Selesaikan dengan pembantu",
+        "mondayOnly": "Ditinggalkan untuk hari Isnin: {names}.",
+        "errors": {
+          "unauthorized": "Sila log masuk semula.",
+          "forbidden": "Hanya pemilik atau admin boleh menukar automasi.",
+          "invalid": "Tetapan itu tidak sah.",
+          "rate_limited": "Terlalu banyak semakan. Cuba lagi sebentar lagi.",
+          "failed": "Sesuatu tidak kena. Sila cuba lagi."
+        }
+      },
       "emailTemplates": {
         "title": "Templat e-mel",
         "subtitle": "Sesuaikan email pesanan dan akaun yang dihantar oleh kedai anda kepada pembeli dan diri anda. Perubahan hanya digunakan untuk kedai anda. Tetapan set semula kekal disimpan dan boleh dipulihkan pada bila-bila masa.",
@@ -3075,7 +3127,40 @@
         "generateFailed": "Tidak dapat menjana isi kandungan. Sila cuba lagi.",
         "noContentGenerated": "Tiada kandungan berjaya dijana. Sila cuba lagi",
         "authorLoading": "Memuat naik",
-        "authorFallback": "Pengguna"
+        "authorFallback": "Pengguna",
+        "aiTab": "Penulis AI",
+        "settingsTab": "Tetapan",
+        "aiMarkTag": "AI",
+        "aiUndoPart": "Buat asal bahagian ini",
+        "aiKeepPart": "Simpan",
+        "aiDraftTitle": "Draf AI dalam editor",
+        "aiEditTitle": "Perubahan AI pada catatan ini",
+        "aiPendingNote": "tiada yang disimpan sehingga anda simpannya.",
+        "aiAppliedTitle": "Perubahan AI digunakan",
+        "aiAppliedNote": "buat asal mana-mana bahagian, atau semuanya.",
+        "aiSavedTitle": "Draf AI disimpan sebagai catatan draf",
+        "aiSavedNote": "bahagian bertanda adalah daripada AI; ubah apa-apa, kemudian simpan.",
+        "aiKeepAll": "Simpan semua",
+        "aiDiscard": "Buang",
+        "aiAskChanges": "Minta perubahan",
+        "aiUndoAll": "Buat asal semua",
+        "aiDone": "Selesai",
+        "aiPartTitle": "tajuk",
+        "aiPartContent": "artikel",
+        "aiPartCover": "foto muka depan",
+        "aiPartSeo": "SEO",
+        "aiLocked": "Simpan atau buang draf AI dahulu",
+        "aiWriting": "AI sedang menulis — draf akan muncul di sini",
+        "aiSeoFill": "Tulis dengan AI",
+        "aiSeoWriting": "Menulis dalam bahasa catatan…",
+        "aiSeoFilled": "Diisi oleh AI",
+        "aiSeoUndo": "Buat asal",
+        "aiSeoFailed": "Teks SEO tidak dapat ditulis. Cuba lagi.",
+        "aiSeoNeedsText": "Tulis tajuk atau sedikit teks dahulu",
+        "aiKeepFailed": "Perubahan AI tidak dapat digunakan. Cuba lagi.",
+        "aiStale": "Perubahan AI ini dibuat daripada versi lama catatan, jadi tiada yang diubah.",
+        "aiAskAgain": "Tanya semula",
+        "aiSaveFirst": "Simpan suntingan anda dahulu — perubahan AI dibuat daripada catatan yang disimpan."
       },
       "categoryModal": {
         "title": "Urus kategori",
@@ -3134,6 +3219,25 @@
       },
       "noMatches": "Tiada pos yang ditemui berdasarkan pilihan carian anda",
       "resetFilters": "Set semula pilihan carian"
+    },
+    "agentChanged": {
+      "product": "Pembantu telah mengemas kini produk ini.",
+      "post": "Pembantu telah mengemas kini catatan ini.",
+      "discount": "Pembantu telah mengemas kini diskaun ini.",
+      "customer": "Pembantu telah mengemas kini pelanggan ini.",
+      "template": "Pembantu telah mengemas kini templat e-mel ini.",
+      "reload": "Muat semula",
+      "keepMine": "Kekalkan milik saya",
+      "loadLatest": "Muat yang terkini",
+      "saveAnyway": "Simpan juga milik saya (gantikan perubahan mereka)",
+      "conflict": {
+        "product": "Produk ini telah diubah selepas anda membukanya.",
+        "post": "Catatan ini telah diubah selepas anda membukanya.",
+        "discount": "Diskaun ini telah diubah selepas anda membukanya.",
+        "customer": "Pelanggan ini telah diubah selepas anda membukanya.",
+        "template": "Templat e-mel ini telah diubah selepas anda membukanya."
+      },
+      "changedElsewhere": "Diubah di tempat lain — dimuat semula"
     },
     "tenantAccessWatcher": {
       "sessionExpiredTitle": "Sesi tamat",
@@ -3380,6 +3484,35 @@
           "other": "{count} item"
         }
       },
+      "todo": {
+        "title": "Isu",
+        "subtitle": "Apa yang memerlukan perhatian anda sekarang",
+        "count": {
+          "one": "{count} isu",
+          "other": "{count} isu"
+        },
+        "emptyTitle": "Tiada isu sekarang",
+        "emptyDesc": "Pesanan, stok dan semakan laman web yang memerlukan anda akan dipaparkan di sini.",
+        "unavailableTitle": "Isu tidak tersedia",
+        "unavailableDesc": "Kami tidak dapat memuatkan isu anda buat masa ini. Sila cuba lagi kemudian.",
+        "askAi": "Tanya AI",
+        "askAiLabel": "Minta AI membantu: {title}",
+        "open": "Buka",
+        "openLabel": "Buka halaman untuk: {title}",
+        "more": "dan {count} lagi",
+        "openChat": "Buka sembang",
+        "openChatLabel": "Buka sembang untuk: {title}",
+        "group": {
+          "now": "Segera",
+          "you": "Perlukan anda",
+          "week": "Tidak lama lagi"
+        },
+        "severity": {
+          "high": "Segera",
+          "medium": "Tidak lama lagi",
+          "low": "Kemudian"
+        }
+      },
       "customize": {
         "button": "Sesuaikan",
         "title": "Sesuaikan papan pemuka",
@@ -3395,6 +3528,7 @@
         "moveDown": "Alih ke bawah",
         "close": "Tutup",
         "blockOnboarding": "Senarai semak permulaan",
+        "blockTodo": "Isu",
         "blockGlance": "Statistik sekilas pandang",
         "blockTraffic": "Trafik & prestasi",
         "blockSeo": "Kesihatan SEO",
@@ -4101,13 +4235,17 @@
       "dismiss": "Tutup"
     },
     "compactLayout": {
-      "aiEditing": "AI sedang mengedit reka bentuk anda…",
+      "aiEditing": "AI sedang menyunting…",
       "openAIChat": "Buka Chat AI",
       "openChatAndTools": "Buka Chat AI & Alatan",
       "moveUp": "Alih Ke Atas",
       "moveDown": "Alih Ke Bawah",
       "deleteBlock": "Padam Blok",
-      "deletedBlock": "{type} dipadam"
+      "deletedBlock": "{type} dipadam",
+      "openTools": "Buka Alatan",
+      "stopFailed": "Tidak dapat menghentikan AI. Cuba lagi.",
+      "busy": "Mengemas kini reka bentuk anda…",
+      "stopAI": "Hentikan AI"
     },
     "toolbar": {
       "publish": "Terbitkan",
@@ -4129,6 +4267,8 @@
       "redo": "Ulang semula",
       "undoShortcut": "Undur (Cmd/Ctrl+Z)",
       "redoShortcut": "Ulang semula (Cmd/Ctrl+Shift+Z)",
+      "undoStepTooltip": "Buat asal: {label} (Ctrl/Cmd+Z)",
+      "redoStepTooltip": "Buat semula: {label} (Ctrl/Cmd+Shift+Z)",
       "openMenu": "Buka menu",
       "desktop": "Paparan utama",
       "mobile": "Mudah alih",
@@ -4203,7 +4343,11 @@
       "viewAction": "Lihat",
       "saveSuccess": "Perubahan disimpan",
       "manualSaveSuccess": "Disimpan!",
-      "saveFailed": "Tidak dapat menyimpan. Cuba lagi."
+      "saveFailed": "Tidak dapat menyimpan. Cuba lagi.",
+      "publishNeedsFix": "Lengkapkan ini sebelum menyiarkan",
+      "publishShowField": "Tunjuk",
+      "draftChanged": "Halaman ini telah diubah di tempat lain (tab lain atau perubahan AI yang diluluskan). Suntingan terbaru anda tidak disimpan — muat semula untuk teruskan dari versi terkini.",
+      "reloadAction": "Muat semula"
     },
     "maintenance": {
       "banner": "Laman web anda dalam mod penyelenggaraan. Pengunjung akan melihat halaman yang sedang diselenggara",
@@ -4272,7 +4416,27 @@
       "inputPlaceholder": "Beritahu AI apa yang ingin diubah...",
       "send": "Hantar",
       "newLine": "baris baru",
-      "stopAI": "Hentikan AI"
+      "stopAI": "Hentikan AI",
+      "agentPageUpdated": "Pembantu telah mengemas kini halaman ini",
+      "agentChangeUndone": "Dibuat asal: {title}",
+      "themeUndoneLive": "Tema kembali pada laman langsung anda. Buat semula untuk mengembalikannya.",
+      "themeRedoneLive": "Tema pada laman langsung anda berubah semula. Buat asal untuk menariknya balik.",
+      "agentPagesUpdated": "Pembantu telah mengubah beberapa halaman",
+      "agentPagesListUpdated": "Pembantu telah mengemas kini halaman dan menu anda",
+      "agentNavUpdated": "Pembantu telah mengubah menu dan pengaki",
+      "agentLanguagesUpdated": "Pembantu telah menukar bahasa laman web",
+      "agentPublished": "Laman web anda kini dalam talian",
+      "agentThemeUpdated": "Pembantu telah mengemas kini tema anda",
+      "agentEditsReplaced": "Perubahan pembantu telah digunakan. Suntingan yang anda buat semasa ia sedang digunakan telah diganti — buat semula jika masih perlu.",
+      "agentSeoUpdated": "Pembantu telah mengemas kini SEO halaman ini",
+      "agentTranslationUpdated": "Pembantu telah menterjemah halaman ini",
+      "agentTranslationShown": "Pembantu telah menterjemah halaman ini — kini memaparkan terjemahan",
+      "agentTranslationNotAdded": "Pembantu telah menterjemah halaman ini ke {language}. Tambah {language} sebagai bahasa kedua (Menu → Bahasa pantas) untuk melihatnya pada halaman.",
+      "agentLocateMissing": "Bahagian ini muncul di halaman selepas anda meluluskan perubahan.",
+      "localeAutoTranslated": "AI telah menterjemah {count} bahagian ke {language}. Semak nama dan harga sebelum anda terbitkan.",
+      "undoTranslation": "Buat asal terjemahan",
+      "translationUndone": "Terjemahan dibuang. Bahagian itu menunjukkan teks asal.",
+      "localeTranslateFailed": "{count} bahagian halaman tidak dapat diterjemah ke {language}. Ia kekal dalam teks asal buat masa ini. Cuba lagi sebentar lagi, atau minta pembantu menterjemah halaman."
     },
     "menu": {
       "dashboard": "Papan pemuka",
@@ -4983,6 +5147,72 @@
     },
     "menuDrawer": {
       "defaultUserName": "Pengguna"
+    },
+    "elementAsk": {
+      "title": "Tanya AI",
+      "placeholder": "Apa yang perlu diubah?",
+      "now": "Kini:",
+      "hint": "Enter untuk hantar · Esc",
+      "send": "Hantar ke sembang AI",
+      "close": "Tutup",
+      "kinds": {
+        "text": "Teks",
+        "button": "Butang",
+        "image": "Gambar",
+        "section": "Bahagian",
+        "seo": "SEO",
+        "menu": "Menu",
+        "footer": "Footer",
+        "page": "Halaman"
+      },
+      "suggestions": {
+        "text": [
+          "Lebih ringkas",
+          "Lebih mesra",
+          "Terjemah ke bahasa Inggeris"
+        ],
+        "button": [
+          "Lebih ringkas",
+          "Nyatakan apa berlaku bila diklik",
+          "Terjemah ke bahasa Inggeris"
+        ],
+        "image": [
+          "Cari gambar yang lebih baik",
+          "Jana gambar baharu",
+          "Tulis teks alt"
+        ],
+        "section": [
+          "Tulis semula bahagian ini",
+          "Tambah gambar",
+          "Terjemah ke bahasa Inggeris"
+        ],
+        "seo": [
+          "Tulis tajuk dan penerangan",
+          "Lebih ringkas",
+          "Terjemah ke bahasa Inggeris"
+        ],
+        "menu": [
+          "Tambah item menu",
+          "Susun semula menu"
+        ],
+        "footer": [
+          "Tambah pautan hubungan",
+          "Tulis semula slogan"
+        ],
+        "page": [
+          "Baiki halaman ini",
+          "Tulis SEO",
+          "Terjemah ke bahasa Inggeris"
+        ]
+      },
+      "walker": {
+        "label": "Perubahan oleh pembantu",
+        "prev": "Perubahan sebelumnya",
+        "next": "Perubahan seterusnya",
+        "done": "Selesai",
+        "changed": "Diubah AI",
+        "missing": "Tiada lagi di halaman — mungkin telah dibuang."
+      }
     }
   },
   "previewPage": {
