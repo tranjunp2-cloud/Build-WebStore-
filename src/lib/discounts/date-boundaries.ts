@@ -34,3 +34,9 @@ export function endOfDayKL(input: Date | string): Date {
     const { y, m, day } = klDateParts(input)
     return new Date(Date.UTC(y, m - 1, day, 23, 59, 59, 999) - KL_OFFSET_MS)
 }
+
+/** The KL calendar day of an instant as `YYYY-MM-DD` (what the seller picked; the inverse of the helpers above). */
+export function klDateKey(input: Date | string): string {
+    const { y, m, day } = klDateParts(input)
+    return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Field, SanitizedCollectionConfig } from 'payload'
 import { buildEntities, creatorDiagnosticResolved, projectionMatches, resolveData, sourceKey } from '@/lib/migration/pw1-json/projection'
 import { COLLECTIONS, type ImportDocument, type ImportStore } from '@/lib/migration/pw1-json/types'
+import { DEFAULT_DASHBOARD_BLOCKS } from '@/lib/dashboard-utils'
 
 function fixture(product: ImportDocument = {}) {
   const store: ImportStore = {storeId:'205',collections:Object.fromEntries(COLLECTIONS.map(c=>[c,[]])) as ImportStore['collections']}
@@ -174,7 +175,7 @@ describe('[TC-F42-IMP-PREFS] Legacy dashboard preferences', () => {
     // Act
     const tenant = buildEntities(store, configs, 'test').find(entity => entity.collection === 'tenants')!
     // Assert
-    expect(tenant.data.settings).toEqual({ dashboardPreferences: Array.isArray(preferences) ? preferences : ['onboarding', 'glance', 'traffic', 'seo'] })
+    expect(tenant.data.settings).toEqual({ dashboardPreferences: Array.isArray(preferences) ? preferences : DEFAULT_DASHBOARD_BLOCKS })
     expect(JSON.stringify(store)).toBe(before)
   })
 })

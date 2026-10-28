@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
+import { getPayload, type User } from 'payload'
 import config from '@payload-config'
 import { sql } from 'drizzle-orm'
 import { withAuth } from '@/lib/auth'
 import { extractTenantId } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { createDiscountSchema } from '@/lib/validations/discounts'
+import { createDiscountAs, DiscountServiceError, type DiscountWriteData } from '@/lib/discounts/discount-service'
+import { canAccessArea } from '@/lib/insights/area-access'
+
+type CreateBody = DiscountWriteData & { code: string; type: 'percentage' | 'fixed'; value: number }
 
 const ALLOWED_SORT_FIELDS = new Set(['code', 'type', 'value', 'usageCount', 'expiresAt', 'createdAt', 'status'])
 
@@ -124,31 +128,28 @@ export const POST = withAuth(async (user, request) => {
                 { status: 403 },
             )
         }
-        // Payload postgres adapter uses integer IDs — coerce string → number
-        const tenantIdForPayload: string | number = /^\d+$/.test(tenantId) ? parseInt(tenantId, 10) : tenantId
-
-        const payload = await getPayload({ config })
+        // Discounts belong to the Orders permission (the sidebar entry's `permissionId`): a custom role without it
+        // (e.g. products only) can not create codes, same rule as the copilot's discount tools.
+        if (!canAccessArea(user, tenantId, 'orders')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Your role cannot manage discounts' } },
+                { status: 403 },
+            )
+        }
 
         let discount
         try {
-            discount = await payload.create({
-                collection: 'discounts',
-                data: {
-                    ...data!,
-                    tenant: tenantIdForPayload,
-                    usageCount: 0,
-                },
-                // overrideAccess: true — tenant is extracted from the authenticated user (not from the
-                // client request), so collection-level auth is already enforced by withAuth + extractTenantId.
-                // Using false here triggers Payload's relationship read-check against the tenants collection,
-                // which has restricted read access and incorrectly rejects valid tenant IDs.
-                overrideAccess: true,
-            })
+            // The tenant is the authenticated user's (never the client's): the shared service forces it, sets
+            // usageCount to 0 and writes with overrideAccess (see lib/discounts/discount-service).
+            discount = await createDiscountAs(
+                { user: user as unknown as User, tenantId },
+                { ...(data as CreateBody), site: data!.site ?? null },
+            )
         } catch (err: any) {
             // Unique constraint on (tenant_id, upper(code)) → 409
-            if (err?.message?.includes('duplicate') || err?.message?.includes('unique') || err?.code === '23505') {
+            if (err instanceof DiscountServiceError && err.code === 'DUPLICATE_CODE') {
                 return NextResponse.json(
-                    { success: false, error: { code: 'DUPLICATE_CODE', message: 'This code is already in use for your tenant. Try a different code or append a number.' } },
+                    { success: false, error: { code: 'DUPLICATE_CODE', message: err.message } },
                     { status: 409 },
                 )
             }
