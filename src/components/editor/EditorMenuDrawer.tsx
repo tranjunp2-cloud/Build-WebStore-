@@ -27,6 +27,7 @@ import {
 } from '@/config/sidebar-nav'
 import { isPathActive } from '@/lib/sidebar/is-path-active'
 import { formatBadgeCount } from '@/lib/sidebar/format-badge-count'
+import { clearClientAiState } from '@/lib/auth/clear-client-ai-state'
 
 type EditorMenuDrawerProps = {
     siteId: string
@@ -98,6 +99,7 @@ export function EditorMenuDrawer({
         } catch (error) {
             console.error('Logout request failed:', error)
         } finally {
+            clearClientAiState()
             document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
             window.location.href = '/login'
         }

@@ -48,8 +48,8 @@ vi.mock('@/lib/analytics/track-event', () => ({
     trackEvent: vi.fn(),
 }))
 
-vi.mock('next/font/google', () => ({
-    Inter: () => ({
+vi.mock('next/font/local', () => ({
+    default: () => ({
         style: {
             fontFamily: 'Inter',
         },
@@ -73,6 +73,8 @@ vi.mock('@/i18n', () => ({
                     publishSuccess: 'Website đã live!',
                     publishSuccessDomain: 'Live at {domain}',
                     publishFailed: 'Publish thất bại',
+                    publishNeedsFix: 'Điền mục này trước khi publish',
+                    publishShowField: 'Xem',
                     saveSuccess: 'Đã lưu thành công!',
                     manualSaveSuccess: 'Saved!',
                     saveFailed: 'Lưu thất bại',
@@ -307,6 +309,8 @@ describe('Publish and Save Flows (TC-F05)', () => {
                     socialWidget: null,
                 },
             })
+            // Redo reports the step it crossed
+            return { label: 'Apply template: Editorial', themeChanged: false, canvasTyped: false }
         })
         useEditorStore.setState({
             autoSaveEnabled: true,
@@ -2204,8 +2208,9 @@ afterEach(() => {
             await setupAndClickPublish()
 
             await waitFor(() => {
+                // a field to fill is a fix, not a retry [TC-AIWB-66]
                 expect(toast.error).toHaveBeenCalledWith(
-                    'Publish thất bại',
+                    'Điền mục này trước khi publish',
                     expect.objectContaining({ description: 'WhatsApp Phone Number: This field is required' })
                 )
             })
@@ -2232,8 +2237,9 @@ afterEach(() => {
             await setupAndClickPublish()
 
             await waitFor(() => {
+                // a field to fill is a fix, not a retry [TC-AIWB-66]
                 expect(toast.error).toHaveBeenCalledWith(
-                    'Publish thất bại',
+                    'Điền mục này trước khi publish',
                     expect.objectContaining({ description: 'About Us → Portfolio → Project 5 → title: This field is required.' })
                 )
             })

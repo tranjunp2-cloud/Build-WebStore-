@@ -49,7 +49,7 @@ describe('EditorStore', () => {
 
             // Assert — slot no longer contains the deleted link, survivors keep their BM labels
             const h = useEditorStore.getState().headerBlock as Record<string, unknown>
-            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as Array<Record<string, unknown>>
+            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as unknown as Array<Record<string, unknown>>
             expect(msLinks).toHaveLength(2)
             expect(msLinks.map(l => l.url)).toEqual(['/', '/about'])
             expect(msLinks.find(l => l.url === '/')?.label).toBe('Utama') // translation preserved
@@ -67,7 +67,7 @@ describe('EditorStore', () => {
             } as never)
 
             const h = useEditorStore.getState().headerBlock as Record<string, unknown>
-            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as Array<Record<string, unknown>>
+            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as unknown as Array<Record<string, unknown>>
             expect(msLinks).toHaveLength(4)
             expect(msLinks.find(l => l.url === '/contact')?.label).toBe('Contact') // new link → base label
             expect(msLinks.find(l => l.url === '/about')?.label).toBe('Tentang')   // existing translation kept
@@ -444,6 +444,36 @@ describe('EditorStore', () => {
             await Promise.resolve()
             
             expect(useEditorStore.getState().saveStatus).toBe('error')
+            expect(global.fetch).toHaveBeenCalledTimes(1)
+        })
+
+        it('[TC-AIWB-41] sends the draft revision as base and keeps the one the save returns', async () => {
+            useEditorStore.getState().setDraftVersion('3.7')
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true, status: 200, headers: new Headers({ 'x-draft-version': '4.8' }) })
+
+            useEditorStore.getState().updateBlock(0, { heading: 'Based save' })
+            await vi.advanceTimersByTimeAsync(3000)
+
+            const body = JSON.parse((global.fetch as any).mock.calls[0][1].body)
+            expect(body.base).toBe('3.7')
+            expect(useEditorStore.getState().draftVersion).toBe('4.8')
+        })
+
+        it('[TC-AIWB-41] a save refused as stale (409 DRAFT_CHANGED) stops saving instead of retrying over the newer draft', async () => {
+            useEditorStore.getState().setDraftVersion('3.7')
+            const refused = { ok: false, status: 409, json: async () => ({ code: 'DRAFT_CHANGED' }) }
+            ;(global.fetch as any).mockResolvedValueOnce({ ...refused, clone: () => refused })
+
+            useEditorStore.getState().updateBlock(0, { heading: 'Stale tab edit' })
+            await vi.advanceTimersByTimeAsync(3000)
+            await vi.advanceTimersByTimeAsync(40000)
+            useEditorStore.getState().updateBlock(0, { heading: 'Another edit' })
+            await vi.advanceTimersByTimeAsync(3000)
+
+            const state = useEditorStore.getState()
+            expect(state.draftConflict).toBe(true)
+            expect(state.hasUnsavedChanges).toBe(true)
+            expect(await state.performSave(true)).toBe(false)
             expect(global.fetch).toHaveBeenCalledTimes(1)
         })
 

@@ -44,7 +44,7 @@ describe('[TC-EDIT-06..09] BlockActionBar — Light/Dark Theme & Drag (GH-1367)'
 
     // TC-EDIT-07: Icon base classes preserved (dark mode uses them directly; light mode is
     // recolored via the globals.css opt-out keyed off these same classes)
-    it('TC-EDIT-07 (GH-1367): icon base classes preserved (amber-300 AI, red-400 delete)', () => {
+    it('TC-EDIT-07 (GH-1367): icon base classes preserved (teal-300 Ask AI, red-400 delete)', () => {
         // Arrange
         const mockHandlers = {
             onMoveUp: vi.fn(),
@@ -72,14 +72,33 @@ describe('[TC-EDIT-06..09] BlockActionBar — Light/Dark Theme & Drag (GH-1367)'
         const toolbar = container.querySelector('.block-action-toolbar')
         expect(toolbar?.className).toContain('bg-[#334155]/98')
 
-        // Assert — AI icon color: text-amber-300
-        const aiButton = screen.getByTitle('Edit with AI')
-        expect(aiButton.querySelector('svg')).toHaveClass('text-amber-300')
+        // Assert — Ask AI icon color: text-teal-300 (light mode keeps it via the toolbar opt-out)
+        const aiButton = screen.getByTitle('Ask AI')
+        expect(aiButton.querySelector('svg')).toHaveClass('text-teal-300')
 
         // Assert — Delete icon color: text-red-400
         // (delete button has no title attr — it uses a Tooltip — so query the icon by class)
         const deleteIcon = container.querySelector('svg.text-red-400')
         expect(deleteIcon).toBeInTheDocument()
+    })
+
+    // TC-AIWB-61: no assistant on this deployment → no Ask AI button on the section bar
+    it('TC-AIWB-61: without onAIEdit (assistant off) the bar has no Ask AI button', () => {
+        render(
+            <BlockActionBar
+                blockIndex={1}
+                blockType="features"
+                blockName="Features"
+                totalBlocks={5}
+                position={{ top: 150, left: 250, width: 400 }}
+                onMoveUp={vi.fn()}
+                onMoveDown={vi.fn()}
+                onDuplicate={vi.fn()}
+                onDelete={vi.fn()}
+            />
+        )
+
+        expect(screen.queryByTitle('Ask AI')).toBeNull()
     })
 
     // TC-EDIT-08: Hover button class present (hover:bg-white/10)

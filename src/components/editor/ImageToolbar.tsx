@@ -1,16 +1,18 @@
 'use client'
 
 import React, { useRef } from 'react'
-import { ImagePlus, Loader2 } from 'lucide-react'
+import { ImagePlus, Loader2, Sparkles } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { useI18n } from '@/i18n'
 
 interface ImageToolbarProps {
     onImageSelect: (file: File, compressedUrl: string) => void
     isProcessing?: boolean
+    /** Ask AI about this picture (the copilot chat); omitted when the copilot is off */
+    onAskAI?: () => void
 }
 
-export function ImageToolbar({ onImageSelect, isProcessing }: ImageToolbarProps) {
+export function ImageToolbar({ onImageSelect, isProcessing, onAskAI }: ImageToolbarProps) {
     const { t } = useI18n()
     const it = t.editor.imageToolbar
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -55,6 +57,16 @@ export function ImageToolbar({ onImageSelect, isProcessing }: ImageToolbarProps)
                 )}
                 {isProcessing ? it.uploading : it.changeImage}
             </button>
+            {onAskAI && (
+                <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-300 hover:bg-white/10 rounded transition-colors"
+                    onClick={onAskAI}
+                >
+                    <Sparkles className="w-4 h-4" aria-hidden />
+                    {t.editor.elementAsk.title}
+                </button>
+            )}
 
         </div>
     )

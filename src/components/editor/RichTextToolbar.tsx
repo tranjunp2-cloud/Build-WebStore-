@@ -10,6 +10,8 @@ import { useI18n } from '@/i18n'
 
 interface RichTextToolbarProps {
     onCommand: (command: string, value?: string) => void
+    /** Ask AI (the copilot chat) on the text being edited; hidden without the copilot */
+    canAskAI?: boolean
     activeState?: Record<string, unknown>
 }
 
@@ -18,7 +20,7 @@ const PRESET_COLORS = [
     '#22C55E', '#3B82F6', '#8B5CF6', '#EC4899', '#6B7280',
 ]
 
-export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbarProps) {
+export function RichTextToolbar({ onCommand, activeState = {}, canAskAI = false }: RichTextToolbarProps) {
     const { t } = useI18n()
     const rt = t.editor.richText
     const isActive = (cmd: string) => Boolean(activeState[cmd])
@@ -308,14 +310,18 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
                 )}
             </div>
 
-            {/* AI Edit */}
-            <button
-                className="p-1.5 rounded transition-colors text-amber-500 hover:bg-amber-500/20"
-                onClick={(e) => { e.preventDefault(); onCommand('aiEdit') }}
-                title="Edit with AI"
-            >
-                <Sparkles className="w-4 h-4" />
-            </button>
+            {/* Ask AI → the copilot chat */}
+            {canAskAI && (
+                <button
+                    type="button"
+                    className="p-1.5 rounded transition-colors text-teal-300 hover:bg-teal-400/15"
+                    onClick={(e) => { e.preventDefault(); onCommand('aiEdit') }}
+                    title="Ask AI"
+                    aria-label="Ask AI"
+                >
+                    <Sparkles className="w-4 h-4" />
+                </button>
+            )}
         </div>
     )
 }
