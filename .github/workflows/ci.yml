@@ -19,7 +19,7 @@
 #   quality-check (1.5m, PR only): lint + typecheck + migrations
 #   test (3.5m, PR only, needs: quality-check)
 #   metrics (PR only, needs: test)
-#   ai-platform-check (PR only, parallel): services/ai-platform install + typecheck + test + build (Node 22)
+#   ai-platform-check (PR only, parallel): services/ai-platform install + typecheck + test + build (Node 24)
 #   deploy-staging    (push staging, no needs — CI already ran on PR)
 #   deploy-production (push main,    no needs — CI already ran on PR)
 #   deploy-ai-platform            (push staging) — separate Vercel project, same 3-stage flow
@@ -203,7 +203,7 @@ jobs:
           retention-days: 3
 
   # ──────────────────────────────────────
-  # Job 2b: ai-platform check — standalone install (Node 22)
+  # Job 2b: ai-platform check — standalone install (Node 24)
   # ──────────────────────────────────────
   # services/ai-platform is a copy synced from the monorepo (AI_LAYER_SOURCE) with its
   # own package-lock.json; it links ../../packages/{agent-core,ai-contracts} via file:.
@@ -443,32 +443,16 @@ jobs:
         # CLI aborts with a "prebuilt environment mismatch" error.
         run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
 
+      - name: Preflight — AI platform env (staging, warn only)
+        # Same check as production (scripts/ci/ai-env-preflight.mjs) but never blocks staging:
+        # missing / bad AI_PLATFORM_URL or AI_PLATFORM_CONTEXT_SECRET → ::warning:: only.
+        run: node scripts/ci/ai-env-preflight.mjs .vercel/.env.staging.local --warn-only
+
       - name: Preflight — Postgres reachable
-        run: |
-          # Ensure the DB is reachable from the runner before build runs migrations.
-          # Reads DATABASE_URI from the env file that vercel pull just wrote.
-          set -e
-          ENV_FILE=".vercel/.env.staging.local"
-          if [ ! -f "$ENV_FILE" ]; then
-            echo "::error::vercel pull did not produce $ENV_FILE"
-            exit 1
-          fi
-          # shellcheck disable=SC1090
-          set -a && . "$ENV_FILE" && set +a
-          if [ -z "${DATABASE_URI:-}" ]; then
-            echo "::error::DATABASE_URI not present in $ENV_FILE"
-            exit 1
-          fi
-          # TCP-level probe using node builtins — no npm install required.
-          node -e "
-            const net = require('net');
-            const u = new URL(process.env.DATABASE_URI);
-            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
-            s.setTimeout(5000);
-            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
-            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
-            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
-          "
+        # Ensure the DB is reachable from the runner before build runs migrations.
+        # Reads only DATABASE_URI from the env file vercel pull just wrote — never sourced into
+        # the shell, never printed. TCP-level probe using node builtins — no npm install required.
+        run: node scripts/ci/pg-tcp-check.mjs .vercel/.env.staging.local DATABASE_URI
 
       - name: Build --target=staging
         # --target=staging must match both the pulled env metadata
@@ -618,30 +602,20 @@ jobs:
       - name: Pull Vercel env (production)
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
+      - name: Preflight — AI platform env (production)
+        # Without AI_PLATFORM_URL (https) + AI_PLATFORM_CONTEXT_SECRET (32+ chars) production still
+        # runs, but onboarding falls back to rule-based sites, auto SEO stops and /api/ai/* answers
+        # 503 — silently. Fail the deploy here (Notify deploy fail pings Lark). An empty secret only
+        # warns (a Vercel Sensitive variable is pulled empty). AI_AGENT_ENABLED is not checked: the
+        # copilot is off on production on purpose. To ship without AI deliberately, set repo
+        # variable ALLOW_PROD_WITHOUT_AI=true (problems become warnings).
+        env:
+          ALLOW_PROD_WITHOUT_AI: ${{ vars.ALLOW_PROD_WITHOUT_AI }}
+        run: node scripts/ci/ai-env-preflight.mjs .vercel/.env.production.local
+
       - name: Preflight — Postgres reachable
-        run: |
-          set -e
-          ENV_FILE=".vercel/.env.production.local"
-          if [ ! -f "$ENV_FILE" ]; then
-            echo "::error::vercel pull did not produce $ENV_FILE"
-            exit 1
-          fi
-          # shellcheck disable=SC1090
-          set -a && . "$ENV_FILE" && set +a
-          if [ -z "${DATABASE_URI:-}" ]; then
-            echo "::error::DATABASE_URI not present in $ENV_FILE"
-            exit 1
-          fi
-          # TCP-level probe using node builtins — no npm install required.
-          node -e "
-            const net = require('net');
-            const u = new URL(process.env.DATABASE_URI);
-            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
-            s.setTimeout(5000);
-            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
-            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
-            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
-          "
+        # Reads only DATABASE_URI (never sourced, never printed); TCP probe, node builtins only.
+        run: node scripts/ci/pg-tcp-check.mjs .vercel/.env.production.local DATABASE_URI
 
       - name: Build (prod)
         run: vercel build --prod --token="$VERCEL_TOKEN"
@@ -745,30 +719,10 @@ jobs:
         run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
 
       - name: Preflight — ai-platform Postgres reachable
-        run: |
-          # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
-          # Fail here (not mid-build) when it is missing or unreachable from the runner.
-          set -e
-          ENV_FILE=".vercel/.env.staging.local"
-          if [ ! -f "$ENV_FILE" ]; then
-            echo "::error::vercel pull did not produce $ENV_FILE"
-            exit 1
-          fi
-          # shellcheck disable=SC1090
-          set -a && . "$ENV_FILE" && set +a
-          if [ -z "${AI_PLATFORM_DATABASE_URL:-}" ]; then
-            echo "::error::AI_PLATFORM_DATABASE_URL not present in $ENV_FILE"
-            exit 1
-          fi
-          node -e "
-            const net = require('net');
-            const u = new URL(process.env.AI_PLATFORM_DATABASE_URL);
-            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
-            s.setTimeout(5000);
-            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
-            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
-            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
-          "
+        # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
+        # Fail here (not mid-build) when it is missing or unreachable from the runner.
+        # Reads only that key (never sourced, never printed). Path is from services/ai-platform.
+        run: node ../../scripts/ci/pg-tcp-check.mjs .vercel/.env.staging.local AI_PLATFORM_DATABASE_URL
 
       - name: Build --target=staging
         run: vercel build --target=staging --token="$VERCEL_TOKEN"
@@ -860,30 +814,10 @@ jobs:
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
       - name: Preflight — ai-platform Postgres reachable
-        run: |
-          # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
-          # Fail here (not mid-build) when it is missing or unreachable from the runner.
-          set -e
-          ENV_FILE=".vercel/.env.production.local"
-          if [ ! -f "$ENV_FILE" ]; then
-            echo "::error::vercel pull did not produce $ENV_FILE"
-            exit 1
-          fi
-          # shellcheck disable=SC1090
-          set -a && . "$ENV_FILE" && set +a
-          if [ -z "${AI_PLATFORM_DATABASE_URL:-}" ]; then
-            echo "::error::AI_PLATFORM_DATABASE_URL not present in $ENV_FILE"
-            exit 1
-          fi
-          node -e "
-            const net = require('net');
-            const u = new URL(process.env.AI_PLATFORM_DATABASE_URL);
-            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
-            s.setTimeout(5000);
-            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
-            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
-            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
-          "
+        # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
+        # Fail here (not mid-build) when it is missing or unreachable from the runner.
+        # Reads only that key (never sourced, never printed). Path is from services/ai-platform.
+        run: node ../../scripts/ci/pg-tcp-check.mjs .vercel/.env.production.local AI_PLATFORM_DATABASE_URL
 
       - name: Build --prod
         run: vercel build --prod --token="$VERCEL_TOKEN"
@@ -1004,34 +938,12 @@ jobs:
             --token="$VERCEL_TOKEN"
 
       - name: Preflight — Postgres reachable
+        # Reads only DATABASE_URI (never sourced, never printed); TCP probe, node builtins only.
+        # Sanity check first: it must resolve to the QC endpoint, not staging (ep-blue-king-a1qufqjg).
         run: |
-          set -e
-          ENV_FILE=".vercel/.env.preview.local"
-          if [ ! -f "$ENV_FILE" ]; then
-            echo "::error::vercel pull did not produce $ENV_FILE"
-            exit 1
-          fi
-          # shellcheck disable=SC1090
-          set -a && . "$ENV_FILE" && set +a
-          if [ -z "${DATABASE_URI:-}" ]; then
-            echo "::error::DATABASE_URI not present in $ENV_FILE"
-            exit 1
-          fi
-          # Sanity check: must resolve to QC endpoint, not staging.
-          if echo "$DATABASE_URI" | grep -q "ep-blue-king-a1qufqjg"; then
-            echo "::error::DATABASE_URI points at staging endpoint — branch-filter override missing"
-            echo "::error::Fix: Vercel Dashboard → env vars → add DATABASE_URI with scope Preview + branch=qc-test"
-            exit 1
-          fi
-          node -e "
-            const net = require('net');
-            const u = new URL(process.env.DATABASE_URI);
-            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
-            s.setTimeout(5000);
-            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
-            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
-            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
-          "
+          node scripts/ci/pg-tcp-check.mjs .vercel/.env.preview.local DATABASE_URI \
+            --forbid ep-blue-king-a1qufqjg \
+            --forbid-hint "DATABASE_URI points at staging endpoint — branch-filter override missing. Fix: Vercel Dashboard → env vars → add DATABASE_URI with scope Preview + branch=qc-test"
 
       - name: Build (preview)
         run: vercel build --token="$VERCEL_TOKEN"
