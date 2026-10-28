@@ -74,6 +74,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-02-25** | `GH-1984/select` | `UX` | Bấm vào bất kỳ đâu trên card để chọn trang | 1. Bấm vào dòng path/ngày của trang khác.<br>2. Bấm icon eye/trash.<br>3. Bấm thân card đang chọn. | - Bước 1 chọn trang đó.<br>- Bước 2 không làm chọn trang (chỉ chạy action của icon).<br>- Bước 3 không làm gì. | Medium | [x] |
 | **TC-F05-02-26** | `GH-1984/layout` | `UX` | Thứ tự trên hàng tiêu đề card | 1. Mở tab Pages, quan sát 1 card thường. | - Thứ tự: tên → badge trạng thái → (khoảng trống) → icon eye, trash sát phải.<br>- Light theme: card tách khỏi nền, chữ badge đọc rõ. | Medium | [x] |
 | **TC-F05-02-27** | `GH-1984/name-literal` | `Bound` | Tên trang chứa `$&` hiển thị nguyên văn trong xác nhận xoá và toast | 1. Đổi tên 1 trang thành `Sale $& more`.<br>2. Bấm trash → Delete. | - Câu xác nhận và toast hiển thị đúng `Sale $& more` (không bị thay `{name}`/ký tự đặc biệt). | Low | [x] |
+| **TC-F05-02-28** | `slug/reserved` | `Neg` | Tạo trang có slug hệ thống `/checkout` hoặc `/orders` | 1. Mở tab Pages → Add new page.<br>2. Nhập tên "Checkout" (hoặc "Orders").<br>3. Gọi thẳng `POST /api/sites/{id}/pages` hoặc `PATCH .../pages/{pageId}` (site chưa publish) với slug `checkout` hoặc `orders`. | - Form báo lỗi "URL này được hệ thống sử dụng" và không cho tạo.<br>- API trả 400, không tạo page. Tên như "Checkout info" vẫn tạo được. | High | [ ] |
 
 ---
 

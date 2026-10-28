@@ -313,6 +313,19 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         expect(body.error).toContain('duplicate')
     })
 
+    it.each(['checkout', '/checkout', 'checkout/', 'orders', '/orders'])('TC-F05-02-28: returns 400 when renaming a page to reserved slug %s', async (slug) => {
+        mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] }) // auth
+        mockFindByID.mockResolvedValueOnce({ id: '10', site: 1, slug: '/old', title: 'Old' })
+
+        const req = { json: () => Promise.resolve({ slug }) } as unknown as Request
+        const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
+        const body = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(body.error).toContain('reserved')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
     it('returns 400 when no fields to update', async () => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] })
         mockFindByID.mockResolvedValueOnce({ id: '10', site: 1, slug: '/about', title: 'About' })

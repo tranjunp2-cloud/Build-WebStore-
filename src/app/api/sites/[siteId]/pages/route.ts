@@ -10,6 +10,7 @@ import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { z } from 'zod'
 import { sql } from 'drizzle-orm'
 import { homepageFrame, type LayoutBlock } from '@/lib/sites/new-page-layout'
+import { isReservedPageSlug } from '@/lib/utils/reserved-page-slugs'
 
 const MAX_PAGES_PER_SITE = 100
 
@@ -170,9 +171,8 @@ export const POST = withFeatureGuard('website_builder')(withAuth<RouteContext>(a
         let normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`
         if (normalizedSlug === '//') normalizedSlug = '/'
 
-        // Block reserved slugs — these are auto-managed by the system
-        const RESERVED_SLUGS = ['/404']
-        if (RESERVED_SLUGS.includes(normalizedSlug)) {
+        // Block reserved slugs — system-managed (/404) or served by a fixed storefront route (/checkout)
+        if (isReservedPageSlug(normalizedSlug)) {
             return new NextResponse('This slug is reserved and cannot be used', { status: 400 })
         }
 

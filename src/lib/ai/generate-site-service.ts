@@ -43,6 +43,7 @@ import {
     normalizeSupportedLocale,
 } from '@/lib/language-detection'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
+import { applyGenerationContact, buildSiteContactInfo } from '@/lib/ai/user-contact-defaults'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveBusinessCategory, normalizeComposerCategory } from '@/lib/ai/composer-category-resolver'
@@ -538,6 +539,18 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             where: migration ? { and: [{ tenant: { equals: resolvedTenantId } }, { id: { equals: migration.targetSiteId } }] } : { tenant: { equals: resolvedTenantId } },
             limit: 1,
         })
+
+        // Contact defaults: form > existing site contactInfo > account (see
+        // user-contact-defaults.ts). Runs after startCapture, so the captured
+        // snapshot keeps the raw form input. Recovery/admin rerun call
+        // generateSiteWithAI directly with that snapshot and never reach this
+        // step, so a recovered site gets no account-derived contact.
+        const existingForContact = (await existingSitesPromise).docs[0] as { contactInfo?: Record<string, unknown> } | undefined
+        Object.assign(businessInfo, applyGenerationContact(businessInfo, {
+            user: user as { email?: unknown; phone?: unknown },
+            existingContactInfo: existingForContact?.contactInfo,
+            migration: Boolean(migration),
+        }))
 
         // Check SSE mode
         const isStreaming = context.streaming === true
@@ -1377,6 +1390,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         const detectedLocale = (['ms', 'en'] as string[]).includes(generationLocale) ? generationLocale : 'en'
         const productsGridContentLocale = detectedLocale === 'ms' ? 'ms' : 'en'
         const pendingLocaleConfirm = false
+        const generatedContactInfo = buildSiteContactInfo(businessInfo)
         const siteGenerationData = {
             name: result.siteName,
             status: 'draft' as const,
@@ -1389,6 +1403,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 metaTitle: result.seo.title,
                 metaDescription: result.seo.description,
             },
+            ...(Object.keys(generatedContactInfo).length > 0 ? { contactInfo: generatedContactInfo } : {}),
             aiGenerationMetadata: {
                 generatedAt: new Date().toISOString(),
                 originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,

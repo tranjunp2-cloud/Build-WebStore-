@@ -14,11 +14,14 @@ const formatTime = (t: number) => {
 
 const stop = (e: MouseEvent | PointerEvent) => e.stopPropagation()
 
+const CONTROLS_IDLE_MS = 2500
+
 const ctrlBtn =
   'flex size-8 flex-none items-center justify-center rounded-lg border-0 bg-transparent p-0 transition-[background-color,color,transform] duration-150 hover:bg-white/[.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/70'
 
 /**
- * Custom player for the V2 intro video: poster first, one glass control bar, controls hide while playing unless hovered.
+ * Custom player for the V2 intro video: poster first, one glass control bar; while playing the bar hides once the pointer
+ * rests (it would sit on the burned-in subtitles) and comes back on pointer move, tap or keyboard focus.
  * Loading: metadata on open, full buffering once the browser is idle (skipped on Save-Data / 2G) or when the user
  * reaches for Play; shimmer until the poster paints, spinner while playback waits for data.
  */
@@ -38,7 +41,11 @@ export function V2IntroVideo({ onFullscreenChange }: { onFullscreenChange?: () =
   const [started, setStarted] = useState(false)
   const [muted, setMuted] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
-  const [hover, setHover] = useState(false)
+  // Pointer moved over the player recently — the bar sits on the burned-in subtitles, so it hides again when the pointer rests
+  const [awake, setAwake] = useState(false)
+  const idleTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // Pointer or keyboard focus is on the bar — keep it up
+  const onBar = useRef({ pointer: false, focus: false })
   const [buffering, setBuffering] = useState(false)
   const [missing, setMissing] = useState(false)
   const [duration, setDuration] = useState(0)
@@ -81,7 +88,20 @@ export function V2IntroVideo({ onFullscreenChange }: { onFullscreenChange?: () =
     return () => document.removeEventListener('fullscreenchange', onFs)
   }, [onFullscreenChange])
 
-  const showControls = !missing && (!playing || hover)
+  useEffect(() => () => clearTimeout(idleTimer.current), [])
+
+  const wake = () => {
+    setAwake(true)
+    clearTimeout(idleTimer.current)
+    idleTimer.current = setTimeout(() => { if (!onBar.current.pointer && !onBar.current.focus && !seeking.current) setAwake(false) }, CONTROLS_IDLE_MS)
+  }
+
+  const sleep = () => {
+    clearTimeout(idleTimer.current)
+    setAwake(false)
+  }
+
+  const showControls = !missing && (!playing || awake)
   const progress = duration > 0 ? Math.min(1, current / duration) : 0
 
   const togglePlay = (e?: MouseEvent) => {
@@ -162,13 +182,15 @@ export function V2IntroVideo({ onFullscreenChange }: { onFullscreenChange?: () =
   const playLabel = playing ? copy.video.pause : ended ? copy.video.replay : copy.video.play
   const onWaitingForData = () => { if (playRequested.current) setBuffering(true) }
   const updateBuffered = (v: HTMLVideoElement) => setBuffered(bufferedFraction(v))
+  const onMediaError = () => { setMissing(true); setPlaying(false); setBuffering(false) }
 
   return (
     <div
       ref={playerRef}
       onClick={togglePlay}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onPointerMove={wake}
+      onPointerDown={wake}
+      onMouseLeave={sleep}
       className="relative aspect-video cursor-pointer select-none overflow-hidden bg-black"
     >
       <video
@@ -187,11 +209,19 @@ export function V2IntroVideo({ onFullscreenChange }: { onFullscreenChange?: () =
         onPlaying={() => { setBuffering(false); setHasPlayed(true) }}
         onCanPlay={() => setBuffering(false)}
         onEnded={() => { setPlaying(false); setEnded(true) }}
-        onError={() => { setMissing(true); setPlaying(false); setBuffering(false) }}
+        // React bubbles <source> errors up here; an earlier source failing only means the browser tries the next one
+        onError={(e) => { if (e.target === e.currentTarget) onMediaError() }}
       >
-        <source src={V2_INTRO_MEDIA.webm} type={V2_INTRO_MEDIA.webmType} />
-        {/* With <source> children the error fires on the last source, not on the video */}
-        <source src={V2_INTRO_MEDIA.mp4} type={V2_INTRO_MEDIA.mp4Type} onError={() => { setMissing(true); setPlaying(false); setBuffering(false) }} />
+        {V2_INTRO_MEDIA.sources.map((s, i, all) => (
+          <source
+            key={s.src}
+            src={s.src}
+            type={s.type}
+            media={s.media}
+            // With <source> children the error fires on the last source, not on the video
+            onError={i === all.length - 1 ? onMediaError : undefined}
+          />
+        ))}
       </video>
 
       {/* Poster as a real image: preloaded with the popup and shown until the first frame plays */}
@@ -202,8 +232,8 @@ export function V2IntroVideo({ onFullscreenChange }: { onFullscreenChange?: () =
           ref={posterRef}
           src={V2_INTRO_MEDIA.posterJpg}
           alt=""
-          width={1280}
-          height={720}
+          width={V2_INTRO_MEDIA.posterWidth}
+          height={V2_INTRO_MEDIA.posterHeight}
           fetchPriority="high"
           decoding="async"
           onLoad={() => setPosterReady(true)}
@@ -245,7 +275,13 @@ export function V2IntroVideo({ onFullscreenChange }: { onFullscreenChange?: () =
       </span>
 
       <div
+        data-testid="v2-intro-controls"
         onClick={stop}
+        onPointerEnter={() => { onBar.current.pointer = true }}
+        onPointerLeave={() => { onBar.current.pointer = false; wake() }}
+        // Keyboard focus only — a mouse click on Play focuses it too, and that must not pin the bar over the subtitles
+        onFocus={(e) => { onBar.current.focus = e.target.matches(':focus-visible'); wake() }}
+        onBlur={() => { onBar.current.focus = false; wake() }}
         className={`absolute inset-x-3 bottom-3 z-[2] flex cursor-default items-center gap-2 transition-[opacity,transform] duration-[250ms] ${showControls ? 'pointer-events-auto opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}
       >
         <div className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-solid border-white/10 bg-slate-950/[.62] px-1.5 backdrop-blur-[10px]">

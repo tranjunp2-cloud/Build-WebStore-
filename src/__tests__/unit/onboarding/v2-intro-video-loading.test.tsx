@@ -5,7 +5,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { I18nProvider } from '@/i18n'
 import { V2IntroVideo } from '@/components/dashboard/V2IntroVideo'
-import { V2_INTRO_MEDIA, bufferedFraction, canPreloadVideo } from '@/components/dashboard/v2-intro-media'
+import { V2_INTRO_LARGE_SCREEN, V2_INTRO_MEDIA, bufferedFraction, canPreloadVideo } from '@/components/dashboard/v2-intro-media'
 
 const renderPlayer = () =>
     render(
@@ -35,16 +35,22 @@ describe('[TC-F06.24] V2 intro video — loading strategy', () => {
         setConnection(undefined)
     })
 
-    it('TC-F06.24: lists AV1 WebM first and H.264 MP4 second, hashed file names', () => {
+    it('TC-F06.24: 1080p for large screens first, 720p after it; H.264 MP4 with hashed names', () => {
         // Arrange + Act
         const { container } = renderPlayer()
 
         // Assert
         const sources = [...video(container).querySelectorAll('source')]
-        expect(sources.map(s => s.getAttribute('src'))).toEqual([V2_INTRO_MEDIA.webm, V2_INTRO_MEDIA.mp4])
-        expect(sources[0].getAttribute('type')).toMatch(/^video\/webm/)
-        expect(V2_INTRO_MEDIA.mp4).toMatch(/^\/videos\/v2-intro\.[0-9a-f]{8}\.mp4$/)
-        expect(V2_INTRO_MEDIA.webm).toMatch(/^\/videos\/v2-intro\.[0-9a-f]{8}\.webm$/)
+        expect(sources.map(s => [s.getAttribute('src'), s.getAttribute('media')])).toEqual([
+            [expect.stringMatching(/^\/videos\/v2-intro-1080\.[0-9a-f]{8}\.mp4$/), V2_INTRO_LARGE_SCREEN],
+            // No media on 720p: a browser that ignores `media` still lands on 1080p, never a soft 720p on desktop
+            [expect.stringMatching(/^\/videos\/v2-intro-720\.[0-9a-f]{8}\.mp4$/), null],
+        ])
+        expect(sources.map(s => s.getAttribute('type'))).toEqual([
+            'video/mp4; codecs="avc1.640028, mp4a.40.2"',
+            'video/mp4; codecs="avc1.64001f, mp4a.40.2"',
+        ])
+        expect(V2_INTRO_LARGE_SCREEN).toBe('(min-width: 769px)')
     })
 
     it('TC-F06.24: opens with preload=metadata, then buffers (auto) once the browser is idle', () => {
@@ -199,11 +205,90 @@ describe('[TC-F06.25] V2 intro video — loading states', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Play video' }))
         expect(screen.queryByText('Video coming soon')).not.toBeInTheDocument()
 
-        // Act — the MP4 is the last source
-        fireEvent.error(container.querySelectorAll('video source')[1])
+        // Act — an earlier source failing is not the end: the browser moves on to the next one
+        fireEvent.error(container.querySelectorAll('video source')[0])
+        expect(screen.queryByText('Video coming soon')).not.toBeInTheDocument()
+        // the 720p MP4 is the last source
+        fireEvent.error([...container.querySelectorAll('video source')].at(-1)!)
 
         // Assert
         expect(screen.getByText('Video coming soon')).toBeVisible()
         expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+})
+
+describe('[TC-F06.26] V2 intro video — controls stay off the subtitles', () => {
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve())
+        vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
+        vi.restoreAllMocks()
+    })
+
+    const controlBar = () => screen.getByTestId('v2-intro-controls')
+    const playing = (c: HTMLElement) => {
+        fireEvent.click(screen.getByRole('button', { name: 'Play video' }))
+        fireEvent.play(video(c))
+    }
+
+    it('TC-F06.26: while playing, the bar hides once the pointer rests on the video and comes back when it moves', () => {
+        // Arrange
+        const { container } = renderPlayer()
+        playing(container)
+        const player = container.firstElementChild as HTMLElement
+
+        // Act — pointer moves over the video
+        fireEvent.pointerMove(player)
+
+        // Assert
+        expect(controlBar()).toHaveClass('opacity-100')
+
+        // Act — pointer rests
+        act(() => { vi.advanceTimersByTime(2600) })
+
+        // Assert
+        expect(controlBar()).toHaveClass('opacity-0')
+
+        // Act
+        fireEvent.pointerMove(player)
+
+        // Assert
+        expect(controlBar()).toHaveClass('opacity-100')
+    })
+
+    it('TC-F06.26: the bar stays while the pointer or keyboard focus is on it, and always while paused', () => {
+        // Arrange
+        const { container } = renderPlayer()
+        playing(container)
+        const bar = controlBar()
+
+        // Act — pointer on the bar
+        fireEvent.pointerEnter(bar)
+        fireEvent.pointerMove(bar)
+        act(() => { vi.advanceTimersByTime(5000) })
+
+        // Assert
+        expect(bar).toHaveClass('opacity-100')
+
+        // Act — pointer leaves, keyboard focus moves in
+        fireEvent.pointerLeave(bar)
+        act(() => { screen.getByRole('button', { name: 'Mute' }).focus() })
+        act(() => { vi.advanceTimersByTime(5000) })
+
+        // Assert
+        expect(bar).toHaveClass('opacity-100')
+
+        // Act — focus leaves, then playback pauses
+        act(() => { screen.getByRole('button', { name: 'Mute' }).blur() })
+        act(() => { vi.advanceTimersByTime(2600) })
+        expect(bar).toHaveClass('opacity-0')
+        fireEvent.pause(video(container))
+
+        // Assert
+        expect(bar).toHaveClass('opacity-100')
     })
 })

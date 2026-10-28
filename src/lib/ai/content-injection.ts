@@ -400,11 +400,13 @@ export function buildBlockFromLibrary(
                     ?? (isNonEnglish ? userDescription ?? name : i18n.contact.subheadline),
                 sectionLabel: localized?.sections.contact ?? navigation.contact,
                 // Plan 07 — user-supplied contact fields win over canned pool.
-                address: userAddress ?? biz?.address ?? '',
-                phone: userPhone ?? biz?.phone ?? '',
+                // Real generation (userBiz present) never falls back to canned sample
+                // contact data; gallery/preview callers (no userBiz) keep the sample.
+                address: userAddress ?? (userBiz ? '' : biz?.address ?? ''),
+                phone: userPhone ?? (userBiz ? '' : biz?.phone ?? ''),
                 // null not '' — Payload email-type field validates format even without required:true,
                 // so empty string causes ValidationError on publish.
-                email: userEmail ?? biz?.email ?? null,
+                email: userEmail ?? (userBiz ? null : biz?.email ?? null),
                 submitLabel: localized?.contact.submitLabel ?? i18n.contact.submitLabel,
                 phoneLabel: localized?.contact.phoneLabel ?? i18n.contact.phoneLabel,
                 addressLabel: localized?.contact.addressLabel ?? i18n.contact.addressLabel,

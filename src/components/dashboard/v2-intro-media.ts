@@ -1,15 +1,23 @@
 // V2 intro video assets + loading helpers. File names carry a content hash so
 // /videos/* can be cached as immutable (next.config.ts headers()).
 
+/** Viewports above this get the 1080p encodes (dialog + full screen stay sharp); phones and tablets get 720p */
+export const V2_INTRO_LARGE_SCREEN = '(min-width: 769px)'
+
 export const V2_INTRO_MEDIA = {
-  /** AV1 + Opus — smallest; browsers without AV1 fall through to the MP4 */
-  webm: '/videos/v2-intro.797fa6f7.webm',
-  webmType: 'video/webm; codecs="av01.0.05M.08, opus"',
-  /** H.264 High + AAC — plays everywhere */
-  mp4: '/videos/v2-intro.353eb55a.mp4',
-  mp4Type: 'video/mp4; codecs="avc1.640028, mp4a.40.2"',
-  posterWebp: '/videos/v2-intro-poster.58c9b524.webp',
-  posterJpg: '/videos/v2-intro-poster.0d752135.jpg',
+  /**
+   * H.264 High + AAC only: at the same sharpness AV1 wasn't smaller for this screen-recording video and it smeared the
+   * fading burned-in subtitles. 1080p carries the media query, 720p doesn't — a browser that ignores `media` on <source>
+   * picks 1080p (sharp, just heavier on a phone) instead of a soft 720p on desktop.
+   */
+  sources: [
+    { src: '/videos/v2-intro-1080.348f3e19.mp4', type: 'video/mp4; codecs="avc1.640028, mp4a.40.2"', media: V2_INTRO_LARGE_SCREEN },
+    { src: '/videos/v2-intro-720.e1052c5e.mp4', type: 'video/mp4; codecs="avc1.64001f, mp4a.40.2"' },
+  ] as ReadonlyArray<{ src: string; type: string; media?: string }>,
+  posterWebp: '/videos/v2-intro-poster.d75884bd.webp',
+  posterJpg: '/videos/v2-intro-poster.3baf3b45.jpg',
+  posterWidth: 1600,
+  posterHeight: 900,
 } as const
 
 type ConnectionInfo = { saveData?: boolean; effectiveType?: string }

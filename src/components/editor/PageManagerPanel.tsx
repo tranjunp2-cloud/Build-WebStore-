@@ -106,6 +106,7 @@ export function PageManagerPanel({
         createPage: pm.createPage,
         duplicatePage: pm.duplicatePage,
         invalidPageName: pm.invalidPageName,
+        reservedPage: pm.reservedPage,
     }
 
     const addForm = (
