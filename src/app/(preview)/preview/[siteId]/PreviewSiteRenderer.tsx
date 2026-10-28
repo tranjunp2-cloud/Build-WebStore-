@@ -5,6 +5,7 @@ import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
 import { useEditorStore } from '@/store/editorStore'
 import { resolveInitialActiveLocale } from '@/lib/detect-locale'
+import { siteLanguages } from '@/lib/site-languages'
 
 interface Props {
     site: SiteRendererProps['site']
@@ -41,10 +42,10 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
         const s = site as Record<string, unknown>
         const generationLocale = (s.generationLocale as string) || (s.locale as string) || 'en'
         const persistedLocale = s.locale as string | undefined
-        const activeLocale = resolveInitialActiveLocale(generationLocale, persistedLocale)
         // F26: seed the persisted language pair so the header switcher renders exactly
         // [primary, secondary] on first paint (matches the editor's Quick Language panel).
         const header = s.headerBlock as { primaryLocale?: string; secondaryLocale?: string } | null | undefined
+        const activeLocale = resolveInitialActiveLocale(generationLocale, persistedLocale, siteLanguages({ ...header, generationLocale }))
         const store = useEditorStore.getState()
         store.setGenerationLocale(generationLocale)
         store.setActiveLocale(activeLocale)
