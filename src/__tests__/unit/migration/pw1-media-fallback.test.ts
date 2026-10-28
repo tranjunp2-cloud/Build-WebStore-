@@ -93,4 +93,16 @@ describe('[TC-F35.M12] Missing/forbidden images and download size', () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('hello', { headers: { 'content-type': 'application/octet-stream' } })))
         await expect(downloadSourceImage('https://s3.example/b.jpg')).rejects.toThrow('not a supported raster image')
     })
+    it('[TC-F35.M64] accepts a JPEG stored as .txt and served as text/plain, but still rejects real text', async () => {
+        // Arrange: PW1 keeps some uploads as `<hash>.txt`, which DigitalOcean Spaces serves as text/plain
+        const jpeg = await sharp({ create: { width: 4, height: 4, channels: 3, background: '#cc3366' } }).jpeg().toBuffer()
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(jpeg, { headers: { 'content-type': 'text/plain' } })))
+        // Act
+        const asset = await downloadSourceImage('https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-primeweb/img/2026/a.txt')
+        // Assert
+        expect(asset.mimetype).toBe('image/jpeg')
+        expect(asset.buffer.equals(jpeg)).toBe(true)
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('rv isi', { headers: { 'content-type': 'text/plain; charset=utf-8' } })))
+        await expect(downloadSourceImage('https://tm-prime-web.sgp1.digitaloceanspaces.com/tm-primeweb/img/2026/b.txt')).rejects.toThrow('not a supported raster image')
+    })
 })
