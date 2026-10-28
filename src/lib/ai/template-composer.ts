@@ -622,7 +622,7 @@ function buildFooter(
   const supportLinks = [
     { label: i18n.footer.helpCenter, url: '/help' },
     { label: 'FAQ', url: '/faq' },
-    { label: i18n.footer.getInTouch, url: `mailto:${biz.email}` },
+    ...(biz.email ? [{ label: i18n.footer.getInTouch, url: `mailto:${biz.email}` }] : []),
   ].filter((l) => isLiveLink(l.url))
 
   const legalLinks = [
@@ -2320,8 +2320,11 @@ export function composeFromBlueprint(
     return null
   }
 
+  // Real generation (bizOverride present): never leak canned phone/email/address
+  // into a user's site — blank them unless the user supplied their own.
+  // Template gallery/preview (no override) keeps the sample data.
   const biz: BusinessSample = bizOverride
-    ? { ...structuredClone(baseBiz), ...bizOverride }
+    ? { ...structuredClone(baseBiz), phone: '', email: '', address: '', ...bizOverride }
     : baseBiz
 
   // Use businessIndex as seed if not provided — each template gets deterministic but different variants

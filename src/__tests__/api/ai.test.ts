@@ -21,11 +21,11 @@ import { buildBulkCategoryInstructions } from '@/lib/ai/bulk-category-matching'
 vi.mock('@/lib/auth', () => ({
     withAuth: vi.fn().mockImplementation((handler: any) => {
         return async (req: any, ctx: any) => {
-            const user = { id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }
+            const user = { id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }], ...mockAuthContact }
             return handler(user, req, ctx)
         }
     }),
-    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }),
+    getCurrentUser: vi.fn().mockImplementation(async () => ({ id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }], ...mockAuthContact })),
     tenantIdForQuery: vi.fn().mockReturnValue('tenant-1'),
 }))
 
@@ -71,6 +71,7 @@ const mockPayloadLoggerInfo = vi.hoisted(() => vi.fn())
 let mockCompleteBlogCount = 3
 let mockFailedPageCreateData: Record<string, unknown> | null = null
 let mockIdCounter = 0
+let mockAuthContact: { email?: string; phone?: string } = {}
 
 type PersistedBlock = Record<string, unknown> & { blockType?: string }
 type PersistedPage = Record<string, unknown> & {
@@ -292,6 +293,7 @@ describe('AI Streaming APIs', () => {
         mockCompleteBlogCount = 3
         mockFailedPageCreateData = null
         mockIdCounter = 0
+        mockAuthContact = {}
     })
 
     describe('POST /api/ai/generate-site', () => {
@@ -1460,6 +1462,45 @@ describe('AI Streaming APIs', () => {
              )
              expect(siteCreateCall).toBeDefined()
              expect(siteCreateCall![0].data.generationStatus).toBe('generating')
+        })
+
+        describe('contactInfo persistence (TC-F01-W.09, GH-2048)', () => {
+            const generate = async () => {
+                const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                    }),
+                })
+                await GenerateSitePOST(req)
+                const resolvedPayload = await vi.mocked(getPayload).mock.results[0]?.value
+                return resolvedPayload as { create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> }
+            }
+            const siteWrite = (calls: Array<[{ collection: string; data?: { contactInfo?: Record<string, string> } }]>) =>
+                calls.find((c) => c[0].collection === 'sites')?.[0].data
+
+            it('new site: saves account email + phone as contactInfo', async () => {
+                mockAuthContact = { email: 'Owner@Login.my', phone: '60123456789' }
+                const p = await generate()
+                expect(siteWrite(p.create.mock.calls as never)?.contactInfo)
+                    .toEqual({ email: 'owner@login.my', phone: '60123456789' })
+            })
+
+            it('new site: omits contactInfo when the account has no usable contact (QC email, no phone)', async () => {
+                mockAuthContact = { email: 'qa@primeweb.local' }
+                const p = await generate()
+                const data = siteWrite(p.create.mock.calls as never)
+                expect(data).toBeDefined()
+                expect(data?.contactInfo).toBeUndefined()
+            })
+
+            it('regenerate: keeps contactInfo the owner edited, account only fills empty fields', async () => {
+                mockAuthContact = { email: 'owner@login.my', phone: '60123456789' }
+                mockSiteDB = [{ id: 'site-existing', tenant: 'tenant-1', name: 'Bakery', generationStatus: 'completed', contactInfo: { email: 'shop@mybiz.my' } }]
+                const p = await generate()
+                expect(siteWrite(p.update.mock.calls as never)?.contactInfo)
+                    .toEqual({ email: 'shop@mybiz.my', phone: '60123456789' })
+            })
         })
 
         // TC-F26-01-02 (extension): user-confirmed source locale persists verbatim.

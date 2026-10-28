@@ -275,7 +275,7 @@ export function composeTemplateResult(
     }
 
     const biz: BusinessSample = bizOverride
-        ? { ...baseBiz, ...bizOverride }
+        ? { ...baseBiz, phone: '', email: '', address: '', ...bizOverride }
         : baseBiz
 
     // Phase 06 — the consistency check runs ONE level up in
