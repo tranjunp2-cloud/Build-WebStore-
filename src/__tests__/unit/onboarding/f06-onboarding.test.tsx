@@ -135,7 +135,7 @@ describe('AIDiscoveryWizard', () => {
         expect(screen.getByRole('button', { name: /Get started/ })).toBeVisible()
 
         const video = container.querySelector('video')
-        expect([...container.querySelectorAll('video source')].map(s => s.getAttribute('src'))).toEqual([V2_INTRO_MEDIA.webm, V2_INTRO_MEDIA.mp4])
+        expect([...container.querySelectorAll('video source')].map(s => s.getAttribute('src'))).toEqual(V2_INTRO_MEDIA.sources.map(s => s.src))
         expect(container.querySelector('picture img')).toHaveAttribute('src', V2_INTRO_MEDIA.posterJpg)
         expect(video).toHaveAttribute('preload', 'metadata')
         // Never autoplays with sound
