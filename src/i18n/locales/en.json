@@ -3424,9 +3424,6 @@
       },
       "success": {
         "title": "Feedback sent",
-        "feedbackId": "Feedback ID",
-        "copy": "Copy",
-        "copied": "Copied",
         "notifyNote": "We'll notify you in Prime Web (the bell icon) when there's an update."
       }
     }

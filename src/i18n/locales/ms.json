@@ -3424,9 +3424,6 @@
       },
       "success": {
         "title": "Maklum balas dihantar",
-        "feedbackId": "ID maklum balas",
-        "copy": "Salin",
-        "copied": "Disalin",
         "notifyNote": "Kami akan memaklumkan anda dalam Prime Web (ikon loceng) apabila ada kemas kini."
       }
     }
