@@ -57,14 +57,7 @@ export const POST = withAuth(async (user, request) => {
             parsed.data,
             key.data,
             // Tenant and reporter come from the session, never from the client body.
-            {
-                tenantId,
-                storeName,
-                isMigratedStore,
-                appVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
-                userAgent: request.headers.get('user-agent')?.slice(0, 300) ?? null,
-                ...extractReporter(user),
-            },
+            { tenantId, storeName, ...extractReporter(user) },
             { appToken, tableId },
         )
         // A retry of a request that already landed does not count against the limit.

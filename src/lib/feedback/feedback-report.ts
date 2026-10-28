@@ -12,9 +12,6 @@ export const feedbackSchema = z.object({
     areas: z.array(z.enum(AREA_KEYS)).min(1).max(AREA_KEYS.length).refine((a) => new Set(a).size === a.length),
     details: z.string().trim().min(10).max(2000),
     // Lark attachment tokens from /api/feedback/screenshots (Lark rejects tokens from another Base).
-    // Context the client reports about where the form was opened.
-    pageUrl: z.string().max(500).optional(),
-    locale: z.enum(['en', 'ms']).optional(),
     screenshotTokens: z.array(z.string().min(1).max(100)).max(9).optional(),
 })
 export type FeedbackBody = z.infer<typeof feedbackSchema>
@@ -32,13 +29,9 @@ export const LARK_FEEDBACK_FIELDS = {
     store: 'Store',
     storeId: 'Store ID',
     reporter: 'Reporter',
+    userId: 'User ID',
     role: 'Role',
     status: 'Status',
-    migrated: 'Migrated store',
-    pageUrl: 'Page URL',
-    locale: 'Language',
-    appVersion: 'App version',
-    userAgent: 'User agent',
 } as const
 
 const TYPE_LABEL = { problem: 'Report a problem', mismatch: 'Data mismatch', suggestion: 'Suggestion' } as const
@@ -63,18 +56,16 @@ type Meta = {
     feedbackId: string
     tenantId: string | null
     storeName: string | null
-    isMigratedStore: boolean
-    appVersion: string | null
-    userAgent: string | null
+    reporterId: string | null
     reporterName: string | null
     reporterRole: string | null
 }
 
 /** Reporter name + store role from the session user (never from the client body). Role is the one of tenants[0], the same tenant extractTenantId picks. */
-export function extractReporter(user: unknown): Pick<Meta, 'reporterName' | 'reporterRole'> {
-    const u = user as { firstName?: string | null; lastName?: string | null; tenants?: Array<{ role?: string | null }> }
+export function extractReporter(user: unknown): Pick<Meta, 'reporterId' | 'reporterName' | 'reporterRole'> {
+    const u = user as { id?: string | number | null; firstName?: string | null; lastName?: string | null; tenants?: Array<{ role?: string | null }> }
     const name = [u.firstName, u.lastName].map((p) => p?.trim()).filter(Boolean).join(' ')
-    return { reporterName: name || null, reporterRole: u.tenants?.[0]?.role ?? null }
+    return { reporterId: u.id != null ? String(u.id) : null, reporterName: name || null, reporterRole: u.tenants?.[0]?.role ?? null }
 }
 
 export function toLarkFields(body: FeedbackBody, meta: Meta): Record<string, unknown> {
@@ -88,15 +79,11 @@ export function toLarkFields(body: FeedbackBody, meta: Meta): Record<string, unk
     }
     // A store is a tenant, so the session's tenant id is the store id.
     if (meta.tenantId) fields[f.storeId] = meta.tenantId
+    if (meta.reporterId) fields[f.userId] = meta.reporterId
     if (meta.reporterName) fields[f.reporter] = meta.reporterName
     if (meta.reporterRole) fields[f.role] = meta.reporterRole
     if (body.screenshotTokens?.length) fields[f.screenshots] = body.screenshotTokens.map((file_token) => ({ file_token }))
     if (meta.storeName) fields[f.store] = meta.storeName
-    fields[f.migrated] = meta.isMigratedStore ? 'Yes' : 'No'
-    if (body.pageUrl) fields[f.pageUrl] = body.pageUrl
-    if (body.locale) fields[f.locale] = body.locale === 'ms' ? 'Bahasa Melayu' : 'English'
-    if (meta.appVersion) fields[f.appVersion] = meta.appVersion
-    if (meta.userAgent) fields[f.userAgent] = meta.userAgent
     return fields
 }
 

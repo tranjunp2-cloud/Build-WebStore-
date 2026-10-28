@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { isFeedbackWindowOpen } from '@/lib/feedback/feedback-availability'
 import { feedbackGuardKey, getFeedbackBlockSeconds } from '@/lib/feedback/feedback-spam-guard'
 import { LarkApiError, uploadBaseImage } from '@/lib/lark/lark-base-client'
 
@@ -27,6 +28,8 @@ function sniffImage(b: Uint8Array): { ext: 'png' | 'jpg'; mime: string } | null 
  * which the feedback submit later writes into the Attachment cell. Nothing is stored on our side.
  */
 export const POST = withAuth(async (user, request) => {
+    if (!isFeedbackWindowOpen()) return errorResponse(403, 'FEEDBACK_CLOSED', 'Feedback is not open right now')
+
     // A user blocked for spamming submits cannot keep pushing media into the Base either.
     const blockedFor = await getFeedbackBlockSeconds(feedbackGuardKey(user.id))
     if (blockedFor) {

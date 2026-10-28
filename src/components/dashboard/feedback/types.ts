@@ -20,9 +20,6 @@ export type FeedbackContext = {
     storeName?: string
 }
 
-/** Where the user was when opening the form; sent as report context. */
-export type FeedbackPageContext = { pageUrl: string; locale: string }
-
 export type FeedbackInput = {
     type: FeedbackType
     /** One or more features the feedback relates to (at least one). */
