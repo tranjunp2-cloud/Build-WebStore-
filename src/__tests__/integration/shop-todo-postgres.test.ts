@@ -38,7 +38,7 @@ describe.skipIf(!connectionString)('[TC-AICP-189] computeShopTodos on PostgreSQL
 
     const order = (tenant: number, status: string, payment: string, created: string, updated = created) =>
         pool.query(`INSERT INTO orders (tenant_id, status, currency, payment_status, total, created_at, updated_at) VALUES ($1, $2, 'MYR', $3, 10, $4, $5)`, [tenant, status, payment, created, updated])
-    const product = async (tenant: number, v: { status?: string; inventory?: number | null; variants?: number[]; photo?: 'local' | 'remote' | null; description?: string | null; descriptionBM?: string | null; short?: string; seoTitle?: string | null; ai?: boolean; deleted?: boolean }) => {
+    const product = async (tenant: number, v: { status?: string; inventory?: number | null; variants?: number[]; photo?: 'local' | null; description?: string | null; descriptionBM?: string | null; short?: string; seoTitle?: string | null; ai?: boolean; deleted?: boolean }) => {
         const { rows } = await pool.query(
             `INSERT INTO products (tenant_id, name, status, inventory, has_variants, description, description_b_m, short_description, seo_title, ai_review_pending, deleted_at)
              VALUES ($1, 'P', $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
@@ -46,7 +46,6 @@ describe.skipIf(!connectionString)('[TC-AICP-189] computeShopTodos on PostgreSQL
         )
         const id = rows[0].id as number
         if (v.photo === undefined || v.photo === 'local') await pool.query('INSERT INTO products_images (_parent_id, image_id) VALUES ($1, 1)', [id])
-        if (v.photo === 'remote') await pool.query(`INSERT INTO products_remote_images (_parent_id, url) VALUES ($1, 'https://cdn.example/x.jpg')`, [id])
         for (const stock of v.variants ?? []) await pool.query('INSERT INTO products_variants (_parent_id, stock) VALUES ($1, $2)', [id, stock])
     }
     const todos = (extra: Record<string, unknown> = {}) => computeShopTodos(payload as never, { tenantId: T, now: NOW, ...extra })
@@ -54,7 +53,7 @@ describe.skipIf(!connectionString)('[TC-AICP-189] computeShopTodos on PostgreSQL
     beforeEach(async () => {
         vi.clearAllMocks()
         siteCheck.readSiteCheckCounts.mockResolvedValue({ siteId: '2', published: true, pages: 4, unpublished: 2, brokenLinks: 3, pagesMissingSeo: 1 })
-        await pool.query('TRUNCATE orders, orders_items, discounts, products, products_images, products_remote_images, products_variants, sites, contact_submissions RESTART IDENTITY')
+        await pool.query('TRUNCATE orders, orders_items, discounts, products, products_images, products_variants, sites, contact_submissions RESTART IDENTITY')
 
         await order(T, 'pending', 'unpaid', ago(5)) // COD waiting for the shop
         await order(T, 'new', 'paid', ago(30)) // paid online, oldest waiting
@@ -70,7 +69,7 @@ describe.skipIf(!connectionString)('[TC-AICP-189] computeShopTodos on PostgreSQL
         await product(T, { inventory: 5 }) // low
         await product(T, { inventory: 0, variants: [3, 4] }) // variants: 7 in total -> low
         await product(T, { photo: null, description: emptyDoc, seoTitle: null }) // missing photo, description and SEO
-        await product(T, { photo: 'remote', description: null, descriptionBM: richText('Penerangan'), seoTitle: 'Beli sekarang' }) // has everything it needs
+        await product(T, { photo: 'local', description: null, descriptionBM: richText('Penerangan'), seoTitle: 'Beli sekarang' }) // has everything it needs
         await product(T, { status: 'draft', inventory: 0, ai: true }) // AI draft to review (a draft is never out of stock)
         await product(T, { inventory: 0, deleted: true }) // deleted: ignored
         await product(OTHER, { inventory: 0 }) // another shop

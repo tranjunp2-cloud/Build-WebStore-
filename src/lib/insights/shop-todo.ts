@@ -107,7 +107,8 @@ async function orderDrafts(db: ReportsDb, tenantId: number, now: Date): Promise<
 
 // Stock of a product = its own inventory, or the sum of its variants' stock when it has variants.
 const STOCK: SQL = sql`CASE WHEN p.has_variants THEN COALESCE((SELECT SUM(v.stock) FROM products_variants v WHERE v._parent_id = p.id), 0) ELSE COALESCE(p.inventory, 0) END`
-const NO_PHOTO: SQL = sql`(NOT EXISTS (SELECT 1 FROM products_images i WHERE i._parent_id = p.id) AND NOT EXISTS (SELECT 1 FROM products_remote_images r WHERE r._parent_id = p.id))`
+// Prime Web's products keep their pictures in `images` only (no remote-image array: that table does not exist here).
+const NO_PHOTO: SQL = sql`(NOT EXISTS (SELECT 1 FROM products_images i WHERE i._parent_id = p.id))`
 const HAS_TEXT = (column: string): SQL => sql`COALESCE(${sql.raw(`p.${column}`)}::text, '') ~ '"text": ?"[^"]'`
 const NO_DESCRIPTION: SQL = sql`(NOT ${HAS_TEXT('description')} AND NOT ${HAS_TEXT('description_b_m')} AND COALESCE(BTRIM(p.short_description), '') = '')`
 const NO_SEO: SQL = sql`(COALESCE(BTRIM(p.seo_title), '') = '' AND COALESCE(BTRIM(p.seo_description), '') = '')`
