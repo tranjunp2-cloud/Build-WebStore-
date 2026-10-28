@@ -9,9 +9,6 @@ export const feedbackSchema = z.object({
     details: z.string().trim().min(1).max(2000),
     // Lark attachment tokens from /api/feedback/screenshots/attach (Lark rejects tokens from another Base).
     screenshotTokens: z.array(z.string().min(1).max(100)).max(9).optional(),
-    context: z.object({
-        storeName: z.string().trim().max(200).optional(),
-    }),
 })
 export type FeedbackBody = z.infer<typeof feedbackSchema>
 
@@ -51,6 +48,7 @@ export function buildFeedbackId(idempotencyKey: string, now = new Date()): strin
 type Meta = {
     feedbackId: string
     tenantId: string | null
+    storeName: string | null
     reporterName: string | null
     reporterRole: string | null
 }
@@ -76,7 +74,7 @@ export function toLarkFields(body: FeedbackBody, meta: Meta): Record<string, unk
     if (meta.reporterName) fields[f.reporter] = meta.reporterName
     if (meta.reporterRole) fields[f.role] = meta.reporterRole
     if (body.screenshotTokens?.length) fields[f.screenshots] = body.screenshotTokens.map((file_token) => ({ file_token }))
-    if (body.context.storeName) fields[f.store] = body.context.storeName
+    if (meta.storeName) fields[f.store] = meta.storeName
     return fields
 }
 

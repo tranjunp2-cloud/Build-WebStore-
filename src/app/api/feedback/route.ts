@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { extractTenantId, withAuth } from '@/lib/auth'
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import { extractTenantId, tenantIdForQuery, withAuth } from '@/lib/auth'
 import { feedbackGuardKey, registerFeedbackSubmit } from '@/lib/feedback/feedback-spam-guard'
 import { LarkApiError } from '@/lib/lark/lark-base-client'
 import {
@@ -13,6 +15,19 @@ export const dynamic = 'force-dynamic'
 
 const errorResponse = (status: number, code: string, message: string, headers?: HeadersInit) =>
     NextResponse.json({ error: { code, message } }, { status, headers })
+
+/** Store name from the DB (never the client). Fail-open: a lookup error only leaves the Store column empty. */
+async function lookupStoreName(tenantId: string | number | null): Promise<string | null> {
+    if (!tenantId) return null
+    try {
+        const payload = await getPayload({ config })
+        const tenant = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, select: { name: true } })
+        return (tenant as { name?: string }).name?.trim() || null
+    } catch (err) {
+        console.error('[feedback] store name lookup failed', err instanceof Error ? err.message : err)
+        return null
+    }
+}
 
 /**
  * POST /api/feedback
@@ -43,12 +58,15 @@ export const POST = withAuth(async (user, request) => {
         return errorResponse(503, 'REPORTING_UNAVAILABLE', 'Feedback is temporarily unavailable')
     }
 
+    const tenantId = extractTenantId(user)
+    const storeName = await lookupStoreName(tenantIdForQuery(user))
+
     try {
         const { feedbackId } = await submitFeedbackToLarkBase(
             parsed.data,
             key.data,
             // Tenant and reporter come from the session, never from the client body.
-            { tenantId: extractTenantId(user), ...extractReporter(user) },
+            { tenantId, storeName, ...extractReporter(user) },
             { appToken, tableId },
         )
         return NextResponse.json({ feedbackId })

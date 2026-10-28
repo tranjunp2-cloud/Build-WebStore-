@@ -9,7 +9,8 @@ export const FEEDBACK_ENDPOINT = '/api/feedback'
  * Screenshots are pushed to Lark first (on submit, not on pick); only their attachment tokens travel with the feedback.
  */
 export const submitFeedback: SubmitFeedback = async (input, idempotencyKey) => {
-    const { screenshots, ...rest } = input
+    // `context` is display-only: the server resolves the store name from the session itself.
+    const { screenshots, context: _context, ...rest } = input
     let screenshotTokens: string[]
     try {
         screenshotTokens = await uploadScreenshots(screenshots)
