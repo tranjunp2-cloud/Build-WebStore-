@@ -39,7 +39,7 @@ import {
     normalizeSupportedLocale,
 } from '@/lib/language-detection'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
-import { pickUserContactDefaults, withUserContactDefaults, buildSiteContactInfo } from '@/lib/ai/user-contact-defaults'
+import { applyGenerationContact, buildSiteContactInfo } from '@/lib/ai/user-contact-defaults'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveBusinessCategory, normalizeComposerCategory } from '@/lib/ai/composer-category-resolver'
@@ -436,10 +436,6 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             .then((translated) => Object.assign(businessInfo, translated))
             .catch(() => businessInfo)
 
-        // Fill empty phone/email from the account AFTER the capture snapshot so
-        // admin reruns of a stored snapshot don't inherit the admin's contact info.
-        Object.assign(businessInfo, withUserContactDefaults(businessInfo, pickUserContactDefaults(user as { email?: unknown; phone?: unknown })))
-
         // F23: Sync tenant slug with builder — deferred to post-generation success (GH-1371).
         // Syncing before SSE caused "Already taken" on retry after interrupted generation
         // because the slug was claimed even when no site was created. The sync now runs
@@ -487,6 +483,18 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             where: migration ? { and: [{ tenant: { equals: resolvedTenantId } }, { id: { equals: migration.targetSiteId } }] } : { tenant: { equals: resolvedTenantId } },
             limit: 1,
         })
+
+        // Contact defaults: form > existing site contactInfo > account (see
+        // user-contact-defaults.ts). Runs after startCapture, so the captured
+        // snapshot keeps the raw form input. Recovery/admin rerun call
+        // generateSiteWithAI directly with that snapshot and never reach this
+        // step, so a recovered site gets no account-derived contact.
+        const existingForContact = (await existingSitesPromise).docs[0] as { contactInfo?: Record<string, unknown> } | undefined
+        Object.assign(businessInfo, applyGenerationContact(businessInfo, {
+            user: user as { email?: unknown; phone?: unknown },
+            existingContactInfo: existingForContact?.contactInfo,
+            migration: Boolean(migration),
+        }))
 
         // Check SSE mode
         const isStreaming = context.streaming === true

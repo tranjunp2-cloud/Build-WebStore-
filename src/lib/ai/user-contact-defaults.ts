@@ -1,30 +1,53 @@
 /**
- * User contact defaults — fill empty phone/email on the AI gen wire payload
- * from the signed-in account, so generated sites show the owner's real contact
- * info instead of canned category sample data.
+ * Contact defaults for AI gen — fill empty phone/email/address on the wire
+ * payload so generated sites show real contact info instead of canned sample
+ * data.
  *
- * Pure functions only. Form-supplied values always win over account values.
- * QC test accounts (`@primeweb.local`) are skipped so fake inboxes never reach
- * a public page.
+ * Priority per field: wizard form > contactInfo already on the site (owner may
+ * have edited it in Global) > signed-in account. Account values only seed NEW
+ * sites or fields still empty on an existing site, so regenerate never
+ * overwrites what the owner set. QC accounts (`@primeweb.local`) are skipped
+ * and PW1 migrations skip the account fallback entirely (the owner's login
+ * email is not the store's business contact).
+ *
+ * Pure functions only — no I/O. Import from source in tests.
  */
 
 import { normalizeEmail, normalizePhone } from './business-info-mapper'
 
 const QC_EMAIL_SUFFIX = '@primeweb.local'
 
-export type ContactDefaults = { phone?: string; email?: string }
+export type ContactDefaults = { phone?: string; email?: string; address?: string }
+type ContactLike = { phone?: unknown; email?: unknown; address?: unknown }
 
-export function pickUserContactDefaults(user: { email?: unknown; phone?: unknown }): ContactDefaults {
+function cleanAddress(raw: unknown): string | undefined {
+  return typeof raw === 'string' && raw.trim() ? raw.trim().replace(/\s+/g, ' ') : undefined
+}
+
+/** Contact fields from a record (account or site.contactInfo), normalized. Empty fields omitted. */
+export function pickContact(src: ContactLike | null | undefined): ContactDefaults {
   const out: ContactDefaults = {}
-  const email = normalizeEmail(typeof user.email === 'string' ? user.email : undefined)
-  if (email && !email.endsWith(QC_EMAIL_SUFFIX)) out.email = email
-  const phone = normalizePhone(typeof user.phone === 'string' ? user.phone : undefined)
+  if (!src) return out
+  const email = normalizeEmail(typeof src.email === 'string' ? src.email : undefined)
+  if (email) out.email = email
+  const phone = normalizePhone(typeof src.phone === 'string' ? src.phone : undefined)
   if (phone) out.phone = phone
+  const address = cleanAddress(src.address)
+  if (address) out.address = address
   return out
 }
 
-/** Returns a copy of `info` with empty phone/email filled from `defaults`. */
-export function withUserContactDefaults<T extends { phone?: string; email?: string }>(
+/** Account contact: email (minus QC domain) + phone. Users have no address field. */
+export function pickUserContactDefaults(user: { email?: unknown; phone?: unknown }): ContactDefaults {
+  const { email, phone } = pickContact({ email: user.email, phone: user.phone })
+  return {
+    ...(email && !email.endsWith(QC_EMAIL_SUFFIX) ? { email } : {}),
+    ...(phone ? { phone } : {}),
+  }
+}
+
+/** Returns a copy of `info` with empty phone/email/address filled from `defaults`. */
+export function withUserContactDefaults<T extends { phone?: string; email?: string; address?: string }>(
   info: T,
   defaults: ContactDefaults,
 ): T {
@@ -32,17 +55,27 @@ export function withUserContactDefaults<T extends { phone?: string; email?: stri
     ...info,
     phone: normalizePhone(info.phone) ? info.phone : defaults.phone,
     email: normalizeEmail(info.email) ? info.email : defaults.email,
+    address: cleanAddress(info.address) ? info.address : defaults.address,
   }
+}
+
+/**
+ * Wire payload with contact defaults applied. `migration` skips the account
+ * fallback; the site's own contactInfo is still honored.
+ */
+export function applyGenerationContact<T extends { phone?: string; email?: string; address?: string }>(
+  info: T,
+  ctx: {
+    user: { email?: unknown; phone?: unknown }
+    existingContactInfo?: ContactLike | null
+    migration?: boolean
+  },
+): T {
+  const account = ctx.migration ? {} : pickUserContactDefaults(ctx.user)
+  return withUserContactDefaults(info, { ...account, ...pickContact(ctx.existingContactInfo) })
 }
 
 /** Contact data to persist on `sites.contactInfo` — only non-empty fields. */
 export function buildSiteContactInfo(info: { phone?: string; email?: string; address?: string }) {
-  const out: { phone?: string; email?: string; address?: string } = {}
-  const phone = normalizePhone(info.phone)
-  if (phone) out.phone = phone
-  const email = normalizeEmail(info.email)
-  if (email) out.email = email
-  const address = info.address?.trim()
-  if (address) out.address = address
-  return out
+  return pickContact(info)
 }

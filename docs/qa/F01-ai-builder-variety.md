@@ -1021,7 +1021,7 @@ Thread user-supplied `phone`, `email`, `address`, `products`, `shortDescription`
 | **TC-F01-W.06b** | `product-translator.test.ts` + `image-keywords-products.test.ts` | `nasi lemak` → `malaysian coconut rice`; `phở` → `vietnamese pho noodle soup`; unknown vi/ms pass-through | ✅ |
 | **TC-F01-W.07** | `build-user-prompt.test.ts` | `buildUserPrompt` serialize phone/email/address/tagline khi provided; omit khi empty | ✅ |
 | **TC-F01-W.08** | `user-data-e2e-fixture.test.ts` | End-to-end: ramen shop + nasi lemak shop fixtures — composer + keywords + prompt đồng bộ | ✅ |
-| **TC-F01-W.09** | `user-contact-defaults.test.ts` | Account phone/email điền vào field rỗng của wizard (form thắng account); bỏ email `@primeweb.local`; không bịa phone; `sites.contactInfo` chỉ nhận field non-empty | ✅ |
+| **TC-F01-W.09** | `user-contact-defaults.test.ts` + `api/ai.test.ts` | Contact điền theo ưu tiên form > `sites.contactInfo` hiện có > account; regenerate không ghi đè contact đã sửa; migration không dùng account owner; bỏ email `@primeweb.local`; không bịa phone; service ghi `contactInfo` (tạo mới + regenerate) | ✅ |
 
 ### Files Modified
 
