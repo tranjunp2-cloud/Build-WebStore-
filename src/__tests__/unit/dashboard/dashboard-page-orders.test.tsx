@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({ getPayload: mocks.getPayload }))
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('@/lib/agent-changes/agent-refresh', () => ({ AgentRefresh: () => null }))
 vi.mock('@/lib/auth', () => ({
     getCurrentUser: mocks.getCurrentUser,
     tenantIdForQuery: mocks.tenantIdForQuery,

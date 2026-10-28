@@ -49,6 +49,7 @@ export type DetailedProduct = {
     variants?: Variant[]
     hasVariants?: boolean
     attributes?: Array<{ key: string; value: string }>
+    updatedAt?: string
 }
 
 interface ProductQuickViewModalProps {

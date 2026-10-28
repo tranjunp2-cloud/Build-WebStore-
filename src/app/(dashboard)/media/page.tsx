@@ -6,6 +6,7 @@ import { Upload, ImageIcon, Search, Trash2, Copy, Check, RefreshCw, Film, FileTe
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 
 type MediaDoc = {
     id: string
@@ -46,24 +47,31 @@ export default function MediaLibraryPage() {
     const [copiedId, setCopiedId] = useState<string | null>(null)
     const [selectedMedia, setSelectedMedia] = useState<MediaDoc | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const latestLoad = useRef(0)
 
     useEffect(() => {
         loadMedia()
     }, [])
 
-    const loadMedia = async () => {
-        setIsLoading(true)
+    // `silent`: the assistant added pictures — swap the list in place (grid, scroll, search and open preview stay)
+    const loadMedia = async (silent = false) => {
+        const load = ++latestLoad.current
+        if (!silent) setIsLoading(true)
         try {
             const res = await fetch('/api/media?sort=-createdAt&limit=200', { credentials: 'include' })
             if (!res.ok) throw new Error(`Server returned ${res.status}`)
             const data = await res.json()
-            setMedia(data.docs || [])
-        } catch {
-            toast.error(ml.loadFailed)
+            if (load === latestLoad.current) setMedia(data.docs || [])
+        } catch (error) {
+            if (load !== latestLoad.current) return
+            if (silent) console.error('[Media Library] refresh failed', error)
+            else toast.error(ml.loadFailed)
         } finally {
-            setIsLoading(false)
+            if (load === latestLoad.current) setIsLoading(false)
         }
     }
+
+    useAgentChanges({ kinds: ['media'] }, () => { void loadMedia(true) })
 
     const handleUpload = async (files: FileList | null) => {
         if (!files || files.length === 0) return

@@ -1,11 +1,13 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 
 export function AwaitingVerificationChip() {
     const [count, setCount] = useState<number | null>(null)
 
-    useEffect(() => {
+    // `silent` = an assistant-driven refetch: a failure keeps the count on screen
+    const load = useCallback((silent = false) => {
         let cancelled = false
         fetch('/api/orders?paymentStatus=pending_verification&paymentMethod=bank_transfer&limit=0')
             .then(r => r.json())
@@ -14,10 +16,15 @@ export function AwaitingVerificationChip() {
             })
             .catch(err => {
                 console.error('[AwaitingVerificationChip] fetch failed', err)
-                if (!cancelled) setCount(0)
+                if (!cancelled && !silent) setCount(0)
             })
         return () => { cancelled = true }
     }, [])
+
+    useEffect(() => load(), [load])
+
+    // The assistant checked or rejected a payment: the chip count moves with it
+    useAgentChanges({ kinds: ['store_order'] }, () => { load(true) })
 
     if (count === null || count === 0) return null
 

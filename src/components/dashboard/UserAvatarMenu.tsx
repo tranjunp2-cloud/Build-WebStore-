@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 import { useUserAvatar } from '@/providers/UserAvatarContext'
+import { clearClientAiState } from '@/lib/auth/clear-client-ai-state'
 
 type UserAvatarMenuProps = {
     userName: string
@@ -47,6 +48,7 @@ export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarM
         } catch {
             toast.error('Network error. You may need to refresh.')
         } finally {
+            clearClientAiState()
             document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
             window.location.href = '/login'
         }

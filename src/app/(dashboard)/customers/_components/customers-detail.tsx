@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, User, ShoppingBag, UndoDot, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,10 @@ import { useI18n } from '@/i18n'
 import { CustomerAvatar, RankBadge } from './customers-shared-ui'
 import { CustomersDetailDefaultTab } from './customers-detail-default-tab'
 import { CustomersDetailOrdersTab } from './customers-detail-orders-tab'
-import { updateShopCustomerAction } from '../actions'
+import { getShopCustomerDetailAction, updateShopCustomerAction } from '../actions'
+import { useAgentRecordSync } from '@/lib/agent-changes/use-agent-record-sync'
+import { AgentChangedNotice, SaveConflictNotice } from '@/components/agent/agent-changed-notice'
+import { useSaveVersion } from '@/lib/save-version/use-save-version'
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
 
 type Tab = 'default' | 'orders'
@@ -39,11 +42,28 @@ export function CustomersDetail({ customer }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('default')
     const [saving, setSaving]     = useState(false)
     const [errors, setErrors]     = useState<Record<string, string>>({})
+    // the customer's updatedAt as loaded: sent with each save so a newer change is never written over
+    const version = useSaveVersion(customer.updatedAt)
+    const setVersion = version.set
 
     const dirty = useMemo(
         () => JSON.stringify(draft) !== JSON.stringify(original),
         [draft, original],
     )
+
+    // The assistant changed this customer: read it again and replace both copies (draft + saved)
+    const reload = useCallback(async () => {
+        try {
+            const fresh: ShopCustomerRecord = await getShopCustomerDetailAction(customer.id)
+            setOriginal(fresh)
+            setDraft(fresh)
+            setErrors({})
+            setVersion(fresh.updatedAt)
+        } catch (err) {
+            console.error('[Customer reload]', err)
+        }
+    }, [customer.id, setVersion])
+    const sync = useAgentRecordSync({ kind: 'store_customer', id: String(customer.id), dirty, reload })
 
     function handleChange(updates: Partial<EditableFields>) {
         setDraft(prev => ({ ...prev, ...updates }))
@@ -68,11 +88,13 @@ export function CustomersDetail({ customer }: Props) {
         if (!validate()) return
         setSaving(true)
         try {
-            await updateShopCustomerAction(draft.id, {
+            const saved = await updateShopCustomerAction(draft.id, {
                 name: draft.name,
                 rank: draft.rank,
                 notes: draft.notes,
-            })
+            }, version.current())
+            if (version.refused(saved)) return
+            version.set(saved.updatedAt)
             toast.success(cd.saved)
             router.push('/customers')
         } catch {
@@ -120,6 +142,10 @@ export function CustomersDetail({ customer }: Props) {
                     </div>
                 </div>
             </div>
+
+            {version.conflicted
+                ? <SaveConflictNotice record="customer" onLoadLatest={sync.reloadNow} onSaveAnyway={() => { version.overwrite(); void handleSave() }} />
+                : sync.stale && <AgentChangedNotice record="customer" onReload={sync.reloadNow} onKeep={sync.keepMine} />}
 
             {/* Dirty bar — synced with discount-form-header style */}
             {dirty && (

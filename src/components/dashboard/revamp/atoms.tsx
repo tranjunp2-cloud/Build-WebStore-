@@ -8,7 +8,7 @@
 import type { ReactNode } from 'react'
 import {
     LayoutGrid, BarChart3, SearchCheck, PackageCheck, ListChecks,
-    TrendingUp, TrendingDown, Minus, Clock, Info, type LucideIcon,
+    TrendingUp, TrendingDown, Minus, Clock, Info, ClipboardList, type LucideIcon,
 } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useTapToggleTooltip as useTapTooltip } from '@/hooks/use-tap-toggle-tooltip'
@@ -20,6 +20,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
     'search-check': SearchCheck,
     'package-check': PackageCheck,
     'list-checks': ListChecks,
+    'clipboard-list': ClipboardList,
 }
 
 export function BlockIcon({ name, className }: { name: string; className?: string }) {

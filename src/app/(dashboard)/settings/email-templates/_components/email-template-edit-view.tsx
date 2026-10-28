@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { ArrowLeft, Mail, AlertTriangle, Send, ExternalLink } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { EmailTemplateType, EmailRecipient } from '@/lib/email/types'
@@ -49,6 +49,8 @@ interface Props {
     onReset: () => void
     onSendTest: () => void
     onOpenInNewTab: () => void
+    /** shown above the form (the assistant changed this template while it has unsaved edits) */
+    notice?: ReactNode
 }
 
 export function EmailTemplateEditView({
@@ -70,6 +72,7 @@ export function EmailTemplateEditView({
     onReset,
     onSendTest,
     onOpenInNewTab,
+    notice,
 }: Props) {
     const { t, ti } = useI18n()
     const et = t.dashboard.settings.emailTemplates
@@ -168,6 +171,8 @@ export function EmailTemplateEditView({
                     </div>
                 </TooltipProvider>
             </div>
+
+            {notice && <div className="mb-4">{notice}</div>}
 
             {/* Save error banner */}
             {saveError && (

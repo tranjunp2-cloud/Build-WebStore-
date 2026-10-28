@@ -9,10 +9,64 @@ import { useI18n } from '@/i18n'
 import { getProductAction, saveProductAction, deleteProductAction } from '../actions'
 import { lexicalToText, descriptionEditPatch } from '@/lib/products/description-edit'
 import { parseServerError } from '@/lib/products/server-errors'
+import { useSaveVersion } from '@/lib/save-version/use-save-version'
 
 function slugify(text: string) {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
+
+/** The product as the form shows it (the same mapping for the first load and for a reload after the copilot changed it). */
+function toFormValues(data: any): Partial<ProductFormValues> {
+    return {
+        name: data.name || '',
+        urlSlug: data.slug || '',
+        description: lexicalToText(data.description) || '',
+        categoryIds: Array.isArray(data.category) 
+            ? data.category.map((c: any) => typeof c === 'string' ? c : c.id) 
+            : [],
+        images: data.images?.map((img: any) => ({
+            id: typeof img.image === 'string' ? img.image : img.image?.id,
+            url: typeof img.image === 'string' ? '' : (img.image?.url || ''),
+            alt: img.alt || '',
+        })).filter((i: any) => i.id) || [],
+        
+        hasVariants: Boolean(data.hasVariants),
+        
+        basePrice: data.price != null ? parseFloat(data.price) : undefined,
+        compareAtPrice: data.compareAtPrice != null ? parseFloat(data.compareAtPrice) : undefined,
+        baseInventory: data.inventory != null ? parseInt(data.inventory) : undefined,
+        baseSku: data.sku || '',
+        currency: data.currency || 'MYR',
+        
+        tiers: (data.variantConfigs || []).map((t: any, idx: number) => ({
+            id: t.id || `tier-${idx}`,
+            name: t.name || '',
+            options: (t.options || []).map((o: any) => o.value)
+        })),
+        variants: (data.variants || []).map((v: any, index: number) => ({
+            id: v.id || v.sku || `var-${index}`,
+            variantName: v.name || '',
+            skuCode: v.sku || '',
+            price: v.price ? parseFloat(v.price) : 0,
+            compareAtPrice: v.compareAtPrice != null ? parseFloat(v.compareAtPrice) : undefined,
+            stock: v.stock !== undefined ? parseInt(v.stock) : 0,
+        })),
+
+        shippingWeight: data.weight ? parseFloat(data.weight) : undefined,
+        shippingLength: data.dimensions?.length ? parseFloat(data.dimensions.length) : undefined,
+        shippingWidth: data.dimensions?.width ? parseFloat(data.dimensions.width) : undefined,
+        shippingHeight: data.dimensions?.height ? parseFloat(data.dimensions.height) : undefined,
+
+        metaTitle: data.seo?.title || '',
+        metaDescription: data.seo?.description || '',
+        autoGenerateSeo: false, // UI default
+        attributes: Array.isArray(data.attributes)
+            ? data.attributes.map((a: any) => ({ key: a.key || '', value: a.value || '' }))
+            : [],
+    }
+}
+
+const hasLegacyVariantPrice = (data: any) => Boolean(data.hasVariants) && parseFloat(data.price ?? '0') === 0
 
 export default function ProductEditPage() {
     const params = useParams()
@@ -24,6 +78,8 @@ export default function ProductEditPage() {
     const [initialData, setInitialData] = useState<Partial<ProductFormValues> | null>(null)
     const [isLoading, setIsLoading] = useState(!isNew)
     const [showLegacyWarning, setShowLegacyWarning] = useState(false)
+    // the product's updatedAt as loaded: sent with each save so a newer change is never written over
+    const version = useSaveVersion()
 
     useEffect(() => {
         if (isNew) {
@@ -36,57 +92,9 @@ export default function ProductEditPage() {
             try {
                 const data = await getProductAction(productId)
                 if (data) {
-                    if (Boolean(data.hasVariants) && parseFloat(data.price ?? '0') === 0) {
-                        setShowLegacyWarning(true)
-                    }
-                    const mappedData: Partial<ProductFormValues> = {
-                        name: data.name || '',
-                        urlSlug: data.slug || '',
-                        description: lexicalToText(data.description) || '',
-                        categoryIds: Array.isArray(data.category) 
-                            ? data.category.map((c: any) => typeof c === 'string' ? c : c.id) 
-                            : [],
-                        images: data.images?.map((img: any) => ({
-                            id: typeof img.image === 'string' ? img.image : img.image?.id,
-                            url: typeof img.image === 'string' ? '' : (img.image?.url || ''),
-                            alt: img.alt || '',
-                        })).filter((i: any) => i.id) || [],
-                        
-                        hasVariants: Boolean(data.hasVariants),
-                        
-                        basePrice: data.price != null ? parseFloat(data.price) : undefined,
-                        compareAtPrice: data.compareAtPrice != null ? parseFloat(data.compareAtPrice) : undefined,
-                        baseInventory: data.inventory != null ? parseInt(data.inventory) : undefined,
-                        baseSku: data.sku || '',
-                        currency: data.currency || 'MYR',
-                        
-                        tiers: (data.variantConfigs || []).map((t: any, idx: number) => ({
-                            id: t.id || `tier-${idx}`,
-                            name: t.name || '',
-                            options: (t.options || []).map((o: any) => o.value)
-                        })),
-                        variants: (data.variants || []).map((v: any, index: number) => ({
-                            id: v.id || v.sku || `var-${index}`,
-                            variantName: v.name || '',
-                            skuCode: v.sku || '',
-                            price: v.price ? parseFloat(v.price) : 0,
-                            compareAtPrice: v.compareAtPrice != null ? parseFloat(v.compareAtPrice) : undefined,
-                            stock: v.stock !== undefined ? parseInt(v.stock) : 0,
-                        })),
-
-                        shippingWeight: data.weight ? parseFloat(data.weight) : undefined,
-                        shippingLength: data.dimensions?.length ? parseFloat(data.dimensions.length) : undefined,
-                        shippingWidth: data.dimensions?.width ? parseFloat(data.dimensions.width) : undefined,
-                        shippingHeight: data.dimensions?.height ? parseFloat(data.dimensions.height) : undefined,
-
-                        metaTitle: data.seo?.title || '',
-                        metaDescription: data.seo?.description || '',
-                        autoGenerateSeo: false, // UI default
-                        attributes: Array.isArray(data.attributes)
-                            ? data.attributes.map((a: any) => ({ key: a.key || '', value: a.value || '' }))
-                            : [],
-                    }
-                    setInitialData(mappedData)
+                    setShowLegacyWarning(hasLegacyVariantPrice(data))
+                    setInitialData(toFormValues(data))
+                    version.set(data.updatedAt)
                 } else {
                     toast.error(t.dashboard.products.form.failedLoad)
                 }
@@ -98,6 +106,17 @@ export default function ProductEditPage() {
         }
         loadProduct()
     }, [productId, isNew])
+
+    // The copilot changed this product while the form is open: no spinner, the form swaps its values in place.
+    const reloadProduct = async (isStillClean: () => boolean) => {
+        const data = await getProductAction(productId)
+        if (!data || !isStillClean()) return null
+        const values = toFormValues(data)
+        setShowLegacyWarning(hasLegacyVariantPrice(data))
+        setInitialData(values)
+        version.set(data.updatedAt)
+        return values
+    }
 
     const handleSave = async (data: ProductFormValues) => {
         try {
@@ -142,7 +161,9 @@ export default function ProductEditPage() {
                 currency: data.currency || 'MYR'
             }
 
-            await saveProductAction(body, isNew ? undefined : productId)
+            const saved = await saveProductAction(body, isNew ? undefined : productId, isNew ? undefined : version.current())
+            if (version.refused(saved)) return { conflict: true as const }
+            version.set(saved?.updatedAt)
 
             toast.success(isNew ? t.dashboard.products.form.productCreated : t.dashboard.products.form.productUpdated)
             setTimeout(() => {
@@ -188,6 +209,9 @@ export default function ProductEditPage() {
                 initialData={initialData || undefined}
                 onSubmitForm={handleSave}
                 showLegacyPriceWarning={showLegacyWarning}
+                recordId={isNew ? undefined : productId}
+                onReload={reloadProduct}
+                version={version}
             />
         </div>
     )

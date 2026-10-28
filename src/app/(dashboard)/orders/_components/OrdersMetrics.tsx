@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Clock, CheckCircle2, Package, Truck, XCircle, RotateCcw } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 
 export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number }) {
     const { t } = useI18n()
@@ -25,6 +26,9 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
     useEffect(() => {
         fetchMetrics()
     }, [refreshCounter, fetchMetrics])
+
+    // The assistant changed an order: the tab counts move with it
+    useAgentChanges({ kinds: ['store_order'] }, fetchMetrics)
 
     // Refresh on real-time order notifications (new order or status update)
     useEffect(() => {

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { LogOut } from 'lucide-react';
 import { useI18n } from '@/i18n';
+import { clearClientAiState } from '@/lib/auth/clear-client-ai-state';
 
 const REFRESH_THRESHOLD = 15 * 60 * 1000; // 15 min before expiry
 
@@ -177,6 +178,7 @@ export function TenantAccessWatcher() {
         } catch (error) {
             console.error('Logout request failed', error);
         } finally {
+            clearClientAiState();
             // payload-token is httpOnly — cannot be cleared via JS; server clears it on logout.
             window.location.href = '/login';
         }
