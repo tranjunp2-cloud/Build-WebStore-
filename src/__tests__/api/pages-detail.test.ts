@@ -313,7 +313,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         expect(body.error).toContain('duplicate')
     })
 
-    it.each(['checkout', '/checkout', 'checkout/'])('TC-F05-02-28: returns 400 when renaming a page to reserved slug %s', async (slug) => {
+    it.each(['checkout', '/checkout', 'checkout/', 'orders', '/orders'])('TC-F05-02-28: returns 400 when renaming a page to reserved slug %s', async (slug) => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] }) // auth
         mockFindByID.mockResolvedValueOnce({ id: '10', site: 1, slug: '/old', title: 'Old' })
 

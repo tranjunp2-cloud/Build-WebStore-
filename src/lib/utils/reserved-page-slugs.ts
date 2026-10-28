@@ -1,8 +1,8 @@
 /**
- * Page slugs users cannot create. `/404` is auto-managed; `/checkout` is a fixed
- * storefront route (src/app/sites/[slug]/checkout) that always wins over a user page.
+ * Page slugs users cannot create. `/404` is auto-managed; `/checkout` and `/orders` are fixed
+ * storefront routes (src/app/sites/[slug]/{checkout,orders}) that always win over a user page.
  */
-export const RESERVED_PAGE_SLUGS = new Set(['/404', '/checkout'])
+export const RESERVED_PAGE_SLUGS = new Set(['/404', '/checkout', '/orders'])
 
 /** True when a page slug (with or without leading/trailing slash, any case) is reserved. */
 export function isReservedPageSlug(slug: string): boolean {

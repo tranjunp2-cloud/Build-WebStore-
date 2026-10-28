@@ -6,7 +6,6 @@ import { useEditorStore, getDisplayPageTitle } from '@/store/editorStore'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
-import { isReservedPageSlug } from '@/lib/utils/reserved-page-slugs'
 import { SYSTEM_PAGE_SLUGS, slugifyPageTitle } from './page-manager-helpers'
 import { pageToast, withPageName } from './page-toast'
 
@@ -58,10 +57,6 @@ export function usePageManagerActions({
             if (!res.ok) {
                 if (res.status === 409) {
                     toast.error(t.editor.pageManagerPanel.slugConflict)
-                    return false
-                }
-                if (res.status === 400 && isReservedPageSlug(slugifyPageTitle(title))) {
-                    toast.error(pm.reservedPage)
                     return false
                 }
                 const data = await res.json().catch(() => null)
