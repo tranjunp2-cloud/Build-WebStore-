@@ -1,0 +1,39 @@
+import "server-only";
+
+/**
+ * prime-web → apps/ai-platform wiring. The AI platform is the only service
+ * that calls models; prime-web reaches it server-side and the browser only
+ * ever talks to /api/agent on this origin.
+ */
+export function getAiPlatformUrl(): string | null {
+	const url = process.env.AI_PLATFORM_URL?.trim();
+	return url ? url.replace(/\/+$/, "") : null;
+}
+
+export function getAiPlatformContextSecret(): string | null {
+	const secret = process.env.AI_PLATFORM_CONTEXT_SECRET?.trim();
+	return secret && secret.length >= 32 ? secret : null;
+}
+
+function isProductionDeploy(): boolean {
+	return (process.env.VERCEL_ENV ?? process.env.NODE_ENV) === "production";
+}
+
+/**
+ * The agent mascot runs against the real AI platform only when it is
+ * configured, and stays off on production unless AI_AGENT_ENABLED=true.
+ */
+export function isAiAgentEnabled(): boolean {
+	if (!getAiPlatformUrl() || !getAiPlatformContextSecret()) return false;
+	return !isProductionDeploy() || process.env.AI_AGENT_ENABLED === "true";
+}
+
+/**
+ * Every model call prime-web makes is a platform task. Without the platform
+ * configured, AI features answer 503 or fall back to their non-AI path.
+ */
+export function isAiTasksEnabled(): boolean {
+	return Boolean(getAiPlatformUrl() && getAiPlatformContextSecret());
+}
+
+export const AI_UNAVAILABLE_MESSAGE = "AI features are not available right now.";

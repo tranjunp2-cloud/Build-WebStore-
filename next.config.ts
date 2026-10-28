@@ -20,7 +20,30 @@ const nextConfig: NextConfig = {
     process.env.ENABLE_HARNESS === '1'
       ? ['tsx', 'ts', 'jsx', 'js', 'harness.tsx']
       : ['tsx', 'ts', 'jsx', 'js'],
-  serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push', 'googleapis', 'firebase-admin'],
+  // AI layer packages (packages/agent-*, packages/ai-contracts — synced from the monorepo, see
+  // AI_LAYER_SOURCE) export raw TypeScript, so Next must compile them. They resolve their own
+  // zod 4 from packages/*/node_modules while the app stays on zod 3.
+  transpilePackages: [
+    '@ech/agent-core',
+    '@ech/agent-react',
+    '@ech/agent-transport',
+    '@ech/agent-ui',
+    '@ech/ai-contracts',
+  ],
+  serverExternalPackages: [
+    'undici',
+    'pg',
+    'isomorphic-dompurify',
+    'web-push',
+    'googleapis',
+    // Server-only scraping deps used by the AI routes: never bundle.
+    // (pdfjs-dist stays out: orders/pdf-label-preview imports its worker with `new URL()` on the
+    // webpack client build, which fails when the package is external. Phase 4's read-document
+    // must load pdfjs without making it external.)
+    'cheerio',
+    'open-graph-scraper',
+    'firebase-admin',
+  ],
   // Bundle runtime JSON files into serverless for /test-harness routes:
   //   1. .harness-out/*.json — matrix + rubric reports (built via vercel.json
   //      buildCommand when ENABLE_HARNESS=1)

@@ -7,7 +7,15 @@ export type PlatformUser = {
     phone?: string
     roles?: ('super-admin' | 'tenant-owner' | 'editor' | 'viewer')[]
     tenants?: Array<{
-        tenant: string | { id: string; name?: string; slug?: string }
+        tenant:
+            | string
+            | {
+                  id: string
+                  name?: string
+                  slug?: string
+                  status?: string
+                  metaData?: Record<string, unknown> | null
+              }
         role: 'owner' | 'admin' | 'editor' | 'viewer' | 'custom'
         permissions?: string[]
         status?: 'pending' | 'active'
