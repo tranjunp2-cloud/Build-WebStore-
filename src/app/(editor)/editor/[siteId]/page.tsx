@@ -3479,8 +3479,10 @@ export default function EditorPage() {
                     })
                     requestAnimationFrame(() => requestAnimationFrame(() => setIsTransitioning(false)))
                 }}
-                onApplied={async ({ templateName, unmatchedBlocks, appliedState }: TemplateApplyResult) => {
+                onApplied={async ({ templateName, unmatchedBlocks, appliedState, draftVersion }: TemplateApplyResult) => {
                     setIsTemplateModalOpen(false)
+                    // the apply bumped the draft revision: this tab holds the applied state, so it saves from the new one
+                    if (draftVersion) useEditorStore.getState().setDraftVersion(draftVersion)
                     const hadOptimisticState = optimisticTemplateRollbackRef.current !== null
                     if (!hadOptimisticState) setIsTransitioning(true)
 

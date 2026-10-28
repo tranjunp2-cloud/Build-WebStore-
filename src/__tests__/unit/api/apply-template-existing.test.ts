@@ -7,6 +7,8 @@
  *   TC-F07.023 — New site creation from template (backward compat)
  *   TC-F07.022 — Rate limit protection (429)
  *   TC-F07.050 — GH-731: service-cards empty titles coerced before payload.update on apply-template
+ *   TC-AIWB-121 — applying a template bumps the editor draft revision (site + reskinned pages) inside the swap
+ *                 transaction and answers the applying tab's new draftVersion
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -644,6 +646,32 @@ describe('POST /api/ai/apply-template', () => {
             expect(pageUpdateCalls.length).toBeGreaterThanOrEqual(1)
         })
 
+        it('TC-AIWB-121: bumps the site and reskinned page revisions in the swap transaction and answers the new draftVersion', async () => {
+            // Arrange
+            const dialect = new PgDialect()
+            mockPayloadInstance.db.drizzle.execute.mockImplementation(async (query: SQL) => {
+                const text = dialect.sqlToQuery(query).sql
+                if (text.includes('FROM sites')) return { rows: [{ editor_revision: 8, editor_last_save_id: null }] }
+                if (text.includes('FROM pages')) return { rows: [{ editor_revision: 4, editor_last_save_id: null }] }
+                return { rows: mockHomepage ? [{ id: (mockHomepage as Record<string, unknown>).id }] : [] }
+            })
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101', pageId: '201' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(200)
+            const bumps = mockTransactionExecute.mock.calls
+                .map(([query]: [SQL]) => dialect.sqlToQuery(query))
+                .filter(query => query.sql.includes('editor_revision = editor_revision + 1'))
+            expect(bumps.map(query => query.sql.split(' ')[1])).toEqual(['sites', 'pages'])
+            expect(bumps[0].params).toEqual([null, 101])
+            expect(bumps[1].params).toEqual([null, 201, 101])
+            expect(body.data.draftVersion).toBe('8.4')
+        })
+
         it('runs the complete template swap in one transaction', async () => {
             // Arrange
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
@@ -803,8 +831,9 @@ describe('POST /api/ai/apply-template', () => {
             // Act
             await POST(req)
 
-            // Assert — tenant lock, site lock, then page read all share one session.
-            expect(mockTransactionExecute).toHaveBeenCalledTimes(3)
+            // Assert — tenant lock, site lock, page read, then the site + page draft revision bumps (TC-AIWB-121)
+            // all share one session.
+            expect(mockTransactionExecute).toHaveBeenCalledTimes(5)
             // payload.findByID must be called for the fetched page IDs
             const pageFindByIDCall = mockPayloadInstance.findByID.mock.calls.find(
                 (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
