@@ -4347,7 +4347,9 @@
       "publishNeedsFix": "Fill this in before publishing",
       "publishShowField": "Show",
       "draftChanged": "This page was changed somewhere else (another tab or an approved AI change). Your latest edits were not saved — reload to continue from the newest version.",
-      "reloadAction": "Reload"
+      "reloadAction": "Reload",
+      "keepMineAction": "Keep my version",
+      "keepMineHint": "Keep my version saves your edits over the other change."
     },
     "maintenance": {
       "banner": "Your website is in maintenance mode. Visitors see a maintenance page instead.",

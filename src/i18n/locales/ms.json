@@ -4347,7 +4347,9 @@
       "publishNeedsFix": "Lengkapkan ini sebelum menyiarkan",
       "publishShowField": "Tunjuk",
       "draftChanged": "Halaman ini telah diubah di tempat lain (tab lain atau perubahan AI yang diluluskan). Suntingan terbaru anda tidak disimpan — muat semula untuk teruskan dari versi terkini.",
-      "reloadAction": "Muat semula"
+      "reloadAction": "Muat semula",
+      "keepMineAction": "Kekalkan versi saya",
+      "keepMineHint": "Kekalkan versi saya akan simpan suntingan anda menggantikan perubahan lain itu."
     },
     "maintenance": {
       "banner": "Laman web anda dalam mod penyelenggaraan. Pengunjung akan melihat halaman yang sedang diselenggara",
