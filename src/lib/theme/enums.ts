@@ -2,8 +2,7 @@
  * Single source of truth for theme enum values.
  * Consumed by:
  *  - `src/collections/Sites.ts`                (fontHeading/fontBody select options)
- *  - `src/app/api/sites/[siteId]/save/route.ts` (runtime validation via Set<string>)
- *  - `src/app/api/ai/edit-block/route.ts`      (AI system prompt constraints)
+ *  - `src/lib/theme/sanitize-theme.ts`          (runtime validation via Set<string>: editor save + copilot theme edits)
  */
 export const THEME_ENUMS = {
     fontHeading: ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway'] as const,

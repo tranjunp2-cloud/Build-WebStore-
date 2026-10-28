@@ -25,6 +25,7 @@ import {
     resetProcessPixabayKeyRingForTests,
     type SelectedPixabayKey,
 } from '@/lib/ai/image-sourcing/key-ring'
+import { FetchGuardError, fetchAllowlisted, readBodyCapped } from '@/lib/ai/fetch-capped'
 
 export type PixabayOrientation = 'landscape' | 'portrait' | 'squarish'
 
@@ -307,7 +308,7 @@ function getConfiguredPixabayKeys(): string[] {
     return parsePixabayKeys(process.env.PIXABAY_API_KEYS, process.env.PIXABAY_API_KEY)
 }
 
-function hasPixabayKey(): boolean {
+export function hasPixabayKey(): boolean {
     return getConfiguredPixabayKeys().length > 0
 }
 
@@ -783,11 +784,14 @@ export async function searchPhotos(
     return photos
 }
 
-/** SSRF guard: URL host must be in the allowlist (Pixabay or static-fallback hosts). */
+/** SSRF guard: https on the default port, host in the allowlist (Pixabay or static-fallback hosts). */
+function isAllowedDownloadTarget(parsed: URL): boolean {
+    return parsed.protocol === 'https:' && parsed.port === '' && !parsed.username && !parsed.password && DOWNLOAD_HOST_ALLOWLIST.includes(parsed.hostname)
+}
+
 function isAllowedDownloadUrl(url: string): boolean {
     try {
-        const parsed = new URL(url)
-        return DOWNLOAD_HOST_ALLOWLIST.includes(parsed.hostname)
+        return isAllowedDownloadTarget(new URL(url))
     } catch {
         return false
     }
@@ -804,27 +808,34 @@ export async function downloadPhotoBuffer(
     if (!isAllowedDownloadUrl(url)) {
         throw new PixabayError('SSRF_BLOCKED', 0, false, `URL host not in allowlist: ${url}`)
     }
-    let res: Response
-    try {
-        res = await fetch(url, {
-            signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-            headers: { 'User-Agent': 'ech-prime-web-v2/1.0' },
-        })
-    } catch (err) {
+    const signal = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS)
+    const failed = (err: unknown): PixabayError => {
+        if (err instanceof PixabayError) return err
+        if (err instanceof FetchGuardError) {
+            return err.code === 'TOO_LARGE'
+                ? new PixabayError('TOO_LARGE', 413, false, `over ${maxBytes} bytes`)
+                : new PixabayError('SSRF_BLOCKED', 0, false, err.message)
+        }
         // 'TimeoutError' is what AbortSignal.timeout() actually throws;
         // 'AbortError' covers manual aborts (same fix as fetchWithRetry).
         if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
-            throw new PixabayError('TIMEOUT', 0, true, err.message)
+            return new PixabayError('TIMEOUT', 0, true, err.message)
         }
-        throw new PixabayError('DOWNLOAD_FAIL', 0, true, (err as Error).message)
+        return new PixabayError('DOWNLOAD_FAIL', 0, true, (err as Error).message)
     }
-    if (!res.ok) {
-        throw new PixabayError('DOWNLOAD_FAIL', res.status, res.status >= 500)
-    }
-    const arrayBuffer = await res.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    if (buffer.length > maxBytes) {
-        throw new PixabayError('TOO_LARGE', 413, false, `${buffer.length} > ${maxBytes}`)
+    let res: Response
+    let buffer: Buffer
+    try {
+        // redirects only to another allowlisted https host, at most 2 hops (the CDN may redirect once)
+        res = await fetchAllowlisted(url, { signal, headers: { 'User-Agent': 'ech-prime-web-v2/1.0' } }, isAllowedDownloadTarget)
+        if (!res.ok) {
+            await res.body?.cancel().catch(() => undefined)
+            throw new PixabayError('DOWNLOAD_FAIL', res.status, res.status >= 500)
+        }
+        // counted while it arrives: nothing over the cap is ever held in memory
+        buffer = Buffer.from(await readBodyCapped(res, maxBytes))
+    } catch (err) {
+        throw failed(err)
     }
     if (isPixabayUrl(url)) {
         const budget = searchBudgetStorage.getStore()

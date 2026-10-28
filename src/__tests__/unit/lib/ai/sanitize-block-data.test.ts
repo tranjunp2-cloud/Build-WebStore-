@@ -7,7 +7,6 @@
 
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('openai', () => ({ default: vi.fn() }))
 vi.mock('@/blocks/registry', () => ({
     blockRegistry: {
         getAllMeta: () => [],
@@ -497,7 +496,7 @@ describe('sanitizeBlockData — gallery and logo-cloud cleanup [TC-F01.08]', () 
         const output = sanitizeBlockData(input)
 
         // Assert — strings converted to name metadata
-        const logos = output.logos as Array<Record<string, unknown>>
+        const logos = output.logos as unknown as Array<Record<string, unknown>>
         expect(logos).toHaveLength(2)
         expect(logos[0]).toHaveProperty('name')
     })

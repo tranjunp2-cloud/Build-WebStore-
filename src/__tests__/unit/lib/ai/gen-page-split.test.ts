@@ -55,9 +55,22 @@ vi.mock('@/lib/ai/fallback-adapter', () => ({
 	})),
 }))
 
-vi.mock('@/lib/ai/log-usage', () => ({
-	logAiUsage: vi.fn(),
+const { mockCompleteComposed } = vi.hoisted(() => ({ mockCompleteComposed: vi.fn() }))
+// The split steps are AI platform tasks (sitegen.page-blocks) reached through completeComposed.
+// The actor scope is faked: an actor is present, and each call answers via the fixture below.
+vi.mock('@/lib/ai-platform/actor-scope', () => ({
+	completeComposed: (...args: unknown[]) => mockCompleteComposed(...args),
+	currentAiActor: () => ({ tenantId: '1' }),
+	AiUnavailableError: class AiUnavailableError extends Error {},
 }))
+
+/** The composed request as the model sees it (system + user); the reply is the model's JSON text. */
+function bindPlatform(fixture: { chat: { completions: { create: (opts: { messages: Array<{ role: string; content: string }> }) => Promise<any> } } }) {
+	mockCompleteComposed.mockImplementation(async (_taskId: string, messages: { system: string; user: string }) => {
+		const reply = await fixture.chat.completions.create({ messages: [{ role: 'system', content: messages.system }, { role: 'user', content: messages.user }] })
+		return { content: reply.choices[0].message.content, model: reply.model ?? 'test', inputTokens: reply.usage?.prompt_tokens ?? 0, outputTokens: reply.usage?.completion_tokens ?? 0 }
+	})
+}
 
 describe('[TC-GENPERF-W2-01] buildBrief — deterministic nav labels', () => {
 	it('keeps footer identity fields intact when repairing Malay copy', () => {
@@ -102,7 +115,7 @@ describe('[TC-GENPERF-W2-01] buildBrief — deterministic nav labels', () => {
 			},
 			'ms',
 		)
-		const footer = (result.blocks as Array<Record<string, unknown>>)[0]!
+		const footer = (result.blocks as unknown as Array<Record<string, unknown>>)[0]!
 		const columns = footer.columns as Array<{ title: string; links: Array<{ label: string }> }>
 
 		expect(footer.logoText).toBe('Luna Beauty Studio')
@@ -426,7 +439,7 @@ describe('[TC-GENPERF-W2-02] mergeSplitParsed — merge shape', () => {
 		const result = mergeSplitParsed(homeParsed, subsParsed)
 
 		// Assert
-		const pages = result.pages as Array<Record<string, unknown>>
+		const pages = result.pages as unknown as Array<Record<string, unknown>>
 		expect(pages[0]!.slug).toBe('/')
 		expect(pages[0]!.isHomepage).toBe(true)
 		// Exactly one page may carry the '/about' slug (the batch one)
@@ -479,8 +492,6 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		const input: ParallelSplitInput = {
-			openai: mockOpenai as any,
-			model: 'gpt-4o',
 			systemPrompt: 'System',
 			userPromptText: 'User prompt',
 			promptText: 'Prompt text',
@@ -491,6 +502,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		// Act
+		bindPlatform(mockOpenai)
 		const result = await runParallelPageSplit(input)
 
 		// Assert
@@ -538,8 +550,6 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		const input: ParallelSplitInput = {
-			openai: mockOpenai as any,
-			model: 'gpt-4o',
 			systemPrompt: 'System',
 			userPromptText: 'User prompt',
 			promptText: 'Prompt text',
@@ -550,6 +560,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		// Act
+		bindPlatform(mockOpenai)
 		const result = await runParallelPageSplit(input)
 
 		// Assert — home from AI (siteName survives), composer fallback fired
@@ -603,9 +614,8 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 			},
 		}
 
+		bindPlatform(mockOpenai)
 		const result = await runParallelPageSplit({
-			openai: mockOpenai as any,
-			model: 'gpt-4o',
 			systemPrompt: 'System',
 			userPromptText: 'Website auf Deutsch erstellen',
 			promptText: 'GrünRaum Innenarchitektur',
@@ -694,9 +704,8 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 			},
 		}
 
+		bindPlatform(mockOpenai)
 		const result = await runParallelPageSplit({
-			openai: mockOpenai as any,
-			model: 'gpt-4o',
 			systemPrompt: 'System',
 			userPromptText: 'Website auf Deutsch erstellen',
 			promptText: 'GrünRaum Innenarchitektur',
@@ -755,8 +764,6 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		const input: ParallelSplitInput = {
-			openai: mockOpenai as any,
-			model: 'gpt-4o',
 			systemPrompt: 'System',
 			userPromptText: 'User prompt',
 			promptText: 'Prompt text',
@@ -767,6 +774,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		// Act
+		bindPlatform(mockOpenai)
 		const result = await runParallelPageSplit(input)
 
 		// Assert
@@ -804,9 +812,8 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 			},
 		}
 
+		bindPlatform(mockOpenai)
 		const result = await runParallelPageSplit({
-			openai: mockOpenai as any,
-			model: 'gpt-4o',
 			systemPrompt: 'System',
 			userPromptText: 'User prompt',
 			promptText: 'Prompt text',
@@ -854,8 +861,6 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		const input: ParallelSplitInput = {
-			openai: mockOpenai as any,
-			model: 'gpt-4o',
 			systemPrompt: 'System',
 			userPromptText: 'User prompt',
 			promptText: 'Prompt text',
@@ -866,6 +871,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		// Act
+		bindPlatform(mockOpenai)
 		const result = await runParallelPageSplit(input)
 
 		// Assert
@@ -909,7 +915,6 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 			},
 		}
 		const input: ParallelSplitInput = {
-			openai: mockOpenai as any,
 			model: 'gpt-4.1-mini',
 			systemPrompt: 'System',
 			userPromptText: 'User prompt',
@@ -921,6 +926,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		// Act
+		bindPlatform(mockOpenai)
 		const result = await runParallelPageSplit(input)
 
 		// Assert — 4 calls (3 + 1 retry), full 5-page site from GPT, composer NOT used
@@ -930,28 +936,28 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		expect(slugs).toEqual(['/', '/about', '/services', '/contact', '/blog'])
 	})
 
-	it('[TC-GENPERF-W2-12] Contact+Blog batch runs on the light model, others on the main model', async () => {
-		// Arrange — capture the model of every dispatched call
-		const seenModels: Array<{ scope: string; model: string }> = []
+	it('[TC-GENPERF-W2-12] every split call goes to sitegen.page-blocks; prime-web picks no model', async () => {
+		// Arrange — the model tier is the platform task's (alias), so the caller sends only system + user + temperature
 		const mockOpenai = {
 			chat: {
 				completions: {
 					create: vi.fn(async (opts: any) => {
 						const sys = String(opts.messages?.[0]?.content ?? '')
-						const scope = sys.includes('HOMEPAGE ONLY') ? 'home' : sys.includes('Contact, Blog') ? 'light-batch' : 'main-batch'
-						seenModels.push({ scope, model: opts.model })
+						const pages = sys.includes('HOMEPAGE ONLY')
+							? [{ title: 'Home', slug: '/', isHomepage: true, blocks: [] }]
+							: sys.includes('Contact, Blog')
+								? [{ title: 'Contact', slug: '/contact', isHomepage: false, blocks: [] }, { title: 'Blog', slug: '/blog', isHomepage: false, blocks: [] }]
+								: [{ title: 'About', slug: '/about', isHomepage: false, blocks: [] }, { title: 'Services', slug: '/services', isHomepage: false, blocks: [] }]
 						return {
-							model: opts.model,
+							model: 'test',
 							usage: { prompt_tokens: 100, completion_tokens: 100 },
-							choices: [{ message: { content: JSON.stringify({ siteName: 'X', category: 'business', theme: {}, seo: {}, language: 'en', pages: [{ title: 'P', slug: scope === 'home' ? '/' : '/p-' + seenModels.length, isHomepage: scope === 'home', blocks: [] }] }) } }],
+							choices: [{ message: { content: JSON.stringify({ siteName: 'X', category: 'business', theme: {}, seo: {}, language: 'en', pages }) } }],
 						}
 					}),
 				},
 			},
 		}
 		const input: ParallelSplitInput = {
-			openai: mockOpenai as any,
-			model: 'gpt-5.4-mini',
 			systemPrompt: 'System',
 			userPromptText: 'User prompt',
 			promptText: 'Prompt text',
@@ -962,14 +968,14 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		}
 
 		// Act
+		bindPlatform(mockOpenai)
 		await runParallelPageSplit(input)
 
-		// Assert — both routes default to GPT-5.4 mini,
-		// home + About/Services batch on the caller's main model
-		const light = seenModels.find((m) => m.scope === 'light-batch')
-		expect(light?.model).toBe('gpt-5.4-mini')
-		expect(seenModels.find((m) => m.scope === 'home')?.model).toBe('gpt-5.4-mini')
-		expect(seenModels.find((m) => m.scope === 'main-batch')?.model).toBe('gpt-5.4-mini')
+		// Assert — home + both batches on the same platform task; the request carries no model choice
+		expect(mockCompleteComposed.mock.calls.map((call) => call[0])).toEqual(['sitegen.page-blocks', 'sitegen.page-blocks', 'sitegen.page-blocks'])
+		expect(mockCompleteComposed.mock.calls.map((call) => Object.keys(call[1] as object).sort())).toEqual([
+			['system', 'temperature', 'user'], ['system', 'temperature', 'user'], ['system', 'temperature', 'user'],
+		])
 	})
 
 	it('[TC-GENPERF-W2-11] applyDeterministicChrome — nav on every page, home footer cloned, GPT chrome stripped', () => {
@@ -1018,9 +1024,9 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		// into the nested links/columns arrays (a shallow spread would leak it)
 		expect(aboutNav).not.toBe(homeNav)
 		homeNav.logoText = 'MUTATED'
-		;(homeNav.links as Array<Record<string, unknown>>).push({ label: 'X', url: '/x' })
+		;(homeNav.links as unknown as Array<Record<string, unknown>>).push({ label: 'X', url: '/x' })
 		const homeFooter = pages[0]!.blocks.find((b) => b.blockType === 'footer')!
-		;(homeFooter.columns as Array<Record<string, unknown>>).push({ title: 'HomeOnly' })
+		;(homeFooter.columns as unknown as Array<Record<string, unknown>>).push({ title: 'HomeOnly' })
 
 		// Assert — About page chrome unaffected
 		expect(aboutNav.logoText).toBe('Cơm Ba Má')
@@ -1032,7 +1038,7 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		syncFooterAcrossPages(pages)
 		const aboutFooterSynced = pages[1]!.blocks.find((b) => b.blockType === 'footer')!
 		expect(aboutFooterSynced).not.toBe(homeFooter)
-		;(homeFooter.columns as Array<Record<string, unknown>>).push({ title: 'AfterSync' })
+		;(homeFooter.columns as unknown as Array<Record<string, unknown>>).push({ title: 'AfterSync' })
 		expect((aboutFooterSynced.columns as Array<{ title: string }>).some((c) => c.title === 'AfterSync')).toBe(false)
 	})
 

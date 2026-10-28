@@ -63,12 +63,8 @@ function makeApiResponse(hits: FakeHit[]) {
 }
 
 function makeDownloadResponse(data: Uint8Array, mimeType = 'image/jpeg') {
-    return {
-        ok: true,
-        status: 200,
-        headers: new Headers({ 'content-type': mimeType }),
-        arrayBuffer: vi.fn().mockResolvedValue(data.buffer),
-    } as unknown as Response
+    // a real Response: the download reads its body as a stream (byte cap while it arrives)
+    return new Response(data, { status: 200, headers: { 'content-type': mimeType } })
 }
 
 // ── Setup / teardown ─────────────────────────────────────────────────────────

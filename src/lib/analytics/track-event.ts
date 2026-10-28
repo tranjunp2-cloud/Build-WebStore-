@@ -1,3 +1,5 @@
+import { uuid } from '@/lib/uuid'
+
 /**
  * Fire-and-forget analytics event from storefront client components.
  * Reuses the same session + endpoint as TrackingManager (pageview).
@@ -18,7 +20,7 @@ export function trackEvent(params: {
         try {
             let id = sessionStorage.getItem('pw-session') || ''
             if (!id) {
-                id = crypto.randomUUID()
+                id = uuid()
                 sessionStorage.setItem('pw-session', id)
             }
             return id
