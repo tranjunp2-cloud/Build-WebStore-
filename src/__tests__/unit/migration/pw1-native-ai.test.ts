@@ -1,10 +1,24 @@
-import { describe, expect, it, vi } from 'vitest'
-import type OpenAI from 'openai'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pw1DesignDirection } from '@/lib/migration/pw1-design-direction'
 import { NavigationConfigSchema } from '@/blocks/navigation/config'
 import { FooterConfigSchema } from '@/blocks/footer/config'
-import { bindNativeDesign, generateNativePw1WithAI, nativeDesignSchemaForSource, NATIVE_BLOCKS } from '@/lib/migration/pw1-native-ai'
-vi.mock('@/lib/ai/log-usage', () => ({ logAiUsage: vi.fn() }))
+import { bindNativeDesign, generateNativePw1WithAI, nativeDesignOptions, nativeDesignSchemaForSource, NATIVE_BLOCKS } from '@/lib/migration/pw1-native-ai'
+import { runWithAiActor } from '@/lib/ai-platform/actor-scope'
+
+// The design step runs as the AI platform task `migration.pw1-native-design`; the platform
+// client is faked here, the actor scope is real (it decides whether AI may run at all).
+const runTask = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/ai-platform/task-client', () => ({ getAiTaskClient: () => ({ runTask }) }))
+
+const ACTOR = { user: { id: 7 }, tenantId: '1', organizationId: 'org_1', role: 'owner' } as never
+const generate = (source: unknown, onEvent?: (event: never) => void) => runWithAiActor(ACTOR, () => generateNativePw1WithAI(source, onEvent))
+const answer = (output: unknown) => ({ taskId: 'migration.pw1-native-design', output, usage: { model: 'test', inputTokens: 10, outputTokens: 5 } })
+
+beforeEach(() => {
+    vi.stubEnv('AI_PLATFORM_URL', 'http://ai.internal:8300')
+    vi.stubEnv('AI_PLATFORM_CONTEXT_SECRET', 'test-context-secret-at-least-32-characters')
+    runTask.mockReset()
+})
 function fixture() {
     const source = { format: 'pw2-reconstruction-contract', version: '1.0.0', source: { url: 'https://source.example', storeId: '1', capturedAt: '2026-09-10', dumpHash: 'abc' }, site: { name: 'Tea', navigation: { blockType: 'navigation', links: [] }, footer: { blockType: 'footer', columns: [] } }, reconciliation: [], pages: [{ sourceId: '10', title: 'Home', slug: 'home', isHomepage: true, components: [
         { sourceId: '11', position: 1, kind: 'banner', block: { blockType: 'hero', headline: '', sourceLayout: { size: 'small', autoplay: false, interval: 3000, sourceComponentId: '11' }, slides: [{ headline: 'One', image: { url: 'https://source.example/1.jpg' }, ctaButtons: [{ label: 'Buy', url: '/products' }] }, { headline: 'Two', ctaButtons: [] }] } },
@@ -123,25 +137,26 @@ describe('[TC-F35.M18] AI chooses only existing PW2 blocks', () => {
         const { source, design } = fixture(); design.pages[0].sections[0].blockType = 'rich-text'
         expect(() => bindNativeDesign(source, design)).toThrow()
     })
-    it('actually calls AI before binding and does not fallback on failed AI', async () => {
+    it('[TC-AIMV-07] sends the source options and prompts to migration.pw1-native-design, then binds the answer', async () => {
         const { source, design } = fixture()
-        const create = vi.fn().mockResolvedValue({ model: 'test', choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(design) } }] })
-        const client = { chat: { completions: { create } } } as unknown as OpenAI
+        runTask.mockResolvedValue(answer(design))
         const brandEvidence = { status: 'observed', url: source.source.url, capturedAt: '2026-09-16', colors: [{ color: '#335533', score: 5, roles: ['cta'] }], screenshot: 'test-jpeg' }
-        const output = await generateNativePw1WithAI(client, { ...source, site: { ...source.site, brandEvidence } })
-        expect(create).toHaveBeenCalledOnce()
-        const request = create.mock.calls[0][0]
-        const context = JSON.parse(request.messages[1].content)
+        const output = await generate({ ...source, site: { ...source.site, brandEvidence } })
+        expect(runTask).toHaveBeenCalledOnce()
+        const [taskId, request] = runTask.mock.calls[0]! as [string, { choices: unknown; fontHeading: unknown; system: string; user: string }]
+        expect(taskId).toBe('migration.pw1-native-design')
+        expect(request).toMatchObject({ choices: nativeDesignOptions(source).choices, fontHeading: nativeDesignOptions(source).fontHeading })
+        expect(request.system.length).toBeGreaterThan(0)
+        const context = JSON.parse(request.user)
         expect(context.brandEvidence.colors).toEqual(brandEvidence.colors)
         expect(context.brandEvidence.screenshot).toBeUndefined()
-        expect(request.messages).toHaveLength(2)
         expect(context.designDirection).toEqual(pw1DesignDirection(source.source.storeId))
         expect(context.footer).toEqual(source.site.footer)
         expect(context.navigation).toEqual(source.site.navigation)
         expect(context.allowedFooterVariants).toEqual(FooterConfigSchema.shape.variant.removeDefault().options)
         expect(output.effectiveGenMode).toBe('ai-first')
-        create.mockRejectedValueOnce(new Error('AI unavailable'))
-        await expect(generateNativePw1WithAI(client, source)).rejects.toThrow('AI unavailable')
+        runTask.mockRejectedValueOnce(new Error('AI unavailable'))
+        await expect(generate(source)).rejects.toThrow('AI unavailable')
     })
 })
 
@@ -240,19 +255,17 @@ it.each(['grid','masonry','showcase'])('[TC-F35.M25] category %s retains every s
 it('[TC-F35.M39] corrects one invalid AI layout without weakening binder validation', async () => {
     const { source, design } = fixture()
     const invalid = { ...design, pages: [] }
-    const response = (value: unknown) => ({ model: 'test', choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(value) } }] })
-    const create = vi.fn().mockResolvedValueOnce(response(invalid)).mockResolvedValueOnce(response(design))
-    const client = { chat: { completions: { create } } } as unknown as OpenAI
+    runTask.mockResolvedValueOnce(answer(invalid)).mockResolvedValueOnce(answer(design))
     const events: Array<{ event: string; data: Record<string, unknown> }> = []
-    const output = await generateNativePw1WithAI(client, source, event => events.push(event as never))
-    expect(create).toHaveBeenCalledTimes(2)
+    const output = await generate(source, event => events.push(event as never))
+    expect(runTask).toHaveBeenCalledTimes(2)
     // The paid re-generation is observable with its validation reason.
     expect(events.filter(e => e.data.step === 'ai-native-design-retry')).toEqual([expect.objectContaining({ data: expect.objectContaining({ attempt: 1, reason: 'AI page count mismatch' }) })])
-    expect(JSON.parse(create.mock.calls[1][0].messages[1].content).validationCorrection).toContain('AI page count mismatch')
+    expect(JSON.parse(runTask.mock.calls[1]![1].user).validationCorrection).toContain('AI page count mismatch')
     expect(output.result.pages).toHaveLength(1)
-    create.mockReset().mockResolvedValue(response(invalid))
-    await expect(generateNativePw1WithAI(client, source)).rejects.toThrow('AI page count mismatch')
-    expect(create).toHaveBeenCalledTimes(2)
+    runTask.mockReset().mockResolvedValue(answer(invalid))
+    await expect(generate(source)).rejects.toThrow('AI page count mismatch')
+    expect(runTask).toHaveBeenCalledTimes(2)
 })
 
 describe('[TC-F35.M46] Source-constrained AI output', () => {
@@ -313,3 +326,12 @@ it('[TC-F35.M22] binds an image-only banner to the existing slideshow renderer w
     design.pages[0].sections[0].variant='split-right'
     expect(()=>bindNativeDesign(source,design)).toThrow('Banner block must match')
 });
+
+describe('[TC-AIMV-07] native design without an AI actor', () => {
+    it('refuses to run the design step when no actor is in scope, and never calls the platform', async () => {
+        const { source } = fixture()
+
+        await expect(generateNativePw1WithAI(source)).rejects.toThrow('The AI platform is required for source-aware generation')
+        expect(runTask).not.toHaveBeenCalled()
+    })
+})

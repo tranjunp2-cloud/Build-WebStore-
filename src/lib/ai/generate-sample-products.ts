@@ -6,10 +6,9 @@
  * Called from generate-site/route.ts via Promise.allSettled.
  */
 
-import OpenAI from 'openai'
 import { getLocaleLabel } from '@/lib/locale-labels'
+import { AiUnavailableError, completeComposed } from '@/lib/ai-platform/actor-scope'
 import type { BasePayload } from 'payload'
-import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
 import { resolveBusinessCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
@@ -67,12 +66,6 @@ export interface PreparedSampleProductsResult {
 }
 
 
-function getOpenAI(): OpenAI | null {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
-    return new OpenAI({ apiKey: key, timeout: 12_000, maxRetries: 0 })
-}
-
 async function mapWithConcurrency<T, R>(
     items: readonly T[],
     concurrency: number,
@@ -90,28 +83,23 @@ async function mapWithConcurrency<T, R>(
     return results
 }
 
-/** Returns true when the OpenAI error is a hard quota/credit limit (no point retrying). */
+/**
+ * True when no model can answer this run (no AI actor, or the workspace's AI
+ * quota is used up) — no point retrying; the curated products take over.
+ */
 function isQuotaExhausted(err: unknown): boolean {
-    // Structural check instead of instanceof so this works in test environments
-    // where OpenAI.APIError may be undefined (mock doesn't expose the class).
-    if (!(err instanceof Error)) return false
-    const status = (err as { status?: unknown }).status
-    if (status !== 429) return false
-    const code = (err as { code?: string | null }).code
-    if (!code) return false // unknown code — retry rather than abort on ambiguous 429
-    return code === 'insufficient_quota'
+    if (err instanceof AiUnavailableError) return true
+    // Structural check: the platform client's error carries the HTTP status.
+    return err instanceof Error && (err as { status?: unknown }).status === 429
 }
 
-/** Tier 1: ask GPT-4.1-nano for `count` products tailored to the business. */
+/** Tier 1: ask the AI platform (`sitegen.sample-products`) for `count` products tailored to the business. */
 async function generateSampleProductsAI(
     businessInfo: BusinessInfoInput,
     language: string,
     count = 6,
     excludeNames: readonly string[] = [],
 ): Promise<Array<SampleProduct & { _imageKeyword: string }>> {
-    const openai = getOpenAI()
-    if (!openai) throw new Error('OPENAI_API_KEY not set')
-
     const includeBM = language === 'ms' || language === 'auto'
     const targetLanguage = language !== 'auto' && language !== 'en' && language !== 'ms'
         ? getLocaleLabel(language).full
@@ -132,18 +120,14 @@ ${targetLanguage ? `Write product names and customer-facing descriptions in ${ta
 Return JSON: {"products":[{"name":"...","shortDescription":"max 100 chars","description":"2-3 sentences","price":number${includeBM ? ',"descriptionBM":"Bahasa Melayu translation"' : ''},"imageKeyword":"2-3 word English-only Unsplash search query (e.g. pet shampoo bottle, cat carrier bag)","weight":number (estimated shipping weight in kg for this specific product, minimum 0.1),"length":number (estimated length in cm),"width":number (estimated width in cm),"height":number (estimated height in cm)}]}
 Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a chair is heavier than earrings). No markdown. JSON only.`
 
-    const completion = await openai.chat.completions.create({
-        model: selectModel('product-description'),
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt },
-        ],
+    const completion = await completeComposed('sitegen.sample-products', {
+        system: systemPrompt,
+        user: prompt,
         temperature: 0.4,
-        max_tokens: Math.min(1500, (includeBM ? 450 : 300) * count),
-        response_format: { type: 'json_object' },
+        maxOutputTokens: Math.min(1500, (includeBM ? 450 : 300) * count),
     })
 
-    const content = completion.choices[0]?.message?.content ?? ''
+    const content = completion.content
     const parsed = JSON.parse(content) as { products?: unknown[] }
     if (!Array.isArray(parsed.products) || parsed.products.length === 0) {
         throw new Error('AI returned empty products array')
@@ -162,7 +146,7 @@ Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a ch
     const toBoundedNumber = (v: unknown, min: number, max: number): number | undefined =>
         typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined
 
-    return (parsed.products as Array<Record<string, unknown>>).slice(0, count).map((p) => ({
+    return (parsed.products as unknown as Array<Record<string, unknown>>).slice(0, count).map((p) => ({
         name: String(p.name ?? ''),
         shortDescription: String(p.shortDescription ?? '').slice(0, 100),
         description: String(p.description ?? ''),
@@ -336,7 +320,7 @@ export async function prepareSampleProducts(
     businessInfo: BusinessInfoInput,
     language: string,
 ): Promise<PreparedSampleProductsResult> {
-    // The OpenAI client has retries disabled. Curated products are a complete,
+    // The platform task allows a single attempt. Curated products are a complete,
     // deterministic fallback, so a second/third model attempt only extends p95.
     const MAX_RETRIES = 1
     let rawProducts: Array<SampleProduct & { _imageKeyword: string }> = []
@@ -353,7 +337,7 @@ export async function prepareSampleProducts(
             console.warn(`[sample-products] AI attempt ${attempt}/${MAX_RETRIES} returned 0 products`)
         } catch (err) {
             if (isQuotaExhausted(err)) {
-                console.warn('[sample-products] OpenAI quota exhausted, skipping retries')
+                console.warn('[sample-products] AI unavailable or quota used up, skipping retries')
                 break
             }
             console.warn(`[sample-products] AI attempt ${attempt}/${MAX_RETRIES} failed:`, (err as Error).message)

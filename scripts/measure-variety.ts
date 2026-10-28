@@ -12,7 +12,7 @@
  *   - Dev server on http://localhost:3000 (or PORT env var)
  *   - ALLOW_E2E_TEST_UTILS=true in .env.local (enables /api/e2e/ensure-test-user)
  *   - E2E_TEST_BEARER=local-test-secret-12345 (or .env.local value)
- *   - OPENAI_API_KEY + PIXABAY_API_KEY set so AI happy path runs
+ *   - AI_PLATFORM_URL + AI_PLATFORM_CONTEXT_SECRET (ai-platform) + PIXABAY_API_KEY set so AI happy path runs
  *
  * Output:
  *   - plans/260414-2253-ai-gen-variety-root-cause/reports/variety-{label}.json

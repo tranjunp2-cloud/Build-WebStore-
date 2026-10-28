@@ -10,6 +10,7 @@ import { preparePw1SiteSettings } from './pw1-site-settings'
 import type { WebsiteBlueprint } from './pw1-contract'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import type { Payload } from 'payload'
+import { isAiTasksEnabled } from '@/lib/ai-platform/config'
 
 export interface ApplyWebsiteOptions {
     allowPublished?: boolean
@@ -34,7 +35,7 @@ export async function applyPw1Website(options: ApplyWebsiteOptions) {
     const connectionString = process.env.DATABASE_URI || process.env.DATABASE_URL
     if (!connectionString) throw new Error('DATABASE_URI or DATABASE_URL is required')
     const databaseUrl = new URL(connectionString)
-    if (!process.env.PAYLOAD_SECRET || !process.env.OPENAI_API_KEY) throw new Error('PAYLOAD_SECRET and OPENAI_API_KEY are required')
+    if (!process.env.PAYLOAD_SECRET || !isAiTasksEnabled()) throw new Error('PAYLOAD_SECRET and the AI platform (AI_PLATFORM_URL, AI_PLATFORM_CONTEXT_SECRET) are required')
     process.env.PAYLOAD_PUSH_SCHEMA = 'false'
     const { Client } = await import('pg')
     const lock = new Client({ connectionString })
