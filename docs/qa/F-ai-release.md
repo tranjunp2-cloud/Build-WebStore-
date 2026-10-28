@@ -465,6 +465,7 @@ The OpenAI-in-process behaviour these cases covered no longer exists. Their rows
 | TC-AICP-351 | src | Blog slug de-dup counts trashed posts (`saveBlogForUser`, `seedBlogPosts`) | Unit | `src/__tests__/unit/blog/save-blog-slug-trash.test.ts`, `src/__tests__/unit/lib/ai/seed-blog-posts.test.ts` |
 | TC-AICP-352 | src | Media: only active memberships (missing status = active) touch stock rows or receive uploads | Unit | `src/__tests__/unit/ai-platform/media-stock-ownership.test.ts` |
 | TC-AICP-356 | src | Xendit refund: a 4xx saying a refund is under way or done (`REFUND_IN_PROGRESS`, duplicates) is an unknown outcome (order stays refunded, note names the key), other 4xx codes roll back; each attempt uses its own key `refund-<id>-<CAS time>` | Unit | `src/__tests__/api/orders-refund-xendit.test.ts` |
+| TC-AICP-357 | src | Product page: after a save the page goes back to the list in 1.5 s; leaving the page first cancels that (it no longer pulls the user back to `/products` from another page) | Unit | `src/__tests__/unit/save-version/save-version-product-page.test.tsx` |
 
 ## Editor Undo / Redo and the assistant's cards (TC-AIREL-300..329)
 
