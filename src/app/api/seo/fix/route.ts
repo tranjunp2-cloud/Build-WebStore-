@@ -1,18 +1,48 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import OpenAI from 'openai'
 import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { SEO_CONTEXT_MAX_CHARS } from '@ech/ai-contracts'
+import { describeAiTaskFailure } from '@/lib/ai-platform/ai-tasks'
+import { AI_UNAVAILABLE_MESSAGE, isAiTasksEnabled } from '@/lib/ai-platform/config'
+import { resolveActorForUser } from '@/lib/ai-platform/context'
+import { getAiTaskClient } from '@/lib/ai-platform/task-client'
+import type { PlatformUser } from '@/types/user'
 
 /**
  * POST /api/seo/fix
  * Uses AI (GPT-4o-mini) to auto-generate missing meta titles and descriptions
- * for all pages in a site.
+ * for all pages in a site. The site must belong to a workspace the caller is
+ * an active member of (super-admins excepted).
  *
  * Body: { siteId: string }
  */
+
+type TenantRef = string | number | { id: string | number } | null | undefined
+type SeoMetaResult = { metaTitle?: string; metaDescription?: string }
+
+function tenantId(value: TenantRef): string | null {
+    if (value == null) return null
+    return String(typeof value === 'object' ? value.id : value)
+}
+
+function activeTenantIds(user: unknown): Set<string> {
+    const memberships = (user as { tenants?: Array<{ tenant?: TenantRef; status?: string }> }).tenants ?? []
+    return new Set(
+        memberships.flatMap((membership) => {
+            const id = tenantId(membership.tenant)
+            return membership.status === 'active' && id ? [id] : []
+        }),
+    )
+}
+
+const forbidden = () =>
+    NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Forbidden' } },
+        { status: 403 },
+    )
 
 import { seoFixSchema } from '@/lib/validations/seo'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -22,7 +52,7 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
         const payload = await getPayload({ config })
 
         // Rate Limit: 20 AI tasks per hour
-        const rateLimit = await checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(`ai:seo-fix:${user.id}`, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },
@@ -35,14 +65,28 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
         
         const { siteId } = data!
 
-        // Get site info
-        const site = await payload.findByID({ collection: 'sites', id: siteId })
+        const isSuperAdmin = user.roles?.includes('super-admin') === true
+        const userTenantIds = activeTenantIds(user)
+        // Inactive memberships are denied before any protected Local API read.
+        if (!isSuperAdmin && userTenantIds.size === 0) return forbidden()
+
+        // Get site info — read with the caller's access so another tenant's site is not found.
+        const site = await payload.findByID({
+            collection: 'sites',
+            id: siteId,
+            depth: 0,
+            overrideAccess: false,
+            user,
+            disableErrors: true,
+        })
         if (!site) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
                 { status: 404 }
             )
         }
+        const siteTenantId = tenantId(site.tenant as TenantRef)
+        if (!siteTenantId || (!isSuperAdmin && !userTenantIds.has(siteTenantId))) return forbidden()
 
         // Get all pages
         const pagesResult = await payload.find({
@@ -50,6 +94,8 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
             where: { site: { equals: siteId } },
             limit: 50,
             depth: 1,
+            overrideAccess: false,
+            user,
         })
 
         if (pagesResult.docs.length === 0) {
@@ -73,8 +119,37 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
             })
         }
 
-        // Use OpenAI to generate SEO metadata
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+        // Generate SEO metadata with the ECH AI platform task.
+        let generateMeta: (pageContent: string) => Promise<SeoMetaResult>
+        if (isAiTasksEnabled()) {
+            let ai: ReturnType<typeof getAiTaskClient>
+            try {
+                ai = getAiTaskClient(await resolveActorForUser(user as unknown as PlatformUser, request, { tenantId: siteTenantId }))
+            } catch (error) {
+                const failure = describeAiTaskFailure(error)
+                return NextResponse.json(
+                    { success: false, error: { code: 'AI_ERROR', message: failure.message } },
+                    { status: failure.status },
+                )
+            }
+            generateMeta = async (pageContent) => {
+                try {
+                    const { output } = await ai.runTask('seo.fix-meta', {
+                        siteName: (site.name || '').slice(0, 200),
+                        pageContent: pageContent.slice(0, SEO_CONTEXT_MAX_CHARS),
+                    })
+                    return output
+                } catch (error) {
+                    // Per-page error text is shown to the user: keep it user-safe.
+                    throw new Error(describeAiTaskFailure(error).message)
+                }
+            }
+        } else {
+            return NextResponse.json(
+                { success: false, error: { code: 'AI_UNAVAILABLE', message: AI_UNAVAILABLE_MESSAGE } },
+                { status: 503 },
+            )
+        }
 
         const fixResults = []
         for (const page of pagesToFix) {
@@ -90,21 +165,7 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
             const pageContent = contentParts.join('\n') || `Page: ${page.title}`
 
             try {
-                const completion = await openai.chat.completions.create({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: `You are an SEO specialist for Malaysian businesses. Generate optimized meta title (max 60 chars) and meta description (max 155 chars) for the website page described. The business is called "${site.name}". Output JSON only: {"metaTitle":"...","metaDescription":"..."}`
-                        },
-                        { role: 'user', content: pageContent },
-                    ],
-                    temperature: 0.3,
-                    max_tokens: 200,
-                    response_format: { type: 'json_object' },
-                })
-
-                const result = JSON.parse(completion.choices[0]?.message?.content || '{}')
+                const result = await generateMeta(pageContent)
 
                 if (result.metaTitle || result.metaDescription) {
                     // Update the page SEO
@@ -119,6 +180,8 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
                     await payload.update({
                         collection: 'pages',
                         id: page.id,
+                        overrideAccess: false,
+                        user,
                         data: {
                             seo: {
                                 ...(page.seo || {}),

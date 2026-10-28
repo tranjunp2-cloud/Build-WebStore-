@@ -196,6 +196,7 @@ describe('POST /api/seo/fix-all [TC-F37-04-16, TC-F19.38]', () => {
             undefined,
             [],
             expect.any(AbortSignal),
+            undefined, // no platform actor: AI tasks are not configured in this test
         )
     })
 

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
     generateSiteSchema,
-    editBlockSchema,
     rewriteTextSchema,
     applyTemplateSchema,
 } from '@/lib/validations/ai'
@@ -79,35 +78,6 @@ describe('generateSiteSchema [TC-F01.04, TC-F01.05]', () => {
 
     it('rejects completely missing businessInfo', () => {
         const result = generateSiteSchema.safeParse({})
-        expect(result.success).toBe(false)
-    })
-})
-
-describe('editBlockSchema [TC-F01.04]', () => {
-    it('accepts valid input with instruction', () => {
-        const result = editBlockSchema.safeParse({ instruction: 'Change color to blue' })
-        expect(result.success).toBe(true)
-    })
-
-    it('accepts with optional block, blockIndex, allBlocks, theme, siteName', () => {
-        const result = editBlockSchema.safeParse({
-            instruction: 'Update hero',
-            block: { type: 'hero' },
-            blockIndex: 0,
-            allBlocks: [{ type: 'hero' }],
-            theme: { primaryColor: '#000' },
-            siteName: 'My Site',
-        })
-        expect(result.success).toBe(true)
-    })
-
-    it('rejects missing instruction', () => {
-        const result = editBlockSchema.safeParse({})
-        expect(result.success).toBe(false)
-    })
-
-    it('rejects empty instruction', () => {
-        const result = editBlockSchema.safeParse({ instruction: '' })
         expect(result.success).toBe(false)
     })
 })

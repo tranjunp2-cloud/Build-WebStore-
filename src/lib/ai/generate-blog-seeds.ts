@@ -1,5 +1,4 @@
-import OpenAI from 'openai'
-import { selectModel } from './config'
+import { AiUnavailableError, completeComposed } from '@/lib/ai-platform/actor-scope'
 import { getLocaleLabel } from '@/lib/locale-labels'
 import { detectLanguageFromText } from '@/lib/language-detection'
 
@@ -10,19 +9,10 @@ export interface BlogSeedAI {
     imageKeyword: string
 }
 
-function getOpenAI(): OpenAI | null {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
-    return new OpenAI({ apiKey: key, timeout: 12_000, maxRetries: 0 })
-}
-
+/** True when no model can answer (no AI actor, or the workspace's AI quota is used up). */
 export function isQuotaExhausted(err: unknown): boolean {
-    if (!(err instanceof Error)) return false
-    const status = (err as { status?: unknown }).status
-    if (status !== 429) return false
-    const code = (err as { code?: string | null }).code
-    if (!code) return false
-    return code === 'insufficient_quota'
+    if (err instanceof AiUnavailableError) return true
+    return err instanceof Error && (err as { status?: unknown }).status === 429
 }
 
 function slugify(text: string): string {
@@ -55,8 +45,6 @@ export async function generateBlogSeedsAI(input: {
     products?: readonly string[]
     locale?: string
 }): Promise<BlogSeedAI[]> {
-    const openai = getOpenAI()
-    if (!openai) throw new Error('OPENAI_API_KEY not set')
 
     const safeName = input.businessName.slice(0, 100)
     const safeIndustry = input.industry.slice(0, 50)
@@ -73,34 +61,27 @@ Return JSON: {"posts":[
 ]}
 JSON only.`
 
-    const response = await openai.chat.completions.create({
-        model: selectModel('blog-seed'),
-        response_format: { type: 'json_object' },
-        max_tokens: 600,
-        temperature: 0.4,
-        messages: [
-            {
-                role: 'system',
-                content: `You generate 3 blog post seeds for a small-business website.
+    const response = await completeComposed('sitegen.blog-seeds', {
+        system: `You generate 3 blog post seeds for a small-business website.
 Posts MUST be specific to the business — never generic placeholders.
 Every human-facing title and excerpt MUST be written in the requested target language.
 Preserve business and product names exactly as provided.
 Slugs MUST be kebab-case, lowercase, no business name embedded.
 imageKeyword MUST be 2-4 plain English words describing a stock photo that fits the post (e.g. "fresh croissants pastry", "yoga studio mat").
 Output strictly JSON. No markdown.`,
-            },
-            { role: 'user', content: userPrompt },
-        ],
-    }, { timeout: 12_000 })
+        user: userPrompt,
+        temperature: 0.4,
+        maxOutputTokens: 600,
+    })
 
-    const content = response.choices[0]?.message?.content ?? ''
+    const content = response.content
     const parsed = JSON.parse(content) as { posts?: unknown }
 
     if (!Array.isArray(parsed.posts) || parsed.posts.length === 0) {
         throw new Error('AI returned empty or invalid posts array')
     }
 
-    const posts = (parsed.posts as Array<Record<string, unknown>>)
+    const posts = (parsed.posts as unknown as Array<Record<string, unknown>>)
         .slice(0, 3)
         .map((p, index) => ({
             title: String(p.title ?? '').slice(0, 70),
@@ -129,37 +110,25 @@ export async function generateBlogPostContent(
     industry: string,
     locale: string = 'en',
 ): Promise<string> {
-    const openai = getOpenAI()
-    if (!openai) throw new Error('OPENAI_API_KEY not set')
 
     const safeName = businessName.slice(0, 100)
     const safeIndustry = industry.slice(0, 50)
     const targetLanguage = resolveBlogLanguage(locale)
 
-    const response = await openai.chat.completions.create({
-        model: selectModel('blog-seed'),
-        response_format: { type: 'json_object' },
-        max_tokens: 2000,
-        temperature: 0.7,
-        messages: [
-            {
-                role: 'system',
-                content: `You write blog post content for small business websites.
+    const response = await completeComposed('sitegen.blog-post-content', {
+        system: `You write blog post content for small business websites.
 Use rich HTML: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>. Target 400-600 words.
 Write every human-facing word strictly in the requested target language.
 Preserve business and product names exactly as provided.
 Be specific and practical. No markdown. JSON only.`,
-            },
-            {
-                role: 'user',
-                content: `Write blog post "${title}" for "${safeName}", a ${safeIndustry} business.
+        user: `Write blog post "${title}" for "${safeName}", a ${safeIndustry} business.
 The complete article must be written strictly in ${targetLanguage.name} (${targetLanguage.code}).
 Return JSON: {"content":"<h2>...</h2><p>...</p>..."}`,
-            },
-        ],
-    }, { timeout: 12_000 })
+        temperature: 0.7,
+        maxOutputTokens: 2000,
+    })
 
-    const raw = response.choices[0]?.message?.content ?? ''
+    const raw = response.content
     const parsed = JSON.parse(raw) as { content?: string }
     if (!parsed.content) throw new Error('No content in response')
     assertTargetLanguage(parsed.content, targetLanguage.code, 'article')

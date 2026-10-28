@@ -2,14 +2,27 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
-import OpenAI from 'openai'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { describeAiTaskFailure, runAiTaskForUser } from '@/lib/ai-platform/ai-tasks'
+import { AI_UNAVAILABLE_MESSAGE, isAiTasksEnabled } from '@/lib/ai-platform/config'
 
-function getOpenAI(): OpenAI | null {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
-    return new OpenAI({ apiKey: key })
+type TenantRef = string | number | { id: string | number } | null | undefined
+
+function tenantId(value: TenantRef): string | null {
+    if (value == null) return null
+    return String(typeof value === 'object' ? value.id : value)
 }
+
+function activeTenantIds(user: unknown): Set<string> {
+    const memberships = (user as { tenants?: Array<{ tenant?: TenantRef; status?: string }> }).tenants ?? []
+    return new Set(
+        memberships.flatMap((membership) => {
+            const id = tenantId(membership.tenant)
+            return membership.status === 'active' && id ? [id] : []
+        }),
+    )
+}
+
 
 /**
  * POST /api/ai/seo-generate
@@ -28,7 +41,7 @@ function getOpenAI(): OpenAI | null {
 export const POST = withAuth(async (user, req) => {
     try {
         // Rate Limit: 20 AI tasks per hour
-        const rateLimit = await checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(`ai:seo-generate:${user.id}`, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { success: false, error: 'Rate limit exceeded. Try again later.' },
@@ -39,15 +52,32 @@ export const POST = withAuth(async (user, req) => {
         const body = await req.json()
         const { name, category, language = 'en', siteId } = body
 
-        // Fetch tracked keywords if siteId provided (AC-15)
+        // Fetch tracked keywords if siteId provided (AC-15) — only from a site
+        // of a workspace the caller is an active member of.
         let trackedKeywords: string[] = []
+        let siteTenantId: string | null = null
         if (siteId) {
+            let site: unknown = null
             try {
                 const payload = await getPayload({ config })
-                const site = await payload.findByID({ collection: 'sites', id: siteId })
+                site = await payload.findByID({
+                    collection: 'sites',
+                    id: siteId,
+                    depth: 0,
+                    overrideAccess: false,
+                    user,
+                    disableErrors: true,
+                })
+            } catch { /* site fetch failed — proceed without keywords */ }
+            if (site) {
+                const isSuperAdmin = user.roles?.includes('super-admin') === true
+                siteTenantId = tenantId((site as { tenant?: TenantRef }).tenant)
+                if (!isSuperAdmin && (!siteTenantId || !activeTenantIds(user).has(siteTenantId))) {
+                    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+                }
                 trackedKeywords = ((site as any)?.seo?.trackedKeywords as Array<{ keyword: string }> | undefined)
                     ?.map(k => k.keyword).filter(Boolean) || []
-            } catch { /* site fetch failed — proceed without keywords */ }
+            }
         }
 
         if (!name || typeof name !== 'string' || name.trim().length < 3) {
@@ -57,78 +87,22 @@ export const POST = withAuth(async (user, req) => {
             )
         }
 
-        const openai = getOpenAI()
-        if (!openai) {
-            return NextResponse.json(
-                { success: false, error: 'OPENAI_API_KEY is not configured' },
-                { status: 501 }
-            )
+        if (!isAiTasksEnabled()) {
+            return NextResponse.json({ success: false, error: AI_UNAVAILABLE_MESSAGE }, { status: 503 })
         }
 
-        const categoryContext = category ? ` in the "${category}" category` : ''
-
-        const systemPrompt = `You are an expert SEO copywriter for Malaysian e-commerce (Bahasa Melayu and English market).
-Your job is to generate SEO metadata for a product listing.
-
-The output MUST be in ${language === 'ms' ? 'Bahasa Melayu (Malay)' : 'English'}.
-
-STRICT OUTPUT FORMAT — respond ONLY with a valid JSON object, no extra text:
-{
-  "title": "SEO-optimized product title in ${language === 'ms' ? 'Malay' : 'English'} (MUST be ≤ 70 characters, include product name, add a compelling attribute)",
-  "description": "Compelling meta description in ${language === 'ms' ? 'Malay' : 'English'} (MUST be between 150 and 160 characters, action-oriented, include a call to action like '${language === 'ms' ? 'Beli sekarang' : 'Shop now'}', mention price context if relevant)",
-  "slug": "url-friendly-slug (kebab-case, romanized if in Malay/Vietnamese, no special chars, all lowercase, no trailing/leading hyphens)"
-}
-
-IMPORTANT RULES:
-1. title MUST NOT exceed 70 characters — count carefully.
-2. description MUST be between 150 and 160 characters — count carefully and pad if needed.
-3. slug is derived from the product name only — pure ASCII kebab-case.
-4. Do NOT include store brand name in title or description.
-5. Use natural, friendly language appropriate for Malaysian SME market.`
-
-        const keywordContext = trackedKeywords.length
-            ? `\nTarget Keywords: ${trackedKeywords.join(', ')}\n- Naturally incorporate 1-2 keywords if relevant (keyword density ≤ 2%)`
-            : ''
-
-        const userPrompt = `Generate SEO metadata for this product:
-Product Name: "${name.trim()}"${categoryContext}${keywordContext}
-
-Remember: title ≤ 70 chars, description 150-160 chars, slug kebab-case ASCII.`
-
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-            ],
-            temperature: 0.6,
-            max_tokens: 400,
-            response_format: { type: 'json_object' },
-        })
-
-        const content = completion.choices[0]?.message?.content
-        if (!content) {
-            throw new Error('No content received from OpenAI')
+        try {
+            const { output } = await runAiTaskForUser(user, req, 'seo.page-meta', {
+                name: name.trim(),
+                category: typeof category === 'string' && category.trim() ? category.trim() : undefined,
+                language: typeof language === 'string' ? language : 'en',
+                keywords: trackedKeywords,
+            }, { tenantId: siteTenantId })
+            return NextResponse.json({ success: true, data: enforceSeoConstraints(output, name) })
+        } catch (error) {
+            const failure = describeAiTaskFailure(error)
+            return NextResponse.json({ success: false, error: failure.message }, { status: failure.status })
         }
-
-        const parsed = JSON.parse(content) as {
-            title?: string
-            description?: string
-            slug?: string
-        }
-
-        // Enforce hard constraints server-side as safety net
-        const title = (parsed.title || '').slice(0, 70).trim()
-        const description = (parsed.description || '').slice(0, 160).trim()
-        const slug = (parsed.slug || slugify(name))
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/(^-|-$)/g, '')
-
-        return NextResponse.json({
-            success: true,
-            data: { title, description, slug },
-        })
     } catch (error) {
         console.error('API /api/ai/seo-generate error:', error)
         return NextResponse.json(
@@ -136,7 +110,21 @@ Remember: title ≤ 70 chars, description 150-160 chars, slug kebab-case ASCII.`
             { status: 500 }
         )
     }
-})
+}, { csrf: true })
+
+/** Enforce hard constraints server-side as safety net. */
+function enforceSeoConstraints(
+    parsed: { title?: string; description?: string; slug?: string },
+    name: string,
+): { title: string; description: string; slug: string } {
+    const title = (parsed.title || '').slice(0, 70).trim()
+    const description = (parsed.description || '').slice(0, 160).trim()
+    const slug = (parsed.slug || slugify(name))
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+    return { title, description, slug }
+}
 
 function slugify(text: string): string {
     return text

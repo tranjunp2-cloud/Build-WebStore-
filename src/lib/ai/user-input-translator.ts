@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import { completeComposed, currentAiActor } from '@/lib/ai-platform/actor-scope'
 import { detectLanguage } from './lang-detect'
 
 interface TranslatableBusinessInputs {
@@ -53,32 +53,26 @@ export async function translateUserInputsIfNeeded(
     const { blockLang: detectedIso } = detectLanguage(combined)
     if (detectedIso === targetIso) return inputs
 
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return inputs
+    if (!currentAiActor()) return inputs
 
     const targetLangName = LOCALE_TO_LANG_NAME[targetIso] ?? 'English'
 
     try {
-        const openai = new OpenAI({ apiKey: key })
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 8000)
 
         try {
-            const response = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
-                messages: [{
-                    role: 'user',
-                    content: `Translate these business details to ${targetLangName}. Keep brand names and proper nouns as-is when they have no natural translation. Return valid JSON only, no markdown.
+            const response = await completeComposed('i18n.translate-user-input', {
+                user: `Translate these business details to ${targetLangName}. Keep brand names and proper nouns as-is when they have no natural translation. Return valid JSON only, no markdown.
 
 Input: ${JSON.stringify({ businessName: inputs.businessName, shortDescription: inputs.shortDescription, products: inputs.products })}
 
 Return JSON with same three keys.`,
-                }],
-                max_tokens: 600,
+                maxOutputTokens: 600,
                 temperature: 0.1,
             }, { signal: controller.signal })
 
-            const content = response.choices[0]?.message?.content?.trim()
+            const content = response.content.trim()
             if (!content) return inputs
 
             const clean = content.replace(/```json/g, '').replace(/```/g, '').trim()

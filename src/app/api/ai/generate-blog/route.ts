@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
-import OpenAI from 'openai'
+import { describeAiTaskFailure, runAiTaskForUser } from '@/lib/ai-platform/ai-tasks'
+import { AI_UNAVAILABLE_MESSAGE, isAiTasksEnabled } from '@/lib/ai-platform/config'
 
-function getOpenAI(): OpenAI | null {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
-    return new OpenAI({ apiKey: key })
-}
 
 export const POST = withAuth(async (user, req) => {
     try {
-        const rateLimit = await checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(`ai:generate-blog:${user.id}`, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { success: false, error: 'Rate limit exceeded. Try again later.' },
@@ -29,55 +25,26 @@ export const POST = withAuth(async (user, req) => {
             )
         }
 
-        const openai = getOpenAI()
-        if (!openai) {
-            return NextResponse.json(
-                { success: false, error: 'OPENAI_API_KEY is not configured' },
-                { status: 501 }
-            )
+        if (!isAiTasksEnabled()) {
+            return NextResponse.json({ success: false, error: AI_UNAVAILABLE_MESSAGE }, { status: 503 })
         }
 
-        const systemPrompt = `You are an expert copywriter and SEO specialist. 
-Your task is to write a comprehensive, high-quality, and deeply engaging blog post based on the user's topic.
-The blog post should be well-structured with an introduction, multiple detailed body sections with clear subheadings (<h2>, <h3>), bullet points where appropriate, and a strong conclusion.
-Target length: Around 800 to 1200 words. Make it incredibly detailed, adding real-world examples, actionable advice, and deep insights.
-The tone of voice MUST be: ${tone}. Adapt your writing style, vocabulary, and structure to perfectly match this tone.
-The output MUST be strictly in ${language === 'ms' ? 'Malay' : 'English'}. NO MATTER WHAT LANGUAGE THE USER PROMPT IS WRITTEN IN, YOUR ENTIRE RESPONSE (INCLUDING TITLE, CONTENT, AND SEO) MUST BE TRANSLATED AND WRITTEN EXCLUSIVELY IN ${language === 'ms' ? 'Malay (Bahasa Melayu)' : 'English'}. Do not include any text in the user's input language if it differs from the required output language.
-
-CRITICAL CONSTRAINT: You can ONLY assist with text generation. If the user's prompt asks you to generate, create, or provide an image/picture, you MUST politely explain in the "content" field that you only generate text and suggest they upload images manually using the thumbnail upload feature.
-
-Format the output EXACTLY as a JSON object matching this structure:
-{
-  "title": "A catchy, SEO-friendly title (max 90 chars)",
-  "content": "The full blog post content in rich HTML format (use strictly <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>). The content MUST be comprehensive and detailed (at least 800 words). If the user asked for an image, put the refusal message here instead as a single paragraph.",
-  "seoTitle": "SEO optimized title (max 60 chars)",
-  "seoDescription": "SEO optimized meta description (max 155 chars)"
-}
-Do not include any extra text (like markdown code blocks \`\`\`json) outside the JSON object.`
-
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Please write a blog post about: ${prompt}\n\nIMPORTANT: Write the entire response strictly in ${language === 'ms' ? 'Malay' : 'English'}, regardless of the language used in this prompt.` },
-            ],
-            temperature: 0.7,
-            max_tokens: 3000,
-            response_format: { type: 'json_object' },
-        })
-
-        const content = completion.choices[0]?.message?.content
-        if (!content) {
-            throw new Error('No content received from OpenAI')
+        try {
+            const { output } = await runAiTaskForUser(user, req, 'copy.blog-post', {
+                prompt: String(prompt),
+                language: typeof language === 'string' ? language : 'en',
+                tone: typeof tone === 'string' && tone.trim() ? tone.trim() : 'Professional',
+            })
+            return NextResponse.json({ success: true, data: output })
+        } catch (error) {
+            const failure = describeAiTaskFailure(error)
+            return NextResponse.json({ success: false, error: failure.message }, { status: failure.status })
         }
-
-        const parsed = JSON.parse(content)
-        return NextResponse.json({ success: true, data: parsed })
     } catch (error: any) {
         console.error('API /api/ai/generate-blog error:', error)
         return NextResponse.json(
-            { success: false, error: 'Failed to generate blog post: ' + (error?.message || error) },
+            { success: false, error: 'Failed to generate blog post' },
             { status: 500 }
         )
     }
-})
+}, { csrf: true })

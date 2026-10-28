@@ -87,21 +87,6 @@ export const extractionResultSchema = z.object({
     confidence: z.enum(['high', 'medium', 'low']).default('medium'),
 })
 
-export const editBlockSchema = z.object({
-    instruction: z.string().min(1),
-    block: z.record(z.unknown()).nullable().optional(),
-    blockIndex: z.number().nullable().optional(),
-    allBlocks: z.array(z.record(z.unknown())).optional(),
-    theme: z.record(z.unknown()).optional(),
-    siteName: z.string().optional(),
-    currentPageSlug: z.string().optional(),
-    currentPageTitle: z.string().optional(),
-    chatHistory: z.array(z.object({
-        role: z.enum(['user', 'assistant']),
-        content: z.string().max(300),
-    })).max(10).optional(),
-})
-
 export const rewriteTextSchema = z.object({
     text: z.string().min(1),
     instruction: z.string().min(1),
