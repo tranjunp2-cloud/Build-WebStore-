@@ -3,6 +3,7 @@
  * data. Used by the dashboard "To do" card, the copilot (`store_todos`) and, later, scheduled automations.
  *
  *   computeShopTodos(payload, { tenantId, siteId?, now, locale?, areas? }) -> ShopTodoItem[]
+ *   = localizeShopTodos(await readShopTodoDrafts(payload, options), locale): read once, word it per language.
  *
  * STABLE CONTRACT (other code imports this):
  *  - Always resolves (a query that fails is logged and its tasks left out); never throws for data problems.
@@ -69,7 +70,9 @@ const ORDER: ShopTodoKind[] = [
 const RANK: Record<ShopTodoSeverity, number> = { high: 0, medium: 1, low: 2 }
 const HOUR = 3_600_000
 
-type Draft = { kind: ShopTodoKind; severity: ShopTodoSeverity; count: number; href: string; vars: TodoTextVars }
+/** A task as read from the data, before it is worded in a language (see `localizeShopTodos`). */
+export type ShopTodoDraft = { kind: ShopTodoKind; severity: ShopTodoSeverity; count: number; href: string; vars: TodoTextVars }
+type Draft = ShopTodoDraft
 type Row = Record<string, unknown>
 
 /** A failed query must not take the whole list down. */
@@ -181,9 +184,9 @@ async function siteDrafts(payload: Payload, tenantId: number, siteId: string): P
     ]
 }
 
-export async function computeShopTodos(payload: Payload, options: ComputeShopTodosOptions): Promise<ShopTodoItem[]> {
+/** The data step: every query of the allowed areas, the tasks with something to do, most urgent first. */
+export async function readShopTodoDrafts(payload: Payload, options: Omit<ComputeShopTodosOptions, 'locale'>): Promise<ShopTodoDraft[]> {
     const tenantId = tenantParam(options.tenantId)
-    const locale = options.locale === 'ms' ? 'ms' : 'en'
     const allowed = (area: ShopArea) => options.areas?.[area] !== false
     const db = payload as unknown as ReportsDb
 
@@ -203,16 +206,24 @@ export async function computeShopTodos(payload: Payload, options: ComputeShopTod
     }
 
     const drafts = (await Promise.all(tasks)).flatMap((list) => list ?? []).filter((draft) => draft.count > 0)
-    return drafts
-        .sort((a, b) => RANK[a.severity] - RANK[b.severity] || ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind))
-        .map((draft) => ({
-            id: draft.kind,
-            kind: draft.kind,
-            severity: draft.severity,
-            count: draft.count,
-            href: draft.href,
-            ...todoText(draft.kind, locale, draft.vars),
-            ...(draft.vars.oldestHours != null ? { ageHours: draft.vars.oldestHours } : {}),
-            ...(draft.vars.neverPublished ? { neverPublished: true } : {}),
-        }))
+    return drafts.sort((a, b) => RANK[a.severity] - RANK[b.severity] || ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind))
+}
+
+/** The wording step (pure): the drafts as To do items in `locale` (default 'en'), order kept. */
+export function localizeShopTodos(drafts: readonly ShopTodoDraft[], locale?: TodoLocale): ShopTodoItem[] {
+    const lang: TodoLocale = locale === 'ms' ? 'ms' : 'en'
+    return drafts.map((draft) => ({
+        id: draft.kind,
+        kind: draft.kind,
+        severity: draft.severity,
+        count: draft.count,
+        href: draft.href,
+        ...todoText(draft.kind, lang, draft.vars),
+        ...(draft.vars.oldestHours != null ? { ageHours: draft.vars.oldestHours } : {}),
+        ...(draft.vars.neverPublished ? { neverPublished: true } : {}),
+    }))
+}
+
+export async function computeShopTodos(payload: Payload, options: ComputeShopTodosOptions): Promise<ShopTodoItem[]> {
+    return localizeShopTodos(await readShopTodoDrafts(payload, options), options.locale)
 }

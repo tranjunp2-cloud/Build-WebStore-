@@ -1,5 +1,6 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { isAiAgentEnabled } from '@/lib/ai-platform/config'
 import { getCurrentTenantId, getCurrentUser } from '@/lib/auth'
 import { canManageAutomations } from '@/lib/automations/automation-access'
 import { readAutomationSettings } from '@/lib/automations/automation-store'
@@ -39,9 +40,10 @@ export default async function EmailTemplatesPage() {
         ])
     ) as Record<EmailTemplateType, { contentEn: ContentFields; contentMs: ContentFields }>
 
-    // Automations (scheduled reminders): same page, under the template list
+    // Automations (scheduled reminders): same page, under the template list. They run only where the
+    // assistant does (the cron skips otherwise), so the section is hidden with it.
     let automationsSlot = null
-    if (tenantId) {
+    if (tenantId && isAiAgentEnabled()) {
         try {
             const user = await getCurrentUser()
             const settings = await readAutomationSettings(payload, tenantId)
