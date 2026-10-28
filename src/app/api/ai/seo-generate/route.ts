@@ -110,7 +110,7 @@ export const POST = withAuth(async (user, req) => {
             { status: 500 }
         )
     }
-}, { csrf: true })
+}, { csrf: true, requireMfa: true })
 
 /** Enforce hard constraints server-side as safety net. */
 function enforceSeoConstraints(

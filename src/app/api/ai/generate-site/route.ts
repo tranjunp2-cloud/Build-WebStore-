@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         const { data, errorResponse, validationIssues } = await parseRequest(req.clone(), generateSiteSchema)
         if (errorResponse) {
             // Best-effort tracking only: a session check that cannot run must not turn the 400 into an error.
-            const rejectedUser = await getCurrentUser(req).catch(() => null)
+            const rejectedUser = await getCurrentUser(req, { requireMfa: true }).catch(() => null)
             if (rejectedUser && validationIssues?.length) {
                 // Invalid forms used to be side-effect free. Keep this new
                 // observability path bounded per user so it cannot become a DB
@@ -53,7 +53,8 @@ export async function POST(req: NextRequest) {
             return errorResponse
         }
 
-        const user = await getCurrentUser(req)
+        // Only a session that passed the OTP step (a password-only login token can not spend AI quota)
+        const user = await getCurrentUser(req, { requireMfa: true })
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         const payload = await getPayload({ config })
         return generateSiteService({

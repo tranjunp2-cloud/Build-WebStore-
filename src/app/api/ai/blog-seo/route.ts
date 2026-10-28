@@ -40,4 +40,4 @@ export const POST = withAuth(async (user, req) => {
         const failure = describeAiTaskFailure(error)
         return NextResponse.json({ success: false, error: failure.message }, { status: failure.status })
     }
-}, { csrf: true })
+}, { csrf: true, requireMfa: true })

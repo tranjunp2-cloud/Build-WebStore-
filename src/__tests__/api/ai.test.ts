@@ -431,7 +431,8 @@ describe('AI Streaming APIs', () => {
              const result = await res.json()
 
              expect(res.status).toBe(200)
-             expect(getCurrentUser).toHaveBeenCalledWith(req)
+             // TC-AICP-355: only an OTP-verified session may generate a site
+             expect(getCurrentUser).toHaveBeenCalledWith(req, { requireMfa: true })
              expect(result.success).toBe(true)
              expect(result.siteName).toBe('AI Bakery')
              expect(mockSiteDB.length).toBe(1) // A site was created

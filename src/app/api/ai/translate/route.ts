@@ -145,4 +145,4 @@ export const POST = withAuth(async (user, req) => {
         // AC-3: Never crash — answer the failure; the original text is not a translation
         return translationFailed(502, 'The translation could not be made right now. Try again in a moment.')
     }
-}, { csrf: true })
+}, { csrf: true, requireMfa: true })

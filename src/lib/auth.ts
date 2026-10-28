@@ -157,13 +157,19 @@ export function withAuth<TContext extends { params: Promise<any> } = never>(
          * passes and still needs a valid session. Opt-in: used by the /api/ai/* POST routes.
          */
         csrf?: boolean
+        /**
+         * Only a session that passed the OTP step counts (`getCurrentUser(req, { requireMfa: true })`): a
+         * password-only token from `POST /api/users/login` gets 401. Used by the /api/ai/* POST routes, which
+         * spend AI quota, like the copilot (`resolveAgentActor`).
+         */
+        requireMfa?: boolean
     },
 ) {
     return async (req: Request, ctx: TContext): Promise<NextResponse> => {
         if (options?.csrf && !validateCsrf(req)) {
             return NextResponse.json({ error: 'CSRF verification failed.' }, { status: 403 })
         }
-        const user = await getCurrentUser(req)
+        const user = options?.requireMfa ? await getCurrentUser(req, { requireMfa: true }) : await getCurrentUser(req)
         if (!user) {
             if (options?.unauthorizedResponse) {
                 return options.unauthorizedResponse(req)
