@@ -2,11 +2,13 @@
  * TC-AIREL-216 — stock pictures the copilot saved for a shop (Pixabay rows carrying that shop's `tenant`) can be edited
  * and deleted by that shop's members; the shared stock library (no tenant) and other shops' stock rows stay out of
  * reach, and the provenance fields stay system-only.
- * Real: the Media collection's update / delete access and field access.
+ * TC-AICP-352 — only an ACTIVE membership counts (missing status = active): a pending or suspended member can not
+ * edit / delete the shop's stock rows nor upload into its library.
+ * Real: the Media collection's update / delete access, field access and the upload tenant (resolveMediaTenant).
  * Faked: nothing; the returned `where` is evaluated against sample rows by a small interpreter.
  */
 import { describe, expect, it } from 'vitest'
-import { Media } from '@/collections/Media'
+import { Media, resolveMediaTenant } from '@/collections/Media'
 
 type Row = Record<string, unknown>
 function matches(row: Row, where: unknown): boolean {
@@ -71,5 +73,45 @@ describe('stock rows of the member\'s own workspace [TC-AIREL-216]', () => {
         // the owner never changes after the upload
         const tenant = fields.find((candidate) => candidate.name === 'tenant')
         expect(tenant?.access?.update?.()).toBe(false)
+    })
+})
+
+describe('only active memberships count [TC-AICP-352]', () => {
+    const withStatus = (status: string | undefined, ...more: Array<{ tenant: unknown; status?: string }>) => ({
+        id: 3,
+        roles: ['user'],
+        tenants: [{ tenant: { id: 4 }, ...(status === undefined ? {} : { status }) }, ...more],
+    })
+
+    it.each(['pending', 'suspended'])('[TC-AICP-352] a %s member gets no stock row of that shop', (status) => {
+        // Arrange
+        const user = withStatus(status)
+
+        // Act
+        const rows = allowed('delete', user)
+
+        // Assert
+        expect(rows).toEqual(['plain', 'ai', 'legacyPlain'])
+    })
+
+    it('[TC-AICP-352] an active member, and one whose membership has no status, keep their stock rows', () => {
+        // Act + Assert
+        expect(allowed('update', withStatus('active'))).toContain('ownStock')
+        expect(allowed('update', withStatus(undefined))).toContain('ownStock')
+    })
+
+    it('[TC-AICP-352] an upload never lands in a shop the user is only pending / suspended in', () => {
+        // Arrange: pending in 4 (first), active in 9
+        const user = withStatus('pending', { tenant: 9, status: 'active' })
+
+        // Act
+        const asked = resolveMediaTenant(user, 4)
+        const fallback = resolveMediaTenant(user, undefined)
+        const onlyPending = resolveMediaTenant(withStatus('suspended'), 4)
+
+        // Assert
+        expect(asked).toBe(9)
+        expect(fallback).toBe(9)
+        expect(onlyPending).toBeNull()
     })
 })
