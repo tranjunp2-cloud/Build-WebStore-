@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isPublicIp } from '@/lib/sso/avatar-sync/is-public-ip'
+import { isPublicIp } from '@/lib/net/is-public-ip'
 
 // TC-F23-SSO-08: the SSRF guard only lets globally routable unicast addresses through
 describe('isPublicIp (GH-1723)', () => {

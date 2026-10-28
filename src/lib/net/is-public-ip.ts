@@ -1,9 +1,10 @@
 import { isIP } from 'node:net'
 
 /**
- * True only for globally routable unicast addresses. Used to keep the avatar download
- * (SSRF guard, GH-1723) away from loopback, private, link-local (cloud metadata
- * 169.254.169.254), CGNAT, multicast and other reserved ranges. No configuration needed.
+ * True only for globally routable unicast addresses. The shared SSRF guard of server-side fetches
+ * (SSO avatar download GH-1723, the website scraper `lib/ai/url-scraper.ts`): keeps them away from
+ * loopback, private, link-local (cloud metadata 169.254.169.254), CGNAT, multicast and other reserved
+ * ranges, including IPv4 embedded in IPv6 (mapped, compatible, NAT64, 6to4). No configuration needed.
  */
 
 function parseIPv4(addr: string): number[] | null {

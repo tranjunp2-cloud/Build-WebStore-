@@ -124,6 +124,36 @@ describe('resolveAndValidate', () => {
         mockLookup.mockRejectedValue(new Error('ENOTFOUND'))
         await expect(resolveAndValidate('nonexistent.invalid')).rejects.toThrow('Could not resolve hostname')
     })
+
+    // TC-AICP-353: the shared isPublicIp guard (lib/net/is-public-ip) — only globally routable unicast passes
+    it.each([
+        ['224.0.0.1', 4, 'multicast 224/4'],
+        ['240.0.0.1', 4, 'reserved 240/4'],
+        ['198.18.0.1', 4, 'benchmarking 198.18/15'],
+        ['192.0.0.1', 4, 'IETF protocol assignments 192.0.0/24'],
+        ['64:ff9b::7f00:1', 6, 'NAT64 of 127.0.0.1'],
+        ['2002:7f00:1::', 6, '6to4 of 127.0.0.1'],
+        ['::7f00:1', 6, 'IPv4-compatible 127.0.0.1'],
+        ['::ffff:10.0.0.1', 6, 'IPv4-mapped private'],
+    ])('[TC-AICP-353] blocks %s (%s, %s)', async (address, family) => {
+        // Arrange
+        mockLookup.mockResolvedValue([{ address, family }])
+
+        // Act + Assert
+        await expect(resolveAndValidate('target.com')).rejects.toThrow('blocked IP range')
+    })
+
+    it.each([
+        ['8.8.8.8', 4],
+        ['2606:4700:4700::1111', 6],
+        ['::ffff:93.184.216.34', 6],
+    ])('[TC-AICP-353] lets the public address %s through', async (address, family) => {
+        // Arrange
+        mockLookup.mockResolvedValue([{ address, family }])
+
+        // Act + Assert
+        await expect(resolveAndValidate('example.com')).resolves.toBeUndefined()
+    })
 })
 
 // ── Metadata Extraction ──────────────────────────────────────────────────
