@@ -66,7 +66,8 @@
     "migrate:pw1:test:local": "tsx --require ./scripts/seed-preload.cjs src/__tests__/integration/pw1-json-clone-rehearsal.ts",
     "migrate:pw1:repair": "tsx --require ./scripts/seed-preload.cjs scripts/repair-pw1-sites.ts --apply",
     "migrate:pw1:website:qa-backfill": "tsx --require ./scripts/seed-preload.cjs scripts/backfill-pw1-qa.ts",
-    "migrate:pw1:website": "tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts"
+    "migrate:pw1:website": "tsx --require ./scripts/seed-preload.cjs scripts/migrate-pw1.ts",
+    "migrate:pw1:delta": "node --max-old-space-size=4608 --no-network-family-autoselection --dns-result-order=ipv4first --require ./scripts/seed-preload.cjs --import tsx scripts/pw1-delta.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.1.0",
