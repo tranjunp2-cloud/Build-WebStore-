@@ -38,6 +38,7 @@ import ProductEditPage from '@/app/(dashboard)/products/[id]/page'
 import { I18nProvider } from '@/i18n'
 import en from '@/i18n/locales/en.json'
 import { announceAgentChange, resetAgentChangeBus } from '@/lib/agent-changes/bus'
+import { COALESCE_MS } from '@/lib/agent-changes/use-agent-changes'
 import { isStaleVersion } from '@/lib/save-version/save-version'
 
 Element.prototype.scrollIntoView = vi.fn()
@@ -56,6 +57,8 @@ const copilotChangesPrice = async () => {
     server.updatedAt = V2
     await act(async () => {
         announceAgentChange({ action: 'applied', kind: 'shop_product.update', entities: [{ kind: 'product', id: '5' }], changeSetId: `cs-${Math.random()}`, at: Date.now() })
+        // the screen hears it once the change window closes: let that land before the next step
+        await new Promise((resolve) => setTimeout(resolve, COALESCE_MS + 20))
     })
 }
 const nameInput = async () => (await screen.findByLabelText('name')) as HTMLInputElement
