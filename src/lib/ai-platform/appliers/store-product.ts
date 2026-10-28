@@ -197,10 +197,13 @@ export async function applyShopProductUpdate(raw: unknown, actor: AgentActor, lo
 		set("images", rows, currentImages(doc));
 		before.images = currentImages(doc);
 	}
-	// a product with options keeps its options: re-passed without row ids (the Payload 3.79 update quirk)
+	// a product with options keeps its options: re-passed without row ids (the Payload 3.79 update quirk). Checkout
+	// lowers an option's stock without touching updatedAt, so after the photo upload (seconds) they are read again.
 	if (doc.hasVariants) {
-		data.variants = stripRowIds(doc.variants);
-		data.variantConfigs = stripRowIds(doc.variantConfigs);
+		const latest = changes.images !== undefined ? await currentProduct(client, actor, id) : doc;
+		assertSameVersion(latest, base);
+		data.variants = stripRowIds(latest.variants);
+		data.variantConfigs = stripRowIds(latest.variantConfigs);
 	}
 
 	let saved: { id: number | string; name: string; updatedAt: string };
