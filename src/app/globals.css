@@ -842,6 +842,8 @@ html:not(.dark) .editor-shell .text-cyan-400 { color: #0e7490; }
 html:not(.dark) .editor-shell .text-cyan-200\/70 { color: #155e75; }
 html:not(.dark) .editor-shell .text-amber-300 { color: #92400e; }
 html:not(.dark) .editor-shell .text-amber-300\/80 { color: #92400e; }
+/* Ask AI (copilot) buttons and chips: teal-300 reads on the dark chrome only */
+html:not(.dark) .editor-shell .text-teal-300 { color: #0f766e; }
 html:not(.dark) .editor-shell .text-amber-400 { color: #b45309; }
 html:not(.dark) .editor-shell .text-amber-400\/70 { color: #b45309; }
 html:not(.dark) .editor-shell .text-emerald-400 { color: #15803d; }
@@ -952,6 +954,7 @@ html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.12\]:hover { background-col
 html:not(.dark) .editor-shell .block-action-toolbar .text-slate-400,
 html:not(.dark) .editor-shell .block-action-toolbar .text-slate-300 { color: #94a3b8; }
 html:not(.dark) .editor-shell .block-action-toolbar .text-amber-300 { color: #fcd34d; }
+html:not(.dark) .editor-shell .block-action-toolbar .text-teal-300 { color: #5eead4; }
 html:not(.dark) .editor-shell .block-action-toolbar .text-red-400 { color: #f87171; }
 html:not(.dark) .editor-shell .block-action-toolbar .bg-white\/10 { background-color: rgba(255,255,255,0.1); }
 html:not(.dark) .editor-shell .block-action-toolbar .hover\:bg-white\/10:hover { background-color: rgba(255,255,255,0.1); }
@@ -959,7 +962,7 @@ html:not(.dark) .editor-shell .block-action-toolbar .hover\:bg-white\/10:hover {
 /* ── Editor Shell: input/textarea/select visibility in light mode ─────────── */
 /* bg overrides turn input bgs white (same as page bg) → need distinct bg */
 html:not(.dark) .editor-shell input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"]),
-html:not(.dark) .editor-shell textarea,
+html:not(.dark) .editor-shell textarea:not(.ech-ag textarea),
 html:not(.dark) .editor-shell select {
   background-color: #F8FAFC !important;
   border-color: rgba(0, 0, 0, 0.15) !important;

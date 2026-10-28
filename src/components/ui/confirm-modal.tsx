@@ -73,13 +73,15 @@ export function ConfirmModal({
                     {title}
                 </DialogTitle>
 
-                {/* Description — break-words so long names/emails wrap instead of overflowing */}
+                {/* Description — break-words so long names/emails wrap instead of overflowing. Rendered as a
+                    <div> (asChild): callers pass lists and blocks, which a <p> can't hold (hydration error). */}
                 {description != null && (
                     <DialogDescription
+                        asChild
                         className="text-[14px] leading-relaxed mt-1.5 break-words"
                         style={{ color: 'var(--dash-text-muted)' }}
                     >
-                        {description}
+                        <div>{description}</div>
                     </DialogDescription>
                 )}
 

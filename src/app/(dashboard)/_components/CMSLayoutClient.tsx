@@ -9,7 +9,9 @@ import { Toaster } from '@/components/ui/sonner'
 import { TenantAccessWatcher } from '@/components/dashboard/TenantAccessWatcher'
 import { UserAvatarProvider } from '@/providers/UserAvatarContext'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
+import { AgentRefresh } from '@/lib/agent-changes/agent-refresh'
 import { shouldShowNoWebsiteGuard } from './dashboard-guard-paths'
+import { BADGE_ENTITY_KINDS, countsMayChange } from './sidebar-badge-refresh'
 
 type CMSLayoutClientProps = {
     userName: string
@@ -79,6 +81,8 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                 className={cn('dash-shell dash-shell-root min-h-screen bg-dash-bg flex flex-col', collapsed && 'dash-sidebar-mini')}
             >
                 <TenantAccessWatcher />
+                {/* The layout computes the badge counts on the server: render it again when the assistant changes one. */}
+                <AgentRefresh kinds={BADGE_ENTITY_KINDS} when={countsMayChange} />
                 <TopHeader
                     userName={userName}
                     userInitial={userInitial}
