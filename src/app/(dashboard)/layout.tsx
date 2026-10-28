@@ -44,16 +44,22 @@ export default async function DashboardLayout({
     let badgeCounts: Partial<Record<SidebarBadgeKey, number>> = {}
     // Fail-open: default true so a transient DB error never hides a real site (GH-1392).
     let hasWebsite = true
+    let storeName: string | undefined
     if (user) {
         try {
             const payload = await getPayload({ config: configPromise })
             // allSettled so one failure never blanks the others. Site-state piggybacks
             // on this session — no extra getPayload()/query session (GH-1392).
-            const [avatarRes, countsRes, siteStateRes] = await Promise.allSettled([
+            const [avatarRes, countsRes, siteStateRes, tenantRes] = await Promise.allSettled([
                 payload.findByID({ collection: 'users', id: user.id, depth: 1 }) as Promise<Record<string, unknown>>,
                 getCachedSidebarBadgeCounts(tenantId),
                 getTenantSiteState(payload, tenantId),
+                // Store name for the header feedback report context (name only → light query).
+                tenantId != null
+                    ? payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, select: { name: true } }) as Promise<{ name?: string }>
+                    : Promise.resolve(null),
             ])
+            if (tenantRes.status === 'fulfilled' && tenantRes.value?.name) storeName = tenantRes.value.name
             if (avatarRes.status === 'fulfilled') {
                 const av = avatarRes.value?.avatar as { url?: string } | null | undefined
                 if (av && typeof av === 'object' && av.url) userAvatarUrl = av.url
@@ -87,7 +93,7 @@ export default async function DashboardLayout({
                 <I18nProvider defaultLocale="en">
                     <AppMascotProvider>
                         <TooltipProvider delayDuration={300}>
-                            <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} userPermissions={userPermissions} isSuperAdmin={isSuperAdmin} isProduction={isProduction} badgeCounts={badgeCounts} hasWebsite={hasWebsite}>
+                            <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} userPermissions={userPermissions} isSuperAdmin={isSuperAdmin} isProduction={isProduction} badgeCounts={badgeCounts} hasWebsite={hasWebsite} storeName={storeName}>
                                 {children}
                             </CMSLayoutClient>
                             {typedUser && (

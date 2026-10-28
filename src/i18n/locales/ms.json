@@ -3534,6 +3534,78 @@
         "blockSeo": "Kesihatan SEO",
         "blockOrders": "Pesanan belum selesai"
       }
+    },
+    "feedback": {
+      "button": "Hantar maklum balas",
+      "title": "Hantar maklum balas",
+      "description": "Butiran kedai anda dan halaman yang sedang dilihat dilampirkan secara automatik.",
+      "context": {
+        "store": "Kedai: {store}"
+      },
+      "mismatchNotice": "V1 tidak memaparkan data yang dicipta selepas pembekuan. Bandingkan data pada titik masa yang sama.",
+      "fields": {
+        "type": "Jenis maklum balas",
+        "typeOptions": {
+          "problem": "Laporkan masalah",
+          "mismatch": "Percanggahan data",
+          "suggestion": "Cadangan"
+        },
+        "area": "Ciri",
+        "areaPlaceholder": "Pilih ciri (boleh pilih lebih daripada satu)",
+        "areaError": "Sila pilih sekurang-kurangnya satu ciri.",
+        "areaMore": "+{count}",
+        "removeArea": "Buang {name}",
+        "areaOptions": {
+          "products": "Produk & stok",
+          "orders": "Pesanan",
+          "customers": "Pelanggan",
+          "discounts": "Diskaun",
+          "design": "Reka bentuk & halaman",
+          "payments": "Pembayaran",
+          "shipping": "Penghantaran",
+          "domains": "Domain",
+          "account": "Akaun & kakitangan",
+          "other": "Lain-lain"
+        },
+        "details": "Butiran",
+        "detailsPlaceholder": "Apa yang anda lakukan, apa yang anda jangkakan, dan apa yang berlaku?",
+        "detailsPlaceholderMismatch": "Apakah yang berbeza antara V1 dan V2? Cth: Jumlah pesanan DH-1042 ialah RM120 dalam V1 tetapi RM100 dalam V2.",
+        "detailsError": "Sila masukkan butiran.",
+        "detailsShortError": "Sila tulis sekurang-kurangnya 10 aksara.",
+        "detailsHelper": "Jangan masukkan kata laluan, butiran pembayaran atau data peribadi pelanggan anda.",
+        "optional": "(pilihan)",
+        "screenshots": "Tangkapan skrin",
+        "addScreenshot": "Tambah imej",
+        "screenshotAlt": "Tangkapan skrin {n}",
+        "removeScreenshot": "Buang tangkapan skrin {n}",
+        "screenshotHelper": "Sehingga 9 imej, PNG atau JPG, maksimum 5 MB setiap satu.",
+        "screenshotTooLarge": "Imej ini melebihi 5 MB.",
+        "screenshotWrongType": "Hanya imej PNG atau JPG disokong.",
+        "screenshotTooMany": "Anda boleh menambah sehingga 9 imej."
+      },
+      "failed": {
+        "title": "Maklum balas anda tidak dihantar",
+        "description": "Apa yang anda masukkan telah disimpan. Sila cuba lagi.",
+        "screenshotTooLarge": "Satu tangkapan skrin masih terlalu besar untuk dimuat naik walaupun selepas pemampatan. Alih keluarnya atau gunakan imej yang lebih kecil, kemudian cuba lagi."
+      },
+      "rateLimited": "Anda telah menghantar banyak maklum balas dalam masa yang singkat. Sila cuba lagi dalam beberapa minit.",
+      "sendingNote": "Menghantar… Sila jangan hantar lagi.",
+      "actions": {
+        "cancel": "Batal",
+        "send": "Hantar maklum balas",
+        "sending": "Menghantar…",
+        "close": "Tutup"
+      },
+      "discard": {
+        "title": "Buang apa yang anda masukkan?",
+        "description": "Maklum balas anda belum dihantar.",
+        "keep": "Teruskan menyunting",
+        "confirm": "Buang"
+      },
+      "success": {
+        "title": "Maklum balas dihantar",
+        "notifyNote": "Kami akan memaklumkan anda dalam Prime Web (ikon loceng) apabila ada kemas kini."
+      }
     }
   },
   "auth": {
