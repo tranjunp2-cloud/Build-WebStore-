@@ -449,10 +449,31 @@ jobs:
         run: node scripts/ci/ai-env-preflight.mjs .vercel/.env.staging.local --warn-only
 
       - name: Preflight — Postgres reachable
-        # Ensure the DB is reachable from the runner before build runs migrations.
-        # Reads only DATABASE_URI from the env file vercel pull just wrote — never sourced into
-        # the shell, never printed. TCP-level probe using node builtins — no npm install required.
-        run: node scripts/ci/pg-tcp-check.mjs .vercel/.env.staging.local DATABASE_URI
+        run: |
+          # Ensure the DB is reachable from the runner before build runs migrations.
+          # Reads DATABASE_URI from the env file that vercel pull just wrote.
+          set -e
+          ENV_FILE=".vercel/.env.staging.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${DATABASE_URI:-}" ]; then
+            echo "::error::DATABASE_URI not present in $ENV_FILE"
+            exit 1
+          fi
+          # TCP-level probe using node builtins — no npm install required.
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
 
       - name: Build --target=staging
         # --target=staging must match both the pulled env metadata
@@ -614,8 +635,29 @@ jobs:
         run: node scripts/ci/ai-env-preflight.mjs .vercel/.env.production.local
 
       - name: Preflight — Postgres reachable
-        # Reads only DATABASE_URI (never sourced, never printed); TCP probe, node builtins only.
-        run: node scripts/ci/pg-tcp-check.mjs .vercel/.env.production.local DATABASE_URI
+        run: |
+          set -e
+          ENV_FILE=".vercel/.env.production.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${DATABASE_URI:-}" ]; then
+            echo "::error::DATABASE_URI not present in $ENV_FILE"
+            exit 1
+          fi
+          # TCP-level probe using node builtins — no npm install required.
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
 
       - name: Build (prod)
         run: vercel build --prod --token="$VERCEL_TOKEN"
@@ -938,12 +980,34 @@ jobs:
             --token="$VERCEL_TOKEN"
 
       - name: Preflight — Postgres reachable
-        # Reads only DATABASE_URI (never sourced, never printed); TCP probe, node builtins only.
-        # Sanity check first: it must resolve to the QC endpoint, not staging (ep-blue-king-a1qufqjg).
         run: |
-          node scripts/ci/pg-tcp-check.mjs .vercel/.env.preview.local DATABASE_URI \
-            --forbid ep-blue-king-a1qufqjg \
-            --forbid-hint "DATABASE_URI points at staging endpoint — branch-filter override missing. Fix: Vercel Dashboard → env vars → add DATABASE_URI with scope Preview + branch=qc-test"
+          set -e
+          ENV_FILE=".vercel/.env.preview.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${DATABASE_URI:-}" ]; then
+            echo "::error::DATABASE_URI not present in $ENV_FILE"
+            exit 1
+          fi
+          # Sanity check: must resolve to QC endpoint, not staging.
+          if echo "$DATABASE_URI" | grep -q "ep-blue-king-a1qufqjg"; then
+            echo "::error::DATABASE_URI points at staging endpoint — branch-filter override missing"
+            echo "::error::Fix: Vercel Dashboard → env vars → add DATABASE_URI with scope Preview + branch=qc-test"
+            exit 1
+          fi
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
 
       - name: Build (preview)
         run: vercel build --token="$VERCEL_TOKEN"

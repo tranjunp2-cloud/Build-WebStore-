@@ -35,8 +35,9 @@ AI env preflight below.
 
 Preflights (`scripts/ci/*.mjs`, node builtins only — run before any `npm ci`): read only the key
 they need from the pulled `.vercel/.env.*.local` (never `source` the file — a `$`/backtick in a
-secret would run in bash) and never print values.
-  pg-tcp-check.mjs      DATABASE_URI / AI_PLATFORM_DATABASE_URL reachable (TCP) before build migrates
+secret would run in bash) and never print values. (The prime-web Postgres preflights still source
+the file; not changed by the AI release.)
+  pg-tcp-check.mjs      AI_PLATFORM_DATABASE_URL reachable (TCP) before the ai-platform build migrates
   ai-env-preflight.mjs  AI_PLATFORM_URL (https) + AI_PLATFORM_CONTEXT_SECRET (32+ chars):
                         production → fails the deploy (Lark deploy_fail); empty secret = warning
                         (Vercel Sensitive vars pull empty); staging → warning only.
