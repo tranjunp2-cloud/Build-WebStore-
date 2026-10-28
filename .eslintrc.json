@@ -1,3 +1,20 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": ["src/**/*.ts", "src/**/*.tsx"],
+      "excludedFiles": ["src/__tests__/**"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "paths": [
+            { "name": "openai", "message": "Call an AI platform task instead (src/lib/ai-platform)." },
+            { "name": "ai", "message": "Call an AI platform task instead (src/lib/ai-platform)." }
+          ],
+          "patterns": [
+            { "group": ["openai/*", "@ai-sdk/*"], "message": "Call an AI platform task instead (src/lib/ai-platform)." }
+          ]
+        }]
+      }
+    }
+  ]
 }
