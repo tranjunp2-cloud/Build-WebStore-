@@ -150,7 +150,7 @@ export function PageManagerPanel({
                                 isPending={pendingPageId === page.id}
                                 isConfirmingDelete={confirmDeleteId === page.id}
                                 onSelect={() => { setConfirmDeleteId(null); onPageSelected(page.id) }}
-                                onEditWithAI={() => onEditPage?.(page.id)}
+                                onEditWithAI={onEditPage ? () => onEditPage(page.id) : undefined}
                                 onToggleVisibility={() => { setConfirmDeleteId(null); void toggleVisibility(page) }}
                                 onRequestDelete={() => setConfirmDeleteId(page.id)}
                                 onCancelDelete={() => setConfirmDeleteId(null)}

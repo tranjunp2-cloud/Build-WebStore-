@@ -16,7 +16,8 @@ interface BlockActionBarProps {
     onMoveUp: () => void
     onMoveDown: () => void
     onDuplicate: () => void
-    onAIEdit: () => void
+    /** Ask AI on this section (the copilot chat); no button without the copilot */
+    onAIEdit?: () => void
     onDelete: () => void
     deleteDisabled?: boolean
     deleteDisabledTitle?: string
@@ -107,9 +108,11 @@ export function BlockActionBar({
                     <Copy className="h-3.5 w-3.5 text-slate-300" />
                 </button>
             )}
-            <button type="button" className={ACTION_BTN} onClick={onAIEdit} title="Edit with AI">
-                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-            </button>
+            {onAIEdit && (
+                <button type="button" className={ACTION_BTN} onClick={onAIEdit} title="Ask AI" aria-label="Ask AI">
+                    <Sparkles className="h-3.5 w-3.5 text-teal-300" />
+                </button>
+            )}
 
             <div className="h-5 w-px bg-white/10" />
 

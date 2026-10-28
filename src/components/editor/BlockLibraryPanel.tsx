@@ -35,8 +35,6 @@ interface BlockLibraryPanelProps {
     onBlockSelect: (index: number) => void
     onAIAction: (action: AIAction) => Promise<void> | void
     onEditGlobalBlock?: (blockType: string) => void
-    /** F26-04: Called when user clicks "✨ AI" auto-translate button for a block type */
-    onAutoTranslate?: (blockType: string) => Promise<void>
     /** F05 compact Tools sheet: touch has no hover/drag, so the desktop "click or drag"
      * hover hint is replaced with an always-visible "+" affordance. Desktop omits this
      * (defaults false) and keeps its existing hover-hint text unchanged. */
@@ -48,7 +46,6 @@ export function BlockLibraryPanel({
     selectedBlock,
     onAIAction,
     onEditGlobalBlock,
-    onAutoTranslate,
     isCompact = false,
 }: BlockLibraryPanelProps) {
     const { t } = useI18n()
@@ -57,9 +54,6 @@ export function BlockLibraryPanel({
     const blockTranslations = bl.blocks as Record<string, { name: string; description: string; scopeTooltip?: string }>
     const [query, setQuery] = useState('')
     const [expandedCategory, setExpandedCategory] = useState<string>('basics')
-    // F26-04: block types that have been AI-translated this session (icon disappears after translate)
-    const [translatedTypes, setTranslatedTypes] = useState<Set<string>>(new Set())
-    const [pendingTranslateTypes, setPendingTranslateTypes] = useState<Set<string>>(new Set())
 
     // Registry is module-lifetime stable — memo with [] deps to avoid new array ref every render.
     // categoryLabels comes from i18n (stable ref); included in deps for correctness.

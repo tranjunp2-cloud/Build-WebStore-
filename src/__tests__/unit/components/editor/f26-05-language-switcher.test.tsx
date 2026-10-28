@@ -6,7 +6,7 @@
  *   AC-1: Switcher shows active locale
  *   AC-2: Switch EN↔BM; per-locale overrides preserved across switches
  *   AC-3: Business data (raw block fields not in localeOverrides) unchanged on switch
- *   Store: setLocaleOverride, getDisplayBlock, initLocaleFromBlock
+ *   Store: setLocaleOverride, getDisplayBlock
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -147,33 +147,50 @@ describe('TC-F26-05-08: Business data not affected by locale switch', () => {
     })
 })
 
-// ── initLocaleFromBlock ───────────────────────────────────────────────────────
+// ── A new section holds no language copy ─────────────────────────────────────
 
-describe('TC-F26-05-09: initLocaleFromBlock — both en and ms populated', () => {
-    it('populates both en and ms slots with defaults', () => {
-        const { initLocaleFromBlock } = useEditorStore.getState()
-        initLocaleFromBlock('block-faq', {
-            en: { headline: 'FAQ' },
-            ms: { headline: 'Soalan Lazim' },
-        })
+const NEW_HERO = {
+    id: 'block-hero', blockType: 'hero', variant: 'centered',
+    headline: 'Welcome to Acme',
+    subheadline: 'We deliver exceptional products and services that help you achieve your goals. Discover what makes us different.',
+} as unknown as BlockData
 
-        const overrides = useEditorStore.getState().localeOverrides['block-faq']
-        // EN slot is seeded with EN defaults so switching to EN on an ms site shows correct EN content
-        expect(overrides['en']).toEqual({ headline: 'FAQ' })
-        expect(overrides['ms']['headline']).toBe('Soalan Lazim')
+describe('TC-F26-05-09: a new section stores no language copy (template text is not a translation) [TC-AIREL-250]', () => {
+    it('adding a section leaves localeOverrides empty and the store has no seeding action', () => {
+        const store = useEditorStore.getState()
+        store.init('1', [], {}, 'Acme')
+        store.addBlock(-1, NEW_HERO)
+
+        expect(useEditorStore.getState().localeOverrides).toEqual({})
+        expect((store as unknown as Record<string, unknown>).initLocaleFromBlock).toBeUndefined()
     })
 
-    it('does not overwrite existing user edits on re-init', () => {
-        const { initLocaleFromBlock, setLocaleOverride } = useEditorStore.getState()
-        // User already edited
-        setLocaleOverride('block-hero', 'ms', { headline: 'Kedai Saya' })
-        // Re-init should not overwrite
-        initLocaleFromBlock('block-hero', {
-            en: { headline: 'Welcome' },
-            ms: { headline: 'Selamat Datang' },
-        })
-        const overrides = useEditorStore.getState().localeOverrides['block-hero']
-        expect(overrides['ms']['headline']).toBe('Kedai Saya')
+    it('the other language shows the template of that language on the canvas, still without a copy', () => {
+        const store = useEditorStore.getState()
+        store.init('1', [NEW_HERO], {}, 'Acme')
+        store.setGenerationLocale('en')
+        store.setSiteLocale('en')
+        store.setActiveLocale('ms')
+
+        const shown = useEditorStore.getState().getDisplayBlock(NEW_HERO) as unknown as Record<string, unknown>
+
+        expect(shown['headline']).toBe('Selamat Datang ke Acme')
+        expect(useEditorStore.getState().localeOverrides).toEqual({})
+    })
+})
+
+describe('TC-F26-05-11: a hand edit in the other language is a copy of that language only', () => {
+    it('setLocaleOverride ms edit shows in ms, the written text stays in en', () => {
+        const store = useEditorStore.getState()
+        store.init('1', [NEW_HERO], {}, 'Acme')
+        store.setGenerationLocale('en')
+        store.setSiteLocale('en')
+        store.setLocaleOverride('block-hero', 'ms', { headline: 'Kedai Saya' })
+
+        store.setActiveLocale('ms')
+        expect((useEditorStore.getState().getDisplayBlock(NEW_HERO) as unknown as Record<string, unknown>)['headline']).toBe('Kedai Saya')
+        store.setActiveLocale('en')
+        expect((useEditorStore.getState().getDisplayBlock(NEW_HERO) as unknown as Record<string, unknown>)['headline']).toBe('Welcome to Acme')
     })
 })
 
@@ -187,43 +204,12 @@ describe('TC-F26-05-10: getDisplayBlock safe when localeOverrides empty', () => 
     })
 })
 
-// ── EN setLocaleOverride edit wins over seeded EN defaults (H1 regression) ────
-
-describe('TC-F26-05-11: EN user edit wins over initLocaleFromBlock seeded defaults', () => {
-    it('setLocaleOverride EN edit wins over initLocaleFromBlock en slot', () => {
-        const { setActiveLocale, initLocaleFromBlock, setLocaleOverride, getDisplayBlock } = useEditorStore.getState()
-        setActiveLocale('en')
-        // Simulate block drop: init seeds EN defaults
-        initLocaleFromBlock('block-h1', {
-            en: { headline: 'Welcome to Your Brand' },
-            ms: { headline: 'Selamat Datang' },
-        })
-        // Simulate user typing in EN — EN edits now route through setLocaleOverride
-        setLocaleOverride('block-h1', 'en', { headline: 'My Custom Title' })
-        const flatBlock = { id: 'block-h1', blockType: 'hero', headline: 'Welcome to Your Brand' } as unknown as BlockData
-        const display = getDisplayBlock(flatBlock) as Record<string, unknown>
-        // User's setLocaleOverride edit must win over seeded defaults
-        expect(display['headline']).toBe('My Custom Title')
-    })
-
-    it('initLocaleFromBlock populates en slot with EN defaults', () => {
-        const { initLocaleFromBlock } = useEditorStore.getState()
-        initLocaleFromBlock('block-h2', {
-            en: { headline: 'Template EN' },
-            ms: { headline: 'Template MS' },
-        })
-        const overrides = useEditorStore.getState().localeOverrides['block-h2']
-        // EN slot is seeded — user EN edits via setLocaleOverride merge on top and win
-        expect(overrides?.['en']).toEqual({ headline: 'Template EN' })
-    })
-})
-
 // ── TC-F26-05-12: Reload after locale switch — generationLocale fix ───────────
 // Regression: before fix, siteLocale was set from Sites.locale (user-changeable),
 // causing flat blocks (stored in generation locale) to show as-is in wrong locale.
 
 describe('TC-F26-05-12: reload after locale switch uses generationLocale as baseLocale', () => {
-    it('getDisplayBlock returns EN defaults when generationLocale=ms, activeLocale=en, no override', () => {
+    it('getDisplayBlock keeps the section\'s own text when generationLocale=ms, activeLocale=en, no override [TC-AIREL-243]', () => {
         // F26 update: native check now uses generationLocale (immutable), not siteLocale.
         const { setSiteLocale, setActiveLocale, setGenerationLocale, getDisplayBlock } = useEditorStore.getState()
         setSiteLocale('ms')
@@ -233,8 +219,9 @@ describe('TC-F26-05-12: reload after locale switch uses generationLocale as base
         const flatBlock = { id: 'block-r1', blockType: 'hero', headline: 'Selamat datang' } as unknown as BlockData
         const display = getDisplayBlock(flatBlock) as Record<string, unknown>
 
-        // activeLocale !== generationLocale → resolves EN template defaults
-        expect(display['headline']).not.toBe('Selamat datang')
+        // activeLocale !== generationLocale, no copy yet → the merchant's own text, never EN template filler
+        // (the layout is saved as shown); only untouched template text takes the template of the language
+        expect(display['headline']).toBe('Selamat datang')
     })
 
     it('getDisplayBlock returns flat BM block when generationLocale=ms, activeLocale=ms', () => {

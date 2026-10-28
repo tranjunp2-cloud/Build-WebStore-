@@ -6,9 +6,15 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { FileText, MessageCircle, Zap } from 'lucide-react'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
-import { patchBlockCtaUrls, patchLocaleInitCtaUrls } from '@/lib/ai/patch-block-cta-urls'
-import { hasLocaleContent, resolveBlockContent, interpolateBrand } from '@/lib/ai/add-section-content'
-import { STRUCTURAL_BLOCK_FIELDS, routeBlockChanges } from '@/lib/editor/structural-block-fields'
+import { patchBlockCtaUrls } from '@/lib/ai/patch-block-cta-urls'
+import { hasLocaleContent } from '@/lib/ai/add-section-content'
+import { isTemplateSlot, templateLocaleOf } from '@/lib/i18n/template-content'
+import { localeSwitchWork } from '@/lib/i18n/locale-switch-work'
+import { requestTranslation } from '@/lib/i18n/request-translation'
+import { ownTextToTranslate, translateSectionsIntoSlots } from '@/lib/i18n/translate-sections'
+import { getLocaleLabel } from '@/lib/locale-labels'
+import { STRUCTURAL_BLOCK_FIELDS } from '@/lib/editor/structural-block-fields'
+import { buildSavePayload } from '@/lib/editor/save-payload'
 import { parseEditorSettingsDeepLink } from '@/lib/editor/settings-deep-link'
 import {
     isTemplateSwapDraftStable,
@@ -17,8 +23,15 @@ import {
 import { buildOptimisticTemplateSwap } from '@/lib/editor/optimistic-template-swap'
 import { restoreTemplateRenderMedia } from '@/lib/editor/template-render-media'
 import { resolveInitialActiveLocale } from '@/lib/detect-locale'
+import { siteLanguages } from '@/lib/site-languages'
+import { framesAsWritten } from '@/lib/i18n/locale-display'
+import { uuid } from '@/lib/uuid'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
-import { AIChatPanel } from '@/components/editor/AIChatPanel'
+import { EditorAiChatSlot } from '@/components/editor/agent/EditorAiChatSlot'
+import { askEditorAgent, EDITOR_AI_CHANGED_EVENT, requestReconcile, revealInEditor, type EditorAiChangedDetail, editorBlockId, useEditorAgentEnabled, useEditorAgentFocus, useEditorHistoryControl } from '@/components/editor/agent/editor-agent-context'
+import { useEditorReveal } from '@/components/editor/agent/use-editor-reveal'
+import { PublishError, type PublishFailureBody, publishFailure } from '@/lib/editor/publish-failure'
+import { ChangeWalker } from '@/components/editor/agent/ChangeWalker'
 import { BlockLibraryPanel } from '@/components/editor/BlockLibraryPanel'
 import { EditorMenuDrawer } from '@/components/editor/EditorMenuDrawer'
 import type { SidebarBadgeKey } from '@/config/sidebar-nav'
@@ -40,6 +53,9 @@ import {
     runSerializedEditorSave,
     hasPendingSerializedEditorSave,
     isEditorSaveContextCurrent,
+    draftBase,
+    keepDraftVersion,
+    isDraftConflict,
     BLOCK_TYPE_TO_KEY,
     PAGE_META_LOCALE_KEY,
     getDisplayPageTitle,
@@ -144,6 +160,7 @@ type OptimisticTemplateRollback = {
 }
 
 import type { PageData, BlockData, GlobalBlocksState } from '@/store/editorStore'
+import { NON_TRANSLATABLE_FIELDS } from '@/lib/i18n/non-translatable-fields'
 
 type SaveOptions = {
     showToast?: boolean
@@ -217,72 +234,6 @@ function localBusinessSnapshotsMatch(authoritative: unknown, requested: unknown)
         === JSON.stringify(normalizeLocalBusinessForComparison(requested))
 }
 
-// Maps Payload field path segments → user-facing labels for publish error toasts.
-const FIELD_LABELS: Record<string, string> = {
-    phoneNumber: 'WhatsApp Phone Number',
-    countryCode: 'WhatsApp Country Code',
-}
-
-function friendlyValidationDetail(path: string, message?: string): string {
-    const field = path.split('.').pop() || path
-    const label = FIELD_LABELS[field] || field
-    return `${label}: ${message || 'invalid'}`
-}
-
-/** Shared publish/re-publish error detail extractor — DRYs up the identical
- *  error-parsing block that was duplicated across handlePublish and handleRepublish.
- *  Returns a human-readable detail string for the toast. */
-type PublishFailureBody = {
-    error?: {
-        message?: string
-        failures?: Array<{
-            errName?: string
-            errMsg?: string
-            pgColumn?: string
-            pgTable?: string
-            causeMsg?: string
-            friendlyDetail?: string
-            validationErrors?: Array<{ path?: string; message?: string }>
-        }>
-    }
-} | null
-
-function extractPublishErrorDetail(body: PublishFailureBody, status: number): string {
-    const firstFailure = body?.error?.failures?.[0]
-    const firstValidation = firstFailure?.validationErrors?.[0]
-    if (firstFailure?.friendlyDetail) {
-        // GH-1621 P1: server already resolved the failing block/item, e.g.
-        // "Portfolio Grid → Project 5 → Title: This field is required."
-        return firstFailure.friendlyDetail
-    }
-    if (firstValidation?.path) {
-        return friendlyValidationDetail(firstValidation.path, firstValidation.message)
-    }
-    if (firstFailure?.pgColumn && firstFailure?.pgTable) {
-        return `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
-    }
-    const isDev = process.env.NODE_ENV === 'development'
-    return (isDev ? (firstFailure?.causeMsg || firstFailure?.errMsg) : undefined)
-        || body?.error?.message
-        || `Server returned ${status}`
-}
-
-// F26: top-level block fields NEVER sent to the translator. Two groups (see docs/prd/F26 §7b
-// Content Classification): (1) structural/media/link fields, and (2) "business data" that must
-// stay identical across locales — shop name (logoText), contact info (email/phone/address),
-// social links. Translating these mangles brand names, phone numbers, and URLs.
-const NON_TRANSLATABLE_FIELDS = [
-    // structural
-    'id', 'blockType', 'variant', 'backgroundColor', 'showLanguageSwitcher', 'multilingualEnabled', 'primaryLocale', 'secondaryLocale', '_localeContent',
-    'filterControls', 'selectionMode', 'selectedProductIds', 'includeOutOfStock', 'category', 'limit', 'showCategoryFilter',
-    // media / assets
-    'logo', 'image', 'backgroundImage', 'images', 'icon', 'avatar', 'media',
-    // links / urls
-    'url', 'href', 'src', 'embedUrl',
-    // business data — preserved verbatim across locales
-    'logoText', 'email', 'phone', 'phoneNumber', 'countryCode', 'address', 'socials',
-] as const
-
 export default function EditorPage() {
     const params = useParams()
     const router = useRouter()
@@ -315,8 +266,6 @@ export default function EditorPage() {
         isProduction: boolean
         badgeCounts: Partial<Record<SidebarBadgeKey, number>>
     } | null>(null)
-    const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
-    const [chatBlockContext, setChatBlockContext] = useState<{ blockIndex: number; blockType: string } | null>(null)
     const {
         isCompact: isCompactLayout,
         isResolved: isLayoutModeResolved,
@@ -325,11 +274,9 @@ export default function EditorPage() {
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
-    // Phase 03: F05 Tools sheet (bottom bar → 4-tab sheet) + AI-processing (Stop AI) state.
+    // Phase 03: F05 Tools sheet (bottom bar → 4-tab sheet).
     const [toolsSheetOpen, setToolsSheetOpen] = useState(false)
     const [toolsSheetTab, setToolsSheetTab] = useState<ToolsSheetTab>('chat')
-    const [aiRunning, setAiRunning] = useState(false)
-    const stopAIRef = useRef<(() => void) | null>(null)
     const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string; focus?: string } | null>(null)
     const settingsDeepLinkSignatureRef = useRef<string | null>(null)
 
@@ -439,6 +386,7 @@ export default function EditorPage() {
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
+    const editorAgentEnabled = useEditorAgentEnabled()
     const siteName = useEditorStore(state => state.siteName)
     const pages = useEditorStore(state => state.pages)
     const currentPageId = useEditorStore(state => state.currentPageId)
@@ -451,6 +399,7 @@ export default function EditorPage() {
     const setCurrentPageId = useEditorStore(state => state.setCurrentPageId)
     const updatePageInState = useEditorStore(state => state.updatePageInState)
     const updateBlock = useEditorStore(state => state.updateBlock)
+    const editBlock = useEditorStore(state => state.editBlock)
     const addBlock = useEditorStore(state => state.addBlock)
     const deleteBlock = useEditorStore(state => state.deleteBlock)
     const duplicateBlock = useEditorStore(state => state.duplicateBlock)
@@ -463,11 +412,11 @@ export default function EditorPage() {
     const updateHeaderBlock = useEditorStore(state => state.updateHeaderBlock)
     const updateFooterBlock = useEditorStore(state => state.updateFooterBlock)
     const undo = useEditorStore(state => state.undo)
-    const redo = useEditorStore(state => state.redo)
     const canUndo = useEditorStore(state => state.canUndo)
+    // the step the next Undo / Redo takes — read as values so the header re-renders when the history moves
+    const undoStepLabel = useEditorStore(state => (state.historyIndex > 0 ? state.history[state.historyIndex]?.label : undefined))
+    const redoStepLabel = useEditorStore(state => state.history[state.historyIndex + 1]?.label)
     const canRedo = useEditorStore(state => state.canRedo)
-    const undoLabel = useEditorStore(state => state.undoLabel)
-    const redoLabel = useEditorStore(state => state.redoLabel)
     const markSaved = useEditorStore(state => state.markSaved)
     const markDirty = useEditorStore(state => state.markDirty)
     const markPublished = useEditorStore(state => state.markPublished)
@@ -487,7 +436,6 @@ export default function EditorPage() {
     const setSecondaryLocale = useEditorStore(state => state.setSecondaryLocale)
     const setPendingLocale = useEditorStore(state => state.setPendingLocale)
     const setLocaleOverride = useEditorStore(state => state.setLocaleOverride)
-    const initLocaleFromBlock = useEditorStore(state => state.initLocaleFromBlock)
 
     const currentBlock = useMemo(() => {
         if (selectedBlock === null) return null
@@ -645,6 +593,8 @@ export default function EditorPage() {
                     normalizedGb,
                     persistedLocaleContent ?? {},
                 )
+                // saves are based on the revision this content was read at (lib/sites/editor-revision)
+                useEditorStore.getState().setDraftVersion(typeof data.draftVersion === 'string' ? data.draftVersion : null)
 
                 // F-26: siteLocale = EN/MS translation slot (Sites.locale).
                 // generationLocale = actual ISO 639-1 code AI generated in (may be 'vi', 'el', etc.).
@@ -656,8 +606,13 @@ export default function EditorPage() {
                 // F-26 FIX: restore the user's last-viewed locale (persisted to site.locale on save)
                 // so reloading an MS-switched page stays in MS instead of snapping back to the base
                 // language. See resolveInitialActiveLocale for the fallback rules.
-                const activeLocale = resolveInitialActiveLocale(rawGenerationLocale, data.site?.locale as string | undefined)
                 const persistedHeaderLocales = data.site?.headerBlock as { primaryLocale?: string; secondaryLocale?: string } | null | undefined
+                // only a language the site has (Quick language): Malay viewed once, but never added, opens in English
+                const activeLocale = resolveInitialActiveLocale(
+                    rawGenerationLocale,
+                    data.site?.locale as string | undefined,
+                    siteLanguages({ ...persistedHeaderLocales, generationLocale: rawGenerationLocale, siteLocale }),
+                )
                 useEditorStore.getState().setSiteLocale(siteLocale)
                 useEditorStore.getState().setActiveLocale(activeLocale)
                 useEditorStore.getState().setGenerationLocale(rawGenerationLocale)
@@ -766,9 +721,13 @@ export default function EditorPage() {
                 // while waiting could overwrite a newer edit saved by an earlier task.
                 const snapshot = useEditorStore.getState()
                 if (!isEditorSaveContextCurrent(saveContext, snapshot)) return false
+                // a refused (stale) save stops every save until the editor reloads
+                if (snapshot.draftConflict) return false
 
-                const currentBlocks = snapshot.getDisplayBlocks()
-                const currentTheme = snapshot.theme
+                // the sections as written in the base language — never the language on screen: each
+                // other language lives in its own copy (localeContent, _localeContent), and the preview
+                // and the live site read a language through lib/i18n/locale-display
+                const currentBlocks = snapshot.blocks
                 const savePageId = snapshot.currentPageId
                 const savedRevision = snapshot.contentRevision
 
@@ -786,35 +745,13 @@ export default function EditorPage() {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
-                        body: JSON.stringify({
-                            blocks: currentBlocks,
-                            theme: currentTheme,
-                            // F26-04: header/footer also serialized in display-locale so public site
-                            // renders the chosen language without needing locale resolution on read.
-                            headerBlock: snapshot.headerBlock ? snapshot.getDisplayBlock(snapshot.headerBlock) : null,
-                            footerBlock: snapshot.footerBlock ? snapshot.getDisplayBlock(snapshot.footerBlock) : null,
-                            // F26-04: global blocks also serialized in display locale
-                            ...(snapshot.globalBlocks !== null && {
-                                globalBlocks: {
-                                    cartWidget: snapshot.globalBlocks.cartWidget
-                                        ? snapshot.getDisplayBlock(snapshot.globalBlocks.cartWidget)
-                                        : null,
-                                    whatsappButton: snapshot.globalBlocks.whatsappButton
-                                        ? snapshot.getDisplayBlock(snapshot.globalBlocks.whatsappButton)
-                                        : null,
-                                    socialWidget: snapshot.globalBlocks.socialWidget
-                                        ? snapshot.getDisplayBlock(snapshot.globalBlocks.socialWidget)
-                                        : null,
-                                },
-                            }),
-                            // F-26: Persist locale overrides alongside blocks
-                            ...(Object.keys(snapshot.localeOverrides).length > 0 && { localeContent: snapshot.localeOverrides }),
-                            // F-26: Persist activeLocale so reload restores the correct locale (only en/ms supported by Sites.locale)
-                            ...((snapshot.activeLocale === 'en' || snapshot.activeLocale === 'ms') && { locale: snapshot.activeLocale }),
-                            isDraft: true,
-                        }),
+                        body: JSON.stringify(buildSavePayload(snapshot)),
                     })
 
+                    if (!res.ok && await isDraftConflict(res)) {
+                        useEditorStore.getState().markDraftConflict()
+                        return false
+                    }
                     if (!res.ok) {
                         const payload = await res.json().catch(() => null)
                         const fallback = typeof payload?.error === 'string'
@@ -831,6 +768,7 @@ export default function EditorPage() {
                     }
 
                     markSaved(savedRevision)
+                    keepDraftVersion(res, useEditorStore.getState())
                     setSaveSuccess(true)
 
                     if (options.refreshPreview ?? true) {
@@ -961,6 +899,57 @@ export default function EditorPage() {
         return () => { localeSwitchAbortRef.current?.abort() }
     }, [])
 
+    // ── Undo / Redo: ONE history for everything on the canvas ───────────────────────────────────────────────
+    // The header buttons, Ctrl/Cmd+Z and the chat card's Undo of the newest assistant change all run this. A step
+    // is the merchant's edit or the assistant's change (its step carries the change's id): the editor restores it
+    // (sections, menu, widgets, language copies, theme), saves AT ONCE — the assistant's cards are compared with the
+    // saved draft — and the caller then lets the chat settle the card (Undone / Applied).
+    const stepHistory = useCallback(async (direction: 'undo' | 'redo'): Promise<{ changeSetId?: string; saved: boolean } | null> => {
+        if (templateApplyPendingRef.current) return null
+        const before = useEditorStore.getState()
+        if (direction === 'undo' ? !before.canUndo() : !before.canRedo()) return null
+        const next = direction === 'undo' ? before.undoLabel() : before.redoLabel()
+        const isTemplateStep = next?.startsWith('Apply template:') === true
+        if (direction === 'redo' && isTemplateStep) setAutoSaveEnabled(false)
+        const crossed = direction === 'undo' ? before.undo() : before.redo()
+        if (!crossed) return null
+        if (direction === 'redo' && isTemplateStep) setTemplateApplied(true)
+        const after = useEditorStore.getState()
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: after.getDisplayBlocks() })
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: after.globalBlocks })
+        if (after.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: after.getDisplayBlock(after.headerBlock) })
+        if (after.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: after.getDisplayBlock(after.footerBlock) })
+        // If user undoes the template apply, clear the save guard
+        if (direction === 'undo' && templateApplied && isTemplateStep) {
+            setTemplateApplied(false)
+            setAutoSaveEnabled(true)
+            void handleSave({ showToast: false, refreshPreview: true })
+            return { changeSetId: crossed.changeSetId, saved: true }
+        }
+        // the theme is the LIVE site's: the save below writes it there, so say so
+        if (crossed.themeChanged) {
+            toast.info(direction === 'undo' ? t.editor.aiChat.themeUndoneLive : t.editor.aiChat.themeRedoneLive)
+        }
+        // text typed on the canvas lives in the page's own DOM: the canvas reloads from the saved draft to show the step
+        if (!crossed.changeSetId && !crossed.canvasTyped) return { saved: true }
+        const saved = await useEditorStore.getState().performSave(true)
+        if (saved && crossed.canvasTyped) setIframeKey(key => key + 1)
+        return { changeSetId: crossed.changeSetId, saved }
+    }, [handleSave, setAutoSaveEnabled, templateApplied, t])
+
+    /** Header buttons and Ctrl/Cmd+Z: a step, then the chat settles the card of the assistant change it crossed. */
+    const stepAndReconcile = useCallback(async (direction: 'undo' | 'redo') => {
+        const result = await stepHistory(direction)
+        if (result?.changeSetId && result.saved) requestReconcile(result.changeSetId)
+    }, [stepHistory])
+    const stepAndReconcileRef = useRef(stepAndReconcile)
+    useEffect(() => { stepAndReconcileRef.current = stepAndReconcile }, [stepAndReconcile])
+    const setHistoryStep = useEditorHistoryControl(state => state.setStep)
+    useEffect(() => {
+        setHistoryStep(stepHistory)
+        return () => setHistoryStep(null)
+    }, [setHistoryStep, stepHistory])
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (
@@ -984,43 +973,14 @@ export default function EditorPage() {
 
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
                 e.preventDefault()
-
-                if (e.shiftKey) {
-                    if (canRedo()) {
-                        const isTemplateRedo = redoLabel()?.startsWith('Apply template:') === true
-                        if (isTemplateRedo) setAutoSaveEnabled(false)
-                        redo()
-                        if (isTemplateRedo) setTemplateApplied(true)
-                        const redoState = useEditorStore.getState()
-                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: redoState.getDisplayBlocks() })
-                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: redoState.globalBlocks })
-                        if (redoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: redoState.getDisplayBlock(redoState.headerBlock) })
-                        if (redoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: redoState.getDisplayBlock(redoState.footerBlock) })
-                    }
-                    return
-                }
-
-                if (canUndo()) {
-                    const isTemplateUndo = undoLabel()?.startsWith('Apply template:') === true
-                    undo()
-                    const undoState = useEditorStore.getState()
-                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: undoState.getDisplayBlocks() })
-                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: undoState.globalBlocks })
-                    if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.getDisplayBlock(undoState.headerBlock) })
-                    if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.getDisplayBlock(undoState.footerBlock) })
-                    if (templateApplied && isTemplateUndo) {
-                        setTemplateApplied(false)
-                        setAutoSaveEnabled(true)
-                        void handleSave({ showToast: false, refreshPreview: true })
-                    }
-                }
+                void stepAndReconcileRef.current(e.shiftKey ? 'redo' : 'undo')
             }
 
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [canRedo, canUndo, handleManualSave, handleSave, redo, redoLabel, setAutoSaveEnabled, templateApplied, undo, undoLabel])
+    }, [handleManualSave])
 
     const handleThemeChange = useCallback((key: string, value: string) => {
         updateTheme({ [key]: value })
@@ -1161,6 +1121,8 @@ export default function EditorPage() {
                                     ? useEditorStore.getState().headerBlock
                                     : (logoSyncedHeaderBlock ?? changes.headerBlock),
                                 footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
+                                // the open site's draft revision (another site's settings carry none)
+                                ...(options.targetSiteId === undefined ? draftBase(useEditorStore.getState()) : {}),
                             }),
                         })
                     } catch (setupError) {
@@ -1265,9 +1227,14 @@ export default function EditorPage() {
             }
 
             if (!response.ok) {
+                if (await isDraftConflict(response)) {
+                    useEditorStore.getState().markDraftConflict()
+                    return false
+                }
                 const body = await response.json().catch(() => null)
                 throw new Error(resolveApiError(body, `Server returned ${response.status}`, sub))
             }
+            if (persistenceSiteId === siteId) keepDraftVersion(response, useEditorStore.getState())
 
             if (isContactSave) commitChangesToSite()
 
@@ -1457,50 +1424,44 @@ export default function EditorPage() {
     // F-26: Auto-translate header or footer block into target locale if not already cached.
     // Stores translation in block._localeContent[locale] (no history entry — silent background op).
     // F26-04: AbortSignal cancels in-flight fetch when caller's switch is superseded.
+    // Resolves true when the translation could not be made (the slot stays empty, so a later switch retries).
     const translateGlobalBlock = useCallback(async (
         block: BlockData,
         blockTypeKey: string,
         locale: SiteLocale,
         applyFn: (patch: Record<string, unknown>) => void,
         signal?: AbortSignal,
-    ) => {
+    ): Promise<boolean> => {
         const existing = (block as Record<string, unknown>)._localeContent as
             | Record<string, Record<string, unknown>>
             | undefined
-        if (existing?.[locale] && Object.keys(existing[locale]).length > 0) return
+        if (existing?.[locale] && Object.keys(existing[locale]).length > 0) return false
 
         // F26: skip media/non-text + business-data fields — see NON_TRANSLATABLE_FIELDS.
         const SKIP = new Set<string>(NON_TRANSLATABLE_FIELDS)
+        // From the written language, never from what the stored block shows (the layout is saved as shown).
+        const source = useEditorStore.getState().getSourceBlock(block)
         const translatableContent = Object.fromEntries(
-            Object.entries(block as Record<string, unknown>).filter(([k]) => !SKIP.has(k)),
+            Object.entries(source as Record<string, unknown>).filter(([k]) => !SKIP.has(k)),
         )
 
-        try {
-            const res = await fetch('/api/ai/translate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                signal,
-                body: JSON.stringify({ blockType: blockTypeKey, targetLocale: locale, content: translatableContent }),
-            })
-            if (!res.ok || signal?.aborted) return
-            const { translated, status } = await res.json() as { translated: Record<string, unknown>; status?: string }
-            // Re-check abort after parse — a newer switch may have superseded this flow.
-            if (signal?.aborted) return
-            // F26: never persist a fallback (English) result — it poisons the locale slot and the
-            // guard above would then permanently skip re-translation. Leave empty → registry fallback.
-            if (status === 'fallback') return
-            const newLocaleContent = { ...(existing ?? {}), [locale]: translated }
-            applyFn({ _localeContent: newLocaleContent })
-        } catch {
-            // AbortError or non-fatal network — show original content as fallback
-        }
+        const result = await requestTranslation({ blockType: blockTypeKey, targetLocale: locale, content: translatableContent, signal })
+        if (!result.ok) return result.reason !== 'aborted'
+        // Re-check abort after parse — a newer switch may have superseded this flow.
+        if (signal?.aborted) return false
+        // F26: a failed translation is never stored — it would poison the locale slot and the guard
+        // above would then permanently skip re-translation. Leave empty; the block shows its own text.
+        applyFn({ _localeContent: { ...(existing ?? {}), [locale]: result.translated } })
+        return false
     }, [])
 
     // F-26: Handle locale switch — accepts any ISO code; only persists/translates for EN/MS.
     // Switching to generationLocale (native view) bypasses translation since base blocks
     // are already in that language.
-    const handleLocaleSwitch = useCallback(async (locale: string) => {
+    // `viewOnly`: the copilot shows a language (a translation it made, a "Show" on a translation line) — only the
+    // menu, footer and widgets are translated by the editor then; the page's sections and the page titles are
+    // not (that is the copilot's own, reviewed translation, or the merchant's switch from the language menu).
+    const handleLocaleSwitch = useCallback(async (locale: string, options: { viewOnly?: boolean } = {}) => {
         if (!siteId) return
         const isStandard = locale === 'en' || locale === 'ms'
 
@@ -1610,8 +1571,11 @@ export default function EditorPage() {
         // Collected as promises so we can await everything before clearing pendingLocale.
         const state = useEditorStore.getState()
         const translationPromises: Array<Promise<unknown>> = []
+        // translations that could not be made (their slots stay empty); a superseded switch is not one
+        let failedCount = 0
+        const trackFailure = (failed: Promise<boolean>) => failed.then((didFail) => { if (didFail) failedCount++ })
         if (state.headerBlock) {
-            translationPromises.push(translateGlobalBlock(
+            translationPromises.push(trackFailure(translateGlobalBlock(
                 state.headerBlock,
                 `navigation-${siteId}`,
                 locale as SiteLocale,
@@ -1627,14 +1591,14 @@ export default function EditorPage() {
                     }
                 },
                 switchController.signal,
-            ))
+            )))
         }
         const gb = state.globalBlocks
         if (gb) {
             (['cartWidget', 'whatsappButton', 'socialWidget'] as const).forEach((key) => {
                 const block = gb[key]
                 if (!block) return
-                translationPromises.push(translateGlobalBlock(
+                translationPromises.push(trackFailure(translateGlobalBlock(
                     block,
                     `${key}-${siteId}`,
                     locale as SiteLocale,
@@ -1650,11 +1614,11 @@ export default function EditorPage() {
                         }
                     },
                     switchController.signal,
-                ))
+                )))
             })
         }
         if (state.footerBlock) {
-            translationPromises.push(translateGlobalBlock(
+            translationPromises.push(trackFailure(translateGlobalBlock(
                 state.footerBlock,
                 `footer-${siteId}`,
                 locale as SiteLocale,
@@ -1670,111 +1634,89 @@ export default function EditorPage() {
                     }
                 },
                 switchController.signal,
-            ))
+            )))
         }
 
         // F26-04: Auto-translate body blocks that have no localeOverride for the new locale.
         // Skips blocks already translated (cached in localeOverrides) for instant switch back.
         // F26: also skip media/non-text fields — translating image objects/URLs bloats the payload,
         // risks malformed JSON, and wastes tokens. Only marketing copy needs translation.
-        const SKIP_FIELDS = new Set<string>([...NON_TRANSLATABLE_FIELDS, '__localeInit'])
-        translationPromises.push(Promise.all(state.blocks.map(async (block) => {
-            if (!block.id) return
-            const existingOverride = state.localeOverrides[block.id as string]?.[locale]
-            if (existingOverride && Object.keys(existingOverride).length > 0) return
+        // What the automatic translation wrote, so the merchant can take it back from the toast.
+        const autoTranslated: Record<string, Record<string, unknown>> = {}
+        const work = localeSwitchWork(options)
+        if (work.sections) {
+            const SKIP_FIELDS = new Set<string>([...NON_TRANSLATABLE_FIELDS, '__localeInit'])
+            const brand = state.siteName || 'Your Brand'
+            translationPromises.push(translateSectionsIntoSlots(state.blocks, locale, {
+                getSourceBlock: (block) => useEditorStore.getState().getSourceBlock(block),
+                // a copy that is only the editor's template text is no translation: the section is translated
+                getSlot: (blockId) => {
+                    const slot = state.localeOverrides[blockId]?.[locale]
+                    const block = state.blocks.find((b) => b.id === blockId)
+                    return slot && isTemplateSlot(block?.blockType, locale, slot, brand) ? undefined : slot
+                },
+                setSlot: (blockId, translated) => {
+                    setLocaleOverride(blockId, locale, translated)
+                    return useEditorStore.getState().localeOverrides[blockId]?.[locale]
+                },
+                skipFields: SKIP_FIELDS,
+                signal: switchController.signal,
+            }).then(({ written, failed }) => {
+                Object.assign(autoTranslated, written)
+                failedCount += failed
+            }))
+        }
 
-            const translatable = Object.fromEntries(
-                Object.entries(block as Record<string, unknown>).filter(([k, v]) =>
-                    !SKIP_FIELDS.has(k) && (typeof v === 'string' || Array.isArray(v) || (v !== null && typeof v === 'object'))
-                ),
-            )
-            if (Object.keys(translatable).length === 0) return
-
-            // F26: cache key = blockType + the block's unique id, so the translate cache is scoped per
-            // block instance. Prevents cross-site AND cross-page collision (e.g. another site's hero,
-            // or a sibling page's hero, leaking in) while still reusing on switch-back for the same block.
-            const cacheBlockType = `${String(block.blockType || '')}-${block.id}`
-
-            try {
-                const res = await fetch('/api/ai/translate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    signal: switchController.signal,
-                    body: JSON.stringify({
-                        blockType: cacheBlockType,
-                        targetLocale: locale,
-                        content: translatable,
-                    }),
-                })
-                if (!res.ok || switchController.signal.aborted) return
-                const { translated, status } = await res.json() as { translated?: Record<string, unknown>; status?: string }
-                // F26: never persist a fallback (English) result into the locale slot — that poisons
-                // the slot AND blocks future retries (the existingOverride guard above would skip it).
-                // Leaving it empty lets getDisplayBlock fall back to the registry BM bundle instead.
-                if (status === 'fallback') return
-                if (!translated || Object.keys(translated).length === 0) return
-                // F26-04: re-check aborted before persisting — stale flow must not write.
-                if (switchController.signal.aborted) return
-                setLocaleOverride(block.id as string, locale, translated)
-            } catch {
-                // AbortError or non-fatal network — block stays in original language
-            }
-        })))
-
-        // GH-1136: translate page titles (Page Library + tab) into the target locale. Titles
-        // live on the page record (not blocks) under localeContent['__pageMeta'][locale].title.
-        // Current page persists via localeOverrides → /save; other pages persist via PATCH.
-        const currentPageIdForTitles = useEditorStore.getState().currentPageId
-        translationPromises.push(Promise.all(useEditorStore.getState().pages.map(async (pg) => {
-            const title = (pg.title || '').trim()
-            if (!title) return
-            // Cache: skip when this page already has a title translation for the locale.
-            const cachedTitle = pg.localeContent?.[PAGE_META_LOCALE_KEY]?.[locale]?.title
-            if (typeof cachedTitle === 'string' && cachedTitle.trim()) return
-            try {
-                const res = await fetch('/api/ai/translate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    signal: switchController.signal,
+        if (work.pageTitles) {
+            // GH-1136: translate page titles (Page Library + tab) into the target locale. Titles
+            // live on the page record (not blocks) under localeContent['__pageMeta'][locale].title.
+            // Current page persists via localeOverrides → /save; other pages persist via PATCH.
+            const currentPageIdForTitles = useEditorStore.getState().currentPageId
+            translationPromises.push(Promise.all(useEditorStore.getState().pages.map(async (pg) => {
+                const title = (pg.title || '').trim()
+                if (!title) return
+                // Cache: skip when this page already has a title translation for the locale.
+                const cachedTitle = pg.localeContent?.[PAGE_META_LOCALE_KEY]?.[locale]?.title
+                if (typeof cachedTitle === 'string' && cachedTitle.trim()) return
+                try {
                     // Per-page cache key: the translate cache is keyed by blockType+locale only (not
                     // content), so a shared key would return one page's title for all pages.
-                    body: JSON.stringify({ blockType: `pagetitle-${pg.id}`, targetLocale: locale, content: { title } }),
-                })
-                if (!res.ok || switchController.signal.aborted) return
-                const { translated, status } = await res.json() as { translated?: { title?: unknown }; status?: string }
-                if (status === 'fallback') return
-                const translatedTitle = translated?.title
-                if (typeof translatedTitle !== 'string' || !translatedTitle.trim() || switchController.signal.aborted) return
+                    const result = await requestTranslation({ blockType: `pagetitle-${pg.id}`, targetLocale: locale, content: { title }, signal: switchController.signal })
+                    if (!result.ok) {
+                        if (result.reason !== 'aborted') failedCount++
+                        return
+                    }
+                    const translatedTitle = result.translated.title
+                    if (typeof translatedTitle !== 'string' || !translatedTitle.trim() || switchController.signal.aborted) return
 
-                // Mirror into pages[] for immediate Library/tab display.
-                const mergedLc = {
-                    ...(pg.localeContent ?? {}),
-                    [PAGE_META_LOCALE_KEY]: {
-                        ...(pg.localeContent?.[PAGE_META_LOCALE_KEY] ?? {}),
-                        [locale]: { title: translatedTitle },
-                    },
-                }
-                updatePageInState(pg.id, { localeContent: mergedLc })
+                    // Mirror into pages[] for immediate Library/tab display.
+                    const mergedLc = {
+                        ...(pg.localeContent ?? {}),
+                        [PAGE_META_LOCALE_KEY]: {
+                            ...(pg.localeContent?.[PAGE_META_LOCALE_KEY] ?? {}),
+                            [locale]: { title: translatedTitle },
+                        },
+                    }
+                    updatePageInState(pg.id, { localeContent: mergedLc })
 
-                if (pg.id === currentPageIdForTitles) {
-                    // Persisted by the /save below (localeOverrides → locale_content).
-                    setLocaleOverride(PAGE_META_LOCALE_KEY, locale, { title: translatedTitle })
-                } else {
-                    // Other pages aren't in the save payload — persist directly.
-                    await fetch(`/api/sites/${siteId}/pages/${pg.id}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        signal: switchController.signal,
-                        body: JSON.stringify({ localeContent: mergedLc }),
-                    }).catch(() => { /* non-fatal — title falls back to original */ })
+                    if (pg.id === currentPageIdForTitles) {
+                        // Persisted by the /save below (localeOverrides → locale_content).
+                        setLocaleOverride(PAGE_META_LOCALE_KEY, locale, { title: translatedTitle })
+                    } else {
+                        // Other pages aren't in the save payload — persist directly.
+                        await fetch(`/api/sites/${siteId}/pages/${pg.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            signal: switchController.signal,
+                            body: JSON.stringify({ localeContent: mergedLc }),
+                        }).catch(() => { /* non-fatal — title falls back to original */ })
+                    }
+                } catch {
+                    // AbortError or non-fatal network — title stays in original language
                 }
-            } catch {
-                // AbortError or non-fatal network — title stays in original language
-            }
-        })))
+            })))
+        }
 
         // Await all translations (header + footer + global + body), then push refreshed
         // layout to preview, persist to DB, and clear pending state so UI exits "Adding…".
@@ -1796,6 +1738,29 @@ export default function EditorPage() {
             if (localeSwitchAbortRef.current === switchController) {
                 setPendingLocale(null)
             }
+            // the slots that could not be filled stay empty and show the original text; say so once
+            if (failedCount > 0) {
+                toast.warning(ti(t.editor.aiChat.localeTranslateFailed, { count: failedCount, language: getLocaleLabel(locale).full }), { duration: 12000 })
+            }
+            const translatedCount = Object.keys(autoTranslated).length
+            if (translatedCount > 0 && !switchController.signal.aborted) {
+                toast(ti(t.editor.aiChat.localeAutoTranslated, { count: translatedCount, language: getLocaleLabel(locale).full }), {
+                    duration: 12000,
+                    action: {
+                        label: t.editor.aiChat.undoTranslation,
+                        onClick: () => {
+                            if (useEditorStore.getState().discardLocaleOverrides(locale, autoTranslated) === 0) return
+                            const after = useEditorStore.getState()
+                            previewFrameSendRef.current?.sendToIframe({
+                                type: 'UPDATE_FULL_LAYOUT',
+                                bodyBlocks: after.blocks.map(b => after.getDisplayBlock(b)),
+                            })
+                            void saveWithRetry({ showToast: false, refreshPreview: false })
+                            toast(t.editor.aiChat.translationUndone)
+                        },
+                    },
+                })
+            }
         })
 
         // Persist new locale to Sites.locale + mark unsaved so flushSavesBeforePublish
@@ -1814,27 +1779,33 @@ export default function EditorPage() {
         markDirty(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- saveWithRetry declared after this; refs are stable
     }, [siteId, markDirty, setActiveLocale, setPendingLocale, translateGlobalBlock, setLocaleOverride, updatePageInState])
+    // the copilot's listeners call the newest switch without re-subscribing
+    const localeSwitchRef = useRef(handleLocaleSwitch)
+    useEffect(() => {
+        localeSwitchRef.current = handleLocaleSwitch
+    }, [handleLocaleSwitch])
 
-    // F-26-04: Translate a specific block instance (called after block drop when needsTranslation)
+    // F-26-04: Translate a specific block instance (called after block drop when needsTranslation).
+    // Translates the section's own text (the written language's copy over the stored section), never the
+    // editor's template: translated template text is filler, and stored in a language copy it would count as a
+    // translation and reach visitors. A section still holding only template text has nothing to translate and
+    // keeps no copy (its canvas shows the template of the language until the merchant writes or translates).
     const handleAutoTranslateBlock = useCallback(async (blockId: string, blockType: string) => {
-        // TC-F26-04-03/04: non-blocking notice when auto-translation can't complete. EN default
+        // TC-F26-04-03/04: non-blocking notice when auto-translation can't complete. The section's own text
         // is already in place (AC-3) so this only informs — never blocks the editor.
         const notifyFallback = () =>
-            toast.warning('Auto-translation unavailable — using English default for now.')
+            toast.warning('Auto-translation unavailable — showing the original text for now.')
         try {
-            // Send with {brand} token intact so server cache is brand-agnostic (Fix 3)
-            const rawContent = resolveBlockContent(blockType, 'en', '{brand}').content
-            const res = await fetch('/api/ai/translate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ blockType, targetLocale: 'ms', content: rawContent }),
-            })
-            if (!res.ok) { notifyFallback(); return }
-            const json = await res.json() as { translated?: Record<string, unknown>; status?: string }
-            if (json.status === 'fallback' || !json.translated) { notifyFallback(); return }
-            // Re-apply brand after retrieval (cache stores {brand} tokens)
-            const branded = interpolateBrand(json.translated, siteName || 'Your Brand')
+            const state = useEditorStore.getState()
+            const block = state.blocks.find(b => b.id === blockId)
+            if (!block) return
+            const brand = siteName || 'Your Brand'
+            // nothing the merchant wrote yet: no copy (never a translated template)
+            const source = ownTextToTranslate(state.getSourceBlock(block) as Record<string, unknown>, blockType, new Set<string>(NON_TRANSLATABLE_FIELDS), brand)
+            if (!source) return
+            const result = await requestTranslation({ blockType: `${blockType}-${blockId}`, targetLocale: 'ms', content: source })
+            if (!result.ok) { notifyFallback(); return }
+            const branded = result.translated
             setLocaleOverride(blockId, 'ms', branded)
             // Push display-merged block to iframe
             setTimeout(() => {
@@ -1849,26 +1820,10 @@ export default function EditorPage() {
                 }
             }, 0)
         } catch {
-            // AC-3: Non-fatal — EN fallback already in place; inform user (TC-F26-04-04 timeout path).
+            // AC-3: Non-fatal — the original text is already in place; inform user (TC-F26-04-04 timeout path).
             notifyFallback()
         }
-    }, [siteId, siteName, setLocaleOverride])
-
-    // F-26-04: Manual translate for a block type (✨ AI button in Block Library)
-    const handleAutoTranslate = useCallback(async (blockType: string) => {
-        // Send {brand} intact — server caches brand-agnostic template
-        const rawContent = resolveBlockContent(blockType, 'en', '{brand}').content
-        const res = await fetch('/api/ai/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ blockType, targetLocale: 'ms', content: rawContent }),
-        })
-        if (!res.ok) throw new Error('translate failed')
-        const json = await res.json() as { translated?: Record<string, unknown>; status?: string }
-        if (json.status === 'fallback') throw new Error('translate fallback')
-        // Result cached server-side with {brand} tokens — future block drops re-interpolate brand
-    }, [])
+    }, [siteName, setLocaleOverride])
 
     const handleDeleteBlock = useCallback((index: number) => {
         deleteBlock(index)
@@ -1922,26 +1877,8 @@ export default function EditorPage() {
         // the next flat-block render silently reverted to the old variant. The full
         // decision (incl. the generationLocale base-language gate) lives in
         // routeBlockChanges() so unit tests pin it.
-        const { flatChanges, contentOverride, purgeKeys } = routeBlockChanges(changes, {
-            hasBlockId: Boolean(blockId),
-            activeLocale,
-            generationLocale: store.generationLocale,
-            siteLocale: store.siteLocale,
-        })
-
-        if (Object.keys(flatChanges).length > 0) {
-            updateBlock(index, flatChanges)
-        }
-        if (blockId) {
-            // Purge stale per-locale copies of structural keys (pre-fix sessions) so
-            // they can't shadow the flat value in getDisplayBlock.
-            for (const key of purgeKeys) store.clearLocaleOverrideField(blockId, key)
-            if (Object.keys(contentOverride).length > 0) {
-                // F-26: Store edit in localeOverrides so EN defaults (seeded by
-                // initLocaleFromBlock) never mask user content when switching locales.
-                setLocaleOverride(blockId, activeLocale, contentOverride)
-            }
-        }
+        // (editBlock = that decision + the section write + the language copy write, as ONE history step)
+        editBlock(index, changes)
 
         const updatedBlock = useEditorStore.getState().blocks[index]
         // Id-less blocks (pre-save) echo the RAW block: getDisplayBlock's template
@@ -1950,7 +1887,7 @@ export default function EditorPage() {
         const blockData = blockId ? useEditorStore.getState().getDisplayBlock(updatedBlock) : updatedBlock
         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData })
         void saveWithRetry({ showToast: false, refreshPreview: false })
-    }, [updateBlock, setLocaleOverride, activeLocale, saveWithRetry])
+    }, [editBlock, saveWithRetry])
 
     const handleBlockFieldChange = useCallback((index: number, field: string, value: string | boolean) => {
         handleBlockUpdate(index, { [field]: value })
@@ -2055,10 +1992,6 @@ export default function EditorPage() {
         if (fromIndex === toIndex) return
         reorderBlocks(fromIndex, toIndex)
         setSelectedBlock(toIndex)
-        setChatActivity({
-            id: `reorder-${Date.now()}`,
-            content: `Moved block #${fromIndex + 1} to position #${toIndex + 1}`,
-        })
         
         setTimeout(() => {
             previewFrameSendRef.current?.sendToIframe({
@@ -2109,20 +2042,21 @@ export default function EditorPage() {
                 siteName: siteName || site?.name || '',
                 theme,
                 requestedType: blockData.blockType,
-                // Block normalized to match the currently-viewed locale; non-standard codes
-                // (e.g. 'vi') fall back to 'en' since template defaults are EN/MS only.
-                locale: activeLocale === 'ms' ? 'ms' : 'en',
+                // A section is stored in the language the site is written in, whatever language is on screen
+                // (the other language shows the template of that language until it is translated). Non-standard
+                // codes (e.g. 'vi') fall back to 'en' since template defaults are EN/MS only.
+                locale: templateLocaleOf(useEditorStore.getState().generationLocale || useEditorStore.getState().siteLocale),
             },
             blockData as Record<string, unknown>
         )
 
         let safeBlock: BlockData = nextBlock || { blockType: blockData.blockType || 'hero', variant: blockData.variant || 'default' }
 
-        // C1 fix: assign a stable client UUID before initLocaleFromBlock / auto-translate
+        // C1 fix: assign a stable client UUID before auto-translate
         // guards so both proceed correctly. normalizeBlocksForPersistence strips this before
         // writing to Payload; the save route remaps localeContent to the Payload-assigned ID.
         if (!(safeBlock as Record<string, unknown>).id) {
-            ;(safeBlock as Record<string, unknown>).id = crypto.randomUUID()
+            ;(safeBlock as Record<string, unknown>).id = uuid()
         }
 
         // GH-1359: resolve hardcoded CTA placeholders (#contact/#about/#) to
@@ -2130,25 +2064,23 @@ export default function EditorPage() {
         // locale-variant slots (which override the base on render).
         const pagesNow = useEditorStore.getState().pages
 
-        // F-26: Consume __localeInit injected by Phase 01 normalizeAddSectionBlock
-        const localeInit = (safeBlock as Record<string, unknown>).__localeInit as { en: Record<string, unknown>; ms: Record<string, unknown> } | undefined
-        if (localeInit && safeBlock.id) {
-            initLocaleFromBlock(safeBlock.id as string, patchLocaleInitCtaUrls(localeInit, pagesNow))
-        }
-        // Strip __localeInit before persisting the block
+        // __localeInit (the EN/MS template slots of normalizeAddSectionBlock) is dropped, not stored: template text
+        // in a language copy would count as a translation and reach visitors. The other language shows the
+        // template of that language on the canvas (getDisplayBlock) until it is translated or edited.
         if ((safeBlock as Record<string, unknown>).__localeInit) {
             const { __localeInit: _, ...rest } = safeBlock as Record<string, unknown>
             safeBlock = rest as BlockData
         }
         safeBlock = patchBlockCtaUrls(safeBlock, pagesNow)
 
-        // F-26-04: Auto-translate when site is ms + block type has no authored BM content
+        addBlock(index - 1, safeBlock)
+
+        // F-26-04: Auto-translate when site is ms + block type has no authored BM content. After the add: it
+        // translates the section's own text from the store (and does nothing for a section that is only template text)
         const blockTypeStr = String(safeBlock.blockType || '')
         if (blockTypeStr && safeBlock.id && (site?.locale === 'ms' || activeLocale === 'ms') && !hasLocaleContent(blockTypeStr, 'ms')) {
             void handleAutoTranslateBlock(safeBlock.id as string, blockTypeStr)
         }
-
-        addBlock(index - 1, safeBlock)
         setSelectedBlock(index)
 
         setTimeout(() => {
@@ -2166,10 +2098,6 @@ export default function EditorPage() {
         // Don't call setIframeKey(key => key + 1) because save happens asynchronously via autoSave,
         // which causes a race condition where the iframe fetches stale db state.
 
-        setChatActivity({
-            id: `drop-${Date.now()}`,
-            content: `Added ${blockData.blockType} block`,
-        })
 
         if (blockData.blockType === 'gallery') void triggerImageSeed()
 
@@ -2207,9 +2135,8 @@ export default function EditorPage() {
                         requestedType: String(action.block?.blockType || ''),
                         siteName: siteName || site?.name || '',
                         theme,
-                        // Block normalized to match the currently-viewed locale; non-standard codes
-                // (e.g. 'vi') fall back to 'en' since template defaults are EN/MS only.
-                locale: activeLocale === 'ms' ? 'ms' : 'en',
+                        // stored in the language the site is written in (see handleBlockDrop)
+                        locale: templateLocaleOf(useEditorStore.getState().generationLocale || useEditorStore.getState().siteLocale),
                     },
                     action.block,
                 )
@@ -2217,11 +2144,7 @@ export default function EditorPage() {
                 if (nextBlock) {
                     // GH-1359: resolve CTA placeholders to canonical slugs (base + locale slots).
                     const pagesNowAI = useEditorStore.getState().pages
-                    // F-26: Consume __localeInit from Phase 01 normalizeAddSectionBlock
-                    const localeInitAI = (nextBlock as Record<string, unknown>).__localeInit as { en: Record<string, unknown>; ms: Record<string, unknown> } | undefined
-                    if (localeInitAI && nextBlock.id) {
-                        initLocaleFromBlock(nextBlock.id as string, patchLocaleInitCtaUrls(localeInitAI, pagesNowAI))
-                    }
+                    // __localeInit is dropped, never stored as language copies (see handleBlockDrop)
                     if ((nextBlock as Record<string, unknown>).__localeInit) {
                         const { __localeInit: _li, ...rest } = nextBlock as Record<string, unknown>
                         nextBlock = rest as BlockData
@@ -2304,43 +2227,185 @@ export default function EditorPage() {
         }, 300)
     }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo, triggerImageSeed])
 
-    const handleUndo = useCallback(() => {
-        if (templateApplyPendingRef.current) return
-        if (!canUndo()) return
-        const isTemplateUndo = undoLabel()?.startsWith('Apply template:') === true
-        undo()
-        const undoState = useEditorStore.getState()
-        previewFrameSendRef.current?.sendToIframe({
-            type: 'UPDATE_FULL_LAYOUT',
-            bodyBlocks: undoState.getDisplayBlocks(),
-        })
-        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: undoState.globalBlocks })
-        if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.getDisplayBlock(undoState.headerBlock) })
-        if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.getDisplayBlock(undoState.footerBlock) })
-        // If user undoes the template apply, clear the save guard
-        if (templateApplied && isTemplateUndo) {
-            setTemplateApplied(false)
-            setAutoSaveEnabled(true)
-            void handleSave({ showToast: false, refreshPreview: false })
-        }
-    }, [canUndo, handleSave, setAutoSaveEnabled, templateApplied, undo, undoLabel])
+    // ── Web builder copilot (AI Chat tab) ────────────────────────────────
+    // The dock pins the section in view. After it applies or undoes a change,
+    // the page draft on the server is newer than the store: reload it as ONE
+    // history step so preview, Undo/Redo and autosave stay in step.
+    const setAgentFocus = useEditorAgentFocus(state => state.setBlock)
+    useEffect(() => {
+        if (!editorAgentEnabled) return
+        const block = selectedBlock !== null ? blocks[selectedBlock] : undefined
+        setAgentFocus(block && selectedBlock !== null ? editorBlockId(block, selectedBlock) : null, block ? String(block.blockType ?? '') : null)
+    }, [editorAgentEnabled, selectedBlock, blocks, setAgentFocus])
 
-    const handleRedo = useCallback(() => {
-        if (templateApplyPendingRef.current) return
-        if (!canRedo()) return
-        const isTemplateRedo = redoLabel()?.startsWith('Apply template:') === true
-        if (isTemplateRedo) setAutoSaveEnabled(false)
-        redo()
-        if (isTemplateRedo) setTemplateApplied(true)
-        const redoState = useEditorStore.getState()
-        previewFrameSendRef.current?.sendToIframe({
-            type: 'UPDATE_FULL_LAYOUT',
-            bodyBlocks: redoState.getDisplayBlocks(),
-        })
-        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: redoState.globalBlocks })
-        if (redoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: redoState.getDisplayBlock(redoState.headerBlock) })
-        if (redoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: redoState.getDisplayBlock(redoState.footerBlock) })
-    }, [canRedo, redo, redoLabel, setAutoSaveEnabled])
+    useEffect(() => {
+        if (!editorAgentEnabled) return
+        const onChanged = async (event: Event) => {
+            const detail = (event as CustomEvent<EditorAiChangedDetail>).detail
+            const state = useEditorStore.getState()
+            // the chat's Undo is its own history step ("Undid: …") with its own toast — never "the assistant updated"
+            const undone = detail.undone === true
+            // a theme step is written to the LIVE site (no draft for it): the history says so
+            const stepLabel = `${undone ? 'Undid' : 'AI'}: ${detail.label}${detail.kind === 'theme' ? ' (live)' : ''}`
+            const stepMeta = detail.changeSetId ? (undone ? { undoOf: detail.changeSetId } : { changeSetId: detail.changeSetId, kind: detail.kind }) : undefined
+            const undoneToast = ti(t.editor.aiChat.agentChangeUndone, { title: detail.label })
+            const openPage = String(state.currentPageId ?? '')
+            // several pages: the open one reloads like a page edit; the others load fresh when opened
+            if (detail.kind === 'pages' && !detail.pageIds?.includes(openPage)) {
+                toast.success(undone ? undoneToast : t.editor.aiChat.agentPagesUpdated)
+                detail.resume?.()
+                return
+            }
+            // site-wide: the page list, the menu/footer draft, the live state
+            if (detail.kind === 'structure' || detail.kind === 'nav' || detail.kind === 'languages' || detail.kind === 'publish') {
+                try {
+                    // the open page was removed (undo of a new page): start again from the site
+                    if (detail.kind === 'structure' && detail.pageId && detail.pageId === openPage) {
+                        window.location.assign(`/editor/${siteId}`)
+                        return
+                    }
+                    const editorUrl = new URL(`/api/sites/${siteId}/editor-data`, window.location.origin)
+                    if (state.currentPageId) editorUrl.searchParams.set('pageId', state.currentPageId)
+                    const [pagesRes, dataRes] = await Promise.all([
+                        fetch(`/api/sites/${siteId}/pages`, { credentials: 'include', cache: 'no-store' }),
+                        fetch(editorUrl.toString(), { credentials: 'include', cache: 'no-store' }),
+                    ])
+                    if (pagesRes.ok) {
+                        const pagesData = await pagesRes.json() as { pages?: unknown }
+                        if (Array.isArray(pagesData.pages)) setPages(pagesData.pages as never)
+                    }
+                    const data = dataRes.ok ? await dataRes.json() as { draftVersion?: string; site?: { headerBlock?: Record<string, unknown> | null; footerBlock?: Record<string, unknown> | null } } : null
+                    const current = useEditorStore.getState()
+                    // the copilot's write bumped the draft revision: later saves are based on the reloaded one
+                    if (data?.draftVersion) current.setDraftVersion(data.draftVersion)
+                    // the menu/footer drafts exactly as stored (one history step, nothing left to autosave):
+                    // a save of the store's older copy would undo the change and block its Undo
+                    const header = data?.site?.headerBlock ?? null
+                    const footer = data?.site?.footerBlock ?? null
+                    if (JSON.stringify(header) !== JSON.stringify(current.headerBlock) || JSON.stringify(footer) !== JSON.stringify(current.footerBlock)) {
+                        // the menu & footer follow a nav change on the timeline; a new page's link, the website languages and a
+                        // publish are undone from their card only, so no history step may lead back to the older menu
+                        if (detail.kind === 'nav') {
+                            current.pushBatch(current.blocks, current.theme, stepLabel, { headerBlock: header as BlockData | null, footerBlock: footer as BlockData | null }, stepMeta)
+                        } else {
+                            current.adoptServerFrame({ headerBlock: header as BlockData | null, footerBlock: footer as BlockData | null })
+                        }
+                        useEditorStore.getState().markSaved()
+                        const next = useEditorStore.getState()
+                        if (next.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: next.getDisplayBlock(next.headerBlock) })
+                        if (next.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: next.getDisplayBlock(next.footerBlock) })
+                    }
+                    if (detail.kind === 'languages') {
+                        // the language pair lives in the menu (Quick language): the store's copy follows it, and
+                        // the canvas leaves a language the site no longer has
+                        const menu = (useEditorStore.getState().headerBlock ?? {}) as { primaryLocale?: string; secondaryLocale?: string }
+                        const now = useEditorStore.getState()
+                        now.setPrimaryLocale(menu.primaryLocale || now.generationLocale || now.siteLocale)
+                        now.setSecondaryLocale(menu.secondaryLocale || null)
+                        const languages = siteLanguages(useEditorStore.getState())
+                        if (!languages.includes(useEditorStore.getState().activeLocale)) void localeSwitchRef.current(languages[0]!, { viewOnly: true })
+                        toast.success(undone ? undoneToast : t.editor.aiChat.agentLanguagesUpdated)
+                    } else if (detail.kind === 'publish') {
+                        setSite(prev => prev ? { ...prev, status: 'published' } : prev)
+                        useEditorStore.getState().markPublished()
+                        toast.success(t.editor.aiChat.agentPublished)
+                    } else {
+                        toast.success(undone ? undoneToast : detail.kind === 'nav' ? t.editor.aiChat.agentNavUpdated : t.editor.aiChat.agentPagesListUpdated)
+                    }
+                } catch (error) {
+                    console.error('[editor] reload after AI change failed', error)
+                    toast.error(t.editor.aiChat.editFailed)
+                } finally {
+                    detail.resume?.()
+                }
+                return
+            }
+            // a change to another page: that page loads fresh when opened; only its SEO is mirrored into pages[]
+            if (detail.kind !== 'theme' && detail.pageId && detail.pageId !== String(state.currentPageId ?? '')) {
+                try {
+                    if (detail.kind !== 'seo') {
+                        // that page loads fresh when opened; say what happened to it
+                        toast.success(undone ? undoneToast : t.editor.aiChat.agentPageUpdated)
+                        return
+                    }
+                    const url = new URL(`/api/sites/${siteId}/editor-data`, window.location.origin)
+                    url.searchParams.set('pageId', detail.pageId)
+                    const response = await fetch(url.toString(), { credentials: 'include', cache: 'no-store' })
+                    const data = response.ok ? await response.json() as { page?: { id?: string | number; seo?: { title?: string | null; description?: string | null } | null } } : null
+                    if (data?.page && String(data.page.id) === detail.pageId) {
+                        useEditorStore.getState().updatePageInState(detail.pageId, { seoTitle: data.page.seo?.title ?? null, seoDescription: data.page.seo?.description ?? null })
+                    }
+                } catch (error) {
+                    console.error('[editor] reading SEO after AI change failed', error)
+                } finally {
+                    detail.resume?.()
+                }
+                return
+            }
+            try {
+                const url = new URL(`/api/sites/${siteId}/editor-data`, window.location.origin)
+                if (state.currentPageId) url.searchParams.set('pageId', state.currentPageId)
+                const response = await fetch(url.toString(), { credentials: 'include', cache: 'no-store' })
+                if (!response.ok) throw new Error(`editor-data ${response.status}`)
+                const data = await response.json() as {
+                    draftVersion?: string
+                    page?: { id?: string | number; layout?: BlockData[]; seo?: { title?: string | null; description?: string | null } | null; localeContent?: Record<string, Record<string, Record<string, unknown>>> }
+                    site?: { theme?: Record<string, unknown> }
+                }
+                // editor-data falls back to the homepage when a page is gone: never load it into this page
+                if (state.currentPageId && String(data.page?.id ?? '') !== String(state.currentPageId)) throw new Error('page changed while reloading')
+                const current = useEditorStore.getState()
+                if (detail.kind === 'seo') {
+                    // SEO lives on the page record (Settings → SEO reads pages[]), not in the block history
+                    if (current.currentPageId) {
+                        current.updatePageInState(current.currentPageId, { seoTitle: data.page?.seo?.title ?? null, seoDescription: data.page?.seo?.description ?? null })
+                    }
+                    toast.success(undone ? undoneToast : t.editor.aiChat.agentSeoUpdated)
+                    return
+                }
+                if (data.draftVersion) current.setDraftVersion(data.draftVersion)
+                const editedMeanwhile = detail.heldRevision !== undefined && current.contentRevision !== detail.heldRevision
+                const nextBlocks = detail.kind === 'page' || detail.kind === 'pages' ? (data.page?.layout ?? current.blocks) : current.blocks
+                const nextTheme = detail.kind === 'theme' ? (data.site?.theme ?? current.theme) : current.theme
+                // page edits also bring the page's language slots: the server keeps the base-language copy in step,
+                // and the store's older copy would win on the canvas (and be autosaved back) otherwise
+                const withLocales = detail.kind === 'translate' || detail.kind === 'page' || detail.kind === 'pages'
+                current.pushBatch(nextBlocks, nextTheme, stepLabel, withLocales && data.page?.localeContent ? { localeOverrides: data.page.localeContent } : undefined, stepMeta)
+                // the store now equals the saved draft — nothing to autosave
+                useEditorStore.getState().markSaved()
+                if (detail.kind === 'page' || detail.kind === 'pages' || detail.kind === 'translate') {
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: useEditorStore.getState().getDisplayBlocks() })
+                } else {
+                    void handleSave({ showToast: false, refreshPreview: true })
+                }
+                // a translation writes that language's copy: show it when the site has that language
+                // (Quick language), else say where to add it — never switch to a language the site lacks
+                const translated = detail.kind === 'translate' ? detail.locale : undefined
+                const after = useEditorStore.getState()
+                const hasLanguage = translated ? siteLanguages(after).includes(translated) : false
+                const showTranslation = Boolean(translated && hasLanguage && translated !== after.activeLocale)
+                if (showTranslation) void localeSwitchRef.current(translated!, { viewOnly: true })
+                if (translated && !hasLanguage) {
+                    if (editedMeanwhile) toast.warning(t.editor.aiChat.agentEditsReplaced)
+                    else toast.info(ti(t.editor.aiChat.agentTranslationNotAdded, { language: getLocaleLabel(translated).full }))
+                    return
+                }
+                const done = detail.kind === 'theme' ? t.editor.aiChat.agentThemeUpdated : showTranslation ? t.editor.aiChat.agentTranslationShown : detail.kind === 'translate' ? t.editor.aiChat.agentTranslationUpdated : detail.kind === 'pages' ? t.editor.aiChat.agentPagesUpdated : t.editor.aiChat.agentPageUpdated
+                if (editedMeanwhile) toast.warning(t.editor.aiChat.agentEditsReplaced)
+                else toast.success(undone ? undoneToast : done)
+            } catch (error) {
+                console.error('[editor] reload after AI change failed', error)
+                toast.error(t.editor.aiChat.editFailed)
+            } finally {
+                detail.resume?.()
+            }
+        }
+        window.addEventListener(EDITOR_AI_CHANGED_EVENT, onChanged)
+        return () => window.removeEventListener(EDITOR_AI_CHANGED_EVENT, onChanged)
+    }, [editorAgentEnabled, siteId, handleSave, setPages, t, ti])
+
+    const handleUndo = useCallback(() => { void stepAndReconcile('undo') }, [stepAndReconcile])
+    const handleRedo = useCallback(() => { void stepAndReconcile('redo') }, [stepAndReconcile])
 
     // Wait for any in-flight save to complete, then save if there are pending changes.
     // Prevents publish from reading a stale draft when the user clicks Publish
@@ -2406,6 +2471,24 @@ export default function EditorPage() {
         return false
     }, [handleSave, markDirty, siteId])
 
+    // A refused publish: a field the merchant must fill → say so and offer "Show" (the field in
+    // Settings, the element on the canvas; retrying would fail the same way). Anything else → Retry.
+    // Expected refusals are not logged as errors (the dev overlay would treat them as a crash).
+    const notifyPublishFailure = useCallback((err: unknown, retry: () => void) => {
+        const detail = err instanceof Error ? err.message : undefined
+        if (err instanceof PublishError && err.needsFix) {
+            const target = err.target
+            toast.error(t.editor.toast.publishNeedsFix, {
+                description: detail,
+                duration: 12000,
+                ...(target ? { action: { label: t.editor.toast.publishShowField, onClick: () => revealInEditor(target) } } : {}),
+            })
+            return
+        }
+        if (process.env.NODE_ENV === 'development') console.warn('[Editor] Publish failed:', err)
+        toast.error(t.editor.toast.publishFailed, { description: detail, duration: 10000, action: { label: 'Retry', onClick: retry } })
+    }, [t])
+
     const handlePublish = useCallback(async () => {
         if (!siteId || isPublishing) return
         // F26-04: Block publish while translation in flight to prevent shipping mixed-language content.
@@ -2426,16 +2509,10 @@ export default function EditorPage() {
 
             // Send current store state so publish route uses authoritative client values
             // rather than relying on pending DB reads (unreliable if migration missing).
-            // F26-04: serialize header/footer in current display locale so published page
-            // renders in the chosen language (not the base/source language).
+            // As written, with their other languages inside: the live site shows the primary
+            // language through lib/i18n/locale-display, never the language on screen here.
             const snap = useEditorStore.getState()
-            const headerForPublish = snap.headerBlock ? snap.getDisplayBlock(snap.headerBlock) : null
-            const footerForPublish = snap.footerBlock ? snap.getDisplayBlock(snap.footerBlock) : null
-            const globalBlocksForPublish = snap.globalBlocks ? {
-                cartWidget: snap.globalBlocks.cartWidget ? snap.getDisplayBlock(snap.globalBlocks.cartWidget) : null,
-                whatsappButton: snap.globalBlocks.whatsappButton ? snap.getDisplayBlock(snap.globalBlocks.whatsappButton) : null,
-                socialWidget: snap.globalBlocks.socialWidget ? snap.getDisplayBlock(snap.globalBlocks.socialWidget) : null,
-            } : null
+            const { headerBlock: headerForPublish, footerBlock: footerForPublish, globalBlocks: globalBlocksForPublish } = framesAsWritten(snap)
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: currentlyPublished ? 'DELETE' : 'PATCH',
                 credentials: 'include',
@@ -2451,7 +2528,7 @@ export default function EditorPage() {
 
             if (!res.ok) {
                 const body = await res.json().catch(() => null) as PublishFailureBody
-                throw new Error(extractPublishErrorDetail(body, res.status))
+                throw publishFailure(body, res.status)
             }
 
             setPublishSuccess(true)
@@ -2499,16 +2576,7 @@ export default function EditorPage() {
 
             resetFlashAfter(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            if (process.env.NODE_ENV === 'development') console.error('[Editor] Publish failed:', err)
-            const detail = err instanceof Error ? err.message : undefined
-            toast.error(t.editor.toast.publishFailed, {
-                description: detail,
-                duration: 10000,
-                action: {
-                    label: 'Retry',
-                    onClick: () => void handlePublish(),
-                },
-            })
+            notifyPublishFailure(err, () => void handlePublish())
         } finally {
             setIsPublishing(false)
         }
@@ -2531,18 +2599,8 @@ export default function EditorPage() {
                 return
             }
 
-            // Send current store state — same pattern as handlePublish.
-            // F26: serialize header/footer/globals in the current display locale via getDisplayBlock
-            // so re-publish promotes the translated (e.g. Malay) header — NOT the raw base-language
-            // block. Sending raw here was promoting an English header on Update.
-            const snap = useEditorStore.getState()
-            const headerBlockSnap = snap.headerBlock ? snap.getDisplayBlock(snap.headerBlock) : null
-            const footerBlockSnap = snap.footerBlock ? snap.getDisplayBlock(snap.footerBlock) : null
-            const globalBlocksSnap = snap.globalBlocks ? {
-                cartWidget: snap.globalBlocks.cartWidget ? snap.getDisplayBlock(snap.globalBlocks.cartWidget) : null,
-                whatsappButton: snap.globalBlocks.whatsappButton ? snap.getDisplayBlock(snap.globalBlocks.whatsappButton) : null,
-                socialWidget: snap.globalBlocks.socialWidget ? snap.getDisplayBlock(snap.globalBlocks.socialWidget) : null,
-            } : null
+            // Send current store state — same pattern as handlePublish: as written, other languages inside.
+            const { headerBlock: headerBlockSnap, footerBlock: footerBlockSnap, globalBlocks: globalBlocksSnap } = framesAsWritten(useEditorStore.getState())
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: 'PATCH',
                 credentials: 'include',
@@ -2552,7 +2610,7 @@ export default function EditorPage() {
 
             if (!res.ok) {
                 const body = await res.json().catch(() => null) as PublishFailureBody
-                throw new Error(extractPublishErrorDetail(body, res.status))
+                throw publishFailure(body, res.status)
             }
 
             markPublished()
@@ -2587,16 +2645,7 @@ export default function EditorPage() {
 
             resetFlashAfter(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            if (process.env.NODE_ENV === 'development') console.error('[Editor] Re-publish failed:', err)
-            const detail = err instanceof Error ? err.message : undefined
-            toast.error(t.editor.toast.publishFailed, {
-                description: detail,
-                duration: 10000,
-                action: {
-                    label: 'Retry',
-                    onClick: () => void handleRepublish(),
-                },
-            })
+            notifyPublishFailure(err, () => void handleRepublish())
         } finally {
             setIsPublishing(false)
         }
@@ -2617,13 +2666,21 @@ export default function EditorPage() {
             await handleSave({ showToast: false, refreshPreview: false })
         }
 
+        // A language switch still translating belongs to the page being left: its results would land in the
+        // next page's translations. Stop it (the page's sections stay in their language until it is switched again).
+        if (localeSwitchAbortRef.current) {
+            localeSwitchAbortRef.current.abort()
+            localeSwitchAbortRef.current = null
+            setPendingLocale(null)
+        }
+
         const nextParams = new URLSearchParams(searchParams.toString())
         nextParams.set('pageId', pageId)
         router.replace(`/editor/${siteId}?${nextParams.toString()}`)
         // Force iframe refresh to show new page content
         setIframeKey(k => k + 1)
         setSelectedBlock(null)
-    }, [handleSave, router, searchParams, siteId])
+    }, [handleSave, router, searchParams, siteId, setPendingLocale])
 
     const handlePageUpdate = useCallback(async (pageId: string, changes: Partial<PageData>) => {
         try {
@@ -2729,28 +2786,45 @@ export default function EditorPage() {
 
     const closeTools = useCallback(() => setToolsSheetOpen(false), [])
 
-    // Phase 03: "■ Stop AI" — aborts the in-flight AIChatPanel request via the abort
-    // function it registers through `onStopHandlerChange` (see toolsPanelProps.chat below).
-    const handleStopAI = useCallback(() => {
-        stopAIRef.current?.()
+    // A save was refused because the draft changed elsewhere (another tab, an approved copilot change):
+    // saving has stopped so nothing newer is overwritten; the merchant reloads to continue.
+    const draftConflict = useEditorStore((s) => s.draftConflict)
+    useEffect(() => {
+        if (!draftConflict) return
+        const id = toast.error(t.editor.toast.draftChanged, {
+            duration: Infinity,
+            action: { label: t.editor.toast.reloadAction, onClick: () => window.location.reload() },
+        })
+        return () => { toast.dismiss(id) }
+    }, [draftConflict, t])
+
+    // Pages panel "Edit with AI": the page goes to the chat as its subject (the chat tab opens)
+    const askAboutPage = useCallback((pageId: string) => {
+        const page = useEditorStore.getState().pages.find((p) => String(p.id) === String(pageId))
+        askEditorAgent({ element: { kind: 'page', label: (page?.title || page?.slug || 'Page').slice(0, 80), pageId: String(pageId) } })
     }, [])
 
-    // PR #1485 review fix (C1): the compact AIChatPanel applies AI actions incrementally
-    // (and DB-saves each one) as SSE events stream in. On abort, `appliedCount` of those
-    // actions already landed — compact hides the global undo/redo pill, so this is the
-    // only recovery path. Fully revert everything the aborted stream applied, then
-    // persist the reverted state so the DB no longer holds the orphaned partial edit.
-    const handleAbortRollback = useCallback((appliedCount: number) => {
-        for (let i = 0; i < appliedCount; i++) {
-            if (!useEditorStore.getState().canUndo()) break
-            useEditorStore.getState().undo()
-        }
-        previewFrameSendRef.current?.sendToIframe({
-            type: 'UPDATE_FULL_LAYOUT',
-            bodyBlocks: useEditorStore.getState().getDisplayBlocks(),
-        })
-        void handleSave({ showToast: false, refreshPreview: false })
-    }, [handleSave])
+    // Web builder copilot: "Show" on a change (and each step of the change walker) → that place in the
+    // editor (page, Settings tab, section, the element outlined, its field pulsed); chat chips light their
+    // element up on hover; Ask AI on an element opens the chat. See lib/editor/reveal.
+    useEditorReveal({
+        enabled: editorAgentEnabled,
+        isCompactLayout,
+        closeTools,
+        selectBlock: handleBlockSelectWithContext,
+        selectPage: handlePageSelected,
+        switchLocale: (locale) => localeSwitchRef.current(locale, { viewOnly: true }),
+        languageNotAdded: (locale) => ti(t.editor.aiChat.agentTranslationNotAdded, { language: getLocaleLabel(locale).full }),
+        requestSettingsTab: (request) => setSettingsRequestedTab({ ...request, key: Date.now() }),
+        sendToIframe: (message) => previewFrameSendRef.current?.sendToIframe(message),
+        openChat: () => {
+            if (isCompactLayout) return openTools('chat')
+            setActiveSidebarTab('chat')
+            if (!useWorkspaceStore.getState().leftSidebarVisible) useWorkspaceStore.getState().toggleLeft()
+        },
+        // read when a reveal runs (copilot on), not on every render
+        labels: () => ({ changed: t.editor.elementAsk.walker.changed, missing: t.editor.aiChat.agentLocateMissing }),
+    })
 
     // Lifted from the inline onHeaderUpdate/onFooterUpdate closures previously in the
     // compact branch's SettingsPanel mount (bodies copied verbatim) so CompactEditorLayout
@@ -2795,29 +2869,23 @@ export default function EditorPage() {
     }, [siteId, setPages])
 
     const sidebarTabs = [
-        { id: 'chat' as const, label: t.editor.sidebar.aiChat, icon: <MessageCircle className="h-4 w-4" aria-hidden /> },
+        // the AI chat tab only where the assistant runs (isAiAgentEnabled)
+        ...(editorAgentEnabled ? [{ id: 'chat' as const, label: t.editor.sidebar.aiChat, icon: <MessageCircle className="h-4 w-4" aria-hidden /> }] : []),
         { id: 'components' as const, label: t.editor.sidebar.components, icon: <Zap className="h-4 w-4" aria-hidden /> },
         { id: 'pages' as const, label: t.editor.sidebar.pages, icon: <FileText className="h-4 w-4" aria-hidden /> },
     ]
+    // without the assistant the editor opens on Components, not on a chat tab that is not there
+    useEffect(() => {
+        if (!editorAgentEnabled && activeSidebarTab === 'chat') setActiveSidebarTab('components')
+    }, [editorAgentEnabled, activeSidebarTab])
 
     const sidebarContent = (
         <>
-            {activeSidebarTab === 'chat' ? (
-                <AIChatPanel
-                    siteId={siteId}
-                    blocks={blocks}
-                    selectedBlock={selectedBlock}
-                    onAIAction={handleAIAction}
-                    onUndoLastAction={handleUndo}
-                    siteName={siteName || site?.name || ''}
-                    theme={theme}
-                    currentPageSlug={page?.slug || 'home'}
-                    currentPageTitle={currentPageTitle}
-                    externalActivity={chatActivity}
-                    blockContext={chatBlockContext}
-                    onBlockContextDismiss={() => setChatBlockContext(null)}
-                    compact={isCompactLayout}
-                />
+            {/* the copilot chat stays mounted on other tabs: its stream and open chat survive a tab switch */}
+            {editorAgentEnabled ? (
+                <div className={cn('h-full', activeSidebarTab !== 'chat' && 'hidden')}>
+                    <EditorAiChatSlot siteId={siteId} />
+                </div>
             ) : null}
 
             {activeSidebarTab === 'components' ? (
@@ -2830,7 +2898,6 @@ export default function EditorPage() {
                         handleBlockSelectWithContext(-1, blockType)
                         if (!rightSidebarVisible) useWorkspaceStore.getState().toggleRight()
                     }}
-                    onAutoTranslate={handleAutoTranslate}
                 />
             ) : null}
 
@@ -2841,7 +2908,7 @@ export default function EditorPage() {
                     siteStatus={site?.status}
                     onPageSelected={handlePageSelected}
                     onPagesChanged={handlePagesChanged}
-                    onEditPage={() => setActiveSidebarTab('chat')}
+                    onEditPage={editorAgentEnabled ? askAboutPage : undefined}
                 />
             ) : null}
         </>
@@ -2853,26 +2920,7 @@ export default function EditorPage() {
     // business logic, mirrors the Phase 02 precedent where CompactEditorLayout's
     // block-settings sheet already duplicates the desktop SettingsPanel mount this way.
     const toolsPanelProps: ToolsSheetPanelProps = {
-        chat: {
-            siteId,
-            blocks,
-            selectedBlock,
-            onAIAction: handleAIAction,
-            onUndoLastAction: handleUndo,
-            siteName: siteName || site?.name || '',
-            theme,
-            currentPageSlug: page?.slug || 'home',
-            currentPageTitle,
-            externalActivity: chatActivity,
-            blockContext: chatBlockContext,
-            onBlockContextDismiss: () => setChatBlockContext(null),
-            compact: true,
-            onProcessingChange: setAiRunning,
-            onStopHandlerChange: (stop) => { stopAIRef.current = stop },
-            onAbortRollback: handleAbortRollback,
-            onRequestStop: handleStopAI,
-            externalProcessing: aiRunning,
-        },
+        chat: { siteId },
         components: {
             blocks,
             selectedBlock,
@@ -2896,7 +2944,6 @@ export default function EditorPage() {
                     setIsMobileSettingsOpen(true)
                 }
             },
-            onAutoTranslate: handleAutoTranslate,
             isCompact: true,
         },
         pages: {
@@ -2909,7 +2956,7 @@ export default function EditorPage() {
                 closeTools()
             },
             onPagesChanged: handlePagesChanged,
-            onEditPage: () => openTools('chat'),
+            onEditPage: editorAgentEnabled ? askAboutPage : undefined,
         },
         settings: {
             block: null,
@@ -2959,37 +3006,8 @@ export default function EditorPage() {
         isLoading,
         viewport,
         selectedBlock,
-        onBlockAIEdit: (blockIndex, blockType) => {
-            setActiveSidebarTab('chat')
-            setChatBlockContext({ blockIndex, blockType })
-        },
         onDeleteBlock: handleDeleteBlock,
         onDuplicateBlock: handleDuplicateBlock,
-        onInlineEditApplied: async (content, blockIndex, detail) => {
-            setSelectedBlock(blockIndex)
-            setActiveSidebarTab('chat')
-            // BUG-F05-13: Show instruction + result separately in chat
-            if (detail) {
-                setChatActivity({
-                    id: `inline-req-${Date.now()}`,
-                    content: `✏️ **${detail.blockType}**: ${detail.instruction}`,
-                })
-                setTimeout(() => {
-                    setChatActivity({
-                        id: `inline-res-${Date.now()}`,
-                        content: `✅ "${detail.originalText}" → "${detail.rewrittenText}"`,
-                    })
-                }, 100)
-            } else {
-                setChatActivity({
-                    id: `inline-${Date.now()}`,
-                    content,
-                })
-            }
-            // Inline edit already pushed UPDATE_BLOCK_DATA during editing session
-            // — no iframe reload needed, just persist to DB.
-            await handleSave({ showToast: false, refreshPreview: false })
-        },
         onReorderBlocks: handleReorderBlocks,
         onBlockDrop: handleBlockDrop,
         onImageReplaced: async () => {
@@ -3098,9 +3116,11 @@ export default function EditorPage() {
                 publishSuccess={publishSuccess}
                 canUndo={!isTemplateApplyPending && canUndo()}
                 canRedo={!isTemplateApplyPending && canRedo()}
+                undoStepLabel={undoStepLabel}
+                redoStepLabel={redoStepLabel}
                 viewport={viewport}
                 compact={isCompactLayout}
-                aiRunning={aiRunning || isTemplateApplyPending}
+                busy={isTemplateApplyPending}
                 onOpenMenu={() => { if (!templateApplyPendingRef.current) setIsMenuOpen(true) }}
                 onOpenTemplates={() => { if (!templateApplyPendingRef.current) setIsTemplateModalOpen(true) }}
                 onPageSelected={handlePageSelected}
@@ -3171,8 +3191,7 @@ export default function EditorPage() {
                         onCloseTools={closeTools}
                         onToolsTabChange={setToolsSheetTab}
                         toolsPanelProps={toolsPanelProps}
-                        aiRunning={aiRunning}
-                        onStopAI={handleStopAI}
+                        busy={isTemplateApplyPending}
                         onCopyLink={handleCopyLink}
                     />
                 </div>
@@ -3198,7 +3217,7 @@ export default function EditorPage() {
                     </div>
 
                     <div
-                        className={cn('flex flex-1 flex-col transition-opacity duration-200', isTransitioning && 'opacity-0')}
+                        className={cn('relative flex flex-1 flex-col transition-opacity duration-200', isTransitioning && 'opacity-0')}
                         data-template-transition="desktop"
                         data-template-apply-pending={isTemplateApplyPending ? 'true' : 'false'}
                     >
@@ -3206,6 +3225,7 @@ export default function EditorPage() {
                             {...previewFrameSharedProps}
                             onBlockSelect={handleBlockSelectWithContext}
                         />
+                        {editorAgentEnabled && <ChangeWalker />}
                     </div>
 
                     <div
@@ -3337,7 +3357,7 @@ export default function EditorPage() {
                 }}
                 onApplyPending={() => {
                     templateApplyPendingRef.current = true
-                    templateSwapRevisionRef.current = crypto.randomUUID()
+                    templateSwapRevisionRef.current = uuid()
                     setIsTemplateApplyPending(true)
                     if (footerUpdateSaveTimerRef.current) {
                         clearTimeout(footerUpdateSaveTimerRef.current)
