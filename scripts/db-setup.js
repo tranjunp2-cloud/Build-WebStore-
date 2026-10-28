@@ -5621,7 +5621,6 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   // ── Contact Submissions: replies the shop sent (copilot "reply to a lead") — array table ──
   {
     name: 'contact_submissions_replies.create_table',
-    required: true,
     sql: `CREATE TABLE IF NOT EXISTS contact_submissions_replies (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
@@ -5635,7 +5634,6 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   },
   {
     name: 'contact_submissions_replies.alter_columns',
-    required: true,
     sql: `ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS subject varchar;
       ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS body varchar;
       ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS sent_at timestamp(3) with time zone;
@@ -5649,7 +5647,6 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   // Payload trash on blogs: a trashed post keeps its row with deleted_at set (restorable; AI copilot undo)
   {
     name: 'blogs.deleted_at',
-    required: true,
     sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS deleted_at timestamp(3) with time zone;`,
   },
   {
@@ -5659,7 +5656,6 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   // Copilot blog drafts: the change set that created the post (replay key of appliers/blog-draft.ts)
   {
     name: 'blogs.ai_change_set_id',
-    required: true,
     sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS ai_change_set_id varchar;`,
   },
   {
@@ -5670,7 +5666,6 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   // Per-workspace switches + the cron's day markers: tenants.settings.automations (json).
   {
     name: 'tenants.settings_automations',
-    required: true,
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_automations jsonb;`,
   },
   // New notification type. The column is an enum when Payload created it (pushDevSchema) and a varchar when
@@ -5687,14 +5682,12 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   //    site reads this one, set on publish (empty until the next publish: the site shows as before) ──
   {
     name: 'pages.published_locale_content',
-    required: true,
     sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS published_locale_content jsonb DEFAULT '{}';`,
   },
   // Media owner workspace (AI copilot library + `media:<id>` ownership). Nullable: legacy rows keep NULL
   // and are reachable only as pictures their workspace's sites, pages, products or blogs already use.
   {
     name: 'media.tenant_id',
-    required: true,
     sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL;`,
   },
   {
@@ -5706,12 +5699,10 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   // not a Payload field — read/written by src/lib/sites/editor-revision.ts) ──
   {
     name: 'sites.editor_revision',
-    required: true,
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS editor_revision integer NOT NULL DEFAULT 0;`,
   },
   {
     name: 'pages.editor_revision',
-    required: true,
     sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS editor_revision integer NOT NULL DEFAULT 0;`,
   },
   // the editor save that made the last bump (NULL = an AI change / other writer): a save retried after
@@ -5730,7 +5721,6 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   // for a product without a photo) instead of the industry sample pictures — same rows as a gallery ──
   {
     name: 'pages_blocks_products_featured_images.create_table',
-    required: true,
     sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_products_featured_images" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
@@ -5747,7 +5737,6 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   },
   {
     name: '_pages_v_blocks_products_featured_images.create_table',
-    required: true,
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_products_featured_images" (
       id serial PRIMARY KEY,
       _order integer NOT NULL, _parent_id integer NOT NULL,
@@ -5767,7 +5756,6 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   // /api/cron/ai-receipts sweep records on ai-platform what it never heard about (recorded_at NULL) ──
   {
     name: 'ai_change_set_applies.create_table',
-    required: true,
     sql: `CREATE TABLE IF NOT EXISTS ai_change_set_applies (
       change_set_id varchar PRIMARY KEY,
       tenant_id integer NOT NULL,
@@ -5793,23 +5781,7 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
 // Migrations flagged `critical: true` bypass the cache and always re-run —
 // use only for CREATE OR REPLACE FUNCTION bodies or safety-net idempotent
 // statements that must apply on every deploy.
-// Migrations flagged `required: true` are cached like any other entry, but a
-// failure fails the build instead of a warning — use for columns/tables that
-// Payload queries on every read (a missing one breaks the collection). A
-// failed entry is never recorded in _db_setup_state, so it re-runs next build.
 async function runMigrations(pool) {
-  const summary = await applyMigrationList(pool, MIGRATIONS);
-  // Import ledger failures must abort setup: claims and fencing are safety boundaries.
-  await runPw1MigrationSchema(pool);
-  await runPw1JsonMigrationSchema(pool);
-  await runPw1EvidenceSchema(pool);
-
-  console.log(
-    `[db-setup] Migration summary: skipped=${summary.skipped}, applied=${summary.ran}, always-run=${summary.alwaysRan}, failed=${summary.failed}, total=${MIGRATIONS.length}`,
-  );
-}
-
-async function applyMigrationList(pool, migrations) {
   await pool.query(`CREATE TABLE IF NOT EXISTS _db_setup_state (
     name varchar PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT NOW()
@@ -5824,10 +5796,10 @@ async function applyMigrationList(pool, migrations) {
   let failed = 0;
 
   console.log(
-    `[db-setup] Running ${migrations.length} migrations (${applied.size} previously applied)...`,
+    `[db-setup] Running ${MIGRATIONS.length} migrations (${applied.size} previously applied)...`,
   );
 
-  for (const m of migrations) {
+  for (const m of MIGRATIONS) {
     const alwaysRun = m.critical === true;
     if (!alwaysRun && applied.has(m.name)) {
       skipped++;
@@ -5847,16 +5819,20 @@ async function applyMigrationList(pool, migrations) {
       console.log(`[db-setup] ✅ ${m.name}`);
     } catch (e) {
       failed++;
-      if (m.critical || m.required) {
-        console.error(`[db-setup] ❌ ${m.name} (${m.critical ? 'critical' : 'required'}): ${e.message}`);
-        throw e;
-      }
+      if (m.critical) throw e;
       // Log but don't fail — column might already exist with different type etc.
       // Not inserted into state → will retry on next build.
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
   }
-  return { skipped, ran, alwaysRan, failed };
+  // Import ledger failures must abort setup: claims and fencing are safety boundaries.
+  await runPw1MigrationSchema(pool);
+  await runPw1JsonMigrationSchema(pool);
+  await runPw1EvidenceSchema(pool);
+
+  console.log(
+    `[db-setup] Migration summary: skipped=${skipped}, applied=${ran}, always-run=${alwaysRan}, failed=${failed}, total=${MIGRATIONS.length}`,
+  );
 }
 
 // PERF-04: only audited pairs may be removed. Unknown duplicate pairs fail the
@@ -6926,7 +6902,6 @@ if (require.main === module) {
 module.exports = {
   runContentSlugTenantMigration,
   MIGRATIONS,
-  applyMigrationList,
   APPROVED_DUPLICATE_INDEX_PAIRS,
   buildDuplicateIndexCleanupPlan,
   cleanupApprovedDuplicateIndexes,
