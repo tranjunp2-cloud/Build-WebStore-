@@ -2,7 +2,13 @@
 // when the build has a database URL. Builds without one (e.g. a preview with no database)
 // still deploy; they just cannot serve requests that need the database.
 import { spawnSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+
+// The service is only a function (api/index.js + vercel.json rewrites), but a project with no
+// framework fails `vercel build` with "No Output Directory named public found". An empty
+// public/ satisfies that check without serving any file statically (dist/ stays private).
+mkdirSync(fileURLToPath(new URL("../public", import.meta.url)), { recursive: true });
 
 if (!process.env.AI_PLATFORM_DATABASE_URL) {
 	console.log("[ai-platform] AI_PLATFORM_DATABASE_URL is not set for this build: skipping migrations");
