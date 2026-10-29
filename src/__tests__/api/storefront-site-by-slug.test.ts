@@ -66,4 +66,17 @@ describe('GET /api/storefront/site-by-slug [TC-F05-11-12]', () => {
         expect(res.status).toBe(400)
         expect(mockFind).not.toHaveBeenCalled()
     })
+
+    it('[TC-F09.269] never returns the bank account details (GH-2077)', async () => {
+        mockFind
+            .mockResolvedValueOnce({ docs: [{ id: 42 }] })
+            .mockResolvedValueOnce({ docs: [{ id: 99, paymentConfig: { bankName: 'CIMB', bankAccountNo: '9876543210', bankAccountHolder: 'Hehe Sdn Bhd' } }] })
+        mockFindByID.mockResolvedValueOnce({ id: 42, payments: { payment_qr: true } })
+        const res = await GET(new Request('http://localhost/api/storefront/site-by-slug?slug=mybakery'))
+        const body = await res.json()
+        expect(res.status).toBe(200)
+        expect(JSON.stringify(body)).not.toContain('9876543210')
+        expect(body).not.toHaveProperty('bankAccountNo')
+        expect(body).not.toHaveProperty('bankAccountHolder')
+    })
 })

@@ -592,6 +592,20 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.263** | Unit | High | Tenant không có phương thức thanh toán: hiện thông báo trong trang, nút Place order vẫn disabled khi form đủ | Có `role="alert"` "Checkout unavailable"; form vẫn hiển thị; nút disabled | PR #1997 | [x] |
 | **TC-F09.264** | Unit | Medium | Control: tenant có phương thức thanh toán, form đủ | Không có thông báo; nút Place order enabled | PR #1997 | [x] |
 
+### TC-F09.265–269: Storefront không lộ secret / số tài khoản (GH-2077)
+
+> **File test nguồn:** `src/__tests__/unit/storefront/public-site-dto.test.ts`, `src/__tests__/api/storefront-site-by-slug.test.ts`
+>
+> Mọi trang storefront đưa site/page/pages qua `toPublicSite` / `toPublicDoc` (`src/lib/storefront/public-site-dto.ts`) trước khi render: site chỉ giữ field allow-list, mọi `tenant` đã populate thu về id.
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.265** | Unit | Critical | `toPublicSite` chỉ giữ field render | Không còn tenant secret, paymentConfig, shippingConfig, brief AI, trackedKeywords; tenant = id | GH-2077 | [x] |
+| **TC-F09.266** | Unit | Critical | `toPublicDoc` thu `tenant` đã populate ở mọi độ sâu | `page.tenant`, `media.tenant` → id | GH-2077 | [x] |
+| **TC-F09.267** | Unit | Critical | `page.site` đã populate → site public | Không còn secret trong JSON | GH-2077 | [x] |
+| **TC-F09.268** | Unit | Medium | Giá trị thường / tenant id giữ nguyên | Bản sao, bằng giá trị | GH-2077 | [x] |
+| **TC-F09.269** | Unit | Critical | `/api/storefront/site-by-slug` không trả số tài khoản | Không có `bankAccountNo` / `bankAccountHolder` | GH-2077 | [x] |
+
 ### TC-F09.64: Product component variant guard
 
 | ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |

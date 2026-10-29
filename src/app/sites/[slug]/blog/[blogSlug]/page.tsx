@@ -18,6 +18,7 @@ import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 import { hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
 import { proseThemeVars } from '@/lib/theme/prose-theme'
+import { toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 
 export const dynamic = 'force-dynamic'
 
@@ -166,7 +167,7 @@ export default async function BlogDetailPage({ params }: Props) {
         typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
     ) ?? []).includes(String(tenant.id))
 
-    const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
+    const siteWithContext = toPublicSite({ ...site, tenantSlug: slug, siteBasePath: base })
 
     const origin = resolveStorefrontOrigin(tenant as any, { fallbackHostname: tenantHostname, slug })
     const articleJsonLd = origin ? {
@@ -194,7 +195,7 @@ export default async function BlogDetailPage({ params }: Props) {
     return (
         <SiteLayoutShell
             site={siteWithContext as SiteRendererProps['site']}
-            pages={pages as unknown as NavPage[]}
+            pages={toPublicDoc(pages) as unknown as NavPage[]}
             isOwner={isOwner}
         >
             <ScrollToTop />

@@ -13,6 +13,7 @@ import type { Metadata } from 'next'
 import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRenderer'
 import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
 import type { SiteData } from '@/blocks/types'
+import { toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 import type { PageData } from '@/store/editorStore'
 import { StorefrontBlogList } from '@/components/site-renderer/StorefrontBlogList'
 import DOMPurify from 'isomorphic-dompurify'
@@ -379,9 +380,9 @@ export default async function TenantSitePage({ params }: Props) {
         <ScrollToTop />
         <LiveLanguageProvider languages={languages} active={language}>
             <SiteRenderer
-                site={{ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
-                page={page as unknown as PageData}
-                pages={pages as unknown as NavPage[]}
+                site={toPublicSite({ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 }) as unknown as SiteData}
+                page={toPublicDoc(page) as unknown as PageData}
+                pages={toPublicDoc(pages) as unknown as NavPage[]}
                 siteId={String(site.id)}
                 isOwner={isOwner}
             />

@@ -23,9 +23,6 @@ type InitialSiteData = {
     merchantQrCodeUrl: string | null
     enableCod: boolean
     enableQrBanking: boolean
-    bankName: string | null
-    bankAccountNo: string | null
-    bankAccountHolder: string | null
     shippingConfig: ShippingConfig | null
     cardEnabled: boolean
     fpxEnabled: boolean
@@ -129,9 +126,6 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
                         : null,
                     enableCod: codEnabled,
                     enableQrBanking: qrEnabled,
-                    bankName: paymentConfig?.bankName ?? null,
-                    bankAccountNo: paymentConfig?.bankAccountNo ?? null,
-                    bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
                     shippingConfig: (site as any).shippingConfig ?? null,
                     cardEnabled: tenantCardEnabled && siteCardEnabled,
                     fpxEnabled: tenantFpxEnabled && siteFpxEnabled,
