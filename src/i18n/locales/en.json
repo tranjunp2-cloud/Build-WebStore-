@@ -1149,6 +1149,15 @@
         "undoSuccess": "Batch fix undone",
         "errorTimeout": "The AI fix took too long. Please try again.",
         "errorFailed": "Couldn't finish the AI fix. Please try again.",
+        "errorQuota": "The AI usage limit was reached. Please try again later.",
+        "errorUnavailable": "The AI service isn't available right now. Please try again in a moment.",
+        "partialFailed": "{count} items couldn't be generated: {names} ({reason})",
+        "andMore": "+{count} more",
+        "reasonTimeout": "the AI took too long",
+        "reasonQuota": "AI usage limit reached",
+        "reasonUnavailable": "AI unavailable",
+        "reasonFailed": "generation failed",
+        "retryFailed": "Retry failed items",
         "undoPartial": "Some fixes could not be undone. The remaining changes are ready to retry."
       },
       "keywordTracker": {

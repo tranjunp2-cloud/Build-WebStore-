@@ -118,6 +118,8 @@ async function generateMetaOnPlatform(
         const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('[AI] SEO Meta Generation failed:', message)
         await finishCapture(cap, { status: 'failed', error: message })
-        throw new Error(`AI meta generation failed: ${message}`)
+        // `cause` keeps the original name/status (AiClientError, TimeoutError) for
+        // callers that classify the failure; the message is unchanged.
+        throw new Error(`AI meta generation failed: ${message}`, { cause: error })
     }
 }

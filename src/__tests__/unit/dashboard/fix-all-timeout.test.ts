@@ -2,7 +2,7 @@
  * Unit Tests — Fix-All SSE Timeout & Retry
  * Coverage Map (QA Doc Traceability):
  *   TC-F03.39  → SSE retry directive
- *   TC-F03.40  → 15s timeout sends error event
+ *   TC-F03.40  → overall budget timeout sends error event
  *   TC-F03.41  → stream closes gracefully on timeout
  */
 
@@ -56,6 +56,7 @@ vi.mock('@/lib/seo/local-seo-evaluation', () => ({
 }))
 
 import { POST } from '@/app/api/seo/fix-all/route'
+import { FIX_ALL_TIMEOUT_MS } from '@/lib/seo/fix-all-protocol'
 
 function makeRequest(
     missingSeo: Array<{
@@ -188,15 +189,15 @@ describe('Fix-All SSE Timeout & Retry [TC-F03.39, TC-F03.40, TC-F03.41]', () => 
         expect(dataEvents.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('[TC-F03.41] timeout sends error event after 15s', async () => {
-        // Arrange — AI takes 20s per item
+    it('[TC-F03.41] timeout sends error event after the overall budget', async () => {
+        // Arrange — AI outlives the whole budget
         vi.useFakeTimers()
         mockGenerateAutoSEOMeta.mockImplementation(
             () =>
                 new Promise((resolve) =>
                     setTimeout(
                         () => resolve({ title: 'T', description: 'D' }),
-                        20_000,
+                        FIX_ALL_TIMEOUT_MS + 5_000,
                     ),
                 ),
         )
@@ -219,17 +220,20 @@ describe('Fix-All SSE Timeout & Retry [TC-F03.39, TC-F03.40, TC-F03.41]', () => 
         const first = await reader.read()
         expect(decoder.decode(first.value)).toContain('retry: 3000')
 
-        // Advance past 15s timeout
-        vi.advanceTimersByTime(15_001)
+        // Advance past the overall budget (keep-alive comments are interleaved)
+        vi.advanceTimersByTime(FIX_ALL_TIMEOUT_MS + 1)
 
-        // Read timeout error event
-        const second = await reader.read()
-        const text = decoder.decode(second.value)
+        // Read until the timeout error event
+        let text = ''
+        for (let i = 0; i < 10 && !text.includes('"error":"timeout"'); i += 1) {
+            const chunk = await reader.read()
+            text = chunk.value ? decoder.decode(chunk.value) : ''
+        }
         expect(text).toContain('"error":"timeout"')
 
         // Stream should be closed
-        const third = await reader.read()
-        expect(third.done).toBe(true)
+        const last = await reader.read()
+        expect(last.done).toBe(true)
 
         vi.useRealTimers()
     })
