@@ -84,7 +84,7 @@ describe("tools per capability set [TC-AIREL-32]", () => {
 
 		// Assert
 		expect(Object.keys(TOOL_CAPABILITIES).sort()).toEqual([...Object.keys(all), ...shopOnly].sort());
-		expect(shopOnly).toEqual(["propose_shop_product_update", "propose_shop_product_status", "propose_shop_product_drafts"]);
+		expect(shopOnly).toEqual(["propose_shop_product_update", "propose_shop_product_status", "propose_shop_product_drafts", "propose_shop_products_setup"]);
 		expect(offered).toEqual(Object.keys(all));
 		// everything except the opt-in shop_products tools (counted from the map: a new tool needs no new number here)
 		expect(offered).toHaveLength(Object.keys(TOOL_CAPABILITIES).length - shopOnly.length);

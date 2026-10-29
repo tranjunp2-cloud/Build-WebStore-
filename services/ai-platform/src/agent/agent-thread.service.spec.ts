@@ -11,6 +11,7 @@ import { ChangeSetDecisionService } from "./change-set-decision.service";
 import { MERCHANT_INSTRUCTIONS } from "./merchant-tools";
 import { boundTurns, draftTitle, historyMessages, threadTitle, type ThreadTurn } from "./thread-memory";
 import { ThreadRetentionService } from "./thread-retention.service";
+import { replyLanguageNote } from "./message-language";
 
 type CallOptions = Parameters<MockLanguageModelV4["doGenerate"]>[0];
 type Turn = { toolCall: { name: string; input: unknown } } | { text: string };
@@ -210,7 +211,7 @@ describe("copilot threads — conversation memory [TC-AICP-37]", () => {
 		const first = await runs.start(ctx, { prompt: "Create draft products: Batik scarf, Silk tudung", context: { module: "products" } }, noop);
 		const firstUser = lastUserText(model.doGenerateCalls[0] as CallOptions);
 		expect(firstUser).toBe(
-			'Context: the merchant is on the "products" page, UI locale en-MY. Today is 2026-10-20.\n\nCreate draft products: Batik scarf, Silk tudung',
+			'Context: the merchant is on the "products" page, UI locale en-MY. Today is 2026-10-20. Reply language: English (from this message).\n\nCreate draft products: Batik scarf, Silk tudung\n\n' + replyLanguageNote("English"),
 		);
 
 		vi.setSystemTime(new Date("2026-10-21T08:00:00Z"));
@@ -230,7 +231,7 @@ describe("copilot threads — conversation memory [TC-AICP-37]", () => {
 				content: [
 					{
 						type: "text",
-						text: `Drafted 2 products for your approval.\n[Staged draft ${csId}: Create 2 draft products — Batik scarf, Silk tudung]`,
+						text: `Drafted 2 products for your approval.\n<staged_draft id="${csId}">Create 2 draft products — Batik scarf, Silk tudung</staged_draft>`,
 					},
 				],
 			},
@@ -240,7 +241,7 @@ describe("copilot threads — conversation memory [TC-AICP-37]", () => {
 					{
 						type: "text",
 						// a day later the earlier draft has expired: the line says what became of it
-						text: `Context: the merchant is on the "blog" page, UI locale en-MY. Today is 2026-10-21.\nDrafts from earlier messages: ${csId} "Create 2 draft products": expired\n\nMake the second one's description shorter`,
+						text: `Context: the merchant is on the "blog" page, UI locale en-MY. Today is 2026-10-21. Reply language: English (from this message).\nDrafts from earlier messages: ${csId} "Create 2 draft products": expired\n\nMake the second one's description shorter\n\n${replyLanguageNote("English")}`,
 					},
 				],
 			},

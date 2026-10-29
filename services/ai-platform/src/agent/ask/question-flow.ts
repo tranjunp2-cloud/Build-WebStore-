@@ -55,7 +55,8 @@ type FlowStep =
 	| { id: string; kind: "images"; question: AgentQuestion; search: { query: string; source: "stock" | "library" | "both"; forProduct?: boolean } }
 	| { id: string; kind: "attribute"; code: string }
 	| { id: "variants"; kind: "variants" }
-	| { id: string; kind: "choice"; question: AgentQuestion };
+	| { id: string; kind: "choice"; question: AgentQuestion }
+	| { id: string; kind: "quantities"; question: AgentQuestion };
 
 /** Serializable flow of one `ask_user` call — stored with the paused run. */
 export interface FlowState {
@@ -113,7 +114,8 @@ export interface ProductFlowResult {
 }
 
 export interface CustomFlowResult {
-	answers: Array<{ id: string; question: string; answer: string }>;
+	/** `rows`: a quantities question's numbers keyed by row id (rows left empty are absent) */
+	answers: Array<{ id: string; question: string; answer: string; rows?: Record<string, number> }>;
 }
 
 function plain(decision: Decision | undefined): PlainDecision | undefined {
@@ -229,13 +231,37 @@ export class QuestionFlowService {
 					state.steps.push(step);
 					continue;
 				}
+				const label = question.title.length > 40 ? `${question.title.slice(0, 39)}…` : question.title;
+				if (question.table) {
+					// one number per row: the rows are the items to count, never answers the model made up
+					const rows = uniqueRows(question.table.rows);
+					state.steps.push({
+						id: `q_${question.id}`,
+						kind: "quantities",
+						question: {
+							id: `q_${question.id}`,
+							kind: "quantities",
+							label,
+							title: question.title,
+							why: question.why ?? undefined,
+							options: [],
+							multiple: false,
+							allowText: false,
+							allowSkip: true,
+							rows,
+							...(question.table.unit ? { unit: question.table.unit } : {}),
+							...(question.table.decimals ? { decimals: true } : {}),
+						},
+					});
+					continue;
+				}
 				state.steps.push({
 					id: `q_${question.id}`,
 					kind: "choice",
 					question: {
 						id: `q_${question.id}`,
 						kind: "choice",
-						label: question.title.length > 40 ? `${question.title.slice(0, 39)}…` : question.title,
+						label,
 						title: question.title,
 						why: question.why ?? undefined,
 						options: question.options,
@@ -306,6 +332,8 @@ export class QuestionFlowService {
 			state.answers.push(
 				this.answered(step.id, "images", step.question.label, images.map((i) => i.id), images.length ? display : "", images.length ? "you" : "skipped"),
 			);
+		} else if (step.kind === "quantities") {
+			state.answers.push(this.quantitiesAnswer(step, input));
 		} else {
 			state.answers.push(
 				this.answered(step.id, "choice", step.question.label, values, text ?? pickedLabels.join(", "), input.skip ? "skipped" : "you"),
@@ -415,6 +443,29 @@ export class QuestionFlowService {
 	}
 
 	// ── internals ────────────────────────────────────────────────────────
+
+	/**
+	 * The numbers of a quantities card. Only rows the question has are kept (an id it never offered is a
+	 * refusal, not a silent drop: the answer may be for another question); a row left empty stays out.
+	 */
+	private quantitiesAnswer(step: Extract<FlowStep, { kind: "quantities" }>, input: AnswerInput): AnsweredQuestion {
+		const { label, rows: offered = [], unit, decimals } = step.question;
+		if (input.skip) return this.answered(step.id, "quantities", label, [], "", "skipped");
+		const given = input.rows ?? {};
+		const byId = new Map(offered.map((row) => [row.id, row]));
+		const unknown = Object.keys(given).filter((id) => !byId.has(id));
+		if (unknown.length > 0) throw new FlowError("These numbers don't match the question. Reload the chat and answer again.");
+		// in the card's order, so the display and the tool result read the way the card did
+		const ordered = offered.filter((row) => given[row.id] !== undefined);
+		if (ordered.length === 0) throw new FlowError("Fill in at least one number, or skip.");
+		if (!decimals && ordered.some((row) => !Number.isInteger(given[row.id]))) throw new FlowError("Enter whole numbers.");
+		const rows = Object.fromEntries(ordered.map((row) => [row.id, given[row.id] as number]));
+		const display = ordered.map((row) => `${row.label}: ${rows[row.id]}${unit ? ` ${unit}` : ""}`).join(" · ");
+		return {
+			...this.answered(step.id, "quantities", label, ordered.map((row) => row.id), display.length > 400 ? `${display.slice(0, 399)}…` : display, "you"),
+			rows,
+		};
+	}
 
 	private answered(
 		questionId: string,
@@ -534,7 +585,7 @@ export class QuestionFlowService {
 			if (step.kind === "attribute") labels.push(state.suggested[`label:${step.code}`] ?? step.code);
 			else if (step.kind === "variants") labels.push("variants");
 			else if (step.kind === "images") labels.push("photos");
-			else if (step.kind === "choice") labels.push(step.question.label);
+			else if (step.kind === "choice" || step.kind === "quantities") labels.push(step.question.label);
 		}
 		return labels;
 	}
@@ -794,10 +845,15 @@ export class QuestionFlowService {
 					question: a.label,
 					answer:
 						a.source === "skipped"
-							? "(skipped — decide yourself)"
+							? a.kind === "images"
+								? "(skipped — no photos for now: do not search for or generate pictures for this, continue without them)"
+								: "(skipped — decide yourself)"
 							: a.kind === "images"
 								? `photos picked, use these image ids in order (first = cover): ${JSON.stringify(a.values)}`
-								: a.display,
+								: a.kind === "quantities"
+									? quantitiesText(a, state)
+									: a.display,
+					...(a.kind === "quantities" && a.rows ? { rows: a.rows } : {}),
 				})),
 			};
 		}
@@ -843,6 +899,23 @@ export class QuestionFlowService {
 }
 
 export class FlowError extends Error {}
+
+/** A quantities question's rows with a unique id each (the model may repeat one); the first wins. */
+function uniqueRows(rows: ReadonlyArray<{ id: string; label: string }>): NonNullable<AgentQuestion["rows"]> {
+	const seen = new Set<string>();
+	return rows.filter((row) => !seen.has(row.id) && seen.add(row.id)).map((row) => ({ id: row.id, label: row.label }));
+}
+
+/** What the model reads for a quantities answer: the merchant's numbers by row id, and the rows they left empty. */
+function quantitiesText(answer: AnsweredQuestion, state: FlowState): string {
+	const rows = state.steps.flatMap((step) => (step.kind === "quantities" && step.id === answer.questionId ? (step.question.rows ?? []) : []));
+	const given = answer.rows ?? {};
+	const empty = rows.filter((row) => given[row.id] === undefined).map((row) => row.id);
+	return (
+		`numbers the merchant typed, by row id: ${JSON.stringify(given)}` +
+		(empty.length > 0 ? `; left empty (change nothing for these): ${JSON.stringify(empty)}` : "")
+	);
+}
 
 /** This chat's pictures (Pixabay finds, generated ones, earlier picks) as options of a product's photo question. */
 function chatPictureOptions(state: FlowState): QuestionOption[] {

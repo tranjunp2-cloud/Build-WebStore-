@@ -83,8 +83,8 @@ describe("routing a message to tool groups [TC-AISEC-080]", () => {
 
 		// Act
 		const one = routeGroups({ turns: [first] });
-		const two = routeGroups({ turns: [first, second], replies: ["Done.\n[Staged draft cs_1: Discount code WEEKEND10]"] });
-		const three = routeGroups({ turns: [first, second, third], replies: ["Done.\n[Staged draft cs_1: Discount code WEEKEND10]", "Glad to help."] });
+		const two = routeGroups({ turns: [first, second], replies: ["Done.\n<staged_draft id=\"cs_1\">Discount code WEEKEND10</staged_draft>"] });
+		const three = routeGroups({ turns: [first, second, third], replies: ["Done.\n<staged_draft id=\"cs_1\">Discount code WEEKEND10</staged_draft>", "Glad to help."] });
 
 		// Assert
 		for (const group of one) expect(two).toContain(group);

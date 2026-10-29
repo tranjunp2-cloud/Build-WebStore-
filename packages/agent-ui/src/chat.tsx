@@ -156,6 +156,7 @@ export const DEFAULT_CHAT_LABELS: ChatLabels = {
 		"step.thinking": "Thinking",
 		"step.drafting": "Drafting with your answers",
 		"step.families": "Reading your catalog families",
+		"step.question": "Preparing a question",
 		"step.picture": "Generating a picture (about a minute)",
 		"step.pictures": "Generating pictures (about a minute)",
 		"ask.done": "Asked {asked}",

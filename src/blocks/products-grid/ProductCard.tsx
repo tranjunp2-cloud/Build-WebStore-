@@ -9,6 +9,7 @@ import { Heading } from '../shared/Typography'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
 import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
 import type { ProductItem } from './filter-types'
+import { soldOutLabel } from '../shared/sold-out-label'
 
 interface ProductCardProps {
     product: ProductItem
@@ -16,6 +17,8 @@ interface ProductCardProps {
     theme: ThemeConfig
     siteBasePath: string
     siteName?: string
+    /** The site doc (generationLocale / locale) - the badge text follows the shop's language. */
+    site?: unknown
 }
 
 function formatCompareAtPrice(price: number, currency: string) {
@@ -25,7 +28,7 @@ function formatCompareAtPrice(price: number, currency: string) {
     return `${currency} ${price.toFixed(2)}`
 }
 
-export function ProductCard({ product, variant, theme, siteBasePath, siteName }: ProductCardProps) {
+export function ProductCard({ product, variant, theme, siteBasePath, siteName, site }: ProductCardProps) {
     const pdpHref = product.slug ? `${siteBasePath}/products/${product.slug}` : '#'
     const hasDiscount = typeof product.compareAtPrice === 'number' && product.compareAtPrice > product.priceRaw
 
@@ -65,6 +68,12 @@ export function ProductCard({ product, variant, theme, siteBasePath, siteName }:
                         />
                     ) : (
                         <div className="flex h-full w-full items-center justify-center text-3xl opacity-20 sm:text-4xl">🛍️</div>
+                    )}
+
+                    {product.inventory <= 0 && (
+                        <span data-testid="sold-out-badge" className="absolute bottom-2 left-2 rounded-full bg-black/75 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white sm:bottom-3 sm:left-3 sm:text-[11px]">
+                            {soldOutLabel(site)}
+                        </span>
                     )}
 
                     {hasDiscount && (

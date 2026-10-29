@@ -40,6 +40,23 @@ function isFreshClaim(claimedAt: Date | null): boolean {
 
 const BEING_APPLIED = "This change is being applied right now.";
 
+/** Run statuses a decision may settle: a run still working (or stopped / failed) is never overwritten by one. */
+const SETTLEABLE: readonly RunStatus[] = ["awaiting_approval", "applied", "rejected"];
+
+/**
+ * What a run's drafts make it once none is pending: applied when any was applied, else rejected.
+ * Null while one is still pending, or when the run staged none.
+ */
+export function settledStatus(sets: readonly ChangeSet[]): "applied" | "rejected" | null {
+	if (sets.length === 0 || sets.some((cs) => cs.status === "pending")) return null;
+	return sets.some((cs) => cs.status === "applied") ? "applied" : "rejected";
+}
+
+/** A draft asked in another shop of the organization: the same answer as a missing one. */
+function otherShop(ctx: AiRequestContext, stored: StoredChangeSet): boolean {
+	return Boolean(ctx.tenantId && stored.tenantId && stored.tenantId !== ctx.tenantId);
+}
+
 export interface DecisionInput {
 	decision: "approve" | "reject";
 	note?: string;
@@ -61,7 +78,7 @@ export class ChangeSetDecisionService {
 
 	async get(ctx: AiRequestContext, id: string): Promise<ChangeSet> {
 		const stored = await this.store.getChangeSet(ctx.organizationId, id);
-		if (!stored) throw new AgentError("Change set not found.", 404);
+		if (!stored || otherShop(ctx, stored)) throw new AgentError("Change set not found.", 404);
 		assertVisible(ctx, stored.changeSet.requestedBy?.id);
 		return this.expireIfDue(ctx, stored);
 	}
@@ -77,7 +94,7 @@ export class ChangeSetDecisionService {
 
 	async release(ctx: AiRequestContext, id: string): Promise<void> {
 		const stored = await this.store.getChangeSet(ctx.organizationId, id);
-		if (!stored) return;
+		if (!stored || otherShop(ctx, stored)) return;
 		// only who could claim it may let it go (a teammate cannot free a claim to apply it twice)
 		assertCanDecide(ctx, stored.changeSet.requestedBy?.id);
 		await this.store.releaseChangeSet(ctx.organizationId, id);
@@ -85,7 +102,7 @@ export class ChangeSetDecisionService {
 
 	async decide(ctx: AiRequestContext, id: string, input: DecisionInput): Promise<ChangeSet> {
 		const stored = await this.store.getChangeSet(ctx.organizationId, id);
-		if (!stored) throw new AgentError("Change set not found.", 404);
+		if (!stored || otherShop(ctx, stored)) throw new AgentError("Change set not found.", 404);
 		assertCanDecide(ctx, stored.changeSet.requestedBy?.id);
 		const current = await this.expireIfDue(ctx, stored);
 		if (current.status !== "pending") throw new AgentError(`This change was already ${current.status}.`, 409);
@@ -121,7 +138,11 @@ export class ChangeSetDecisionService {
 	private async supersedeStale(ctx: AiRequestContext, applied: ChangeSet): Promise<void> {
 		const key = guardedRecord(applied);
 		if (!key) return;
-		const pending = await this.store.listChangeSets(ctx.organizationId, { status: "pending", limit: 200 });
+		const pending = await this.store.listChangeSets(ctx.organizationId, {
+			status: "pending",
+			limit: 200,
+			...(ctx.tenantId ? { tenantId: ctx.tenantId } : {}),
+		});
 		const stale = pending.filter((cs) => cs.id !== applied.id && guardedRecord(cs) === key);
 		const runs = new Set<string>();
 		for (const cs of stale) {
@@ -199,13 +220,13 @@ export class ChangeSetDecisionService {
 		return new AgentError(now && isFreshClaim(now.claimedAt) ? BEING_APPLIED : "This change was just changed by someone else. Try again.", 409);
 	}
 
-	/** Once nothing in the run is pending, the run settles to applied/rejected. */
+	/**
+	 * Once nothing in the run is pending, the run settles to applied/rejected — only from a status a decision may
+	 * settle: a card approved while its run is still working leaves the run working (its finish() settles it).
+	 */
 	private async settleRun(ctx: AiRequestContext, runId: string): Promise<void> {
-		const run = await this.store.getRun(ctx.organizationId, runId);
-		if (!run) return;
-		const sets = await this.store.listRunChangeSets(ctx.organizationId, runId);
-		if (sets.some((cs) => cs.status === "pending")) return;
-		const status: RunStatus = sets.some((cs) => cs.status === "applied") ? "applied" : "rejected";
-		await this.store.saveRun(ctx.organizationId, { ...run, status, finishedAt: new Date().toISOString() });
+		const status = settledStatus(await this.store.listRunChangeSets(ctx.organizationId, runId));
+		if (!status) return;
+		await this.store.settleRunStatus(ctx.organizationId, runId, status, new Date().toISOString(), SETTLEABLE);
 	}
 }

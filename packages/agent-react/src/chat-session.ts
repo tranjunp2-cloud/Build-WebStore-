@@ -18,6 +18,7 @@ import {
 	type PageLocation,
 	type QueueRunningItem,
 	reduceRunEvent,
+	type StartRunInput,
 } from "@ech/agent-core";
 import { type AgentGateway, AgentGatewayError } from "@ech/agent-transport";
 import {
@@ -118,6 +119,8 @@ const POLL_WINDOW_MS = 6 * 60_000;
 export const INTERRUPTED_RUN_ERROR = "This request was interrupted before it finished.";
 /** How long deleting a chat waits for a prompt that is still being sent, so its run can be stopped. */
 const START_WAIT_MS = 5000;
+/** The wait before a message refused as "chat busy" right after its own run ended is sent once more. */
+const BUSY_RETRY_MS = 1500;
 const ACCEPTED_TYPES: ReadonlySet<string> = new Set([...ATTACHMENT_IMAGE_TYPES, ...ATTACHMENT_DOCUMENT_TYPES]);
 /** Prompt sent when the merchant sends files without typing anything. */
 export const ATTACHMENTS_ONLY_PROMPT = "Use the attached files.";
@@ -554,7 +557,7 @@ export class ChatSession {
 		try {
 			let run: AgentRun;
 			try {
-				run = await this.gateway.startRun({
+				run = await this.startRun({
 					prompt: text,
 					context,
 					page: this.page,
@@ -570,7 +573,7 @@ export class ChatSession {
 				if (gen !== this.generation) return;
 				this.records = new Map();
 				this.set({ threadId: undefined, turns: [userTurn] });
-				run = await this.gateway.startRun({ prompt: text, context, page: this.page, attachmentIds, pictureIds, ...this.taskInput() });
+				run = await this.startRun({ prompt: text, context, page: this.page, attachmentIds, pictureIds, ...this.taskInput() });
 			}
 			if (gen !== this.generation) {
 				this.ignored.add(run.id);
@@ -604,6 +607,27 @@ export class ChatSession {
 			if (gen === this.generation) this.set({ sending: false });
 		}
 	};
+
+	/**
+	 * Hands the prompt to the server. A 409 "chat busy" right after this chat's own last run ended means the server
+	 * had not yet saved its end (older servers streamed the end first): wait briefly and send once more.
+	 */
+	private async startRun(input: StartRunInput): Promise<AgentRun> {
+		try {
+			return await this.gateway.startRun(input);
+		} catch (error) {
+			if (!(error instanceof AgentGatewayError && error.status === 409 && this.lastRunEnded())) throw error;
+			await new Promise<void>((resolve) => setTimeout(resolve, BUSY_RETRY_MS));
+			return this.gateway.startRun(input);
+		}
+	}
+
+	/** The newest reply of this chat has ended (or waits for approval): nothing of ours should still be working. */
+	private lastRunEnded(): boolean {
+		const last = [...this.snapshot.turns].reverse().find((turn) => turn.role === "assistant" && turn.run !== undefined);
+		const status = last?.role === "assistant" ? last.run?.status : undefined;
+		return status !== undefined && (isTerminalStatus(status) || status === "awaiting_approval");
+	}
 
 	/** The task a new chat starts as: the pending one, or the open (deleted) chat's own. */
 	private taskInput(): { task?: ChatTask } {

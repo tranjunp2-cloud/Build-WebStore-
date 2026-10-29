@@ -12,6 +12,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { buildGenerationFacts } from '@/lib/ai/generation-facts'
+import { runWithGenerationFacts } from '@/lib/ai/generation-facts-scope'
 import { composeFallbackResult } from '@/lib/ai/fallback-adapter'
 import type { BusinessInfoInput } from '@/lib/ai/system-prompt'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
@@ -104,15 +106,22 @@ describe('TC-F01-W.23 — Contact page user fields + FAQ (GH-820: google-maps te
     expect(maps).toBeUndefined()
   })
 
-  it('FAQ block present with opening hours question', () => {
-    const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
+  it('FAQ block is built from facts (contact question) and never invents opening hours (#2103 A1)', () => {
+    const facts = buildGenerationFacts({ businessInfo: ramenInfo() })
+    const result = runWithGenerationFacts(facts, () => composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo()))
     const contact = getPage(result, 'Contact')
     const blocks = getBlocks(contact)
     const faq = blocks.find((b) => b.blockType === 'faq')
     expect(faq).toBeDefined()
-    const items = faq!.items as Array<{ question: string }>
-    const hasHours = items.some((i) => /hour|open/i.test(i.question))
-    expect(hasHours).toBe(true)
+    const items = faq!.items as Array<{ question: string; answer: string }>
+    expect(items.map((i) => i.question)).toContain('How can I contact Ramen Ichiban?')
+    expect(items.some((i) => /hour|open|parking/i.test(`${i.question} ${i.answer}`))).toBe(false)
+  })
+
+  it('Contact has no FAQ items when there are no facts to answer from', () => {
+    const result = composeFallbackResult('ramen restaurant', 42, 'en', { ...ramenInfo(), phone: '', email: '', address: '', products: '' })
+    const faqs = getBlocks(getPage(result, 'Contact')).filter((b) => b.blockType === 'faq')
+    expect(faqs.every((b) => (b.items as unknown[]).length === 0)).toBe(true)
   })
 })
 

@@ -108,6 +108,30 @@ export const ShopProductDraftsInputSchema = z.object({
 });
 export type ShopProductDraftsInput = z.infer<typeof ShopProductDraftsInputSchema>;
 
+export const SHOP_PRODUCTS_SETUP_MAX = 20;
+
+/**
+ * One card that sets price, stock, photos and on-sale / draft for 1–20 EXISTING products at once — the
+ * numbers come from the merchant (an ask_user quantities / pictures answer), never from the model.
+ * Every product is read again; a value that is already there, or can't be set (options), is left out.
+ */
+export const ShopProductsSetupInputSchema = z.object({
+	reason: z.string().min(3).max(200).describe("Why, one short line in the merchant's language"),
+	products: z
+		.array(
+			z.object({
+				id: z.string().min(1).max(120).describe("Product id from read_item / search_items"),
+				price: Money.nullable().describe("Selling price the merchant typed; null keeps it (not for a product with options)"),
+				inventory: ProductFields.inventory.nullable().describe("Stock the merchant typed; null keeps it (not for a product with options)"),
+				images: ProductFields.images.nullable().describe("The COMPLETE photo list in order, the first is the main photo; null keeps the photos"),
+				status: z.enum(["active", "draft"]).nullable().describe("active = on sale (needs price, SKU, stock and weight above 0) | draft = off sale; null keeps it"),
+			}),
+		)
+		.min(1)
+		.max(SHOP_PRODUCTS_SETUP_MAX),
+});
+export type ShopProductsSetupInput = z.infer<typeof ShopProductsSetupInputSchema>;
+
 const Named = z.object({ id: z.string().min(1), name: z.string() });
 
 /**
@@ -131,7 +155,17 @@ export const ShopProductSnapshotSchema = z.object({
 	category: Named.nullable(),
 	categories: z.array(Named).max(200),
 	seo: z.object({ title: z.string().nullable(), description: z.string().nullable() }),
-	images: z.array(z.object({ ref: z.string().min(1), url: z.string(), alt: z.string().nullable() })).max(30),
+	images: z
+		.array(
+			z.object({
+				ref: z.string().min(1),
+				url: z.string(),
+				alt: z.string().nullable(),
+				/** where the photo came from: the merchant's own upload, a stock library or an AI picture (older snapshots: absent) */
+				source: z.enum(["upload", "stock", "ai"]).optional(),
+			}),
+		)
+		.max(30),
 	/** false: the description holds pictures or content the copilot can't rewrite — leave it to the product form */
 	descriptionEditable: z.boolean().optional(),
 	descriptionBMEditable: z.boolean().optional(),

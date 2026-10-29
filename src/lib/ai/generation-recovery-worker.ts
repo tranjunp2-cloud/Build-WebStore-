@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { sql } from 'drizzle-orm'
 import { generateSiteWithAI } from './openai-generator'
 import { sanitizeBlocksForPayload } from './pages-schema'
+import { buildGenerationFacts, type GenerationFacts } from './generation-facts'
 import { resolveSiteType } from './site-type'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { contentBriefToReferencePrompt, type ContentBrief } from './content-brief'
@@ -70,6 +71,28 @@ function referencePromptFromSnapshot(contentBrief: unknown): string | undefined 
     } catch {
         return undefined
     }
+}
+
+/**
+ * #2103 H1: recovery rebuilds the same FACTS the service uses (frozen form answers + URL-import
+ * brief + the tenant's own data), so enforceGroundedBlocks stays active and nothing is invented.
+ * The parent's site is never read: its contact defaults are not part of the frozen snapshot.
+ */
+async function recoveryFacts(
+    payload: RecoveryWorkerPayloadLike,
+    tenant: Id,
+    frozen: NonNullable<ReturnType<typeof snapshotBusinessInfo>>,
+): Promise<GenerationFacts> {
+    const tenantDoc = await payload.findByID({ collection: 'tenants', id: tenant, depth: 0, overrideAccess: true }).catch((error: unknown) => {
+        console.warn('[generation-recovery] tenant facts unavailable (non-fatal):', error instanceof Error ? error.message : error)
+        return null
+    })
+    return buildGenerationFacts({
+        businessInfo: frozen.businessInfo,
+        contentBrief: frozen.contentBrief,
+        tenant: tenantDoc,
+        site: null,
+    })
 }
 
 class LeaseLostError extends Error {}
@@ -154,7 +177,8 @@ export async function runGenerationRecoveryJob(payload: RecoveryWorkerPayloadLik
 
         // Runs as the merchant who made the request, billed to their workspace.
         const { actor, skipReason: aiSkipReason } = await resolveGenerationRecordActor(payload as unknown as Payload, child)
-        const regenerate = () => generateSiteWithAI(frozen.businessInfo, frozen.extraInstructions, frozen.language, referencePromptFromSnapshot(frozen.contentBrief))
+        const facts = await recoveryFacts(payload, tenant, frozen)
+        const regenerate = () => generateSiteWithAI(frozen.businessInfo, frozen.extraInstructions, frozen.language, referencePromptFromSnapshot(frozen.contentBrief), undefined, undefined, { facts })
         const generated = actor ? await runWithAiActor(actor, regenerate) : await regenerate()
         const result = generated.result
         // A recovery that ran without AI says why (no user/workspace on the record, lapsed membership…)

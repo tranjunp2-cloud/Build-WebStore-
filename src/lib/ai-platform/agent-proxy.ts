@@ -21,7 +21,7 @@ import { generatePictures } from "./generated-images";
 import { newerOverlapping } from "@/lib/agent-changes/undo-touches";
 import { AiPlatformError, aiPlatformJson, callAiPlatform } from "./upstream";
 import { isTransientUpstreamError, recordWithRetry } from "./record-with-retry";
-import { abandonApply, beginApply, markApplied, markRecorded, markReinstated, markReverted, readReceipt } from "./apply-receipts";
+import { abandonApply, type ApplyReceipt, beginApply, markApplied, markRecorded, markReinstated, markReverted, readReceipt, STALE_APPLYING_MS } from "./apply-receipts";
 import { getWorkList, putWorkState, workStateKey } from "./work/work-routes";
 
 const ID = "[A-Za-z0-9_-]{1,64}";
@@ -176,10 +176,13 @@ async function handleAgentRequest(req: NextRequest, segments: string[]): Promise
 }
 
 async function decide(req: NextRequest, actor: AgentActor, token: string, id: string): Promise<Response> {
-	const body = (await req.json().catch(() => ({}))) as { decision?: unknown; note?: unknown; confirm?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { decision?: unknown; note?: unknown; confirm?: unknown; manual?: unknown };
 	const note = typeof body.note === "string" ? body.note.slice(0, 1000) : undefined;
 	const decisionPath = `/agent/change-sets/${id}/decision`;
 	if (body.decision === "reject") {
+		// a change that already ran here (its record lost) can't be rejected: that would close the card with the data changed and no Undo
+		const receipt = await readReceipt(id, actor.tenantId);
+		if (receipt && receipt.state !== "reverted") return await refuseRejectOfApplied(actor, token, id, receipt, note);
 		const rejected = await aiPlatformJson({ method: "POST", path: decisionPath, token, body: JSON.stringify({ decision: "reject", note }) });
 		return NextResponse.json(rejected);
 	}
@@ -187,6 +190,10 @@ async function decide(req: NextRequest, actor: AgentActor, token: string, id: st
 
 	// destructive changes: the approver said Yes and the card echoed `confirmText` — checked here, not only in the browser
 	const staged = ChangeSetSchema.parse(await aiPlatformJson({ method: "GET", path: `/agent/change-sets/${id}`, token }));
+	// money, buyer emails, live codes: only the merchant's own click approves them (Auto-approve never does), checked here too
+	if (staged.requiresClick && body.manual !== true) {
+		return problem(409, "This change needs your own click: press Approve on the card. If you just updated, reload the page.");
+	}
 	if (staged.confirmText && !sameText(body.confirm, staged.confirmText)) {
 		return problem(400, `Type “${staged.confirmText}” to confirm.`);
 	}
@@ -214,6 +221,12 @@ async function decide(req: NextRequest, actor: AgentActor, token: string, id: st
 		await release(token, id);
 		return problem(409, receipt.state === "reverted" ? "This change was already undone." : "This change is being applied right now.");
 	}
+	if (receipt.kind === "applied" && !receipt.receipt.result) {
+		// it ran here but its stored result can't be read: never applied a second time, on-call settles the card
+		await release(token, id);
+		reportAgentFailure(new Error(`change set ${id} is applied in prime-web but its receipt holds no readable result`), actor, id, "fatal");
+		return problem(409, "This change was already applied. Its card will update shortly.");
+	}
 	let result;
 	let decisionNote = note;
 	if (receipt.kind === "applied" && receipt.receipt.result) {
@@ -227,6 +240,17 @@ async function decide(req: NextRequest, actor: AgentActor, token: string, id: st
 			invalidateAfterAgentWrite(actor.tenantId);
 		} catch (error) {
 			invalidateAfterAgentWrite(actor.tenantId);
+			// this try took over from one that died part way: a version guard refusal may be that earlier try's own
+			// write, so the card is not closed as stale (it stays pending) and the merchant checks the record
+			if (receipt.kind === "started" && receipt.takeover && error instanceof ChangeSetApplyError && error.stale) {
+				await abandonApply(id, attempt).catch((cause: unknown) => console.error(`[ai-agent] apply receipt ${id} could not be cleared`, cause instanceof Error ? cause.message : cause));
+				await release(token, id);
+				reportAgentFailure(error, actor, id);
+				throw new ChangeSetApplyError(
+					"An earlier try of this approval stopped part way and may already have made this change. Open the record to check; if it's there, Reject this card.",
+					409,
+				);
+			}
 			// a failure on our side, or a change that already moved something before it was put back (a version guard
 			// refusal is the merchant's own edit: closed, not reported)
 			if (statusOf(error) >= 500 || (error instanceof ChangeSetApplyError && error.final && !error.stale)) reportAgentFailure(error, actor, id);
@@ -300,6 +324,28 @@ async function recordWrite(
 	}
 }
 
+/**
+ * Reject of a change that has a receipt here (applying or applied): refused, nothing forwarded. An applied one with
+ * its result is recorded as approved on the way (the card gets its Undo), like a retried Approve would.
+ */
+async function refuseRejectOfApplied(actor: AgentActor, token: string, id: string, receipt: ApplyReceipt, note: string | undefined): Promise<Response> {
+	if (receipt.state === "applying") {
+		const age = Date.now() - Date.parse(receipt.updatedAt);
+		// an unreadable time counts as fresh: "Approve again" is only said when the earlier try surely died
+		return age >= STALE_APPLYING_MS
+			? problem(409, "An earlier approve stopped part way — Approve again to finish it.")
+			: problem(409, "This change is being applied right now.");
+	}
+	const result = receipt.result;
+	if (result) {
+		const recorded = await recordWrite(actor, token, id, "applied", () =>
+			aiPlatformJson({ method: "POST", path: `/agent/change-sets/${id}/decision`, token, body: JSON.stringify({ decision: "approve", note: receipt.note ?? note, result }) }),
+		).catch(() => null);
+		if (recorded) await markRecorded(id, "applied").catch(() => undefined);
+	}
+	return problem(409, "This change was already applied — use Undo to take it back.");
+}
+
 /** A `final` failure after steps that keep their undo: kept and recorded as applied with the failure as its note. */
 async function recordPartial(actor: AgentActor, token: string, id: string, attempt: string, partial: ChangeSetResult, note: string): Promise<void> {
 	await markApplied(id, attempt, partial, note).catch((error: unknown) => {
@@ -351,6 +397,9 @@ async function undoChange(actor: AgentActor, token: string, id: string): Promise
 			if (statusOf(error) >= 500) reportAgentFailure(error, actor, id);
 			// refused because the parts moved on: when a newer change of the assistant did it, say which one goes first
 			if (error instanceof ChangeSetApplyError && error.status === 409) {
+				// another tab's Undo put it back first: the same answer as that tab got
+				const undone = await revertedNow(token, id);
+				if (undone) return NextResponse.json(undone);
 				const newer = await newerChangeFor(changeSet, token).catch(() => null);
 				if (newer) throw new ChangeSetApplyError(`Undo “${newer.title}” first — it changed the same part after this one.`, 409);
 			}
@@ -362,9 +411,19 @@ async function undoChange(actor: AgentActor, token: string, id: string): Promise
 			reportAgentFailure(error, actor, id);
 		});
 	}
-	const recorded = await recordWrite(actor, token, id, "reverted", () =>
-		aiPlatformJson({ method: "POST", path: `/agent/change-sets/${id}/revert`, token, body: JSON.stringify({ result }) }),
-	);
+	let recorded: unknown;
+	try {
+		recorded = await recordWrite(actor, token, id, "reverted", () =>
+			aiPlatformJson({ method: "POST", path: `/agent/change-sets/${id}/revert`, token, body: JSON.stringify({ result }) }),
+		);
+	} catch (error) {
+		// another tab's Undo was recorded first: it is undone, answer as such
+		if (!(error instanceof AiPlatformError) || error.status !== 409) throw error;
+		const undone = await revertedNow(token, id);
+		if (!undone) throw error;
+		await markRecorded(id, "reverted").catch(() => undefined);
+		return NextResponse.json(undone);
+	}
 	if (recorded) {
 		await markRecorded(id, "reverted").catch(() => undefined);
 		return NextResponse.json(recorded);
@@ -407,6 +466,14 @@ async function reconcileChange(actor: AgentActor, token: string, id: string): Pr
 		settled = await read();
 	}
 	return NextResponse.json({ changeSet: settled, verdict });
+}
+
+/** The change set as stored now, when it is already undone (another tab / call got there first); else null. */
+async function revertedNow(token: string, id: string): Promise<ChangeSet | null> {
+	const current = await aiPlatformJson({ method: "GET", path: `/agent/change-sets/${id}`, token })
+		.then((raw) => ChangeSetSchema.parse(raw))
+		.catch(() => null);
+	return current?.status === "reverted" ? current : null;
 }
 
 /** The newest applied change that touched the same parts after this one (it has to be undone first). */

@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { ZodTypeAny } from "zod";
 import { blockRegistry } from "@/blocks/registry";
+import { hasInlineFormatting, plainText } from "@/lib/utils/rich-text-render";
 import { storedKeys } from "./site-persisted";
 
 /**
@@ -56,8 +57,8 @@ export function isEmbeddableVideo(value: unknown): boolean {
 	}
 }
 
-/** Fields holding storefront product ids — every id must belong to the site's workspace. */
-export const PRODUCT_ID_FIELDS = new Set(["productIds", "selectedProductIds"]);
+/** Fields holding storefront product ids (a Products Grid in fixed mode) — every id must belong to the site's workspace. */
+export const PRODUCT_ID_FIELDS = new Set(["selectedProductIds"]);
 
 /** Navigation and footer frame every page; the copilot edits them, never removes them. */
 export const STRUCTURAL_BLOCKS = new Set(["navigation", "footer"]);
@@ -108,10 +109,14 @@ export function blockName(block: PageBlock): string {
 	return blockRegistry.getBlockMeta(type)?.name ?? type;
 }
 
-/** A before/after cell: text in full up to 600 chars (the approver must see what is written), structures as their size. */
+/** A before/after cell: text in full up to 600 chars (the approver must see what is written; markup shown as plain text), structures as their size. */
 export function previewValue(value: unknown, max = 600): string | null {
 	if (value === undefined || value === null) return null;
-	if (typeof value === "string") return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+	if (typeof value === "string") {
+		// a heading edited in the inline editor is stored as HTML ("<b>Hi</b>"): the card shows the words, not the markup
+		const text = hasInlineFormatting(value) ? plainText(value.replace(/<br\s*\/?>|<\/(?:p|div|li|h[1-6])>/gi, " ")).replace(/\s+/g, " ").trim() : value;
+		return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+	}
 	if (typeof value === "number" || typeof value === "boolean") return String(value);
 	if (Array.isArray(value)) {
 		const texts = value

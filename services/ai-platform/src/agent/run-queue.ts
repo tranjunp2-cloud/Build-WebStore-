@@ -74,12 +74,14 @@ export function placeInQueue(slots: RunSlots, candidate: { runId: string; userId
 
 /**
  * The `run.queued` frame's body for `ctx`: its place and what is working. Chats are private, so a member sees
- * only their own requests; owners and admins see everyone's (with who asked) and may stop any of them.
+ * only their own requests; owners and admins see everyone's (with who asked) and may stop any of them, within
+ * their own shop (shops sharing one organization share its slots, never their requests).
  */
-export function queueView(ctx: Pick<AiRequestContext, "userId" | "role" | "name">, slots: RunSlots, place: QueuePlace): RunQueue {
+export function queueView(ctx: Pick<AiRequestContext, "userId" | "role" | "name" | "tenantId">, slots: RunSlots, place: QueuePlace): RunQueue {
 	const team = seesTeamDrafts(ctx);
+	const sameShop = (tenantId: string | null | undefined) => !ctx.tenantId || !tenantId || tenantId === ctx.tenantId;
 	const running = slots.working
-		.filter((run) => !run.pending && (run.userId === ctx.userId || team))
+		.filter((run) => !run.pending && (run.userId === ctx.userId || (team && sameShop(run.tenantId))))
 		.slice(0, 20)
 		.map((run) => {
 			const mine = run.userId === ctx.userId;

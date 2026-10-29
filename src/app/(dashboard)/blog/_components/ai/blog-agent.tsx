@@ -63,10 +63,11 @@ function BlogAgentState({ blogId, children }: { blogId: string; children: ReactN
         handlers.current = next
     }, [])
 
-    // Approving from the chat card, the review sheet or the editor's bar all land here.
+    // Approving from the chat card, the review sheet or the editor's bar all land here (the bar is a hand click;
+    // the panel says itself whether Auto-approve or the merchant decided).
     const decide = useCallback(
-        async (changeSet: ChangeSet, decision: 'approve' | 'reject') => {
-            const decided = await decideChangeSet(changeSet.id, decision, 'self')
+        async (changeSet: ChangeSet, decision: 'approve' | 'reject', options: { confirm?: string; manual?: boolean } = { manual: true }) => {
+            const decided = await decideChangeSet(changeSet.id, decision, 'self', undefined, { confirm: options.confirm, manual: options.manual })
             allPending.refresh()
             if (decided.status === 'applied') {
                 if (decided.action?.kind === 'blog.create_draft') handlers.current.onCreated?.(decided)
@@ -101,7 +102,7 @@ function BlogAgentState({ blogId, children }: { blogId: string; children: ReactN
             chat={chat}
             pageLabel={(isNew ? THIS_NEW_POST : THIS_POST)[locale.slice(0, 2)] ?? (isNew ? THIS_NEW_POST.en : THIS_POST.en)}
             pending={pending}
-            onDecide={(changeSet, decision) => decide(changeSet, decision)}
+            onDecide={(changeSet, decision, options) => decide(changeSet, decision, options ?? {})}
             onUndo={undo}
             onNavigate={(href) => router.push(href)}
             suggestions={agentStarters('blog', locale)}

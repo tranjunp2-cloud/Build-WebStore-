@@ -13,7 +13,7 @@ function getActorTenantId(user: unknown) {
     return unwrapRelationId(typedUser?.tenants?.[0]?.tenant)
 }
 
-const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation, originalDoc }) => {
+const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation, originalDoc, context }) => {
     const isSuperAdmin = Boolean(req.user?.roles?.includes('super-admin'))
     const actorTenantId = getActorTenantId(req.user)
     const originalTenantId = unwrapRelationId(originalDoc?.tenant)
@@ -88,6 +88,19 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
                 data.site = siteRes.docs[0].id
             }
         }
+    }
+
+    // #2103 M1: an owner who changes the status of a generator-seeded post has made their own call about it
+    // (publish, unpublish, schedule). Clear the marker so a later site publish never overrules them.
+    // The site publish promotes with `context.promoteAiSeeded`, which is the system's change, not the owner's.
+    if (
+        operation === 'update' &&
+        originalDoc?.aiSeeded === true &&
+        data.status !== undefined &&
+        data.status !== originalDoc.status &&
+        !context?.promoteAiSeeded
+    ) {
+        data.aiSeeded = false
     }
 
     return data
@@ -254,6 +267,19 @@ export const Blogs: CollectionConfig = {
             // instead of making a second one). Set by the server only (saveBlogForUser), never by a request.
             name: 'aiChangeSetId',
             type: 'text',
+            index: true,
+            admin: { hidden: true },
+            access: {
+                create: () => false,
+                update: () => false,
+            },
+        },
+        {
+            // Set when the site generator seeded this draft; the site's first publish takes it live and clears
+            // it. An explicit marker (not a slug prefix) so an owner draft like `10-tips-for-…` is never caught.
+            name: 'aiSeeded',
+            type: 'checkbox',
+            defaultValue: false,
             index: true,
             admin: { hidden: true },
             access: {

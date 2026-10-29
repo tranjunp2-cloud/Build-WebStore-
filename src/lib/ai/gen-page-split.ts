@@ -19,6 +19,7 @@ import { buildNavigation } from './template-composer'
 import { normalizeComposerCategory } from './composer-category-resolver'
 import type { BusinessSample } from './content/types'
 import { composeTemplateResult } from './fallback-adapter'
+import { parseProductsString } from './business-info-mapper'
 import type { BusinessInfoInput } from './system-prompt'
 import type { GenerationResult } from './generate-blocks'
 import { detectLanguageFromText } from '@/lib/language-detection'
@@ -414,11 +415,8 @@ function composerFallback(gr: GenerationResult, scope: 'home' | 'subpages'): Rec
 }
 
 function splitServices(products: string): string[] {
-    const services = products
-        .split(/[\n,;|]+/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-    return services.length > 0 ? services : []
+    // #2103 A2: paren-aware split + prices stripped ("Kek lapis (whole RM65, half RM35)" is ONE service).
+    return parseProductsString(products.replace(/\|/g, ','))
 }
 
 function blockSectionLabel(

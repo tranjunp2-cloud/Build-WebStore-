@@ -42,6 +42,21 @@ describe('shop issues say why they matter [TC-WQ-151]', () => {
     })
 })
 
+describe('the work item starts "finish your store" [TC-AIAUD-121]', () => {
+    it('words the AI-draft and out-of-stock issues as finishing the shop and updating stock, in both languages', () => {
+        const drafts = shopTodoWorkItem(todo('products_ai_review'), 'en', 10)
+        const draftsMs = shopTodoWorkItem(todo('products_ai_review'), 'ms', 10)
+        const stock = shopTodoWorkItem(todo('out_of_stock', { severity: 'high' }), 'en', 0)
+
+        expect(drafts!.actions[0]).toMatchObject({ kind: 'prompt', label: 'Finish your shop' })
+        expect(drafts!.say).toContain('Finish setting them up?')
+        expect(draftsMs!.actions[0]).toMatchObject({ label: 'Siapkan kedai anda' })
+        expect(stock!.actions[0]).toMatchObject({ kind: 'prompt', label: 'Update stock' })
+        // the prompt behind the button is the To do's own, which the wording step now writes as the finish flow
+        expect(drafts!.actions[0]).toMatchObject({ value: 'Help with products_ai_review' })
+    })
+})
+
 describe('SEO health as one issue [TC-WQ-153]', () => {
     const issue = (code: string) => ({ id: code, code, count: 1, action: { kind: 'edit-phone', siteId: '7' } })
 

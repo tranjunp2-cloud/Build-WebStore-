@@ -11,6 +11,7 @@ import { AgentRunService, type RunFrame } from "./agent-run.service";
 import { AgentThreadService } from "./agent-thread.service";
 import { ChangeSetDecisionService, guardedRecord } from "./change-set-decision.service";
 import { MERCHANT_INSTRUCTIONS } from "./merchant-tools";
+import { replyLanguageNote } from "./message-language";
 
 type LanguageModelV4CallOptions = Parameters<MockLanguageModelV4["doGenerate"]>[0];
 
@@ -224,7 +225,7 @@ describe("merchant copilot prompt is prefix-cache friendly [TC-AICP-32]", () => 
 			return message?.role === "user" && message.content[0]?.type === "text" ? message.content[0].text : "";
 		};
 		expect(lastUser(a)).toBe('Context: the merchant is on the "products" page, UI locale en-MY. Today is 2026-10-20.\n\nDraft a batik scarf');
-		expect(lastUser(b)).toBe('Context: the merchant is on the "blog" page, UI locale vi-VN. Today is 2026-12-31.\n\nViết bài về cà phê');
+		expect(lastUser(b)).toBe('Context: the merchant is on the "blog" page, UI locale vi-VN. Today is 2026-12-31. Reply language: Vietnamese (from this message).\n\nViết bài về cà phê\n\n' + replyLanguageNote("Vietnamese"));
 	});
 
 	it("marks the static system prompt as an Anthropic cache breakpoint on anthropic models only", async () => {

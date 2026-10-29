@@ -74,13 +74,15 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             ]
             for (const cat of CATEGORIES) {
                 const result = enforceMinimumStructure([], cat, {})
-                expect(result.length).toBeGreaterThanOrEqual(9)
+                // #2103 A1: stats / pricing / logo-cloud / FAQ are only injected from real facts, so a category
+                // whose recipe leans on them (tech) lands one block under the old 9 with no facts supplied.
+                expect(result.length, cat).toBeGreaterThanOrEqual(8)
             }
         })
     })
 
     describe('enforceMinItems', () => {
-        it('pads testimonials below min to required count', () => {
+        it('TC-AIAUD-027: never pads testimonials with invented reviewers (#2103 A1)', () => {
             const blocks = [
                 {
                     blockType: 'testimonials',
@@ -88,10 +90,8 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
                 },
             ]
             const result = enforceMinItems(blocks, 'beauty')
-            const items = result[0]!.testimonials as unknown[]
-            expect(items.length).toBeGreaterThanOrEqual(
-                CATEGORY_REQUIREMENTS.beauty!.minItems.testimonials ?? 0,
-            )
+            expect(result[0]!.testimonials).toEqual([{ quote: 'Great', name: 'Alice' }])
+            expect(CATEGORY_REQUIREMENTS.beauty!.minItems.testimonials).toBeUndefined()
         })
 
         it('does NOT shrink arrays already above min', () => {
@@ -312,19 +312,14 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
         // Unknown category falls back to DEFAULT, so we pass 'unknown-cat' to
         // exercise the DEFAULT_REQUIREMENT path for each block type.
 
-        it('TC-F01.SE.10: faq with 0 items → pads to at least 4 (default min)', () => {
-            // Arrange
+        it('TC-F01.SE.10: faq with 0 items is NOT padded with library Q&A (#2103 A1)', () => {
             const blocks = [{ blockType: 'faq', faqs: [] as unknown[] }]
 
-            // Act
             const result = enforceMinItems(blocks, 'unknown-cat')
 
-            // Assert
-            const defaultMin = getCategoryRequirement('unknown-cat').minItems.faq ?? 0
-            expect(defaultMin).toBeGreaterThanOrEqual(4)
+            expect(getCategoryRequirement('unknown-cat').minItems.faq).toBeUndefined()
             const faqResult = result[0]! as Record<string, unknown>
-            const faqItems = (faqResult.faqs ?? faqResult.items) as unknown[]
-            expect(faqItems.length).toBeGreaterThanOrEqual(defaultMin)
+            expect((faqResult.faqs ?? faqResult.items) as unknown[]).toEqual([])
         })
 
         it('TC-F01.SE.11: service-cards with 0 services → pads to at least 3 (default min)', () => {
@@ -340,56 +335,32 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             expect((result[0]!.services as unknown[]).length).toBeGreaterThanOrEqual(defaultMin)
         })
 
-        it('TC-F01.SE.12: stats with 0 stats → pads to at least 3 (default min)', () => {
-            // Arrange
-            const blocks = [{ blockType: 'stats', stats: [] as unknown[] }]
+        it('TC-F01.SE.12: stats with 0 stats is NOT padded with invented numbers (#2103 A1)', () => {
+            const result = enforceMinItems([{ blockType: 'stats', stats: [] as unknown[] }], 'unknown-cat')
 
-            // Act
-            const result = enforceMinItems(blocks, 'unknown-cat')
-
-            // Assert
-            const defaultMin = getCategoryRequirement('unknown-cat').minItems.stats ?? 0
-            expect(defaultMin).toBeGreaterThanOrEqual(3)
-            expect((result[0]!.stats as unknown[]).length).toBeGreaterThanOrEqual(defaultMin)
+            expect(getCategoryRequirement('unknown-cat').minItems.stats).toBeUndefined()
+            expect(result[0]!.stats).toEqual([])
         })
 
-        it('TC-F01.SE.13: logo-cloud with 0 logos → pads to at least 5 (default min)', () => {
-            // Arrange
-            const blocks = [{ blockType: 'logo-cloud', logos: [] as unknown[] }]
+        it('TC-F01.SE.13: logo-cloud with 0 logos is NOT padded with real brands (#2103 A1)', () => {
+            const result = enforceMinItems([{ blockType: 'logo-cloud', logos: [] as unknown[] }], 'unknown-cat')
 
-            // Act
-            const result = enforceMinItems(blocks, 'unknown-cat')
-
-            // Assert
-            const defaultMin = getCategoryRequirement('unknown-cat').minItems['logo-cloud'] ?? 0
-            expect(defaultMin).toBeGreaterThanOrEqual(5)
-            expect((result[0]!.logos as unknown[]).length).toBeGreaterThanOrEqual(defaultMin)
+            expect(getCategoryRequirement('unknown-cat').minItems['logo-cloud']).toBeUndefined()
+            expect(result[0]!.logos).toEqual([])
         })
 
-        it('TC-F01.SE.14: team with 0 members → pads to at least 3 (default min)', () => {
-            // Arrange
-            const blocks = [{ blockType: 'team', members: [] as unknown[] }]
+        it('TC-F01.SE.14: team with 0 members is NOT padded with invented people (#2103 A1)', () => {
+            const result = enforceMinItems([{ blockType: 'team', members: [] as unknown[] }], 'unknown-cat')
 
-            // Act
-            const result = enforceMinItems(blocks, 'unknown-cat')
-
-            // Assert
-            const defaultMin = getCategoryRequirement('unknown-cat').minItems.team ?? 0
-            expect(defaultMin).toBeGreaterThanOrEqual(3)
-            expect((result[0]!.members as unknown[]).length).toBeGreaterThanOrEqual(defaultMin)
+            expect(getCategoryRequirement('unknown-cat').minItems.team).toBeUndefined()
+            expect(result[0]!.members).toEqual([])
         })
 
-        it('TC-F01.SE.15: pricing with 0 plans → pads to at least 3 (default min)', () => {
-            // Arrange
-            const blocks = [{ blockType: 'pricing', plans: [] as unknown[] }]
+        it('TC-F01.SE.15: pricing with 0 plans is NOT padded with invented tiers (#2103 A1)', () => {
+            const result = enforceMinItems([{ blockType: 'pricing', plans: [] as unknown[] }], 'unknown-cat')
 
-            // Act
-            const result = enforceMinItems(blocks, 'unknown-cat')
-
-            // Assert
-            const defaultMin = getCategoryRequirement('unknown-cat').minItems.pricing ?? 0
-            expect(defaultMin).toBeGreaterThanOrEqual(3)
-            expect((result[0]!.plans as unknown[]).length).toBeGreaterThanOrEqual(defaultMin)
+            expect(getCategoryRequirement('unknown-cat').minItems.pricing).toBeUndefined()
+            expect(result[0]!.plans).toEqual([])
         })
 
         it('TC-F01.SE.16: gallery with 0 images → pads to at least 6 (default min)', () => {
@@ -428,8 +399,8 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
 
     // ── TC-F01.SE.20–25: enforceGridAlignment ────────────────────────────────
     describe('enforceGridAlignment', () => {
-        it('TC-F01.SE.20: testimonials cards variant with 4 items → pads to 6 (3-col grid)', () => {
-            // Arrange — 4 items on 3-col grid: next multiple is 6
+        it('TC-F01.SE.20: testimonials cards variant with 4 real items stay 4 — grid alignment never invents reviews (#2103)', () => {
+            // Arrange — 4 items on 3-col grid: next multiple is 6, but nothing real to add
             const blocks = [{
                 blockType: 'testimonials',
                 variant: 'cards',
@@ -440,7 +411,7 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             const result = enforceGridAlignment(blocks, 'beauty')
 
             // Assert
-            expect((result[0]!.testimonials as unknown[]).length).toBe(6)
+            expect((result[0]!.testimonials as unknown[]).length).toBe(4)
         })
 
         it('TC-F01.SE.21: features grid-3 variant with 5 items → pads to 6', () => {
@@ -480,8 +451,8 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             expect((result[0]!.images as unknown[]).length).toBe(6)
         })
 
-        it('TC-F01.SE.23: team grid variant with 4 items → pads to 6 (3-col grid)', () => {
-            // Arrange — 4 items on 3-col grid: next multiple is 6
+        it('TC-F01.SE.23: team grid variant with 4 real members stay 4 — grid alignment never invents people (#2103)', () => {
+            // Arrange — 4 items on 3-col grid: next multiple is 6, but nothing real to add
             const blocks = [{
                 blockType: 'team',
                 variant: 'grid',
@@ -495,7 +466,7 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             const result = enforceGridAlignment(blocks, 'tech')
 
             // Assert
-            expect((result[0]!.members as unknown[]).length).toBe(6)
+            expect((result[0]!.members as unknown[]).length).toBe(4)
         })
 
         it('TC-F01.SE.24: testimonials carousel variant with 4 items → does NOT change (no grid)', () => {
@@ -700,7 +671,8 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             )
             const types = result.map((block) => block.blockType)
 
-            expect(types).toEqual(['navigation', 'hero', 'about', 'team', 'stats', 'footer'])
+            // #2103 A1: no facts → no stats block is invented; the neutral features block fills the page instead
+            expect(types).toEqual(['navigation', 'hero', 'about', 'team', 'features', 'footer'])
             expect(types.filter((type) => type === 'about')).toHaveLength(1)
             expect(types).not.toContain('gallery')
             expect(types).not.toContain('contact')

@@ -30,6 +30,8 @@ interface ApplyTemplateResponse {
     siteId: string | number
     unmatchedBlocks?: string[]
     appliedState?: AppliedTemplateState
+    /** the editor draft revision after the apply (the applying tab adopts it) */
+    draftVersion?: string
 }
 
 class TemplateRequestError extends Error {
@@ -101,6 +103,7 @@ function applyResultFromResponse(body: unknown): ApplyTemplateResponse {
             ? data.unmatchedBlocks.filter((block): block is string => typeof block === 'string')
             : undefined,
         appliedState: data.appliedState as AppliedTemplateState | undefined,
+        draftVersion: typeof data.draftVersion === 'string' ? data.draftVersion : undefined,
     }
 }
 

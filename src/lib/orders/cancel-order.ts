@@ -9,8 +9,12 @@ import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-rede
 import { type ActionResult, respond } from './action-result'
 import { sendCancelEmails } from './cancel-order-emails'
 
-/** Payment states in which nothing has been paid: the plain cancel moves them to 'cancelled' (see the CAS below). */
-const UNPAID_PAYMENT_STATUSES = ['unpaid', 'awaiting_payment', 'pending_verification']
+/**
+ * Payment states in which nothing has been paid: the plain cancel moves them to 'cancelled' (see the CAS below).
+ * 'pending_verification' is NOT here: the buyer uploaded a transfer proof and may have paid, so a cancelled order
+ * keeps it (and its proof block) as a reminder that a manual refund may be owed.
+ */
+const UNPAID_PAYMENT_STATUSES = ['unpaid', 'awaiting_payment']
 
 /**
  * Cancels an order with a required reason, as `user` (access-controlled read). The one implementation of
@@ -311,12 +315,13 @@ export async function cancelOrderAs(user: User, id: string, reason: string): Pro
     if (!xenditCasDone && !stripeCasDone) {
         // AND easy_parcel_order_no IS NULL: see the Xendit CAS comment above (label race).
         // payment_status: nothing was paid, so it follows the order to 'cancelled' (the intent of the Orders
-        // update-payment-status hook, which this raw CAS bypasses). A paid order keeps 'paid': the merchant
-        // pays a bank-transfer / COD buyer back by hand.
+        // update-payment-status hook, which this raw CAS bypasses). A paid order keeps 'paid' and a
+        // 'pending_verification' one (proof uploaded) keeps its state: the merchant pays the buyer back by hand.
+        // The bare 'cancelled' literal takes the column's type (enum on some DBs, varchar in db-setup.js).
         casResult = await db.execute(sql`
             UPDATE orders
             SET status = 'cancelled', cancel_reason = ${reason},
-                payment_status = CASE WHEN payment_status IN ('unpaid', 'awaiting_payment', 'pending_verification') THEN 'cancelled'::enum_orders_payment_status ELSE payment_status END,
+                payment_status = CASE WHEN payment_status IN ('unpaid', 'awaiting_payment') THEN 'cancelled' ELSE payment_status END,
                 updated_at = NOW()
             WHERE id = ${orderId} AND status = ${currentStatus}
               AND easy_parcel_order_no IS NULL

@@ -190,7 +190,7 @@ const BEAUTY_RECIPES: CategoryRecipe[] = [
     id: 'beauty-services',
     label: 'Services-first',
     rhythm: 'services-first',
-    blocks: ['hero', 'service-cards', 'gallery', 'gallery', 'testimonials', 'cta', 'cta', 'contact', 'footer'],
+    blocks: ['hero', 'service-cards', 'products-featured', 'gallery', 'gallery', 'testimonials', 'cta', 'cta', 'contact', 'footer'],
     required: ['hero', 'service-cards', 'cta', 'contact'],
     middleShuffleRange: [2, 5],
     description: 'Services menu upfront — before/after visual proof. Best for spas + salons.',
@@ -199,7 +199,7 @@ const BEAUTY_RECIPES: CategoryRecipe[] = [
     id: 'beauty-portfolio',
     label: 'Portfolio-first',
     rhythm: 'portfolio-first',
-    blocks: ['hero', 'gallery', 'gallery', 'service-cards', 'testimonials', 'cta', 'contact', 'footer'],
+    blocks: ['hero', 'gallery', 'gallery', 'service-cards', 'products-featured', 'testimonials', 'cta', 'contact', 'footer'],
     required: ['hero', 'gallery', 'service-cards'],
     middleShuffleRange: [2, 4],
     description: 'Visual proof first — gallery + transformations. Best for nail studios + makeup artists.',
@@ -208,7 +208,7 @@ const BEAUTY_RECIPES: CategoryRecipe[] = [
     id: 'beauty-team',
     label: 'Team-first',
     rhythm: 'team-first',
-    blocks: ['hero', 'about', 'service-cards', 'gallery', 'testimonials', 'cta', 'contact', 'footer'],
+    blocks: ['hero', 'about', 'service-cards', 'products-featured', 'gallery', 'testimonials', 'cta', 'contact', 'footer'],
     required: ['hero', 'about', 'service-cards'],
     middleShuffleRange: [2, 4],
     description: 'Lead with the expertise story — about → services → gallery. Best for dermatology + clinics.',
@@ -430,7 +430,7 @@ const FNB_RECIPES: CategoryRecipe[] = [
     id: 'fnb-menu',
     label: 'Menu-first',
     rhythm: 'menu-first',
-    blocks: ['hero', 'features', 'features', 'gallery', 'testimonials', 'cta', 'contact', 'footer'],
+    blocks: ['hero', 'features', 'products-featured', 'features', 'gallery', 'testimonials', 'cta', 'contact', 'footer'],
     required: ['hero', 'features', 'contact'],
     middleShuffleRange: [2, 5],
     description: 'Menu upfront — for cafes + dessert shops + bakeries.',
@@ -439,7 +439,7 @@ const FNB_RECIPES: CategoryRecipe[] = [
     id: 'fnb-story',
     label: 'Story-first',
     rhythm: 'story-first',
-    blocks: ['hero', 'about', 'features', 'gallery', 'testimonials', 'cta', 'contact', 'footer'],
+    blocks: ['hero', 'about', 'features', 'products-featured', 'gallery', 'testimonials', 'cta', 'contact', 'footer'],
     required: ['hero', 'about', 'features'],
     middleShuffleRange: [2, 5],
     description: 'Craft story first — for specialty coffee + artisan bakeries.',
@@ -448,7 +448,7 @@ const FNB_RECIPES: CategoryRecipe[] = [
     id: 'fnb-gallery',
     label: 'Gallery-first',
     rhythm: 'gallery-first',
-    blocks: ['hero', 'gallery', 'features', 'features', 'testimonials', 'cta', 'contact', 'footer'],
+    blocks: ['hero', 'gallery', 'features', 'products-featured', 'features', 'testimonials', 'cta', 'contact', 'footer'],
     required: ['hero', 'gallery', 'features'],
     middleShuffleRange: [2, 4],
     description: 'Photos of drinks + ambience. Best for bubble tea shops + cocktail bars.',
@@ -617,7 +617,8 @@ export function pickRecipe(
     return BUSINESS_RECIPES[0]!
   }
   const nameHash = biz?.name ? djb2(biz.name) : 0
-  const effectiveSeed = Math.abs(Math.floor(seed)) ^ nameHash
+  // `^` yields a signed int32: a Date.now()-sized seed (fallback path) went negative → recipes[-1] → undefined → composer crash.
+  const effectiveSeed = (Math.abs(Math.floor(seed)) ^ nameHash) >>> 0
   const index = effectiveSeed % recipes.length
   return recipes[index]!
 }

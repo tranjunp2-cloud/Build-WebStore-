@@ -8,19 +8,30 @@
  * mails nobody (no budget spent), and a run where every email failed gives the day back; a reminder pushes to the phone
  * only for orders waiting (`metadata.push`), the other reminders stay in the bell.
  * TC-AICP-237 — "Run now" (previewAutomations) reads the same items but creates and sends nothing.
- * Real: runner, reminders, config, digest email, shop-todo texts. Faked: Payload (in-memory find/create with the unique
- * (tenant, user, dedupe key) index), `computeShopTodos` (items built from the real texts), `sendEmail`.
+ * TC-AICP-346 — the digest budget is reserved before the claim is awaited (parallel workers can not overspend it) and
+ * given back when the claim is lost or throws.
+ * TC-AICP-347 — only a unique violation counts as "the reminder exists"; any other create failure asks for a retry.
+ * TC-AICP-348 — the To do data is read once per workspace, only for the areas of the due automations (the website
+ * check only when site_health is due), and worded per recipient language; "Run now" reads the switched-on areas.
+ * Real: runner, reminders, config, digest email, shop-todo wording (`localizeShopTodos`) and texts. Faked: Payload
+ * (in-memory find/create with the unique (tenant, user, dedupe key) index, rejecting like Payload's adapter), the To do
+ * data read (`readShopTodoDrafts`), `computeShopTodos` (preview), `sendEmail`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ computeShopTodos: vi.fn(), sendEmail: vi.fn(), claim: vi.fn(), release: vi.fn() }))
+const mocks = vi.hoisted(() => ({ computeShopTodos: vi.fn(), readShopTodoDrafts: vi.fn(), sendEmail: vi.fn(), claim: vi.fn(), release: vi.fn() }))
 vi.mock('@/lib/automations/automation-store', () => ({ claimDigestDay: mocks.claim, releaseDigestDay: mocks.release }))
-vi.mock('@/lib/insights/shop-todo', () => ({ computeShopTodos: mocks.computeShopTodos }))
+vi.mock('@/lib/insights/shop-todo', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/insights/shop-todo')>()),
+    computeShopTodos: mocks.computeShopTodos,
+    readShopTodoDrafts: mocks.readShopTodoDrafts,
+}))
 vi.mock('@/lib/email/send', () => ({ sendEmail: mocks.sendEmail }))
 
 import { defaultAutomationSettings, parseAutomationSettings, type AutomationSettings } from '@/lib/automations/automation-config'
 import { pushWanted } from '@/lib/automations/automation-push'
-import { previewAutomations, runTenantAutomations, type TenantRunContext } from '@/lib/automations/automation-runner'
+import { isUniqueViolation, previewAutomations, runTenantAutomations, type TenantRunContext } from '@/lib/automations/automation-runner'
+import type { ShopTodoDraft } from '@/lib/insights/shop-todo'
 import { todoText, type ShopTodoKind, type TodoLocale } from '@/lib/insights/shop-todo-text'
 
 const TENANT = 4
@@ -34,13 +45,18 @@ const todosFor = (locale: TodoLocale) => [
     todo('discounts_expiring', '/discounts', locale, 1),
     todo('site_broken_links', '/editor/7', locale, 2),
 ]
+/** the same tasks as read from the data, before wording */
+const draft = (kind: ShopTodoKind, href: string, count = 3): ShopTodoDraft => ({ kind, severity: 'high', count, href, vars: { count, codes: ['RAYA10'] } })
+const DRAFTS = [draft('payment_proofs', '/orders'), draft('out_of_stock', '/products', 6), draft('discounts_expiring', '/discounts', 1), draft('site_broken_links', '/editor/7', 2)]
+/** what Payload's drizzle adapter throws for a Postgres 23505 (handleUpsertError) */
+const uniqueViolation = () => Object.assign(new Error('The following field is invalid: dedupeKey'), { name: 'ValidationError', data: { collection: 'notifications', errors: [{ message: 'Value must be unique', path: 'dedupeKey' }] } })
 
 type Row = Record<string, unknown>
 function fakePayload(users: Row[]) {
     const notifications: Row[] = []
     const create = vi.fn(async ({ collection, data }: { collection: string; data: Row }) => {
         if (collection !== 'notifications') throw new Error('unexpected collection')
-        if (notifications.some((n) => n.user === data.user && n.tenant === data.tenant && n.dedupeKey === data.dedupeKey)) throw new Error('duplicate key value violates unique constraint')
+        if (notifications.some((n) => n.user === data.user && n.tenant === data.tenant && n.dedupeKey === data.dedupeKey)) throw uniqueViolation()
         const row = { id: notifications.length + 1, ...data }
         notifications.push(row)
         return row
@@ -63,6 +79,7 @@ const tenant = { id: TENANT, name: 'Kedai Demo' }
 beforeEach(() => {
     vi.clearAllMocks()
     mocks.computeShopTodos.mockImplementation(async (_p: unknown, o: { locale: TodoLocale }) => todosFor(o.locale))
+    mocks.readShopTodoDrafts.mockResolvedValue(DRAFTS)
     mocks.sendEmail.mockResolvedValue(true)
     mocks.claim.mockResolvedValue(true)
     mocks.release.mockResolvedValue(undefined)
@@ -112,7 +129,7 @@ describe('runTenantAutomations notifications [TC-AICP-229]', () => {
 
         expect(result.status).toBe('nothing_due')
         expect(find).not.toHaveBeenCalled()
-        expect(mocks.computeShopTodos).not.toHaveBeenCalled()
+        expect(mocks.readShopTodoDrafts).not.toHaveBeenCalled()
     })
 
     it('tells owners and admins only, each in their language', async () => {
@@ -130,8 +147,9 @@ describe('runTenantAutomations notifications [TC-AICP-229]', () => {
         expect(notifications.map((n) => n.user).sort()).toEqual([1, 2])
         expect(notifications.find((n) => n.user === 1)!.title).toBe(todoText('out_of_stock', 'ms', { count: 6 }).title)
         expect(notifications.find((n) => n.user === 2)!.title).toBe(todoText('out_of_stock', 'en', { count: 6 }).title)
-        expect(mocks.computeShopTodos).toHaveBeenCalledTimes(2)
-        expect(mocks.computeShopTodos.mock.calls.map(([, o]) => o.tenantId)).toEqual([TENANT, TENANT])
+        // the data is read once for both languages, scoped to the workspace
+        expect(mocks.readShopTodoDrafts).toHaveBeenCalledTimes(1)
+        expect(mocks.readShopTodoDrafts.mock.calls[0]![1].tenantId).toBe(TENANT)
     })
 
     it('says no_recipients when nobody can be told', async () => {
@@ -155,7 +173,7 @@ describe('runTenantAutomations notifications [TC-AICP-229]', () => {
 
     it('does not fail when a concurrent run wins the unique index for one row', async () => {
         const { payload, create, notifications } = fakePayload([user(1)])
-        create.mockRejectedValueOnce(new Error('duplicate key value violates unique constraint'))
+        create.mockRejectedValueOnce(uniqueViolation())
 
         const result = await runTenantAutomations(payload, tenant, defaultAutomationSettings(), ctx())
 
@@ -165,7 +183,7 @@ describe('runTenantAutomations notifications [TC-AICP-229]', () => {
     })
 
     it('creates no reminder for an automation without items', async () => {
-        mocks.computeShopTodos.mockResolvedValue([todo('low_stock', '/products', 'en', 2)])
+        mocks.readShopTodoDrafts.mockResolvedValue([draft('low_stock', '/products', 2)])
         const { payload, notifications } = fakePayload([user(1)])
 
         await runTenantAutomations(payload, tenant, defaultAutomationSettings(), ctx())
@@ -220,7 +238,7 @@ describe('runTenantAutomations digest [TC-AICP-230]', () => {
     })
 
     it('mails nothing when the automations found nothing', async () => {
-        mocks.computeShopTodos.mockResolvedValue([])
+        mocks.readShopTodoDrafts.mockResolvedValue([])
         const { payload } = fakePayload([user(1)])
 
         await runTenantAutomations(payload, tenant, withDigest(), ctx())
@@ -333,6 +351,142 @@ describe('digest claim and push policy [TC-AICP-275]', () => {
     })
 })
 
+describe('digest budget reservation [TC-AICP-346]', () => {
+    const withDigest = (): AutomationSettings => ({ ...defaultAutomationSettings(), digest: { enabled: true, frequency: 'daily' } })
+
+    it('[TC-AICP-346] reserves the emails before the claim is awaited, so a parallel worker sees the smaller budget', async () => {
+        // Arrange
+        const budget = { left: 3 }
+        const seenDuringClaim: number[] = []
+        mocks.claim.mockImplementation(async () => {
+            seenDuringClaim.push(budget.left)
+            return true
+        })
+
+        // Act: two runs (separate workers) with two mailable owners each, in parallel, against a budget of 3
+        const [a, b] = await Promise.all([
+            runTenantAutomations(fakePayload([user(1), user(2, { email: 'b@shop.test' })]).payload, tenant, withDigest(), ctx({ emailBudget: budget })),
+            runTenantAutomations(fakePayload([user(3), user(4, { email: 'd@shop.test' })]).payload, tenant, withDigest(), ctx({ emailBudget: budget })),
+        ])
+
+        // Assert: one workspace got the budget, the other is retried later; never more than 3 emails
+        expect(seenDuringClaim).toEqual([1])
+        expect([a.status, b.status].sort()).toEqual(['done', 'retry_later'])
+        expect(mocks.sendEmail).toHaveBeenCalledTimes(2)
+        expect(budget.left).toBe(1)
+    })
+
+    it('[TC-AICP-346] gives the reservation back when the day is taken or the claim throws', async () => {
+        // Arrange
+        const budget = { left: 10 }
+        mocks.claim.mockResolvedValueOnce(false).mockRejectedValueOnce(new Error('connection lost'))
+
+        // Act
+        const lost = await runTenantAutomations(fakePayload([user(1), user(2, { email: 'b@shop.test' })]).payload, tenant, withDigest(), ctx({ emailBudget: budget }))
+        const thrown = runTenantAutomations(fakePayload([user(1), user(2, { email: 'b@shop.test' })]).payload, tenant, withDigest(), ctx({ emailBudget: budget }))
+
+        // Assert
+        expect(lost.digests).toBe(0)
+        await expect(thrown).rejects.toThrow('connection lost')
+        expect(budget.left).toBe(10)
+        expect(mocks.sendEmail).not.toHaveBeenCalled()
+    })
+})
+
+describe('notification failures [TC-AICP-347]', () => {
+    it('[TC-AICP-347] retries the workspace when a notification failed for another reason than "already exists"', async () => {
+        // Arrange
+        const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        const { payload, create, notifications } = fakePayload([user(1)])
+        create.mockRejectedValueOnce(new Error('Connection terminated unexpectedly'))
+
+        // Act
+        const result = await runTenantAutomations(payload, tenant, defaultAutomationSettings(), ctx())
+
+        // Assert
+        expect(result).toMatchObject({ status: 'retry_later', notifications: 2 })
+        expect(notifications).toHaveLength(2)
+        log.mockRestore()
+    })
+
+    it('[TC-AICP-347] a rerun after the failure creates only the missing reminder and finishes the day', async () => {
+        // Arrange
+        const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        const { payload, create, notifications } = fakePayload([user(1)])
+        create.mockRejectedValueOnce(new Error('Connection terminated unexpectedly'))
+        await runTenantAutomations(payload, tenant, defaultAutomationSettings(), ctx())
+
+        // Act
+        const again = await runTenantAutomations(payload, tenant, defaultAutomationSettings(), ctx())
+
+        // Assert
+        expect(again).toMatchObject({ status: 'done', notifications: 1 })
+        expect(notifications).toHaveLength(3)
+        log.mockRestore()
+    })
+
+    it.each([
+        ['Payload ValidationError "Value must be unique"', uniqueViolation(), true],
+        ['raw pg 23505', Object.assign(new Error('duplicate key'), { code: '23505' }), true],
+        ['pg 23505 as the cause', Object.assign(new Error('insert failed'), { cause: { code: '23505' } }), true],
+        ['another ValidationError (required field)', Object.assign(new Error('invalid'), { name: 'ValidationError', data: { errors: [{ message: 'This field is required.', path: 'title' }] } }), false],
+        ['a connection error', new Error('Connection terminated unexpectedly'), false],
+        ['a message that only mentions "unique"', new Error('duplicate key value violates unique constraint'), false],
+        ['nothing', null, false],
+    ])('[TC-AICP-347] isUniqueViolation: %s -> %s', (_label, error, expected) => {
+        expect(isUniqueViolation(error)).toBe(expected)
+    })
+})
+
+describe('one read per workspace, scoped to the due automations [TC-AICP-348]', () => {
+    it('[TC-AICP-348] on a weekday reads orders, products and leads but never runs the website check', async () => {
+        // Arrange
+        const { payload } = fakePayload([user(1), user(2, { prefer_lang: 'ms' })])
+
+        // Act
+        await runTenantAutomations(payload, tenant, defaultAutomationSettings(), ctx())
+
+        // Assert
+        expect(mocks.readShopTodoDrafts).toHaveBeenCalledTimes(1)
+        expect(mocks.readShopTodoDrafts).toHaveBeenCalledWith(payload, { tenantId: TENANT, now: TUESDAY, areas: { orders: true, products: true, builder: false, settings: false, leads: true } })
+        expect(mocks.computeShopTodos).not.toHaveBeenCalled()
+    })
+
+    it('[TC-AICP-348] on Monday includes the website, and with only stock on reads products alone', async () => {
+        // Arrange
+        const monday = fakePayload([user(1)])
+        const stockOnly = parseAutomationSettings({ enabled: { discounts: false, orders_waiting: false, leads: false, site_health: false } })
+
+        // Act
+        await runTenantAutomations(monday.payload, tenant, defaultAutomationSettings(), ctx({ now: MONDAY }))
+        await runTenantAutomations(fakePayload([user(1)]).payload, tenant, stockOnly, ctx())
+
+        // Assert
+        const [first, second] = mocks.readShopTodoDrafts.mock.calls.map(([, o]) => o.areas)
+        expect(first).toEqual({ orders: true, products: true, builder: true, settings: false, leads: true })
+        expect(second).toEqual({ orders: false, products: true, builder: false, settings: false, leads: false })
+    })
+
+    it('[TC-AICP-348] the reminders are the same as wording the To do list per language', async () => {
+        // Arrange
+        const { payload, notifications } = fakePayload([user(1), user(2, { prefer_lang: 'ms' })])
+
+        // Act
+        await runTenantAutomations(payload, tenant, defaultAutomationSettings(), ctx())
+
+        // Assert
+        const byUser = (id: number) => notifications.filter((n) => n.user === id).map((n) => [n.dedupeKey, n.title, n.message, n.actionUrl])
+        const expected = (locale: TodoLocale) =>
+            [['discounts', 'discounts_expiring', 1], ['stock', 'out_of_stock', 6], ['orders_waiting', 'payment_proofs', 3]].map(([automation, kind, count]) => {
+                const text = todoText(kind as ShopTodoKind, locale, { count: count as number, codes: ['RAYA10'] })
+                const href = DRAFTS.find((d) => d.kind === kind)!.href
+                return [`automation:${automation}:2026-10-27`, text.title, text.detail, `${href}?todo=${kind}`]
+            })
+        expect(byUser(1)).toEqual(expected('en'))
+        expect(byUser(2)).toEqual(expected('ms'))
+    })
+})
+
 describe('pushWanted (the Notifications hook) [TC-AICP-275]', () => {
     it.each([
         [{ type: 'ORDER_NEW' }, true],
@@ -360,7 +514,10 @@ describe('previewAutomations ("Run now") [TC-AICP-237]', () => {
         expect(preview.digest).toEqual({ enabled: true, frequency: 'weekly' })
         expect(create).not.toHaveBeenCalled()
         expect(mocks.sendEmail).not.toHaveBeenCalled()
-        expect(mocks.computeShopTodos).toHaveBeenCalledWith(payload, { tenantId: TENANT, now: TUESDAY, locale: 'en' })
+        // the switched-on areas only (leads is off), weekly ones included
+        expect(mocks.computeShopTodos).toHaveBeenCalledWith(payload, {
+            tenantId: TENANT, now: TUESDAY, locale: 'en', areas: { orders: true, products: true, builder: true, settings: false, leads: false },
+        })
     })
 
     it('skips the To do queries when everything is off', async () => {

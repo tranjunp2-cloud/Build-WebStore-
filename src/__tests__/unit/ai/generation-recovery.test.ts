@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { queueGenerationRecovery } from '@/lib/ai/generation-recovery'
 import { runGenerationRecoveryJob } from '@/lib/ai/generation-recovery-worker'
 import { hashGenerationSnapshot } from '@/lib/ai/generation-snapshot-hash'
+import { enforceGroundedBlocks } from '@/lib/ai/grounded-blocks'
 
 vi.mock('@/lib/ai/openai-generator', () => ({
     generateSiteWithAI: vi.fn(),
@@ -155,10 +156,75 @@ describe('runGenerationRecoveryJob', () => {
             undefined,
             'en',
             expect.stringContaining('The original recovery brief'),
+            undefined,
+            undefined,
+            { facts: expect.objectContaining({ brand: 'Demo' }) },
         )
         expect(updates.filter((call) => call.collection === 'ai-generation-records' && call.id === 41))
             .toEqual([expect.objectContaining({ data: { recoveryStatus: 'none' } })])
         expect(updates.some((call) => call.collection === 'ai-generation-records' && call.id === 41 && Object.keys(call.data as object).some((key) => key !== 'recoveryStatus'))).toBe(false)
+    })
+
+    it('TC-AIAUD-200: recovery rebuilds FACTS from the frozen snapshot, scrubs invented blocks and saves no empty required list', async () => {
+        // Arrange — the model invents testimonials/stats/features; the merchant gave no real ones.
+        const invented = [
+            { blockType: 'hero', headline: 'Demo' },
+            { blockType: 'testimonials', testimonials: [{ quote: 'Best app ever', name: 'Jane', role: 'CEO' }] },
+            { blockType: 'stats', stats: [{ value: '10,000+', label: 'Happy customers' }, { value: '99%', label: 'Satisfaction' }] },
+            { blockType: 'features', features: [] },
+        ]
+        vi.mocked(generateSiteWithAI).mockImplementation((async (...args: unknown[]) => {
+            const options = (args[6] ?? {}) as { facts?: Parameters<typeof enforceGroundedBlocks>[1] }
+            return {
+                result: {
+                    siteName: 'Recovery site', siteType: 'business', theme: 'modern',
+                    seo: { title: 'Recovery', description: 'Recovery draft' },
+                    pages: [{ title: 'Home', slug: '/', blocks: enforceGroundedBlocks(invented, options.facts, 'en'), seo: { title: 'Home', description: 'Home page' } }],
+                },
+            }
+        }) as never)
+        const job = { id: 99, status: 'running', leaseToken: 'lease-1', childGeneration: 42, sourceGeneration: 41, tenant: 9 }
+        const payload = {
+            findByID: vi.fn(async ({ collection, id }) => collection === 'tenants' ? { id, payments: { payment_cod: true } } : id === 99 ? job : { id: 42, inputSnapshot: snapshot }),
+            create: vi.fn().mockResolvedValueOnce({ id: 501 }).mockResolvedValueOnce({ id: 601 }),
+            update: vi.fn(async () => ({})),
+        }
+
+        // Act
+        const result = await runGenerationRecoveryJob(payload, { jobId: 99, leaseToken: 'lease-1' })
+
+        // Assert
+        expect(result).toEqual({ status: 'succeeded', siteId: '501' })
+        const options = vi.mocked(generateSiteWithAI).mock.calls.at(-1)?.[6] as { facts?: { brand: string; paymentMethods: string[] } }
+        expect(options.facts).toMatchObject({ brand: 'Demo', paymentMethods: ['Cash on delivery'] })
+        const layout = (payload.create.mock.calls[1]?.[0].data as { layout: Array<Record<string, unknown>> }).layout
+        expect(layout.map((b) => b.blockType)).toEqual(['hero', 'testimonials'])
+        const testimonials = (layout[1]!.testimonials as Array<{ quote: string }>)
+        expect(JSON.stringify(testimonials)).not.toContain('Best app ever')
+    })
+
+    it('TC-AIAUD-201: recovery drops an empty required stats / features list even when the generator returns one', async () => {
+        // Arrange
+        vi.mocked(generateSiteWithAI).mockResolvedValue({
+            result: {
+                siteName: 'Recovery site', siteType: 'business', theme: 'modern',
+                seo: { title: 'Recovery', description: 'Recovery draft' },
+                pages: [{ title: 'Home', slug: '/', blocks: [{ blockType: 'hero', headline: 'Demo' }, { blockType: 'stats', stats: [] }, { blockType: 'features' }], seo: { title: 'Home', description: 'Home page' } }],
+            },
+        } as never)
+        const job = { id: 99, status: 'running', leaseToken: 'lease-1', childGeneration: 42, sourceGeneration: 41, tenant: 9 }
+        const payload = {
+            findByID: vi.fn(async ({ id }) => id === 99 ? job : { id: 42, inputSnapshot: snapshot }),
+            create: vi.fn().mockResolvedValueOnce({ id: 501 }).mockResolvedValueOnce({ id: 601 }),
+            update: vi.fn(async () => ({})),
+        }
+
+        // Act
+        await runGenerationRecoveryJob(payload, { jobId: 99, leaseToken: 'lease-1' })
+
+        // Assert
+        const layout = (payload.create.mock.calls[1]?.[0].data as { layout: Array<Record<string, unknown>> }).layout
+        expect(layout.map((b) => b.blockType)).toEqual(['hero'])
     })
 
     it('TC-F41-12: terminalizes a failed child and makes only the parent ticket-eligible', async () => {
@@ -196,6 +262,7 @@ describe('runGenerationRecoveryJob', () => {
                 .mockResolvedValueOnce({ id: 42, inputSnapshot: snapshot })
                 .mockResolvedValueOnce(ownedJob)
                 .mockResolvedValueOnce(ownedJob)
+                .mockResolvedValueOnce({ id: 9 }) // tenant FACTS read
                 .mockResolvedValueOnce(reclaimedJob),
             create: vi.fn(), update: vi.fn(async (args) => { updates.push(args); return {} }),
         }

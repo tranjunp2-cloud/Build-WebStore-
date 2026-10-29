@@ -13,12 +13,6 @@ import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
 
-const FALLBACK_PLANS: PricingConfig['plans'] = [
-    { name: 'Starter', price: 'RM 99', period: 'mo', features: [{ text: 'Core features', included: true }, { text: 'Email support', included: true }], ctaLabel: 'Get Started', ctaUrl: '/contact' },
-    { name: 'Pro', price: 'RM 299', period: 'mo', features: [{ text: 'All Starter features', included: true }, { text: 'Priority support', included: true }, { text: 'Advanced tools', included: true }], ctaLabel: 'Choose Pro', ctaUrl: '/contact', highlighted: true },
-    { name: 'Enterprise', price: 'Custom', features: [{ text: 'All Pro features', included: true }, { text: 'Dedicated manager', included: true }], ctaLabel: 'Contact Sales', ctaUrl: '/contact' },
-]
-
 void _StaggerGrid
 void _StaggerItem
 void _HoverCard
@@ -134,7 +128,9 @@ function FeatureList({ features, className = 'space-y-3' }: FeatureListProps) {
 
 export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
     const { headline, subheadline, plans: rawPlans = [], variant = 'cards' } = block
-    const plans = rawPlans.length > 0 ? rawPlans : FALLBACK_PLANS
+    // No plans = nothing to show: never invent tiers or prices (renders nothing, like stats/team/faq)
+    if (rawPlans.length === 0) return null
+    const plans = rawPlans
 
     // ── horizontal variant ────────────────────────────────────────────────
     if (variant === 'horizontal') {

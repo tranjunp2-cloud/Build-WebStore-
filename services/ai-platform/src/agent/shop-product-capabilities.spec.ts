@@ -25,7 +25,7 @@ const jsonSchema = (schema: unknown) => z.toJSONSchema(schema as z.ZodType, { io
 const tool = (capabilities: ReturnType<typeof set>, name: MerchantToolName) =>
 	(createMerchantTools(deps(), capabilities) as unknown as Record<string, { description: string; inputSchema: z.ZodType }>)[name] as { description: string; inputSchema: z.ZodType };
 
-const SHOP_TOOLS = ["propose_shop_product_update", "propose_shop_product_status", "propose_shop_product_drafts"];
+const SHOP_TOOLS = ["propose_shop_product_update", "propose_shop_product_status", "propose_shop_product_drafts", "propose_shop_products_setup"];
 const STAGING: Capability[] = ["site", "blog", "stock_photos", "shop_products"];
 
 describe("shop_products capability config [TC-AIREL-51]", () => {
@@ -62,7 +62,7 @@ describe("shop_products capability config [TC-AIREL-51]", () => {
 });
 
 describe("tools per set with shop_products [TC-AIREL-52]", () => {
-	it("maps the three Payload product tools to shop_products only", () => {
+	it("maps the four Payload product tools to shop_products only", () => {
 		for (const name of SHOP_TOOLS) expect(TOOL_CAPABILITIES[name as MerchantToolName]).toEqual(["shop_products"]);
 		expect(TOOL_CAPABILITIES.read_item).toContain("shop_products");
 		expect(TOOL_CAPABILITIES.search_items).toContain("shop_products");
@@ -82,7 +82,7 @@ describe("tools per set with shop_products [TC-AIREL-52]", () => {
 		}
 	});
 
-	it("offers shop_products alone the reads, the three tools and ask_user / current_page", () => {
+	it("offers shop_products alone the reads, the four tools and ask_user / current_page", () => {
 		expect(names(set("shop_products"))).toEqual(["ask_user", "read_item", "search_items", "current_page", ...SHOP_TOOLS]);
 	});
 });

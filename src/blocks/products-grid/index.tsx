@@ -326,6 +326,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                             theme={theme}
                             siteBasePath={siteBasePath}
                             siteName={site?.name ?? undefined}
+                            site={site}
                         />
                     </StaggerItem>
                 ))}

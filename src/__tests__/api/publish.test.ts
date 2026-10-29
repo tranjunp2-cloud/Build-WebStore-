@@ -362,6 +362,128 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(pageUpdate![0].data).not.toHaveProperty('_currentVersionId')
     })
 
+    describe('[TC-AIAUD-037/038] AI blog posts go live with the first publish (#2103 A4)', () => {
+        // siteStatus 'unpublished' = a site that was published once, then taken offline (status draft, publishedAt kept)
+        const run = async (siteStatus: 'draft' | 'published' | 'unpublished', blogs: Array<Record<string, unknown>>) => {
+            const { getPayload } = await import('payload')
+            mockSiteRecord = {
+                ...mockSiteRecord,
+                status: siteStatus === 'published' ? 'published' : 'draft',
+                publishedAt: siteStatus === 'draft' ? null : '2026-01-01T00:00:00.000Z',
+            }
+            const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+                if (collection === 'sites') {
+                    mockSiteRecord = { ...mockSiteRecord, ...data }
+                    return mockSiteRecord
+                }
+                return { id, ...data }
+            })
+            // the blogs query is honoured the way the database would: only the clauses we send filter the posts
+            const matchesBlogWhere = (doc: Record<string, unknown>, where: { and?: Array<Record<string, { equals: unknown }>> }) =>
+                (where.and ?? []).every((clause) =>
+                    Object.entries(clause).every(([field, cond]) =>
+                        field === 'status' || field === 'aiSeeded' ? (doc[field] ?? false) === cond.equals : true))
+            const findSpy = vi.fn().mockImplementation(async ({ collection, where }) =>
+                collection === 'blogs'
+                    ? { docs: blogs.filter((b) => matchesBlogWhere(b, where)), hasNextPage: false }
+                    : { docs: [{ id: 'page-1', _status: 'draft', site: 'site-123', layout: [] }], hasNextPage: false })
+            // @ts-ignore
+            vi.mocked(getPayload).mockResolvedValueOnce({
+                findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                    if (collection === 'sites' && id === mockSiteRecord.id) {
+                        return depth === 1 ? { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } } : mockSiteRecord
+                    }
+                    return null
+                }),
+                find: findSpy,
+                update: updateSpy,
+            })
+            const res = await PublishPATCH(makePatchReq('site-123'), { params: Promise.resolve({ siteId: 'site-123' }) })
+            return { res, updateSpy, findSpy }
+        }
+        const seeded = { id: 'b1', slug: 'tenant-1-first-time-diners', status: 'draft', aiSeeded: true }
+        const ownDraft = { id: 'b2', slug: 'my-own-draft', status: 'draft' }
+        const copilotDraft = { id: 'b3', slug: 'tenant-1-copilot-post', status: 'draft', aiChangeSetId: 'cs-1' }
+        // an owner draft whose slug starts with the tenant id, like `10-tips-for-…`
+        const ownNumericDraft = { id: 'b4', slug: 'tenant-1-tips-for-first-timers', status: 'draft' }
+
+        it('TC-AIAUD-037: first publish promotes only the seeded AI draft posts, silently', async () => {
+            const { res, updateSpy, findSpy } = await run('draft', [seeded, ownDraft, copilotDraft, ownNumericDraft])
+
+            expect(res.status).toBe(200)
+            expect(findSpy).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'blogs',
+                where: { and: expect.arrayContaining([{ status: { equals: 'draft' } }]) },
+            }))
+            const blogUpdates = updateSpy.mock.calls.filter((c) => c[0].collection === 'blogs')
+            expect(blogUpdates.map((c) => c[0].id)).toEqual(['b1'])
+            expect(blogUpdates[0]![0].data.status).toBe('published')
+            expect(typeof blogUpdates[0]![0].data.publishedAt).toBe('string')
+            // the marker is cleared once the post is live, so it can never be promoted a second time
+            expect(blogUpdates[0]![0].data.aiSeeded).toBe(false)
+            expect(blogUpdates[0]![0].context).toEqual({ skipPublishNotify: true, promoteAiSeeded: true })
+        })
+
+        it('TC-AIAUD-140: publish -> unpublish -> publish does not re-promote an AI post the owner took down (marker cleared)', async () => {
+            // first publish: the seeded draft goes live
+            const first = await run('draft', [seeded])
+            expect(first.updateSpy.mock.calls.filter((c) => c[0].collection === 'blogs').map((c) => c[0].id)).toEqual(['b1'])
+            // the owner unpublishes the site and the post (marker cleared by the first publish), then publishes again
+            const takenDown = { id: 'b1', slug: 'tenant-1-first-time-diners', status: 'draft', aiSeeded: false }
+            const second = await run('unpublished', [takenDown])
+            expect(second.res.status).toBe(200)
+            expect(second.updateSpy.mock.calls.filter((c) => c[0].collection === 'blogs')).toHaveLength(0)
+        })
+
+        it('TC-AIAUD-203: regenerate + republish promotes the new seeded posts even though the site kept its publishedAt', async () => {
+            // regeneration resets the site to draft but keeps publishedAt; the new posts are seeded + draft
+            const regenerated = { id: 'b9', slug: 'tenant-1-new-post', status: 'draft', aiSeeded: true }
+            const { res, updateSpy } = await run('unpublished', [regenerated, ownDraft])
+            expect(res.status).toBe(200)
+            const blogUpdates = updateSpy.mock.calls.filter((c) => c[0].collection === 'blogs')
+            expect(blogUpdates.map((c) => c[0].id)).toEqual(['b9'])
+            expect(blogUpdates[0]![0].data).toMatchObject({ status: 'published', aiSeeded: false })
+        })
+
+        it('TC-AIAUD-142: an owner draft whose slug starts with the tenant id is not promoted', async () => {
+            const { res, updateSpy } = await run('draft', [ownNumericDraft])
+            expect(res.status).toBe(200)
+            expect(updateSpy.mock.calls.filter((c) => c[0].collection === 'blogs')).toHaveLength(0)
+        })
+
+        it('TC-AIAUD-038: re-publishing an already-published site never touches blogs', async () => {
+            const { res, updateSpy } = await run('published', [seeded])
+
+            expect(res.status).toBe(200)
+            expect(updateSpy.mock.calls.filter((c) => c[0].collection === 'blogs')).toHaveLength(0)
+        })
+
+        it('TC-AIAUD-037b: a failing blog promotion does not fail the publish', async () => {
+            const { getPayload } = await import('payload')
+            mockSiteRecord = { ...mockSiteRecord, status: 'draft', publishedAt: null }
+            // @ts-ignore
+            vi.mocked(getPayload).mockResolvedValueOnce({
+                findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) =>
+                    collection === 'sites' && id === mockSiteRecord.id
+                        ? (depth === 1 ? { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } } : mockSiteRecord)
+                        : null),
+                find: vi.fn().mockImplementation(async ({ collection }) => {
+                    if (collection === 'blogs') throw new Error('blogs table unavailable')
+                    return { docs: [], hasNextPage: false }
+                }),
+                update: vi.fn().mockImplementation(async ({ collection, data }) => {
+                    mockSiteRecord = { ...mockSiteRecord, ...data }
+                    return mockSiteRecord
+                }),
+            })
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+            const res = await PublishPATCH(makePatchReq('site-123'), { params: Promise.resolve({ siteId: 'site-123' }) })
+            expect(res.status).toBe(200)
+            expect(warn).toHaveBeenCalledWith('[Publish] could not publish the generated blog posts', 'blogs table unavailable')
+            warn.mockRestore()
+        })
+    })
+
     it('TC-F01-pub-12: strips block + nested array id/_uuid before promote so cross-page UUID collisions do not hit pg unique constraint', async () => {
         // Regression (pages 790 + 793): AI generate-site seeded multiple pages
         // with colliding block UUIDs. First page publishes OK, second page's

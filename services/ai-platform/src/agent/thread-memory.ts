@@ -106,9 +106,14 @@ export function threadPreview(prompt: string): string {
 
 const STAGED_SUMMARY_MAX_CHARS = 200;
 
+/** Prefix of a staged-draft record line (tool routing reads those lines out of earlier replies). */
+export const STAGED_LINE_PREFIX = "<staged_draft ";
+
 /**
  * The static line a staged change set leaves in history: its id, title and
  * summary (e.g. the product names) — all fixed at staging, so the line never changes.
+ * It is a tag, not a bracketed sentence, so it reads as platform bookkeeping the model has no
+ * reason to imitate; whatever slips into a reply is removed by `stripInternalMarkers`.
  */
 export function stagedLine(changeSet: { id: string; title: string; summary?: string }): string {
 	const summary = collapse(changeSet.summary ?? "");
@@ -116,7 +121,8 @@ export function stagedLine(changeSet: { id: string; title: string; summary?: str
 		summary && !changeSet.title.includes(summary)
 			? ` — ${summary.length > STAGED_SUMMARY_MAX_CHARS ? `${summary.slice(0, STAGED_SUMMARY_MAX_CHARS - 1).trimEnd()}…` : summary}`
 			: "";
-	return `[Staged draft ${changeSet.id}: ${changeSet.title}${detail}]`;
+	// `<` / `>` in a title would close the tag early
+	return `${STAGED_LINE_PREFIX}id="${changeSet.id}">${`${changeSet.title}${detail}`.replace(/[<>]/g, " ")}</staged_draft>`;
 }
 
 type StagedRef = { id: string; title: string; summary?: string };

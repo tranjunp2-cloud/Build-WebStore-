@@ -13,8 +13,9 @@ import { checkRateLimit } from '@/lib/rateLimit'
 import { withPayloadRetry, classifyTransientError } from '@/lib/payload-retry'
 import { stripOrphanMediaRefs, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
 import { sanitizeTheme } from '@/lib/theme/sanitize-theme'
-import { mergeGlobalBlocks } from '@/lib/sites/merge-global-blocks'
-import { bumpEditorRevision, DraftChangedError, formatDraftVersion, parseDraftVersion, readEditorRevision, staleParts, txExec, type EditorRevision } from '@/lib/sites/editor-revision'
+import { mergeGlobalBlocks, type GlobalBlocks } from '@/lib/sites/merge-global-blocks'
+import { canonicalJson } from '@/lib/ai/generation-snapshot-hash'
+import { bumpEditorRevision, DraftChangedError, formatDraftVersion, ownsLastWrite, parseDraftVersion, readEditorRevision, staleParts, txExec, type EditorRevision } from '@/lib/sites/editor-revision'
 import { sanitizeLegacyOpeningHours } from '@/components/editor/local-business/opening-hours-utils'
 import type { OpeningHourRow } from '@/components/editor/local-business/types'
 import {
@@ -24,6 +25,43 @@ import {
     withTenantRowLock,
     type TenantTransactionRequest,
 } from '@/lib/payload/tenant-row-lock'
+
+type SiteFrames = {
+    theme?: unknown
+    headerBlock?: unknown
+    footerBlock?: unknown
+    globalBlocks?: unknown
+}
+
+const sameJson = (left: unknown, right: unknown) => canonicalJson(left ?? null) === canonicalJson(right ?? null)
+/** What the editor shows for a header / footer / widgets: the pending draft, else the live value (editor-data). */
+const draftOf = (pending: unknown, live: unknown) => (pending != null ? pending : live ?? null)
+const asRecord = (value: unknown): Record<string, unknown> =>
+    value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+
+/**
+ * Whether this save changes the site part of the draft (theme, menu, footer, widgets) compared to what is
+ * stored — the same values the route would write. Every save sends these frames, so only a real change
+ * counts as a site write: an unchanged theme / menu neither needs the site revision to match nor bumps it
+ * (otherwise each autosave would make every other tab's next save stale).
+ */
+function siteFramesChanged(stored: Record<string, unknown>, sent: SiteFrames): boolean {
+    if (sent.theme && !sameJson(sanitizeTheme(asRecord(sent.theme)), sanitizeTheme(asRecord(stored.theme)))) return true
+    for (const [field, pendingField] of [['headerBlock', 'pendingHeaderBlock'], ['footerBlock', 'pendingFooterBlock']] as const) {
+        if (sent[field] === undefined) continue
+        // the route stores the sent value as pending; null pending = the live one shows
+        if (!sameJson(draftOf(sent[field], stored[field]), draftOf(stored[pendingField], stored[field]))) return true
+    }
+    if (sent.globalBlocks !== undefined) {
+        const storedDraft = draftOf(stored.pendingGlobalBlocks, stored.globalBlocks)
+        const merged = mergeGlobalBlocks(
+            (stored.pendingGlobalBlocks ?? stored.globalBlocks ?? null) as GlobalBlocks,
+            sent.globalBlocks as GlobalBlocks,
+        )
+        if (!sameJson(draftOf(merged, stored.globalBlocks), storedDraft)) return true
+    }
+    return false
+}
 
 class SavePageNotFoundError extends Error {
     readonly pageId: string
@@ -102,7 +140,7 @@ export async function PATCH(
         const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
-        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, localBusiness, socialLinks, branding, seo, isDraft, localeContent, pendingLocaleConfirm, base } = data!
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, localBusiness, socialLinks, branding, seo, isDraft, localeContent, pendingLocaleConfirm, base, saveId } = data!
 
         let validatedLocalBusiness: unknown
         if (localBusiness !== undefined) {
@@ -264,17 +302,21 @@ export async function PATCH(
             const page = await resolvePage(transactionReq)
 
             // Refuse a save made from an older draft than the stored one: it would overwrite what was
-            // written since (another tab, an approved copilot change). Only the parts this save writes count.
+            // written since (another tab, an approved copilot change). Only the parts this save CHANGES
+            // count: the theme / menu / footer / widgets are sent with every save, unchanged ones are no write.
             const exec = txExec(payload, transactionReq)
+            const siteFrames: SiteFrames = { theme, headerBlock, footerBlock, globalBlocks }
+            const siteFramesSent = Object.values(siteFrames).some((value) => value !== undefined)
             const writes = {
-                site: theme !== undefined || headerBlock !== undefined || footerBlock !== undefined,
+                site: siteFramesChanged(lockedSite as unknown as Record<string, unknown>, siteFrames),
                 page: Boolean(page && (normalizedBlocks || localeContent)),
             }
             // a save that writes no page still reports the open page's revision (the editor keeps one base)
             const revisionPage = page ?? await resolvePage(transactionReq, true).catch(() => null)
             const revisionPageId = revisionPage ? Number(revisionPage.id) : null
             const current = await readEditorRevision(exec, numericSiteId, revisionPageId)
-            const stale = staleParts(parseDraftVersion(base), current, writes)
+            const baseRevision = parseDraftVersion(base)
+            const stale = staleParts(baseRevision, current, writes, saveId)
             if (stale.length > 0) throw new DraftChangedError(current, stale)
 
             const siteUpdateData: SiteUpdateData = {}
@@ -332,8 +374,16 @@ export async function PATCH(
                 )
             }
 
-            await bumpEditorRevision(exec, numericSiteId, { site: writes.site, pageIds: writes.page && page ? [page.id] : [] })
-            savedRevision = await readEditorRevision(exec, numericSiteId, revisionPageId)
+            await bumpEditorRevision(exec, numericSiteId, { site: writes.site, pageIds: writes.page && page ? [page.id] : [] }, saveId)
+            const after = await readEditorRevision(exec, numericSiteId, revisionPageId)
+            // Never hand the editor a revision it has not seen: a part this save did not check stays at the
+            // base it sent (a settings save, an unchanged theme on a site changed elsewhere), so a later save
+            // that does change that part is still checked against what this tab loaded.
+            const siteSeen = writes.site || (siteFramesSent && baseRevision !== null
+                && (baseRevision.site === current.site || ownsLastWrite(current, 'site', saveId)))
+            savedRevision = baseRevision
+                ? { site: siteSeen ? after.site : baseRevision.site, page: writes.page ? after.page : baseRevision.page }
+                : { site: after.site, page: after.page }
         })
 
         try {

@@ -3,7 +3,8 @@
  *
  * isAiTasksEnabled: AI_PLATFORM_URL + AI_PLATFORM_CONTEXT_SECRET (>= 32 chars). The old
  * AI_TASKS_ENABLED production flag is gone and must have no effect.
- * isAiAgentEnabled: same platform requirement, plus AI_AGENT_ENABLED=true on production.
+ * isAiAgentEnabled: same platform requirement, plus AI_AGENT_ENABLED=true on production;
+ * AI_AGENT_ENABLED=false turns it off everywhere (TC-AICP-341).
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -145,5 +146,29 @@ describe('platform endpoint helpers and the unavailable message [TC-AISEC-02]', 
     it('keeps the user-facing unavailable message free of configuration names', () => {
         expect(AI_UNAVAILABLE_MESSAGE.length).toBeGreaterThan(0)
         expect(AI_UNAVAILABLE_MESSAGE).not.toMatch(/OPENAI|API_KEY|AI_PLATFORM|SECRET/i)
+    })
+})
+
+describe('isAiAgentEnabled kill switch [TC-AICP-341]', () => {
+    it.each([
+        ['preview + false → off', { NODE_ENV: 'production', VERCEL_ENV: 'preview', AI_AGENT_ENABLED: 'false' }, false],
+        ['development + false → off', { NODE_ENV: 'development', AI_AGENT_ENABLED: 'false' }, false],
+        ['development + " FALSE " → off', { NODE_ENV: 'development', AI_AGENT_ENABLED: ' FALSE ' }, false],
+        ['non-production unset → on', { NODE_ENV: 'development' }, true],
+        ['production unset → off', { NODE_ENV: 'production' }, false],
+        ['production true → on', { NODE_ENV: 'production', AI_AGENT_ENABLED: 'true' }, true],
+        ['production + VERCEL_ENV=production true → on', { NODE_ENV: 'production', VERCEL_ENV: 'production', AI_AGENT_ENABLED: 'true' }, true],
+    ] as const)('[TC-AICP-341] %s', (_label, env, expected) => {
+        // Arrange
+        vi.stubEnv('NODE_ENV', env.NODE_ENV)
+        if ('VERCEL_ENV' in env) process.env.VERCEL_ENV = env.VERCEL_ENV
+        if ('AI_AGENT_ENABLED' in env) vi.stubEnv('AI_AGENT_ENABLED', env.AI_AGENT_ENABLED)
+        else delete process.env.AI_AGENT_ENABLED
+
+        // Act
+        const enabled = isAiAgentEnabled()
+
+        // Assert
+        expect(enabled).toBe(expected)
     })
 })

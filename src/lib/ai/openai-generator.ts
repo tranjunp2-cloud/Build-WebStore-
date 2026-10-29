@@ -39,6 +39,9 @@ import { resolveBusinessCategory } from './composer-category-resolver'
 import { getCategoryRequirement } from './category-requirements'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
 import { mapBusinessInfo } from './business-info-mapper'
+import { runWithGenerationFacts } from './generation-facts-scope'
+import type { GenerationFacts } from './generation-facts'
+import { enforceGroundedBlocks } from './grounded-blocks'
 import {
     dedupePageSingletonBlocks,
     dedupeRepeatedServiceCardsAcrossPages,
@@ -82,6 +85,8 @@ export interface GenerateSiteOptions {
     targetLocale?: string
     /** Request-local mode selected by the route's single credit pilot. */
     modeDecision?: SiteGenerationModeDecision
+    /** #2103 A1: merchant FACTS — the only source for claims on the generated site. */
+    facts?: GenerationFacts
 }
 
 export type SiteGenerationMode = 'ai-first' | 'template-first'
@@ -195,7 +200,7 @@ function backfillPagesAfterServiceDedupe(
  *   Fetched by the caller (generate-site route) so this function stays DB-free.
  *   Merged into buildUserPrompt so GPT tailors per-block content accordingly.
  */
-export async function generateSiteWithAI(
+export function generateSiteWithAI(
     rawBusinessInfo: BusinessInfoInput,
     extraInstructions?: string,
     language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
@@ -203,6 +208,22 @@ export async function generateSiteWithAI(
     blockPromptOverrides?: Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>,
     onEvent?: (e: SSEEvent) => void,
     options: GenerateSiteOptions = {},
+): Promise<GenerateSiteOutput> {
+    // #2103 A1: every mapBusinessInfo() below (template-first, AI-first, page-split, fallback)
+    // reads the merchant FACTS from this scope.
+    return runWithGenerationFacts(options.facts, () =>
+        generateSiteWithAIScoped(rawBusinessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent, options),
+    )
+}
+
+async function generateSiteWithAIScoped(
+    rawBusinessInfo: BusinessInfoInput,
+    extraInstructions: string | undefined,
+    language: 'en' | 'ms' | 'vi' | 'auto',
+    referencePrompt: string | undefined,
+    blockPromptOverrides: Record<string, { prompt: string; updatedAt: string; updatedBy?: string }> | undefined,
+    onEvent: ((e: SSEEvent) => void) | undefined,
+    options: GenerateSiteOptions,
 ): Promise<GenerateSiteOutput> {
     if (options.sourceBlueprint) {
         if (!currentAiActor()) throw new Error('The AI platform is required for source-aware generation')
@@ -374,6 +395,7 @@ export async function generateSiteWithAI(
             // Plan 260429-1032 Phase 5 — pass resolved category so buildUserPrompt
             // can inject preferred CTA labels for this industry.
             category: presetCategory,
+            facts: options.facts,
         })
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
@@ -651,6 +673,12 @@ export async function generateSiteWithAI(
                     enforcerCtx,
                 ) as typeof pageBlocks
                 enforceGridAlignment(pageBlocks as unknown as Record<string, unknown>[], enforcerCategory, enforcerCtx)
+                // #2103 A1: reviews, numbers, team, logos, FAQ and pricing come from FACTS only.
+                pageBlocks = enforceGroundedBlocks(
+                    pageBlocks as unknown as Record<string, unknown>[],
+                    enforcerBizOverride.facts,
+                    blockLang,
+                ) as typeof pageBlocks
                 pageBlocks = normalizeLocaleStructuralStrings(
                     pageBlocks as unknown as Record<string, unknown>[],
                     blockLang,
@@ -800,6 +828,11 @@ export async function generateSiteWithAI(
                 ) as typeof validBlocks
                 enforceGridAlignment(validBlocks as unknown as Record<string, unknown>[], detectedCategory, enforcerCtx)
             }
+            validBlocks = enforceGroundedBlocks(
+                validBlocks as unknown as Record<string, unknown>[],
+                enforcerBizOverride.facts,
+                blockLang,
+            ) as typeof validBlocks
             validBlocks = normalizeLocaleStructuralStrings(
                 validBlocks as unknown as Record<string, unknown>[],
                 blockLang,

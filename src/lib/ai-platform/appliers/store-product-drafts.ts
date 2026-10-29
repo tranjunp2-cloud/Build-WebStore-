@@ -150,11 +150,22 @@ export async function applyShopProductDrafts(
 			created.push({ id: String(saved.id), name: saved.name, updatedAt: saved.updatedAt });
 		} catch (error) {
 			const failure = saveFailure(error);
-			// say which product, and that the ones before it exist (a second approval continues from there)
-			const done = created.length > 0 ? ` ${created.length} product${created.length === 1 ? " was" : "s were"} already created; approving again continues from there.` : "";
-			throw new ChangeSetApplyError(`"${product.name}": ${failure.message}${done}`, failure.status);
+			if (created.length === 0) throw new ChangeSetApplyError(`"${product.name}": ${failure.message}`, failure.status);
+			// the ones before it exist: the card closes as applied with them (their Undo trashes them), and says which
+			const names = created.map((done) => `"${done.name}"`).join(", ");
+			throw new ChangeSetApplyError(
+				`"${product.name}": ${failure.message} Created before it: ${names}. The rest were not created: ask again for them.`,
+				failure.status,
+				true,
+				{ partial: draftsResult(created) },
+			);
 		}
 	}
+	return draftsResult(created);
+}
+
+/** The drafts made, with their undo (to the trash while none of them was touched since). */
+function draftsResult(created: ReadonlyArray<{ id: string; name: string; updatedAt: string }>): ChangeSetResult {
 	return {
 		entities: created.map((product) => productEntity(product.id, product.name)),
 		links: productLink(created[0]?.id ?? ""),

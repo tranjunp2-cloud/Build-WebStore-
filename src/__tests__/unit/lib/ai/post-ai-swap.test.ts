@@ -21,6 +21,7 @@ import {
 } from '@/lib/ai/post-ai-swap'
 import * as composer from '@/lib/ai/template-composer'
 import type { BusinessSample } from '@/lib/ai/content'
+import { categoryMap } from '@/lib/ai/content'
 import { getBlockStrings, injectBlockStrings } from '@/lib/ai/block-i18n'
 import { resolveLocaleStructuralStrings } from '@/lib/ai/locale-structural-strings'
 
@@ -652,11 +653,11 @@ describe('Phase 04 — postAISwapStep', () => {
     })
 
     /**
-     * TC-F01-PAS-07 — GH-912 regression: when bizPartial is missing fields,
-     * hydrateBiz must rotate `pack.businesses` by seed so two same-category
-     * users with different contact info don't both inherit `businesses[0]`.
+     * TC-F01-PAS-07 — GH-912 regression, superseded by #2103 A1 (TC-AIAUD-160):
+     * a missing field in bizPartial never falls back to a library sample
+     * business (not even a seed-rotated one), so no fictional name / contact leaks.
      */
-    describe('TC-F01-PAS-07: seed-rotated hydrateBiz fallback (GH-912)', () => {
+    describe('TC-F01-PAS-07: hydrateBiz never inherits a library business (GH-912, #2103 A1)', () => {
         const genericFeaturesBlock = {
             blockType: 'features',
             headline: 'Why Choose Us',
@@ -666,15 +667,12 @@ describe('Phase 04 — postAISwapStep', () => {
             ],
         }
 
-        it('different seeds produce different swap output for empty bizPartial', () => {
-            const a = postAISwapStep([genericFeaturesBlock], {}, 'health', undefined, 0)
-            const b = postAISwapStep([genericFeaturesBlock], {}, 'health', undefined, 99999)
-            expect(a.telemetry[0]!.action).toBe('swapped')
-            expect(b.telemetry[0]!.action).toBe('swapped')
-            // Hydrated biz.name flows into composer output; different seed pulls
-            // a different pack.businesses[i] → different rendered content.
-            // health pack has multiple businesses so seeds 0 and 99999 diverge.
-            expect(JSON.stringify(a.blocks[0])).not.toBe(JSON.stringify(b.blocks[0]))
+        it('empty bizPartial output carries no library business name for any seed', () => {
+            const names = Object.values(categoryMap).flatMap((p) => p.businesses.map((b) => b.name))
+            for (const seed of [0, 1, 99999]) {
+                const out = JSON.stringify(postAISwapStep([genericFeaturesBlock], {}, 'health', undefined, seed).blocks)
+                for (const name of names) expect(out).not.toContain(name)
+            }
         })
 
         it('same seed produces deterministic swap output (stable regen)', () => {
@@ -684,7 +682,7 @@ describe('Phase 04 — postAISwapStep', () => {
             expect(JSON.stringify(a.blocks[0])).toBe(JSON.stringify(b.blocks[0]))
         })
 
-        it('omitting seed defaults to legacy businesses[0] path (backward compat)', () => {
+        it('omitting seed defaults to seed 0 (backward compat)', () => {
             const a = postAISwapStep([genericFeaturesBlock], {}, 'health')
             const b = postAISwapStep([genericFeaturesBlock], {}, 'health', undefined, 0)
             expect(JSON.stringify(a.blocks[0])).toBe(JSON.stringify(b.blocks[0]))

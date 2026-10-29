@@ -1,3 +1,4 @@
+import { MAX_QUESTION_ROWS } from "@ech/agent-core";
 import { tool } from "ai";
 import { z } from "zod";
 
@@ -29,6 +30,30 @@ const VariantAxisSchema = z.object({
 const PICTURES_DESCRIPTION =
 	"Set to let the merchant pick or upload photos in the card (options are filled for you). Never ask them to describe photos in words.";
 
+const TABLE_DESCRIPTION =
+	'Set to ask for a number per item (stock quantities, prices, how many of each) in ONE question: the merchant fills one input per row. Leave "options" empty and pictures null. One unit per question: ask stock and prices as two questions. The answer comes back as numbers keyed by row id; a row left empty is absent. Never put a number you invented in a row.';
+
+/** A row is only the item to count: the numbers are the merchant's to give. */
+export const tableSchema = z
+	.object({
+		rows: z
+			.array(
+				z.object({
+					id: z.string().min(1).max(60).describe("Id the answer is keyed by (e.g. a product id from read_item / search_items)"),
+					label: z.string().min(1).max(160).describe("What the merchant sees, e.g. the product name"),
+				}),
+			)
+			.min(1)
+			.max(MAX_QUESTION_ROWS)
+			.describe(`1–${MAX_QUESTION_ROWS} rows`),
+		unit: z.string().min(1).max(20).nullable().describe('What is counted, e.g. "pcs" or "RM"; null for none'),
+		decimals: z.boolean().describe("true = amounts with up to two decimals (prices); false = whole numbers (stock)"),
+	})
+	.nullable()
+	// optional: a call without it is an ordinary question
+	.optional()
+	.describe(TABLE_DESCRIPTION);
+
 const PICTURE_SOURCES = ["stock", "library", "both"] as const;
 type PictureSource = (typeof PICTURE_SOURCES)[number];
 
@@ -52,6 +77,7 @@ const customQuestionSchema = (pictures: ReturnType<typeof picturesSchema>) =>
 			.describe("2–6 concrete options; empty to ask for free text"),
 		multiple: z.boolean(),
 		pictures,
+		table: tableSchema,
 	});
 
 const userInputSchema = (question: ReturnType<typeof customQuestionSchema>) =>

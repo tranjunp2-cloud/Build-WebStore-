@@ -194,6 +194,37 @@ describe('photos [TC-AIREL-171]', () => {
     })
 })
 
+describe('options stock sold during a photo upload is kept [TC-AIREL-268]', () => {
+    it('reads the options again after the upload: the saved options carry the stock checkout left', async () => {
+        const products = [productDoc({ hasVariants: true, variants: [{ id: 'r1', name: 'Red', sku: 'R', price: 49, stock: 5 }], variantConfigs: [{ id: 'c1', name: 'Colour', options: [{ id: 'o1', value: 'Red' }] }] })]
+        state.cms = fakeCms({ products })
+        // a buyer checks out while the picture uploads: raw SQL lowers the option's stock, updatedAt stays
+        vi.mocked(ingestPicture).mockImplementationOnce(async () => {
+            products[0] = { ...(products[0] as object), variants: [{ id: 'r1', name: 'Red', sku: 'R', price: 49, stock: 4 }] } as never
+            return { id: 77, url: '/x.jpg' } as never
+        })
+
+        await applyChangeSet(update({ images: [{ ref: 'attachment:att_9', url: '/api/agent/attachments/att_9', alt: 'Side', existing: false }] }), SHOP_ACTOR, ATT)
+
+        expect(updateData().data.variants).toEqual([{ name: 'Red', sku: 'R', price: 49, stock: 4 }])
+        expect(updateData().data.images).toEqual([{ image: 77, alt: 'Side' }])
+    })
+
+    it('refuses (409, nothing written) when the product itself was saved during the upload', async () => {
+        const products = [productDoc({ hasVariants: true, variants: [{ id: 'r1', name: 'Red', sku: 'R', price: 49, stock: 5 }] })]
+        state.cms = fakeCms({ products })
+        vi.mocked(ingestPicture).mockImplementationOnce(async () => {
+            products[0] = { ...(products[0] as object), updatedAt: '2026-10-20T09:45:00.000Z' } as never
+            return { id: 77, url: '/x.jpg' } as never
+        })
+
+        await expect(
+            applyChangeSet(update({ images: [{ ref: 'attachment:att_9', url: '/api/agent/attachments/att_9', alt: 'Side', existing: false }] }), SHOP_ACTOR, ATT),
+        ).rejects.toMatchObject({ status: 409 })
+        expect(cms().update).not.toHaveBeenCalled()
+    })
+})
+
 describe('undo of an edit [TC-AIREL-172]', () => {
     const restore = (fields: Record<string, unknown>, expectStamp = NEW_STAMP) => ({
         kind: 'shop_product.restore',

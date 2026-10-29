@@ -183,7 +183,82 @@ describe('list meta [TC-AIREL-165]', () => {
 
         const result = await searchShopProducts(SHOP_ACTOR, {})
 
+        // options listed nowhere: the product's own price and stock stand in
         expect(result.items[0]?.meta).toBe('RM 49.00 · stock 7 (options)')
+    })
+})
+
+describe('price and stock of a product with options [TC-AIAUD-130]', () => {
+    const options = [
+        { name: 'Red / S', sku: 'R-S', price: 79, stock: 2 },
+        { name: 'Red / M', sku: 'R-M', price: 59, stock: 3 },
+        { name: 'Blue / M', sku: 'B-M', price: 69, stock: null },
+    ]
+    const withOptions = () => ({ ...populated(productDoc({ hasVariants: true, price: 0, inventory: 0, variants: options })), category: [] })
+
+    it('lists "From RM 59.00" and the options\' stock added up, not the base price 0 and stock 0', async () => {
+        state.cms = fakeCms({ products: [withOptions()] })
+
+        const result = await searchShopProducts(SHOP_ACTOR, {})
+
+        expect(result.items[0]?.meta).toBe('From RM 59.00 · stock 5 (options)')
+    })
+
+    it('asks Payload for the options\' price and stock, so the list is not read from the base fields', async () => {
+        state.cms = fakeCms({ products: [withOptions()] })
+
+        await searchShopProducts(SHOP_ACTOR, {})
+
+        expect(productFinds()[0]?.select).toMatchObject({ hasVariants: true, variants: { price: true, stock: true } })
+    })
+
+    it('says the same in read_item: the cheapest option as the price and the stock sum', async () => {
+        state.cms = fakeCms({ products: [withOptions()] })
+
+        const detail = await readShopProduct(SHOP_ACTOR, '42')
+
+        const facts = Object.fromEntries(detail.facts.map((fact) => [fact.label, fact.value]))
+        expect(facts.Price).toBe('From RM 59.00')
+        expect(facts.Stock).toBe("5 (the options' stock added up)")
+    })
+
+    it('keeps a plain product as it was: its own price and stock, no "From"', async () => {
+        const result = await searchShopProducts(SHOP_ACTOR, {})
+
+        expect(result.items[0]?.meta).toBe('RM 49.00 · stock 12 · Scarves')
+    })
+})
+
+describe('where each photo came from [TC-AIAUD-131]', () => {
+    const media = (id: number, flags: Record<string, unknown> = {}) => ({ image: { id, url: `/api/media/file/${id}.jpg`, ...flags }, alt: `Photo ${id}` })
+    const mixed = () => ({
+        ...populated(productDoc()),
+        images: [media(11), media(12, { sourceProvider: 'pixabay' }), media(13, { aiGenerated: true }), media(14, { sourceProvider: 'ai' }), media(15, { sourceProvider: 'wikimedia' })],
+    })
+
+    it('marks upload, stock and ai on the snapshot the copilot drafts from', async () => {
+        state.cms = fakeCms({ products: [mixed()] })
+
+        const snapshot = await snapshotShopProduct(SHOP_ACTOR, '42')
+
+        expect(snapshot.shopProduct.images.map((image) => [image.ref, image.source])).toEqual([
+            ['media:11', 'upload'],
+            ['media:12', 'stock'],
+            ['media:13', 'ai'],
+            ['media:14', 'ai'],
+            ['media:15', 'stock'],
+        ])
+    })
+
+    it('tells read_item which photos are not the merchant\'s own, and says nothing extra about their uploads', async () => {
+        state.cms = fakeCms({ products: [mixed()] })
+
+        const detail = await readShopProduct(SHOP_ACTOR, '42')
+
+        const photos = detail.lists.find((list) => list.label === 'Photos')?.items ?? []
+        expect(photos[0]).toBe('photo 1 · media:11 · Photo 11')
+        expect(photos[1]).toBe("photo 2 · media:12 · Photo 12 · stock photo (not the merchant's own)")
+        expect(photos[2]).toContain('made or picked by AI')
     })
 })
 

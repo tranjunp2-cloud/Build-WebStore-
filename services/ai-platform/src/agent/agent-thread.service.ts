@@ -7,6 +7,7 @@ import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { AgentError } from "./agent-errors";
 import { AGENT_STORE, type AgentStore, type ThreadOwner, type ThreadRunRecord } from "./agent-store";
+import { currentState } from "./change-set-expiry";
 import { newId } from "./ids";
 import { CLAIM_STALE_AFTER_MS } from "./change-set-decision.service";
 import { stagedById, historyMessages, threadTitle } from "./thread-memory";
@@ -23,13 +24,6 @@ function threadEntity(entity: EntityRef | undefined): EntityRef | undefined {
 	if (!entity) return undefined;
 	const label = entity.label?.replace(/\s+/g, " ").trim().slice(0, 120);
 	return { kind: entity.kind.slice(0, 40), id: entity.id.slice(0, 120), ...(label ? { label } : {}) };
-}
-
-/** Pending change sets past their expiry read as expired (same view ChangeSetDecisionService gives). */
-function currentState(changeSet: ChangeSet, now: Date): ChangeSet {
-	return changeSet.status === "pending" && new Date(changeSet.expiresAt).getTime() <= now.getTime()
-		? { ...changeSet, status: "expired" }
-		: changeSet;
 }
 
 /** The pictures of a chat's runs, newest 40, keyed by their chat-wide ids (attachments, then receipt media). */

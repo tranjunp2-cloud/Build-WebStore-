@@ -58,11 +58,11 @@ describe.skipIf(!connectionString)('[TC-AISEC-100/102/103] apply receipts on Pos
     const age = (changeSetId: string, ms: number, column = 'updated_at') => pool.query(`UPDATE ai_change_set_applies SET ${column} = now() - ($2 || ' milliseconds')::interval WHERE change_set_id = $1`, [changeSetId, String(ms)])
 
     it('one receipt per change set: started, then busy while fresh, taken over once stale [TC-AISEC-100]', async () => {
-        expect(await start('cs_1')).toEqual({ kind: 'started' })
+        expect(await start('cs_1')).toEqual({ kind: 'started', takeover: false })
         expect(await start('cs_1', 'req-2')).toEqual({ kind: 'busy', state: 'applying' })
 
         await age('cs_1', STALE_APPLYING_MS + 1_000)
-        expect(await start('cs_1', 'req-3')).toEqual({ kind: 'started' })
+        expect(await start('cs_1', 'req-3')).toEqual({ kind: 'started', takeover: true })
         expect(await readReceipt('cs_1')).toMatchObject({ state: 'applying', requestId: 'req-3', tenantId: '7', userId: '3' })
     })
 

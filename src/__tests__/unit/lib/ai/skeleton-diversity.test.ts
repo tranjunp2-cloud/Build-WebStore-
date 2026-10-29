@@ -10,6 +10,21 @@
 import { describe, expect, it } from 'vitest'
 import { enforceMinimumStructure } from '@/lib/ai/structure-enforcer'
 import { hashBusinessName } from '@/lib/ai/category-theme-picker'
+import { buildGenerationFacts } from '@/lib/ai/generation-facts'
+
+// #2103 A1: stats / pricing / logo-cloud / FAQ blocks are only injected when the merchant's FACTS can
+// fill them, so the recipe-driven skeleton variety is exercised with a shop that told us enough.
+const RICH_FACTS = buildGenerationFacts({
+    businessInfo: {
+        businessName: 'Rich Shop',
+        products: 'Alpha RM10, Beta RM20, Gamma RM30',
+        phone: '012-3456789',
+        buyingMethods: ['delivery', 'pickup'],
+        shopFacts: 'Started in 2015',
+    },
+    tenant: { payments: { payment_fpx: true, payment_cod: true } },
+})
+const richCtx = (seed: number) => ({ seed, userBiz: { name: 'Rich Shop', facts: RICH_FACTS } })
 
 const TEST_NAMES = [
     'Farah Glow Spa', 'Priya Nails', 'Zen Hair', 'Bloom Beauty',
@@ -25,7 +40,7 @@ describe('skeleton diversity — R1 recipe-based enforcement', () => {
             const skeletons = new Set<string>()
             for (const name of TEST_NAMES) {
                 const seed = hashBusinessName(name)
-                const result = enforceMinimumStructure([], cat, { seed })
+                const result = enforceMinimumStructure([], cat, richCtx(seed))
                 const seq = result.map((b) => String(b.blockType)).join('→')
                 skeletons.add(seq)
             }
@@ -69,7 +84,7 @@ describe('skeleton diversity — R1 recipe-based enforcement', () => {
             const counts = new Map<string, number>()
             for (const name of TEST_NAMES) {
                 const seed = hashBusinessName(name)
-                const result = enforceMinimumStructure([], cat, { seed })
+                const result = enforceMinimumStructure([], cat, richCtx(seed))
                 const seq = result.map((b) => String(b.blockType)).join('→')
                 counts.set(seq, (counts.get(seq) ?? 0) + 1)
             }
