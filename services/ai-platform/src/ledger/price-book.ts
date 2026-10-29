@@ -7,6 +7,8 @@ interface Price {
 	/** Fraction of the rates charged outside `isPeak` hours (DeepSeek: half). */
 	offPeakFactor?: number;
 	isPeak?: (at: Date) => boolean;
+	/** Rates for a request whose whole prompt (cache hits included) is over `overInputTokens`. */
+	longContext?: { overInputTokens: number; input: number; cachedInput: number; output: number };
 }
 
 /**
@@ -27,6 +29,21 @@ export function isDeepSeekPeak(at: Date): boolean {
  * cost rather than a guessed one; reconcile against gateway logs.
  */
 const PRICES: Record<string, Price> = {
+	// Standard API rates from https://platform.claude.com/docs/en/about-claude/pricing (read 2026-10-29).
+	// Cache writes (1.25x input) are not modelled, as for every provider here.
+	"anthropic:claude-haiku-5-5": {
+		input: 0.1,
+		cachedInput: 0.01,
+		output: 0.5,
+		longContext: { overInputTokens: 100_000, input: 0.5, cachedInput: 0.05, output: 2.5 },
+	},
+	"anthropic:claude-haiku-4-5": { input: 1, cachedInput: 0.1, output: 5 },
+	"anthropic:claude-sonnet-5-5": { input: 2, cachedInput: 0.1, output: 10 },
+	"anthropic:claude-sonnet-5": { input: 2, cachedInput: 0.2, output: 10 },
+	"anthropic:claude-opus-5-5": { input: 4, cachedInput: 0.2, output: 20 },
+	// Standard tier from https://developers.openai.com/api/docs/pricing (read 2026-10-29).
+	"openai:gpt-5.4-nano": { input: 0.2, cachedInput: 0.02, output: 1.25 },
+	"openai:gpt-5.4-mini": { input: 0.75, cachedInput: 0.075, output: 4.5 },
 	"openai:gpt-4.1-mini": { input: 0.4, cachedInput: 0.1, output: 1.6 },
 	"openai:gpt-4.1-nano": { input: 0.1, cachedInput: 0.025, output: 0.4 },
 	"openai:gpt-4o-mini": { input: 0.15, cachedInput: 0.075, output: 0.6 },
@@ -69,8 +86,11 @@ export function estimateCostMicros(
 		const each = IMAGE_PRICES[`${provider}:${modelId}`];
 		return each === undefined ? null : Math.round(each * usage.images * 1_000_000);
 	}
-	const price = PRICES[`${provider}:${modelId}`];
-	if (!price) return null;
+	const listed = PRICES[`${provider}:${modelId}`];
+	if (!listed) return null;
+	// The whole request is billed at the long-context rates once its prompt passes the threshold.
+	const long = listed.longContext;
+	const price = long && (usage.inputTokens ?? 0) > long.overInputTokens ? { ...listed, ...long } : listed;
 	const cached = usage.cachedInputTokens ?? 0;
 	const freshInput = Math.max(0, (usage.inputTokens ?? 0) - cached);
 	const factor = price.isPeak && !price.isPeak(at) ? (price.offPeakFactor ?? 1) : 1;

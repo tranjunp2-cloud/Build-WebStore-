@@ -12,8 +12,8 @@ const ModelRefSchema = z
 		"model refs are provider:model[, provider:model…], e.g. openai:gpt-4.1-mini, anthropic:claude-haiku-4-5",
 	);
 
-/** Reasoning effort (AI SDK `reasoning`); each provider maps it, and lowers levels a model lacks. */
-const EffortSchema = z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+/** Reasoning effort (AI SDK `reasoning`); each provider maps it, and lowers levels a model lacks. `default` = send none. */
+const EffortSchema = z.enum(["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
 const EnvSchema = z.object({
 	NODE_ENV: z.string().default("development"),
@@ -76,17 +76,18 @@ const EnvSchema = z.object({
 	DEEPSEEK_API_KEY: z.string().optional(),
 	AI_GATEWAY_BASE_URL: z.url().optional(),
 	AI_GATEWAY_TOKEN: z.string().optional(),
-	AI_MODEL_FAST: ModelRefSchema.default("openai:gpt-4.1-nano"),
-	AI_MODEL_BALANCED: ModelRefSchema.default("openai:gpt-4.1-mini"),
+	AI_MODEL_FAST: ModelRefSchema.default("anthropic:claude-haiku-5-5, openai:gpt-5.4-nano"),
+	AI_MODEL_BALANCED: ModelRefSchema.default("anthropic:claude-haiku-5-5, openai:gpt-5.4-mini"),
 	/** Site generation (prime-web builder, PW1 migration): long composed prompts → whole-page JSON. */
-	AI_MODEL_QUALITY: ModelRefSchema.default("openai:gpt-5.4-mini"),
+	AI_MODEL_QUALITY: ModelRefSchema.default("anthropic:claude-haiku-5-5, openai:gpt-5.4-mini"),
 	/** Picture generation (DAM "Generate", the copilot's generate_image): openai:gpt-image-1 or compat-<name>:<model>. */
 	AI_MODEL_IMAGE: ModelRefSchema.default("openai:gpt-image-1"),
 	/**
 	 * Reasoning effort per tier, for every provider of that tier's chain (AI SDK `reasoning`: Anthropic
 	 * effort, OpenAI/compat reasoning_effort, Gemini thinking level/budget, DeepSeek thinking). Lets one
-	 * cheap model serve every tier, e.g. claude-haiku-5-5 with fast = low, balanced = medium, quality = high.
-	 * Unset = each model's own default (DeepSeek stays non-thinking).
+	 * cheap model serve every tier. Unset = fast low, balanced medium, quality high (the default chains run
+	 * claude-haiku-5-5 on all three); DeepSeek stays non-thinking unless the tier effort is set explicitly.
+	 * `default` = send no effort, each model uses its own.
 	 */
 	AI_EFFORT_FAST: EffortSchema.optional(),
 	AI_EFFORT_BALANCED: EffortSchema.optional(),

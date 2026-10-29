@@ -108,15 +108,30 @@ describe("per-tier reasoning effort for every provider (AI_EFFORT_*)", () => {
 		expect(compatOptIn.reasoning_effort).toBe("low");
 	});
 
-	it("[TC-AIEFF-04] an unset tier keeps each model's default; DeepSeek stays non-thinking", async () => {
+	it("[TC-AIEFF-04] an unset tier uses its default effort; `default` sends none; DeepSeek stays non-thinking", async () => {
 		// Act
-		const anthropic = await requestBodyFor("anthropic:claude-haiku-5-5");
+		const unsetFast = await requestBodyFor("anthropic:claude-haiku-5-5");
+		const unsetQuality = await requestBodyFor("anthropic:claude-haiku-5-5", {}, undefined, "quality");
+		const modelOwn = await requestBodyFor("anthropic:claude-haiku-5-5", { AI_EFFORT_FAST: "default" });
 		const deepseek = await requestBodyFor("deepseek:deepseek-chat");
 
 		// Assert
-		expect(anthropic.output_config?.effort).toBeUndefined();
+		expect(unsetFast.output_config?.effort).toBe("low");
+		expect(unsetQuality.output_config?.effort).toBe("high");
+		expect(modelOwn.output_config?.effort).toBeUndefined();
 		expect(deepseek.thinking?.type).toBe("disabled");
 		expect(deepseek.reasoning_effort).toBeUndefined();
+	});
+
+	it("[TC-AIEFF-07] the default chains run Claude Haiku 5.5 first, a current OpenAI model as fallback", () => {
+		// Act
+		const registry = createModelRegistry(parseEnv(vars), vars);
+		const chain = (alias: ModelAlias) => registry.resolveChain(alias).map((m) => `${m.provider}:${m.modelId}`);
+
+		// Assert
+		expect(chain("fast")).toEqual(["anthropic:claude-haiku-5-5", "openai:gpt-5.4-nano"]);
+		expect(chain("balanced")).toEqual(["anthropic:claude-haiku-5-5", "openai:gpt-5.4-mini"]);
+		expect(chain("quality")).toEqual(["anthropic:claude-haiku-5-5", "openai:gpt-5.4-mini"]);
 	});
 
 	it("[TC-AIEFF-05] a call's own reasoning wins over the tier default", async () => {
