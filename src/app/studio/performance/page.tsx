@@ -1,99 +1,71 @@
 /**
- * /studio/performance — AI Quality Dashboard server component.
- * Revalidates every 5 min. Cache-busted by ?_=timestamp from RefreshNowButton.
- * Accepts ?from=YYYY-MM-DD&to=YYYY-MM-DD (defaults: last 30d).
+ * /studio/performance — AI usage overview: cost, calls, errors, plans, top shops, tasks/models and website generation.
+ * Everything comes from `ai_usage_logs` (+ `ai_generation_records` for the generation section), in Malaysia time.
+ * ?period=24h|7d|30d|90d (default 7d) or ?from&to, ?compare=0, ?sort=cost|calls|avg|max|errors
  */
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 import type { Metadata } from 'next'
-import { requireSuperAdmin } from '@/lib/admin/auth-guard'
-import {
-  getAvgQualityScore,
-  getGenSuccessRate,
-  getCostPerGen,
-  getWorstBlocks,
-  getCategoryBlockHeatmap,
-  getHighestOverrideCategories,
-} from '@/lib/admin/quality-metrics'
-import { categorizeFailures } from '@/lib/admin/fail-reason-categorizer'
-import { QualityDashboardClient } from './_components/quality-dashboard-client'
-import { getPayload } from 'payload'
 import config from '@payload-config'
-import { sql } from 'drizzle-orm'
+import { getPayload } from 'payload'
+import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { bucketLabel, first, klDay, periodQuery, previousRangeLabel, rangeLabel, resolvePeriod } from '@/lib/admin/ai-usage/period'
+import { loadOverview } from '@/lib/admin/ai-usage/overview-loader'
+import { TOP_SHOP_SORTS, type TopShopSort } from '@/lib/admin/ai-usage/overview-types'
+import './ai-usage.css'
+import { ErrorState } from './_components/au-parts'
+import { CostChart } from './_components/cost-chart'
+import { GenerationSection } from './_components/generation-section'
+import { KpiRow } from './_components/kpi-row'
+import { PeriodControls } from './_components/period-controls'
+import { CardHead } from './_components/au-parts'
+import { ErrorsTable, PlanTable, TopShopsTable } from './_components/overview-tables'
+import { TaskModelCard } from './_components/task-model-card'
 
-export const metadata: Metadata = { title: 'AI Quality Dashboard' }
+export const metadata: Metadata = { title: 'AI usage' }
 
-// ── Date helpers ──────────────────────────────────────────────────────────────
+type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
-function parseRange(sp: Record<string, string | string[] | undefined>): { from: Date; to: Date } {
-  const toRaw = typeof sp.to === 'string' ? sp.to : undefined
-  const fromRaw = typeof sp.from === 'string' ? sp.from : undefined
-  const to = toRaw ? new Date(toRaw) : new Date()
-  const from = fromRaw
-    ? new Date(fromRaw)
-    : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-  return { from, to }
-}
+export default async function AiUsagePage({ searchParams }: { searchParams: SearchParams }) {
+    await requireSuperAdmin()
+    const sp = await searchParams
+    const period = resolvePeriod(sp)
+    const compare = first(sp.compare) !== '0'
+    const sortParam = first(sp.sort)
+    const sort: TopShopSort = (TOP_SHOP_SORTS as readonly string[]).includes(sortParam ?? '') ? (sortParam as TopShopSort) : 'cost'
+    const now = new Date()
+    const today = klDay(now)
+    const query = periodQuery(period)
+    const exportHref = `/api/admin/ai-usage/export${query.toString() ? `?${query.toString()}` : ''}`
 
-// ── Page ──────────────────────────────────────────────────────────────────────
-
-export default async function PerformancePage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>
-}) {
-  await requireSuperAdmin()
-
-  const sp = await searchParams
-  const range = parseRange(sp)
-
-  // Fetch fail logs for categorizer (server-side, no client round-trip)
-  const failLogsPromise = (async () => {
+    let data: Awaited<ReturnType<typeof loadOverview>> | null = null
     try {
-      const payload = await getPayload({ config })
-      const result = await (payload.db.drizzle.execute(sql`
-        SELECT error_log AS "errorLog"
-        FROM ai_generation_records
-        WHERE status = 'failed'
-          AND created_at >= ${range.from.toISOString()}
-          AND created_at <= ${range.to.toISOString()}
-          AND error_log IS NOT NULL
-        LIMIT 500
-      `) as Promise<{ rows: Array<{ errorLog: string | null }> }>)
-      return result.rows
-    } catch {
-      return []
+        data = await loadOverview(await getPayload({ config }), period, sort)
+    } catch (error) {
+        console.error('[ai-usage] overview failed', error)
     }
-  })()
 
-  const [quality, genRate, cost, worstBlocks, heatmap, failLogs, overrideCategories] = await Promise.all([
-    getAvgQualityScore(range).catch(() => null),
-    getGenSuccessRate(range).catch(() => null),
-    getCostPerGen(range).catch(() => null),
-    getWorstBlocks(range, 10).catch(() => []),
-    getCategoryBlockHeatmap(range).catch(() => ({ categories: [], blocks: [], matrix: [] })),
-    failLogsPromise,
-    getHighestOverrideCategories(range, 8).catch(() => []),
-  ])
-
-  const failBreakdown = categorizeFailures(failLogs)
-
-  const fromStr = range.from.toISOString()
-  const toStr = range.to.toISOString()
-  const exportUrl = `/api/admin/metrics/export?from=${encodeURIComponent(fromStr)}&to=${encodeURIComponent(toStr)}`
-
-  return (
-    <QualityDashboardClient
-      quality={quality}
-      genRate={genRate}
-      cost={cost}
-      worstBlocks={worstBlocks}
-      heatmap={heatmap}
-      failBreakdown={failBreakdown}
-      from={fromStr}
-      to={toStr}
-      exportUrl={exportUrl}
-      overrideCategories={overrideCategories}
-    />
-  )
+    return (
+        <div className="page au-page">
+            <div className="page-head">
+                <div><h1 className="page-title">AI usage &amp; quality</h1><p className="page-sub">What AI costs across all shops, where it errors, and how website generation is doing.</p></div>
+                <PeriodControls periodKey={period.key} rangeText={rangeLabel(period)} fromDay={period.fromDay} toDay={period.toDay} todayDay={today}
+                    compare={{ on: compare, text: previousRangeLabel(period) }} exportHref={exportHref} />
+            </div>
+            {!data ? <ErrorState what="AI usage" retryHref={`/studio/performance${query.toString() ? `?${query.toString()}` : ''}`} /> : (
+                <>
+                    <KpiRow current={data.current} previous={data.previous} series={data.series} compare={compare} />
+                    <section className="card aiq-card">
+                        <CardHead title={period.bucket === 'hour' ? 'Cost per hour, by area' : 'Cost per day, by area'} sub="Split by where the AI was used." />
+                        <CostChart data={data.costByArea.map((b) => ({ ...b, label: bucketLabel(b.key, period.bucket, today) }))} />
+                    </section>
+                    <PlanTable rows={data.plans} limits={data.limits} />
+                    <TopShopsTable shops={data.shops} total={data.totalShops} sort={sort} query={query} />
+                    <TaskModelCard tasks={data.byTask} models={data.byModel} logsQuery={query.toString()} />
+                    <ErrorsTable rows={data.errors} errors={data.current.errors} refused={data.current.refused} calls={data.current.calls} logsQuery={query.toString()} />
+                    <GenerationSection data={data.generation} compare={compare} />
+                </>
+            )}
+        </div>
+    )
 }
