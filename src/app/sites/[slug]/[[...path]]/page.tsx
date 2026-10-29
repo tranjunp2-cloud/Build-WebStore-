@@ -13,7 +13,7 @@ import type { Metadata } from 'next'
 import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRenderer'
 import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
 import type { SiteData } from '@/blocks/types'
-import { toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
+import { publicAuthorName, toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 import type { PageData } from '@/store/editorStore'
 import { StorefrontBlogList } from '@/components/site-renderer/StorefrontBlogList'
 import DOMPurify from 'isomorphic-dompurify'
@@ -293,9 +293,7 @@ export default async function TenantSitePage({ params }: Props) {
         const post = blogPost as BlogPost
         const thumbUrl = typeof post.thumbnail === 'object' ? post.thumbnail?.url : null
         const catName = typeof post.category === 'object' ? post.category?.name : null
-        const authorName = typeof post.author === 'object'
-            ? [post.author?.firstName, post.author?.lastName].filter(Boolean).join(' ') || post.author?.email
-            : null
+        const authorName = publicAuthorName(post.author)
         const publishDate = post.publishedAt || post.createdAt
 
         const jsonLd = {

@@ -12,7 +12,12 @@
 
 type Doc = Record<string, unknown>
 
-/** Site fields blocks, SiteRenderer, SiteLayoutShell and JSON-LD read. Everything else stays on the server. */
+/**
+ * Site fields blocks, SiteRenderer, SiteLayoutShell and JSON-LD read. Everything else stays on the server.
+ * A block that needs a new site field: add it here (and keep it public — never a secret or payment detail).
+ * `SiteData` is an open `[key: string]: unknown`, so TypeScript will not flag a missing key: the block just
+ * gets `undefined` on the live site.
+ */
 const PUBLIC_SITE_KEYS = [
     'id',
     'name',
@@ -74,6 +79,16 @@ function scrub(value: unknown): unknown {
         else out[key] = scrub(child)
     }
     return out
+}
+
+/**
+ * The byline shown on a public blog post: the author's first + last name, else nothing.
+ * Never their email (GH-2077 review) — it would print into the HTML and the Article JSON-LD.
+ */
+export function publicAuthorName(author: unknown): string | null {
+    if (!isDoc(author)) return null
+    const name = [author.firstName, author.lastName].filter((part) => typeof part === 'string' && part.trim()).join(' ').trim()
+    return name || null
 }
 
 /** Allow-listed site shape for public rendering. `tenant` is kept as its id (blog-list block fetches by it). */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
+import { publicAuthorName, toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 
 // Shape of a tenant as the Local API returns it (overrideAccess: true → field access ignored)
 const tenantDoc = {
@@ -95,5 +95,38 @@ describe('public storefront DTO [GH-2077]', () => {
         // Assert
         expect(result).toEqual(page)
         expect(result).not.toBe(page)
+    })
+
+    it('[TC-F09.270] toPublicDoc collapses a populated tenants[] membership list (user docs) to ids', () => {
+        // Arrange
+        const author = { id: 5, firstName: 'Aina', tenants: [{ tenant: tenantDoc, role: 'owner' }, tenantDoc, 12] }
+
+        // Act
+        const result = toPublicDoc(author)
+
+        // Assert
+        expect(result).toEqual({ id: 5, firstName: 'Aina', tenants: [{ tenant: 7, role: 'owner' }, 7, 12] })
+        for (const secret of SECRETS) expect(JSON.stringify(result)).not.toContain(secret)
+    })
+
+    it('[TC-F09.271] toPublicSite with no seo group adds none, and keeps an unpopulated tenant id', () => {
+        // Arrange
+        const site = { id: 3, name: 'The Hehe', tenant: 7 }
+
+        // Act
+        const result = toPublicSite(site) as Record<string, unknown>
+
+        // Assert
+        expect(result).toEqual({ id: 3, name: 'The Hehe', tenant: 7 })
+        expect(result).not.toHaveProperty('seo')
+    })
+
+    it("[TC-F09.272] publicAuthorName shows the author's name and never falls back to their email", () => {
+        expect(publicAuthorName({ firstName: 'Aina', lastName: 'Rahman', email: 'aina@shop.my' })).toBe('Aina Rahman')
+        expect(publicAuthorName({ firstName: 'Aina', email: 'aina@shop.my' })).toBe('Aina')
+        expect(publicAuthorName({ firstName: ' ', lastName: '', email: 'aina@shop.my' })).toBeNull()
+        expect(publicAuthorName({ email: 'aina@shop.my' })).toBeNull()
+        expect(publicAuthorName(42)).toBeNull()
+        expect(publicAuthorName(null)).toBeNull()
     })
 })

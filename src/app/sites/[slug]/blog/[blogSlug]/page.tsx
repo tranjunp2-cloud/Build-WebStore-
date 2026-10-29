@@ -18,7 +18,7 @@ import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 import { hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
 import { proseThemeVars } from '@/lib/theme/prose-theme'
-import { toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
+import { publicAuthorName, toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 
 export const dynamic = 'force-dynamic'
 
@@ -152,10 +152,7 @@ export default async function BlogDetailPage({ params }: Props) {
     const category = typeof post.category === 'object' && post.category
         ? (post.category as Record<string, unknown>).name as string
         : null
-    const author = typeof post.author === 'object' && post.author
-        ? ([(post.author as any).firstName, (post.author as any).lastName].filter(Boolean).join(' '))
-          || ((post.author as Record<string, unknown>).email as string) || null
-        : null
+    const author = publicAuthorName(post.author)
     const publishedAt = post.publishedAt
         ? new Date(post.publishedAt as string).toLocaleDateString('en-US', {
             year: 'numeric', month: 'long', day: 'numeric',
