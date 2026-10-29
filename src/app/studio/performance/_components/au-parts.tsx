@@ -21,8 +21,9 @@ export function OutcomeBadge({ outcome }: { outcome: Outcome }) {
 export const UnpricedBadge = () => <span className="badge b-unpriced">Unpriced</span>
 
 /** Change vs the previous period. `upIsGood` decides the tone; `pts` shows percentage points instead of percent. */
-export function Delta({ current, previous, upIsGood, kind = 'pct' }: { current: number; previous: number; upIsGood: boolean; kind?: 'pct' | 'pts' }) {
-    if (kind === 'pct' && !previous) return <div className="aiq-metric-delta">No earlier data</div>
+/** `noEarlier`: the earlier period had nothing to compare with (a rate of 0 % there is not a real 0 %). */
+export function Delta({ current, previous, upIsGood, kind = 'pct', noEarlier = false }: { current: number; previous: number; upIsGood: boolean; kind?: 'pct' | 'pts'; noEarlier?: boolean }) {
+    if (noEarlier || (kind === 'pct' && !previous)) return <div className="aiq-metric-delta">No earlier data</div>
     if (Math.abs(current - previous) < 1e-9) return <div className="aiq-metric-delta"><Minus size={12} />No change</div>
     const up = current > previous
     const text = kind === 'pts' ? `${Math.abs(current - previous).toFixed(1)} pts` : `${Math.abs(((current - previous) / previous) * 100).toFixed(1)}%`

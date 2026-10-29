@@ -41,6 +41,14 @@ describe('TC-AIS-OV-010 empty and error states', () => {
         expect(screen.getByText('No earlier data')).toBeInTheDocument()
     })
 
+    it('a rate (pts) with no calls in the earlier period is not compared with 0 %', () => {
+        // Arrange + Act
+        const { container } = render(<Delta kind="pts" current={78} previous={0} upIsGood noEarlier />)
+        // Assert
+        expect(screen.getByText('No earlier data')).toBeInTheDocument()
+        expect(container.querySelector('[data-tone]')).toBeNull()
+    })
+
     it('renders a delta with the right tone: cost going up is bad', () => {
         const { container } = render(<Delta current={110} previous={100} upIsGood={false} />)
         expect(container.querySelector('[data-tone="bad"]')).toHaveTextContent('10.0%')
