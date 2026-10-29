@@ -1149,6 +1149,15 @@
         "undoSuccess": "Pembetulan kelompok dibatalkan",
         "errorTimeout": "Pembetulan AI mengambil masa terlalu lama. Sila cuba lagi.",
         "errorFailed": "Tidak dapat menyelesaikan pembetulan AI. Sila cuba lagi.",
+        "errorQuota": "Had penggunaan AI telah dicapai. Sila cuba lagi nanti.",
+        "errorUnavailable": "Perkhidmatan AI tidak tersedia buat masa ini. Sila cuba lagi sebentar nanti.",
+        "partialFailed": "{count} item tidak dapat dijana: {names} ({reason})",
+        "andMore": "+{count} lagi",
+        "reasonTimeout": "AI mengambil masa terlalu lama",
+        "reasonQuota": "had penggunaan AI dicapai",
+        "reasonUnavailable": "AI tidak tersedia",
+        "reasonFailed": "penjanaan gagal",
+        "retryFailed": "Cuba semula item yang gagal",
         "undoPartial": "Sesetengah pembaikan tidak dapat dibatalkan. Perubahan yang selebihnya sedia untuk dicuba semula."
       },
       "keywordTracker": {

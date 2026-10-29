@@ -6,6 +6,11 @@ import { Sparkles, Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import {
+    dominantFixFailureReason,
+    normalizeFixFailureReason,
+    type FixFailureReason,
+} from '@/lib/seo/fix-all-protocol'
 import type { MissingSeoItem } from './views/SEOView'
 
 interface AIFixModalProps {
@@ -27,6 +32,22 @@ interface ProposedFix {
     currentTitle?: string
     currentDescription?: string
 }
+
+interface FailedItem {
+    key: string
+    name: string
+    reason: FixFailureReason
+}
+
+/** Fixes + selection kept from an earlier run while only failed items are retried. */
+interface RetryBase {
+    fixes: ProposedFix[]
+    selected: Set<string>
+}
+
+const FAILED_NAMES_SHOWN = 3
+const itemKey = (item: { collection: string; id: string | number }) =>
+    `${item.collection}:${String(item.id)}`
 
 type ModalState = 'loading' | 'review' | 'applying' | 'done' | 'error'
 
@@ -191,6 +212,24 @@ export function AIFixModal({
         string | null
     >(null)
     const [undoAvailable, setUndoAvailable] = useState(false)
+    const [failedItems, setFailedItems] = useState<FailedItem[]>([])
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+    // Read lazily: copy is only needed once a run has finished.
+    const reasonLabel = (reason: FixFailureReason) =>
+        ({
+            timeout: aifix.reasonTimeout,
+            quota: aifix.reasonQuota,
+            unavailable: aifix.reasonUnavailable,
+            failed: aifix.reasonFailed,
+        })[reason]
+    const reasonError = (reason: FixFailureReason) =>
+        ({
+            timeout: aifix.errorTimeout,
+            quota: aifix.errorQuota,
+            unavailable: aifix.errorUnavailable,
+            failed: aifix.errorFailed,
+        })[reason]
 
     // Reset + start when modal opens; abort when closes
     useEffect(() => {
@@ -205,6 +244,8 @@ export function AIFixModal({
             setTaskMessages([])
             setActiveRevisionToken(null)
             setUndoAvailable(false)
+            setFailedItems([])
+            setErrorMessage(null)
             return
         }
         if (siteId && missingSeoItems.length > 0) {
@@ -214,28 +255,40 @@ export function AIFixModal({
     }, [isOpen])
 
     // ── Stream fixes from API ──────────────────────────────────────────────
-    const runFixAll = async () => {
-        if (!siteId || missingSeoItems.length === 0) return
+    const showError = (message: string) => {
+        setState('error')
+        setErrorMessage(message)
+        setTaskMessages((prev) => [...prev, message])
+    }
+
+    const runFixAll = async (
+        items: MissingSeoItem[] = missingSeoItems,
+        base?: RetryBase,
+    ) => {
+        if (!siteId || items.length === 0) return
+        const baseFixes = base?.fixes ?? []
+        const totalCount = baseFixes.length + items.length
 
         abortController?.abort()
         const controller = new AbortController()
         setAbortController(controller)
         setState('loading')
         setProgress(5)
-        setFixes([])
-        setTaskMessages([
-            ti(seo.fixAllAnalysing, { count: missingSeoItems.length }),
-        ])
+        setFixes(baseFixes)
+        setFailedItems([])
+        setErrorMessage(null)
+        setTaskMessages([ti(seo.fixAllAnalysing, { count: items.length })])
 
         try {
+            // A retry keeps earlier fixes, so it must stay on the revision they were checked against.
+            const knownToken = base ? activeRevisionToken : revisionToken
             const resolvedRevisionToken = REVISION_TOKEN_PATTERN.test(
-                revisionToken ?? '',
+                knownToken ?? '',
             )
-                ? revisionToken
+                ? knownToken
                 : await loadRevisionToken(siteId, controller.signal)
             if (!resolvedRevisionToken) {
-                setState('error')
-                setTaskMessages((prev) => [...prev, aifix.errorFailed])
+                showError(aifix.errorFailed)
                 return
             }
             setActiveRevisionToken(resolvedRevisionToken)
@@ -247,7 +300,7 @@ export function AIFixModal({
                 body: JSON.stringify({
                     siteId: String(siteId),
                     revisionToken: resolvedRevisionToken,
-                    missingSeo: missingSeoItems.map((item) => ({
+                    missingSeo: items.map((item) => ({
                         collection: item.collection,
                         id: item.id,
                         title: item.title,
@@ -258,15 +311,16 @@ export function AIFixModal({
             })
 
             if (!res.ok || !res.body) {
-                setState('error')
-                setTaskMessages((prev) => [...prev, aifix.errorFailed])
+                showError(aifix.errorFailed)
                 return
             }
 
             const reader = res.body.getReader()
             const decoder = new TextDecoder()
             let buffer = ''
-            const collected: ProposedFix[] = []
+            const collected: ProposedFix[] = [...baseFixes]
+            const failures: FailedItem[] = []
+            let timedOut = false
 
             try {
                 while (true) {
@@ -283,20 +337,43 @@ export function AIFixModal({
                         if (!jsonStr) continue
                         try {
                             const data = JSON.parse(jsonStr)
-                            if (data.error === 'timeout') {
-                                setState('error')
-                                setTaskMessages((prev) => [
-                                    ...prev,
-                                    aifix.errorTimeout,
-                                ])
-                                // Keep what we have — show review for partial results
-                                if (collected.length > 0) {
-                                    setFixes([...collected])
-                                    initSelection(collected)
-                                    setState('review')
-                                }
-                                return
+                            if (data.error === 'item_failed') {
+                                failures.push({
+                                    key: `${data.collection}:${String(data.targetId)}`,
+                                    name: String(data.name ?? ''),
+                                    reason: normalizeFixFailureReason(
+                                        data.reason,
+                                    ),
+                                })
+                                continue
                             }
+                            if (data.error === 'timeout') {
+                                // Budget ran out: unfinished items can be retried like failed ones.
+                                const pending: unknown[] = Array.isArray(
+                                    data.pending,
+                                )
+                                    ? data.pending
+                                    : []
+                                for (const entry of pending) {
+                                    const target = entry as Record<
+                                        string,
+                                        unknown
+                                    >
+                                    failures.push({
+                                        key: `${String(target.collection)}:${String(target.targetId)}`,
+                                        name: String(target.name ?? ''),
+                                        reason: 'timeout',
+                                    })
+                                }
+                                timedOut = true
+                                continue
+                            }
+                            // Summary / unknown frames carry no proposal.
+                            if (
+                                data.targetId == null ||
+                                typeof data.collection !== 'string'
+                            )
+                                continue
                             // Match with original for BR-06 (current values)
                             const original = missingSeoItems.find(
                                 (item) =>
@@ -315,7 +392,7 @@ export function AIFixModal({
                                     90,
                                     Math.round(
                                         (collected.length /
-                                            missingSeoItems.length) *
+                                            totalCount) *
                                             90,
                                     ),
                                 ),
@@ -336,34 +413,31 @@ export function AIFixModal({
             if (controller.signal.aborted) return
 
             if (collected.length === 0) {
-                // If we sent items but got 0 back → API errors (e.g. OpenAI quota)
-                if (missingSeoItems.length > 0) {
-                    setState('error')
-                    setTaskMessages((prev) => [...prev, aifix.errorFailed])
-                } else {
-                    setState('done')
-                    setProgress(100)
-                    setAppliedCount(0)
-                    setTaskMessages([seo.allGood])
-                }
+                // Nothing came back: say why (timeout, quota, AI down) instead of a generic failure.
+                const reasons = failures.map((failure) => failure.reason)
+                if (timedOut) reasons.push('timeout')
+                showError(reasonError(dominantFixFailureReason(reasons)))
                 return
             }
 
-            // Stream done → go to REVIEW (not auto-apply)
+            // Stream done → go to REVIEW (not auto-apply); failed items stay retryable
+            setFailedItems(failures)
             setFixes(collected)
-            initSelection(collected)
+            initSelection(collected.slice(baseFixes.length), base?.selected)
             setProgress(100)
             setState('review')
         } catch (err) {
             if (err instanceof DOMException && err.name === 'AbortError') return
-            setState('error')
-            setTaskMessages((prev) => [...prev, aifix.errorFailed])
+            showError(aifix.errorFailed)
         }
     }
 
     // BR-06: field trống → checked. Field bị thay thế (đã có giá trị cũ) → unchecked
-    function initSelection(proposedFixes: ProposedFix[]) {
-        const defaultSelected = new Set<string>()
+    function initSelection(
+        proposedFixes: ProposedFix[],
+        previous?: Set<string>,
+    ) {
+        const defaultSelected = new Set<string>(previous)
         proposedFixes.forEach((fix) => {
             const titleIsReplace = !!(fix.proposedTitle && fix.currentTitle)
             const descIsReplace = !!(
@@ -374,6 +448,16 @@ export function AIFixModal({
                 defaultSelected.add(fixKey(fix))
         })
         setSelectedIds(defaultSelected)
+    }
+
+    // Re-run fix-all for just the items that failed, keeping the fixes already proposed.
+    const retryFailedItems = () => {
+        const failedKeys = new Set(failedItems.map((failure) => failure.key))
+        const retryItems = missingSeoItems.filter((item) =>
+            failedKeys.has(itemKey(item)),
+        )
+        if (retryItems.length === 0) return
+        void runFixAll(retryItems, { fixes, selected: selectedIds })
     }
 
     // ── Apply selected fixes ───────────────────────────────────────────────
@@ -568,6 +652,19 @@ export function AIFixModal({
             </div>
         )
 
+    const shownFailedNames = failedItems
+        .slice(0, FAILED_NAMES_SHOWN)
+        .map((failure) => failure.name)
+        .filter(Boolean)
+        .join(', ')
+    const hiddenFailedCount = Math.max(
+        0,
+        failedItems.length - FAILED_NAMES_SHOWN,
+    )
+    const failedNames = hiddenFailedCount
+        ? `${shownFailedNames} ${ti(aifix.andMore, { count: hiddenFailedCount })}`
+        : shownFailedNames
+
     const headerTitle = {
         loading: seo.fixAllProgress,
         review: seo.reviewTitle,
@@ -581,7 +678,7 @@ export function AIFixModal({
         review: `${fixes.length} ${fixes.length === 1 ? 'fix' : 'fixes'} proposed`,
         applying: aifix.description,
         done: ti(aifix.applySuccess, { count: appliedCount }),
-        error: aifix.errorTimeout,
+        error: errorMessage ?? '',
     }[state]
 
     return createPortal(
@@ -703,6 +800,33 @@ export function AIFixModal({
                                             : seo.selectAll}
                                     </button>
                                 </div>
+                                {failedItems.length > 0 && (
+                                    <div
+                                        data-testid="aifix-failed-note"
+                                        className="flex flex-col gap-2 p-3 rounded-xl border bg-amber-500/10 border-amber-500/30"
+                                    >
+                                        <span className="text-[13px] text-amber-300">
+                                            {ti(aifix.partialFailed, {
+                                                count: failedItems.length,
+                                                names: failedNames,
+                                                reason: reasonLabel(
+                                                    dominantFixFailureReason(
+                                                        failedItems.map(
+                                                            (failure) =>
+                                                                failure.reason,
+                                                        ),
+                                                    ),
+                                                ),
+                                            })}
+                                        </span>
+                                        <button
+                                            onClick={retryFailedItems}
+                                            className="self-start text-[13px] text-[#38BDF8] hover:underline font-medium"
+                                        >
+                                            {aifix.retryFailed}
+                                        </button>
+                                    </div>
+                                )}
                                 {/* Fix list */}
                                 {fixes.map((fix) => {
                                     const titleIsReplace = !!(

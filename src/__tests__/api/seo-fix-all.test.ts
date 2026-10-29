@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const CURRENT_REVISION = 'a'.repeat(64)
 
@@ -47,7 +47,17 @@ vi.mock('@/lib/seo/local-seo-evaluation', () => ({
         mockEvaluateAuthoritativeLocalSeo(...args),
 }))
 
-import { POST } from '@/app/api/seo/fix-all/route'
+import { AiClientError } from '@ech/ai-contracts'
+import { POST, maxDuration } from '@/app/api/seo/fix-all/route'
+import {
+    FIX_ALL_KEEPALIVE_MS,
+    FIX_ALL_MAX_DURATION_S,
+    FIX_ALL_TIMEOUT_MS,
+    classifyFixFailure,
+    fixAllStreamBudgetMs,
+    FIX_ALL_FLUSH_MARGIN_MS,
+    FIX_ALL_MIN_STREAM_MS,
+} from '@/lib/seo/fix-all-protocol'
 
 interface RequestedItem {
     collection: 'pages' | 'products' | 'blogs'
@@ -183,7 +193,8 @@ describe('POST /api/seo/fix-all [TC-F37-04-16, TC-F19.38]', () => {
 
         // Assert
         expect(response.status).toBe(200)
-        expect(events).toHaveLength(1)
+        expect(events).toHaveLength(2) // proposal + done summary
+        expect(events[1]).toEqual({ done: true, succeeded: 1, failed: 0 })
         expect(events[0]).toMatchObject({
             targetId: 'prod-1',
             name: 'Nasi Lemak',
@@ -459,5 +470,208 @@ describe('POST /api/seo/fix-all [TC-F37-04-16, TC-F19.38]', () => {
 
         expect(mockGenerateAutoSEOMeta).toHaveBeenCalledTimes(4)
         expect(generationSignals).toHaveLength(4)
+    })
+})
+
+// ── TC-F37-04-30..36: time budget, per-item failures, done summary ──────
+describe('POST /api/seo/fix-all — budget and per-item failures [TC-F37-04-30..36]', () => {
+    const pageItems = (count: number): RequestedItem[] =>
+        Array.from({ length: count }, (_, index) => ({
+            collection: 'pages' as const,
+            id: String(index),
+            title: `Page ${index}`,
+            missingFields: ['title'] as Array<'title'>,
+        }))
+
+    const slowSuccess = (delayMs: number) => () =>
+        new Promise((resolve) =>
+            setTimeout(
+                () => resolve({ title: 'Generated', description: 'Desc' }),
+                delayMs,
+            ),
+        )
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockCheckTwoTierRateLimit.mockResolvedValue({
+            allowed: true,
+            remaining: 4,
+            resetAt: Date.now() + 60_000,
+        })
+        mockUser.roles = []
+        mockUser.tenants = [{ tenant: 'tenant-1', status: 'active' }]
+        mockFindByID.mockResolvedValue({
+            id: 'site-1',
+            name: 'My Store',
+            tenant: 'tenant-1',
+        })
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
+    it('[TC-F37-04-40] the stream budget shrinks by the time setup already used, never past maxDuration', () => {
+        // Act + Assert — fast setup keeps the full budget
+        expect(fixAllStreamBudgetMs(0)).toBe(FIX_ALL_TIMEOUT_MS)
+        expect(fixAllStreamBudgetMs(2_000)).toBe(FIX_ALL_TIMEOUT_MS)
+        // a slow cold start (20 s) leaves only what fits before maxDuration
+        expect(fixAllStreamBudgetMs(20_000)).toBe(maxDuration * 1_000 - 20_000 - FIX_ALL_FLUSH_MARGIN_MS)
+        expect(20_000 + fixAllStreamBudgetMs(20_000)).toBeLessThan(maxDuration * 1_000)
+        // pathological setup still gives the first wave a floor
+        expect(fixAllStreamBudgetMs(70_000)).toBe(FIX_ALL_MIN_STREAM_MS)
+    })
+
+    it('[TC-F37-04-30] budget is at least 45s and stays below maxDuration', () => {
+        expect(FIX_ALL_TIMEOUT_MS).toBeGreaterThanOrEqual(45_000)
+        expect(FIX_ALL_TIMEOUT_MS).toBeLessThan(maxDuration * 1_000)
+        expect(FIX_ALL_MAX_DURATION_S).toBe(maxDuration)
+        expect(FIX_ALL_KEEPALIVE_MS).toBeLessThan(FIX_ALL_TIMEOUT_MS)
+    })
+
+    it('[TC-F37-04-31] nine slow items (3 waves of 12s) all finish within the budget', async () => {
+        // Arrange — 3 waves x 12s = 36s: cut by the old 15s limit, fits the new budget
+        vi.useFakeTimers()
+        const items = pageItems(9)
+        mockEvaluateAuthoritativeLocalSeo.mockResolvedValue(evaluation(items))
+        mockGenerateAutoSEOMeta.mockImplementation(slowSuccess(12_000))
+
+        // Act
+        const response = await POST(request(items), {} as never)
+        const eventsPromise = dataEvents(response)
+        await vi.advanceTimersByTimeAsync(40_000)
+        const events = await eventsPromise
+
+        // Assert
+        expect(events.filter((event) => event.proposedTitle)).toHaveLength(9)
+        expect(events.some((event) => event.error === 'timeout')).toBe(false)
+        expect(events.at(-1)).toEqual({ done: true, succeeded: 9, failed: 0 })
+    })
+
+    it.each([
+        ['timeout', () => new Error('AI meta generation failed: slow', { cause: new DOMException('t', 'TimeoutError') })],
+        ['timeout', () => new Error('AI meta generation failed: gw', { cause: new AiClientError('gateway timeout', 504) })],
+        ['quota', () => new Error('AI meta generation failed: q', { cause: new AiClientError('limit', 429) })],
+        ['unavailable', () => new Error('AI meta generation failed: bad', { cause: new AiClientError('bad gateway', 502) })],
+        ['unavailable', () => new Error('AI meta generation failed: down', { cause: new AiClientError('down', 503) })],
+        ['failed', () => new Error('AI meta generation failed: boom')],
+    ])(
+        '[TC-F37-04-32] failure kind %s emits item_failed and does not stop the other items',
+        async (reason, makeError) => {
+            // Arrange — the first item fails, the other two succeed
+            const items = pageItems(3)
+            mockEvaluateAuthoritativeLocalSeo.mockResolvedValue(evaluation(items))
+            mockGenerateAutoSEOMeta.mockImplementation(
+                async (_type: string, itemName: string) => {
+                    if (itemName === 'Page 0') throw makeError()
+                    return { title: 'Generated', description: 'Desc' }
+                },
+            )
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+            // Act
+            const response = await POST(request(items), {} as never)
+            const events = await dataEvents(response)
+
+            // Assert
+            const failed = events.filter((event) => event.error === 'item_failed')
+            expect(failed).toEqual([
+                {
+                    error: 'item_failed',
+                    targetId: '0',
+                    collection: 'pages',
+                    name: 'Page 0',
+                    reason,
+                },
+            ])
+            expect(events.filter((event) => event.proposedTitle)).toHaveLength(2)
+            // Server log carries the reason, never the error message / prompt text
+            const logged = JSON.stringify(errorSpy.mock.calls)
+            expect(logged).toContain(`"reason":"${reason}"`)
+            expect(logged).not.toContain('AI meta generation failed')
+            errorSpy.mockRestore()
+        },
+    )
+
+    it('[TC-F37-04-33] done summary counts succeeded and failed items', async () => {
+        // Arrange
+        const items = pageItems(4)
+        mockEvaluateAuthoritativeLocalSeo.mockResolvedValue(evaluation(items))
+        mockGenerateAutoSEOMeta.mockImplementation(
+            async (_type: string, itemName: string) => {
+                if (itemName === 'Page 1' || itemName === 'Page 3')
+                    throw new Error('boom')
+                return { title: 'Generated', description: 'Desc' }
+            },
+        )
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        // Act
+        const response = await POST(request(items), {} as never)
+        const events = await dataEvents(response)
+
+        // Assert — done is the last frame, after every item result
+        expect(events.at(-1)).toEqual({ done: true, succeeded: 2, failed: 2 })
+        errorSpy.mockRestore()
+    })
+
+    it('[TC-F37-04-34] overall timeout reports the unfinished and not-started items as pending', async () => {
+        // Arrange — 6 items, 4 at a time: wave 1 (0-3) finishes at 20s, wave 2 never fits
+        vi.useFakeTimers()
+        const items = pageItems(6)
+        mockEvaluateAuthoritativeLocalSeo.mockResolvedValue(evaluation(items))
+        mockGenerateAutoSEOMeta.mockImplementation(
+            async (_type: string, itemName: string) => {
+                if (itemName === 'Page 0') return { title: 'Generated', description: 'Desc' }
+                return slowSuccess(FIX_ALL_TIMEOUT_MS + 10_000)()
+            },
+        )
+
+        // Act
+        const response = await POST(request(items), {} as never)
+        const eventsPromise = dataEvents(response)
+        await vi.advanceTimersByTimeAsync(FIX_ALL_TIMEOUT_MS + 1)
+        const events = await eventsPromise
+
+        // Assert
+        const timeout = events.find((event) => event.error === 'timeout')
+        expect(timeout).toMatchObject({
+            error: 'timeout',
+            pending: ['1', '2', '3', '4', '5'].map((id) => ({
+                targetId: id,
+                collection: 'pages',
+                name: `Page ${id}`,
+            })),
+        })
+        expect(events.some((event) => event.done === true)).toBe(false)
+    })
+
+    it('[TC-F37-04-35] sends an SSE comment keep-alive every 10s while waiting', async () => {
+        // Arrange
+        vi.useFakeTimers()
+        const items = pageItems(1)
+        mockEvaluateAuthoritativeLocalSeo.mockResolvedValue(evaluation(items))
+        mockGenerateAutoSEOMeta.mockImplementation(slowSuccess(25_000))
+
+        // Act
+        const response = await POST(request(items), {} as never)
+        const textPromise = response.text()
+        await vi.advanceTimersByTimeAsync(26_000)
+        const text = await textPromise
+
+        // Assert — pings at 10s and 20s, before the result and the summary
+        expect(text.split(': ping\n\n')).toHaveLength(3)
+        expect(text.indexOf(': ping')).toBeLessThan(text.indexOf('"proposedTitle"'))
+        expect(text.trimEnd().endsWith('}')).toBe(true)
+    })
+
+    it('[TC-F37-04-36] classifyFixFailure reads name/status/code through the cause chain only', () => {
+        expect(classifyFixFailure(new Error('x', { cause: new AiClientError('m', 429) }))).toEqual({ reason: 'quota', status: 429 })
+        expect(classifyFixFailure(new AiClientError('m', 504))).toEqual({ reason: 'timeout', status: 504 })
+        expect(classifyFixFailure(new Error('x', { cause: new DOMException('t', 'TimeoutError') }))).toEqual({ reason: 'timeout' })
+        expect(classifyFixFailure(new Error('x', { cause: Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } }) }))).toEqual({ reason: 'unavailable' })
+        expect(classifyFixFailure(new AiClientError('m', 500))).toEqual({ reason: 'failed', status: 500 })
+        expect(classifyFixFailure('timeout 429')).toEqual({ reason: 'failed' })
+        expect(classifyFixFailure(null)).toEqual({ reason: 'failed' })
     })
 })
