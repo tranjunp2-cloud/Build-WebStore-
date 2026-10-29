@@ -124,10 +124,10 @@ export function FeedbackDialog({ context, types = FEEDBACK_TYPES, onClose, submi
                                         {f.sendingNote}
                                     </p>
                                 )}
-                                <Button type="button" variant="dashSecondary" className="px-4" disabled={submitting} onClick={requestClose}>
+                                <Button type="button" variant="dashSecondary" size="dash" disabled={submitting} onClick={requestClose}>
                                     {f.actions.cancel}
                                 </Button>
-                                <Button type="submit" variant="dashPrimary" className="px-4" disabled={submitting}>
+                                <Button type="submit" variant="dashPrimary" size="dash" disabled={submitting}>
                                     {submitting && <Loader2 aria-hidden className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                                     {submitting ? f.actions.sending : f.actions.send}
                                 </Button>
