@@ -682,8 +682,10 @@ jobs:
         # Plan 260419-2022 Phase 03 — mirror of staging seed step against prod
         # alias. SEED_TOKEN must be mirrored in Vercel production env.
         # NOTE: staging freshness gate deferred (see plan.md — nice-to-have).
+        # Target the deployment URL, not the production domain: on the first deploy
+        # (and during cutover) the domain still points at v1. /api/* skips host routing.
         env:
-          DEPLOY_URL: https://web-v2.ecommercehub.my
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
           SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
         run: bash .github/scripts/seed-templates-post-deploy.sh
 
