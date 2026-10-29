@@ -12,6 +12,9 @@ const ModelRefSchema = z
 		"model refs are provider:model[, provider:model…], e.g. openai:gpt-4.1-mini, anthropic:claude-haiku-4-5",
 	);
 
+/** Anthropic reasoning effort (`output_config.effort`); xhigh/max are lowered by the SDK where a model lacks them. */
+const EffortSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
+
 const EnvSchema = z.object({
 	NODE_ENV: z.string().default("development"),
 	PORT: z.coerce.number().int().min(1).max(65_535).default(8300),
@@ -79,6 +82,14 @@ const EnvSchema = z.object({
 	AI_MODEL_QUALITY: ModelRefSchema.default("openai:gpt-5.4-mini"),
 	/** Picture generation (DAM "Generate", the copilot's generate_image): openai:gpt-image-1 or compat-<name>:<model>. */
 	AI_MODEL_IMAGE: ModelRefSchema.default("openai:gpt-image-1"),
+	/**
+	 * Reasoning effort per tier for Anthropic models (other providers ignore it). Lets one cheap model
+	 * (e.g. claude-haiku-5-5) serve every tier: fast = low, balanced = medium, quality = high.
+	 * Unset = the model's own default (Haiku 5.5 / Opus 5.5: medium; other current models: high).
+	 */
+	AI_EFFORT_FAST: EffortSchema.optional(),
+	AI_EFFORT_BALANCED: EffortSchema.optional(),
+	AI_EFFORT_QUALITY: EffortSchema.optional(),
 	AI_IMAGE_TIMEOUT_MS: z.coerce.number().int().min(10_000).max(300_000).default(150_000),
 	/** Generated picture format (OpenAI image models). Unset = png locally, webp on Vercel (response and upload bodies stay under 4.5 MB). */
 	AI_IMAGE_OUTPUT_FORMAT: z.enum(["png", "jpeg", "webp"]).optional(),

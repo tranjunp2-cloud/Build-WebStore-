@@ -37,6 +37,15 @@ const DEEPSEEK_NON_THINKING = defaultSettingsMiddleware({
 	settings: { providerOptions: { deepseek: { thinking: { type: "disabled" } } } },
 });
 
+/** Anthropic `output_config.effort` as a default every call on this model carries (a call's own value wins). */
+export function withAnthropicEffort(model: LanguageModel, effort: "low" | "medium" | "high" | "xhigh" | "max"): LanguageModel {
+	if (typeof model === "string") return model;
+	return wrapLanguageModel({
+		model,
+		middleware: defaultSettingsMiddleware({ settings: { providerOptions: { anthropic: { effort } } } }),
+	});
+}
+
 const KEY_HEADERS = ["authorization", "x-api-key", "x-goog-api-key"];
 
 function envKey(provider: string): string {
