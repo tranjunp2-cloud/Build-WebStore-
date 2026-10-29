@@ -17,6 +17,7 @@ import {
 	toLogRow,
 	userPlatformMap,
 } from "./usage-sync-map";
+import { currentPlanByTenant } from "./usage-sync-plan";
 
 /**
  * Copies ai-platform's usage ledger into `ai_usage_logs` (the Payload admin list super-admins read).
@@ -100,14 +101,17 @@ async function fetchPage(after: number, requestId: string): Promise<{ events: Us
 }
 
 const COLUMNS = [
-	"platform_event_id", "source", "organization_id", "tenant_id", "user_id", "summary", "feature", "area", "task",
+	"platform_event_id", "source", "organization_id", "tenant_id", "plan", "user_id", "summary", "feature", "area", "task",
 	"task_label", "page_title", "page_path", "run_id", "thread_id", "provider", "model", "tokens_in", "tokens_out",
 	"cached_tokens_in", "total_tokens", "cache_hit_percent", "cost_usd", "priced", "battery_cost_usd", "duration_ms",
 	"outcome", "success", "error_code", "error_label", "created_at",
 ] as const satisfies ReadonlyArray<keyof UsageLogRow>;
 
-/** Columns a re-copy refreshes (labels and derived values can change between releases; the ledger row itself does not). */
-const REFRESHED = COLUMNS.filter((column) => column !== "platform_event_id" && column !== "created_at");
+/**
+ * Columns a re-copy refreshes (labels and derived values can change between releases; the ledger row itself does not).
+ * `plan` is kept once set: a backfill must not stamp today's plan on an old call.
+ */
+const REFRESHED = COLUMNS.filter((column) => column !== "platform_event_id" && column !== "created_at" && column !== "plan");
 
 /** Writes a page; returns how many rows were new (xmax = 0 on an inserted row, not on an updated one). */
 async function insertRows(handle: ReportsDb, rows: UsageLogRow[]): Promise<number> {
@@ -121,7 +125,8 @@ async function insertRows(handle: ReportsDb, rows: UsageLogRow[]): Promise<numbe
 		sql`INSERT INTO ai_usage_logs (${sql.raw(COLUMNS.join(", "))}, updated_at)
 			VALUES ${sql.join(tuples, sql`, `)}
 			ON CONFLICT (platform_event_id) DO UPDATE SET
-				${sql.raw(REFRESHED.map((column) => `${column} = EXCLUDED.${column}`).join(", "))}, updated_at = now()
+				${sql.raw(REFRESHED.map((column) => `${column} = EXCLUDED.${column}`).join(", "))},
+				plan = COALESCE(ai_usage_logs.plan, EXCLUDED.plan), updated_at = now()
 			RETURNING (xmax = 0) AS inserted`,
 	);
 	return inserted.filter((row) => row.inserted).length;
@@ -149,6 +154,8 @@ export async function syncUsageEvents(now: () => number = Date.now, options: { f
 				userByPlatformId = userPlatformMap(await rowsOf(handle, sql`SELECT id FROM users`));
 			}
 			const rows = page.events.map((event) => toLogRow(event, tenantByOrg!, userByPlatformId ?? new Map()));
+			const plans = await currentPlanByTenant(handle, rows.flatMap((row) => (row.tenant_id === null ? [] : [row.tenant_id])));
+			for (const row of rows) row.plan = row.tenant_id === null ? null : (plans.get(row.tenant_id) ?? null);
 			result.inserted += await insertRows(handle, rows);
 		}
 		if (page.malformed) throw new Error(`malformed usage event ${page.malformed}`);

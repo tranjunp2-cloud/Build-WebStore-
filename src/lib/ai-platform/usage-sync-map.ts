@@ -145,6 +145,8 @@ export interface UsageLogRow {
 	source: "ai-platform";
 	organization_id: string;
 	tenant_id: number | null;
+	/** plan code the shop was on when the row was copied (FREEMIUM when no active subscription); null without a tenant */
+	plan: string | null;
 	user_id: number | null;
 	summary: string;
 	feature: UsageFeature;
@@ -185,6 +187,7 @@ export function toLogRow(
 		source: "ai-platform",
 		organization_id: event.organizationId,
 		tenant_id: tenantByOrg.get(event.organizationId) ?? null,
+		plan: null,
 		user_id: event.userId ? (userByPlatformId.get(event.userId) ?? null) : null,
 		summary: summaryOf(event),
 		feature: featureOf(event),

@@ -2732,6 +2732,9 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   { name: 'ai_usage_logs.alter_battery_cost_usd', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS battery_cost_usd numeric;` },
   { name: 'ai_usage_logs.alter_priced', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS priced boolean;` },
   { name: 'ai_usage_logs.alter_error_label', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS error_label varchar;` },
+  // plan code the shop was on when the call was copied (lib/ai-platform/usage-sync-plan); older rows stay NULL
+  { name: 'ai_usage_logs.alter_plan', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS plan varchar;` },
+  { name: 'ai_usage_logs.plan_created_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_plan_created_idx ON ai_usage_logs (plan, created_at);` },
   { name: 'ai_usage_logs.area_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_area_idx ON ai_usage_logs (area);` },
   {
     // legacy prime-web rows: give them a readable title and totals (their cost was always priced)
