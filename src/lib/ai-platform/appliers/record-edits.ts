@@ -6,6 +6,7 @@ import { applyBlogTrashCreated } from "./blog-draft";
 import { applyBlogRestoreFields, applyBlogStatus } from "./blog-edits";
 import { ChangeSetApplyError } from "./errors";
 import { applyShopProductRestore } from "./store-product";
+import { applyShopProductsRestore } from "./store-product-setup";
 import { applyStoreCategoriesRestore } from "./store-categories";
 import { applyStoreDiscountsRestore } from "./store-discounts";
 import { applyStoreCustomersRestore } from "./store-customers";
@@ -36,6 +37,8 @@ export async function applyUndo(
 			return applyBlogTrashCreated(undo.payload, actor);
 		case "shop_product.restore":
 			return applyShopProductRestore(undo.payload, actor);
+		case "shop_product.restore_many":
+			return applyShopProductsRestore(undo.payload, actor);
 		case "shop_product.trash_created":
 			return applyShopProductTrashCreated(undo.payload, actor);
 		case "site.page_restore":

@@ -34,25 +34,29 @@ const DEFAULT_REQUIREMENT: CategoryRequirement = {
     minBlocks: 9,
     mandatoryBlocks: ['navigation', 'hero', 'features', 'testimonials', 'cta', 'footer'],
     recommendedBlocks: ['about', 'stats', 'faq', 'team', 'gallery'],
-    minItems: { testimonials: 3, features: 4, faq: 4, 'service-cards': 3, stats: 3, 'logo-cloud': 5, team: 3, pricing: 3, gallery: 6 },
+    minItems: { features: 4, 'service-cards': 3, gallery: 6 },
 }
 
-/** Per-category minimum item counts — used by structure-enforcer padding. Not part of shared TEMPLATE_RULES schema. */
+/**
+ * Per-category minimum item counts — used by structure-enforcer padding. Not part of shared TEMPLATE_RULES schema.
+ * #2103 A1: testimonials / faq / team / stats / pricing / logo-cloud carry NO minimum — they only ever hold
+ * real merchant facts, so padding them would mean inventing items (see content-injection NEVER_PAD_BLOCKS).
+ */
 const CATEGORY_MIN_ITEMS: Readonly<Record<string, Readonly<Partial<Record<string, number>>>>> = {
-    beauty:     { team: 3, testimonials: 4, features: 4, gallery: 6, 'service-cards': 3, faq: 4, stats: 3, 'logo-cloud': 6 },
-    restaurant: { testimonials: 4, features: 4, gallery: 8, faq: 5, stats: 3 },
-    fnb:        { testimonials: 4, features: 4, gallery: 6, faq: 4, stats: 3 },
-    tech:       { features: 6, testimonials: 3, pricing: 3, faq: 5, stats: 4, 'logo-cloud': 6 },
-    health:     { team: 3, testimonials: 4, features: 4, faq: 5, 'service-cards': 4, stats: 4 },
-    education:  { testimonials: 3, features: 4, faq: 5, stats: 3 },
-    realestate: { testimonials: 3, gallery: 8, stats: 4, faq: 4 },
-    fitness:    { team: 3, testimonials: 4, features: 4, pricing: 3, stats: 3 },
-    creative:   { testimonials: 3, gallery: 6, stats: 3 },
-    business:   { features: 6, testimonials: 3, 'service-cards': 4, stats: 4, 'logo-cloud': 6 },
-    ecommerce:  { features: 6, testimonials: 4, faq: 4, 'logo-cloud': 6, stats: 3 },
-    events:     { testimonials: 3, features: 4, gallery: 6, stats: 3 },
-    blog:       { features: 4, testimonials: 3, faq: 4 },
-    travel:     { testimonials: 3, features: 4, gallery: 8, stats: 3, faq: 4 },
+    beauty:     { features: 4, gallery: 6, 'service-cards': 3 },
+    restaurant: { features: 4, gallery: 8 },
+    fnb:        { features: 4, gallery: 6 },
+    tech:       { features: 6 },
+    health:     { features: 4, 'service-cards': 4 },
+    education:  { features: 4 },
+    realestate: { gallery: 8 },
+    fitness:    { features: 4 },
+    creative:   { gallery: 6 },
+    business:   { features: 6, 'service-cards': 4 },
+    ecommerce:  { features: 6 },
+    events:     { features: 4, gallery: 6 },
+    blog:       { features: 4 },
+    travel:     { features: 4, gallery: 8 },
 }
 
 /**

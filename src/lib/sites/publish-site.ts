@@ -447,6 +447,23 @@ export async function publishSite(input: PublishSiteInput): Promise<PublishSiteR
         return failed
     }
 
+    // #2103 A4: the AI blog posts are seeded as drafts (the generated site is a draft too), so a publish that
+    // takes the site live also takes its seeded posts live. No "never published" gate: a regeneration resets the
+    // site to draft but keeps publishedAt, and its new seeded posts must still go live on the next publish.
+    // The `aiSeeded` marker is the only gate - it is cleared when a post is promoted and whenever an owner
+    // changes a post's status (Blogs beforeChange), so a post the owner took down is never re-promoted.
+    // Updating a published site never touches blogs either.
+    const e = existing as { status?: unknown }
+    if (e.status !== 'published') {
+        try {
+            await publishSeededBlogPosts(payload, siteId, siteTenantId, inTx)
+        } catch (err) {
+            // in a transaction a failed update has already killed it: surface it so the caller rolls back
+            if (tx) throw err
+            console.warn('[Publish] could not publish the generated blog posts', err instanceof Error ? err.message : String(err))
+        }
+    }
+
     // The pages' translations go live with them (template filler left out, see publishTranslations)
     const brand = String((existing as { name?: unknown }).name ?? '') || 'Your Brand'
     if (tx) {
@@ -583,6 +600,47 @@ export async function publishSite(input: PublishSiteInput): Promise<PublishSiteR
         },
     })
 
+}
+
+/**
+ * Promotes the draft blog posts the site generator seeded for this site (they carry the `aiSeeded` marker, set
+ * at seed time) and clears the marker, so a post is promoted at most once. An owner status change clears the
+ * marker too (Blogs beforeChange), so an owner-unpublished post is never promoted again. Posts the owner wrote themselves
+ * (no marker, whatever their slug) and copilot drafts are never touched. Returns how many went live.
+ */
+export async function publishSeededBlogPosts(
+    payload: Payload,
+    siteId: string | number,
+    tenantId: string,
+    inTx: { req?: TenantTransactionRequest } = {},
+): Promise<number> {
+    const seeded = await payload.find({
+        collection: 'blogs',
+        where: {
+            and: [
+                { site: { equals: Number(siteId) } },
+                { tenant: { equals: tenantId } },
+                { status: { equals: 'draft' } },
+                { aiSeeded: { equals: true } },
+            ],
+        },
+        limit: 50,
+        depth: 0,
+        pagination: false,
+        ...inTx,
+    })
+    for (const post of seeded.docs) {
+        await payload.update({
+            collection: 'blogs',
+            id: post.id,
+            data: { status: 'published', publishedAt: new Date().toISOString(), aiSeeded: false },
+            // the owner is publishing the site, not announcing each post; `promoteAiSeeded` tells the Blogs
+            // hook this status change is the system's (not the owner's), so it is not read as an owner decision
+            context: { skipPublishNotify: true, promoteAiSeeded: true },
+            ...inTx,
+        })
+    }
+    return seeded.docs.length
 }
 
 /**

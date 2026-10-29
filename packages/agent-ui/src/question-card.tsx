@@ -1,4 +1,4 @@
-import type { AgentAsk, AgentAttachment, AnswerInput, AnsweredQuestion, QuestionOption } from "@ech/agent-core";
+import { type AgentAsk, type AgentAttachment, type AnswerInput, type AnsweredQuestion, MAX_QUESTION_NUMBER, type QuestionOption } from "@ech/agent-core";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { Icon } from "./icons";
 
@@ -31,6 +31,10 @@ export interface QuestionLabels {
 	/** short chip on rows the decision model answered */
 	autoTag: string;
 	skipped: string;
+	/** under a quantities card: how to fill it in */
+	quantitiesHint: string;
+	/** a quantity input holding something that is not a whole number from 0 */
+	quantityInvalid: string;
 }
 
 export const DEFAULT_QUESTION_LABELS: QuestionLabels = {
@@ -56,6 +60,8 @@ export const DEFAULT_QUESTION_LABELS: QuestionLabels = {
 	pickedForYou: "Picked for you from your catalog — change it if it's wrong",
 	autoTag: "Auto",
 	skipped: "Skipped",
+	quantitiesHint: "Numbers 0 or more. Leave a row empty to keep it as it is.",
+	quantityInvalid: "Enter a valid number, 0 or more",
 };
 
 function fill(template: string, values: Record<string, string | number>): string {
@@ -65,6 +71,18 @@ function fill(template: string, values: Record<string, string | number>): string
 /** "families", "values" — what the search box looks through. */
 function searchNoun(ask: AgentAsk): string {
 	return ask.question.kind === "family" ? "families" : ask.question.kind === "images" ? "photos" : "options";
+}
+
+/**
+ * A quantity input's text → the number it stands for; null for empty, NaN for anything else (negative, text,
+ * out of range, a decimal where only whole numbers are asked, more than two decimals).
+ */
+export function parseQuantity(text: string, decimals = false): number | null {
+	const value = text.trim().replace(",", ".");
+	if (value === "") return null;
+	if (!(decimals ? /^\d{1,7}(\.\d{1,2})?$/ : /^\d{1,7}$/).test(value)) return Number.NaN;
+	const n = Number(value);
+	return n <= MAX_QUESTION_NUMBER ? n : Number.NaN;
 }
 
 export interface QuestionCardProps {
@@ -92,8 +110,10 @@ export function QuestionCard({ ask, onAnswer, onSearch, onUpload, labels: overri
 	const [results, setResults] = useState<QuestionOption[] | null>(null);
 	const [searching, setSearching] = useState(false);
 	const [sending, setSending] = useState(false);
+	const [quantities, setQuantities] = useState<Record<string, string>>({});
 	const headingId = useId();
 	const groupRef = useRef<HTMLDivElement>(null);
+	const rowsRef = useRef<HTMLDivElement>(null);
 
 	// a new question replaces the card's state
 	useEffect(() => {
@@ -102,6 +122,7 @@ export function QuestionCard({ ask, onAnswer, onSearch, onUpload, labels: overri
 		setQuery("");
 		setResults(null);
 		setSending(false);
+		setQuantities({});
 	}, [question.id, question.suggested]);
 
 	// hosts pass an inline search callback; a ref keeps a new identity from re-running the search
@@ -163,7 +184,18 @@ export function QuestionCard({ ask, onAnswer, onSearch, onUpload, labels: overri
 		}
 	};
 	const typed = text.trim();
-	const canSubmit = !sending && (selected.length > 0 || typed.length > 0);
+	const numbers = question.kind === "quantities";
+	const quantityRows = question.rows ?? [];
+	const parsed = quantityRows.map((row) => ({ row, value: parseQuantity(quantities[row.id] ?? "", question.decimals) }));
+	const filled = parsed.filter((entry) => entry.value !== null);
+	const quantitiesOk = filled.length > 0 && filled.every((entry) => !Number.isNaN(entry.value));
+	const canSubmit = !sending && (numbers ? quantitiesOk : selected.length > 0 || typed.length > 0);
+	const answer = (): Omit<AnswerInput, "toolCallId" | "questionId"> =>
+		numbers
+			? { rows: Object.fromEntries(filled.map((entry) => [entry.row.id, entry.value as number])) }
+			: typed
+				? { text: typed }
+				: { values: selected };
 
 	const toggle = (option: QuestionOption) => {
 		if (!picked.some((p) => p.value === option.value)) setPicked((rows) => [...rows, option]);
@@ -222,6 +254,46 @@ export function QuestionCard({ ask, onAnswer, onSearch, onUpload, labels: overri
 				{ask.total > 1 && <span>{fill(labels.progress, { i: ask.index + 1, n: ask.total })}</span>}
 			</div>
 			{question.why && <p className="ech-ag-q-why">{question.why}</p>}
+			{numbers && (
+				<div ref={rowsRef} className="ech-ag-q-rows" role="group" aria-labelledby={headingId}>
+					{parsed.map(({ row, value }, i) => {
+						const invalid = Number.isNaN(value);
+						const inputId = `${headingId}-${i}`;
+						return (
+							<div key={row.id} className="ech-ag-q-row" data-invalid={invalid ? "" : undefined}>
+								<label htmlFor={inputId}>{row.label}</label>
+								<input
+									id={inputId}
+									type="text"
+									inputMode={question.decimals ? "decimal" : "numeric"}
+									autoComplete="off"
+									value={quantities[row.id] ?? ""}
+									placeholder={row.suggested !== undefined ? String(row.suggested) : "0"}
+									maxLength={question.decimals ? 10 : 7}
+									aria-invalid={invalid || undefined}
+									aria-describedby={invalid ? `${inputId}-err` : undefined}
+									onChange={(e) => setQuantities((current) => ({ ...current, [row.id]: e.target.value }))}
+									onKeyDown={(e) => {
+										if (e.key !== "Enter") return;
+										e.preventDefault();
+										const inputs = [...(rowsRef.current?.querySelectorAll<HTMLInputElement>("input") ?? [])];
+										const next = inputs[inputs.indexOf(e.currentTarget) + 1];
+										if (next) next.focus();
+										else if (canSubmit) void submit(answer());
+									}}
+								/>
+								{question.unit && <span className="ech-ag-q-unit">{question.unit}</span>}
+								{invalid && (
+									<span id={`${inputId}-err`} className="ech-ag-q-row-err" role="alert">
+										{labels.quantityInvalid}
+									</span>
+								)}
+							</div>
+						);
+					})}
+					<p className="ech-ag-q-hint">{labels.quantitiesHint}</p>
+				</div>
+			)}
 			{pictures && (
 				<div className="ech-ag-q-tiles" role="group" aria-labelledby={headingId}>
 					{shown.map((option) => {
@@ -274,7 +346,7 @@ export function QuestionCard({ ask, onAnswer, onSearch, onUpload, labels: overri
 					{uploadError}
 				</p>
 			)}
-			{!pictures && shown.length > 0 && (
+			{!pictures && !numbers && shown.length > 0 && (
 				<div
 					ref={groupRef}
 					className="ech-ag-opts"
@@ -313,7 +385,7 @@ export function QuestionCard({ ask, onAnswer, onSearch, onUpload, labels: overri
 				</div>
 			)}
 			{results !== null && results.length === 0 && !searching && <p className="ech-ag-q-empty">{labels.noOptions}</p>}
-			{searchable && (
+			{searchable && !numbers && (
 				<label className="ech-ag-q-other">
 					<Icon name={searching ? "loader-circle" : "search"} className={searching ? "ech-ag-spin" : undefined} />
 					<input
@@ -331,7 +403,7 @@ export function QuestionCard({ ask, onAnswer, onSearch, onUpload, labels: overri
 					/>
 				</label>
 			)}
-			{!pictures && (question.allowText || question.options.length === 0) && (
+			{!pictures && !numbers && (question.allowText || question.options.length === 0) && (
 				<label className="ech-ag-q-other">
 					<Icon name="square-pen" />
 					<input
@@ -345,7 +417,7 @@ export function QuestionCard({ ask, onAnswer, onSearch, onUpload, labels: overri
 						onKeyDown={(e) => {
 							if (e.key === "Enter" && canSubmit) {
 								e.preventDefault();
-								void submit(typed ? { text: typed } : { values: selected });
+								void submit(answer());
 							}
 						}}
 						placeholder={labels.typeAnswer}
@@ -371,7 +443,7 @@ export function QuestionCard({ ask, onAnswer, onSearch, onUpload, labels: overri
 					type="button"
 					className="ech-ag-button is-primary is-sm"
 					disabled={!canSubmit || uploading > 0}
-					onClick={() => void submit(typed ? { text: typed } : { values: selected })}
+					onClick={() => void submit(answer())}
 				>
 					{sending && <Icon name="loader-circle" className="ech-ag-spin" size={14} />}
 					{pictures && selected.length > 0

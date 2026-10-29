@@ -332,8 +332,11 @@ export async function persistBlogPosts(
                     title: post.title,
                     slug: finalSlug,
                     content: post.content,
-                    status: 'published',
-                    publishedAt: new Date().toISOString(),
+                    // #2103 A4: the generated site is a draft, so its AI posts are drafts too; the first
+                    // publish of the site takes them live (publishSeededBlogPosts in publish-site.ts).
+                    status: 'draft',
+                    // explicit marker: the site's first publish promotes exactly these (publishSeededBlogPosts)
+                    aiSeeded: true,
                     author: userId,
                     ...(post.thumbnailId !== undefined ? { thumbnail: post.thumbnailId } : {}),
                 },

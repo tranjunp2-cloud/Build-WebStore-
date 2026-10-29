@@ -74,20 +74,20 @@ describe('[TC-S3-009] Each category has minimum content', () => {
         expect(content.businesses.length).toBeGreaterThanOrEqual(4)
       })
 
-      it('has at least 3 testimonials', () => {
+      it('TC-AIAUD-026: has no library testimonials (invented reviewers removed, #2103 A1)', () => {
         // Arrange
         const content = categoryMap[cat]!
 
-        // Assert
-        expect(content.testimonials.length).toBeGreaterThanOrEqual(3)
+        // Assert — reviews come only from the merchant's own site import
+        expect(content.testimonials).toEqual([])
       })
 
-      it('has at least 3 faqItems', () => {
+      it('TC-AIAUD-026: has no library faqItems (invented policies removed, #2103 A1)', () => {
         // Arrange
         const content = categoryMap[cat]!
 
-        // Assert
-        expect(content.faqItems.length).toBeGreaterThanOrEqual(3)
+        // Assert — FAQ is built from the merchant's FACTS only
+        expect(content.faqItems).toEqual([])
       })
 
       it('has locale en-MY', () => {

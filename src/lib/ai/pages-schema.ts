@@ -13,6 +13,7 @@
  */
 
 import { normalizeComparisonValues } from '@/blocks/feature-comparison/config'
+import { isEmptyRequiredListBlock } from './required-list-blocks'
 
 /** Block types that have a persistence schema in Pages.ts layout blocks[]. */
 export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
@@ -357,11 +358,15 @@ export function sanitizeBlockForPayload(block: Record<string, unknown>): Record<
     return result
 }
 
-/** Bulk sanitize: filter out unknown block types, sanitize the rest. */
+/**
+ * Bulk sanitize: filter out unknown block types, sanitize the rest, and drop blocks whose
+ * `required` list (stats / features / plans) is empty — Payload refuses the whole page otherwise
+ * (#2103 H1: grounded generation can leave nothing true to list).
+ */
 export function sanitizeBlocksForPayload(
     blocks: Record<string, unknown>[],
 ): Record<string, unknown>[] {
     return blocks
         .map(sanitizeBlockForPayload)
-        .filter((b): b is Record<string, unknown> => b !== null)
+        .filter((b): b is Record<string, unknown> => b !== null && !isEmptyRequiredListBlock(b))
 }

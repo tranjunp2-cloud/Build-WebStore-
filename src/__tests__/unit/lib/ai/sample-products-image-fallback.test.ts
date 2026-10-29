@@ -475,3 +475,53 @@ describe('[TC-GH1458-P2] AI-estimated weight/dimensions', () => {
         expect(products).toEqual([])
     })
 })
+
+// ── #2103 A3 — exactly the merchant's listed products ────────────────────────
+describe('[TC-AIAUD-028..030] prepareSampleProducts — merchant list is the catalogue (#2103 A3)', () => {
+    const LISTED = 'Kek lapis (whole RM65, half RM35), kuih raya box RM48, birthday from RM120'
+    const info = { businessName: 'Dapur Kak Yah', industry: 'business', products: LISTED }
+
+    it('[TC-AIAUD-028] creates exactly the 3 listed products with the merchant names and typed prices', async () => {
+        // Arrange — the model echoes different names and its own prices
+        mockRunTask.mockResolvedValueOnce({ output: { products: [
+            { name: 'Layer Cake Deluxe', shortDescription: 'S1', description: 'D1', price: 99, imageKeyword: 'layer cake' },
+            { name: 'Festive Cookie Tin', shortDescription: 'S2', description: 'D2', price: 77, imageKeyword: 'cookie tin' },
+            { name: 'Custom Cake', shortDescription: 'S3', description: 'D3', price: 55, imageKeyword: 'custom cake' },
+        ] }, usage: PLATFORM_USAGE })
+
+        // Act
+        const { products } = await prepareSampleProducts(info, 'en')
+
+        // Assert
+        expect(products.map((p) => [p.name, p.price])).toEqual([['Kek lapis', 65], ['kuih raya box', 48], ['birthday', 120]])
+        expect(products.map((p) => p.description)).toEqual(['D1', 'D2', 'D3'])
+        expect(products.map((p) => p.imageKeyword)).toEqual(['layer cake', 'cookie tin', 'custom cake'])
+        // stays active with stock 0 (storefront shows sold out)
+        expect(products.every((p) => p.status === 'active')).toBe(true)
+    })
+
+    it('[TC-AIAUD-029] never tops up from the curated library when the model returns fewer or fails', async () => {
+        mockRunTask.mockResolvedValueOnce({ output: { products: [
+            { name: 'x', shortDescription: 'S1', description: 'D1', price: 10, imageKeyword: 'k' },
+        ] }, usage: PLATFORM_USAGE })
+        const partial = await prepareSampleProducts(info, 'en')
+        expect(partial.products.map((p) => p.name)).toEqual(['Kek lapis', 'kuih raya box', 'birthday'])
+        expect(partial.products.map((p) => p.price)).toEqual([65, 48, 120])
+
+        mockRunTask.mockRejectedValue(new Error('model down'))
+        const failed = await prepareSampleProducts(info, 'en')
+        expect(failed.products.map((p) => p.name)).toEqual(['Kek lapis', 'kuih raya box', 'birthday'])
+        expect(failed.products.map((p) => p.price)).toEqual([65, 48, 120])
+        expect(JSON.stringify(failed.products)).not.toMatch(/Business Card|Notebook|Pen Set/)
+    })
+
+    it('[TC-AIAUD-030] caps at 20 listed products; with nothing listed the previous 6-product fallback stays', async () => {
+        const many = Array.from({ length: 25 }, (_, i) => `Item ${i + 1}`).join(', ')
+        const capped = await prepareSampleProducts({ ...info, products: many }, 'en')
+        expect(capped.products).toHaveLength(20)
+
+        const none = await prepareSampleProducts({ ...info, products: '' }, 'en')
+        expect(none.products).toHaveLength(6)
+        expect(['Business Card', 'Notebook', 'Pen Set', 'Folder', 'Stamp', 'Label']).toContain(none.products[0]!.name)
+    })
+})

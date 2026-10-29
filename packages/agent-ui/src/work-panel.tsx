@@ -15,6 +15,8 @@ export interface AgentPanelWork {
 	onLater: (item: WorkItem, until: string) => void;
 	/** an item was raised on its own over the mascot: the host stores when */
 	onRaised?: (item: WorkItem, at: string) => void;
+	/** the merchant is filling in a form: nothing is raised on its own over the mascot (the badge and the desk stay) */
+	quiet?: boolean;
 	/** first unprompted raise after this long on a page (default 3000 ms) */
 	raiseDelayMs?: number;
 	/** a raised bubble hides itself after this long (default 12000 ms; the clock stops while hovered) */
@@ -124,7 +126,7 @@ export function useWorkPanel({
 	const [quietUntil, setQuietUntil] = useState(0);
 	const [hovered, setHovered] = useState(false);
 	const raised = raisedKey ? items.find((item) => item.key === raisedKey) : undefined;
-	const active = Boolean(work) && !open;
+	const active = Boolean(work) && !open && !work?.quiet;
 	const quietFor = useCallback((ms: number) => {
 		setRaisedKey(undefined);
 		setHovered(false);
@@ -154,7 +156,7 @@ export function useWorkPanel({
 		return () => window.clearTimeout(timer);
 	}, [active, raised, raisedKey, items, states, busy, work, quietUntil]);
 
-	const raise: ReactNode = work && raised && !open ? (
+	const raise: ReactNode = work && raised && !open && !work.quiet ? (
 		<WorkRaise
 			item={raised}
 			index={items.indexOf(raised)}

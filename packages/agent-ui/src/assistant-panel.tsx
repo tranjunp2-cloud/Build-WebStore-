@@ -286,6 +286,8 @@ export function pendingEditHref(changeSet: ChangeSet): string | undefined {
 		const page = typeof plan.pageId === "string" && plan.pageId ? `?pageId=${encodeURIComponent(plan.pageId)}` : "";
 		return `/editor/${encodeURIComponent(plan.siteId)}${page}`;
 	}
+	// the shop's own products (shop_product.*) have no Product Master page to open: the card is decided in the chat
+	if (changeSet.action?.kind.startsWith("shop_product.")) return undefined;
 	const id = changeSet.drafts?.[0]?.type === "product_edit" ? changeSet.diffs[0]?.entity.id : undefined;
 	return id ? `/catalog/products/${encodeURIComponent(id)}` : undefined;
 }

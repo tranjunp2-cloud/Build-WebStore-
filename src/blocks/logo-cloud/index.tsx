@@ -96,6 +96,8 @@ function LogoImage({ item, index }: { item: LogoCloudConfig['logos'][number]; in
 export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudConfig>) {
     void _theme
     const { headline, logos = [], variant = 'row' } = block
+    // #2103 A1: no logos → nothing to show (never placeholder partner brands).
+    if (logos.length === 0) return null
     const size = variant === 'grid' ? 'grid' : 'row'
     const gap = variant === 'grid' ? 'gap-6 md:gap-8' : 'gap-5 md:gap-6'
 

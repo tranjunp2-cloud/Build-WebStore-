@@ -5663,6 +5663,15 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
     name: 'blogs.ai_change_set_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS blogs_ai_change_set_id_idx ON blogs(ai_change_set_id);`,
   },
+  // Site-generator seed marker: the site's first publish promotes these drafts and clears it
+  {
+    name: 'blogs.ai_seeded',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS ai_seeded boolean DEFAULT false;`,
+  },
+  {
+    name: 'blogs.ai_seeded_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_ai_seeded_idx ON blogs(ai_seeded);`,
+  },
   // ── Scheduled shop automations (cron /api/cron/shop-automations) ──
   // Per-workspace switches + the cron's day markers: tenants.settings.automations (json).
   {

@@ -142,15 +142,12 @@ describe('TC-F01-W.08 — user data threading e2e fixture', () => {
       const result = composeFallbackResult('restaurant', 42, 'en', emptyInput)
       expect(result.siteName).toBe('Generic Restaurant')
       expect(result.pages.length).toBeGreaterThan(0)
-      // Features block should fall back to canned.
+      // Features block falls back to the claim-free trio (#2103 A1) — never "Halal Certified" & co.
       const features = findBlockAnywhere(result, 'features')
       if (features) {
         const cards = features.features as Array<{ title: string }>
         const titles = cards.map((c) => c.title)
-        const hasCanned = titles.some((t) =>
-          ['Authentic Recipes', 'Halal Certified', 'Fast Delivery'].includes(t),
-        )
-        expect(hasCanned).toBe(true)
+        expect(titles).toEqual(['Tell us what you need', 'Easy to reach', 'Made around you'])
       }
     })
 

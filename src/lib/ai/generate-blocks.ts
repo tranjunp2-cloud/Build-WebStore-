@@ -564,17 +564,8 @@ function buildMiddleBlock(
                 features: content.features,
             }
         case 'stats':
-            return {
-                blockType: 'stats',
-                variant,
-                headline: 'By the Numbers',
-                stats: [
-                    { value: '10', label: 'Years Experience', suffix: '+' },
-                    { value: '5000', label: 'Happy Customers', suffix: '+' },
-                    { value: '4.9', label: 'Average Rating' },
-                    { value: '50', label: 'Awards Won', suffix: '+' },
-                ],
-            }
+            // #2103 A1: legacy safety net never invents numbers — the block stays empty and renders nothing.
+            return { blockType: 'stats', variant, stats: [] }
         case 'gallery':
             // Excluded from MIDDLE_BLOCK_POOL — kept here for callers that pass
             // 'gallery' explicitly. Returns null so the fallback never injects
@@ -582,36 +573,18 @@ function buildMiddleBlock(
             // To enable gallery in fallback, generate media records first via
             // Unsplash + Payload media upload, then pass `image: { id }` refs.
             return null
-        case 'testimonials': {
-            const finalVariant = enforceMinContent('testimonials', variant, content.testimonials.length)
-            return {
-                blockType: 'testimonials',
-                variant: finalVariant,
-                headline: 'What Our Clients Say',
-                testimonials: content.testimonials,
-            }
-        }
+        case 'testimonials':
+            // #2103 A1: no library reviewers — empty until the merchant adds real reviews.
+            return { blockType: 'testimonials', variant: enforceMinContent('testimonials', variant, 0), testimonials: [] }
         case 'faq':
-            // Payload `faq.faqs` (NOT `items`). Field name mismatch causes
-            // Payload to silently drop the array and the faq block renders
-            // an empty section. Always use the Payload field name `faqs`.
-            return {
-                blockType: 'faq',
-                variant,
-                headline: 'Frequently Asked Questions',
-                faqs: [
-                    { question: 'How do I get started?', answer: 'Simply contact us through the form below or give us a call. We\'ll guide you through everything.' },
-                    { question: 'What are your operating hours?', answer: 'We are open Monday to Saturday, 9am to 6pm. Online support is available 24/7.' },
-                    { question: 'Do you offer custom solutions?', answer: 'Yes! Every client gets a tailored solution designed specifically for their needs.' },
-                    { question: 'What payment methods do you accept?', answer: 'We accept FPX, credit/debit cards, e-wallets, and bank transfers.' },
-                ],
-            }
+            // Payload `faq.faqs` (NOT `items`) — use the Payload field name. No invented answers (#2103 A1).
+            return { blockType: 'faq', variant, headline: 'Frequently Asked Questions', faqs: [] }
         case 'cta':
             return {
                 blockType: 'cta',
                 variant,
                 headline: 'Ready to Get Started?',
-                subheadline: `Join thousands of satisfied customers who chose ${name}.`,
+                subheadline: `Get in touch with ${name} today.`,
                 ctaLabel: content.ctaLabel,
                 ctaUrl: '#contact',
             }
@@ -624,49 +597,17 @@ function buildMiddleBlock(
                 buttonLabel: 'Subscribe',
             }
         case 'team':
-            return {
-                blockType: 'team',
-                variant,
-                headline: 'Meet Our Team',
-                members: [
-                    { name: 'Alex Johnson', role: 'Founder & CEO', bio: 'Visionary leader with 15+ years of industry experience.' },
-                    { name: 'Sarah Lee', role: 'Creative Director', bio: 'Award-winning designer passionate about user experience.' },
-                    { name: 'Raj Patel', role: 'Head of Operations', bio: 'Keeps everything running smoothly behind the scenes.' },
-                ],
-            }
+            // #2103 A1: no made-up people or credentials in the legacy safety net.
+            return { blockType: 'team', variant, headline: 'Meet Our Team', members: [] }
 
         // ── Industry-aware blocks ────────────────────────────────────────
         case 'menu-food':
+            // #2103 A1/A2: no invented dishes, prices or halal tags — the merchant's menu goes here.
             return {
                 blockType: 'menu-food',
                 variant: variant === 'simple' ? 'classic' : (variant as 'classic' | 'cards' | 'minimal'),
                 headline: 'Our Menu',
-                categories: [
-                    {
-                        name: 'Starters',
-                        items: [
-                            { name: 'Crispy Spring Rolls', description: 'Hand-rolled with vegetables and glass noodles', price: '12', currency: 'RM', tag: 'vegetarian' },
-                            { name: 'Tom Yum Soup', description: 'Spicy and sour with prawns and lemongrass', price: '18', currency: 'RM', tag: 'spicy' },
-                            { name: 'Satay Skewers', description: 'Grilled marinated chicken with peanut sauce', price: '22', currency: 'RM', tag: 'halal' },
-                        ],
-                    },
-                    {
-                        name: 'Mains',
-                        items: [
-                            { name: 'Nasi Lemak Special', description: 'Coconut rice with rendang, sambal, and crispy anchovies', price: '28', currency: 'RM', tag: 'halal' },
-                            { name: 'Pad Thai', description: 'Stir-fried rice noodles with prawns and peanuts', price: '24', currency: 'RM' },
-                            { name: 'Vegetable Curry', description: 'Mixed vegetables in fragrant coconut curry', price: '22', currency: 'RM', tag: 'vegan' },
-                        ],
-                    },
-                    {
-                        name: 'Desserts',
-                        items: [
-                            { name: 'Mango Sticky Rice', description: 'Sweet glutinous rice with fresh mango', price: '14', currency: 'RM', tag: 'vegetarian' },
-                            { name: 'Cendol', description: 'Pandan jelly with coconut milk and palm sugar', price: '12', currency: 'RM', tag: 'vegetarian' },
-                            { name: 'Bubur Sumsum', description: 'Silky rice flour pudding with palm sugar sauce', price: '10', currency: 'RM', tag: 'vegetarian' },
-                        ],
-                    },
-                ],
+                categories: [],
             }
         case 'booking-widget':
             return {
@@ -684,19 +625,13 @@ function buildMiddleBlock(
                 showTimeSlots: true,
             }
         case 'review-cards':
+            // #2103 A1: no invented reviewers, ratings or review counts.
             return {
                 blockType: 'review-cards',
                 variant: variant === 'simple' ? 'grid' : variant,
-                headline: 'Loved by Our Customers',
-                subheadline: 'Hear what they have to say',
-                showAverage: true,
-                totalReviewCount: 248,
-                reviews: [
-                    { name: 'Sarah M.', rating: 5, text: 'Absolutely incredible experience. The attention to detail blew us away — definitely coming back!', source: 'Google', date: '2 weeks ago', verified: true },
-                    { name: 'Daniel L.', rating: 5, text: 'Best in town, hands down. Service was warm, food was fresh, atmosphere was perfect.', source: 'Tripadvisor', date: '1 month ago', verified: true },
-                    { name: 'Aishah K.', rating: 4, text: 'Great food and lovely staff. Will definitely recommend to friends and family.', source: 'Google', date: '3 weeks ago', verified: true },
-                    { name: 'Marcus T.', rating: 5, text: 'A hidden gem! Everything from starters to dessert was on point. 10/10 would visit again.', source: 'Facebook', date: '1 week ago', verified: true },
-                ],
+                headline: 'Customer Reviews',
+                showAverage: false,
+                reviews: [],
             }
         case 'products-grid':
             return {
@@ -727,16 +662,17 @@ function buildMiddleBlock(
     }
 }
 
-function buildContact(name: string, content: ContentSet, variant: string): GeneratedBlock {
+// #2103 A1: no invented contact details — this last-resort path knows only the
+// business name, so phone/email/address stay empty until the merchant sets them.
+function buildContact(_name: string, content: ContentSet, variant: string): GeneratedBlock {
     return {
         blockType: 'contact',
         variant,
         headline: 'Get in Touch',
         subtext: content.contactSubtext,
-        email: 'hello@' + name.toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9]/g, '') + '.com',
-        phone: '(+60) 12-345 6789',
+        email: null,
+        phone: '',
+        address: '',
         formFields: [
             { fieldName: 'name', fieldType: 'text', label: 'Full Name', required: true },
             { fieldName: 'email', fieldType: 'email', label: 'Email', required: true },

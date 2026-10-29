@@ -20,12 +20,6 @@ import { SectionWrapper } from '../shared/SectionWrapper'
 import { X } from 'lucide-react'
 import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
-const FALLBACK_MEMBERS: TeamConfig['members'] = [
-    { name: 'Team Lead', role: 'Founder' },
-    { name: 'Senior Specialist', role: 'Expert' },
-    { name: 'Customer Success', role: 'Support' },
-]
-
 // ── Local helpers (Plan 260415 team polish) ─────────────────────────────────
 
 function TeamSection({
@@ -604,7 +598,8 @@ function useEmptyWarning(count: number) {
 export function TeamBlock({ block }: BlockProps<TeamConfig>) {
     const { headline, subheadline, members: rawMembers = [], variant = 'grid' } = block
     const validMembers = (Array.isArray(rawMembers) ? rawMembers : []).filter((m): m is TeamMember => !!m && typeof m === 'object')
-    const members = validMembers.length > 0 ? validMembers : FALLBACK_MEMBERS
+    // #2103 A1: no invented fallback team — an empty block renders nothing.
+    const members = validMembers
     const sectionLabel = getSectionLabel(block)
 
     useEmptyWarning(members.length)

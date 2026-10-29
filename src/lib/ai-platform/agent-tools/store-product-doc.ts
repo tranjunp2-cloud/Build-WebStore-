@@ -23,6 +23,9 @@ type Relation<T> = T | number | string | null | undefined;
 export interface MediaRef {
 	id: number | string;
 	url?: string | null;
+	/** provenance flags of the media row (`Media.aiGenerated`, `Media.sourceProvider`) */
+	aiGenerated?: boolean | null;
+	sourceProvider?: "wikimedia" | "pixabay" | "ai" | null;
 }
 export interface ProductDoc {
 	id: number | string;
@@ -84,10 +87,24 @@ export function mediaOf(row: { image?: Relation<MediaRef> }): MediaRef | null {
 	return image == null ? null : { id: image };
 }
 
-export function productPhotos(doc: ProductDoc): Array<{ ref: string; url: string; alt: string | null }> {
+/**
+ * Where a photo came from: the merchant's own (`upload`), a shared stock library (`stock`) or made / picked by the
+ * AI (`ai`: a generated picture, or imagery the site builder sourced — it flags those `aiGenerated`).
+ */
+export type PhotoSource = "upload" | "stock" | "ai";
+
+/** What the model reads next to a photo that is not the merchant's own (empty for an upload). */
+export const SOURCE_NOTE: Record<PhotoSource, string> = { upload: "", stock: " · stock photo (not the merchant's own)", ai: " · made or picked by AI (not the merchant's own photo)" };
+
+export function photoSource(media: Pick<MediaRef, "aiGenerated" | "sourceProvider">): PhotoSource {
+	if (media.aiGenerated || media.sourceProvider === "ai") return "ai";
+	return media.sourceProvider === "pixabay" || media.sourceProvider === "wikimedia" ? "stock" : "upload";
+}
+
+export function productPhotos(doc: ProductDoc): Array<{ ref: string; url: string; alt: string | null; source: PhotoSource }> {
 	return (doc.images ?? []).flatMap((row) => {
 		const media = mediaOf(row);
-		return media ? [{ ref: `media:${media.id}`, url: media.url ?? "", alt: row.alt?.trim() || null }] : [];
+		return media ? [{ ref: `media:${media.id}`, url: media.url ?? "", alt: row.alt?.trim() || null, source: photoSource(media) }] : [];
 	});
 }
 

@@ -912,8 +912,10 @@
 /* Floating launcher + panel — ambient agent surface */
 .ech-ag-float-root {
 	position: fixed;
-	right: 20px;
-	bottom: 20px;
+	/* the host tucks the mascot into the corner on form screens (a smaller gap to the edge, with --ech-ag-fab-zoom) */
+	right: var(--ech-ag-dock-right, 20px);
+	/* the host lifts the mascot above what sits at the bottom of the screen (a fixed save bar) */
+	bottom: var(--ech-ag-dock-bottom, 20px);
 	z-index: 90;
 	display: flex;
 	flex-direction: column;
@@ -922,10 +924,19 @@
 	pointer-events: none;
 	/* guided placement glides via transform offsets — feels like the mascot
 	   is actually moving across the screen to work on the current section */
-	transition: transform 520ms var(--ech-ag-ease);
+	transition:
+		transform 520ms var(--ech-ag-ease),
+		bottom 200ms var(--ech-ag-ease);
 }
 .ech-ag-float-root > * {
 	pointer-events: auto;
+}
+/* an open panel keeps its normal margin and the launcher its normal size */
+.ech-ag-float-root:has(.ech-ag-panel) {
+	right: 20px;
+}
+.ech-ag-fab:not(.open) {
+	zoom: var(--ech-ag-fab-zoom, 1);
 }
 .ech-ag-fab {
 	width: 48px;
@@ -4691,7 +4702,10 @@
 .ech-ag-cmp:has(textarea:focus) .ech-ag-tab-hint {
 	display: inline-block;
 }
-/* …and sits at the end of the typing line, next to the suggestion, not in the footer row */
+/* …and sits at the end of the typing line, next to the suggestion — anchored to the typing box, so chips above it are not covered */
+.ech-ag-cmp-box {
+	position: relative;
+}
 .ech-ag-cmp .ech-ag-tab-hint {
 	position: absolute;
 	top: 12px;
@@ -5733,4 +5747,65 @@ p.ech-ag-hello-hint {
 .ech-ag-work-undo .ech-ag-button {
 	flex: none;
 	color: inherit;
+}
+
+/* ── quantities question (ask_user table): one labelled whole-number input per row ── */
+.ech-ag-q-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-height: 280px;
+	overflow-y: auto;
+	margin: 0 10px 10px;
+}
+.ech-ag-q-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 84px auto;
+	align-items: center;
+	gap: 8px;
+}
+.ech-ag-q-row label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 13px;
+	color: var(--ech-ag-ink);
+}
+.ech-ag-q-row input {
+	height: 34px;
+	min-width: 0;
+	padding: 0 10px;
+	border: 1px solid var(--ech-ag-divider);
+	border-radius: 10px;
+	background: var(--ech-ag-surface);
+	color: var(--ech-ag-ink);
+	font: inherit;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.ech-ag-q-row input::placeholder {
+	color: var(--ech-ag-ink-3);
+}
+.ech-ag-q-row input:focus-visible {
+	outline: 0;
+	border-color: var(--ech-ag-indigo);
+	box-shadow: var(--ech-ag-ring);
+}
+.ech-ag-q-row input[aria-invalid="true"] {
+	border-color: var(--ech-ag-red);
+}
+.ech-ag-q-unit {
+	font-size: 12px;
+	color: var(--ech-ag-ink-3);
+}
+.ech-ag-q-row-err {
+	grid-column: 1 / -1;
+	font-size: 12px;
+	color: var(--ech-ag-red);
+}
+.ech-ag-q-hint {
+	margin: 2px 0 0;
+	font-size: 12px;
+	color: var(--ech-ag-ink-3);
 }

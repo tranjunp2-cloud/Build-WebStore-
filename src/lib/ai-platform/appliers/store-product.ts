@@ -86,7 +86,7 @@ async function cms(): Promise<Payload> {
 const richText = (markdown: string) => (markdown.trim() ? markdownToLexical(markdown) : null);
 const tagRows = (tags: string[]) => tags.map((tag) => ({ tag }));
 
-function currentImages(doc: ProductDoc): Array<{ mediaId: string; alt: string | null }> {
+export function currentImages(doc: ProductDoc): Array<{ mediaId: string; alt: string | null }> {
 	return (doc.images ?? []).flatMap((row) => {
 		const media = mediaOf(row);
 		return media ? [{ mediaId: String(media.id), alt: row.alt ?? null }] : [];
@@ -133,7 +133,7 @@ export async function productPictureRows(
 	return rows;
 }
 
-function guardImages(next: Array<{ image: number | string }>, doc: ProductDoc) {
+export function guardImages(next: Array<{ image: number | string }>, doc: ProductDoc) {
 	const previous = (doc.images ?? []).map((row) => mediaOf(row)?.id).filter((id): id is number | string => id !== undefined);
 	if (!allowsProductImages(next.map((row) => row.image), previous)) {
 		throw new ChangeSetApplyError("A product holds 5 photos; this edit would add more.", 422);

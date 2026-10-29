@@ -172,7 +172,9 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 }))
 
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
-vi.mock('@/lib/ai/generate-sample-products', () => ({
+vi.mock('@/lib/ai/generate-sample-products', async (importOriginal) => ({
+    // #2103 A3: the pure photo matcher stays real; only the AI/image work is mocked.
+    matchPoolPhotosToProducts: (await importOriginal<typeof import('@/lib/ai/generate-sample-products')>()).matchPoolPhotosToProducts,
     prepareSampleProducts: vi.fn().mockResolvedValue({
         category: 'services',
         products: Array.from({ length: 6 }, (_, index) => ({
@@ -666,9 +668,10 @@ describe('AI Streaming APIs', () => {
 
              expect(res.status).toBe(200)
              expect(result.success).toBe(true)
-             expect(result.totalPages).toBe(6)
+             // #2103 A3: a shop also gets a CMS /products page (right after Home)
+             expect(result.totalPages).toBe(7)
              expect(mockPageDB.map((savedPage) => savedPage.slug)).toEqual([
-                 '/', '/about', '/services', '/contact', '/blog', '/gallery', '404',
+                 '/', '/products', '/about', '/services', '/contact', '/blog', '/gallery', '404',
              ])
         })
 
@@ -1390,7 +1393,11 @@ describe('AI Streaming APIs', () => {
                  }))
 
                  expect(res.status).toBe(200)
-                 expect(vi.mocked(payload.findByID).mock.calls.some(([arg]) => arg.collection === 'tenants')).toBe(false)
+                 // #2103 A1: the only tenant read is the single FACTS lookup (WhatsApp / address / enabled payments)
+                 // before generation — the slug sync itself still runs after the response.
+                 const tenantReads = vi.mocked(payload.findByID).mock.calls.filter(([arg]) => arg.collection === 'tenants')
+                 expect(tenantReads).toHaveLength(1)
+                 expect(tenantReads[0]![0]).toMatchObject({ depth: 0 })
              } finally {
                  vi.mocked(payload.findByID).mockImplementation(originalFindByID)
              }
@@ -1762,6 +1769,8 @@ describe('AI Streaming APIs', () => {
                      requestedGenMode: 'template-first',
                      effectiveGenMode: 'template-first',
                  },
+                 // #2103 A1: merchant FACTS ride along with every generation
+                 facts: expect.objectContaining({ brand: expect.any(String) }),
              })
              expect(vi.mocked(generateSampleProducts).mock.calls.at(-1)?.[1]).toBe('it')
              const { prepareBlogPosts } = await import('@/lib/ai/seed-blog-posts')
@@ -2225,6 +2234,8 @@ describe('AI Streaming APIs', () => {
                     'pageId',
                     'pixabayImageStatus',
                     'pixabayUsedImages',
+                    'placeholders',
+                    'productIds',
                     'siteId',
                     'siteLanguage',
                     'siteName',
@@ -2233,6 +2244,103 @@ describe('AI Streaming APIs', () => {
                     'totalPages',
                 ],
             )
+        })
+
+        it('[TC-AIAUD-033] generated pages and the 404 page are created as drafts until the merchant publishes (#2103 A4)', async () => {
+            const res = await GenerateSitePOST(genPerfReq())
+
+            expect(res.status).toBe(200)
+            expect(mockPageDB.length).toBeGreaterThan(1)
+            expect(mockPageDB.map((page) => page._status)).toEqual(mockPageDB.map(() => 'draft'))
+        })
+
+        it('[TC-AIAUD-032] the done event carries productIds of the created products and the placeholders list (#2103 A3/A1)', async () => {
+            const listed = Array.from({ length: 4 }, (_, index) => ({
+                name: `Listed Product ${index + 1}`,
+                shortDescription: 'Listed',
+                description: 'Listed product.',
+                price: 10 + index,
+                sku: `LISTED-${index + 1}`,
+                inventory: 0,
+                status: 'active',
+            }))
+            vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                products: listed,
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            } as Awaited<ReturnType<typeof generateSampleProducts>>)
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Listed Product 1, Listed Product 2, Listed Product 3, Listed Product 4', shortDescription: 'Fresh artisan bakery' },
+                }),
+            })
+
+            const res = await GenerateSitePOST(req)
+            const reader = res.body!.getReader()
+            let full = ''
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                full += new TextDecoder().decode(value)
+            }
+            const done = JSON.parse(full.match(/event: done\ndata: (\{[^\n]*\})/)![1]!)
+
+            // exactly the 4 listed products were created, and their ids are reported
+            expect(mockProductDB).toHaveLength(4)
+            expect(done.productIds).toEqual(mockProductDB.map((product) => String(product.id)))
+            expect(done.productIds.every((id: string) => typeof id === 'string')).toBe(true)
+            // every product stays active with stock 0 (storefront shows it as sold out)
+            expect(mockProductDB.every((product) => product.status === 'active' && product.inventory === 0)).toBe(true)
+            expect(Array.isArray(done.placeholders)).toBe(true)
+            for (const placeholder of done.placeholders) {
+                expect(Object.keys(placeholder).sort()).toEqual(['blockType', 'label', 'pageSlug'])
+            }
+        })
+
+        it('[TC-AIAUD-208] placeholders are collected from the saved pages: a block dropped for an empty required list is not reported (#2103 L1)', async () => {
+            vi.mocked(generateSiteWithAI).mockResolvedValueOnce({
+                result: {
+                    siteName: 'AI Bakery',
+                    siteType: 'ecommerce',
+                    theme: { primaryColor: '#000' },
+                    seo: { title: 'SEO Bakery', description: 'Desc Bakery' },
+                    language: 'en',
+                    blocks: [],
+                    pages: [{
+                        title: 'Home', slug: '/', isHomepage: true,
+                        blocks: [
+                            { blockType: 'hero', variant: 'centered', headline: 'Fresh every morning' },
+                            { blockType: 'stats', stats: [] },
+                            { blockType: 'testimonials', testimonials: [] },
+                        ],
+                    }],
+                },
+                events: [],
+            } as unknown as Awaited<ReturnType<typeof generateSiteWithAI>>)
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                }),
+            })
+
+            const res = await GenerateSitePOST(req)
+            const reader = res.body!.getReader()
+            let full = ''
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                full += new TextDecoder().decode(value)
+            }
+            const done = JSON.parse(full.match(/event: done\ndata: (\{[^\n]*\})/)![1]!)
+
+            const home = mockPageDB.find((page) => page.slug === '/')
+            const savedTypes = (home?.layout as Array<{ blockType: string }>).map((block) => block.blockType)
+            expect(savedTypes).not.toContain('stats')
+            expect(savedTypes).toContain('testimonials')
+            const reported = (done.placeholders as Array<{ pageSlug: string; blockType: string }>).filter((p) => p.pageSlug === '/').map((p) => p.blockType)
+            expect(reported).not.toContain('stats')
+            expect(reported).toContain('testimonials')
         })
 
         it('[TC-GENPERF-W1-07] after() unavailable → fallback executes seeding anyway', async () => {

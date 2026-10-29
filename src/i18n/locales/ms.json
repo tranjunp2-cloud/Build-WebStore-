@@ -645,7 +645,13 @@
       "generated": "dijana",
       "generationTime": "{seconds}s",
       "createdSuccessfully": "Laman web \"{name}\" siap digunakan!",
-      "viewPreviewHint": "Lihat pratonton di sebelah kanan, buka editor untuk membuat perubahan, atau terbitkan sekarang."
+      "viewPreviewHint": "Lihat pratonton di sebelah kanan, buka editor untuk membuat perubahan, atau terbitkan sekarang.",
+      "placeholdersTitle": "Gantikan sebelum anda menerbitkan",
+      "placeholdersHint": "Bahagian ini masih mengandungi kandungan contoh. Gantikan dengan maklumat sebenar anda di editor. Anda masih boleh menerbitkan pada bila-bila masa.",
+      "placeholdersMore": "+{count} lagi",
+      "finishShopTitle": "Siapkan kedai anda",
+      "finishShopDescription": "Produk anda belum ada stok atau foto sebenar. Pembantu akan meminta maklumat tersebut daripada anda.",
+      "finishShopButton": "Siapkan kedai anda"
     },
     "form": {
       "businessName": "Nama perniagaan",
@@ -669,7 +675,7 @@
       "blueprintReady": "Sedia — AI bersedia membina laman web anda",
       "blueprintCount": "{count} daripada 4 butiran ditambah",
       "industryOptions": {
-        "restaurant": "Restoran / kafe / F&B",
+        "restaurant": "Restoran / makan di tempat",
         "ecommerce": "Kedai / fesyen / e-dagang",
         "beauty": "Kecantikan / spa / kesejahteraan",
         "tech": "Teknologi / IT / SaaS",
@@ -679,7 +685,7 @@
         "fitness": "Gim / kecergasan / yoga",
         "creative": "Portfolio / freelancer / agensi",
         "business": "Perniagaan / korporat",
-        "fnb": "F&B / kafe / bakeri",
+        "fnb": "Kafe / bakeri / pencuci mulut",
         "events": "Acara / perkahwinan",
         "blog": "Blog / media / majalah",
         "travel": "Perjalanan / pelancongan"
@@ -691,10 +697,10 @@
         "products": "Sila terangkan produk atau perkhidmatan anda"
       },
       "tabManual": "Huraikan perniagaan",
-      "tabUrl": "Muat masuk dari URL",
-      "urlLabel": "URL laman web",
+      "tabUrl": "Import daripada pautan",
+      "urlLabel": "Pautan laman web, Instagram atau Facebook anda",
       "urlPlaceholder": "https://laman-web-anda.com",
-      "urlHint": "Tampal alamat laman web sedia ada anda.",
+      "urlHint": "Tampal alamat laman web, halaman Instagram atau Facebook anda. Kami hanya membaca maklumat yang terbuka kepada umum.",
       "extractButton": "Ekstrak",
       "extracting": "Sedang Mengekstrak...",
       "analyzingWebsite": "Menganalisis laman web...",
@@ -721,7 +727,38 @@
       "slugAvailable": "Tersedia",
       "slugChecking": "Menyemak ketersediaan…",
       "slugCheckError": "Tidak dapat menyemak nama. Cuba lagi.",
-      "slugHelperText": "Anda boleh tukar ini kemudian di Tetapan > Domain."
+      "slugHelperText": "Anda boleh tukar ini kemudian di Tetapan > Domain.",
+      "optionalLabel": "Pilihan",
+      "buyingMethodsLabel": "Bagaimana pelanggan membeli daripada anda?",
+      "buyingMethodsHint": "Laman web hanya akan menyebut cara yang anda pilih di sini.",
+      "buyingMethodOptions": {
+        "delivery": "Penghantaran",
+        "pickup": "Ambil sendiri",
+        "walk_in": "Datang terus ke kedai",
+        "booking": "Tempahan",
+        "cod": "Bayar semasa terima",
+        "online_payment": "Bayaran dalam talian"
+      },
+      "serviceAreaLabel": "Kawasan perkhidmatan anda",
+      "serviceAreaPlaceholder": "cth. Lembah Klang, Pulau Pinang",
+      "shopFactsLabel": "Fakta yang boleh kami nyatakan tentang kedai anda",
+      "shopFactsPlaceholder": "cth. Bermula pada 2019. Sijil halal (hanya jika benar). Menang Kafe Terbaik 2023.",
+      "shopFactsHint": "Tambah hanya yang benar. AI tidak akan mereka tahun, sijil atau anugerah.",
+      "extractionReview": {
+        "title": "Semak maklumat yang diekstrak",
+        "subtitle": "Ubah mana-mana medan sebelum dimasukkan ke dalam borang anda.",
+        "businessName": "Nama perniagaan",
+        "industry": "Industri",
+        "description": "Penerangan",
+        "products": "Produk / Perkhidmatan",
+        "skip": "Langkau & isi secara manual",
+        "apply": "Masukkan ke dalam borang",
+        "realContentTitle": "Kandungan sebenar ditemui",
+        "testimonialsFound": "{count} ulasan pelanggan",
+        "faqFound": "{count} jawapan soalan lazim",
+        "realContentNote": "Ini disalin daripada halaman anda dan digunakan pada laman web baharu anda seperti asal.",
+        "noRealContent": "Tiada ulasan pelanggan atau soalan lazim ditemui pada halaman itu, jadi tiada yang akan disalin."
+      }
     }
   },
   "email": {
@@ -5348,6 +5385,7 @@
       "description": "Deskripsi",
       "sku": "SKU:",
       "outOfStock": "Stok habis",
+      "soldOut": "Habis dijual",
       "addToCart": "🛒 Tambah ke troli",
       "selectVariant": "Pilih varian",
       "allProducts": "Semua produk",

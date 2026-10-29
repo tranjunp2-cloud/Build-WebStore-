@@ -26,6 +26,7 @@ import { isGenericContent, hasUserDataReference, extractBlockText } from '@/lib/
 
 // ── PR #648: composer builders ──────────────────────────────────────────
 import { buildPricing, buildTeam, buildServiceCards } from '@/lib/ai/template-composer'
+import { buildGenerationFacts } from '@/lib/ai/generation-facts'
 
 describe('Gen Flow 500 Regression Tests', () => {
     afterEach(() => vi.restoreAllMocks())
@@ -291,10 +292,16 @@ describe('Gen Flow 500 Regression Tests', () => {
             'tech', 'travel',
         ] as const
 
+        // #2103 A1: plans / team come from the merchant's FACTS only — the Payload shape must still hold.
+        const biz = {
+            name: 'Acme',
+            facts: buildGenerationFacts({ businessInfo: { businessName: 'Acme', products: 'Alpha RM10, Beta RM20' } }),
+        }
+
         for (const cat of CATEGORIES) {
-            it(`buildPricing("${cat}") returns plans with {text,included} features`, () => {
-                const block = buildPricing(cat) as { plans: Array<{ features: unknown[] }> }
-                expect(block.plans.length).toBeGreaterThanOrEqual(3)
+            it(`buildPricing("${cat}") returns plans with {text,included} features (or no plans without prices)`, () => {
+                const block = buildPricing(biz) as { plans: Array<{ features: unknown[] }> }
+                expect(block.plans.length).toBe(2)
                 for (const plan of block.plans) {
                     for (const feature of plan.features) {
                         expect(feature).toHaveProperty('text')
@@ -302,15 +309,15 @@ describe('Gen Flow 500 Regression Tests', () => {
                         expect(typeof (feature as Record<string, unknown>).text).toBe('string')
                     }
                 }
+                expect((buildPricing({ name: 'Acme' }) as { plans: unknown[] }).plans).toEqual([])
             })
 
-            it(`buildTeam("${cat}") returns 3+ members with name/role/bio`, () => {
-                const block = buildTeam(cat) as { members: Array<{ name: string; role: string; bio: string }> }
-                expect(block.members.length).toBeGreaterThanOrEqual(3)
+            it(`buildTeam("${cat}") returns the brand member with name/role (no invented bio)`, () => {
+                const block = buildTeam(biz) as { members: Array<{ name: string; role: string }> }
+                expect(block.members).toHaveLength(1)
                 for (const m of block.members) {
                     expect(m.name.length).toBeGreaterThan(0)
                     expect(m.role.length).toBeGreaterThan(0)
-                    expect(m.bio.length).toBeGreaterThan(10)
                 }
             })
         }
@@ -338,8 +345,14 @@ describe('Gen Flow 500 Regression Tests', () => {
     // 6. Sanitizer + composer round-trip — simulate full apply-template path
     // ────────────────────────────────────────────────────────────────────
     describe('full round-trip: composer output → sanitizer → Payload-safe shape', () => {
+        // #2103 A1: plans come from the merchant's priced products, not an invented tier pack.
+        const pricedBiz = {
+            name: 'Klinik Sihat',
+            facts: buildGenerationFacts({ businessInfo: { businessName: 'Klinik Sihat', products: 'Consultation RM50, Health screening RM180, Vaccination RM90' } }),
+        }
+
         it('pricing block survives sanitizer with features normalized', () => {
-            const raw = buildPricing('health')
+            const raw = buildPricing(pricedBiz)
             const safe = sanitizeBlockForPayload(raw as Record<string, unknown>)
 
             expect(safe).toBeDefined()
@@ -347,7 +360,7 @@ describe('Gen Flow 500 Regression Tests', () => {
             expect(safe!.headline).toBe('Our Pricing')
 
             const plans = safe!.plans as Array<Record<string, unknown>>
-            expect(plans.length).toBeGreaterThanOrEqual(3)
+            expect(plans.length).toBe(3)
             for (const plan of plans) {
                 expect(plan).not.toHaveProperty('id')
                 const features = plan.features as Array<Record<string, unknown>>
@@ -359,16 +372,17 @@ describe('Gen Flow 500 Regression Tests', () => {
         })
 
         it('team block survives sanitizer with members cleaned', () => {
-            const raw = buildTeam('health')
+            const raw = buildTeam(pricedBiz)
             const safe = sanitizeBlockForPayload(raw as Record<string, unknown>)
 
             expect(safe).toBeDefined()
             expect(safe!.blockType).toBe('team')
             expect(safe!.variant).toBe('grid')
 
+            // #2103 A1: one brand card, no invented staff names or credentials
             const members = safe!.members as Array<Record<string, unknown>>
-            expect(members.length).toBe(3)
-            expect(members[0]!.name).toBe('Dr. Tan Wei Ming')
+            expect(members.length).toBe(1)
+            expect(members[0]!.name).toContain('Klinik Sihat')
             for (const m of members) {
                 expect(m).not.toHaveProperty('id')
             }

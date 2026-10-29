@@ -246,7 +246,7 @@ ORDERING RULES:
 ### Content Quality
 - Hero headline must mention the ACTUAL business name — never generic
 - Features must list ACTUAL products/services from user input — never generic "Quality Service"
-- Testimonials must sound realistic for the SPECIFIC industry with name, role, company
+- NEVER invent people, quotes, ratings, review counts, numbers, years in business, staff names or credentials, partner brands/logos, certifications (e.g. halal, ISO), awards, delivery partners (e.g. GrabFood), discounts or prices. Use ONLY the FACTS section of the user message. Testimonials: use only real reviews listed in FACTS — otherwise emit a single card inviting the first review, with no person name and no rating. Stats: use only numbers listed in FACTS, else leave the stats array empty. Team: only the owner/brand from FACTS, never made-up names. Logo cloud: only the payment methods listed in FACTS, else empty. FAQ: only questions FACTS can answer (contact, what is sold, how to buy, service area).
 - Section titles: 3-7 words, paired with 1-sentence subtitle
 - Short paragraphs: 2-3 sentences max. Use bullet points for 3+ items.
 - CTA text: action verb + benefit ("Book a Table", "View Our Menu", "Get Free Consultation")
@@ -329,11 +329,18 @@ export type BusinessInfoInput = {
   phone?: string
   email?: string
   address?: string
+  // #2103 A1: optional grounding facts the merchant states themselves. The AI may
+  // only make claims (halal, awards, years, counts) that appear here.
+  businessUrl?: string
+  buyingMethods?: Array<'delivery' | 'pickup' | 'walk_in' | 'booking' | 'cod' | 'online_payment'>
+  serviceArea?: string
+  shopFacts?: string
 }
 
 import type { ThemeMood } from './theme-moods'
 import type { CategoryRecipe } from './category-recipes'
 import { getCTAsByLang } from './suggested-cta-by-category'
+import { factsToPromptSection, type GenerationFacts } from './generation-facts'
 
 export type BuildUserPromptOptions = {
   extraInstructions?: string
@@ -368,6 +375,8 @@ export type BuildUserPromptOptions = {
    * so GPT avoids generic fallbacks like "Xem thêm" or "Learn More".
    */
   category?: string
+  /** #2103 A1: merchant FACTS — the only source of claims; rendered as a FACTS section. */
+  facts?: GenerationFacts
 }
 
 export function buildUserPrompt(
@@ -384,6 +393,7 @@ export function buildUserPrompt(
   let blockPromptOverrides: Record<string, { prompt: string }> | undefined
   let category: string | undefined
   let gpLang: string | undefined
+  let facts: GenerationFacts | undefined
   if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
     extraInstructions = extraInstructionsOrOptions
   } else {
@@ -393,6 +403,7 @@ export function buildUserPrompt(
     blockPromptOverrides = extraInstructionsOrOptions.blockPromptOverrides
     category = extraInstructionsOrOptions.category
     gpLang = extraInstructionsOrOptions.gpLang
+    facts = extraInstructionsOrOptions.facts
     if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
     if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
   }
@@ -416,8 +427,16 @@ export function buildUserPrompt(
   if (info.address && info.address.trim()) {
     parts.push(`Physical address: ${info.address.trim()} (use this verbatim)`)
   }
+  if (info.serviceArea && info.serviceArea.trim()) {
+    parts.push(`Service area: ${info.serviceArea.trim()}`)
+  }
   if (extraInstructions) {
     parts.push(`Additional instructions: ${extraInstructions}`)
+  }
+  // #2103 A1: pin every claim to FACTS (real contact, listed products, stated facts, real reviews).
+  // Skipped for the reference-prompt path, where REFERENCE CONTENT is already the real source.
+  if (facts && !referencePrompt) {
+    parts.push(`\n${factsToPromptSection(facts)}`)
   }
 
   // Plan 260414-2249 phase-02: inject mood-driven COPY VOICE block.
@@ -527,10 +546,10 @@ export function buildPersonalizePrompt(
   "seoTitle": "max 60 chars, includes business name",
   "seoDescription": "max 160 chars, compelling meta description"
 }
-Write in ${langLabel}. If business information is in another language, translate it to ${langLabel} — do not copy the original language into output. Be specific to this business — no generic phrases like "Quality Service" or "Welcome to our website".`,
+Write in ${langLabel}. If business information is in another language, translate it to ${langLabel} — do not copy the original language into output. Be specific to this business — no generic phrases like "Quality Service" or "Welcome to our website". Use ONLY facts given in the user message: never invent certifications (halal, ISO), awards, years in business, customer counts, discounts, delivery partners or prices.`,
     user: `Business: "${info.businessName}"
 Industry: ${info.industry}
 Products/services: ${info.products}
-Description: ${info.shortDescription}`,
+Description: ${info.shortDescription}${info.shopFacts?.trim() ? `\nFacts stated by the merchant: ${info.shopFacts.trim()}` : ''}`,
   }
 }

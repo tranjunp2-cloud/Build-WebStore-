@@ -2,6 +2,7 @@ import "server-only";
 
 import config from "@payload-config";
 import { getPayload, type Payload, type Where } from "payload";
+import { getDisplayPrice } from "@/lib/products/display-price";
 import { lexicalToMarkdown } from "@/lib/products/product-rich-text";
 import type { AgentActor } from "../context";
 import {
@@ -15,6 +16,7 @@ import {
 	productId,
 	productPhotos,
 	descriptionLocks,
+	SOURCE_NOTE,
 	SHOP_CURRENCIES,
 	type ShopCurrency,
 	shopMoney,
@@ -120,8 +122,27 @@ function statusFilter(status: ProductSearchStatus | undefined): Where {
 /** `trash` = soft-deleted; otherwise the stored status. */
 const shownStatus = (doc: ProductDoc) => (isTrashed(doc) ? "trash" : doc.status);
 
+/**
+ * What a shopper pays and what is on hand, as the storefront counts them: a product with options sells from
+ * its cheapest option ("From RM 59.00") and its stock is the sum of the options' stock. A product that says it
+ * has options but lists none falls back to its own price and stock.
+ */
+function priceAndStock(doc: ProductDoc): { price: string; stock: number } {
+	const options = doc.hasVariants ? (doc.variants ?? []) : [];
+	const shown = getDisplayPrice({
+		price: doc.price ?? 0,
+		hasVariants: Boolean(doc.hasVariants),
+		variants: options.map((option) => ({ price: option.price ?? 0 })),
+	});
+	return {
+		price: `${shown.isVariant ? "From " : ""}${shopMoney(shown.value, doc.currency)}`,
+		stock: options.length > 0 ? options.reduce((sum, option) => sum + (option.stock ?? 0), 0) : (doc.inventory ?? 0),
+	};
+}
+
 function summaryMeta(doc: ProductDoc): string {
-	const parts = [shopMoney(doc.price ?? 0, doc.currency), doc.hasVariants ? `stock ${doc.inventory ?? 0} (options)` : `stock ${doc.inventory ?? 0}`];
+	const { price, stock } = priceAndStock(doc);
+	const parts = [price, doc.hasVariants ? `stock ${stock} (options)` : `stock ${stock}`];
 	const category = productCategory(doc);
 	if (category) parts.push(category.name);
 	return parts.join(" · ");
@@ -139,7 +160,7 @@ export async function searchShopProducts(
 		limit: Math.min(Math.max(input.limit ?? SEARCH_LIMIT, 1), SEARCH_LIMIT),
 		sort: ["-createdAt", "-id"],
 		depth: 1,
-		select: { name: true, status: true, price: true, currency: true, inventory: true, hasVariants: true, category: true, deletedAt: true, updatedAt: true },
+		select: { name: true, status: true, price: true, currency: true, inventory: true, hasVariants: true, variants: { price: true, stock: true }, category: true, deletedAt: true, updatedAt: true },
 		populate: { categories: { name: true, breadcrumbs: true } },
 		overrideAccess: false,
 		user: payloadUser(actor),
@@ -177,11 +198,12 @@ export async function readShopProduct(actor: AgentActor, id: string) {
 	const malay = lexicalToMarkdown(doc.descriptionBM);
 	const options = optionsLabel(doc);
 	const locks = descriptionLocks(doc);
+	const { price, stock } = priceAndStock(doc);
 	const facts = [
 		{ label: "SKU", value: doc.sku?.trim() || none },
-		{ label: "Price", value: shopMoney(doc.price ?? 0, doc.currency) },
+		{ label: "Price", value: price },
 		{ label: "Compare-at price", value: doc.compareAtPrice && doc.compareAtPrice > 0 ? shopMoney(doc.compareAtPrice, doc.currency) : none },
-		{ label: "Stock", value: String(doc.inventory ?? 0) },
+		{ label: "Stock", value: doc.hasVariants ? `${stock} (the options' stock added up)` : String(stock) },
 		{ label: "Weight", value: doc.weight && doc.weight > 0 ? `${doc.weight} kg` : none },
 		{ label: "Category", value: category ? `${category.name} (id ${category.id})` : none },
 		{ label: "Tags", value: (doc.tags ?? []).map((row) => row.tag?.trim()).filter(Boolean).join(", ") || none },
@@ -206,7 +228,7 @@ export async function readShopProduct(actor: AgentActor, id: string) {
 		facts,
 		...(description || malay ? { text: cap([description, malay ? `Bahasa Melayu:\n${malay}` : ""].filter(Boolean).join("\n\n")) } : {}),
 		lists: [
-			{ label: "Photos", items: photos.map((photo, i) => `photo ${i + 1} · ${photo.ref} · ${photo.alt ?? "no alt text"}`).slice(0, MAX_LIST) },
+			{ label: "Photos", items: photos.map((photo, i) => `photo ${i + 1} · ${photo.ref} · ${photo.alt ?? "no alt text"}${SOURCE_NOTE[photo.source]}`).slice(0, MAX_LIST) },
 			{ label: "Categories", items: categories.map((option) => `${option.id} · ${option.name}`).slice(0, MAX_LIST) },
 			...(doc.hasVariants ? [{ label: "Options", items: variants }] : []),
 		],

@@ -31,6 +31,7 @@
 import { downloadPhotoBuffer, registerPixabayMediaSource } from './pixabay-client'
 import { uploadBufferToMedia, Semaphore } from './media-pipeline'
 import type { ImagePool, PoolPhoto } from './image-pool'
+import { buildStockAlt } from './stock-alt'
 
 // Downloads are network-bound (Pixabay CDN, no rate limit) — 4 concurrent is
 // conservative during the GPT window where we don't want to starve any other
@@ -90,7 +91,7 @@ export async function preUploadPool(
 
                 const extension = mimetype.includes('png') ? 'png' : 'jpg'
                 const filename = `pool-${photo.id}-${Date.now()}.${extension}`
-                const alt = photo.alt || `${businessName} photo`
+                const alt = buildStockAlt(photo.alt, businessName) || `${businessName} photo`
 
                 const thisCreate = createChain.then(async () => {
                     try {

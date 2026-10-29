@@ -1,5 +1,5 @@
 import { MockLanguageModelV4 } from "ai/test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AiRequestContext } from "../auth/context-token";
 import { SpendGuard } from "../cost/spend-guard";
 import { DecisionService } from "../decide/decision.service";
@@ -231,5 +231,37 @@ describe("an option search never overwrites a claimed run [TC-AIREL-298]", () =>
 		// Assert
 		expect(store.runs.get("run_q")?.run.status).toBe("running");
 		expect(store.runs.get("run_q")?.state).toMatchObject({ marker: "answer" });
+	});
+});
+
+describe("an answer that fails is saved before its end is streamed [TC-AIAUD-157]", () => {
+	it("TC-AIAUD-157: the stored run says failed before the client sees the failure, so the next message is not THREAD_BUSY", async () => {
+		// Arrange: the question flow blows up while answering (not a refused answer: a real failure)
+		const store = new InMemoryAgentStore();
+		const env = testEnv();
+		const models: ModelRegistry = { resolveChain: () => [{ model: askingModel().model, provider: "openai", modelId: "gpt-4.1-mini" }] };
+		const flows = new QuestionFlowService({} as ShopTools, new DecisionService(store, ledger, env), store);
+		const runs = new AgentRunService(store, models, ledger, env, new AgentThreadService(store, env), flows);
+		const paused = await runs.start(ctx, { prompt: "write a welcome note for new customers" }, () => undefined);
+		const answer = { toolCallId: paused.ask?.toolCallId as string, questionId: paused.ask?.question.id as string, values: ["friendly"] };
+		vi.spyOn(flows, "answer").mockRejectedValue(new Error("shop read timed out"));
+		const log: string[] = [];
+		const save = store.saveRun.bind(store);
+		vi.spyOn(store, "saveRun").mockImplementation(async (org, run) => {
+			log.push(`saved ${run.status}`);
+			return save(org, run);
+		});
+
+		// Act
+		const result = await runs.answer(ctx, paused.id, answer, (frame) => {
+			if (frame.type === "run.status") log.push(`streamed ${frame.status}`);
+		});
+
+		// Assert: saved first, streamed after; the chat is free the moment the client hears about it
+		expect(result.status).toBe("failed");
+		expect(log.indexOf("saved failed")).toBeGreaterThanOrEqual(0);
+		expect(log.indexOf("saved failed")).toBeLessThan(log.indexOf("streamed failed"));
+		expect(store.runs.get(paused.id)?.run.status).toBe("failed");
+		await expect(runs.reserve(ctx, { threadId: paused.threadId })).resolves.toBeDefined();
 	});
 });

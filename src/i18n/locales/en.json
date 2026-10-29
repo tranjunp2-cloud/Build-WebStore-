@@ -645,7 +645,13 @@
       "generated": "generated",
       "generationTime": "{seconds}s",
       "createdSuccessfully": "Website \"{name}\" is ready!",
-      "viewPreviewHint": "See the preview on the right, open the editor to make changes, or publish now."
+      "viewPreviewHint": "See the preview on the right, open the editor to make changes, or publish now.",
+      "placeholdersTitle": "Replace before you publish",
+      "placeholdersHint": "These sections still hold sample content. Swap in your real details in the editor. You can still publish any time.",
+      "placeholdersMore": "+{count} more",
+      "finishShopTitle": "Finish your shop",
+      "finishShopDescription": "Your products have no stock or real photos yet. The assistant will ask you for them.",
+      "finishShopButton": "Finish your shop"
     },
     "form": {
       "businessName": "Business name",
@@ -669,7 +675,7 @@
       "blueprintReady": "All set — AI is ready to build your website",
       "blueprintCount": "{count} of 4 details added",
       "industryOptions": {
-        "restaurant": "Restaurant / cafe / F&B",
+        "restaurant": "Restaurant / dine-in",
         "ecommerce": "Shop / fashion / e-commerce",
         "beauty": "Beauty / spa / wellness",
         "tech": "Tech / IT / SaaS",
@@ -679,7 +685,7 @@
         "fitness": "Gym / fitness / yoga",
         "creative": "Portfolio / freelancer / agency",
         "business": "Business / corporate",
-        "fnb": "F&B / cafe / bakery",
+        "fnb": "Café / bakery / desserts",
         "events": "Events / wedding",
         "blog": "Blog / media / magazine",
         "travel": "Travel / tourism"
@@ -691,10 +697,10 @@
         "products": "Describe your products or services"
       },
       "tabManual": "Describe business",
-      "tabUrl": "Import from URL",
-      "urlLabel": "Website URL",
+      "tabUrl": "Import from a link",
+      "urlLabel": "Your website, Instagram or Facebook link",
       "urlPlaceholder": "https://your-website.com",
-      "urlHint": "Paste the address of your existing website.",
+      "urlHint": "Paste the address of your website, Instagram or Facebook page. We only read what is public.",
       "extractButton": "Extract",
       "extracting": "Extracting...",
       "analyzingWebsite": "Analyzing website...",
@@ -721,7 +727,38 @@
       "slugAvailable": "Available",
       "slugChecking": "Checking availability…",
       "slugCheckError": "Couldn't check that name. Try again.",
-      "slugHelperText": "You can change this later in Settings > Domains."
+      "slugHelperText": "You can change this later in Settings > Domains.",
+      "optionalLabel": "Optional",
+      "buyingMethodsLabel": "How do customers buy from you?",
+      "buyingMethodsHint": "The site will only mention the ways you pick here.",
+      "buyingMethodOptions": {
+        "delivery": "Delivery",
+        "pickup": "Pickup",
+        "walk_in": "Walk-in",
+        "booking": "Booking",
+        "cod": "Cash on delivery",
+        "online_payment": "Online payment"
+      },
+      "serviceAreaLabel": "Areas you serve",
+      "serviceAreaPlaceholder": "e.g. Klang Valley, Penang island",
+      "shopFactsLabel": "Facts we can say about your shop",
+      "shopFactsPlaceholder": "e.g. Started in 2019. Halal certified (only if you really are). Won Best Cafe 2023.",
+      "shopFactsHint": "Only add what is true. The AI will not invent years, certifications or awards.",
+      "extractionReview": {
+        "title": "Review extracted info",
+        "subtitle": "Edit any fields before applying to your form.",
+        "businessName": "Business name",
+        "industry": "Industry",
+        "description": "Description",
+        "products": "Products / Services",
+        "skip": "Skip & enter manually",
+        "apply": "Apply to form",
+        "realContentTitle": "Real content found",
+        "testimonialsFound": "{count} customer reviews",
+        "faqFound": "{count} FAQ answers",
+        "realContentNote": "These are copied from your page and used on your new site as they are.",
+        "noRealContent": "No customer reviews or FAQ found on that page, so none will be copied."
+      }
     }
   },
   "email": {
@@ -5348,6 +5385,7 @@
       "description": "Description",
       "sku": "SKU:",
       "outOfStock": "Out of stock",
+      "soldOut": "Sold out",
       "addToCart": "🛒 Add to cart",
       "selectVariant": "Select a variant",
       "allProducts": "All products",

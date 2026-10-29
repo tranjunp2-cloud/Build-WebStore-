@@ -729,7 +729,10 @@ describe('POST /api/ai/apply-template', () => {
             const pageUpdate = mockPayloadInstance.update.mock.calls.find(
                 (call: [{ collection: string }]) => call[0].collection === 'pages',
             )
-            expect(pageUpdate?.[0].data.layout).toHaveLength(2)
+            // [TC-AIAUD-213] the template's features block has no rows; Payload refuses an empty
+            // required `features` list, so the shared sanitizer drops it instead of failing the page.
+            const layout = pageUpdate?.[0].data.layout as Array<{ blockType: string }>
+            expect(layout.map((block) => block.blockType)).toEqual(['hero'])
             expect(body.data.pagesUpdated).toBe(1)
         })
 

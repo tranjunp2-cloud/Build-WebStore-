@@ -104,8 +104,17 @@ beforeEach(() => {
     vi.clearAllMocks()
 })
 
-describe('TC-F08-BS.01 — seeds 3 published posts for new tenant', () => {
-    it('creates 3 blog records with published status and prefixed slug', async () => {
+describe('TC-F08-BS.01 — seeds 3 draft posts for new tenant (TC-AIAUD-036: published with the site, #2103 A4)', () => {
+    it('TC-AIAUD-143: every seeded post carries the explicit aiSeeded marker (not just a slug prefix)', async () => {
+        const payload = makePayload(0)
+        await seedBlogPosts(payload, 42, 99, 'restaurant', 'TestBiz', 7)
+
+        const calls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
+        expect(calls).toHaveLength(3)
+        for (const [arg] of calls) expect(arg.data.aiSeeded).toBe(true)
+    })
+
+    it('creates 3 blog records with draft status and prefixed slug', async () => {
         const payload = makePayload(0)
         const result = await seedBlogPosts(payload, 42, 99, 'restaurant', 'TestBiz', 7)
 
@@ -113,7 +122,8 @@ describe('TC-F08-BS.01 — seeds 3 published posts for new tenant', () => {
         expect(payload.create).toHaveBeenCalledTimes(3)
 
         const firstCall = (payload.create as ReturnType<typeof vi.fn>).mock.calls[0][0]
-        expect(firstCall.data.status).toBe('published')
+        expect(firstCall.data.status).toBe('draft')
+        expect(firstCall.data.publishedAt).toBeUndefined()
         expect(firstCall.data.slug).toMatch(/^42-/)
         expect(firstCall.data.tenant).toBe(42)
         expect(firstCall.data.author).toBe(7)

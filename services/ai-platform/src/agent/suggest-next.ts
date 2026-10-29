@@ -20,10 +20,22 @@ const MAX_CHARS = 80;
  */
 export const SUGGEST_NEXT_PROMPT = [
 	"[Not from the merchant — the dashboard asks:] Suggest the 3 most useful next messages the merchant could send you now, based on this conversation.",
-	"Only things you can do with your tools on this dashboard. No repeats of what was just done or asked.",
+	"Only things you can do with your tools on this dashboard. No repeats of what was just done or asked. Never suggest something you just said you can't do, nor a workaround for it.",
 	"Write each as the merchant would type it, entirely in the language the merchant's own last message was written in (not the website's, the page's or the editor's language, and not the language of your last reply if it differed), under 60 characters. Never mix two languages in one line.",
 	"One per line. No numbering, bullets, quotes or other text.",
 ].join(" ");
+
+/**
+ * Wording of a reply that says it can't do what was asked (English, Malay, Vietnamese). Chips written after
+ * such a reply offered the very thing declined, or a workaround for it, so the model is not asked for them.
+ */
+const DECLINE =
+	/\b(?:can(?:'|’)?t|cannot|can not|unable to|not able to|isn(?:'|’)?t (?:available|possible|supported)|is not (?:available|possible|supported)|aren(?:'|’)?t (?:available|supported)|(?:do not|don(?:'|’)?t) (?:have (?:a |an |any )?(?:tool|way|access)|support)|no way to|not something i can|beyond what i can)\b|\b(?:tidak boleh|tak boleh|tidak dapat|tak dapat|tidak mampu|tidak disokong|belum disokong|tidak tersedia)\b|không thể|không hỗ trợ|chưa hỗ trợ|chưa thể|không có công cụ/iu;
+
+/** True when a reply declines the request (see DECLINE). */
+export function looksDeclined(answer: string | undefined): boolean {
+	return !!answer && DECLINE.test(answer);
+}
 
 /** Model lines → at most three clean, distinct prompts; anything odd is dropped, never shown. */
 export function parseSuggestions(text: string, alreadySaid: string): RunSuggestion[] {
@@ -165,16 +177,24 @@ function todoPrompts(value: unknown): string[] {
 export const SUGGEST_NEXT_SYSTEM = [
 	"You suggest what a shop owner could ask their store assistant next, from the last exchange below.",
 	"Suggest 3 short next messages (under 60 characters each), written as the merchant would type them, entirely in the language of the merchant's message. Never mix two languages in one line.",
-	"Only things the assistant can do (listed below). No repeats of what was just done or asked.",
+	"Only things the assistant can do (listed below). No repeats of what was just done or asked. Never suggest anything the assistant's reply says it cannot do, nor a workaround for it.",
 	"One per line. No numbering, bullets, quotes or other text.",
 ].join(" ");
 
 /** The tiny call's user turn: the merchant's message, the reply and what the assistant can do (all clipped). */
-export function suggestUserTurn(input: { prompt: string; answer: string; staged: readonly string[]; abilities: readonly string[] }): string {
+export function suggestUserTurn(input: {
+	prompt: string;
+	answer: string;
+	staged: readonly string[];
+	abilities: readonly string[];
+	/** the language of the merchant's message when it is clear (`replyLanguageName`) */
+	language?: string | null;
+}): string {
 	const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max)}…` : text);
 	return [
 		`Merchant: ${clip(input.prompt.replace(/\s+/g, " ").trim(), 500)}`,
 		`Assistant: ${clip(input.answer.replace(/\s+/g, " ").trim(), 700)}`,
+		input.language ? `Write the suggestions in: ${input.language}.` : null,
 		input.staged.length > 0 ? `Drafts waiting for approval: ${clip(input.staged.join("; "), 300)}` : null,
 		`The assistant can: ${input.abilities.join("; ")}.`,
 	]

@@ -12,7 +12,7 @@ import { createAgentGateway } from "@/lib/agent-changes/agent-gateway";
 import { entityForPath, moduleForPath } from "@/lib/ai-platform/shop-surface";
 import { dashboardPageLocation } from "./agent-page-location";
 import { agentPanelLabels, entityLabel, pageLabel } from "./agent-panel-labels";
-import { dockShownOn } from "./agent-dock-routes";
+import { dockShownOn, quietOn } from "./agent-dock-routes";
 import { AGENT_OPEN_EVENT, dockStoppedListening, takeHeldAgentOpens } from "./agent-open-queue";
 import { agentStarters } from "./agent-starters";
 import { useAskParam } from "./use-ask-param";
@@ -40,10 +40,13 @@ function DockSurface() {
 	const pending = useChangeSets({ status: "pending" });
 	// the merchant's work queue: one number on the mascot, the dock's home is the next item
 	const workQueue = useWork();
+	// on a form screen (product editor, settings, a discount, a customer) the mascot raises nothing over the Save bar
+	const quiet = quietOn(pathname);
 	const work = useMemo(
 		() =>
 			workQueue.data || workQueue.loading || workQueue.error
 				? {
+						quiet,
 						items: workQueue.data?.items ?? [],
 						states: workQueue.data?.states ?? [],
 						loading: workQueue.loading,
@@ -57,7 +60,7 @@ function DockSurface() {
 						onRaised: (item: WorkItem, at: string) => void workQueue.setState(item.key, { lastRaisedAt: at }).catch(() => undefined),
 					}
 				: undefined,
-		[workQueue],
+		[workQueue, quiet],
 	);
 	const decideChangeSet = useDecideChangeSet();
 	const [open, setOpen] = useState(false);

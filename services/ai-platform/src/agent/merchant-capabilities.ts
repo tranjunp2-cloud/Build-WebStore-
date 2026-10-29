@@ -51,6 +51,7 @@ export const TOOL_CAPABILITIES = {
 	propose_shop_product_update: ["shop_products"],
 	propose_shop_product_status: ["shop_products"],
 	propose_shop_product_drafts: ["shop_products"],
+	propose_shop_products_setup: ["shop_products"],
 } as const satisfies Record<string, readonly Capability[] | null>;
 
 export type MerchantToolName = keyof typeof TOOL_CAPABILITIES;

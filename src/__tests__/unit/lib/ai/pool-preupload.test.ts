@@ -281,3 +281,29 @@ describe('[TC-GENPERF-W2-08] preUploadPool — orphan handling (by design)', () 
 // TC-GENPERF-W2-09 (flag-off media path) is covered at the REAL seam in
 // media-pipeline-preupload.test.ts: batchFetchFromPool without a
 // preUploadedPool map downloads + creates inline exactly as before.
+
+
+describe('[TC-AIAUD-005] preUploadPool — stock alt text (#2103 A5)', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it('TC-AIAUD-005: uploads with a deduped, subject-prefixed alt of at most 120 chars', async () => {
+		// Arrange — raw Pixabay tags: repeated words, very long
+		const { uploadBufferToMedia } = await import('@/lib/ai/media-pipeline')
+		const tags = ['cake', 'cakes', 'Cake', ...Array.from({ length: 30 }, (_, i) => `sweet-dessert-tag-${i}`)].join(', ')
+		const pool = {
+			landscape: [{ id: 'alt-photo', url: 'https://pixabay.com/alt.jpg', alt: tags }],
+			square: [],
+			portrait: [],
+		} as unknown as ImagePool
+
+		// Act
+		await preUploadPool(pool, 'tenant-1', 'Kedai Kek Kak Yah', {} as any)
+
+		// Assert
+		const opts = vi.mocked(uploadBufferToMedia).mock.calls.at(-1)![1] as { alt: string }
+		expect(opts.alt).toBe('Kedai Kek Kak Yah - cake, sweet-dessert-tag-0, sweet-dessert-tag-1')
+		expect(opts.alt.length).toBeLessThanOrEqual(120)
+	})
+})
