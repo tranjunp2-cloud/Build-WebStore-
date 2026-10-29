@@ -37,18 +37,37 @@ const baseRow = (id: number) => ({
 const RUN = { runDomain: "webbuilder", threadId: "thr_1", pagePath: "/editor/1", pageTitle: 'Online Store › Editor › page "Home"', pageModule: "editor" };
 const NO_RUN = { runDomain: null, threadId: null, pagePath: null, pageTitle: null, pageModule: null };
 
+function numericParam(node: unknown): number | undefined {
+	if (typeof node !== "object" || node === null) return undefined;
+	if ("value" in node && typeof (node as { value: unknown }).value === "number") return (node as { value: number }).value;
+	const chunks = (node as { queryChunks?: unknown[] }).queryChunks;
+	for (const chunk of chunks ?? []) {
+		const found = numericParam(chunk);
+		if (found !== undefined) return found;
+	}
+	return undefined;
+}
+
+function sqlText(node: unknown, depth = 0): string {
+	if (depth > 8 || typeof node !== "object" || node === null) return "";
+	const value = (node as { value?: unknown }).value;
+	if (Array.isArray(value)) return value.filter((v) => typeof v === "string").join("");
+	const chunks = (node as { queryChunks?: unknown[] }).queryChunks;
+	return (chunks ?? []).map((chunk) => sqlText(chunk, depth + 1)).join(" ");
+}
+
 /** A fake of the one query the controller makes: id > after, ordered by id, limited; remembers the limit it got. */
 function fakeDb(total: number, rowsFor: (id: number) => Row = (id) => row(id)) {
-	const seen = { limit: 0, queries: 0 };
+	const seen: { limit: number; queries: number; where?: unknown } = { limit: 0, queries: 0 };
 	let after = 0;
 	const db = {
 		select: () => ({
 			from: () => ({
 				leftJoin: () => ({
 				where: (condition: { queryChunks: unknown[] }) => {
-					// the bound `after` value is the last param chunk of `id > $1`
-					const param = condition.queryChunks.find((c) => typeof c === "object" && c !== null && "value" in c && typeof (c as { value: unknown }).value === "number") as { value: number } | undefined;
-					after = param?.value ?? 0;
+					// the bound `after` value is the numeric param of `id > $1` (nested inside and(...))
+					seen.where = condition;
+					after = numericParam(condition) ?? 0;
 					return {
 						orderBy: () => ({
 							limit: async (n: number) => {
@@ -132,6 +151,15 @@ describe("usage events paging [TC-AIUSE-04]", () => {
 		expect(second.events.map((e: { id: number }) => e.id)).toEqual([3, 4]);
 		expect(rest).toMatchObject({ nextAfter: 5 });
 		expect(none).toEqual({ events: [], nextAfter: 5 });
+	});
+
+	it("holds back rows younger than 2 minutes so an out-of-order commit is never skipped", async () => {
+		// Arrange
+		const seen = await start(2);
+		// Act
+		await get("?after=0", `Bearer ${await sign()}`);
+		// Assert
+		expect(sqlText(seen.where)).toContain("now() - interval '2 minutes'");
 	});
 
 	it("defaults after to 0 and limit to 500, caps the limit at 1000 and rejects bad numbers", async () => {

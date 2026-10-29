@@ -1,5 +1,5 @@
 import { Controller, Get, HttpException, Inject, Query, Req } from "@nestjs/common";
-import { asc, eq, gt, sql } from "drizzle-orm";
+import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import { ContextTokenError, verifyUsageSyncToken } from "../auth/context-token";
@@ -11,6 +11,12 @@ import { IMAGE_TASK } from "../images/picture-quota";
 import { fallbackCostMicros } from "./price-book";
 
 const DEFAULT_LIMIT = 500;
+/**
+ * Rows younger than this are held back: ids come from a sequence, so two calls writing at once can commit out of
+ * order (101 visible before 100). The sync resumes after the highest id it copied, so without the lag a late 100
+ * would be skipped for good.
+ */
+export const SETTLE_LAG = sql`now() - interval '2 minutes'`;
 const MAX_LIMIT = 1000;
 const QuerySchema = z.object({
 	after: z.coerce.number().int().min(0).default(0),
@@ -21,7 +27,7 @@ function problem(status: number, title: string, detail: string): HttpException {
 	return new HttpException({ title, status, detail }, status);
 }
 
-/** Read-only feed of the usage ledger for prime-web's log sync (ordered by id, resume with `nextAfter`). */
+/** Read-only feed of the usage ledger for prime-web's log sync (ordered by id, resume with `nextAfter`; rows settle 2 min first). */
 @Controller("internal/usage-events")
 export class UsageEventsController {
 	constructor(
@@ -59,7 +65,7 @@ export class UsageEventsController {
 			})
 			.from(aiUsageEvents)
 			.leftJoin(aiRuns, eq(aiRuns.id, aiUsageEvents.runId))
-			.where(gt(aiUsageEvents.id, after))
+			.where(and(gt(aiUsageEvents.id, after), lt(aiUsageEvents.createdAt, SETTLE_LAG)))
 			.orderBy(asc(aiUsageEvents.id))
 			.limit(limit);
 		const events = rows.map(({ event: row, ...run }) => ({

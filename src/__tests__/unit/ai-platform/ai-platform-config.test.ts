@@ -4,7 +4,7 @@
  * - 010 seed: config row inserted once (insert-only), valid against the schema, with the agreed prices and models
  * - 011 GET /api/internal/ai-config: 401 (same body) for no / wrong-secret / wrong iss, aud, sub / expired / non-HS256 token
  * - 012 endpoint payload: prices, images, models, updatedAt; most recently updated row wins; empty when missing
- * - 013 invalid stored row → empty config (not a 500); 60 s cache; DB failure → 503
+ * - 013 invalid stored row → 503 (ai-platform keeps its last good copy), not cached; DB failure → 503
  * - 014 the cache-write column is NOT added (no ai_usage_logs.cache_write migration / field)
  * Real: hook, schema, resolver, route, db-setup MIGRATIONS. Faked: Payload find.
  */
@@ -47,7 +47,7 @@ const messageOf = (fn: () => unknown): string => {
 describe('PlanFeatures AI validation hook', () => {
     it('TC-AIU-PLAN-009 accepts valid config and limits', () => {
         expect(() => run({ featureCode: 'ai_platform_config', value: 'YES', settings: goodConfig })).not.toThrow()
-        for (const value of ['0.05', '0', 'UNLIMITED', ' unlimited ']) expect(() => run({ featureCode: 'ai_budget_usd_daily', value })).not.toThrow()
+        for (const value of ['0.05', '0', 'UNLIMITED', ' unlimited ', 'YES']) expect(() => run({ featureCode: 'ai_budget_usd_daily', value })).not.toThrow()
         for (const value of ['3', '0', 'UNLIMITED']) expect(() => run({ featureCode: 'ai_pictures_daily', value })).not.toThrow()
         expect(() => run({ featureCode: 'staff_limit', value: 'whatever' })).not.toThrow()
     })
@@ -150,12 +150,14 @@ describe('GET /api/internal/ai-config', () => {
         expect(await (await call(await token())).json()).toEqual({ prices: {}, images: {}, models: {}, updatedAt: null })
     })
 
-    it('TC-AIU-PLAN-013 invalid row → empty config; cached 60 s; DB failure → 503', async () => {
+    it('TC-AIU-PLAN-013 invalid row → 503, not cached; DB failure → 503', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => undefined)
         find.mockResolvedValue({ docs: [row({ prices: 'x' })] })
-        expect(await (await call(await token())).json()).toEqual({ prices: {}, images: {}, models: {}, updatedAt: null })
+        const invalid = await call(await token())
+        expect(invalid.status).toBe(503)
+        expect(await invalid.json()).toEqual({ error: 'Unavailable' })
         await call(await token())
-        expect(find).toHaveBeenCalledTimes(1)
+        expect(find).toHaveBeenCalledTimes(2)
 
         clearAiConfigCache()
         find.mockRejectedValue(new Error('db down'))

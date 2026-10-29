@@ -4,7 +4,7 @@
  * - 001 feature derivation; 002 null cost / model 'unknown' / null tokens; 003 success from outcome
  * - 004 org → tenant (derived hash and metaData.platformOrgId override); 005 user → users.id, unknown → null
  * - 006 cursor = MAX(platform_event_id), a full page continues, a short page stops, rows upserted on platform_event_id
- * - 007 page / time caps; 008 malformed event skipped, not fatal
+ * - 007 page / time caps; 008 malformed event: rows before it copied, the run fails, the cursor stays before it
  * - 009 cron fails closed without CRON_SECRET; 010 unconfigured platform → 200 skipped; 011 failure → 500
  * - 012 collection fields + migrations (nullable endpoint/cost, unique event id, tenant index) + vercel cron; nothing dropped
  * - 013 readable detail: summary, task label, area (run page, else task family), page/thread, totals, cache %, battery cost
@@ -151,13 +151,11 @@ describe('syncUsageEvents', () => {
         expect(result.pages).toBe(1)
     })
 
-    it('TC-AIU-SYNC-008 skips a malformed event and still copies the rest', async () => {
-        const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-        aiPlatformJson.mockResolvedValueOnce({ events: [event(1), { id: 'nope' }], nextAfter: 2 })
-        const result = await syncUsageEvents()
-        expect(result.fetched).toBe(1)
-        expect(result.cursor).toBe(2)
-        spy.mockRestore()
+    it('TC-AIU-SYNC-008 a malformed event fails the run after copying the rows before it (never skipped)', async () => {
+        aiPlatformJson.mockResolvedValueOnce({ events: [event(1), { id: 'nope' }, event(3)], nextAfter: 3 })
+        await expect(syncUsageEvents()).rejects.toThrow(/malformed usage event after ledger id 1/)
+        expect(queries.filter((q) => q.includes('INSERT INTO ai_usage_logs'))).toHaveLength(1)
+        expect(aiPlatformJson).toHaveBeenCalledTimes(1)
     })
 })
 

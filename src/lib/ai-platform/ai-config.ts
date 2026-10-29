@@ -20,8 +20,9 @@ const EMPTY: AiConfigResponse = { prices: {}, images: {}, models: {}, updatedAt:
 
 /**
  * The platform-wide AI config (prices, picture prices, model chains): the single `ai_platform_config` row of
- * `plan-features` whatever its plan; the most recently updated wins if an admin made several. A missing or invalid
- * row yields empty maps (ai-platform then keeps its env / built-in values). Cached 60 s. Throws on a DB failure.
+ * `plan-features` whatever its plan; the most recently updated wins if an admin made several. A missing row yields
+ * empty maps (ai-platform then uses its env / built-in values). An invalid row (e.g. edited straight in the DB) throws,
+ * so the route answers 503 and ai-platform keeps its last good copy. Cached 60 s. Throws on a DB failure.
  */
 export async function getAiPlatformConfig(): Promise<AiConfigResponse> {
 	if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
@@ -40,7 +41,7 @@ export async function getAiPlatformConfig(): Promise<AiConfigResponse> {
 	if (row) {
 		const parsed = AiPlatformConfigSchema.safeParse(row.settings ?? {});
 		if (parsed.success) value = { ...parsed.data, updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null };
-		else console.error("[ai-config] ai_platform_config row is invalid; serving empty config:", parsed.error.issues[0]?.message);
+		else throw new Error(`ai_platform_config row is invalid: ${parsed.error.issues[0]?.message ?? "unknown problem"}`);
 	}
 	cached = { at: Date.now(), value };
 	return value;

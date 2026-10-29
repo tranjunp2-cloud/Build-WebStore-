@@ -74,7 +74,12 @@ async function currentCursor(handle: ReportsDb): Promise<number> {
 	return Number.isFinite(cursor) ? cursor : 0;
 }
 
-async function fetchPage(after: number, requestId: string): Promise<{ events: UsageEvent[]; nextAfter: number }> {
+/**
+ * One page of the ledger. A malformed event (ledger and sync out of step between releases) ends the page there:
+ * the events before it are kept, the cursor stops before it, and `malformed` makes the run fail so it is retried
+ * (and seen) instead of the row being skipped for good.
+ */
+async function fetchPage(after: number, requestId: string): Promise<{ events: UsageEvent[]; nextAfter: number; malformed: string | null }> {
 	const body = await aiPlatformJson<unknown>({
 		method: "GET",
 		path: `/internal/usage-events?after=${after}&limit=${USAGE_PAGE_SIZE}`,
@@ -85,10 +90,13 @@ async function fetchPage(after: number, requestId: string): Promise<{ events: Us
 	const events: UsageEvent[] = [];
 	for (const raw of page.events) {
 		const parsed = UsageEventSchema.safeParse(raw);
-		if (parsed.success) events.push(parsed.data);
-		else console.error("[ai-usage-sync] skipped a malformed usage event", parsed.error.issues[0]?.message);
+		if (!parsed.success) {
+			const at = events.at(-1)?.id ?? after;
+			return { events, nextAfter: at, malformed: `after ledger id ${at}: ${parsed.error.issues[0]?.message ?? "unknown problem"}` };
+		}
+		events.push(parsed.data);
 	}
-	return { events, nextAfter: page.nextAfter };
+	return { events, nextAfter: page.nextAfter, malformed: null };
 }
 
 const COLUMNS = [
@@ -143,6 +151,7 @@ export async function syncUsageEvents(now: () => number = Date.now, options: { f
 			const rows = page.events.map((event) => toLogRow(event, tenantByOrg!, userByPlatformId ?? new Map()));
 			result.inserted += await insertRows(handle, rows);
 		}
+		if (page.malformed) throw new Error(`malformed usage event ${page.malformed}`);
 		// the cursor only moves forward; a page that did not advance it is the end
 		const next = Math.max(page.nextAfter, ...page.events.map((event) => event.id));
 		const advanced = next > after;

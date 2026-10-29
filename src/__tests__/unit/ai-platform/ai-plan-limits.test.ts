@@ -134,13 +134,13 @@ describe('lim claim', () => {
 })
 
 describe('seed and field options', () => {
-    it('TC-AIU-PLAN-007 seeds 7 plans × 2 features, insert-only, with the agreed values', () => {
+    it('TC-AIU-PLAN-007 seeds 7 plans × 2 features, insert-only, UNLIMITED while usage is collected', () => {
         const seed = MIGRATIONS.find((m) => m.name === 'f-subscription-plan-features-ai-limits-seed')
         expect(seed).toBeDefined()
         const sql = seed!.sql
-        for (const [plan, [budget, pictures]] of Object.entries(EXPECTED)) {
-            expect(sql).toMatch(new RegExp(`\\('${plan}','ai_budget_usd_daily','${budget.toFixed(2)}'\\)`))
-            expect(sql).toContain(`('${plan}','ai_pictures_daily','${pictures}')`)
+        for (const plan of Object.keys(EXPECTED)) {
+            expect(sql).toContain(`('${plan}','ai_budget_usd_daily','UNLIMITED')`)
+            expect(sql).toContain(`('${plan}','ai_pictures_daily','UNLIMITED')`)
         }
         expect((sql.match(/^\s+\('/gm) ?? []).length).toBe(14)
         // insert-only on both table shapes (db-setup's plan_id + UNIQUE one, Payload's enum one): NOT EXISTS guard, no plan_id

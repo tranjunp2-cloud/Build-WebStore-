@@ -5352,6 +5352,8 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   },
   // ── AI limits per plan (read by lib/ai-platform/plan-limits → `lim` claim in the ai-platform context token) ──
   // Insert-only: a row an admin already edited in Payload is never overwritten. "0" = AI off for that plan.
+  // Seeded UNLIMITED: shops use AI freely while real usage is collected in ai-usage-logs; per-plan numbers are set
+  // later in Payload (the platform-wide AI_DAILY_BUDGET_USD guard on ai-platform still applies).
   // Works on both table shapes: the one created above (plan_id + varchar plan_code + UNIQUE) and the one Payload
   // created (no plan_id, enum plan_code, no unique index) — one literal INSERT per row (a literal coerces to the enum),
   // guarded by NOT EXISTS instead of ON CONFLICT.
@@ -5362,20 +5364,20 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
       DECLARE r record;
       BEGIN
         FOR r IN SELECT * FROM (VALUES
-          ('FREEMIUM','ai_budget_usd_daily','0.05'),
-          ('FREEMIUM','ai_pictures_daily','1'),
-          ('STARTER_TM_USER','ai_budget_usd_daily','0.15'),
-          ('STARTER_TM_USER','ai_pictures_daily','3'),
-          ('STARTER_NON_TM_USER','ai_budget_usd_daily','0.15'),
-          ('STARTER_NON_TM_USER','ai_pictures_daily','3'),
-          ('STANDARD_TM_USER','ai_budget_usd_daily','0.40'),
-          ('STANDARD_TM_USER','ai_pictures_daily','8'),
-          ('STANDARD_NON_TM_USER','ai_budget_usd_daily','0.40'),
-          ('STANDARD_NON_TM_USER','ai_pictures_daily','8'),
-          ('PROFESSIONAL_TM_USER','ai_budget_usd_daily','0.90'),
-          ('PROFESSIONAL_TM_USER','ai_pictures_daily','20'),
-          ('PROFESSIONAL_NON_TM_USER','ai_budget_usd_daily','0.90'),
-          ('PROFESSIONAL_NON_TM_USER','ai_pictures_daily','20')
+          ('FREEMIUM','ai_budget_usd_daily','UNLIMITED'),
+          ('FREEMIUM','ai_pictures_daily','UNLIMITED'),
+          ('STARTER_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('STARTER_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('STARTER_NON_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('STARTER_NON_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('STANDARD_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('STANDARD_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('STANDARD_NON_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('STANDARD_NON_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('PROFESSIONAL_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('PROFESSIONAL_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('PROFESSIONAL_NON_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('PROFESSIONAL_NON_TM_USER','ai_pictures_daily','UNLIMITED')
         ) AS v(plan_code, feature_code, value) LOOP
           IF NOT EXISTS (SELECT 1 FROM plan_features WHERE plan_code::text = r.plan_code AND feature_code = r.feature_code) THEN
             EXECUTE format('INSERT INTO plan_features (plan_code, feature_code, value, created_at, updated_at) VALUES (%L, %L, %L, now(), now())',

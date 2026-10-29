@@ -50,11 +50,12 @@ export function aiConfigProblem(settings: unknown): string | null {
 	return `AI platform config is invalid at "${where}": ${issue?.message ?? "unknown problem"}`;
 }
 
-/** A plan limit value: UNLIMITED or a non-negative number (integer for pictures); "0" turns the feature off. */
+/** A plan limit value: UNLIMITED (or YES, as parseLimit reads it) or a non-negative number (integer for pictures); "0" turns the feature off. */
 export function aiLimitProblem(featureCode: string, value: unknown): string | null {
 	const integer = featureCode === AI_PICTURES_FEATURE;
 	const text = typeof value === "string" ? value.trim() : "";
-	if (text.toUpperCase() === "UNLIMITED") return null;
+	const upper = text.toUpperCase();
+	if (upper === "UNLIMITED" || upper === "YES") return null;
 	const number = Number(text);
 	if (text && Number.isFinite(number) && number >= 0 && (!integer || Number.isInteger(number))) return null;
 	return `${featureCode} must be ${integer ? "a whole number" : "a number"} of 0 or more, or UNLIMITED (got "${text}").`;
