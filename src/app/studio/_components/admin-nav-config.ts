@@ -42,7 +42,7 @@ export const NAV_SECTIONS: NavSection[] = [
         items: [
             { href: '/studio/blocks', label: 'Block usage', phase: 4 },
             { href: '/studio/packs', label: 'Content packs', phase: 8 },
-            { href: '/studio/performance', label: 'AI quality', phase: 7 },
+            { href: '/studio/performance', label: 'AI usage', phase: 7 },
         ],
     },
     {
@@ -65,7 +65,7 @@ export const NAV_SECTIONS: NavSection[] = [
     {
         title: 'Admin',
         items: [
-            { href: '/studio/settings', label: 'Settings', phase: null },
+            { href: '/studio/settings/ai', label: 'Settings', phase: null },
         ],
     },
 ]

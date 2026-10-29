@@ -45,6 +45,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
     '/studio/categories': FolderOpen,
     '/studio/tags': Tag,
     '/studio/settings': Settings,
+    '/studio/settings/ai': Settings,
 }
 
 // ── Nav structure — mirrors shell.jsx nav array exactly ───────────────────────
@@ -92,7 +93,7 @@ const NAV: NavSection[] = [
         items: [
             { href: '/studio/blocks', label: 'Block usage' },
             { href: '/studio/packs', label: 'Content packs' },
-            { href: '/studio/performance', label: 'AI quality' },
+            { href: '/studio/performance', label: 'AI usage' },
         ],
     },
     {
@@ -113,7 +114,7 @@ const NAV: NavSection[] = [
     {
         section: 'Admin',
         items: [
-            { href: '/studio/settings', label: 'Settings', soon: true },
+            { href: '/studio/settings/ai', label: 'Settings' },
         ],
     },
 ]

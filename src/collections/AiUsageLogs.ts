@@ -35,6 +35,12 @@ const overview: Field[] = [
         ],
     },
     {
+        name: 'plan',
+        type: 'text',
+        index: true,
+        admin: { readOnly: true, description: 'Plan code the shop was on when the call was copied (empty on rows copied before plans were recorded)' },
+    },
+    {
         type: 'row',
         fields: [
             {

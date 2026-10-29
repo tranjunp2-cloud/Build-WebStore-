@@ -9,6 +9,7 @@
  * - 012 collection fields + migrations (nullable endpoint/cost, unique event id, tenant index) + vercel cron; nothing dropped
  * - 013 readable detail: summary, task label, area (run page, else task family), page/thread, totals, cache %, battery cost
  * - 014 backfill: `from` starts at the given id (route ?from=0) and refreshes rows already copied
+ * - 015 plan: the tenant's active main plan (else FREEMIUM) stamped once; a re-copy never overwrites it
  * Real: mapping, sync loop, route, collection, MIGRATIONS, vercel.json. Faked: Payload's drizzle handle (records the
  * SQL), the upstream HTTP call, the token signer is real (needs a secret).
  */
@@ -27,6 +28,7 @@ vi.mock('@/lib/ai-platform/upstream', () => ({ aiPlatformJson }))
 
 import { GET } from '@/app/api/cron/ai-usage-sync/route'
 import { USAGE_MAX_PAGES, USAGE_PAGE_SIZE, syncUsageEvents } from '@/lib/ai-platform/usage-sync'
+import { currentPlanByTenant } from '@/lib/ai-platform/usage-sync-plan'
 import { areaOf, featureOf, summaryOf, taskLabel, tenantOrgMap, toLogRow, userPlatformMap, type UsageEvent } from '@/lib/ai-platform/usage-sync-map'
 
 const root = path.resolve(__dirname, '../../../..')
@@ -285,5 +287,29 @@ describe('backfill', () => {
         expect(aiPlatformJson.mock.calls[1]![0].path).toContain('after=0&')
         await GET(new Request('http://x/api/cron/ai-usage-sync?from=-5', { headers: { authorization: 'Bearer cron-secret' } }))
         expect(aiPlatformJson.mock.calls[2]![0].path).toContain('after=900&')
+    })
+})
+
+describe('usage plan', () => {
+    it('TC-AIU-SYNC-015 active main plan per tenant, FREEMIUM when expired or absent; kept on re-copy', async () => {
+        // Arrange
+        const future = new Date(Date.now() + 86_400_000).toISOString()
+        const past = new Date(Date.now() - 86_400_000).toISOString()
+        const run = vi.fn(async () => ({ rows: [
+            { tenant_id: 7, plan: 'STARTER_TM_USER', status: 'active', ends_at: future, canceled_at: null, canceled_immediately: null },
+            { tenant_id: '8', plan: 'PROFESSIONAL_NON_TM_USER', status: 'active', ends_at: past, canceled_at: null, canceled_immediately: null },
+        ] }))
+        const handle = { db: { drizzle: { execute: run } } }
+        // Act
+        const plans = await currentPlanByTenant(handle, [7, 8, 9, 7])
+        const none = await currentPlanByTenant(handle, [])
+        // Assert
+        expect(Object.fromEntries(plans)).toEqual({ 7: 'STARTER_TM_USER', 8: 'FREEMIUM', 9: 'FREEMIUM' })
+        expect(none.size).toBe(0)
+        expect(run).toHaveBeenCalledTimes(1)
+        const source = readFileSync(path.join(root, 'src/lib/ai-platform/usage-sync.ts'), 'utf8')
+        expect(source).toContain('plan = COALESCE(ai_usage_logs.plan, EXCLUDED.plan)')
+        const migrations = createRequire(import.meta.url)(path.join(root, 'scripts/db-setup.js')).MIGRATIONS as Array<{ name: string; sql: string }>
+        expect(migrations.find((m) => m.name === 'ai_usage_logs.alter_plan')?.sql).toContain('ADD COLUMN IF NOT EXISTS plan varchar')
     })
 })
