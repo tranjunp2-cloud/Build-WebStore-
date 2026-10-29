@@ -108,7 +108,7 @@
   --editor-border-subtle: rgba(255, 255, 255, 0.04);
   --editor-overlay-bg: rgba(255, 255, 255, 0.04);
   --editor-overlay-hover: rgba(255, 255, 255, 0.06);
-  --editor-slider-track: #0B1120;              /* = editor-bg — darker groove on slate-800 panel */
+  --editor-slider-track: #334155;              /* slate-700 — GH-2107: #0B1120 matched editor bg (invisible) */
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -760,6 +760,55 @@ html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.04\]:hover { background-color
 /* F25 Customers — skeleton bg + subtle row dividers (light mode only) */
 html:not(.dark) .dash-shell .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.06); }
 html:not(.dark) .dash-shell .border-white\/\[0\.04\] { border-color: rgba(0,0,0,0.04); }
+
+/* ── Editor range slider (GH-2107) ────────────────────────────────────────
+   Token-driven track + primary fill. Fill position comes from the inline
+   --fill-ratio (0..1, set per input), inherited by the track pseudo-element.
+   The stop is offset by half the 14px thumb so the fill edge meets the thumb center. */
+.editor-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.editor-range:focus { outline: none; }
+.editor-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  --fill-stop: calc(7px + var(--fill-ratio, 0) * (100% - 14px));
+  background: linear-gradient(to right, hsl(var(--primary)) var(--fill-stop), var(--editor-slider-track) var(--fill-stop));
+}
+.editor-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+}
+.editor-range::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--editor-slider-track);
+}
+.editor-range::-moz-range-progress {
+  height: 6px;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+}
+.editor-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+}
+.editor-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px hsl(var(--ring) / 0.35); }
+.editor-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px hsl(var(--ring) / 0.35); }
 
 /* ── Editor Shell — Legacy Color Overrides ────────────────────────────── */
 /* Remaps hardcoded Tailwind dark utilities to editor-* semantic tokens.

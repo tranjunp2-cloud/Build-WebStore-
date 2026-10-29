@@ -1149,6 +1149,15 @@
         "undoSuccess": "Batch fix undone",
         "errorTimeout": "The AI fix took too long. Please try again.",
         "errorFailed": "Couldn't finish the AI fix. Please try again.",
+        "errorQuota": "The AI usage limit was reached. Please try again later.",
+        "errorUnavailable": "The AI service isn't available right now. Please try again in a moment.",
+        "partialFailed": "{count} items couldn't be generated: {names} ({reason})",
+        "andMore": "+{count} more",
+        "reasonTimeout": "the AI took too long",
+        "reasonQuota": "AI usage limit reached",
+        "reasonUnavailable": "AI unavailable",
+        "reasonFailed": "generation failed",
+        "retryFailed": "Retry failed items",
         "undoPartial": "Some fixes could not be undone. The remaining changes are ready to retry."
       },
       "keywordTracker": {
@@ -4984,6 +4993,9 @@
       "selectBlock": "Select a block first",
       "selectBlockMsg": "Select a block in the preview to edit its settings.",
       "variant": "Variant",
+      "layoutSpacing": "Layout & Spacing",
+      "topSpacing": "Top spacing",
+      "bottomSpacing": "Bottom spacing",
       "logoText": "Logo text",
       "headline": "Headline",
       "subheadline": "Subheadline",
@@ -5027,6 +5039,8 @@
       "visible": "Visible",
       "cartWidget": "Cart widget",
       "whatsappPosition": "Button position",
+      "positionRight": "Right",
+      "positionLeft": "Left",
       "checkoutBehavior": "Checkout behavior",
       "checkoutDesc": "Checkout isn't available in preview, so we'll show a quick message instead. It works normally on your live site.",
       "buttonLabel": "Button label",
@@ -5392,7 +5406,10 @@
       "priceRange": "Price range",
       "applyFilter": "Apply filters",
       "stockLimitMessage": "You've added all available stock ({cartQty}/{inventory}) to your cart",
-      "stockLimitToast": "Your cart has reached the available stock limit"
+      "stockLimitToast": "Your cart has reached the available stock limit",
+      "variantLabel": "Variant",
+      "fromPrice": "From {price}",
+      "stockLeft": "{count} left"
     },
     "blog": {
       "title": "Blog",

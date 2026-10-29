@@ -16,6 +16,8 @@ import { resolveGalleryImages } from '../gallery/resolve-images'
 import { handleCartClick } from '@/lib/storefront/editor-intercept'
 import type { ThemeConfig } from '../types'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
+import { listingPrice } from '@/lib/storefront/variant-price-range'
+import { useI18n } from '@/i18n'
 import { soldOutLabel } from '../shared/sold-out-label'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
@@ -26,6 +28,8 @@ interface FeaturedProduct {
     name: string
     price: string
     priceRaw: number
+    /** variant prices differ: shown as "From <price>" */
+    priceFrom?: boolean
     currency: string
     inventory: number
     compareAtPrice?: number
@@ -65,6 +69,7 @@ function HeroProductView({ product, block, theme, siteBasePath, siteName, site }
     siteName?: string
     site?: unknown
 }) {
+    const { t, ti } = useI18n()
     const isFallback = product.isFallback ?? false
 
     return (
@@ -104,7 +109,7 @@ function HeroProductView({ product, block, theme, siteBasePath, siteName, site }
                     )}
 
                     <RichText text={product.name} as="h2" className="text-5xl lg:text-7xl font-bold font-heading mb-6 leading-tight" />
-                    <RichText text={product.price} as="p" className="text-4xl font-heading mb-6" style={{ color: 'var(--brand-primary)' }} />
+                    <RichText text={product.priceFrom ? ti(t.storefront.products.fromPrice, { price: product.price }) : product.price} as="p" className="text-4xl font-heading mb-6" style={{ color: 'var(--brand-primary)' }} />
 
                     {product.description && (
                         <Body size="lg" className="opacity-70 mb-10 max-w-lg">
@@ -145,6 +150,7 @@ function HeroProductView({ product, block, theme, siteBasePath, siteName, site }
 
 export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<ProductsFeaturedConfig>) {
     const { headline = 'Featured Collection', subheadline, variant = 'hero-product' } = block
+    const { t, ti } = useI18n()
     const category = typeof site?.siteType === 'string' ? site.siteType : 'business'
 
     const [products, setProducts] = useState<FeaturedProduct[]>([])
@@ -169,16 +175,17 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                     const images = doc.images as Array<{ image?: { url?: string }; alt?: string }> | undefined
                     const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
                     const currency = CURRENCY_DISPLAY[currencyCode] ?? currencyCode
-                    const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
+                    const { amount: price, isFrom, compareAtPrice } = listingPrice(doc)
                     return {
                         id: String(doc.id),
                         slug: String(doc.slug || ''),
                         name: String(doc.name || ''),
                         price: `${currency} ${price.toFixed(2)}`,
                         priceRaw: price,
+                        priceFrom: isFrom,
                         currency: currencyCode,
                         inventory: Number(doc.inventory) || 0,
-                        compareAtPrice: typeof doc.compareAtPrice === 'number' ? doc.compareAtPrice : undefined,
+                        compareAtPrice,
                         description: String(doc.shortDescription || ''),
                         image: images?.[0]?.image?.url ?? null,
                         imageAlt: images?.[0]?.alt,
@@ -273,7 +280,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                             {isSoldOut(p) && <SoldOutBadge site={site} className="left-5 top-5" />}
                             <div className="absolute bottom-0 left-0 p-8 z-20 w-full text-white">
                                 <Heading level={3} className="mb-2">{p.name}</Heading>
-                                {p.price && <Body size="lg" className="font-medium" style={{ color: 'var(--brand-primary)' }}>{p.price}</Body>}
+                                {p.price && <Body size="lg" className="font-medium" style={{ color: 'var(--brand-primary)' }}>{p.priceFrom ? ti(t.storefront.products.fromPrice, { price: p.price }) : p.price}</Body>}
                             </div>
                         </div>
                     ))}

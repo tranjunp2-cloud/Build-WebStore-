@@ -76,7 +76,7 @@ const AI_PLATFORM_CONFIG_SEED = {
   prices: {
     'anthropic:claude-haiku-5-5': p(0.1, 0.5, 0.01, 0.125, { longContext: { aboveInputTokens: 100000, input: 0.5, output: 2.5, cachedInput: 0.05, cacheWrite: 0.625 } }),
     'anthropic:claude-haiku-4-5': p(1, 5, 0.1, 1.25),
-    'anthropic:claude-sonnet-5-5': p(2, 10, 0.2, 2.5),
+    'anthropic:claude-sonnet-5-5': p(2, 10, 0.1, 2.5),
     'anthropic:claude-sonnet-5': p(2, 10, 0.2, 2.5),
     'anthropic:claude-sonnet-4-6': p(3, 15, 0.3, 3.75),
     'anthropic:claude-opus-5-5': p(4, 20, 0.2, 5),
@@ -86,6 +86,8 @@ const AI_PLATFORM_CONFIG_SEED = {
     'anthropic:claude-opus-4-6': p(5, 25, 0.5, 6.25),
     'anthropic:claude-fable-5-1': p(10, 50, 0.25, 12.5),
     'anthropic:claude-fable-5': p(10, 50, 1, 12.5),
+    'openai:gpt-5.4-nano': p(0.2, 1.25, 0.02),
+    'openai:gpt-5.4-mini': p(0.75, 4.5, 0.075),
     'openai:gpt-4.1-mini': p(0.4, 1.6, 0.1),
     'openai:gpt-4.1-nano': p(0.1, 0.4, 0.025),
     'openai:gpt-4o-mini': p(0.15, 0.6, 0.075),
@@ -95,12 +97,8 @@ const AI_PLATFORM_CONFIG_SEED = {
     'typesafe:jev-latest': p(0.042, 0, 0.042),
   },
   images: { 'openai:gpt-image-1': 0.042, 'openai:gpt-image-1-mini': 0.011 },
-  models: {
-    fast: 'anthropic:claude-haiku-5-5, openai:gpt-4.1-nano',
-    balanced: 'anthropic:claude-haiku-5-5, openai:gpt-4.1-mini',
-    quality: 'anthropic:claude-sonnet-5-5, openai:gpt-5.4-mini',
-    image: 'openai:gpt-image-1',
-  },
+  // no model chains: the environment's AI_MODEL_* (and AI_EFFORT_*) stay in charge until an admin sets one in Studio
+  models: {},
 }
 
 const MIGRATIONS = [

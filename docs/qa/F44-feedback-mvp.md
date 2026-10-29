@@ -39,7 +39,7 @@ Không dùng bảng Lark Production. Dọn bản ghi có store prefix `e2e-f44-`
 |---|---|---|---|---|
 | TC-F44-01 | [ ] AUTO | API + UI | Critical | **A:** giờ server 30/10/2026 00:00 MYT và 15/11/2026 23:59:59 MYT. **A:** mở CMS, gọi `GET /api/v1/feedback/availability`. **A:** nút hiện ở header mọi trang, `enabled=true`. |
 | TC-F44-02 | [ ] AUTO | API + UI | Critical | **A:** giờ server 29/10/2026 23:59:59 và 16/11/2026 00:00 MYT. **A:** mở CMS, `POST /api/v1/feedback`. **A:** nút ẩn, API trả 403. |
-| TC-F44-03 | [ ] MANUAL | UI | High | **A:** viewport 375px. **A:** mở header, bấm icon. **A:** chỉ icon + tooltip; form full-screen. |
+| TC-F44-03 | [ ] MANUAL | UI | High | **A:** viewport 375px. **A:** mở header, bấm icon. **A:** chỉ icon + tooltip; form là popup căn giữa (lề 16px, tự cuộn, nút Gửi luôn thấy), 3 nhãn loại nằm 1 dòng. |
 | TC-F44-04 | [ ] AUTO | UI | Critical | **A:** store `e2e-f44-migrated`, rồi `e2e-f44-new`. **A:** mở form. **A:** migrated thấy 3 loại; store mới chỉ thấy Report a problem · Suggestion. Không có trường "Mã tham chiếu". |
 | TC-F44-05 | [ ] AUTO | UI | Critical | **A:** form mở (EN và BM). **A:** chọn loại, tick 3 tính năng, nhập mô tả 20 ký tự, gửi. **A:** màn thành công "Feedback sent" / "Maklum balas dihantar", **không** có mã phản hồi, không có thời hạn xử lý. |
 | TC-F44-06 | [ ] AUTO | UI | High | **A:** dropdown Tính năng. **A:** mở, tick/bỏ tick, bấm ✕ trên tag. **A:** đúng 10 mục theo thứ tự PRD; chọn nhiều được; tag rút gọn "+N"; gửi khi chưa chọn → lỗi "Please choose at least one feature." |

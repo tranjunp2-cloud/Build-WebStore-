@@ -17,7 +17,7 @@ export function FeedbackSuccessView({ onClose }: Props) {
             </Alert>
             <p className="text-[13px] leading-5 text-[var(--dash-text-muted)]">{f.success.notifyNote}</p>
             <div className="flex justify-end">
-                <Button type="button" variant="dashPrimary" className="px-4" onClick={onClose}>{f.actions.close}</Button>
+                <Button type="button" variant="dashPrimary" size="dash" onClick={onClose}>{f.actions.close}</Button>
             </div>
         </>
     )

@@ -83,7 +83,7 @@ export function ScreenshotField({ items, onAdd, onRemove, overflow, disabled }: 
                 </p>
             )}
             {overflow && <p role="alert" className="text-xs leading-4 text-[hsl(var(--destructive))]">{f.screenshotTooMany}</p>}
-            <p className="text-[11px] leading-4 text-[var(--dash-text-muted)]">{f.screenshotHelper}</p>
+            <p className="text-xs leading-4 text-[var(--dash-text-muted)]">{f.screenshotHelper}</p>
         </div>
     )
 }

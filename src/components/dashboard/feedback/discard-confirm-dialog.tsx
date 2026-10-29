@@ -22,7 +22,7 @@ export function DiscardConfirmDialog({ open, onKeepEditing, onDiscard }: Props) 
                 <DialogTitle className="text-base font-semibold leading-6 text-[var(--dash-text)]">{d.title}</DialogTitle>
                 <DialogDescription className="text-[13px] leading-5 text-[var(--dash-text-muted)]">{d.description}</DialogDescription>
                 <div className="flex justify-end gap-3 pt-2">
-                    <Button type="button" variant="dashSecondary" className="px-4" onClick={onKeepEditing}>{d.keep}</Button>
+                    <Button type="button" variant="dashSecondary" size="dash" onClick={onKeepEditing}>{d.keep}</Button>
                     <Button
                         type="button"
                         variant="destructive"

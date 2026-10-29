@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { EMPTY_FILTER_BOUNDS, getActiveProductFilters, normalizeSidebarCategory } from './filter-utils'
 import type { ActiveProductFilters, ProductFilterBounds, ProductItem, SidebarCategory } from './filter-types'
+import { listingPrice } from '@/lib/storefront/variant-price-range'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 
@@ -131,7 +132,7 @@ export function useProductsGridData({ filtersEnabled, limit, siteId, localFilter
                     const category = doc.category as { id?: string | number; name?: string; slug?: string } | null | undefined
                     const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
                     const currency = CURRENCY_DISPLAY[currencyCode] ?? currencyCode
-                    const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
+                    const { amount: price, isFrom, compareAtPrice } = listingPrice(doc)
 
                     return {
                         id: String(doc.id),
@@ -139,9 +140,10 @@ export function useProductsGridData({ filtersEnabled, limit, siteId, localFilter
                         name: String(doc.name || ''),
                         price: `${currency} ${price.toFixed(2)}`,
                         priceRaw: price,
+                        priceFrom: isFrom,
                         currency: currencyCode,
                         inventory: Number(doc.inventory) || 0,
-                        compareAtPrice: typeof doc.compareAtPrice === 'number' ? doc.compareAtPrice : undefined,
+                        compareAtPrice,
                         image: images?.[0]?.image?.url ?? null,
                         imageAlt: images?.[0]?.alt,
                         shortDescription: typeof doc.shortDescription === 'string' ? doc.shortDescription : undefined,

@@ -17,6 +17,7 @@ import type { NavPage, SiteRendererProps } from '@/components/site-renderer/Site
 import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 import { hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
+import { buildProductOffers } from '@/lib/storefront/variant-price-range'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -195,12 +196,8 @@ export default async function ProductDetailPage({ params }: Props) {
         description: p.shortDescription || '',
         image: images[0]?.image?.url,
         sku: p.sku || undefined,
-        offers: {
-            '@type': 'Offer',
-            price: p.price,
-            priceCurrency: p.currency || 'MYR',
-            availability: p.inventory > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-        },
+        // Variant products: Google reads the variant prices (AggregateOffer), never the base price, which may be 0
+        offers: buildProductOffers(p),
         ...(additionalProperty.length > 0 && { additionalProperty }),
     }
 

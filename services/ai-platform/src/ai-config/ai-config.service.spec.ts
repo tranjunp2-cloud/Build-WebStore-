@@ -135,7 +135,7 @@ describe("model chains per call [TC-AICFG-05]", () => {
 		expect(registry.resolveChain("fast").map((m) => m.modelId)).toEqual(["gpt-4.1-nano"]);
 		models = { fast: "openai:gpt-4.1-mini" };
 		expect(registry.resolveChain("fast").map((m) => m.modelId)).toEqual(["gpt-4.1-mini"]);
-		expect(registry.resolveChain("balanced").map((m) => m.modelId)).toEqual(["gpt-4.1-mini"]); // env default after anthropic is skipped
+		expect(registry.resolveChain("balanced").map((m) => m.modelId)).toEqual(["gpt-5.4-mini"]); // env default after anthropic is skipped
 	});
 
 	it("skips a Payload provider with no key, and falls back to the env chain when none is usable", () => {

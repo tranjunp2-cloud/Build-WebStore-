@@ -67,7 +67,7 @@ export const BUILTIN_PRICES: Record<string, Price> = {
 	// BUILTIN_* is the fallback and the seed prime-web copies into Payload (ai-pricing); Payload overrides it at runtime.
 	"anthropic:claude-haiku-5-5": claude(0.1, 0.5, 0.01, { longContext: { aboveInputTokens: 100_000, input: 0.5, output: 2.5, cachedInput: 0.05, cacheWrite: 0.625 } }),
 	"anthropic:claude-haiku-4-5": claude(1, 5, 0.1),
-	"anthropic:claude-sonnet-5-5": claude(2, 10, 0.2),
+	"anthropic:claude-sonnet-5-5": claude(2, 10, 0.1),
 	"anthropic:claude-sonnet-5": claude(2, 10, 0.2),
 	"anthropic:claude-sonnet-4-6": claude(3, 15, 0.3),
 	"anthropic:claude-opus-5-5": claude(4, 20, 0.2),
@@ -77,7 +77,8 @@ export const BUILTIN_PRICES: Record<string, Price> = {
 	"anthropic:claude-opus-4-6": claude(5, 25, 0.5),
 	"anthropic:claude-fable-5-1": claude(10, 50, 0.25),
 	"anthropic:claude-fable-5": claude(10, 50, 1),
-	// https://developers.openai.com/api/docs/pricing, standard tier (read 2026-10-26)
+	// https://developers.openai.com/api/docs/pricing, standard tier (read 2026-10-29)
+	"openai:gpt-5.4-nano": { input: 0.2, cachedInput: 0.02, output: 1.25 },
 	"openai:gpt-5.4-mini": { input: 0.75, cachedInput: 0.075, output: 4.5 },
 	// https://ai.google.dev/gemini-api/docs/pricing, standard paid tier, text input (read 2026-10-26)
 	"google:gemini-2.5-flash": { input: 0.3, cachedInput: 0.03, output: 2.5 },

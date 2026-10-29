@@ -90,10 +90,11 @@ describe('seed', () => {
         expect(config.prices['anthropic:claude-opus-4-6']).toMatchObject({ input: 5, output: 25, cachedInput: 0.5, cacheWrite: 6.25 })
         expect(config.prices['deepseek:deepseek-v4-pro']).toMatchObject({ input: 1.32, output: 3.96, cachedInput: 0.044, offPeakFactor: 0.5 })
         expect(config.prices['typesafe:jev-latest']).toMatchObject({ input: 0.042, output: 0, cachedInput: 0.042 })
-        expect(Object.keys(config.prices)).toHaveLength(19)
+        expect(Object.keys(config.prices)).toHaveLength(21)
+        expect(config.prices['openai:gpt-5.4-nano']).toMatchObject({ input: 0.2, output: 1.25, cachedInput: 0.02 })
         expect(config.images).toEqual({ 'openai:gpt-image-1': 0.042, 'openai:gpt-image-1-mini': 0.011 })
-        expect(config.models.image).toBe('openai:gpt-image-1')
-        expect(config.models.quality).toBe('anthropic:claude-sonnet-5-5, openai:gpt-5.4-mini')
+        // no chains seeded: the environment's AI_MODEL_* / AI_EFFORT_* decide until an admin sets one
+        expect(config.models).toEqual({})
     })
 
     it('TC-AIU-PLAN-014 no cache-write column on ai_usage_logs', () => {

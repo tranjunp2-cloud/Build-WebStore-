@@ -1149,6 +1149,15 @@
         "undoSuccess": "Pembetulan kelompok dibatalkan",
         "errorTimeout": "Pembetulan AI mengambil masa terlalu lama. Sila cuba lagi.",
         "errorFailed": "Tidak dapat menyelesaikan pembetulan AI. Sila cuba lagi.",
+        "errorQuota": "Had penggunaan AI telah dicapai. Sila cuba lagi nanti.",
+        "errorUnavailable": "Perkhidmatan AI tidak tersedia buat masa ini. Sila cuba lagi sebentar nanti.",
+        "partialFailed": "{count} item tidak dapat dijana: {names} ({reason})",
+        "andMore": "+{count} lagi",
+        "reasonTimeout": "AI mengambil masa terlalu lama",
+        "reasonQuota": "had penggunaan AI dicapai",
+        "reasonUnavailable": "AI tidak tersedia",
+        "reasonFailed": "penjanaan gagal",
+        "retryFailed": "Cuba semula item yang gagal",
         "undoPartial": "Sesetengah pembaikan tidak dapat dibatalkan. Perubahan yang selebihnya sedia untuk dicuba semula."
       },
       "keywordTracker": {
@@ -4984,6 +4993,9 @@
       "selectBlock": "Pilih blok dahulu",
       "selectBlockMsg": "Pilih blok dalam pratonton untuk mengubah tetapannya",
       "variant": "Variasi",
+      "layoutSpacing": "Susun atur & jarak",
+      "topSpacing": "Jarak atas",
+      "bottomSpacing": "Jarak bawah",
       "logoText": "Logo teks",
       "headline": "Tajuk utama",
       "subheadline": "Sub-tajuk",
@@ -5027,6 +5039,8 @@
       "visible": "Boleh dilihat",
       "cartWidget": "Widget troli",
       "whatsappPosition": "Posisi butang",
+      "positionRight": "Kanan",
+      "positionLeft": "Kiri",
       "checkoutBehavior": "Tingkah laku daftar keluar",
       "checkoutDesc": "Daftar keluar tidak tersedia dalam pratonton, jadi kami akan memaparkan mesej ringkas. Ia berfungsi seperti biasa di laman web sebenar anda.",
       "buttonLabel": "Label butang",
@@ -5392,7 +5406,10 @@
       "priceRange": "Julat harga",
       "applyFilter": "Gunakan penapis",
       "stockLimitMessage": "Anda telah menambah semua stok yang tersedia ({cartQty}/{inventory}) ke dalam troli",
-      "stockLimitToast": "Troli anda telah mencapai had stok yang dibernarkan"
+      "stockLimitToast": "Troli anda telah mencapai had stok yang dibernarkan",
+      "variantLabel": "Varian",
+      "fromPrice": "Dari {price}",
+      "stockLeft": "Tinggal {count}"
     },
     "blog": {
       "title": "Blog",
