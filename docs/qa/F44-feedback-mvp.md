@@ -32,6 +32,7 @@ Không dùng bảng Lark Production. Dọn bản ghi có store prefix `e2e-f44-`
 | US-F44-01 Gửi phản hồi | 01–14 |
 | US-F44-02 Thông báo in-app | 15–18 |
 | US-F44-03 Đồng bộ Lark Base | 19–24 |
+| US-F44-04 Thẻ nhóm Lark + nút xử lý + nhắc trễ | 25–34 |
 
 ## 4. Test cases
 
@@ -61,8 +62,20 @@ Không dùng bảng Lark Production. Dọn bản ghi có store prefix `e2e-f44-`
 | TC-F44-22 | [ ] AUTO | API | Critical | **A:** payload webhook sai chữ ký / sai token. **A:** gọi `/api/v1/integrations/lark/feedback-webhook`. **A:** bị từ chối, không đổi DB, không tạo thông báo. |
 | TC-F44-23 | [ ] AUTO | API | Critical | **A:** cùng `lark_event_id`. **A:** gửi webhook 2 lần. **A:** chỉ 1 lần cập nhật, 1 thông báo. |
 | TC-F44-24 | [ ] MANUAL | Integration | High | **A:** staging hoàn chỉnh. **A:** chạy 6 bước kiểm thử chấp nhận PRD §13.5. **A:** cả 6 pass. |
+| TC-F44-25 | [x] AUTO | Unit | High | **A:** hàng Base ở bảng Staging / Production / bảng lạ. **A:** vẽ thẻ nhóm. **A:** header ghi [Staging] / [Production]; bảng lạ bị từ chối; nút theo trạng thái (New: Take it · Mark replied · Won't fix; đã đóng: Reopen) + Open in Base; màu header theo Priority/kết quả; tên người gửi không @all được nhóm. |
+| TC-F44-26 | [x] AUTO | Unit | Critical | **A:** hàng ở từng trạng thái. **A:** bấm Take it / Mark replied / Resolve / Won't fix / Reopen. **A:** patch đúng bảng nút (spec phase-02); First Response At chỉ ghi lần đầu; thẻ cũ (đã đóng) → không đổi gì. |
+| TC-F44-27 | [x] AUTO | API | Critical | **A:** callback thiếu/sai token, app lạ, JSON hỏng, có Encrypt Key mà chữ ký sai hoặc payload không mã hoá. **A:** gọi `POST /api/v1/feedback/lark-card-action`. **A:** 401, không đọc/ghi Base; url_verification đúng token trả challenge; chưa cấu hình token → từ chối hết. |
+| TC-F44-28 | [x] AUTO | API | Critical | **A:** bấm nút trên thẻ. **A:** callback hợp lệ / thẻ cũ / bảng lạ / record_id giả / nhóm khác / ghi Base lỗi. **A:** trả thẻ mới ngay rồi mới ghi; thẻ cũ → cảnh báo + vẽ lại, không ghi; đầu vào xấu → toast lỗi, không gọi Base; ghi lỗi → thẻ về trạng thái thật qua delayed update. |
+| TC-F44-29 | [x] AUTO | Service | Critical | **A:** gửi feedback mới. **A:** có / không `LARK_NOTIFY_CHAT_ID`, Lark lỗi. **A:** thẻ có nút vào nhóm, header đúng môi trường; không có chat id → không gửi; Lark lỗi → chỉ log, user vẫn thấy thành công. |
+| TC-F44-30 | [x] AUTO | Unit | High | **A:** các hàng mở với tuổi / First Response At / trạng thái khác nhau. **A:** chọn danh sách nhắc trễ. **A:** chỉ hàng mở, chưa trả lời, ≥ 24h (cũ nhất trước); mục ">7 ngày" chỉ In Progress / Waiting on Reporter; thứ Hai tính theo giờ MY; thẻ 1 tin có link từng record. |
+| TC-F44-31 | [x] AUTO | API | Critical | **A:** gọi `GET /api/cron/feedback-overdue-digest`. **A:** thiếu/sai CRON_SECRET; không có hàng trễ; env trỏ bảng Staging; thứ Hai/thứ Ba; Lark lỗi. **A:** 401 không đọc Base; im lặng khi trống; Staging → bỏ qua; mục stale chỉ thứ Hai; Lark lỗi → 502. |
+| TC-F44-32 | [ ] MANUAL | Integration | High | **A:** staging + app Lark đã cấu hình callback (`card.action.trigger`) và bot trong nhóm. **A:** gửi feedback, bấm Take it → Mark replied → Resolve → Reopen trên thẻ. **A:** thẻ vẽ lại cho cả nhóm sau mỗi lần bấm, hàng Base đổi đúng (Owner, Status, First Response At, Resolved At); cron prod 09:00 MY gửi thẻ nhắc khi có feedback chưa trả lời > 24h. |
+| TC-F44-33 | [x] AUTO | Unit | Critical | **A:** tên người gửi / tên store / mô tả chứa `<at id=all></at>`. **A:** vẽ thẻ nhóm và thẻ nhắc. **A:** chữ người dùng nằm trong phần tử plain_text (hoặc entity-escape, không còn `<`); thẻ chỉ có @ của Owner thật. |
+| TC-F44-34 | [x] AUTO | Unit | High | **A:** Base có > 200 hàng mở. **A:** đọc danh sách cho thẻ nhắc. **A:** đi theo page_token tới hết; dừng ở trần 1.000 hàng và log cảnh báo. |
 
 ## 5. Còn mở
+
+- Thẻ nhóm Lark: xem mục "Giới hạn đã biết" trong `plans/261029-2236-shared-lark-feedback-base/phase-02-feedback-lark-card-actions.md` (bấm đồng thời: lần ghi sau thắng; không chống phát lại; stale tính từ Submitted At).
 
 - GAP-D12 / D14: chưa có bảng Lark + app Staging → TC-19 → 24 chưa chạy được.
 - GAP-D13: nơi lưu ảnh chưa chốt → TC-09 (ảnh không public) phụ thuộc quyết định này.

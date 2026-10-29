@@ -41,7 +41,7 @@ async function larkFetch(url: string, init: RequestInit, timeoutMs = REQUEST_TIM
     return { status: res.status, body }
 }
 
-async function getTenantAccessToken(): Promise<string> {
+async function getTenantAccessToken(timeoutMs = REQUEST_TIMEOUT_MS): Promise<string> {
     if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value
 
     const appId = process.env.LARK_APP_ID
@@ -52,7 +52,7 @@ async function getTenantAccessToken(): Promise<string> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
-    })
+    }, timeoutMs)
     if (status !== 200 || body?.code !== 0 || typeof body?.tenant_access_token !== 'string') {
         throw new LarkApiError('Lark tenant_access_token request rejected', body?.code ?? null, status)
     }
@@ -86,6 +86,89 @@ export async function createBaseRecord(input: CreateBaseRecordInput): Promise<{ 
         throw new LarkApiError('Lark create record rejected', body?.code ?? null, status)
     }
     return { recordId: String(body?.data?.record?.record_id ?? '') }
+}
+
+type RecordsRef = { appToken: string; tableId: string }
+
+const recordsUrl = (ref: RecordsRef, suffix = ''): string =>
+    `${apiBase()}/bitable/v1/apps/${encodeURIComponent(ref.appToken)}/tables/${encodeURIComponent(ref.tableId)}/records${suffix}`
+
+/** Shape of the Lark `data` object for the record endpoints used here. */
+type LarkData = {
+    record?: { fields?: Record<string, unknown> }
+    items?: Array<{ record_id?: string; fields?: Record<string, unknown> }>
+    has_more?: boolean
+    page_token?: string
+}
+
+/**
+ * Authenticated JSON call; returns Lark `data`. Throws LarkApiError unless HTTP 200 + code 0.
+ * `budgetMs` caps token fetch + request together (default: the usual 10 s per request).
+ */
+async function larkJson(method: string, url: string, payload: unknown, what: string, budgetMs?: number): Promise<LarkData> {
+    const started = Date.now()
+    const token = await getTenantAccessToken(budgetMs ?? REQUEST_TIMEOUT_MS)
+    const remaining = budgetMs === undefined ? REQUEST_TIMEOUT_MS : Math.max(300, budgetMs - (Date.now() - started))
+    const { status, body } = await larkFetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+        ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+    }, remaining)
+    if (status !== 200 || body?.code !== 0) {
+        if (status === 401 || status === 403) cachedToken = null
+        throw new LarkApiError(`Lark ${what} rejected`, body?.code ?? null, status)
+    }
+    return (body?.data ?? {}) as LarkData
+}
+
+/** Reads one record. Person columns come back as `[{ id: open_id, name }]`. `timeoutMs` bounds token + read. */
+export async function getBaseRecord(ref: RecordsRef & { recordId: string; timeoutMs?: number }): Promise<Record<string, unknown>> {
+    const data = await larkJson('GET', recordsUrl(ref, `/${encodeURIComponent(ref.recordId)}?user_id_type=open_id`), undefined, 'get record', ref.timeoutMs)
+    return data.record?.fields ?? {}
+}
+
+/** Changes some columns of one record; columns not named stay as they are. */
+export async function updateBaseRecord(ref: RecordsRef & { recordId: string; fields: Record<string, unknown> }): Promise<void> {
+    await larkJson('PUT', recordsUrl(ref, `/${encodeURIComponent(ref.recordId)}?user_id_type=open_id`), { fields: ref.fields }, 'update record')
+}
+
+export type BaseSearchResult = { recordId: string; fields: Record<string, unknown> }
+const SEARCH_PAGE_SIZE = 200
+const SEARCH_MAX_ROWS = 1000
+
+/** Records matching a Lark filter, following page_token up to `maxRows` (logs when capped). Person columns keyed by open_id. */
+export async function searchBaseRecords(
+    ref: RecordsRef & { filter: Record<string, unknown>; fieldNames: string[]; maxRows?: number },
+): Promise<BaseSearchResult[]> {
+    const maxRows = ref.maxRows ?? SEARCH_MAX_ROWS
+    const rows: BaseSearchResult[] = []
+    let pageToken: string | undefined
+    for (;;) {
+        const query = `/search?page_size=${SEARCH_PAGE_SIZE}&user_id_type=open_id${pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : ''}`
+        const data = await larkJson('POST', recordsUrl(ref, query), { filter: ref.filter, field_names: ref.fieldNames }, 'search records')
+        for (const item of data.items ?? []) rows.push({ recordId: String(item.record_id ?? ''), fields: item.fields ?? {} })
+        if (!data.has_more || !data.page_token) return rows
+        if (rows.length >= maxRows) {
+            console.warn('[lark] search capped', { maxRows })
+            return rows.slice(0, maxRows)
+        }
+        pageToken = data.page_token
+    }
+}
+
+/** Sends an interactive card to a chat as the app bot. `card` is the card JSON body. */
+export async function sendChatCard(chatId: string, card: unknown): Promise<void> {
+    await larkJson(
+        'POST',
+        `${apiBase()}/im/v1/messages?receive_id_type=chat_id`,
+        { receive_id: chatId, msg_type: 'interactive', content: JSON.stringify(card) },
+        'send card',
+    )
+}
+
+/** Delayed card update: the callback token (valid ~30 min) replaces the card the user pressed. */
+export async function updateCardAfterCallback(callbackToken: string, card: unknown): Promise<void> {
+    await larkJson('POST', `${apiBase()}/interactive/v1/card/update`, { token: callbackToken, card }, 'card update')
 }
 
 export type UploadBaseImageInput = {
