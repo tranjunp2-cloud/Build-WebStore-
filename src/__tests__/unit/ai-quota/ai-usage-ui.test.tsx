@@ -1,5 +1,5 @@
 /**
- * TC-AIU-UI-001..007 — shop-facing AI allowance (option A): header chip + popover, chat notice / lock.
+ * TC-AIU-UI-001..008 — shop-facing AI allowance (option A): header chip + popover, chat notice / lock.
  * Real: quota-format, use-ai-usage, ai-usage-text, AiUsageChip, useAiChatQuota, I18nProvider (en).
  * Faked: fetch of GET /api/agent/usage (the platform), the clock for "back at".
  */
@@ -8,7 +8,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { I18nProvider } from '@/i18n'
-import { aiTone, backAt, batteryIcon, parseAiUsage, picturesLeft, planName, type AiUsage } from '@/components/ai-quota/quota-format'
+import { aiTone, backAt, batteryIcon, parseAiUsage, picturesLeft, planName, SHOW_AI_LEVEL, type AiUsage } from '@/components/ai-quota/quota-format'
 import { AiUsageChip } from '@/components/ai-quota/AiUsageChip'
 import { useAiChatQuota } from '@/components/ai-quota/ai-chat-quota'
 
@@ -98,8 +98,8 @@ describe('AiUsageChip', () => {
     })
 })
 
-function ChatProbe({ busy = false, editor = false }: { busy?: boolean; editor?: boolean }) {
-    const quota = useAiChatQuota({ busy, editor })
+function ChatProbe({ busy = false, editor = false, showLevel }: { busy?: boolean; editor?: boolean; showLevel?: boolean }) {
+    const quota = useAiChatQuota({ busy, editor, showLevel })
     return (
         <div>
             <div data-testid="notice">{quota.notice}</div>
@@ -123,7 +123,7 @@ describe('useAiChatQuota', () => {
         plenty.unmount()
         vi.restoreAllMocks()
         serve(usage(12))
-        const low = withApp(<ChatProbe />)
+        const low = withApp(<ChatProbe showLevel />)
         expect(await low.findByText('AI is almost out for today (12%)')).toBeInTheDocument()
         expect(low.getByTestId('locked')).toHaveTextContent('open')
     })
@@ -139,5 +139,24 @@ describe('useAiChatQuota', () => {
         expect(view.getByRole('link', { name: 'Upgrade plan' })).toBeInTheDocument()
         expect(view.getByTestId('locked').textContent).toMatch(/^Available again at /)
         expect(view.getByTestId('out')).toHaveTextContent('true')
+    })
+
+    it('TC-AIU-UI-008 level hidden (default while SHOW_AI_LEVEL is off): no line at ≤20 %, used-up still locks', async () => {
+        // Arrange
+        expect(SHOW_AI_LEVEL).toBe(false)
+        const fetchSpy = serve(usage(12))
+        // Act
+        const low = withApp(<ChatProbe />)
+        // Assert
+        await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+        await waitFor(() => expect(low.getByTestId('notice')).toBeEmptyDOMElement())
+        expect(low.queryByText('AI is almost out for today (12%)')).not.toBeInTheDocument()
+        expect(low.getByTestId('locked')).toHaveTextContent('open')
+        low.unmount()
+        vi.restoreAllMocks()
+        serve(usage(0))
+        const out = withApp(<ChatProbe />)
+        expect(await out.findByText('AI is out for today')).toBeInTheDocument()
+        expect(out.getByTestId('out')).toHaveTextContent('true')
     })
 })

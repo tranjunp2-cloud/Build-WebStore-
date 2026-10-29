@@ -12,6 +12,12 @@ export interface AiUsage {
 
 export type AiTone = 'ok' | 'low' | 'out'
 
+/**
+ * Whether shops see how much AI they have left (header chip, "almost out" chat line). Off for now: limits are set
+ * quietly on the server (Payload plan-features) while real usage is collected; the used-up lock still shows.
+ */
+export const SHOW_AI_LEVEL = false
+
 /** At or below this the chip turns amber and the chat shows the "almost out" line. */
 export const LOW_PERCENT = 20
 

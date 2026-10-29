@@ -5,13 +5,15 @@ import type { ReactNode } from 'react'
 import { SSO_PORTAL_URL } from '@/config/app-switcher'
 import { useAiUsage, useRefreshAiUsageAfterReply } from './use-ai-usage'
 import { useAiUsageText } from './ai-usage-text'
+import { SHOW_AI_LEVEL } from './quota-format'
 
 /**
  * What an assistant chat shows about the shop's AI allowance: nothing while there is plenty; a slim amber line at
  * ≤ 20 %; when it is used up a box with when it comes back (+ Upgrade plan), the composer closed and the starters
- * gone. `busy` is the chat's reply-in-progress flag: the allowance is re-read when a reply finishes.
+ * gone. `busy` is the chat's reply-in-progress flag: the allowance is re-read when a reply finishes. `showLevel`
+ * off (default while SHOW_AI_LEVEL is off) drops the ≤ 20 % line; the used-up state still shows.
  */
-export function useAiChatQuota({ busy, editor = false }: { busy: boolean; editor?: boolean }): {
+export function useAiChatQuota({ busy, editor = false, showLevel = SHOW_AI_LEVEL }: { busy: boolean; editor?: boolean; showLevel?: boolean }): {
     notice?: ReactNode
     locked?: { placeholder: string }
     out: boolean
@@ -19,7 +21,7 @@ export function useAiChatQuota({ busy, editor = false }: { busy: boolean; editor
     const { usage } = useAiUsage()
     useRefreshAiUsageAfterReply(busy)
     const text = useAiUsageText(usage)
-    if (!text || text.tone === 'ok') return { out: false }
+    if (!text || text.tone === 'ok' || (text.tone === 'low' && !showLevel)) return { out: false }
     const { q, ti, time } = text
 
     if (text.tone === 'low') {
