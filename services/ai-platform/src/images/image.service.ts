@@ -7,6 +7,7 @@ import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { imageOutputFormat } from "../config/limits";
+import { assertAiEnabled, planOf } from "../cost/shop-limits";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { MODEL_REGISTRY } from "../models/models.module";
@@ -78,8 +79,9 @@ export class ImageService {
 		const parsed = ImageRequestSchema.safeParse(request);
 		if (!parsed.success) throw new AgentError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "), 400);
 		const input = parsed.data;
-		// 503 above the daily spend cap: before any picture is reserved or drawn
-		await this.spend?.assertWithinBudget();
+		// 403 when the plan has no AI; 503 above the platform caps: before any picture is reserved or drawn
+		assertAiEnabled(ctx);
+		await this.spend?.assertWithinBudget(planOf(ctx));
 		const chain = this.models.resolveImageChain?.() ?? [];
 		if (chain.length === 0) throw new AgentError("Picture generation is not set up in this environment.", 503);
 

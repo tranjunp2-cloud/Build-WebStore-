@@ -3,6 +3,7 @@ import { SignJWT } from "jose";
 import { z } from "zod";
 import { ENV } from "../config/config.module";
 import { type Env, ModelRefSchema } from "../config/env";
+import { CapsSchema, type PlatformCaps, toPlatformCaps } from "../cost/platform-caps";
 import { isDeepSeekPeak, type Price, setPriceOverrides } from "../ledger/price-book";
 import type { ModelAlias } from "../models/model-registry";
 
@@ -39,6 +40,7 @@ const BodySchema = z.object({
 	prices: z.record(z.string(), z.unknown()).default({}),
 	images: z.record(z.string(), z.unknown()).default({}),
 	models: z.record(z.string(), z.unknown()).default({}),
+	caps: z.unknown().optional(),
 	updatedAt: z.string().nullable().optional(),
 });
 
@@ -46,6 +48,8 @@ export type ModelOverrides = Partial<Record<ModelAlias | "image", string>>;
 
 export interface AiConfig {
 	models: ModelOverrides;
+	/** platform-wide spend caps; undefined = none set in Payload (env defaults apply) */
+	caps?: PlatformCaps;
 	updatedAt: string | null;
 }
 
@@ -89,7 +93,18 @@ export function parseAiConfig(body: unknown, warn: (message: string) => void = (
 		if (ok.success) models[alias] = ok.data.trim();
 		else warn(`ai-config models.${alias} ignored (not provider:model[, provider:model…])`);
 	}
-	return { prices, images, config: { models, updatedAt: parsed.updatedAt ?? null } satisfies AiConfig };
+	// an absent block = no caps set; a present but invalid one is dropped as a whole (`capsValid: false`: the caller keeps its last good caps)
+	let caps: PlatformCaps | undefined;
+	let capsValid = true;
+	if (parsed.caps !== undefined && parsed.caps !== null) {
+		const entry = CapsSchema.safeParse(parsed.caps);
+		if (entry.success) caps = toPlatformCaps(entry.data);
+		else {
+			capsValid = false;
+			warn("ai-config caps ignored (invalid), keeping the last good caps");
+		}
+	}
+	return { prices, images, capsValid, config: { models, ...(caps ? { caps } : {}), updatedAt: parsed.updatedAt ?? null } satisfies AiConfig };
 }
 
 @Injectable()
@@ -132,6 +147,11 @@ export class AiConfigService implements OnModuleInit, OnModuleDestroy {
 		return this.current().models;
 	}
 
+	/** Platform spend caps from Payload; undefined until the first valid fetch or when none are set (env defaults apply). */
+	caps(): PlatformCaps | undefined {
+		return this.current().caps;
+	}
+
 	/** One fetch; true when a valid body replaced the copy. Never throws. */
 	refresh(): Promise<boolean> {
 		if (!this.enabled) return Promise.resolve(false);
@@ -162,9 +182,10 @@ export class AiConfigService implements OnModuleInit, OnModuleDestroy {
 			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
 		});
 		if (!response.ok) throw new Error(`prime-web answered ${response.status}`);
-		const { prices, images, config } = parseAiConfig(await response.json(), (message) => this.logger.warn(message));
+		const { prices, images, config, capsValid } = parseAiConfig(await response.json(), (message) => this.logger.warn(message));
 		setPriceOverrides({ prices, images });
-		this.config = config;
+		const kept = !capsValid && this.config.caps ? { caps: this.config.caps } : {};
+		this.config = { ...config, ...kept };
 		return true;
 	}
 }

@@ -14,6 +14,14 @@ export const ShopLimitsSchema = z.object({
 	aiBudgetUsd: z.number().finite().min(0).nullable(),
 	/** generated pictures per rolling 24 h; null = unlimited */
 	picturesPerDay: z.number().int().min(0).nullable(),
+	/** false = AI is not part of the plan (or the shop is blocked): every run, task and picture is refused. Absent = on. */
+	enabled: z.boolean().optional(),
+	/** AI spend allowance in USD over the Malaysia calendar month; null/absent = unlimited */
+	aiBudgetUsdMonthly: z.number().finite().min(0).nullable().optional(),
+	/** website-setup (`sitegen.*` tasks) spend allowance in USD over the rolling 24 h; null/absent = unlimited */
+	siteBudgetUsd: z.number().finite().min(0).nullable().optional(),
+	/** "shop" when a per-shop override applied (logging only) */
+	source: z.enum(["plan", "shop"]).optional(),
 });
 export type ShopLimits = z.infer<typeof ShopLimitsSchema>;
 

@@ -20,7 +20,8 @@ import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { runMaxRunningMs } from "../config/limits";
 import { ORG_BATTERY, type OrgBattery } from "../cost/org-battery";
-import { aiBudgetMicros } from "../cost/shop-limits";
+import { SHOP_CAPS, type ShopCaps } from "../cost/shop-caps";
+import { aiBudgetMicros, assertAiEnabled, planOf } from "../cost/shop-limits";
 import { tokenUsageOf, UsageTally } from "../ledger/sdk-usage";
 import { anthropicEffortOptions } from "../models/anthropic-effort";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
@@ -356,6 +357,7 @@ export class AgentRunService {
 		@Optional() private readonly pictures?: ImageService,
 		@Optional() @Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
 		@Optional() @Inject(ORG_BATTERY) private readonly battery?: OrgBattery,
+		@Optional() @Inject(SHOP_CAPS) private readonly shopCaps?: ShopCaps,
 	) {}
 
 	/** What each driving run already fed the model (repeated parts of reads become pointers). */
@@ -393,10 +395,14 @@ export class AgentRunService {
 		request: { threadId?: string; clientRequestId?: string } = {},
 		now: Date = new Date(),
 	): Promise<ReservedStart> {
-		// the platform's daily spend cap (AI_DAILY_BUDGET_USD): 503 before anything is reserved
-		await this.spend?.assertWithinBudget();
+		// AI switched off for the shop's plan: 403 before anything else is looked at
+		assertAiEnabled(ctx);
+		// the platform's spend caps (daily / monthly; Free pauses first): 503 before anything is reserved
+		await this.spend?.assertWithinBudget(planOf(ctx));
 		// the shop's own AI battery (its plan's budget, else AI_DAILY_BUDGET_USD_PER_ORG): 429 with the time it is back
 		await this.battery?.assertAvailable(ctx.organizationId, aiBudgetMicros(ctx, this.env));
+		// the shop's calendar-month allowance: 429
+		await this.shopCaps?.assertAvailable(ctx);
 		const runId = newId("run");
 		const caps = queueCaps(this.env);
 		const reserved = await this.store.reserveRunStart(
@@ -617,8 +623,9 @@ export class AgentRunService {
 	}
 
 	/** The platform's daily spend cap (AI_DAILY_BUDGET_USD): 503 before anything calls a model. */
-	private async assertCanSpend(_ctx: AiRequestContext): Promise<void> {
-		await this.spend?.assertWithinBudget();
+	private async assertCanSpend(ctx: AiRequestContext): Promise<void> {
+		assertAiEnabled(ctx);
+		await this.spend?.assertWithinBudget(planOf(ctx));
 	}
 
 	/**

@@ -8,7 +8,8 @@ import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { ORG_BATTERY, type OrgBattery } from "../cost/org-battery";
-import { aiBudgetMicros } from "../cost/shop-limits";
+import { SHOP_CAPS, type ShopCaps } from "../cost/shop-caps";
+import { aiBudgetMicros, assertAiEnabled, planOf } from "../cost/shop-limits";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { estimateCostMicros } from "../ledger/price-book";
 import { anthropicEffortOptions } from "../models/anthropic-effort";
@@ -50,6 +51,7 @@ export class TaskEngine {
 		@Inject(ENV) private readonly env: Env,
 		@Optional() @Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
 		@Optional() @Inject(ORG_BATTERY) private readonly battery?: OrgBattery,
+		@Optional() @Inject(SHOP_CAPS) private readonly shopCaps?: ShopCaps,
 	) {}
 
 	async run(ctx: AiRequestContext, taskId: string, rawInput: unknown, requestId?: string): Promise<RunTaskResponse> {
@@ -59,7 +61,7 @@ export class TaskEngine {
 		if (!parsed.success) {
 			throw new AgentError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "), 400);
 		}
-		await this.assertQuota(ctx);
+		await this.assertQuota(ctx, taskId);
 
 		const definition = TASK_DEFINITIONS[taskId as AiTaskId] as (typeof TASK_DEFINITIONS)[AiTaskId];
 		const input = parsed.data as never;
@@ -160,11 +162,15 @@ export class TaskEngine {
 		};
 	}
 
-	private async assertQuota(ctx: AiRequestContext): Promise<void> {
-		// the platform's daily spend cap (AI_DAILY_BUDGET_USD) before the org's own quota
-		await this.spend?.assertWithinBudget();
+	private async assertQuota(ctx: AiRequestContext, taskId: string): Promise<void> {
+		// AI switched off for the shop's plan: 403 before anything else
+		assertAiEnabled(ctx);
+		// the platform's spend caps (daily / monthly; Free pauses first) before the org's own quota
+		await this.spend?.assertWithinBudget(planOf(ctx));
 		// then the shop's AI battery (its plan's budget, else AI_DAILY_BUDGET_USD_PER_ORG)
 		await this.battery?.assertAvailable(ctx.organizationId, aiBudgetMicros(ctx, this.env));
+		// the shop's calendar-month allowance, and for website-setup tasks (sitegen.*) the website budget
+		await this.shopCaps?.assertAvailable(ctx, taskId);
 		const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 		// only task calls (surface 'system'): copilot steps, decisions, suggestions and pictures have their own limits
 		const used = await this.ledger.countSince(ctx.organizationId, since, { surface: "system" });

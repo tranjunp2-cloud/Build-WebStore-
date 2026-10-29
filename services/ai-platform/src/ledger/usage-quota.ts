@@ -4,7 +4,8 @@ import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { ORG_BATTERY, type OrgBattery, WINDOW_MS } from "../cost/org-battery";
-import { aiBudgetMicros, picturesPerDay } from "../cost/shop-limits";
+import { SHOP_CAPS, type ShopCaps } from "../cost/shop-caps";
+import { aiBudgetMicros, picturesPerDay, planOf } from "../cost/shop-limits";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { DB, type Database } from "../database/database.module";
 import { aiImageReservations, aiUsageEvents } from "../database/schema";
@@ -35,7 +36,13 @@ export interface OrgUsage {
 	/** the shop's AI battery (assistant + writing tools merged); no dollars leave the service */
 	ai: { leftPercent: number; nextFreeAt: string | null };
 	pictures: UsageLine;
+	/** true when AI cannot be used right now for a reason other than a per-day battery or picture count: see `reason` */
 	paused: boolean;
+	/**
+	 * why `paused` is true: "disabled" (the plan has no AI), "platform" (the platform's daily cap, or Free paused first),
+	 * "platform-month" (the platform's monthly cap), "month-empty" (the shop's monthly allowance is used up); absent when not paused
+	 */
+	reason?: "disabled" | "platform" | "platform-month" | "month-empty";
 	/** the shop's plan name from the context token; null when the token carries no limits */
 	plan: string | null;
 }
@@ -87,16 +94,20 @@ export class UsageQuotaService {
 		@Inject(ENV) private readonly env: Env,
 		@Optional() @Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
 		@Optional() @Inject(ORG_BATTERY) private readonly battery?: OrgBattery,
+		@Optional() @Inject(SHOP_CAPS) private readonly shopCaps?: ShopCaps,
 	) {}
 
 	async read(ctx: Pick<AiRequestContext, "organizationId" | "limits">, now: Date = new Date()): Promise<OrgUsage> {
 		const organizationId = ctx.organizationId;
 		const since = new Date(now.getTime() - WINDOW_MS);
-		const [ai, pictures, paused] = await Promise.all([
+		const [ai, pictures, pausedBy, monthEmpty] = await Promise.all([
 			this.aiLine(organizationId, aiBudgetMicros(ctx, this.env)),
 			this.meters.pictures(organizationId, since),
-			this.spend?.isPaused() ?? false,
+			this.spend?.pausedBy(planOf(ctx)) ?? null,
+			this.shopCaps?.monthEmpty(ctx, now) ?? false,
 		]);
+		const reason: OrgUsage["reason"] | null =
+			ctx.limits?.enabled === false ? "disabled" : pausedBy === "day" ? "platform" : pausedBy === "month" ? "platform-month" : monthEmpty ? "month-empty" : null;
 		return {
 			ai,
 			pictures: {
@@ -104,7 +115,8 @@ export class UsageQuotaService {
 				limit: picturesPerDay(ctx, this.env),
 				nextFreeAt: pictures.used > 0 && pictures.oldest ? new Date(pictures.oldest.getTime() + WINDOW_MS).toISOString() : null,
 			},
-			paused,
+			paused: reason !== null,
+			...(reason ? { reason } : {}),
 			plan: ctx.limits?.plan ?? null,
 		};
 	}
