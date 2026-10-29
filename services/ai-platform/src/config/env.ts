@@ -98,7 +98,7 @@ const EnvSchema = z.object({
 	/** Generated pictures per organization per day (each picture counts). */
 	AI_DAILY_IMAGE_LIMIT_PER_ORG: z.coerce.number().int().min(0).default(20),
 	AI_MODEL_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(60_000),
-	AI_DAILY_RUN_LIMIT_PER_ORG: z.coerce.number().int().min(0).default(50),
+	AI_DAILY_RUN_LIMIT_PER_ORG: z.coerce.number().int().min(0).default(200),
 	AI_RUNS_PER_MINUTE_PER_USER: z.coerce.number().int().min(0).default(6),
 	/** Copilot runs one person may have working (planning / running / applying) at once; more wait in the queue. 0 = no cap. */
 	AI_MAX_RUNNING_RUNS_PER_USER: z.coerce.number().int().min(0).default(3),
@@ -108,7 +108,7 @@ const EnvSchema = z.object({
 	AI_QUEUE_POLL_MS: z.coerce.number().int().min(100).max(30_000).default(1_500),
 	/** Longest a run waits in the queue; also capped so the wait plus AI_RUN_BUDGET_MS stays within 290 s. */
 	AI_QUEUE_MAX_WAIT_MS: z.coerce.number().int().min(0).max(600_000).default(90_000),
-	AI_DAILY_TASK_LIMIT_PER_ORG: z.coerce.number().int().min(0).default(500),
+	AI_DAILY_TASK_LIMIT_PER_ORG: z.coerce.number().int().min(0).default(1_000),
 	/** Copilot threads (+ their runs and change sets) are deleted this long after their last activity. */
 	AI_THREAD_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
 	/**
@@ -128,8 +128,8 @@ const EnvSchema = z.object({
 	 * families, attribute schemas and media, read with the merchant's own access.
 	 */
 	PRIME_WEB_INTERNAL_URL: z.url().optional(),
-	/** Request log lines: `default` = failures (status >= 400) and requests over 2 s; `all` = every request. */
-	AI_LOG_REQUESTS: z.enum(["default", "all"]).default("default"),
+	/** Request log lines: `all` (default) = every request; `default` = only failures (status >= 400) and requests over 2 s. */
+	AI_LOG_REQUESTS: z.enum(["default", "all"]).default("all"),
 	/** One request's model time (copilot run, from the request's start): stays inside Vercel's 300 s maxDuration. */
 	AI_RUN_BUDGET_MS: z.coerce.number().int().min(30_000).max(3_600_000).default(200_000),
 	/** Input + output tokens one copilot run may use across its model calls (and pauses); above it no new call starts. */
@@ -142,8 +142,12 @@ const EnvSchema = z.object({
 	AI_TOOL_ROUTING: z.enum(["on", "off"]).default("on"),
 	/** Next-message suggestions: `rules` = from what the run did, a tiny FAST-model call only when no rule fits; `model` = always that call; `off`. */
 	AI_SUGGEST_MODE: z.enum(["rules", "model", "off"]).default("rules"),
-	/** Global daily AI spend cap in USD (every org, Malaysia day, from the ledger's cost); unset = off. Above it runs and tasks get 503. */
-	AI_DAILY_BUDGET_USD: z.coerce.number().positive().optional(),
+	/** Global daily AI spend cap in USD (every org, Malaysia day, from the ledger's cost); unset = 20, 0 = off. Above it runs and tasks get 503. */
+	AI_DAILY_BUDGET_USD: z.coerce
+		.number()
+		.min(0)
+		.default(20)
+		.transform((usd) => (usd === 0 ? undefined : usd)),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

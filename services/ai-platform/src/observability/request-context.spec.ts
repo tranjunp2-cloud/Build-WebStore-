@@ -95,8 +95,8 @@ describe("request ids [TC-AISEC-034]", () => {
 	});
 
 	it("TC-AISEC-034: logs one JSON line for a failed request with the route pattern, never the token or query", async () => {
-		// Arrange
-		app = await startTestApp(ProbeModule);
+		// Arrange — failures-only mode (`all` is the default since #2122)
+		app = await startTestApp(ProbeModule, testEnv({ AI_LOG_REQUESTS: "default" }));
 		const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
 		// Act
@@ -110,7 +110,7 @@ describe("request ids [TC-AISEC-034]", () => {
 		expect(line).not.toMatch(/ctx-token-value|secret-words|prod_42|authorization/i);
 	});
 
-	it("TC-AISEC-034: logs every request when AI_LOG_REQUESTS=all, and slow ones by default", async () => {
+	it("TC-AISEC-034: logs every request when AI_LOG_REQUESTS=all (the default), and only failed or slow ones with `default`", async () => {
 		// Arrange
 		app = await startTestApp(ProbeModule, testEnv({ AI_LOG_REQUESTS: "all" }));
 		const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
