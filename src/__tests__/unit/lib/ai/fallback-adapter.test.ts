@@ -121,7 +121,8 @@ describe('composeFallbackResult — behaviors', () => {
 
         const features = findBlock('features')?.features as Array<{ title: string; description: string }>
         expect(features.map((item) => item.title)).toEqual(services)
-        expect(new Set(features.map((item) => item.description)).size).toBe(services.length)
+        // #2103 A1: no canned feature copy — only where to find the product
+        expect(features.every((item) => item.description === 'Boleh didapati di Luna Beauty Studio.')).toBe(true)
 
         const testimonials = findBlock('testimonials')?.testimonials as Array<{ quote: string; name: string }>
         expect(new Set(testimonials.map((item) => item.quote)).size).toBe(testimonials.length)
@@ -129,6 +130,7 @@ describe('composeFallbackResult — behaviors', () => {
         expect(testimonials.every((item) => !services.includes(item.name))).toBe(true)
 
         const faq = findBlock('faq')?.items as Array<{ question: string; answer: string }>
+        expect(faq).toEqual([]) // no facts to answer from → no invented Q&A
         expect(new Set(faq.map((item) => item.question)).size).toBe(faq.length)
         expect(faq.every((item) => item.question !== 'Soalan Lazim')).toBe(true)
         expect(faq.every((item) => item.answer !== shortDescription)).toBe(true)
@@ -136,7 +138,7 @@ describe('composeFallbackResult — behaviors', () => {
         const team = findBlock('team')?.members as Array<{ name: string; role: string; bio: string }>
         expect(team.every((member) => !services.includes(member.name))).toBe(true)
         expect(team.every((member) => !services.includes(member.role))).toBe(true)
-        expect(team.every((member) => member.bio !== shortDescription)).toBe(true)
+        expect(team).toEqual([{ name: 'Pasukan Luna Beauty Studio', role: 'Pengasas' }])
     })
 
     it('pages array mirrors templateSeed pages', () => {

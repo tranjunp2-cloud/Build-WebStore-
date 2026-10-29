@@ -134,8 +134,14 @@ describe('retries and refusals [TC-AIREL-178..179]', () => {
 
         await expect(applyChangeSet(drafts([DRAFT, { ...DRAFT, name: 'Batik Bag' }]), SHOP_ACTOR)).rejects.toMatchObject({
             status: 422,
-            message: expect.stringMatching(/"Batik Bag".*1 product was already created/),
+            message: '"Batik Bag": The product was not saved — site: bad. Created before it: "Batik Scarf". The rest were not created: ask again for them.',
         })
+    })
+
+    it('a failure on the first product creates nothing and keeps the card open (not final) [TC-AIREL-179]', async () => {
+        cms().create.mockRejectedValueOnce(Object.assign(new Error('x'), { name: 'ValidationError', data: { errors: [{ message: 'bad', path: 'site' }] } }))
+
+        await expect(applyChangeSet(drafts([DRAFT, { ...DRAFT, name: 'Batik Bag' }]), SHOP_ACTOR)).rejects.toMatchObject({ status: 422, final: false, message: '"Batik Scarf": The product was not saved — site: bad.' })
     })
 
     it('refuses a plan without product management', async () => {
@@ -144,6 +150,26 @@ describe('retries and refusals [TC-AIREL-178..179]', () => {
 
         await expect(applyChangeSet(drafts([DRAFT]), SHOP_ACTOR)).rejects.toMatchObject({ status: 403 })
         expect(cms().create).not.toHaveBeenCalled()
+    })
+})
+
+describe('a batch that fails part way keeps the Undo of what it created [TC-AIREL-269]', () => {
+    it('closes as final with a partial result for the products made before it, whose undo trashes them', async () => {
+        cms().create.mockImplementationOnce(async ({ data }: { data: Record<string, unknown> }) => ({ id: 901, updatedAt: UPDATED_AT, ...data }))
+        cms().create.mockImplementationOnce(async ({ data }: { data: Record<string, unknown> }) => ({ id: 902, updatedAt: UPDATED_AT, ...data }))
+        cms().create.mockRejectedValueOnce(Object.assign(new Error('x'), { name: 'ValidationError', data: { errors: [{ message: 'bad', path: 'site' }] } }))
+
+        const error = await applyChangeSet(drafts([DRAFT, { ...DRAFT, name: 'Batik Bag' }, { ...DRAFT, name: 'Batik Hat' }, { ...DRAFT, name: 'Batik Mat' }]), SHOP_ACTOR).catch((e: unknown) => e)
+
+        expect(error).toMatchObject({ final: true, message: expect.stringContaining('Created before it: "Batik Scarf", "Batik Bag".') })
+        expect(cms().create).toHaveBeenCalledTimes(3)
+        const partial = (error as { partial: { entities: unknown; undo: { kind: string; payload: unknown } } }).partial
+        expect(partial.entities).toEqual([{ kind: 'product', id: '901', label: 'Batik Scarf' }, { kind: 'product', id: '902', label: 'Batik Bag' }])
+        expect(partial.undo).toMatchObject({ kind: 'shop_product.trash_created', payload: { ids: ['901', '902'], expect: { '901': UPDATED_AT, '902': UPDATED_AT } } })
+
+        state.cms = fakeCms({ products: [productDoc({ id: 901 })] })
+        await applyUndo(partial.undo as never, SHOP_ACTOR, 'cs_77')
+        expect(cms().update.mock.calls[0]?.[0]).toMatchObject({ id: 901, data: { deletedAt: expect.any(String) } })
     })
 })
 

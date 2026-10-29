@@ -43,6 +43,7 @@ import type {
 	ChangeSetDecision,
 	ChangeSetQuery,
 	ConversationQuery,
+	DecideOptions,
 	InsightQuery,
 	MediaQuery,
 	RunStreamLost,
@@ -332,21 +333,36 @@ export class HttpGateway implements AgentGateway {
 		decision: ChangeSetDecision,
 		actor: string,
 		note?: string,
-		options?: { confirm?: string },
+		options?: DecideOptions,
 	): Promise<ChangeSet> {
 		this.cache.invalidate("changesets");
 		// No pool signal: approving applies a domain write that can outlast the
 		// read timeout, and aborting the browser side would not stop the server.
-		const decided = await this.pool.mutate(() =>
-			this.request("POST", `/agent/change-sets/${encodeURIComponent(id)}/decision`, ChangeSetSchema, {
-				decision,
-				actor,
-				note,
-				...(options?.confirm !== undefined ? { confirm: options.confirm } : {}),
-			}),
-		);
+		let decided: ChangeSet;
+		try {
+			decided = await this.pool.mutate(() =>
+				this.request("POST", `/agent/change-sets/${encodeURIComponent(id)}/decision`, ChangeSetSchema, {
+					decision,
+					actor,
+					note,
+					...(options?.confirm !== undefined ? { confirm: options.confirm } : {}),
+					...(options?.manual === true ? { manual: true } : {}),
+				}),
+			);
+		} catch (error) {
+			// refused because the set moved on (a stale draft the server closed, decided in another tab): show the card as it
+			// now stands, so it stops offering Approve and a second press can't answer "already rejected"
+			if (error instanceof AgentGatewayError && (error.status === 409 || error.status === 422)) await this.announceCurrent(id);
+			throw error;
+		}
 		this.onEvent({ type: "changeset.decided", changeSet: decided });
 		return decided;
+	}
+
+	/** Reads a change set again and announces it when it is no longer pending; a failed read changes nothing. */
+	private async announceCurrent(id: string): Promise<void> {
+		const current = await this.request("GET", `/agent/change-sets/${encodeURIComponent(id)}`, ChangeSetSchema).catch(() => null);
+		if (current && current.status !== "pending") this.onEvent({ type: "changeset.decided", changeSet: current });
 	}
 
 	async undoChangeSet(id: string): Promise<ChangeSet> {

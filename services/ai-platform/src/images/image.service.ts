@@ -7,6 +7,7 @@ import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { imageOutputFormat } from "../config/limits";
+import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { MODEL_REGISTRY } from "../models/models.module";
 import type { ModelRegistry } from "../models/model-registry";
@@ -61,6 +62,8 @@ export class ImageService {
 		@Inject(USAGE_LEDGER) private readonly ledger: UsageLedger,
 		@Inject(ENV) private readonly env: Env,
 		@Inject(PICTURE_QUOTA) private readonly quota: PictureQuota,
+		// the platform's daily spend cap (AI_DAILY_BUDGET_USD), like runs and tasks; LedgerModule provides it
+		@Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
 	) {}
 
 	get available(): boolean {
@@ -75,6 +78,8 @@ export class ImageService {
 		const parsed = ImageRequestSchema.safeParse(request);
 		if (!parsed.success) throw new AgentError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "), 400);
 		const input = parsed.data;
+		// 503 above the daily spend cap: before any picture is reserved or drawn
+		await this.spend?.assertWithinBudget();
 		const chain = this.models.resolveImageChain?.() ?? [];
 		if (chain.length === 0) throw new AgentError("Picture generation is not set up in this environment.", 503);
 

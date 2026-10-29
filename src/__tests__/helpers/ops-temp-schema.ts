@@ -45,7 +45,6 @@ export async function createOpsTempSchema(pool: Pool): Promise<void> {
             ai_review_pending boolean DEFAULT false, seo_title varchar, seo_description varchar, deleted_at timestamptz
         );
         CREATE TEMP TABLE products_images (_order integer, _parent_id integer NOT NULL, id varchar, image_id integer, alt varchar);
-        CREATE TEMP TABLE products_remote_images (_order integer, _parent_id integer NOT NULL, id varchar, url varchar, alt varchar);
         CREATE TEMP TABLE products_variants (_order integer, _parent_id integer NOT NULL, id varchar, name varchar, stock numeric);
         CREATE TEMP TABLE sites (id serial PRIMARY KEY, tenant_id integer NOT NULL, generation_status pg_temp.enum_sites_generation_status);
         CREATE TEMP TABLE contact_submissions (

@@ -6,7 +6,6 @@ export const ProductsFeaturedConfigSchema = BaseBlockSchema.extend({
     variant: z.enum(['hero-product', 'carousel']).default('hero-product'),
     headline: z.string().optional(),
     subheadline: z.string().optional(),
-    productIds: z.array(z.string()).optional(),
     // The section's own pictures (a gallery's rows): shown while no product is
     // on sale instead of the industry sample pictures, and for a product
     // without a photo. Products with a photo always show their own photo.

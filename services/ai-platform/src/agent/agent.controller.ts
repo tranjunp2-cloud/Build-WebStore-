@@ -15,6 +15,7 @@ import {
 	HttpCode,
 	HttpException,
 	Inject,
+	Logger,
 	NotFoundException,
 	NotImplementedException,
 	Param,
@@ -59,6 +60,8 @@ const DecisionBodySchema = z.object({
 	// `actor` from the browser is ignored — the decider comes from the context token.
 	actor: z.string().optional(),
 });
+/** The `run.error` line for a failure that is not one of ours (its detail goes to the log, never the browser). */
+const STREAM_FAILED = "The run could not continue.";
 const LimitSchema = z.coerce.number().int().min(1).max(100).catch(20);
 /** "product:123" → { kind, id }; anything else lists every chat. */
 export function threadEntityQuery(value: unknown): { kind: string; id: string } | undefined {
@@ -117,6 +120,8 @@ async function mapErrors<T>(work: () => Promise<T>): Promise<T> {
 @Controller("agent")
 @UseGuards(ContextGuard)
 export class AgentController {
+	private readonly logger = new Logger(AgentController.name);
+
 	constructor(
 		private readonly runs: AgentRunService,
 		private readonly decisions: ChangeSetDecisionService,
@@ -167,7 +172,11 @@ export class AgentController {
 		try {
 			await running;
 		} catch (error) {
-			emit({ type: "run.error", message: error instanceof Error ? error.message : "The run could not continue." });
+			// our own refusals are written for the merchant; anything else (a database error…) stays in the log
+			if (!(error instanceof AgentError)) {
+				this.logger.warn(`run ${runId ?? "-"} stream failed: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`);
+			}
+			emit({ type: "run.error", message: error instanceof AgentError ? error.message : STREAM_FAILED });
 		} finally {
 			stopPing();
 			raw.end();
@@ -391,6 +400,8 @@ export class AgentController {
 			status: parsedStatus,
 			limit: LimitSchema.parse(limit),
 			...(seesTeamDrafts(ctx) ? {} : { requestedBy: ctx.userId }),
+			// shops sharing one organization never list each other's drafts
+			...(ctx.tenantId ? { tenantId: ctx.tenantId } : {}),
 		});
 		return changeSets.map((changeSet) => forCaller(ctx, changeSet));
 	}

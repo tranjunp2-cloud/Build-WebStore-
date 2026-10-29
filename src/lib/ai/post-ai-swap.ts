@@ -17,27 +17,32 @@
 import type { BusinessSample, CategoryContent } from './content'
 import { getCategoryContent } from './content'
 import { seededPick } from './seeded-random'
+import { withoutLibraryIdentity } from './library-identity'
 
 /**
  * Hydrate a Partial<BusinessSample> into a full BusinessSample for composer
- * consumption. Seeds across `pack.businesses` so two users in the same
- * category whose partial is missing the same field get different canned
- * baselines (GH-912 — addresses leak of `businesses[0]` phone/address/etc.).
+ * consumption. Identity + contact come from the merchant (or their FACTS) and
+ * otherwise stay empty: the library sample businesses are fictional, so their
+ * name / address / phone / email must never reach a real site (#2103 A1,
+ * supersedes the GH-912 seed rotation, which only hid the leak). Generic
+ * category copy (hero lines, products) still falls back to the library pack.
  */
 function hydrateBiz(partial: Partial<BusinessSample>, category: string, seed: number): BusinessSample {
     const pack = getCategoryContent(category) ?? getCategoryContent('business')
-    const fallback = seededPick(pack?.businesses ?? [], seed)
-    return {
-        name: partial.name ?? fallback?.name ?? 'Our Business',
-        tagline: partial.tagline ?? fallback?.tagline ?? 'Serving you with care',
-        description: partial.description ?? fallback?.description ?? 'Your trusted local business.',
-        address: partial.address ?? fallback?.address ?? 'Kuala Lumpur, Malaysia',
-        phone: partial.phone ?? fallback?.phone ?? '+60 3-0000 0000',
-        email: partial.email ?? fallback?.email ?? 'hello@example.com',
-        heroHeadline: partial.heroHeadline ?? fallback?.heroHeadline ?? 'Welcome',
-        heroSubheadline: partial.heroSubheadline ?? fallback?.heroSubheadline ?? 'Quality service',
-        products: partial.products ?? fallback?.products ?? [],
+    const sample = seededPick(pack?.businesses ?? [], seed)
+    const base: BusinessSample = sample ?? {
+        name: '',
+        tagline: '',
+        description: '',
+        address: '',
+        phone: '',
+        email: '',
+        heroHeadline: 'Welcome',
+        heroSubheadline: 'Quality service',
     }
+    const biz = withoutLibraryIdentity(base, partial)
+    // Composer headings interpolate the name ("Why choose {name}"); keep them readable.
+    return { ...biz, name: biz.name || 'Our Business' }
 }
 import {
     buildHero as composerBuildHero,
@@ -683,9 +688,9 @@ function callComposerBuilder(
         case 'features':
             return composerBuildFeatures(biz, category, language)
         case 'testimonials':
-            return content ? composerBuildTestimonials(content, biz.name, language) : null
+            return composerBuildTestimonials(biz, language)
         case 'faq':
-            return content ? composerBuildFAQ(content, biz.name, language) : null
+            return composerBuildFAQ(biz, language)
         case 'about':
             return composerBuildAbout(biz, language)
         case 'cta':

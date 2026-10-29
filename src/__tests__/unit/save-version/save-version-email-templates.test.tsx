@@ -32,6 +32,7 @@ import { I18nProvider } from '@/i18n'
 import en from '@/i18n/locales/en.json'
 import { AgentRefresh } from '@/lib/agent-changes/agent-refresh'
 import { announceAgentChange, resetAgentChangeBus } from '@/lib/agent-changes/bus'
+import { COALESCE_MS } from '@/lib/agent-changes/use-agent-changes'
 import { EMAIL_TEMPLATE_TYPES } from '@/lib/email/types'
 import { isStaleVersion } from '@/lib/save-version/save-version'
 
@@ -67,6 +68,8 @@ const assistantRewrites = async (subject: string) => {
     store.row = row(subject, V2)
     await act(async () => {
         announceAgentChange({ action: 'applied', kind: 'store.email_templates_patch', entities: [{ kind: 'email_template', id: 'order-confirmation' }], changeSetId: `cs-${Math.random()}`, at: Date.now() })
+        // the screen hears it once the change window closes: let that land before the next step
+        await new Promise((resolve) => setTimeout(resolve, COALESCE_MS + 20))
     })
 }
 

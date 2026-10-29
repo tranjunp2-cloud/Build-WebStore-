@@ -55,7 +55,7 @@ import {
     isEditorSaveContextCurrent,
     draftBase,
     keepDraftVersion,
-    isDraftConflict,
+    readDraftConflict,
     BLOCK_TYPE_TO_KEY,
     PAGE_META_LOCALE_KEY,
     getDisplayPageTitle,
@@ -741,15 +741,25 @@ export default function EditorPage() {
                         saveUrl.searchParams.set('pageId', savePageId)
                     }
 
-                    const res = await fetch(saveUrl.toString(), {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify(buildSavePayload(snapshot)),
-                    })
+                    // one id across this save's retries (see editorStore.unconfirmedSaveId)
+                    const saveId = snapshot.nextSaveId()
+                    let res: Response
+                    try {
+                        res = await fetch(saveUrl.toString(), {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify(buildSavePayload(snapshot, { saveId })),
+                        })
+                    } catch (transportError) {
+                        useEditorStore.getState().settleSaveId(saveId, null)
+                        throw transportError
+                    }
+                    useEditorStore.getState().settleSaveId(saveId, res.ok ? 200 : res.status)
 
-                    if (!res.ok && await isDraftConflict(res)) {
-                        useEditorStore.getState().markDraftConflict()
+                    const conflict = res.ok ? null : await readDraftConflict(res)
+                    if (conflict) {
+                        useEditorStore.getState().markDraftConflict(conflict.draftVersion)
                         return false
                     }
                     if (!res.ok) {
@@ -1100,10 +1110,14 @@ export default function EditorPage() {
                 saveUrl.searchParams.set('pageId', currentPageId)
             }
 
+            // the open site's save carries its draft revision and save id (another site's settings carry none)
+            const forOpenSite = options.targetSiteId === undefined
+            const settingsSave: { id: string | null } = { id: null }
             let request: Promise<Response>
             try {
                 request = runSerializedEditorSave(persistenceSiteId, () => {
                     try {
+                        settingsSave.id = forOpenSite ? useEditorStore.getState().nextSaveId() : null
                         return fetch(saveUrl.toString(), {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
@@ -1121,8 +1135,7 @@ export default function EditorPage() {
                                     ? useEditorStore.getState().headerBlock
                                     : (logoSyncedHeaderBlock ?? changes.headerBlock),
                                 footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
-                                // the open site's draft revision (another site's settings carry none)
-                                ...(options.targetSiteId === undefined ? draftBase(useEditorStore.getState()) : {}),
+                                ...(forOpenSite ? draftBase(useEditorStore.getState(), settingsSave.id) : {}),
                             }),
                         })
                     } catch (setupError) {
@@ -1136,10 +1149,12 @@ export default function EditorPage() {
             let response: Response
             try {
                 response = await request
+                if (settingsSave.id) useEditorStore.getState().settleSaveId(settingsSave.id, response.ok ? 200 : response.status)
             } catch (transportError) {
                 if (transportError instanceof SerializedSaveSetupError) {
                     throw transportError.originalError
                 }
+                if (settingsSave.id) useEditorStore.getState().settleSaveId(settingsSave.id, null)
                 if (changes.localBusiness) {
                     const reconcileController = new AbortController()
                     const reconcileTimeoutId = window.setTimeout(
@@ -1227,8 +1242,9 @@ export default function EditorPage() {
             }
 
             if (!response.ok) {
-                if (await isDraftConflict(response)) {
-                    useEditorStore.getState().markDraftConflict()
+                const conflict = await readDraftConflict(response)
+                if (conflict) {
+                    useEditorStore.getState().markDraftConflict(conflict.draftVersion)
                     return false
                 }
                 const body = await response.json().catch(() => null)
@@ -2787,13 +2803,19 @@ export default function EditorPage() {
     const closeTools = useCallback(() => setToolsSheetOpen(false), [])
 
     // A save was refused because the draft changed elsewhere (another tab, an approved copilot change):
-    // saving has stopped so nothing newer is overwritten; the merchant reloads to continue.
+    // saving has stopped so nothing newer is overwritten; the merchant reloads to continue, or keeps
+    // this tab's version (saved over the other change, knowingly).
     const draftConflict = useEditorStore((s) => s.draftConflict)
     useEffect(() => {
         if (!draftConflict) return
+        const canKeepMine = useEditorStore.getState().conflictDraftVersion !== null
         const id = toast.error(t.editor.toast.draftChanged, {
             duration: Infinity,
+            ...(canKeepMine ? { description: t.editor.toast.keepMineHint } : {}),
             action: { label: t.editor.toast.reloadAction, onClick: () => window.location.reload() },
+            ...(canKeepMine
+                ? { cancel: { label: t.editor.toast.keepMineAction, onClick: () => { void useEditorStore.getState().keepMyVersion() } } }
+                : {}),
         })
         return () => { toast.dismiss(id) }
     }, [draftConflict, t])
@@ -3457,8 +3479,10 @@ export default function EditorPage() {
                     })
                     requestAnimationFrame(() => requestAnimationFrame(() => setIsTransitioning(false)))
                 }}
-                onApplied={async ({ templateName, unmatchedBlocks, appliedState }: TemplateApplyResult) => {
+                onApplied={async ({ templateName, unmatchedBlocks, appliedState, draftVersion }: TemplateApplyResult) => {
                     setIsTemplateModalOpen(false)
+                    // the apply bumped the draft revision: this tab holds the applied state, so it saves from the new one
+                    if (draftVersion) useEditorStore.getState().setDraftVersion(draftVersion)
                     const hadOptimisticState = optimisticTemplateRollbackRef.current !== null
                     if (!hadOptimisticState) setIsTransitioning(true)
 

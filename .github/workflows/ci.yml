@@ -19,7 +19,7 @@
 #   quality-check (1.5m, PR only): lint + typecheck + migrations
 #   test (3.5m, PR only, needs: quality-check)
 #   metrics (PR only, needs: test)
-#   ai-platform-check (PR only, parallel): services/ai-platform install + typecheck + test + build (Node 22)
+#   ai-platform-check (PR only, parallel): services/ai-platform install + typecheck + test + build (Node 24)
 #   deploy-staging    (push staging, no needs — CI already ran on PR)
 #   deploy-production (push main,    no needs — CI already ran on PR)
 #   deploy-ai-platform            (push staging) — separate Vercel project, same 3-stage flow
@@ -196,6 +196,10 @@ jobs:
 
       - name: Upload coverage artifact
         if: always()
+        # The org-wide artifact storage quota can be full (it is shared by every
+        # repo and recalculated every 6-12 h). Coverage is a report, not a gate:
+        # a failed upload must not turn a green test run red.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -203,7 +207,7 @@ jobs:
           retention-days: 3
 
   # ──────────────────────────────────────
-  # Job 2b: ai-platform check — standalone install (Node 22)
+  # Job 2b: ai-platform check — standalone install (Node 24)
   # ──────────────────────────────────────
   # services/ai-platform is a copy synced from the monorepo (AI_LAYER_SOURCE) with its
   # own package-lock.json; it links ../../packages/{agent-core,ai-contracts} via file:.
@@ -262,6 +266,9 @@ jobs:
       contents: read
     steps:
       - name: Download coverage
+        # Missing when the upload hit the artifact quota; the parse step below
+        # already handles a missing coverage-summary.json.
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: coverage-report
@@ -377,10 +384,10 @@ jobs:
   # ──────────────────────────────────────
   deploy-staging:
     name: "Deploy: Vercel (staging)"
-    # No `needs` — quality-check and test only run on pull_request, and
-    # this job only runs on push, so a `needs` would make the job
-    # permanently skipped. GitHub branch protection guarantees every
-    # merge commit was already CI-validated on its source PR.
+    # Only `needs` the ai-platform deploy (same push trigger, so never skipped):
+    # prime-web on staging calls AI_PLATFORM_URL, so it must not go live ahead
+    # of a failed ai-platform deploy. quality-check/test run on the PR only.
+    needs: deploy-ai-platform
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 45
@@ -442,6 +449,11 @@ jobs:
         # `vercel deploy --prebuilt --target=staging` below, otherwise the
         # CLI aborts with a "prebuilt environment mismatch" error.
         run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
+
+      - name: Preflight — AI platform env (staging, warn only)
+        # Same check as production (scripts/ci/ai-env-preflight.mjs) but never blocks staging:
+        # missing / bad AI_PLATFORM_URL or AI_PLATFORM_CONTEXT_SECRET → ::warning:: only.
+        run: node scripts/ci/ai-env-preflight.mjs .vercel/.env.staging.local --warn-only
 
       - name: Preflight — Postgres reachable
         run: |
@@ -560,7 +572,8 @@ jobs:
   # ──────────────────────────────────────
   deploy-production:
     name: "Deploy: Vercel (production)"
-    # No `needs` — see deploy-staging rationale above.
+    # Waits for the ai-platform production deploy — see deploy-staging.
+    needs: deploy-ai-platform-production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 45
@@ -617,6 +630,17 @@ jobs:
 
       - name: Pull Vercel env (production)
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Preflight — AI platform env (production)
+        # Without AI_PLATFORM_URL (https) + AI_PLATFORM_CONTEXT_SECRET (32+ chars) production still
+        # runs, but onboarding falls back to rule-based sites, auto SEO stops and /api/ai/* answers
+        # 503 — silently. Fail the deploy here (Notify deploy fail pings Lark). An empty secret only
+        # warns (a Vercel Sensitive variable is pulled empty). AI_AGENT_ENABLED is not checked: the
+        # copilot is off on production on purpose. To ship without AI deliberately, set repo
+        # variable ALLOW_PROD_WITHOUT_AI=true (problems become warnings).
+        env:
+          ALLOW_PROD_WITHOUT_AI: ${{ vars.ALLOW_PROD_WITHOUT_AI }}
+        run: node scripts/ci/ai-env-preflight.mjs .vercel/.env.production.local
 
       - name: Preflight — Postgres reachable
         run: |
@@ -745,30 +769,10 @@ jobs:
         run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
 
       - name: Preflight — ai-platform Postgres reachable
-        run: |
-          # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
-          # Fail here (not mid-build) when it is missing or unreachable from the runner.
-          set -e
-          ENV_FILE=".vercel/.env.staging.local"
-          if [ ! -f "$ENV_FILE" ]; then
-            echo "::error::vercel pull did not produce $ENV_FILE"
-            exit 1
-          fi
-          # shellcheck disable=SC1090
-          set -a && . "$ENV_FILE" && set +a
-          if [ -z "${AI_PLATFORM_DATABASE_URL:-}" ]; then
-            echo "::error::AI_PLATFORM_DATABASE_URL not present in $ENV_FILE"
-            exit 1
-          fi
-          node -e "
-            const net = require('net');
-            const u = new URL(process.env.AI_PLATFORM_DATABASE_URL);
-            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
-            s.setTimeout(5000);
-            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
-            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
-            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
-          "
+        # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
+        # Fail here (not mid-build) when it is missing or unreachable from the runner.
+        # Reads only that key (never sourced, never printed). Path is from services/ai-platform.
+        run: node ../../scripts/ci/pg-tcp-check.mjs .vercel/.env.staging.local AI_PLATFORM_DATABASE_URL
 
       - name: Build --target=staging
         run: vercel build --target=staging --token="$VERCEL_TOKEN"
@@ -860,30 +864,10 @@ jobs:
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
       - name: Preflight — ai-platform Postgres reachable
-        run: |
-          # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
-          # Fail here (not mid-build) when it is missing or unreachable from the runner.
-          set -e
-          ENV_FILE=".vercel/.env.production.local"
-          if [ ! -f "$ENV_FILE" ]; then
-            echo "::error::vercel pull did not produce $ENV_FILE"
-            exit 1
-          fi
-          # shellcheck disable=SC1090
-          set -a && . "$ENV_FILE" && set +a
-          if [ -z "${AI_PLATFORM_DATABASE_URL:-}" ]; then
-            echo "::error::AI_PLATFORM_DATABASE_URL not present in $ENV_FILE"
-            exit 1
-          fi
-          node -e "
-            const net = require('net');
-            const u = new URL(process.env.AI_PLATFORM_DATABASE_URL);
-            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
-            s.setTimeout(5000);
-            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
-            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
-            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
-          "
+        # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
+        # Fail here (not mid-build) when it is missing or unreachable from the runner.
+        # Reads only that key (never sourced, never printed). Path is from services/ai-platform.
+        run: node ../../scripts/ci/pg-tcp-check.mjs .vercel/.env.production.local AI_PLATFORM_DATABASE_URL
 
       - name: Build --prod
         run: vercel build --prod --token="$VERCEL_TOKEN"
@@ -925,6 +909,121 @@ jobs:
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
+  # Job 7c: Deploy ai-platform to Vercel (qc-test branch → Preview scope)
+  # ──────────────────────────────────────
+  # qc-test needs its own ai-platform deploy: the platform calls back into one
+  # prime-web (PRIME_WEB_INTERNAL_URL), so sharing the staging deploy would let
+  # QC chat edit staging shops. Env vars live in the ech-ai-platform project
+  # under scope "Preview + branch qc-test" (own Neon DB, own daily budget).
+  deploy-ai-platform-qc-test:
+    name: "Deploy: AI Platform (qc-test)"
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    concurrency:
+      group: vercel-deploy-ai-platform-qc-test
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_AI_PLATFORM_PROJECT_ID }}
+    defaults:
+      run:
+        working-directory: services/ai-platform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          check-latest: true
+          cache: 'npm'
+          cache-dependency-path: services/ai-platform/package-lock.json
+
+      - name: Get commit subject
+        id: commit
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 70)
+          echo "subject=[ai-platform] $SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@50
+
+      - name: Pull Vercel env (Preview scope + branch=qc-test overrides)
+        run: |
+          vercel pull --yes \
+            --environment=preview \
+            --git-branch=qc-test \
+            --token="$VERCEL_TOKEN"
+
+      - name: Preflight — ai-platform Postgres reachable
+        run: |
+          set -e
+          ENV_FILE=".vercel/.env.preview.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${AI_PLATFORM_DATABASE_URL:-}" ]; then
+            echo "::error::AI_PLATFORM_DATABASE_URL not present in $ENV_FILE"
+            echo "::error::Fix: ech-ai-platform → env vars → scope Preview + branch=qc-test"
+            exit 1
+          fi
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.AI_PLATFORM_DATABASE_URL);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
+
+      - name: Build (preview)
+        run: vercel build --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt (preview)
+        id: deploy
+        run: |
+          set -e
+          URL=$(vercel deploy --prebuilt --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Promote alias → ech-ai-platform-qc.vercel.app
+        # Stable URL for prime-web qc-test's AI_PLATFORM_URL (preview deploys
+        # get a new URL each time) — same reason as deploy-qc-test's alias step.
+        run: |
+          set -e
+          URL="${{ steps.deploy.outputs.url }}"
+          URL="${URL#https://}"
+          vercel alias set "$URL" ech-ai-platform-qc.vercel.app --token="$VERCEL_TOKEN"
+          echo "Alias rolled: ech-ai-platform-qc.vercel.app → $URL"
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'qc-test'
+          branch: qc-test
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # ──────────────────────────────────────
   # Job 8: Deploy to Vercel (qc-test branch → Preview scope with branch-filter)
   # ──────────────────────────────────────
   # Isolated QC environment for JMeter / load / E2E tests.
@@ -947,6 +1046,8 @@ jobs:
     name: "Deploy: Vercel (qc-test)"
     # Accepts both push (normal branch push) and workflow_dispatch (invoked
     # by sync-staging-to-qc-test.yml after auto-merging staging into qc-test).
+    # Waits for the qc-test ai-platform deploy — see deploy-staging.
+    needs: deploy-ai-platform-qc-test
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 45

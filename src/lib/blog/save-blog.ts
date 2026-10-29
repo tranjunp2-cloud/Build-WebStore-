@@ -146,7 +146,8 @@ export async function saveBlogForUser(user: UserWithTenants, data: SaveBlogInput
         body.site = siteId
         if (data.aiChangeSetId) body.aiChangeSetId = data.aiChangeSetId
 
-        // Auto-suffix slug if duplicate exists within same tenant
+        // Auto-suffix slug if duplicate exists within same tenant. Trashed posts count too (`trash: true`): a post
+        // in the trash (e.g. an undone AI post) can be restored, and must not come back with a twin slug.
         let slug = body.slug
         let suffix = 0
         while (true) {
@@ -154,6 +155,7 @@ export async function saveBlogForUser(user: UserWithTenants, data: SaveBlogInput
                 collection: 'blogs',
                 where: { slug: { equals: slug }, tenant: { equals: tenantId } },
                 limit: 1,
+                trash: true,
             })
             if (existing.docs.length === 0) break
             suffix++

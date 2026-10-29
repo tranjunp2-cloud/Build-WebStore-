@@ -65,7 +65,7 @@ export async function prepareSitePatch(actor: AgentActor, raw: unknown): Promise
 		diffs,
 		guardrails: [
 			{ rule: "all_or_nothing", ok: true, detail: `All ${drafted.length} pages change together (${sections} section${sections === 1 ? "" : "s"}), or none does if one of them was edited since.` },
-			...pageEditGuardrails(hosts, drafted.flatMap((d) => d.skipped), drafted.flatMap((d) => d.copy).slice(0, 12), drafted.find((d) => d.locale)?.locale ?? null),
+			...pageEditGuardrails(hosts, drafted.flatMap((d) => d.skipped), drafted.flatMap((d) => d.copy).slice(0, 12), drafted.find((d) => d.locale)?.locale ?? null, drafted.flatMap((d) => d.shows)),
 		],
 		...(many ? { confirmText: siteName.slice(0, 200) } : {}),
 		plan: {
@@ -129,7 +129,7 @@ export async function preparePageCreate(actor: AgentActor, raw: unknown): Promis
 		return { error: { code: "structural", message: "The menu and footer are added to every page by themselves; send only the page's own sections." } };
 	}
 
-	const checked = await checkPagePatchOps(actor, tenantId, [], sectionOps(input.sections), "prepare");
+	const checked = await checkPagePatchOps(actor, tenantId, [], sectionOps(input.sections), "prepare", undefined, site.id);
 	if ("error" in checked) return checked;
 	const copy = copyNotes([], checked.ops, title);
 	if (copy.length > 0 && !input.keepWording) return copyRefusal(copy);
@@ -187,6 +187,7 @@ export async function preparePageCreate(actor: AgentActor, raw: unknown): Promis
 			...(leadingHere.length > 0 ? [{ rule: "fixes_links", ok: true, detail: `Links to ${slug} work once this page is published: ${leadingHere.slice(0, 5).join(", ")}.` }] : []),
 			...(input.menuLabel && inMenu ? [{ rule: "already_in_menu", ok: true, detail: `The menu already links to ${slug}, so no second entry is added.` }] : []),
 			...checked.skipped.map((detail) => ({ rule: "skipped_value", ok: false, detail })),
+			...(checked.shows ?? []).map(({ ok, detail }) => ({ rule: "products_shown", ok, detail })),
 			...copyGuardrails(copy),
 		],
 		plan: {

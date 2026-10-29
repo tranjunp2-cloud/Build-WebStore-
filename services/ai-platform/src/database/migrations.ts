@@ -209,29 +209,47 @@ export const MIGRATIONS: readonly { name: string; sql: string }[] = [
 	},
 ];
 
+/** Session lock taken around every migration run: two builds / deploys migrating at once take turns. */
+export const MIGRATION_LOCK_SQL = "SELECT pg_advisory_lock(hashtext('ai_platform_migrations'))";
+export const MIGRATION_UNLOCK_SQL = "SELECT pg_advisory_unlock(hashtext('ai_platform_migrations'))";
+
+/**
+ * Applies the migrations not applied yet, on one dedicated connection holding a session advisory lock: a
+ * second runner waits, then re-reads what was applied under the lock and finds nothing left to do (no
+ * collision on `CREATE INDEX IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS`).
+ */
 export async function runMigrations(pool: Pool, log: (line: string) => void = () => undefined): Promise<void> {
-	await pool.query(`CREATE TABLE IF NOT EXISTS ai_platform_migrations (
-		name text PRIMARY KEY,
-		applied_at timestamptz NOT NULL DEFAULT now()
-	)`);
-	const applied = await pool.query<{ name: string }>("SELECT name FROM ai_platform_migrations");
-	const done = new Set(applied.rows.map((row) => row.name));
-	for (const migration of MIGRATIONS) {
-		if (done.has(migration.name)) continue;
-		const client = await pool.connect();
+	const client = await pool.connect();
+	let broken = false;
+	try {
+		await client.query(MIGRATION_LOCK_SQL);
 		try {
-			await client.query("BEGIN");
-			await client.query(migration.sql);
-			await client.query("INSERT INTO ai_platform_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING", [
-				migration.name,
-			]);
-			await client.query("COMMIT");
-			log(`[ai-platform] applied migration ${migration.name}`);
-		} catch (error) {
-			await client.query("ROLLBACK");
-			throw error;
+			await client.query(`CREATE TABLE IF NOT EXISTS ai_platform_migrations (
+				name text PRIMARY KEY,
+				applied_at timestamptz NOT NULL DEFAULT now()
+			)`);
+			const applied = await client.query<{ name: string }>("SELECT name FROM ai_platform_migrations");
+			const done = new Set(applied.rows.map((row) => row.name));
+			for (const migration of MIGRATIONS) {
+				if (done.has(migration.name)) continue;
+				try {
+					await client.query("BEGIN");
+					await client.query(migration.sql);
+					await client.query("INSERT INTO ai_platform_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING", [migration.name]);
+					await client.query("COMMIT");
+					log(`[ai-platform] applied migration ${migration.name}`);
+				} catch (error) {
+					await client.query("ROLLBACK");
+					throw error;
+				}
+			}
 		} finally {
-			client.release();
+			// a connection that cannot unlock is dropped instead (closing the session frees its lock)
+			await client.query(MIGRATION_UNLOCK_SQL).catch(() => {
+				broken = true;
+			});
 		}
+	} finally {
+		client.release(broken);
 	}
 }

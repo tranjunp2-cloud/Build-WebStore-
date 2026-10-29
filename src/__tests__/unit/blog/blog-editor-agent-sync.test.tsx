@@ -70,7 +70,8 @@ describe('blog editor follows assistant changes to the open post', () => {
     })
 
     const mount = async () => {
-        render(<I18nProvider defaultLocale="en"><BlogEditorPageClient /></I18nProvider>)
+        // the copilot on: its (faked) provider is loaded on demand and hands the editor's handlers over
+        render(<I18nProvider defaultLocale="en"><BlogEditorPageClient agentEnabled /></I18nProvider>)
         await waitFor(() => expect(titleInput().value).toBe('Original'))
         load.mockClear()
     }

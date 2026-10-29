@@ -105,6 +105,8 @@ describe('preparePagePatch — product ids belong to this store [TC-AIWB-04]', (
     })
 
     it('refuses the same in a new product section', async () => {
+        // a page without a products grid yet (a second one is refused first: TC-AIAUD-079)
+        db.current.page = page(LAYOUT.filter((block) => block.blockType !== 'products-grid'))
         const result = await patch([{ op: 'insert_block', afterBlockId: '00000000-0000-4000-8000-0000000000b1', block: { blockType: 'products-grid', headline: 'Best sellers', selectedProductIds: ['1', '9'] } }])
 
         expect(result.error).toMatchObject({ code: 'unknown_products' })

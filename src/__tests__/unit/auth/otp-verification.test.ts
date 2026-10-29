@@ -11,6 +11,8 @@ vi.mock('@/lib/email/send', () => ({
 vi.mock('@/lib/otp/generate', () => ({
     generateOTP: vi.fn(() => '123456'),
     hashOTP: vi.fn(() => 'hashed_123456'),
+    OTP_TTL_MS: 5 * 60 * 1000,
+    OTP_RESEND_COOLDOWN_MS: 60 * 1000,
     getOTPExpiry: vi.fn(() => new Date(Date.now() + 5 * 60 * 1000)),
     verifyOTP: vi.fn((otp, hash) => otp === '123456' && hash === 'hashed_123456'),
 }))
@@ -88,6 +90,30 @@ describe('OTP Verification Endpoints', () => {
 
             expect(res.status).toBe(429)
             expect(data.errors[0].message).toContain('Please wait before requesting')
+        })
+
+        // TC-F02.44: 429 carries machine-readable code + remaining seconds for the login page
+        it('returns OTP_COOLDOWN code and retryAfter on cooldown (TC-F02.44)', async () => {
+            // Sent ~10s ago: expiry = now + 5min - 10s → cooldown has ~50s left
+            mockPayload.find.mockResolvedValue({
+                docs: [{
+                    id: 1,
+                    email: 'test@test.com',
+                    otpExpiresAt: new Date(Date.now() + 5 * 60 * 1000 - 10 * 1000).toISOString()
+                }]
+            })
+            const req = createMockRequest({ email: 'test@test.com' })
+
+            const res = await sendOtpHandler!(req) as Response
+            const data = await res.json()
+
+            expect(res.status).toBe(429)
+            expect(data.errors[0].code).toBe('OTP_COOLDOWN')
+            expect(data.errors[0].retryAfter).toBeGreaterThanOrEqual(49)
+            expect(data.errors[0].retryAfter).toBeLessThanOrEqual(51)
+            expect(data.errors[0].expiresIn).toBeGreaterThanOrEqual(289)
+            expect(data.errors[0].expiresIn).toBeLessThanOrEqual(291)
+            expect(res.headers.get('Retry-After')).toBe(String(data.errors[0].retryAfter))
         })
 
         it('generates OTP and updates user', async () => {

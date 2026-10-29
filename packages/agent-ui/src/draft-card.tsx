@@ -143,6 +143,7 @@ export const DEFAULT_DRAFT_LABELS: DraftLabels = {
 	morePlaces: "+{n}",
 	showChanges: "Show changes",
 	hideChanges: "Hide",
+	formattingChanged: "Formatting changed",
 	showAllChanges: "Show all {n} changes",
 	locate: "Show on page",
 	locateShort: "Show",

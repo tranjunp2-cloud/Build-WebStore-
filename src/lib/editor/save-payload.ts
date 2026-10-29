@@ -25,12 +25,19 @@ export type SavePayloadState = {
     draftVersion: string | null
 }
 
-/** The draft revision to send with a save (`base`); none known → the save goes through unchecked. */
-export function draftBase(state: { draftVersion: string | null }): { base?: string } {
-    return state.draftVersion ? { base: state.draftVersion } : {}
+/**
+ * The draft revision to send with a save (`base`); none known → the save goes through unchecked.
+ * `saveId` names this save across its retries: a retry whose first try was committed (response lost)
+ * is let through instead of refused as stale (see lib/sites/editor-revision).
+ */
+export function draftBase(state: { draftVersion: string | null }, saveId?: string | null): { base?: string; saveId?: string } {
+    return {
+        ...(state.draftVersion ? { base: state.draftVersion } : {}),
+        ...(saveId ? { saveId } : {}),
+    }
 }
 
-export function buildSavePayload(state: SavePayloadState): Record<string, unknown> {
+export function buildSavePayload(state: SavePayloadState, options: { saveId?: string | null } = {}): Record<string, unknown> {
     return {
         // the sections as written in the base language — never the language on screen: each other language
         // lives in its own copy (localeContent, _localeContent)
@@ -52,6 +59,6 @@ export function buildSavePayload(state: SavePayloadState): Record<string, unknow
         // F-26: the language on screen, so a reload restores it (only en/ms are stored in Sites.locale)
         ...((state.activeLocale === 'en' || state.activeLocale === 'ms') && { locale: state.activeLocale }),
         isDraft: true,
-        ...draftBase(state),
+        ...draftBase(state, options.saveId),
     }
 }

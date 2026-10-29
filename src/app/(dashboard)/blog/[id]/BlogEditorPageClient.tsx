@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -29,7 +29,9 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import type { ChangeSet } from '@ech/agent-core'
-import { BlogAgentProvider, blogThreadKey, useBlogAgent } from '../_components/ai/blog-agent'
+// types only: the copilot (blog-agent → @ech/agent-react, the chat panel and its styles) is loaded
+// on demand, only when it is switched on (BlogAgentShell below)
+import type * as BlogAgentModule from '../_components/ai/blog-agent'
 import { appliedKey, blogAiPreview, createdPostId, isStaleChange, type BlogAiField } from '../_components/ai/blog-ai-draft'
 import { AiMark, BlogAiBar, type BlogAiLabels, type BlogAiPhase } from '../_components/ai/blog-ai-marks'
 
@@ -37,6 +39,41 @@ const BlogRichEditor = dynamic(
     () => import('../_components/BlogRichEditor').then(mod => mod.BlogRichEditor),
     { ssr: false, loading: () => <div className="flex flex-col bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[16px] overflow-hidden min-h-[523px] animate-pulse" /> }
 )
+
+type BlogAgentValue = ReturnType<typeof BlogAgentModule.useBlogAgent>
+/** The copilot as the editor sees it, plus the key its chat is kept under (blog-agent's own). */
+type EditorAgentValue = BlogAgentValue & { threadKey?: (blogId: string) => string }
+
+/** The copilot switched off: the editor works without it (nothing of blog-agent is loaded). */
+const AGENT_OFF: EditorAgentValue = {
+    enabled: false,
+    draft: undefined,
+    busy: false,
+    decide: async (changeSet) => changeSet,
+    undo: undefined,
+    askAgainFor: () => undefined,
+    threadId: undefined,
+    setHandlers: () => undefined,
+    panel: null,
+}
+const EditorAgentContext = createContext<EditorAgentValue>(AGENT_OFF)
+const useEditorAgent = () => useContext(EditorAgentContext)
+
+/** The copilot, loaded on demand: blog-agent's provider, its value handed to the editor's context. */
+const BlogAgentShell = lazy(() => import('../_components/ai/blog-agent').then((mod) => {
+    function BlogAgentBridge({ children }: { children: ReactNode }) {
+        const agent = mod.useBlogAgent()
+        return <EditorAgentContext.Provider value={{ ...agent, threadKey: mod.blogThreadKey }}>{children}</EditorAgentContext.Provider>
+    }
+    function LoadedBlogAgentShell({ blogId, children }: { blogId: string; children: ReactNode }) {
+        return (
+            <mod.BlogAgentProvider blogId={blogId} enabled>
+                <BlogAgentBridge>{children}</BlogAgentBridge>
+            </mod.BlogAgentProvider>
+        )
+    }
+    return { default: LoadedBlogAgentShell }
+}))
 
 type BlogCategory = {
     id: string
@@ -278,7 +315,7 @@ function BlogEditorInner() {
     // A waiting AI change is shown in the form (locked) until it is kept or
     // discarded; keeping approves it server-side, so the post, its photos and
     // Undo are the server's — the form then shows what was written.
-    const agent = useBlogAgent()
+    const agent = useEditorAgent()
     const E = t.dashboard.blog.editor
     const aiLabels: BlogAiLabels = {
         tag: E.aiMarkTag, undoPart: E.aiUndoPart, keepPart: E.aiKeepPart,
@@ -425,7 +462,7 @@ function BlogEditorInner() {
                 const fields = aiRef.current?.fields ?? blogAiPreview(changeSet)?.fields ?? []
                 try {
                     sessionStorage.setItem(appliedKey(id), JSON.stringify({ fields }))
-                    if (agent.threadId) sessionStorage.setItem(blogThreadKey(id), agent.threadId)
+                    if (agent.threadId && agent.threadKey) sessionStorage.setItem(agent.threadKey(id), agent.threadId)
                     localStorage.removeItem(DRAFT_KEY)
                 } catch { /* storage off: the post still opens, without the marks */ }
                 router.replace(`/blog/${encodeURIComponent(id)}`)
@@ -1262,13 +1299,23 @@ function BlogEditorInner() {
 /**
  * The blog editor with its copilot: the AI writer lives in the side column
  * (inline panel, one chat per post) and every AI change shows in the form.
+ * With the copilot off its code is never loaded.
  */
 export default function BlogEditorPageClient({ agentEnabled = false }: { agentEnabled?: boolean }) {
     const params = useParams()
     const blogId = (params?.id as string) ?? 'new'
+    if (!agentEnabled) return <BlogEditorInner key={blogId} />
     return (
-        <BlogAgentProvider key={blogId} blogId={blogId} enabled={agentEnabled}>
-            <BlogEditorInner />
-        </BlogAgentProvider>
+        <Suspense
+            fallback={
+                <div className="flex min-h-[400px] items-center justify-center" aria-busy="true">
+                    <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--muted-foreground))]" />
+                </div>
+            }
+        >
+            <BlogAgentShell key={blogId} blogId={blogId}>
+                <BlogEditorInner />
+            </BlogAgentShell>
+        </Suspense>
     )
 }

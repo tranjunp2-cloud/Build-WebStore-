@@ -179,6 +179,29 @@ describe('what the sweep sends [TC-AISEC-103]', () => {
     })
 })
 
+describe('a refusal from the platform is final, a timeout or rate limit is not [TC-AISEC-142]', () => {
+    it('gives up on a 403 (approver now a viewer) and a 422 on the record call; defers a 429 and a 502', async () => {
+        const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+        const ids = ['cs_403', 'cs_422', 'cs_429', 'cs_502']
+        vi.mocked(unrecordedReceipts).mockResolvedValue(ids.map((id) => receipt(id, 'applied')) as never)
+        vi.mocked(aiPlatformJson).mockImplementation(async ({ method, path: p }) => {
+            const id = ids.find((each) => p.includes(each))!
+            if (id === 'cs_403' && method === 'GET') throw new AiPlatformError('Viewers cannot decide change sets.', 403)
+            if (method === 'GET') return card(id, 'pending')
+            const status = Number(id.slice(3))
+            throw new AiPlatformError(`refused ${status}`, status)
+        })
+
+        const totals = await sweepUnrecordedReceipts()
+
+        expect(totals).toMatchObject({ checked: 4, gaveUp: 2, deferred: 2, recorded: 0 })
+        expect(vi.mocked(markRecorded).mock.calls.map(([id]) => id).sort()).toEqual(['cs_403', 'cs_422'])
+        expect(vi.mocked(deferReceipt).mock.calls.map(([id]) => id).sort()).toEqual(['cs_429', 'cs_502'])
+        expect(log.mock.calls.map(([line]) => String(line)).join('\n')).toContain('the AI platform refused (403): Viewers cannot decide change sets.')
+    })
+})
+
 describe('schedule and schema [TC-AISEC-103]', () => {
     it('is a Vercel cron every 5 minutes and a frequent staging cron route', () => {
         const vercel = JSON.parse(readFileSync(path.join(root, 'vercel.json'), 'utf8')) as { crons: Array<{ path: string; schedule: string }> }

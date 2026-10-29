@@ -15,6 +15,8 @@ export interface SiteChangeLabels {
 	morePlaces: string;
 	showChanges: string;
 	hideChanges: string;
+	/** a text edit that only changed its formatting (bold, size): the words before and after read the same */
+	formattingChanged: string;
 	/** "Show all {n} changes" */
 	showAllChanges: string;
 }
@@ -24,6 +26,14 @@ const LOCATABLE = new Set(["site_block", "site_navigation", "site_page"]);
 const SITE_ROWS = 3;
 const SITE_GROUPS = 4;
 const SUMMARY_PLACES = 3;
+
+/**
+ * The words read the same before and after (the card shows text without markup): the edit changed only the
+ * formatting. Cut text (600 chars, ending in …) may differ further on, so it never counts.
+ */
+export function formattingOnly(diff: FieldDiff): boolean {
+	return Boolean(diff.before) && diff.before === diff.after && !diff.after.endsWith("…");
+}
 
 type Group = { key: string; name: string; kind: string; diffs: FieldDiff[] };
 
@@ -120,10 +130,10 @@ export function SiteChangeRows({ changeSet, labels, fieldName, notes, expanded, 
 										</div>
 										{/* an email the shop will send (a lead reply) or text the buyer is emailed as written (an order's cancel reason / rejection message): the merchant reads all of it, line breaks kept */}
 										<b title={group.kind === "lead_reply" || group.kind === "store_order" ? undefined : diff.after} data-full={group.kind === "lead_reply" ? "" : group.kind === "store_order" ? "order" : undefined}>
-											{diff.after}
+											{formattingOnly(diff) ? labels.formattingChanged : diff.after}
 										</b>
-										{/* nothing before (a new category, a field filled for the first time): no struck "empty" line */}
-										{diff.before ? <s title={diff.before}>{diff.before}</s> : null}
+										{/* nothing before (a new category, a field filled for the first time): no struck "empty" line; same words before and after = only the formatting changed, said once above */}
+										{diff.before && !formattingOnly(diff) ? <s title={diff.before}>{diff.before}</s> : null}
 									</div>
 								);
 							})}

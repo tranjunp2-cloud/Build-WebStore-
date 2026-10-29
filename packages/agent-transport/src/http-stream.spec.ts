@@ -124,6 +124,39 @@ describe("HttpGateway streamed runs", () => {
 		gw.close();
 	});
 
+	// TC-AISEC-144 — the decision body says a hand click (`manual: true`) only when the caller says so
+	it("sends manual: true for a hand click and leaves it out otherwise", async () => {
+		const decided = {
+			id: "cs_1",
+			runId: "run_1",
+			domain: "crm",
+			title: "Reply",
+			summary: "",
+			risk: "low",
+			blastRadius: { kind: "lead", count: 1, label: "1 lead" },
+			diffs: [{ entity: { kind: "lead", id: "2" }, field: "reply", before: null, after: "Hi", provenance: "generated" }],
+			guardrails: [],
+			status: "applied",
+			stagedBy: "agent",
+			stagedAt: "2026-10-19T00:00:00Z",
+			expiresAt: "2026-10-20T00:00:00Z",
+		};
+		const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify(decided), { status: 200 }));
+		const gw = new HttpGateway({ baseUrl: "/api/agent", fetcher: fetcher as unknown as typeof fetch });
+
+		await gw.decideChangeSet("cs_1", "approve", "self", undefined, { manual: true, confirm: "ORD-1" });
+		await gw.decideChangeSet("cs_1", "approve", "self", undefined, { manual: false });
+		await gw.decideChangeSet("cs_1", "approve", "self");
+
+		const bodies = fetcher.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+		expect(bodies).toEqual([
+			{ decision: "approve", actor: "self", confirm: "ORD-1", manual: true },
+			{ decision: "approve", actor: "self" },
+			{ decision: "approve", actor: "self" },
+		]);
+		gw.close();
+	});
+
 	// TC-AIREL-311 — the site editor's Undo / Redo asks the server to compare the page with a change; the answer
 	// carries the status it settled on and the open chat follows it.
 	it("reconciles a change and emits changeset.decided with the settled status", async () => {

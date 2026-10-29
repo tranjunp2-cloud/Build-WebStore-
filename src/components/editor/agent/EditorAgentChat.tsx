@@ -203,12 +203,12 @@ function EditorChatSurface({ siteId }: { siteId: string }) {
 	}, []);
 
 	const decide = useCallback(
-		async (changeSet: ChangeSet, decision: "approve" | "reject", options?: { confirm?: string; auto?: boolean }) => {
+		async (changeSet: ChangeSet, decision: "approve" | "reject", options?: { confirm?: string; auto?: boolean; manual?: boolean }) => {
 			const held = decision === "approve" && isSiteChange(changeSet) ? await holdEditor(options?.auto === true) : null;
 			// applied here: the page timeline has it (or will in a moment) — nothing to ask the server about
 			if (decision === "approve") checked.current.add(changeSet.id);
 			try {
-				const decided = await decideChangeSet(changeSet.id, decision, "self", undefined, options?.confirm !== undefined ? { confirm: options.confirm } : undefined);
+				const decided = await decideChangeSet(changeSet.id, decision, "self", undefined, options && { confirm: options.confirm, manual: options.manual });
 				allPending.refresh();
 				if (held && decided.status === "applied") announce(decided, held);
 				else held?.resume();
@@ -329,8 +329,9 @@ function EditorChatSurface({ siteId }: { siteId: string }) {
 			// two frames: the sidebar and its tab are on screen before the flight measures the box
 			requestAnimationFrame(() =>
 				requestAnimationFrame(async () => {
-					if (from) await flyToComposer(from, { element, kindLabel: kinds[element.kind] ?? element.kind });
-					attachElement(element);
+					// the chip is attached first (hidden); the copy flies to its place and reveals it
+					if (from) await flyToComposer(from, { element, kindLabel: kinds[element.kind] ?? element.kind }, document, { attach: () => attachElement(element) });
+					else attachElement(element);
 					if (prompt) void sendRef.current(prompt);
 					else {
 						composer.current?.focus();
@@ -349,12 +350,10 @@ function EditorChatSurface({ siteId }: { siteId: string }) {
 		const onPick = (event: Event) => {
 			const { element, add, from } = (event as CustomEvent<EditorAiPickDetail>).detail;
 			const kinds = { ...DEFAULT_COMPOSER_LABELS.elementKinds, ...labels.composer?.elementKinds };
-			void (from ? flyToComposer(from, { element, kindLabel: kinds[element.kind] ?? element.kind }) : Promise.resolve()).then(() =>
-				{
-					attachElement(element, add ? "add" : "only");
-					onPickedRef.current(Boolean(add));
-				},
-			);
+			const attach = () => attachElement(element, add ? "add" : "only");
+			void (from ? flyToComposer(from, { element, kindLabel: kinds[element.kind] ?? element.kind }, document, { attach }) : Promise.resolve(attach())).then(() => {
+				onPickedRef.current(Boolean(add));
+			});
 		};
 		window.addEventListener(EDITOR_AI_PICK_EVENT, onPick);
 		return () => window.removeEventListener(EDITOR_AI_PICK_EVENT, onPick);

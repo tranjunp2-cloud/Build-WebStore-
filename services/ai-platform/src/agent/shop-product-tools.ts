@@ -1,10 +1,13 @@
 import { tool } from "ai";
 import { buildShopProductDraftsChangeSet } from "./shop-product-drafts";
 import { buildShopProductStatusChangeSet, buildShopProductUpdateChangeSet } from "./shop-product-changes";
+import { buildShopProductsSetupChangeSet } from "./shop-product-setup";
 import type { MerchantToolDeps } from "./merchant-tools";
 import {
 	type ShopProductDraftsInput,
 	ShopProductDraftsInputSchema,
+	type ShopProductsSetupInput,
+	ShopProductsSetupInputSchema,
 	type ShopProductStatusInput,
 	ShopProductStatusInputSchema,
 	type ShopProductUpdateInput,
@@ -87,6 +90,24 @@ export function buildShopProductTools(deps: MerchantToolDeps) {
 				await deps.stage(built);
 				const skipped = built.guardrails.filter((g) => !g.ok).map((g) => g.detail);
 				return { changeSetId: built.id, products: input.products.length, note: STAGED_NOTE, ...(skipped.length > 0 ? { skipped } : {}) };
+			},
+		}),
+		propose_shop_products_setup: tool({
+			description:
+				"Stage ONE card that finishes 1 to 20 existing products at once: price, stock, photos and on sale / draft, shown as one row per product (before → after) and approved with one click, undone with one click. The numbers and photos must come from the merchant (their ask_user answer: a quantities question for stock and prices, a pictures question for photos) — never invent or estimate them; null keeps a value. At most 5 products per card may get NEW photos (each is downloaded on approval): split bigger jobs into several cards. Products with options keep their prices and stock (set in the product form). Use it for \"finish my store\"; use propose_shop_product_update for one product's other fields.",
+			inputSchema: ShopProductsSetupInputSchema,
+			execute: async (input: ShopProductsSetupInput) => {
+				if (!deps.allowEdit()) return LIMIT;
+				const ids = input.products.map((product) => product.id);
+				const twice = ids.find((id, i) => ids.indexOf(id) !== i);
+				if (twice) return { error: { code: "duplicate", message: `Product ${twice} is listed twice — one row per product.` } };
+				// every product is read again: the card is drafted from, and guarded by, what is stored now
+				const states = await Promise.all(ids.map((id) => deps.snapshot({ kind: "product", id })));
+				const built = buildShopProductsSetupChangeSet(input, states, { id: deps.newChangeSetId(), runId: deps.runId, now: deps.now() }, deps.images());
+				if ("error" in built) return { error: { code: built.code ?? "no_change", message: built.error } };
+				await deps.stage(built);
+				const skipped = built.guardrails.filter((g) => !g.ok).map((g) => g.detail);
+				return { changeSetId: built.id, products: built.blastRadius.count, note: STAGED_NOTE, ...(skipped.length > 0 ? { skipped } : {}) };
 			},
 		}),
 	};

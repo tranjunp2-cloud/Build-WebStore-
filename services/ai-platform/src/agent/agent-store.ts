@@ -7,6 +7,8 @@ export interface StoredChangeSet {
 	/** `requestedBy` is filled from the run's user when the draft predates it */
 	changeSet: ChangeSet;
 	claimedAt: Date | null;
+	/** the shop its run was asked in (ai_runs.tenant_id; null: unknown, e.g. a context without a tenant) */
+	tenantId: string | null;
 }
 
 /** The state a status write expects to find (compare-and-set). */
@@ -21,6 +23,8 @@ export interface ChangeSetListQuery {
 	limit: number;
 	/** only the drafts asked by this user (their run's user); omitted: the whole organization */
 	requestedBy?: string;
+	/** only drafts of this shop (or of a run without a tenant): shops sharing one organization never see each other's */
+	tenantId?: string;
 }
 
 /** Threads are private: every thread query is scoped to the org *and* the user. */
@@ -158,6 +162,8 @@ export interface WorkingRun {
 	startedAt: Date;
 	/** reserved, its run row not written yet: it takes a slot but is not listed */
 	pending: boolean;
+	/** the shop it was asked in (null / absent: unknown); the queue only lists the waiting person's own shop */
+	tenantId?: string | null;
 }
 
 /** A start waiting for a slot, oldest first. */
@@ -224,8 +230,33 @@ export interface RunWithState {
 export interface AgentStore {
 	createRun(ctx: AiRequestContext, run: AgentRun, userMessage?: string): Promise<void>;
 	saveRun(organizationId: string, run: AgentRun): Promise<void>;
-	/** `userId` restricts to that user's runs (prompts are private); omit only for internal settlement. */
-	getRun(organizationId: string, id: string, userId?: string): Promise<AgentRun | null>;
+	/**
+	 * `userId` restricts to that user's runs (prompts are private); omit only for internal settlement.
+	 * `tenantId` hides a run asked in another shop of the organization (a run without a tenant stays visible).
+	 */
+	getRun(organizationId: string, id: string, userId?: string, tenantId?: string): Promise<AgentRun | null>;
+	/**
+	 * Writes the run only while its row is in one of `from` (compare-and-set); false when nothing was written
+	 * (it moved on meanwhile: finished, answered, stopped elsewhere).
+	 */
+	saveRunIfStatus(organizationId: string, run: AgentRun, from: readonly AgentRun["status"][]): Promise<boolean>;
+	/**
+	 * Settles a run's status (and `finishedAt`) in place, only while its row is in one of `from`; the rest of the
+	 * stored run (steps, answer) is kept as its driver last wrote it. False when nothing was written.
+	 */
+	settleRunStatus(
+		organizationId: string,
+		runId: string,
+		status: AgentRun["status"],
+		finishedAt: string,
+		from: readonly AgentRun["status"][],
+	): Promise<boolean>;
+	/**
+	 * The caller's run paused on a question, claimed for one answer: `awaiting_input` → `running` in one
+	 * conditional write, so a second answer (double click, two tabs, a retry) finds nothing. Refused (null) when
+	 * it is not the caller's, not waiting, or a newer run was started in its chat (the question was left open).
+	 */
+	claimAwaitingInput(organizationId: string, runId: string, userId: string, now: Date): Promise<RunWithState | null>;
 	/** Just the status column — cheap enough to poll while a run is working (cross-instance Stop). */
 	getRunStatus(organizationId: string, id: string): Promise<AgentRun["status"] | null>;
 	listRuns(organizationId: string, limit: number, userId?: string): Promise<AgentRun[]>;
@@ -305,8 +336,8 @@ export interface AgentStore {
 	 */
 	failStaleRuns(staleBefore: Date, error: string, now?: Date): Promise<number>;
 
-	/** Paused-run state; null clears it once the run moves on. */
-	saveRunState(organizationId: string, runId: string, state: unknown): Promise<void>;
+	/** Paused-run state; null clears it once the run moves on. `onlyWhile`: written only while the run has that status. */
+	saveRunState(organizationId: string, runId: string, state: unknown, onlyWhile?: AgentRun["status"]): Promise<void>;
 	/** The caller's own run with its state. */
 	getRunWithState(organizationId: string, runId: string, userId: string): Promise<RunWithState | null>;
 
@@ -322,4 +353,6 @@ export interface AgentStore {
 
 	getDecision(organizationId: string, fingerprint: string, freshSince: Date): Promise<StoredDecision | null>;
 	putDecision(organizationId: string, fingerprint: string, decision: StoredDecision): Promise<void>;
+	/** Retention: drops cached decisions made before `before` (reads ignore them after the cache TTL). */
+	pruneDecisions(before: Date): Promise<number>;
 }

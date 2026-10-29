@@ -12,6 +12,7 @@
  */
 import { z } from 'zod'
 import { klDateKey } from '@/lib/discounts/date-boundaries'
+import type { ShopArea } from '@/lib/insights/area-access'
 import type { ShopTodoKind } from '@/lib/insights/shop-todo-text'
 
 export const AUTOMATION_IDS = ['discounts', 'stock', 'orders_waiting', 'leads', 'site_health'] as const
@@ -23,14 +24,25 @@ export interface AutomationDef {
     kinds: ShopTodoKind[]
     /** `weekly` automations run on Mondays (shop time) only */
     schedule: 'daily' | 'weekly'
+    /** The To do area (`computeShopTodos` `areas`) whose data its kinds come from */
+    area: ShopArea
 }
 
 export const AUTOMATIONS: Record<AutomationId, AutomationDef> = {
-    discounts: { id: 'discounts', kinds: ['discounts_expiring', 'discounts_used_up'], schedule: 'daily' },
-    stock: { id: 'stock', kinds: ['out_of_stock', 'low_stock'], schedule: 'daily' },
-    orders_waiting: { id: 'orders_waiting', kinds: ['payment_proofs', 'orders_to_confirm', 'orders_to_ship'], schedule: 'daily' },
-    leads: { id: 'leads', kinds: ['leads_waiting'], schedule: 'daily' },
-    site_health: { id: 'site_health', kinds: ['site_broken_links', 'site_unpublished', 'site_missing_seo'], schedule: 'weekly' },
+    discounts: { id: 'discounts', kinds: ['discounts_expiring', 'discounts_used_up'], schedule: 'daily', area: 'orders' },
+    stock: { id: 'stock', kinds: ['out_of_stock', 'low_stock'], schedule: 'daily', area: 'products' },
+    orders_waiting: { id: 'orders_waiting', kinds: ['payment_proofs', 'orders_to_confirm', 'orders_to_ship'], schedule: 'daily', area: 'orders' },
+    leads: { id: 'leads', kinds: ['leads_waiting'], schedule: 'daily', area: 'leads' },
+    site_health: { id: 'site_health', kinds: ['site_broken_links', 'site_unpublished', 'site_missing_seo'], schedule: 'weekly', area: 'builder' },
+}
+
+/**
+ * The To do areas the given automations read, every other area explicitly off: a run with only `stock` due does
+ * not query orders, and the (heavy) website check runs only when `site_health` is due.
+ */
+export function automationAreas(ids: readonly AutomationId[]): Record<ShopArea, boolean> {
+    const needed = new Set(ids.map((id) => AUTOMATIONS[id].area))
+    return { orders: needed.has('orders'), products: needed.has('products'), builder: needed.has('builder'), settings: false, leads: needed.has('leads') }
 }
 
 const BY_KIND = new Map<ShopTodoKind, AutomationId>(

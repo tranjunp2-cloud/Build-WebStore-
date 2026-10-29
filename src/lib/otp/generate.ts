@@ -1,9 +1,12 @@
 import { randomInt, createHash } from 'crypto'
 
 const OTP_LENGTH = 6
-const OTP_TTL_MS = process.env.NODE_ENV === 'production'
+export const OTP_TTL_MS = process.env.NODE_ENV === 'production'
     ? 5 * 60 * 1000   // Production: 5 minutes
     : 30 * 60 * 1000  // Dev: 30 minutes (easy testing)
+
+/** Minimum gap between two OTP sends for the same user. */
+export const OTP_RESEND_COOLDOWN_MS = 60 * 1000
 
 /** Generate a random 6-digit OTP code. */
 export function generateOTP(): string {

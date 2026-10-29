@@ -30,6 +30,7 @@ import {
     type PixabayPhoto,
 } from './pixabay-client'
 import { withMediaCreateLock } from './media-create-lock'
+import { buildStockAlt, MAX_STOCK_ALT_LENGTH } from './stock-alt'
 
 /** Render-box width per block — drives Pixabay size pick (largeImageURL vs webformatURL). */
 interface SizePreset {
@@ -136,9 +137,11 @@ function sanitizeAlt(raw: string | null | undefined): string {
  * alt informative. Format: `${description} — Photo by ${photographer}`
  */
 function buildAttributedAlt(photo: PixabayPhoto, fallbackContext: string): string {
-    const desc = sanitizeAlt(photo.alt) || fallbackContext
+    // #2103 A5: raw Pixabay tags repeat words and run long — dedupe, keep 2-3, prefix the subject.
+    const desc = buildStockAlt(sanitizeAlt(photo.alt), fallbackContext)
     const photographer = sanitizeAlt(photo.photographer)
-    return photographer ? `${desc} — Photo by ${photographer}` : desc
+    const attributed = photographer ? `${desc} — Photo by ${photographer}` : desc
+    return attributed.length <= MAX_STOCK_ALT_LENGTH ? attributed : desc
 }
 
 /** Pick up to `n` random photos from an array without replacement. */
@@ -247,7 +250,7 @@ async function fetchAndStorePoolPhoto(
     const { buffer, mimetype } = await downloadPhotoBuffer(photo.url)
     const extension = mimetype.includes('png') ? 'png' : 'jpg'
     const filename = `${blockType}-${photo.id}-${Date.now()}.${extension}`
-    const alt = photo.alt || `${ctx.businessName} ${blockType}`
+    const alt = buildStockAlt(photo.alt, `${ctx.businessName} ${blockType}`)
     const mediaId = await uploadBufferToMedia(payload, {
         buffer,
         filename,

@@ -24,6 +24,7 @@ import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 import { useAgentRecordSync } from '@/lib/agent-changes/use-agent-record-sync'
 import { AgentChangedNotice, SaveConflictNotice } from '@/components/agent/agent-changed-notice'
 import type { SaveVersion } from '@/lib/save-version/use-save-version'
+import { SaveBarLift } from '@/components/agent/save-bar-lift'
 
 interface ProductFormProps {
     initialData?: Partial<ProductFormValues>;
@@ -316,9 +317,11 @@ export function ProductForm({ initialData, isEdit, onSubmitForm, showLegacyPrice
                     left edge with the content column (sidebar + p-8 gutter) at lg+. */}
                 {methods.formState.isDirty && (
                     <div
+                        data-save-bar=""
                         className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"
                         style={{ background: 'var(--save-bar-bg)', boxShadow: 'var(--save-bar-shadow)' }}
                     >
+                        <SaveBarLift />
                         <div className="flex items-center gap-2 text-[13px]">
                             <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />
                             <span className="text-amber-600 dark:text-amber-300 font-medium">{t.dashboard.products.form.unsavedChanges}</span>

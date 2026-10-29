@@ -53,6 +53,12 @@ export interface ThreadFilter {
 
 export type ChangeSetDecision = "approve" | "reject";
 
+/** How a decision was made: `confirm` echoes the typed confirmation, `manual` marks the merchant's own click. */
+export interface DecideOptions {
+	confirm?: string;
+	manual?: boolean;
+}
+
 export interface SendReplyInput {
 	conversationId: string;
 	body: string;
@@ -105,8 +111,11 @@ export interface AgentGateway {
 
 	// writes — every write returns the updated aggregate
 	startRun(input: StartRunInput): Promise<AgentRun>;
-	/** `confirm`: echoes `changeSet.confirmText` once the approver said Yes to a change that needs a hand approval */
-	decideChangeSet(id: string, decision: ChangeSetDecision, actor: string, note?: string, options?: { confirm?: string }): Promise<ChangeSet>;
+	/**
+	 * `confirm`: echoes `changeSet.confirmText` once the approver said Yes to a change that needs a hand approval;
+	 * `manual`: the merchant's own click (never sent by Auto-approve) — the server refuses a `requiresClick` card without it
+	 */
+	decideChangeSet(id: string, decision: ChangeSetDecision, actor: string, note?: string, options?: DecideOptions): Promise<ChangeSet>;
 	/** Puts the record back as it was before an applied change (when the change kept undo data). */
 	undoChangeSet?(id: string): Promise<ChangeSet>;
 	/**

@@ -1,108 +1,121 @@
 /**
- * TC-F01V-CD — Content delegation to template-composer builders
- * Source: plans/260415-0900-wire-template-builders-to-ai-gapfill/phase-01-wire-builders.md
+ * TC-F01V-CD — Content delegation to template-composer builders (updated for #2103 A1).
  *
- * Verifies that buildBlockFromLibrary delegates features/stats/pricing/team/
- * service-cards cases to template-composer builders, returning Malaysia-
- * specific hand-curated content instead of the legacy generic pool.
+ * buildBlockFromLibrary delegates features/stats/pricing/team/logo-cloud/testimonials/faq to the
+ * composer builders, which now read only the merchant FACTS: no curated "Halal Certified",
+ * "Dr. Tan Wei Ming", "Bridal Package RM 800", "Patients Treated" and friends.
  */
 
 import { describe, expect, it } from 'vitest'
 import { buildBlockFromLibrary } from '@/lib/ai/content-injection'
+import { buildGenerationFacts } from '@/lib/ai/generation-facts'
+
+const facts = buildGenerationFacts({
+    businessInfo: {
+        businessName: 'Dapur Kak Yah',
+        products: 'Kek lapis (whole RM65, half RM35), kuih raya box RM48, tempahan birthday from RM120',
+        phone: '012-3456789',
+        buyingMethods: ['delivery', 'cod'],
+        serviceArea: 'Klang Valley',
+        shopFacts: 'Started in 2015',
+    },
+    tenant: { payments: { payment_fpx: true, payment_cod: true } },
+})
+const ctx = { seed: 42, userBiz: { name: 'Dapur Kak Yah', products: ['Kek lapis', 'kuih raya box', 'tempahan birthday'], facts } }
 
 describe('buildBlockFromLibrary — delegation to template-composer (R-wire)', () => {
     describe('features delegation', () => {
-        it('TC-F01V-CD.01 — health features contain curated "Expert Doctors"', () => {
-            const block = buildBlockFromLibrary('features', 'health', { seed: 42 })
-            const features = (block?.features as Array<{ title: string }>) ?? []
-            const titles = features.map((f) => f.title)
-            expect(titles).toContain('Expert Doctors')
-            expect(titles).not.toContain('Quality Service')
-        })
-
-        it('TC-F01V-CD.02 — restaurant features contain "Halal Certified" (JAKIM context)', () => {
-            const block = buildBlockFromLibrary('features', 'restaurant', { seed: 100 })
+        it('TC-F01V-CD.01 — features are the merchant products, never curated claims', () => {
+            const block = buildBlockFromLibrary('features', 'fnb', ctx)
             const features = (block?.features as Array<{ title: string; description: string }>) ?? []
-            const titles = features.map((f) => f.title)
-            expect(titles).toContain('Halal Certified')
-            const halal = features.find((f) => f.title === 'Halal Certified')
-            expect(halal?.description).toMatch(/JAKIM/)
+            expect(features.map((f) => f.title)).toEqual(['Kek lapis', 'Kuih raya box', 'Tempahan birthday'])
+            expect(features[0]!.description).toBe('RM 65')
+            expect(features[2]!.description).toBe('From RM 120')
         })
 
-        it('TC-F01V-CD.03 — beauty features contain curated Korean/Japanese products', () => {
+        it('TC-F01V-CD.02 — restaurant/health/tech features carry no halal, SLA, doctor or insurance claims', () => {
+            for (const category of ['restaurant', 'health', 'tech', 'beauty']) {
+                const block = buildBlockFromLibrary('features', category, { seed: 1 })
+                const text = JSON.stringify(block?.features)
+                expect(text, category).not.toMatch(/halal|jakim|grabfood|foodpanda|sla|uptime|soc 2|insurance|dermatolog|doctor/i)
+            }
+        })
+
+        it('TC-F01V-CD.03 — with nothing listed, features are the claim-free trio', () => {
             const block = buildBlockFromLibrary('features', 'beauty', { seed: 7 })
-            const features = (block?.features as Array<{ title: string; description: string }>) ?? []
-            const descriptions = features.map((f) => f.description).join(' ')
-            expect(descriptions).toMatch(/Korea|Japan|halal-certified|dermatologist/i)
-        })
-
-        it('TC-F01V-CD.04 — tech features contain curated SLA/enterprise language', () => {
-            const block = buildBlockFromLibrary('features', 'tech', { seed: 1 })
-            const features = (block?.features as Array<{ title: string; description: string }>) ?? []
-            const text = features.map((f) => `${f.title} ${f.description}`).join(' ')
-            expect(text).toMatch(/SLA|enterprise|SOC 2|uptime/i)
+            const features = (block?.features as Array<{ title: string }>) ?? []
+            expect(features.map((f) => f.title)).toEqual(['Tell us what you need', 'Easy to reach', 'Made around you'])
         })
     })
 
     describe('stats delegation', () => {
-        it('TC-F01V-CD.05 — health stats contain "Patients Treated"', () => {
-            const block = buildBlockFromLibrary('stats', 'health', { seed: 42 })
-            const stats = (block?.stats as Array<{ label: string }>) ?? []
-            const labels = stats.map((s) => s.label)
-            expect(labels).toContain('Patients Treated')
-            expect(labels).not.toContain('Happy Customers')
+        it('TC-F01V-CD.05 — stats are only real facts (year started, products listed)', () => {
+            const block = buildBlockFromLibrary('stats', 'health', ctx)
+            const stats = (block?.stats as Array<{ value: string; label: string }>) ?? []
+            expect(stats).toEqual([
+                { value: '2015', label: 'Year started' },
+                { value: '3', label: 'Products' },
+            ])
         })
 
-        it('TC-F01V-CD.06 — restaurant stats contain "Customers Served" or "Menu Items"', () => {
-            const block = buildBlockFromLibrary('stats', 'restaurant', { seed: 99 })
-            const stats = (block?.stats as Array<{ label: string }>) ?? []
-            const labels = stats.map((s) => s.label)
-            expect(labels.some((l) => /Customers Served|Menu Items|Years Serving/.test(l))).toBe(true)
+        it('TC-F01V-CD.06 — no facts → nothing to inject (no invented numbers)', () => {
+            expect(buildBlockFromLibrary('stats', 'restaurant', { seed: 99 })).toBeNull()
         })
     })
 
     describe('team delegation', () => {
-        it('TC-F01V-CD.07 — health team contains "Dr. Tan Wei Ming" (Malaysian name + credentials)', () => {
-            const block = buildBlockFromLibrary('team', 'health', { seed: 7 })
-            const members = (block?.members as Array<{ name: string; bio: string }>) ?? []
-            const names = members.map((m) => m.name)
-            expect(names).toContain('Dr. Tan Wei Ming')
-            expect(names).not.toContain('Team Lead')
-            const firstMember = members[0]
-            expect(firstMember?.bio).toMatch(/MBBS|BDS|MRCP/)
-        })
-
-        it('TC-F01V-CD.08 — tech team contains "Ahmad Razif" (curated)', () => {
-            const block = buildBlockFromLibrary('team', 'tech', { seed: 7 })
-            const members = (block?.members as Array<{ name: string }>) ?? []
-            const names = members.map((m) => m.name)
-            expect(names).toContain('Ahmad Razif')
+        it('TC-F01V-CD.07 — team is the brand team, no named people', () => {
+            const block = buildBlockFromLibrary('team', 'health', ctx)
+            const members = (block?.members as Array<{ name: string; role: string }>) ?? []
+            expect(members).toEqual([{ name: 'The Dapur Kak Yah team', role: 'Founder' }])
         })
     })
 
     describe('pricing delegation', () => {
-        it('TC-F01V-CD.09 — beauty pricing contains "Bridal Package" (curated)', () => {
-            const block = buildBlockFromLibrary('pricing', 'beauty', { seed: 3 })
-            const plans = (block?.plans as Array<{ name: string }>) ?? []
-            const names = plans.map((p) => p.name)
-            expect(names).toContain('Bridal Package')
-            expect(names).not.toContain('Starter')
+        it('TC-F01V-CD.09 — pricing plans are the merchant priced products', () => {
+            const block = buildBlockFromLibrary('pricing', 'beauty', ctx)
+            const plans = (block?.plans as Array<{ name: string; price: string }>) ?? []
+            expect(plans.map((p) => `${p.name}=${p.price}`)).toEqual([
+                'Kek lapis=RM 65',
+                'kuih raya box=RM 48',
+                'tempahan birthday=From RM 120',
+            ])
         })
 
-        it('TC-F01V-CD.10 — education pricing contains "SPM Package" (Malaysia-specific)', () => {
-            const block = buildBlockFromLibrary('pricing', 'education', { seed: 5 })
-            const plans = (block?.plans as Array<{ name: string }>) ?? []
-            const names = plans.map((p) => p.name)
-            expect(names.some((n) => /SPM|Single Subject|Premium/.test(n))).toBe(true)
+        it('TC-F01V-CD.11 — no merchant prices → no pricing block is injected', () => {
+            expect(buildBlockFromLibrary('pricing', 'travel', { seed: 2 })).toBeNull()
+        })
+    })
+
+    describe('logo-cloud / testimonials / faq delegation', () => {
+        it('TC-F01V-CD.16 — logo-cloud shows only enabled payment methods', () => {
+            const block = buildBlockFromLibrary('logo-cloud', 'tech', ctx)
+            expect((block?.logos as Array<{ name: string }>).map((l) => l.name)).toEqual(['FPX', 'Cash on delivery'])
         })
 
-        it('TC-F01V-CD.11 — pricing for uncovered category falls to composer default (still curated)', () => {
-            // 'travel' not in composer pricingMap → falls to defaultPlans which
-            // has RM prices + real feature lists (still better than old generic).
-            const block = buildBlockFromLibrary('pricing', 'travel', { seed: 2 })
-            const plans = (block?.plans as Array<{ price: string }>) ?? []
-            expect(plans.length).toBeGreaterThan(0)
-            expect(plans[0]?.price).toMatch(/RM/)
+        it('TC-F01V-CD.17 — testimonials without real reviews is one invitation card', () => {
+            const block = buildBlockFromLibrary('testimonials', 'beauty', ctx)
+            const items = block?.testimonials as Array<Record<string, unknown>>
+            expect(items).toHaveLength(1)
+            expect(items[0]!.quote).toBe('Be the first to review Dapur Kak Yah')
+            expect(items[0]!.rating).toBeUndefined()
+        })
+
+        it('TC-F01V-CD.18 — faq answers come from facts (contact, offer, how to order, area)', () => {
+            const block = buildBlockFromLibrary('faq', 'fnb', ctx)
+            const faqs = block?.faqs as Array<{ question: string; answer: string }>
+            expect(faqs.map((f) => f.question)).toEqual([
+                'How can I contact Dapur Kak Yah?',
+                'What does Dapur Kak Yah offer?',
+                'How do I order?',
+                'Which areas do you serve?',
+            ])
+            expect(faqs[2]!.answer).toContain('We offer delivery.')
+            expect(faqs[2]!.answer).toContain('Accepted payment methods: FPX, Cash on delivery.')
+        })
+
+        it('TC-F01V-CD.19 — faq with no facts is not injected', () => {
+            expect(buildBlockFromLibrary('faq', 'fnb', { seed: 1, userBiz: { name: 'Solo' } })).toBeNull()
         })
     })
 
@@ -114,10 +127,7 @@ describe('buildBlockFromLibrary — delegation to template-composer (R-wire)', (
             })
             const services = (block?.services as Array<{ title: string }>) ?? []
             expect(services.length).toBeGreaterThan(0)
-            // composer buildServiceCards generates per-category or biz.products-driven services
-            // Either path should NOT emit the old "Premium Service" generic
-            const titles = services.map((s) => s.title)
-            expect(titles.every((t) => t !== 'Premium Service')).toBe(true)
+            expect(services.every((s) => s.title !== 'Premium Service')).toBe(true)
         })
 
         it('TC-F01V-CD.13 — service-cards with biz.products emits product-derived services', () => {
@@ -130,10 +140,7 @@ describe('buildBlockFromLibrary — delegation to template-composer (R-wire)', (
             })
             const services = (block?.services as Array<{ title: string }>) ?? []
             const titlesText = services.map((s) => s.title.toLowerCase()).join(' ')
-            // Composer's productToService maps product names to service titles
-            expect(
-                /whitening|implant|orthodont|dental/.test(titlesText),
-            ).toBe(true)
+            expect(/whitening|implant|orthodont|dental/.test(titlesText)).toBe(true)
         })
     })
 
@@ -145,16 +152,17 @@ describe('buildBlockFromLibrary — delegation to template-composer (R-wire)', (
         })
 
         it('TC-F01V-CD.15 — delegated blocks have correct blockType field', () => {
-            const features = buildBlockFromLibrary('features', 'beauty', { seed: 1 })
-            const stats = buildBlockFromLibrary('stats', 'beauty', { seed: 1 })
-            const pricing = buildBlockFromLibrary('pricing', 'beauty', { seed: 1 })
-            const team = buildBlockFromLibrary('team', 'beauty', { seed: 1 })
-            const svc = buildBlockFromLibrary('service-cards', 'beauty', { seed: 1 })
-            expect(features?.blockType).toBe('features')
-            expect(stats?.blockType).toBe('stats')
-            expect(pricing?.blockType).toBe('pricing')
-            expect(team?.blockType).toBe('team')
-            expect(svc?.blockType).toBe('service-cards')
+            const types: Record<string, string | undefined> = {}
+            for (const bt of ['features', 'stats', 'pricing', 'team', 'service-cards']) {
+                types[bt] = buildBlockFromLibrary(bt, 'beauty', ctx)?.blockType as string | undefined
+            }
+            expect(types).toEqual({
+                features: 'features',
+                stats: 'stats',
+                pricing: 'pricing',
+                team: 'team',
+                'service-cards': 'service-cards',
+            })
         })
     })
 })

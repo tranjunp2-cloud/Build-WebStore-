@@ -21,11 +21,14 @@ function isProductionDeploy(): boolean {
 
 /**
  * The agent mascot runs against the real AI platform only when it is
- * configured, and stays off on production unless AI_AGENT_ENABLED=true.
+ * configured. AI_AGENT_ENABLED: unset = on outside production; "false" = off
+ * everywhere (kill switch, also on staging/preview); production needs "true".
  */
 export function isAiAgentEnabled(): boolean {
 	if (!getAiPlatformUrl() || !getAiPlatformContextSecret()) return false;
-	return !isProductionDeploy() || process.env.AI_AGENT_ENABLED === "true";
+	const flag = process.env.AI_AGENT_ENABLED?.trim().toLowerCase();
+	if (flag === "false") return false;
+	return flag === "true" || !isProductionDeploy();
 }
 
 /**

@@ -56,7 +56,7 @@ const EXTRA: Record<ShopTodoKind, Extra> = {
 	out_of_stock: {
 		group: "now", area: "products", icon: "package-x",
 		fact: { tone: "late", text: (_, l) => t("buyers can't order", "pembeli tidak boleh membeli")(l) },
-		ask: { en: "Restock them, or hide them for now?", ms: "Tambah stok, atau sembunyikan dahulu?" }, go: { en: "Show the list", ms: "Tunjuk senarai" },
+		ask: { en: "Restock them, or hide them for now?", ms: "Tambah stok, atau sembunyikan dahulu?" }, go: { en: "Update stock", ms: "Kemas kini stok" },
 	},
 	site_broken_links: {
 		group: "now", area: "website", icon: "link-2-off",
@@ -76,7 +76,7 @@ const EXTRA: Record<ShopTodoKind, Extra> = {
 	products_ai_review: {
 		group: "week", area: "products", icon: "sparkles",
 		fact: { tone: "near", text: (_, l) => t("not on sale yet", "belum dijual")(l) },
-		ask: { en: "Take a look?", ms: "Lihat sekarang?" }, go: { en: "Review drafts", ms: "Semak draf" },
+		ask: { en: "Finish setting them up?", ms: "Siapkan sekarang?" }, go: { en: "Finish your shop", ms: "Siapkan kedai anda" },
 	},
 	site_unpublished: {
 		group: "week", area: "website", icon: "globe",

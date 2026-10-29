@@ -42,7 +42,11 @@ import {
     detectLanguageFromText,
     normalizeSupportedLocale,
 } from '@/lib/language-detection'
-import { parseProductsString } from '@/lib/ai/business-info-mapper'
+import { parseProductsString, parseProducts } from '@/lib/ai/business-info-mapper'
+import { buildGenerationFacts, collectPlaceholders, type GenerationPlaceholder } from '@/lib/ai/generation-facts'
+import { applyProductPricesToMenus, isEmptyRequiredListBlock } from '@/lib/ai/grounded-blocks'
+import { ensureHomeCommerceBlock, ensureProductsPage, productsCopy, shopContentLocale, type ShopContentLocale, type ShopPageShape } from '@/lib/ai/ensure-products-page'
+import { applyGenerationContact, buildSiteContactInfo } from '@/lib/ai/user-contact-defaults'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveBusinessCategory, normalizeComposerCategory } from '@/lib/ai/composer-category-resolver'
@@ -67,7 +71,7 @@ import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
-import { generateSampleProducts, prepareSampleProducts } from '@/lib/ai/generate-sample-products'
+import { generateSampleProducts, prepareSampleProducts, matchPoolPhotosToProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
 import { seedBlogPosts, prepareBlogPosts, assignResolvedBlogThumbnails, persistBlogPosts, type PreparedBlogPost } from '@/lib/ai/seed-blog-posts'
 import { getBlogThumbnails } from '@/lib/images/blog-thumbnail-images'
@@ -80,7 +84,6 @@ import { patchBlockCtaUrlsFromLinks } from '@/lib/ai/patch-block-cta-urls'
 import { GenerationTimings, normalizeGenerationRequestId } from '@/lib/ai/generation-timings'
 import { countSnapshotFields, finishWebsiteCapture, heartbeatWebsiteCapture, persistWebsiteCaptureProgress, startCapture, type CaptureHandle } from '@/lib/ai/capture-generation'
 import type { FailedPage, PersistedPage, TerminalErrorPhase } from '@/lib/ai/generation-outcome'
-import { resolveBlockContent } from '@/lib/ai/add-section-content'
 import { PRODUCTS_GRID_LIMIT } from '@/blocks/products-grid/config'
 
 
@@ -539,6 +542,40 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             limit: 1,
         })
 
+        // Contact defaults: form > existing site contactInfo > account (see
+        // user-contact-defaults.ts). Runs after startCapture, so the captured
+        // snapshot keeps the raw form input. Recovery/admin rerun call
+        // generateSiteWithAI directly with that snapshot and never reach this
+        // step, so a recovered site gets no account-derived contact.
+        const existingForContact = (await existingSitesPromise).docs[0] as {
+            contactInfo?: Record<string, unknown>
+            socialLinks?: Record<string, unknown>
+            localBusiness?: Record<string, unknown>
+        } | undefined
+        Object.assign(businessInfo, applyGenerationContact(businessInfo, {
+            user: user as { email?: unknown; phone?: unknown },
+            existingContactInfo: existingForContact?.contactInfo,
+            migration: Boolean(migration),
+        }))
+
+        // #2103 A1: one FACTS object per generation — form answers, URL-import items, contact
+        // (form > site > account), tenant WhatsApp/address, enabled payments, site socials. Every
+        // claim on the generated site must come from here; nothing is invented.
+        const tenantForFacts = migration ? null : await payload.findByID({
+            collection: 'tenants',
+            id: resolvedTenantId,
+            depth: 0,
+        }).catch((err: unknown) => {
+            console.warn('[generate-site] tenant facts unavailable (non-fatal):', err instanceof Error ? err.message : err)
+            return null
+        })
+        const generationFacts = migration ? undefined : buildGenerationFacts({
+            businessInfo,
+            contentBrief: rawContentBrief,
+            tenant: tenantForFacts as Record<string, unknown> | null,
+            site: existingForContact ?? null,
+        })
+
         // Check SSE mode
         const isStreaming = context.streaming === true
 
@@ -710,6 +747,8 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             createdPages: Record<string, unknown>[]
             pageFailures: Array<{ slug: string; title: string; error: string }>
             productsCreatedCount: number
+            productIds: string[]
+            placeholders: GenerationPlaceholder[]
             timeMs: number
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
             blockImageStats: { succeeded: number; failed: number }
@@ -762,7 +801,8 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                             businessName: businessInfo.businessName,
                             industry: businessInfo.industry,
                             shortDescription: businessInfo.shortDescription,
-                            products: businessInfo.products,
+                            // #2103 A2: clean names — no "(whole RM65, half RM35)" in an image-search prompt.
+                            products: _parsedProductsForPool.join(', '),
                             language,
                         }).catch((): string[] => [])
                     const rawKeywords = mergeKeywords(_parsedProductsForPool, extractedKeywords)
@@ -943,15 +983,11 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                     imagePoolPromise,
                     preUploadedPoolPromise,
                 ])
-                const source = pool
-                    ? (pool.square.length > 0 ? pool.square : pool.landscape)
-                    : []
-                const availableIds = source
-                    .map((photo) => preUploadedPool.get(photo.id))
-                    .filter((id): id is number => id != null)
-                const imageIds = prepared.products.map((_, index) =>
-                    availableIds.length > 0 ? availableIds[index % availableIds.length] : undefined,
-                )
+                // #2103 A3: a pool photo goes to a product only when its tags match that product
+                // (its AI keyword or the merchant's own name); each photo once. No match → no photo,
+                // never a round-robin pick that puts a cake photo on a kuih box.
+                const source = pool ? [...pool.square, ...pool.landscape] : []
+                const imageIds = matchPoolPhotosToProducts(prepared.products, source, preUploadedPool)
                 return generateSampleProducts(
                     businessInfo,
                     effectiveGenerationLocale,
@@ -978,7 +1014,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                         referencePrompt,
                         blockPromptOverrides,
                         onEvent,
-                        { targetLocale: effectiveGenerationLocale, modeDecision, ...(migration ? { sourceBlueprint: migration.sourceBlueprint } : {}) },
+                        { targetLocale: effectiveGenerationLocale, modeDecision, facts: generationFacts, ...(migration ? { sourceBlueprint: migration.sourceBlueprint } : {}) },
                     ),
                 ),
             )
@@ -1375,8 +1411,10 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         // en/ms/vi to 'auto' and GPT's result.language often falls back to 'en', losing the real code.
         const generationLocale = effectiveGenerationLocale || result.language || language || 'en'
         const detectedLocale = (['ms', 'en'] as string[]).includes(generationLocale) ? generationLocale : 'en'
-        const productsGridContentLocale = detectedLocale === 'ms' ? 'ms' : 'en'
+        // shop copy (Products page / menu entry / headlines) follows the real generation locale: en, ms and vi have copy
+        const productsGridContentLocale = shopContentLocale(generationLocale)
         const pendingLocaleConfirm = false
+        const generatedContactInfo = buildSiteContactInfo(businessInfo)
         const siteGenerationData = {
             name: result.siteName,
             status: 'draft' as const,
@@ -1389,6 +1427,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 metaTitle: result.seo.title,
                 metaDescription: result.seo.description,
             },
+            ...(Object.keys(generatedContactInfo).length > 0 ? { contactInfo: generatedContactInfo } : {}),
             aiGenerationMetadata: {
                 generatedAt: new Date().toISOString(),
                 originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
@@ -1408,6 +1447,9 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             }
         }
         const keepMigrationDraft = migration?.sourceBlueprint.nativeContract.site.publication === 'keep-draft'
+        // #2103 A4: a generated site is a draft until the merchant publishes it (the publish flow promotes
+        // pages and the AI blog posts together). Migration keeps its own contract-driven behaviour.
+        const pageStatus: 'draft' | 'published' = migration ? (keepMigrationDraft ? 'draft' : 'published') : 'draft'
         if (migration?.beforeWrite) await migration.beforeWrite()
         if (existingSites.docs.length > 0) {
             const previousSite = existingSites.docs[0] as Record<string, unknown>
@@ -1566,6 +1608,16 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             fallbackHeroMediaIds,
         })
 
+        // #2103 A3: the storefront has no /products route of its own, so shops get a CMS page with a
+        // products grid (and, through the nav links built below, a menu entry). It also puts a commerce
+        // block on the site, which is what switches the floating cart on.
+        if (!migration) {
+            ensureProductsPage(rawPageDefinitions as unknown as ShopPageShape[], {
+                locale: productsGridContentLocale,
+                brandName: businessInfo.businessName,
+            })
+        }
+
         // GH-820: build nav links from normalized definitions so URLs match canonical page slugs.
         // aiPageLinks (derived above from result.pages) still carries raw AI slugs like /book-trial;
         // rawPageDefinitions has already run canonicalizePageSlug so slugs are /contact, /about, etc.
@@ -1622,6 +1674,25 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             businessInfo.businessName,
             result.localeStructuralStrings,
         )
+        if (!migration) {
+            // #2103 A3: every shop home gets a commerce block when products exist (fnb/beauty/... recipes have none).
+            ensureHomeCommerceBlock(pageDefinitions as unknown as ShopPageShape[], { locale: productsGridContentLocale, brandName: businessInfo.businessName })
+            // #2103 A2: a menu item the merchant gave no price for takes the price of the product we create for it.
+            // Only if they are already done: page persistence must never wait on product image work.
+            let earlyTimer: ReturnType<typeof setTimeout> | undefined
+            const earlyProducts = await Promise.race([
+                sampleProductsPromise.catch(() => null),
+                new Promise<null>((resolve) => { earlyTimer = setTimeout(() => resolve(null), 0) }),
+            ])
+            if (earlyTimer) clearTimeout(earlyTimer)
+            if (earlyProducts) {
+                for (const page of pageDefinitions) {
+                    if (Array.isArray(page.layout)) {
+                        page.layout = applyProductPricesToMenus(page.layout as Array<Record<string, unknown>>, earlyProducts.products) as typeof page.layout
+                    }
+                }
+            }
+        }
         _expectedPagesCount = pageDefinitions.length
         _expectedPageOutcomes = pageDefinitions.map((page) => ({
             key: page.slug,
@@ -1631,6 +1702,8 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
 
         const createdPages: Record<string, unknown>[] = []
         const pageFailures: Array<{ slug: string; title: string; error: string }> = []
+        // The layouts that were actually saved (after sanitize / drop), for the placeholder report below.
+        const savedLayouts: Array<{ slug: string; layout: unknown }> = []
 
         const dbPhaseStart = Date.now()
         if (_siteCapture) await heartbeatWebsiteCapture(_siteCapture)
@@ -1706,7 +1779,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                                     slug: pageDefinition.slug,
                                     site: site.id,
                                     isHomepage: pageDefinition.isHomepage,
-                                    _status: keepMigrationDraft ? 'draft' : 'published',
+                                    _status: pageStatus,
                                     layout: normalizedLayout,
                                     seo: pageDefinition.seo,
                                 },
@@ -1762,7 +1835,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                                 slug: pageDefinition.slug,
                                 site: site.id,
                                 isHomepage: pageDefinition.isHomepage,
-                                _status: keepMigrationDraft ? 'draft' : 'published',
+                                _status: pageStatus,
                                 layout: normalizedLayout,
                                 seo: pageDefinition.seo,
                             },
@@ -1777,6 +1850,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                     ) as Record<string, unknown>
                 }
                 createdPages.push(createdPage)
+                savedLayouts.push({ slug: pageDefinition.slug, layout: normalizedLayout })
                 _createdPagesCount++
                 _persistedPageOutcomes.push({
                     id: typeof createdPage.id === 'string' || typeof createdPage.id === 'number' ? createdPage.id : undefined,
@@ -1823,6 +1897,12 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 // Sub-page failure is soft — continue loop, gen still ships
             }
         }
+
+        // #2103 A1/L1: blocks still holding placeholder content the merchant should replace (informational).
+        // Collected from what was SAVED: a block the sanitize step dropped (empty required list) is not reported.
+        const generationPlaceholders: GenerationPlaceholder[] = migration
+            ? []
+            : collectPlaceholders(savedLayouts, generationFacts)
 
         // GH-817 post-creation layout sync: if any pages failed to create, their links are
         // still present in nav AND footer blocks of successfully saved pages (normalizedPageLinks
@@ -1927,7 +2007,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                     site: site.id,
                     tenant: resolvedTenantId,
                     isHomepage: false,
-                    _status: keepMigrationDraft ? 'draft' : 'published',
+                    _status: pageStatus,
                     layout: [
                         { blockType: 'hero', variant: 'centered', headline: '404', subheadline: 'Page Not Found — The page you are looking for does not exist or has been moved.' },
                     ],
@@ -1994,6 +2074,14 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 || (code === '23503' && /products_images_image_id_media_id_fk|image_id/i.test(constraint + msg))
         }
         let productsCreatedCount = 0
+        // #2103 A3: ids of the products created for this site (done event → builder "Finish your shop").
+        const createdProductIds: string[] = []
+        const createProduct = async (data: Record<string, unknown>) => {
+            const doc = await payload.create({ collection: 'products', data } as Parameters<typeof payload.create>[0])
+            productsCreatedCount++
+            if (doc?.id != null) createdProductIds.push(String(doc.id))
+            return doc
+        }
         let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
         const productsWriteStarted = Date.now()
         try {
@@ -2094,14 +2182,10 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 // is unbounded AI output, unlike the form's client-validated 120-char product name.
                 const fallbackAlt = buildProductAlt(undefined, name, result.siteName).slice(0, 500)
                 try {
-                    await payload.create({
-                        collection: 'products',
-                        data: {
-                            ...baseData,
-                            ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
-                        },
+                    await createProduct({
+                        ...baseData,
+                        ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
                     })
-                    productsCreatedCount++
                     if (safeImageId !== undefined) markPixabayMediaUsed([safeImageId])
                 } catch (err) {
                     if (safeImageId != null && isStaleMediaFk(err)) {
@@ -2123,34 +2207,27 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                             }
                             if (retryImageId != null) {
                                 try {
-                                    await payload.create({
-                                        collection: 'products',
-                                        data: {
-                                            ...baseData,
-                                            images: [{ image: retryImageId, alt: fallbackAlt }],
-                                        },
+                                    await createProduct({
+                                        ...baseData,
+                                        images: [{ image: retryImageId, alt: fallbackAlt }],
                                     })
-                                    productsCreatedCount++
                                     console.info(`[generate-site] STALE_MEDIA_FK_RETRY_OK product="${name}" oldId=${safeImageId} newId=${retryImageId}`)
                                 } catch {
                                     // retry with new id also failed — give up gracefully
                                     try {
-                                        await payload.create({ collection: 'products', data: baseData })
-                                        productsCreatedCount++
+                                        await createProduct(baseData)
                                     } catch { /* non-fatal */ }
                                     console.warn(`[generate-site] STALE_MEDIA_FK_GIVE_UP product="${name}" oldId=${safeImageId} reason=retry_fk`)
                                 }
                             } else {
                                 try {
-                                    await payload.create({ collection: 'products', data: baseData })
-                                    productsCreatedCount++
+                                    await createProduct(baseData)
                                 } catch { /* non-fatal */ }
                                 console.warn(`[generate-site] STALE_MEDIA_FK_RETRY_FAIL product="${name}" oldId=${safeImageId} reason=reupload_fail`)
                             }
                         } else {
                             try {
-                                await payload.create({ collection: 'products', data: baseData })
-                                productsCreatedCount++
+                                await createProduct(baseData)
                             } catch { /* non-fatal */ }
                             console.warn(`[generate-site] STALE_MEDIA_FK_NO_FALLBACK product="${name}" imageId=${safeImageId}`)
                         }
@@ -2297,6 +2374,8 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 createdPages,
                 pageFailures,
                 productsCreatedCount,
+                productIds: createdProductIds,
+                placeholders: generationPlaceholders,
                 timeMs,
                 productImageStats,
                 blockImageStats,
@@ -2334,6 +2413,8 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                             createdPages,
                             pageFailures,
                             productsCreatedCount,
+                            productIds,
+                            placeholders,
                             productImageStats,
                             blockImageStats,
                             normalizedPageLinks,
@@ -2397,6 +2478,9 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                                 timeMs,
                                 pixabayImageStatus: pixabaySummary.status,
                                 pixabayUsedImages: pixabaySummary.usedImages,
+                                // #2103 A3/A1: created product ids + blocks still holding placeholder content.
+                                productIds,
+                                placeholders,
                             })}\n\n`
                         generationTimings.record('done_sent', 0)
                         if (streamOpen) {
@@ -2454,7 +2538,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                             controller.enqueue(
                                 _encoder.encode(
                                     `event: error\ndata: ${JSON.stringify({
-                                        message: 'Chúng tôi chưa thể hoàn thiện website của bạn. Thông tin của bạn đã được lưu.',
+                                        message: "We couldn't finish your website. Your details are saved — please try again.",
                                         code: 'GENERATION_FAILED',
                                         debugId,
                                         phase: failedPhase,
@@ -2514,6 +2598,8 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             createdPages,
             pageFailures,
             productsCreatedCount: _productsCreatedCount,
+            productIds,
+            placeholders,
             productImageStats,
             blockImageStats,
             requestedGenMode,
@@ -2585,6 +2671,8 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             timeMs,
             pixabayImageStatus: pixabaySummary.status,
             pixabayUsedImages: pixabaySummary.usedImages,
+            productIds,
+            placeholders,
             ...(modeReason ? { modeReason } : {}),
             ...(aiSkipReason ? { aiSkipReason } : {}),
         })
@@ -2810,7 +2898,7 @@ function createPageHero(baseHero: AIBlock | null, options: {
 // Detection priority: block content (structural) > title keyword match.
 // The known-good sub-page slugs — a page already carrying one of these is
 // trusted verbatim (see canonicalizePageSlug).
-const CANONICAL_SUBPAGE_SLUGS: ReadonlySet<string> = new Set(['/about', '/services', '/contact', '/blog'])
+const CANONICAL_SUBPAGE_SLUGS: ReadonlySet<string> = new Set(['/about', '/services', '/contact', '/blog', '/products'])
 
 export function canonicalizePageSlug(
     page: { title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[] },
@@ -3000,14 +3088,11 @@ export function buildGeneratedPages({
 function normalizeGeneratedProductsGridBlocks(
     blocks: AIBlock[],
     pageSlug: string,
-    locale: 'en' | 'ms',
+    locale: ShopContentLocale,
     brandName: string,
 ): AIBlock[] {
     const shouldEnableCategoryFilter = pageSlug === '/products'
-    const defaults = resolveBlockContent('products', locale, brandName).content as {
-        headline?: unknown
-        subheadline?: unknown
-    }
+    const defaults = productsCopy({ locale, brandName })
     const defaultHeadline = (typeof defaults.headline === 'string' && defaults.headline.trim() !== '')
         ? defaults.headline
         : 'Featured Products'
@@ -3463,5 +3548,5 @@ function sanitizeBlocksForPayload(blocks: AIBlock[], migration = false): AIBlock
         delete sanitized.section
 
         return sanitized
-    })
+    }).filter(block => !isEmptyRequiredListBlock(block))
 }

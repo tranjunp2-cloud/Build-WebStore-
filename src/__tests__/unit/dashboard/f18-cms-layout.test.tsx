@@ -38,6 +38,10 @@ vi.mock('@/components/dashboard/NotificationBell', () => ({
     NotificationBell: () => <div data-testid="notification-bell">Bell</div>,
 }))
 
+vi.mock('@/components/dashboard/feedback/feedback-button', () => ({
+    FeedbackButton: () => <div data-testid="feedback-button">Feedback</div>,
+}))
+
 vi.mock('@/app/(dashboard)/actions', () => ({
     logoutAction: vi.fn(() => Promise.resolve({ success: true })),
 }))

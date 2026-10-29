@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ProductForm } from '@/components/dashboard/product-form/ProductForm'
@@ -80,6 +80,9 @@ export default function ProductEditPage() {
     const [showLegacyWarning, setShowLegacyWarning] = useState(false)
     // the product's updatedAt as loaded: sent with each save so a newer change is never written over
     const version = useSaveVersion()
+    // after a save the page goes back to the list; a page already left must not pull the user back there
+    const leaveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+    useEffect(() => () => clearTimeout(leaveTimer.current), [])
 
     useEffect(() => {
         if (isNew) {
@@ -166,7 +169,8 @@ export default function ProductEditPage() {
             version.set(saved?.updatedAt)
 
             toast.success(isNew ? t.dashboard.products.form.productCreated : t.dashboard.products.form.productUpdated)
-            setTimeout(() => {
+            clearTimeout(leaveTimer.current)
+            leaveTimer.current = setTimeout(() => {
                 router.push('/products')
             }, 1500)
         } catch (err: any) {

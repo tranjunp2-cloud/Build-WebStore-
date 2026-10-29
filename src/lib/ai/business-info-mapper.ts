@@ -14,21 +14,122 @@
 
 import type { BusinessSample } from './content/types'
 import type { BusinessInfoInput } from './system-prompt'
+import type { GenerationFacts } from './generation-facts'
+import { currentGenerationFacts } from './generation-facts-scope'
 
 /** Max products kept after dedupe. Composer cards rarely exceed 6. */
 const PRODUCTS_CAP = 6
 
+/** A product the merchant typed, with the price they typed next to it (if any). */
+export type ParsedProduct = {
+  name: string
+  /** First price found (RM amount). For "from RM120" this is the starting price. */
+  price?: number
+  /** True when the merchant wrote "from RMx" — the price is a starting price. */
+  startingPrice?: boolean
+}
+
+/** Max products the generator creates from the merchant's list. */
+export const MAX_LISTED_PRODUCTS = 20
+
+const RM_PRICE = /\bRM\s?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/i
+
 /**
- * Parse comma-separated products string into a clean string[].
+ * Split on `,` `;` newline only outside parentheses. A comma between digits
+ * followed by exactly three digits ("RM1,200") is a thousands separator, not a split.
+ */
+function splitOutsideParens(raw: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i]!
+    if (ch === '(') depth++
+    else if (ch === ')') depth = Math.max(0, depth - 1)
+    const isThousands =
+      ch === ',' && /\d/.test(raw[i - 1] ?? '') && /^\d{3}(?!\d)/.test(raw.slice(i + 1))
+    if (depth === 0 && !isThousands && (ch === ',' || ch === ';' || ch === '\n')) {
+      parts.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  parts.push(current)
+  return parts.map((s) => s.trim()).filter((s) => s.length > 0)
+}
+
+function toPrice(match: RegExpMatchArray | null): number | undefined {
+  if (!match) return undefined
+  const n = Number(match[1]!.replace(/,/g, ''))
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+/** Parse one entry: "Kek lapis (whole RM65, half RM35)", "kuih raya box RM48", "birthday from RM120". */
+function parseProductEntry(entry: string): ParsedProduct | null {
+  let rest = entry.replace(/\s+/g, ' ').trim()
+  let price: number | undefined
+  let startingPrice = false
+
+  // First price inside parentheses is the default; a paren group holding a price is dropped from the name.
+  const parenWithPrice = rest.match(/\(([^()]*\bRM\s?\d[^()]*)\)/i)
+  if (parenWithPrice) {
+    price = toPrice(parenWithPrice[1]!.match(RM_PRICE))
+    if (/\bfrom\b/i.test(parenWithPrice[1]!.split(RM_PRICE)[0] ?? '')) startingPrice = true
+    rest = rest.replace(parenWithPrice[0], ' ')
+  }
+  // Remaining top-level price: "kuih raya box RM48" / "birthday from RM120".
+  const top = rest.match(RM_PRICE)
+  if (top) {
+    price ??= toPrice(top)
+    if (/\bfrom\s*$/i.test(rest.slice(0, top.index ?? 0))) startingPrice = true
+    rest = rest.replace(new RegExp(`\\b(?:starting\\s+)?from\\s+${RM_PRICE.source}`, 'i'), ' ').replace(RM_PRICE, ' ')
+  }
+
+  const name = rest
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s\-–—:@=]+|[\s\-–—:@=]+$/g, '')
+    .trim()
+  const fallbackName = entry.replace(/\s+/g, ' ').trim()
+  const finalName = name || fallbackName
+  if (!finalName) return null
+  return {
+    name: finalName,
+    ...(price !== undefined ? { price } : {}),
+    ...(price !== undefined && startingPrice ? { startingPrice: true } : {}),
+  }
+}
+
+/**
+ * Parse the merchant's free-text product list into names + optional prices.
+ * "Kek lapis (whole RM65, half RM35), kuih raya box RM48, birthday from RM120"
+ *  → [{Kek lapis, 65}, {kuih raya box, 48}, {birthday, 120, startingPrice}]
+ * Duplicate names (case-insensitive) are dropped; capped at MAX_LISTED_PRODUCTS.
+ */
+export function parseProducts(raw: string | undefined | null): ParsedProduct[] {
+  if (!raw || typeof raw !== 'string') return []
+  const seen = new Set<string>()
+  const out: ParsedProduct[] = []
+  for (const entry of splitOutsideParens(raw)) {
+    const parsed = parseProductEntry(entry)
+    if (!parsed) continue
+    const key = parsed.name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(parsed)
+    if (out.length >= MAX_LISTED_PRODUCTS) break
+  }
+  return out
+}
+
+/**
+ * Clean product names only (no prices, no paren price groups) — what image search,
+ * keyword extraction and composer cards want.
  * "ramen, sushi, , gyoza" → ["ramen", "sushi", "gyoza"]
  * Empty/whitespace input → []
  */
 export function parseProductsString(raw: string | undefined | null): string[] {
-  if (!raw || typeof raw !== 'string') return []
-  return raw
-    .split(/[,;\n]/g)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
+  return parseProducts(raw).map((p) => p.name)
 }
 
 /**
@@ -95,7 +196,10 @@ function normalizeText(raw: string | undefined | null): string | undefined {
  * Returns only keys with non-empty values, so the downstream shallow-merge
  * leaves canned content in place for undefined fields.
  */
-export function mapBusinessInfo(info: BusinessInfoInput): Partial<BusinessSample> {
+export function mapBusinessInfo(
+  info: BusinessInfoInput,
+  facts: GenerationFacts | undefined = currentGenerationFacts(),
+): Partial<BusinessSample> {
   const out: Partial<BusinessSample> = {}
 
   const name = normalizeText(info.businessName)
@@ -130,6 +234,8 @@ export function mapBusinessInfo(info: BusinessInfoInput): Partial<BusinessSample
 
   const products = dedupeNonEmpty(parseProductsString(info.products))
   if (products.length > 0) out.products = products
+
+  if (facts) out.facts = facts
 
   return out
 }

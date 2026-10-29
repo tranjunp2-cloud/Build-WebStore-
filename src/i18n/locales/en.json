@@ -645,7 +645,13 @@
       "generated": "generated",
       "generationTime": "{seconds}s",
       "createdSuccessfully": "Website \"{name}\" is ready!",
-      "viewPreviewHint": "See the preview on the right, open the editor to make changes, or publish now."
+      "viewPreviewHint": "See the preview on the right, open the editor to make changes, or publish now.",
+      "placeholdersTitle": "Replace before you publish",
+      "placeholdersHint": "These sections still hold sample content. Swap in your real details in the editor. You can still publish any time.",
+      "placeholdersMore": "+{count} more",
+      "finishShopTitle": "Finish your shop",
+      "finishShopDescription": "Your products have no stock or real photos yet. The assistant will ask you for them.",
+      "finishShopButton": "Finish your shop"
     },
     "form": {
       "businessName": "Business name",
@@ -669,7 +675,7 @@
       "blueprintReady": "All set — AI is ready to build your website",
       "blueprintCount": "{count} of 4 details added",
       "industryOptions": {
-        "restaurant": "Restaurant / cafe / F&B",
+        "restaurant": "Restaurant / dine-in",
         "ecommerce": "Shop / fashion / e-commerce",
         "beauty": "Beauty / spa / wellness",
         "tech": "Tech / IT / SaaS",
@@ -679,7 +685,7 @@
         "fitness": "Gym / fitness / yoga",
         "creative": "Portfolio / freelancer / agency",
         "business": "Business / corporate",
-        "fnb": "F&B / cafe / bakery",
+        "fnb": "Café / bakery / desserts",
         "events": "Events / wedding",
         "blog": "Blog / media / magazine",
         "travel": "Travel / tourism"
@@ -691,10 +697,10 @@
         "products": "Describe your products or services"
       },
       "tabManual": "Describe business",
-      "tabUrl": "Import from URL",
-      "urlLabel": "Website URL",
+      "tabUrl": "Import from a link",
+      "urlLabel": "Your website, Instagram or Facebook link",
       "urlPlaceholder": "https://your-website.com",
-      "urlHint": "Paste the address of your existing website.",
+      "urlHint": "Paste the address of your website, Instagram or Facebook page. We only read what is public.",
       "extractButton": "Extract",
       "extracting": "Extracting...",
       "analyzingWebsite": "Analyzing website...",
@@ -721,7 +727,38 @@
       "slugAvailable": "Available",
       "slugChecking": "Checking availability…",
       "slugCheckError": "Couldn't check that name. Try again.",
-      "slugHelperText": "You can change this later in Settings > Domains."
+      "slugHelperText": "You can change this later in Settings > Domains.",
+      "optionalLabel": "Optional",
+      "buyingMethodsLabel": "How do customers buy from you?",
+      "buyingMethodsHint": "The site will only mention the ways you pick here.",
+      "buyingMethodOptions": {
+        "delivery": "Delivery",
+        "pickup": "Pickup",
+        "walk_in": "Walk-in",
+        "booking": "Booking",
+        "cod": "Cash on delivery",
+        "online_payment": "Online payment"
+      },
+      "serviceAreaLabel": "Areas you serve",
+      "serviceAreaPlaceholder": "e.g. Klang Valley, Penang island",
+      "shopFactsLabel": "Facts we can say about your shop",
+      "shopFactsPlaceholder": "e.g. Started in 2019. Halal certified (only if you really are). Won Best Cafe 2023.",
+      "shopFactsHint": "Only add what is true. The AI will not invent years, certifications or awards.",
+      "extractionReview": {
+        "title": "Review extracted info",
+        "subtitle": "Edit any fields before applying to your form.",
+        "businessName": "Business name",
+        "industry": "Industry",
+        "description": "Description",
+        "products": "Products / Services",
+        "skip": "Skip & enter manually",
+        "apply": "Apply to form",
+        "realContentTitle": "Real content found",
+        "testimonialsFound": "{count} customer reviews",
+        "faqFound": "{count} FAQ answers",
+        "realContentNote": "These are copied from your page and used on your new site as they are.",
+        "noRealContent": "No customer reviews or FAQ found on that page, so none will be copied."
+      }
     }
   },
   "email": {
@@ -3534,6 +3571,78 @@
         "blockSeo": "SEO health",
         "blockOrders": "Pending orders"
       }
+    },
+    "feedback": {
+      "button": "Send feedback",
+      "title": "Send feedback",
+      "description": "Your store details and the page you're on are attached automatically.",
+      "context": {
+        "store": "Store: {store}"
+      },
+      "mismatchNotice": "V1 doesn't show data created after the freeze. Compare data from the same point in time.",
+      "fields": {
+        "type": "Feedback type",
+        "typeOptions": {
+          "problem": "Report a problem",
+          "mismatch": "Data mismatch",
+          "suggestion": "Suggestion"
+        },
+        "area": "Feature",
+        "areaPlaceholder": "Choose features (you can pick more than one)",
+        "areaError": "Please choose at least one feature.",
+        "areaMore": "+{count}",
+        "removeArea": "Remove {name}",
+        "areaOptions": {
+          "products": "Products & stock",
+          "orders": "Orders",
+          "customers": "Customers",
+          "discounts": "Discounts",
+          "design": "Design & pages",
+          "payments": "Payments",
+          "shipping": "Shipping",
+          "domains": "Domains",
+          "account": "Account & staff",
+          "other": "Other"
+        },
+        "details": "Details",
+        "detailsPlaceholder": "What did you do, what did you expect, and what happened instead?",
+        "detailsPlaceholderMismatch": "What's different between V1 and V2? E.g. Order DH-1042 is RM120 in V1 but RM100 in V2.",
+        "detailsError": "Please add some details.",
+        "detailsShortError": "Please write at least 10 characters.",
+        "detailsHelper": "Don't enter passwords, payment details or your customers' personal data.",
+        "optional": "(optional)",
+        "screenshots": "Screenshots",
+        "addScreenshot": "Add image",
+        "screenshotAlt": "Screenshot {n}",
+        "removeScreenshot": "Remove screenshot {n}",
+        "screenshotHelper": "Up to 9 images, PNG or JPG, max 5 MB each.",
+        "screenshotTooLarge": "This image is larger than 5 MB.",
+        "screenshotWrongType": "Only PNG or JPG images are supported.",
+        "screenshotTooMany": "You can add up to 9 images."
+      },
+      "failed": {
+        "title": "Your feedback wasn't sent",
+        "description": "What you entered has been kept. Please try again.",
+        "screenshotTooLarge": "A screenshot is still too large to upload even after compression. Remove it or use a smaller image, then try again."
+      },
+      "rateLimited": "You've sent a lot of feedback in a short time. Please try again in a few minutes.",
+      "sendingNote": "Sending… Please don't send it again.",
+      "actions": {
+        "cancel": "Cancel",
+        "send": "Send feedback",
+        "sending": "Sending…",
+        "close": "Close"
+      },
+      "discard": {
+        "title": "Discard what you've entered?",
+        "description": "Your feedback hasn't been sent.",
+        "keep": "Keep editing",
+        "confirm": "Discard"
+      },
+      "success": {
+        "title": "Feedback sent",
+        "notifyNote": "We'll notify you in Prime Web (the bell icon) when there's an update."
+      }
     }
   },
   "auth": {
@@ -3554,6 +3663,7 @@
       "passwordMinLength": "Password must be at least 8 characters",
       "timeout": "This is taking too long. Please try again.",
       "incorrect": "Incorrect email or password. Please try again.",
+      "otpSendFailed": "Couldn't send the verification code. Please try again.",
       "connection": "Connection problem. Please check your internet and try again.",
       "serviceAccountUI": "Service accounts can't sign in here. Use a personal account instead.",
       "missingCredentials": "Please enter your email and password",
@@ -3566,6 +3676,8 @@
     "loading": "Loading...",
     "otpSentTitle": "Verification code sent.",
     "otpSentDesc": "Check your email for the 6-digit code.",
+    "otpAlreadySentTitle": "Verification code already sent.",
+    "otpAlreadySentDesc": "Use the code we emailed you a moment ago.",
     "otpEmailIssue": "Email might be delayed",
     "otpEmailIssueDesc": "Your code was saved, but the email may not arrive. Tap \"Resend code\" on the next screen.",
     "success": {
@@ -3719,8 +3831,23 @@
     "overview": {
       "title": "Help center",
       "subtitle": "Learn how to use your website management system.",
-      "welcomeTitle": "Welcome to EchPrime!",
-      "welcomeDesc": "EchPrime helps you build and manage your professional website — from creating sites with AI and writing SEO-optimized blog posts to tracking traffic and engagement. Here's an overview of the main features.",
+      "welcomeTitle": "Welcome to Web Store!",
+      "intro": {
+        "desc": "Web Store helps you build and manage your professional website with AI in minutes.",
+        "lead1": "Watch the 1-minute video to quickly learn how to:",
+        "leadN": "Watch the {n}-minute video to quickly learn how to:",
+        "points": [
+          "Create a website & write SEO-friendly blog posts",
+          "Track traffic and leads automatically",
+          "Connect your own domain in 3 steps"
+        ],
+        "durationChip": "{d} min",
+        "tag": "Overview tour",
+        "title": "Web Store overview tour",
+        "resume": "Resume video",
+        "error": "Couldn’t load the video.",
+        "retry": "Try again"
+      },
       "featuresTitle": "Key features",
       "features": {
         "dashboardTitle": "Dashboard",
@@ -3731,9 +3858,7 @@
         "blogDesc": "Write SEO-friendly blog posts to bring in more customers.",
         "settingsTitle": "Settings",
         "settingsDesc": "Set up your domain and invite admin staff."
-      },
-      "needHelpTitle": "Need more help?",
-      "needHelpDesc": "Can't find the answer? Contact our support team on WhatsApp or by email."
+      }
     },
     "modules": {
       "lazyScreenshot": {
@@ -4347,7 +4472,9 @@
       "publishNeedsFix": "Fill this in before publishing",
       "publishShowField": "Show",
       "draftChanged": "This page was changed somewhere else (another tab or an approved AI change). Your latest edits were not saved — reload to continue from the newest version.",
-      "reloadAction": "Reload"
+      "reloadAction": "Reload",
+      "keepMineAction": "Keep my version",
+      "keepMineHint": "Keep my version saves your edits over the other change."
     },
     "maintenance": {
       "banner": "Your website is in maintenance mode. Visitors see a maintenance page instead.",
@@ -4389,6 +4516,7 @@
       "createPage": "Create page",
       "duplicatePage": "A page with this name or URL already exists",
       "invalidPageName": "Use at least one letter or number",
+      "reservedPage": "This URL is used by the system. Please choose another page name.",
       "editing404Page": "Editing 404 page",
       "deleteInlineConfirm": "Delete “{name}”? You can undo for a few seconds.",
       "pageShown": "{name} is now visible",
@@ -5257,6 +5385,7 @@
       "description": "Description",
       "sku": "SKU:",
       "outOfStock": "Out of stock",
+      "soldOut": "Sold out",
       "addToCart": "🛒 Add to cart",
       "selectVariant": "Select a variant",
       "allProducts": "All products",
@@ -5529,6 +5658,380 @@
       "uploadFailed": "Couldn't upload your photo. Use a JPG or PNG under 5MB and try again.",
       "saveFailed": "Couldn't save your profile. Check your connection and try again.",
       "networkError": "Network error. Please try again."
+    }
+  },
+  "landingV2": {
+    "nav": {
+      "menu": "Main menu",
+      "items": {
+        "how": "How it works",
+        "features": "Features",
+        "templates": "Templates",
+        "faq": "FAQ"
+      },
+      "lang": "Switch to Bahasa Melayu",
+      "langName": "English",
+      "langLabel": "EN",
+      "signIn": "Sign in",
+      "cta": "Get started free",
+      "toggle": "Toggle menu",
+      "skip": "Skip to content"
+    },
+    "hero": {
+      "eyebrow": "AI-powered website & online store builder",
+      "t1": "Describe your business.",
+      "t2": "AI builds your online store.",
+      "sub": "Web Store turns a few details about your business into a complete, mobile‑ready online store — then runs payments, shipping and every order from one dashboard.",
+      "cta2": "See how it works",
+      "trust": [
+        "English & Bahasa Melayu",
+        "Payments & shipping built in",
+        "56 ready-made templates"
+      ],
+      "soon": "Video coming soon",
+      "seek": "Seek",
+      "video": {
+        "watch": "Watch the intro",
+        "play": "Play video",
+        "pause": "Pause",
+        "replay": "Replay",
+        "mute": "Mute",
+        "unmute": "Unmute",
+        "fullscreen": "Full screen",
+        "exitFullscreen": "Exit full screen"
+      }
+    },
+    "how": {
+      "label": "How it works",
+      "title": "From idea to first order in three steps",
+      "s1t": "Describe your business",
+      "s1d": "Pick your industry, then add your business name, a short description and what you sell.",
+      "mName": "Business name",
+      "mNameV": "Kopi Senja",
+      "industries": [
+        "Restaurant / cafe / F&B",
+        "Shop / fashion / e-commerce",
+        "Beauty / spa / wellness",
+        "Health / dental / clinic"
+      ],
+      "s2t": "AI creates your website",
+      "s2d": "AI writes the copy and lays out every section. Change anything in the visual editor, or just ask the AI.",
+      "mGen": "Creating your website...",
+      "genSteps": [
+        "Reviewing your business info",
+        "Creating content & design",
+        "Preparing preview"
+      ],
+      "s3t": "Publish and start selling",
+      "s3d": "Go live, take card, FPX and DuitNow QR payments, and ship orders with EasyParcel.",
+      "mLive": "Live",
+      "mPay": "Payment received · Order #1042"
+    },
+    "feat": {
+      "label": "Features",
+      "title": "Everything you need to sell online, in one place",
+      "sub": "Build your site, take payments, ship orders and grow — without juggling separate tools.",
+      "aiT": "AI website builder",
+      "aiD": "Answer four questions and get a complete, mobile-ready website written for your business.",
+      "aiInd": "Restaurant / cafe / F&B",
+      "aiBrief": "Specialty coffee and kuih in Bangsar. Dine-in, takeaway and online orders.",
+      "edT": "Visual editor",
+      "edD": "Click any text to edit it, drag blocks to reorder them and undo any change.",
+      "edSample": "Fresh kopi, every morning",
+      "agT": "ECH Agent",
+      "agD": "Each day it lists what needs you and drafts the fix. Nothing changes until you approve.",
+      "agQ1": "3 orders waiting to be confirmed",
+      "agQ1f": "oldest waiting 2 hours",
+      "agQ1go": "Confirm orders",
+      "agQ2": "2 products are running low",
+      "agQ2f": "fewer than 10 left",
+      "agQ2go": "Show the list",
+      "payT": "Local payment methods",
+      "payD": "Card and FPX through Stripe, plus DuitNow QR and cash on delivery.",
+      "payChips": [
+        "Card",
+        "FPX",
+        "DuitNow QR",
+        "COD"
+      ],
+      "payNote": "Funds go straight to your bank account",
+      "shipT": "Shipping with EasyParcel",
+      "shipD": "Choose a courier, book pickup or drop-off and print the label from the order. Or ship it yourself.",
+      "shipM1": "Label ready",
+      "shipM2": "Pickup booked",
+      "ordT": "Orders, customers & discounts",
+      "ordD": "Confirm, fulfil and refund orders, see each customer's history and create discount codes.",
+      "ordRows": [
+        [
+          "#1042",
+          "Paid"
+        ],
+        [
+          "#1041",
+          "To confirm"
+        ],
+        [
+          "#1040",
+          "Shipped"
+        ]
+      ],
+      "ordCode": "RAYA10 · 10% off",
+      "seoT": "SEO health",
+      "seoD": "See how your site is doing on search and what to fix next.",
+      "tplT": "56 templates, 14 industries",
+      "tplD": "Start from a design made for your industry and switch any time.",
+      "langT": "English & Bahasa Melayu",
+      "langD": "Switch your whole dashboard between English and Bahasa Melayu.",
+      "notT": "Real-time notifications",
+      "notD": "Know about new orders, low stock and failed payments the moment they happen.",
+      "notM1": "New order",
+      "notM2": "Low stock alert"
+    },
+    "deep": {
+      "editor": {
+        "label": "AI editor",
+        "title": "Edit like a document. Ask like a chat.",
+        "sub": "Every part of your site is editable in place, and the AI is one click away when you'd rather describe the change.",
+        "points": [
+          "Drag components onto the page, or click to add them",
+          "Edit text in place with a full formatting toolbar",
+          "Choose from 12 hero layouts",
+          "Ask AI to rewrite a section or a single sentence",
+          "Undo and redo anything, preview on desktop and mobile"
+        ]
+      },
+      "agent": {
+        "label": "ECH Agent",
+        "title": "An assistant that knows what your shop needs today",
+        "sub": "ECH Agent reads your orders and stock, then hands you a short to-do list with the fix already drafted.",
+        "points": [
+          "A daily work queue: orders to confirm, products out of stock or running low",
+          "Drafts the change — restock, switch off, confirm — and waits for your click",
+          "Product changes can be undone for 7 days"
+        ]
+      },
+      "sell": {
+        "label": "Sell & ship",
+        "title": "Get paid and ship, all in one place",
+        "sub": "Connect the payment and courier accounts you already use. Orders, customers and discount codes live in the same dashboard.",
+        "points": [
+          "Card and FPX payments through Stripe",
+          "DuitNow QR bank transfer and cash on delivery",
+          "Book EasyParcel couriers and print labels from the order",
+          "Confirm, fulfil and refund orders",
+          "Customer profiles and discount codes"
+        ]
+      },
+      "seo": {
+        "label": "Get found",
+        "title": "Get found on Google",
+        "sub": "Check your SEO health, fix what's missing and publish fresh content with the AI blog writer.",
+        "points": [
+          "An SEO health overview that shows what to fix",
+          "AI writes blog posts, SEO titles and meta descriptions"
+        ]
+      }
+    },
+    "templates": {
+      "label": "Templates",
+      "title": "56 templates for 14 industries",
+      "sub": "Start from a design made for your business. Switch any time — your text and images are kept where possible.",
+      "cta": "Browse all templates",
+      "cats": {
+        "all": "All",
+        "restaurant": "Restaurant",
+        "ecommerce": "E-commerce",
+        "beauty": "Beauty",
+        "tech": "Tech",
+        "health": "Health",
+        "education": "Education",
+        "realestate": "Real estate",
+        "fitness": "Fitness",
+        "creative": "Creative",
+        "business": "Business",
+        "fnb": "Cafe & bakery",
+        "events": "Events",
+        "blog": "Blog",
+        "travel": "Travel"
+      },
+      "prev": "Previous templates",
+      "next": "Next templates"
+    },
+    "faq": {
+      "label": "FAQ",
+      "title": "Frequently asked questions",
+      "sub": "Everything you need to know before you start. Step-by-step guides are in the Help Center once you sign in.",
+      "groups": [
+        {
+          "id": "start",
+          "name": "Getting started",
+          "items": [
+            {
+              "q": "Do I need design or coding skills?",
+              "a": "No. Describe your business and AI builds the website. You then edit it visually — click text to change it, drag blocks to move them."
+            },
+            {
+              "q": "How does the AI build my website?",
+              "a": "Enter your business name, choose your industry and describe what you sell. AI creates a complete website in about 30–60 seconds."
+            },
+            {
+              "q": "Can I edit what the AI creates?",
+              "a": "Yes. Change text, images, sections, colours and fonts in the visual editor, or ask the AI to rewrite any part for you."
+            },
+            {
+              "q": "Will my website work on mobile?",
+              "a": "Yes. Every website is fully responsive, and you can preview desktop and mobile views before you publish."
+            },
+            {
+              "q": "Can I change my template later?",
+              "a": "Yes. Pick any of the 56 templates in the editor. The new layout and theme are applied, and your text and images are kept where possible."
+            },
+            {
+              "q": "How much does it cost?",
+              "a": "You can get started for free — no design or coding skills needed."
+            }
+          ]
+        },
+        {
+          "id": "sell",
+          "name": "Selling & orders",
+          "items": [
+            {
+              "q": "Which payment methods can my customers use?",
+              "a": "Card and FPX through Stripe, plus DuitNow QR bank transfer and cash on delivery. Online payments go straight to your linked bank account."
+            },
+            {
+              "q": "How does shipping work?",
+              "a": "Connect EasyParcel to choose a courier, book pickup or drop-off and print labels from your orders, with tracking for every parcel. You can also ship yourself and add the tracking number."
+            },
+            {
+              "q": "What does ECH Agent do?",
+              "a": "It checks your shop every day and lists what needs attention — orders to confirm, products out of stock or running low. It drafts the change, and nothing is applied until you approve it."
+            },
+            {
+              "q": "Can my team help run the store?",
+              "a": "Yes. Invite staff by email from Settings and give each person the Viewer or Manager role."
+            }
+          ]
+        },
+        {
+          "id": "grow",
+          "name": "Domain & growth",
+          "items": [
+            {
+              "q": "Can I use my own domain?",
+              "a": "Yes. Add your domain in Settings → Domains, then update the DNS records at your domain provider. Changes usually take effect within 15 minutes to 48 hours."
+            },
+            {
+              "q": "How does Web Store help my SEO?",
+              "a": "The SEO health widget scores your site and flags issues such as missing meta titles or unoptimised images. One click lets AI fix them for you."
+            },
+            {
+              "q": "Can AI write blog posts for me?",
+              "a": "Yes. Enter a topic and choose a tone — professional, friendly or persuasive — and AI drafts the title, outline and SEO meta for you."
+            },
+            {
+              "q": "Can I use Web Store in Bahasa Melayu?",
+              "a": "Yes. Switch the dashboard between English and Bahasa Melayu at any time."
+            }
+          ]
+        }
+      ]
+    },
+    "final": {
+      "title": "Ready to open your online store?",
+      "sub": "Start free and let AI build the first version of your store.",
+      "cta": "Get started free"
+    },
+    "footer": {
+      "tagline": "AI website builder and online store for growing businesses.",
+      "rights": "© 2026 Web Store. All rights reserved."
+    },
+    "tour": {
+      "label": "Product tour",
+      "title": "One platform, from first draft to daily sales",
+      "sub": "See how each part of Web Store works together."
+    },
+    "theme": {
+      "toLight": "Switch to light theme",
+      "toDark": "Switch to dark theme"
+    },
+    "mock": {
+      "ship": {
+        "parcel": "Order #1042 · 1.2 kg",
+        "to": "To Petaling Jaya, Selangor"
+      },
+      "ord": {
+        "amounts": [
+          "RM 48.00",
+          "RM 126.50",
+          "RM 32.00"
+        ]
+      },
+      "seo": {
+        "r1": "Page titles & descriptions",
+        "r2": "3 images need alt text",
+        "health": "SEO health"
+      },
+      "lang": {
+        "sample": "Orders",
+        "sampleMs": "Pesanan"
+      },
+      "notif": {
+        "m1": "#1042 · RM 48.00 · FPX",
+        "m2": "Kopi Arabica 250g · 6 left",
+        "now": "Just now",
+        "ago": "5 min ago"
+      },
+      "ed": {
+        "hero": "Hero",
+        "dup": "Duplicate",
+        "ai": "Edit with AI",
+        "ask": "Make the headline warmer",
+        "done": "Headline updated",
+        "from": "Fresh kopi, every morning",
+        "to": "Your morning kopi, made with love",
+        "undo": "Undo",
+        "keep": "Keep",
+        "input": "Ask AI to change anything…",
+        "small": "Specialty coffee & kuih in Bangsar",
+        "btn": "Order now"
+      },
+      "ag": {
+        "cap": "Today's work",
+        "q3": "1 product is out of stock",
+        "q3f": "Kopi Arabica 250g",
+        "q3go": "Restock",
+        "appr": "Waiting for your approval",
+        "item": "Kopi Arabica 250g",
+        "edit": "Edit · inventory",
+        "approve": "Approve",
+        "undo": "Undo for 7 days"
+      },
+      "sell": {
+        "items": "2 items",
+        "paid": "Paid · FPX",
+        "label": "EasyParcel label ready",
+        "l1": "Kopi Senja house blend 250g",
+        "l2": "Kuih lapis box (6 pcs)",
+        "methods": "Payment methods",
+        "stripe": "Card · FPX",
+        "duitnow": "Bank transfer",
+        "cod": "Cash on delivery",
+        "total": "RM 48.00"
+      },
+      "seoD": {
+        "cap": "SEO health",
+        "ok1": "Page titles set on every page",
+        "ok2": "Meta descriptions written",
+        "warn": "3 images need alt text",
+        "blog": "AI blog writer",
+        "topic": "Topic",
+        "topicV": "Best kopi spots in Bangsar",
+        "title": "Generated title",
+        "titleV": "Where Bangsar Gets Its Morning Kopi: A Local's Guide",
+        "gen": "Generate"
+      }
     }
   }
 }

@@ -83,8 +83,11 @@ export async function readReceipt(changeSetId: string, tenantId?: string | numbe
 }
 
 export type BeginApply =
-	/** this request applies the change (new receipt, or one left by a dead attempt) */
-	| { kind: "started" }
+	/**
+	 * this request applies the change: a new receipt, or (`takeover`) one left by an attempt that died — that one may
+	 * have written before it died, so a version guard refusal is not proof the change never ran
+	 */
+	| { kind: "started"; takeover: boolean }
 	/** it ran already: re-send this result, write nothing */
 	| { kind: "applied"; receipt: ApplyReceipt }
 	/** another request is applying it right now, or it was undone already */
@@ -98,7 +101,7 @@ export async function beginApply(input: { changeSetId: string; tenantId: string;
 		VALUES (${input.changeSetId}, ${tenant}, ${userId}, 'applying', ${input.requestId})
 		ON CONFLICT (change_set_id) DO NOTHING
 		RETURNING ${COLUMNS}`);
-	if (inserted.length > 0) return { kind: "started" };
+	if (inserted.length > 0) return { kind: "started", takeover: false };
 	const existing = await readReceipt(input.changeSetId, tenant);
 	// a receipt of another workspace under this id: never touched from here
 	if (!existing) return { kind: "busy", state: "applying" };
@@ -109,7 +112,7 @@ export async function beginApply(input: { changeSetId: string; tenantId: string;
 	const taken = await rows(sql`UPDATE ai_change_set_applies SET request_id = ${input.requestId}, user_id = ${userId}, updated_at = now()
 		WHERE change_set_id = ${input.changeSetId} AND tenant_id = ${tenant} AND state = 'applying' AND updated_at < ${staleBefore}::timestamptz
 		RETURNING ${COLUMNS}`);
-	return taken.length > 0 ? { kind: "started" } : { kind: "busy", state: "applying" };
+	return taken.length > 0 ? { kind: "started", takeover: true } : { kind: "busy", state: "applying" };
 }
 
 /** The apply failed and nothing stays written: the receipt goes, so Approve can be tried again. */
