@@ -24,7 +24,7 @@ export function PlanTable({ rows, limits }: { rows: PlanRow[]; limits: Partial<R
                             <td><strong>{PLAN_GROUP_LABELS[plan]}</strong></td>
                             <td className="num">{r ? fmtInt(r.shops) : 0}</td><td className="num">{fmtUsd(r?.cost ?? 0)}</td>
                             <td className="num">{r?.p50 == null ? '—' : fmtUsd(r.p50, 3)}</td><td className="num">{r?.p90 == null ? '—' : fmtUsd(r.p90, 3)}</td><td className="num">{r?.max == null ? '—' : fmtUsd(r.max, 3)}</td>
-                            <td className="num">{plan === 'unknown' ? '—' : budgetText(limits[plan])}</td>
+                            <td className="num">{plan === 'unknown' ? '—' : limits[plan]?.off ? <span className="au-warn" title="AI is switched off for this plan">Off</span> : budgetText(limits[plan])}</td>
                         </tr>
                     )
                 })}</tbody>

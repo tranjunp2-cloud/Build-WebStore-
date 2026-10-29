@@ -1,6 +1,6 @@
 /** Daily AI limits per plan, read from `plan-features` (same parsing and fallbacks the runtime uses). */
 import type { Payload } from 'payload'
-import { AI_BUDGET_FEATURE, AI_PICTURES_FEATURE } from '@/lib/ai-platform/ai-config-schema'
+import { AI_BUDGET_FEATURE, AI_ENABLED_FEATURE, AI_PICTURES_FEATURE } from '@/lib/ai-platform/ai-config-schema'
 import { DEFAULT_AI_LIMITS, parseLimit } from '@/lib/ai-platform/plan-limits'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { KNOWN_PLAN_GROUPS, PLAN_CODES_BY_GROUP, type PlanGroup } from './groups'
@@ -12,6 +12,8 @@ export interface DailyLimits {
     picturesPerDay: number | null
     /** The plan codes of the group disagree (e.g. TM and non-TM users differ); the first code is shown. */
     varies: boolean
+    /** AI is switched off (ai_enabled = NO) for every code of the group */
+    off: boolean
 }
 
 type FeatureRow = { planCode?: string | null; featureCode?: string | null; value?: string | null }
@@ -27,18 +29,24 @@ export function limitsForCode(rows: FeatureRow[], code: string): { budgetUsd: nu
     }
 }
 
+/** ai_enabled = NO switches AI off; a missing or any other value leaves it on (as the runtime reads it). */
+export const planAiOff = (rows: FeatureRow[], code: string): boolean =>
+    String(rows.find((r) => r.planCode === code && r.featureCode === AI_ENABLED_FEATURE)?.value ?? '').trim().toUpperCase() === 'NO'
+
 export function groupLimits(rows: FeatureRow[], group: Exclude<PlanGroup, 'unknown'>): DailyLimits {
-    const per = PLAN_CODES_BY_GROUP[group].map((code) => limitsForCode(rows, code))
+    const codes = PLAN_CODES_BY_GROUP[group]
+    const per = codes.map((code) => limitsForCode(rows, code))
     const head = per[0]
-    const varies = per.some((l) => l.budgetUsd !== head.budgetUsd || l.picturesPerDay !== head.picturesPerDay)
-    return { ...head, varies }
+    const offs = codes.map((code) => planAiOff(rows, code))
+    const varies = per.some((l) => l.budgetUsd !== head.budgetUsd || l.picturesPerDay !== head.picturesPerDay) || offs.some((o) => o !== offs[0])
+    return { ...head, varies, off: offs.every(Boolean) }
 }
 
 export async function loadFeatureRows(payload: Pick<Payload, 'find'>): Promise<FeatureRow[]> {
     const result = await payload.find({
         collection: 'plan-features',
         overrideAccess: true,
-        where: { featureCode: { in: [AI_BUDGET_FEATURE, AI_PICTURES_FEATURE] } },
+        where: { featureCode: { in: [AI_BUDGET_FEATURE, AI_PICTURES_FEATURE, AI_ENABLED_FEATURE] } },
         limit: 100,
         pagination: false,
         depth: 0,

@@ -9,6 +9,7 @@ import type { Metadata } from 'next'
 import config from '@payload-config'
 import { getPayload } from 'payload'
 import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { loadCapsStatus, type CapsStatus } from '@/lib/admin/ai-caps/status'
 import { bucketLabel, first, klDay, periodQuery, previousRangeLabel, rangeLabel, resolvePeriod } from '@/lib/admin/ai-usage/period'
 import { loadOverview } from '@/lib/admin/ai-usage/overview-loader'
 import { TOP_SHOP_SORTS, type TopShopSort } from '@/lib/admin/ai-usage/overview-types'
@@ -17,6 +18,7 @@ import { ErrorState } from './_components/au-parts'
 import { CostChart } from './_components/cost-chart'
 import { GenerationSection } from './_components/generation-section'
 import { KpiRow } from './_components/kpi-row'
+import { LimitsPanel } from './_components/limits-panel'
 import { PeriodControls } from './_components/period-controls'
 import { CardHead } from './_components/au-parts'
 import { ErrorsTable, PlanTable, TopShopsTable } from './_components/overview-tables'
@@ -38,12 +40,19 @@ export default async function AiUsagePage({ searchParams }: { searchParams: Sear
     const query = periodQuery(period)
     const exportHref = `/api/admin/ai-usage/export${query.toString() ? `?${query.toString()}` : ''}`
 
-    let data: Awaited<ReturnType<typeof loadOverview>> | null = null
-    try {
-        data = await loadOverview(await getPayload({ config }), period, sort)
-    } catch (error) {
-        console.error('[ai-usage] overview failed', error)
-    }
+    // the limits block and the usage numbers load apart: one failing leaves the other on screen
+    const [data, caps] = await Promise.all([
+        getPayload({ config }).then((payload) => loadOverview(payload, period, sort)).catch((error: unknown) => {
+            console.error('[ai-usage] overview failed', error)
+            return null
+        }),
+        loadCapsStatus().catch((error: unknown): CapsStatus | null => {
+            console.error('[ai-usage] caps status failed', error)
+            return null
+        }),
+    ])
+    const retryHref = `/studio/performance${query.toString() ? `?${query.toString()}` : ''}`
+    const limits = <LimitsPanel status={caps} retryHref={retryHref} />
 
     return (
         <div className="page au-page">
@@ -52,9 +61,10 @@ export default async function AiUsagePage({ searchParams }: { searchParams: Sear
                 <PeriodControls periodKey={period.key} rangeText={rangeLabel(period)} fromDay={period.fromDay} toDay={period.toDay} todayDay={today}
                     compare={{ on: compare, text: previousRangeLabel(period) }} exportHref={exportHref} />
             </div>
-            {!data ? <ErrorState what="AI usage" retryHref={`/studio/performance${query.toString() ? `?${query.toString()}` : ''}`} /> : (
+            {!data ? <><ErrorState what="AI usage" retryHref={retryHref} />{limits}</> : (
                 <>
                     <KpiRow current={data.current} previous={data.previous} series={data.series} compare={compare} />
+                    {limits}
                     <section className="card aiq-card">
                         <CardHead title={period.bucket === 'hour' ? 'Cost per hour, by area' : 'Cost per day, by area'} sub="Split by where the AI was used." />
                         <CostChart data={data.costByArea.map((b) => ({ ...b, label: bucketLabel(b.key, period.bucket, today) }))} />

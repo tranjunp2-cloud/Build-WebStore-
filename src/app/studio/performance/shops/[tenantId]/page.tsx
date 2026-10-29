@@ -10,6 +10,7 @@ import config from '@payload-config'
 import { getPayload } from 'payload'
 import { ArrowLeft, ChevronRight, List } from 'lucide-react'
 import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { getShopLimitView, type ShopLimitView } from '@/lib/admin/ai-caps/shop-overrides'
 import { AREA_GROUP_LABELS, PLAN_GROUP_LABELS } from '@/lib/admin/ai-usage/groups'
 import { fmtInt, fmtUsd, fmtWhen } from '@/lib/admin/ai-usage/format'
 import { getBreakdown } from '@/lib/admin/ai-usage/overview-queries'
@@ -23,6 +24,7 @@ import '../../ai-usage.css'
 import { CardHead, ErrorState, OutcomeBadge, PlanBadge, UnpricedBadge } from '../../_components/au-parts'
 import { DailyBars } from '../../_components/daily-bars'
 import { PeriodControls } from '../../_components/period-controls'
+import { ShopLimitCard } from '../../_components/shop-limit-card'
 
 export const metadata: Metadata = { title: 'AI usage: shop' }
 
@@ -45,12 +47,18 @@ export default async function ShopAiUsagePage({ params, searchParams }: Props) {
         const shop = await getShopHeader(db, tenantId)
         if (!shop) notFound()
         const filters = { unpriced: false, tenantId }
-        const [rolling, series, areas, tasks, recent, totals, errors, features] = await Promise.all([
+        const [rolling, series, areas, tasks, recent, totals, errors, features, view] = await Promise.all([
             getShopRolling24h(db, tenantId), getShopSeries(db, tenantId, period), getShopAreas(db, tenantId, period),
             getBreakdown(db, period, 'task', 8, tenantId), getLogRows(db, filters, period, 6), getLogTotals(db, filters, period),
             getShopErrors(db, tenantId, period), loadFeatureRows(payload),
+            // the override card loads apart: if it fails the page still shows the plan's limits
+            getShopLimitView(tenantId).catch((error: unknown): ShopLimitView | null => { console.error('[ai-usage] shop limit view failed', error); return null }),
         ])
-        const limits = shop.planCode ? limitsForCode(features, shop.planCode) : null
+        const planLimits = shop.planCode ? limitsForCode(features, shop.planCode) : null
+        // what applies now: the plan's limits with this shop's active override on top
+        const limits = view ? { budgetUsd: view.effective.aiBudgetUsd, picturesPerDay: view.effective.picturesPerDay } : planLimits
+        const aiOff = view ? !view.effective.enabled : false
+        const overridden = Boolean(view?.override && !view.override.expired)
         const planName = PLAN_GROUP_LABELS[shop.plan]
         const areaMax = Math.max(...areas.map((a) => a.cost), 0)
         const logsHref = `/studio/performance/logs?${new URLSearchParams([...new URLSearchParams(query), ['shop', String(tenantId)]]).toString()}`
@@ -69,9 +77,9 @@ export default async function ShopAiUsagePage({ params, searchParams }: Props) {
                 </div>
 
                 <section className="card aiq-card">
-                    <CardHead title="Limits and last 24 hours" sub={limits ? `${planName} plan limits. Spend is rolling, last 24 hours.` : 'This shop has no plan on record yet, so no limits are shown.'} />
+                    <CardHead title="Limits and last 24 hours" sub={limits ? `${planName} plan limits${overridden ? ' with this shop\'s override' : ''}${aiOff ? '. AI is off for this shop' : ''}. Spend is rolling, last 24 hours.` : 'This shop has no plan on record yet, so no limits are shown.'} />
                     <div className="au-gen-kpis au-lim">
-                        <div><div className="aiq-metric-label">AI budget / day</div><div className="aiq-metric-val">{limits ? (limits.budgetUsd === null ? 'Unlimited' : `$${limits.budgetUsd}`) : '—'}</div></div>
+                        <div><div className="aiq-metric-label">AI budget / day</div><div className="aiq-metric-val">{aiOff ? 'AI off' : limits ? (limits.budgetUsd === null ? 'Unlimited' : `$${limits.budgetUsd}`) : '—'}</div></div>
                         <div><div className="aiq-metric-label">Pictures / day</div><div className="aiq-metric-val">{limits ? (limits.picturesPerDay === null ? 'Unlimited' : fmtInt(limits.picturesPerDay)) : '—'}</div></div>
                         <div><div className="aiq-metric-label">Spent, last 24 h</div><div className="aiq-metric-val">{fmtUsd(rolling.batteryUsd, 2)}</div>
                             {limits && meter(rolling.batteryUsd, limits.budgetUsd)}
@@ -80,9 +88,11 @@ export default async function ShopAiUsagePage({ params, searchParams }: Props) {
                     </div>
                 </section>
 
+                <ShopLimitCard tenantId={tenantId} shopName={shop.name} view={view} retryHref={self} />
+
                 <section className="card aiq-card">
-                    <CardHead title={period.bucket === 'hour' ? 'Cost per hour' : 'Cost per day'} sub={limits?.budgetUsd == null ? `No budget line${limits ? `: ${planName} is Unlimited` : ''}. A line shows here once a daily budget is set.` : 'Dashed line = daily AI budget.'} />
-                    <DailyBars bars={series.map((s) => ({ key: s.key, label: bucketLabel(s.key, period.bucket, today), cost: s.cost, partial: s.key === today }))} budgetUsd={limits?.budgetUsd ?? null} />
+                    <CardHead title={period.bucket === 'hour' ? 'Cost per hour' : 'Cost per day'} sub={aiOff ? 'AI is off for this shop, so there is no budget line.' : limits?.budgetUsd == null ? `No budget line${limits ? `: ${overridden ? 'this shop is' : `${planName} is`} Unlimited` : ''}. A line shows here once a daily budget is set.` : 'Dashed line = daily AI budget.'} />
+                    <DailyBars bars={series.map((s) => ({ key: s.key, label: bucketLabel(s.key, period.bucket, today), cost: s.cost, partial: s.key === today }))} budgetUsd={aiOff ? null : (limits?.budgetUsd ?? null)} />
                 </section>
 
                 <div className="au-two">
