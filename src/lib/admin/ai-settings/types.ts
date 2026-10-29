@@ -1,5 +1,5 @@
 import type { PlanCode } from '@/collections/PlanSubscriptions'
-import type { AiPlatformConfig } from '@/lib/ai-platform/ai-config-schema'
+import type { AiCaps, AiPlatformConfig } from '@/lib/ai-platform/ai-config-schema'
 import type { LimitKind } from './plan-groups'
 
 export type LimitValues = Record<LimitKind, Record<PlanCode, string>>
@@ -31,9 +31,27 @@ export interface UnpricedModel {
   calls: number
 }
 
+/** Platform caps as saved and as they apply. `saved` null = no caps block (env default for the daily cap, no monthly cap). */
+export interface CapsView {
+  saved: AiCaps | null
+  effective: {
+    /** null = off */
+    dailyUsd: number | null
+    monthlyUsd: number | null
+    alertPercents: number[]
+    pauseFreeAtPercent: number | null
+  }
+  /** where the effective daily cap comes from */
+  dailySource: 'settings' | 'env' | 'off'
+  /** AI_DAILY_BUDGET_USD of this deployment (null = off); what applies while `saved.dailyUsd` is absent */
+  envDailyUsd: number | null
+}
+
 export interface AiSettingsData {
   limits: LimitValues
+  /** prices, pictures and model chains (caps are in `caps`) */
   config: AiPlatformConfig
+  caps: CapsView
   /** ISO time the platform config row last changed; null when none exists */
   configUpdatedAt: string | null
   /** true when the stored config row failed validation (the editor starts from an empty config) */

@@ -6,28 +6,33 @@ import 'server-only'
 import config from '@payload-config'
 import { getPayload, ValidationError, type Payload } from 'payload'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
-import { AI_PLATFORM_CONFIG_FEATURE, AiPlatformConfigSchema, type AiPlatformConfig } from '@/lib/ai-platform/ai-config-schema'
+import { AI_PLATFORM_CONFIG_FEATURE, AiCapsSchema, AiPlatformConfigSchema, type AiCaps, type AiPlatformConfig } from '@/lib/ai-platform/ai-config-schema'
 import { clearAiConfigCache } from '@/lib/ai-platform/ai-config'
 import { DEFAULT_AI_LIMITS, clearAiLimitsCache } from '@/lib/ai-platform/plan-limits'
 import { validateConfig } from './config-validation'
-import { ALL_PLAN_CODES, FEATURE_OF_KIND, UNLIMITED, normalizeLimit, type LimitKind } from './plan-groups'
+import { resolveCaps } from '@/lib/admin/ai-caps/caps-config'
+import { ALL_PLAN_CODES, FEATURE_OF_KIND, LIMIT_KINDS, UNLIMITED, normalizeLimit, type LimitKind } from './plan-groups'
 import { loadGroupStats, loadUnpricedModels } from './usage-queries'
 import type { AiSettingsData, FieldError, LimitChange, LimitValues } from './types'
 
-const KINDS: LimitKind[] = ['budget', 'pictures']
+const KINDS = LIMIT_KINDS
 const LIMIT_FEATURES = KINDS.map((kind) => FEATURE_OF_KIND[kind])
 
 export interface SaveInput {
   limits?: LimitChange[]
   config?: unknown
+  /** platform caps: a block replaces the saved one, null removes it (back to the env default), undefined leaves it */
+  caps?: unknown
 }
 export type SaveResult = { ok: true; written: number } | { ok: false; errors: FieldError[] }
 
 const asText = (value: unknown, fallback: string) => (typeof value === 'string' && value.trim() ? value.trim() : fallback)
 
-/** A missing row shows the same default ai-platform enforces for it. */
+/** A missing row shows the same default ai-platform enforces for it (new budgets: unlimited, AI: on). */
 function defaultLimit(kind: LimitKind, code: PlanCode): string {
   const defaults = DEFAULT_AI_LIMITS[code]
+  if (kind === 'enabled') return 'YES'
+  if (kind === 'monthly' || kind === 'site') return UNLIMITED
   return String(kind === 'budget' ? defaults.aiBudgetUsd : defaults.picturesPerDay)
 }
 
@@ -45,7 +50,7 @@ export async function loadAiSettings(): Promise<AiSettingsData> {
     loadGroupStats(),
     loadUnpricedModels(),
   ])
-  const limits = { budget: {}, pictures: {} } as unknown as LimitValues
+  const limits = Object.fromEntries(KINDS.map((kind) => [kind, {}])) as unknown as LimitValues
   for (const kind of KINDS) {
     for (const code of ALL_PLAN_CODES) {
       const row = rows.docs.find((doc) => doc.planCode === code && doc.featureCode === FEATURE_OF_KIND[kind])
@@ -55,9 +60,11 @@ export async function loadAiSettings(): Promise<AiSettingsData> {
   const row = configRows.docs[0]
   const parsed = AiPlatformConfigSchema.safeParse(row?.settings ?? {})
   const emptyConfig: AiPlatformConfig = { prices: {}, images: {}, models: {} }
+  const { caps: savedCaps, ...configWithoutCaps } = parsed.success ? parsed.data : emptyConfig
   return {
     limits,
-    config: parsed.success ? parsed.data : emptyConfig,
+    config: configWithoutCaps,
+    caps: resolveCaps(savedCaps),
     configUpdatedAt: row?.updatedAt ? new Date(row.updatedAt).toISOString() : null,
     configInvalid: !parsed.success,
     stats,
@@ -86,12 +93,19 @@ async function writeLimit(payload: Payload, change: LimitChange, value: string):
   }
 }
 
-async function writeConfig(payload: Payload, settings: AiPlatformConfig): Promise<void> {
+async function writeConfig(payload: Payload, patch: { config: AiPlatformConfig | null; caps: AiCaps | null | undefined }): Promise<void> {
   const found = await payload.find({
     collection: 'plan-features', overrideAccess: true, depth: 0, limit: 1, pagination: false, sort: '-updatedAt',
     where: { featureCode: { equals: AI_PLATFORM_CONFIG_FEATURE } },
   })
   const existing = found.docs[0]
+  // the page edits prices / chains and caps separately: whatever the request leaves out stays as saved
+  const saved = AiPlatformConfigSchema.safeParse(existing?.settings ?? {})
+  const base: AiPlatformConfig = patch.config ?? (saved.success ? saved.data : { prices: {}, images: {}, models: {} })
+  const caps = patch.caps !== undefined ? patch.caps : (patch.config?.caps ?? (saved.success ? saved.data.caps : undefined))
+  const settings: AiPlatformConfig = { ...base }
+  delete settings.caps
+  if (caps) settings.caps = caps
   if (existing) {
     await payload.update({ collection: 'plan-features', id: existing.id, data: { settings }, overrideAccess: true })
   } else {
@@ -123,6 +137,13 @@ export async function saveAiSettings(input: SaveInput): Promise<SaveResult> {
     if ('errors' in checked) errors.push(...checked.errors)
     else settings = checked.config
   }
+  let caps: AiCaps | null | undefined
+  if (input.caps === null) caps = null
+  else if (input.caps !== undefined) {
+    const checked = AiCapsSchema.safeParse(input.caps)
+    if (checked.success) caps = checked.data
+    else errors.push(...checked.error.issues.map((issue) => ({ path: ['caps', ...issue.path.map(String)], message: issue.message })))
+  }
   if (errors.length) return { ok: false, errors }
 
   const payload = await getPayload({ config })
@@ -138,12 +159,12 @@ export async function saveAiSettings(input: SaveInput): Promise<SaveResult> {
         return { ok: false, errors: mapped }
       }
     }
-    if (settings) {
+    if (settings || caps !== undefined) {
       try {
-        await writeConfig(payload, settings)
+        await writeConfig(payload, { config: settings, caps })
         written += 1
       } catch (error) {
-        const mapped = hookErrors(error, ['config'])
+        const mapped = hookErrors(error, [settings ? 'config' : 'caps'])
         if (!mapped) throw error
         return { ok: false, errors: mapped }
       }

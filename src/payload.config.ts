@@ -28,6 +28,8 @@ import { Categories } from './collections/Categories'
 import { Notifications } from './collections/Notifications'
 import { PushSubscriptions } from './collections/PushSubscriptions'
 import { AiUsageLogs } from './collections/AiUsageLogs'
+import { AiShopLimits } from './collections/AiShopLimits'
+import { AiCapAlerts } from './collections/AiCapAlerts'
 import { TemplateQualityScores } from './collections/TemplateQualityScores'
 import { BlockCatalogEntries } from './collections/BlockCatalogEntries'
 import { BlockVariants } from './collections/BlockVariants'
@@ -151,6 +153,8 @@ export default buildConfig({
     Notifications,
     PushSubscriptions,
     AiUsageLogs,
+    AiShopLimits,
+    AiCapAlerts,
     TemplateQualityScores,
     BlockCatalogEntries,
     BlockVariants,

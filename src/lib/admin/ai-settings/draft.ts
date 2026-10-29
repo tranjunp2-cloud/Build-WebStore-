@@ -3,7 +3,7 @@
  * conversions to/from the saved shapes. Pure + client-safe.
  */
 import { CHAIN_KEYS, joinChain, parseChain } from './config-validation'
-import { ALL_PLAN_CODES, PLAN_GROUPS, sharedValue, type LimitKind } from './plan-groups'
+import { ALL_PLAN_CODES, LIMIT_KINDS, PLAN_GROUPS, sharedValue, type LimitKind } from './plan-groups'
 import type { AiSettingsData, FieldError, LimitChange, LimitValues } from './types'
 
 export type ChainKey = (typeof CHAIN_KEYS)[number]
@@ -79,27 +79,32 @@ export function draftToConfig(draft: Draft): unknown {
 /** Only the plan codes whose value differs from what is saved. */
 export function limitChanges(saved: LimitValues, draft: LimitValues): LimitChange[] {
   const out: LimitChange[] = []
-  for (const kind of ['budget', 'pictures'] as LimitKind[]) {
+  for (const kind of LIMIT_KINDS) {
     for (const planCode of ALL_PLAN_CODES) {
-      if (saved[kind][planCode] !== draft[kind][planCode]) out.push({ planCode, kind, value: draft[kind][planCode] })
+      if (saved[kind]?.[planCode] !== draft[kind]?.[planCode]) out.push({ planCode, kind, value: draft[kind][planCode] })
     }
   }
   return out
 }
 
+const LIMIT_LABELS: Record<LimitKind, string> = { budget: 'AI budget', pictures: 'Pictures', monthly: 'Monthly AI budget', site: 'Website setup budget', enabled: 'AI' }
+
 const shown = (kind: LimitKind, value: string | null) => {
   if (value === null) return 'differs by code'
-  if (value.toUpperCase() === 'UNLIMITED' || value.toUpperCase() === 'YES') return 'Unlimited'
-  return kind === 'budget' ? `$${value}/day` : `${value}/day`
+  const upper = value.toUpperCase()
+  if (kind === 'enabled') return upper === 'NO' ? 'Off' : 'On'
+  if (upper === 'UNLIMITED' || upper === 'YES') return 'Unlimited'
+  if (kind === 'monthly') return `$${value}/month`
+  return kind === 'budget' || kind === 'site' ? `$${value}/day` : `${value}/day`
 }
 
 /** Human lines for plan limit changes. */
 export function describeLimitChanges(data: AiSettingsData, draft: Draft): string[] {
   const lines: string[] = []
   for (const group of PLAN_GROUPS) {
-    for (const kind of ['budget', 'pictures'] as LimitKind[]) {
-      if (!group.codes.some((code) => data.limits[kind][code] !== draft.limits[kind][code])) continue
-      const label = kind === 'budget' ? 'AI budget' : 'Pictures'
+    for (const kind of LIMIT_KINDS) {
+      if (!group.codes.some((code) => data.limits[kind]?.[code] !== draft.limits[kind]?.[code])) continue
+      const label = LIMIT_LABELS[kind]
       lines.push(`${group.label} · ${label}: ${shown(kind, sharedValue(group, data.limits[kind]))} → ${shown(kind, sharedValue(group, draft.limits[kind]))}`)
     }
   }

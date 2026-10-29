@@ -3,14 +3,21 @@
  * Pure + client-safe: no server imports (types only).
  */
 import type { PlanCode } from '@/collections/PlanSubscriptions'
-import { AI_BUDGET_FEATURE, AI_PICTURES_FEATURE, aiLimitProblem } from '@/lib/ai-platform/ai-config-schema'
+import {
+  AI_BUDGET_FEATURE, AI_BUDGET_MONTHLY_FEATURE, AI_ENABLED_FEATURE, AI_PICTURES_FEATURE, AI_SITE_BUDGET_FEATURE, aiLimitProblem,
+  type AiPlanLimitFeature,
+} from '@/lib/ai-platform/ai-config-schema'
 
-export type LimitKind = 'budget' | 'pictures'
-export type LimitFeature = typeof AI_BUDGET_FEATURE | typeof AI_PICTURES_FEATURE
+/** budget / pictures: per rolling 24 h; monthly: USD per calendar month; site: website-setup USD per rolling 24 h; enabled: YES / NO */
+export type LimitKind = 'budget' | 'pictures' | 'monthly' | 'site' | 'enabled'
+export const LIMIT_KINDS: readonly LimitKind[] = ['budget', 'pictures', 'monthly', 'site', 'enabled']
 
-export const FEATURE_OF_KIND: Record<LimitKind, LimitFeature> = {
+export const FEATURE_OF_KIND: Record<LimitKind, AiPlanLimitFeature> = {
   budget: AI_BUDGET_FEATURE,
   pictures: AI_PICTURES_FEATURE,
+  monthly: AI_BUDGET_MONTHLY_FEATURE,
+  site: AI_SITE_BUDGET_FEATURE,
+  enabled: AI_ENABLED_FEATURE,
 }
 
 export const UNLIMITED = 'UNLIMITED'
@@ -54,6 +61,7 @@ export function normalizeLimit(kind: LimitKind, raw: unknown): { value: string }
   if (problem) return { error: problem }
   const text = String(raw).trim()
   const upper = text.toUpperCase()
+  if (kind === 'enabled') return { value: upper }
   return { value: upper === UNLIMITED || upper === 'YES' ? UNLIMITED : text }
 }
 

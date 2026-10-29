@@ -5388,6 +5388,112 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
       END $$;
     `,
   },
+  // ── AI caps in layers (plan 261029-1830): per plan on/off, monthly budget, website-setup budget ──
+  // Insert-only, same two-table-shape handling as the ai-limits seed above. Missing rows already mean "on / unlimited".
+  {
+    name: 'f-subscription-plan-features-ai-caps-seed',
+    sql: `
+      DO $$
+      DECLARE r record;
+      BEGIN
+        FOR r IN SELECT * FROM (VALUES
+          ('FREEMIUM','ai_enabled','YES'),
+          ('FREEMIUM','ai_budget_usd_monthly','UNLIMITED'),
+          ('FREEMIUM','ai_site_budget_usd_daily','UNLIMITED'),
+          ('STARTER_TM_USER','ai_enabled','YES'),
+          ('STARTER_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('STARTER_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('STARTER_NON_TM_USER','ai_enabled','YES'),
+          ('STARTER_NON_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('STARTER_NON_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('STANDARD_TM_USER','ai_enabled','YES'),
+          ('STANDARD_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('STANDARD_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('STANDARD_NON_TM_USER','ai_enabled','YES'),
+          ('STANDARD_NON_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('STANDARD_NON_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('PROFESSIONAL_TM_USER','ai_enabled','YES'),
+          ('PROFESSIONAL_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('PROFESSIONAL_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('PROFESSIONAL_NON_TM_USER','ai_enabled','YES'),
+          ('PROFESSIONAL_NON_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('PROFESSIONAL_NON_TM_USER','ai_site_budget_usd_daily','UNLIMITED')
+        ) AS v(plan_code, feature_code, value) LOOP
+          IF NOT EXISTS (SELECT 1 FROM plan_features WHERE plan_code::text = r.plan_code AND feature_code = r.feature_code) THEN
+            EXECUTE format('INSERT INTO plan_features (plan_code, feature_code, value, created_at, updated_at) VALUES (%L, %L, %L, now(), now())',
+              r.plan_code, r.feature_code, r.value);
+          END IF;
+        END LOOP;
+      END $$;
+    `,
+  },
+  // Per-shop override of the plan's AI limits (collection ai-shop-limits). One row per shop; expired rows are ignored by the reader.
+  {
+    name: 'ai_shop_limits.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_shop_limits (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      mode varchar NOT NULL DEFAULT 'custom',
+      ai_budget_usd numeric,
+      pictures_per_day numeric,
+      ai_budget_usd_monthly numeric,
+      site_budget_usd numeric,
+      reason varchar NOT NULL,
+      expires_at timestamp(3) with time zone,
+      set_by_id integer,
+      updated_at timestamp(3) with time zone DEFAULT now() NOT NULL,
+      created_at timestamp(3) with time zone DEFAULT now() NOT NULL
+    );`,
+  },
+  { name: 'ai_shop_limits.alter_tenant_id', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS tenant_id integer;` },
+  { name: 'ai_shop_limits.alter_mode', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS mode varchar NOT NULL DEFAULT 'custom';` },
+  { name: 'ai_shop_limits.alter_ai_budget_usd', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS ai_budget_usd numeric;` },
+  { name: 'ai_shop_limits.alter_pictures_per_day', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS pictures_per_day numeric;` },
+  { name: 'ai_shop_limits.alter_ai_budget_usd_monthly', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS ai_budget_usd_monthly numeric;` },
+  { name: 'ai_shop_limits.alter_site_budget_usd', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS site_budget_usd numeric;` },
+  { name: 'ai_shop_limits.alter_reason', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS reason varchar;` },
+  { name: 'ai_shop_limits.alter_expires_at', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS expires_at timestamp(3) with time zone;` },
+  { name: 'ai_shop_limits.alter_set_by_id', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS set_by_id integer;` },
+  { name: 'ai_shop_limits.tenant_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS ai_shop_limits_tenant_idx ON ai_shop_limits (tenant_id);` },
+  { name: 'ai_shop_limits.set_by_idx', sql: `CREATE INDEX IF NOT EXISTS ai_shop_limits_set_by_idx ON ai_shop_limits (set_by_id);` },
+  { name: 'ai_shop_limits.updated_at_idx', sql: `CREATE INDEX IF NOT EXISTS ai_shop_limits_updated_at_idx ON ai_shop_limits (updated_at);` },
+  { name: 'ai_shop_limits.created_at_idx', sql: `CREATE INDEX IF NOT EXISTS ai_shop_limits_created_at_idx ON ai_shop_limits (created_at);` },
+  // Alerts when spend crosses a threshold (collection ai-cap-alerts), written by /api/cron/ai-usage-sync.
+  {
+    name: 'ai_cap_alerts.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_cap_alerts (
+      id serial PRIMARY KEY,
+      scope varchar NOT NULL,
+      period_key varchar NOT NULL,
+      threshold numeric NOT NULL,
+      spent_usd numeric NOT NULL,
+      cap_usd numeric NOT NULL,
+      tenant_id integer,
+      notified_lark boolean DEFAULT false,
+      updated_at timestamp(3) with time zone DEFAULT now() NOT NULL,
+      created_at timestamp(3) with time zone DEFAULT now() NOT NULL
+    );`,
+  },
+  { name: 'ai_cap_alerts.alter_scope', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS scope varchar;` },
+  { name: 'ai_cap_alerts.alter_period_key', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS period_key varchar;` },
+  { name: 'ai_cap_alerts.alter_threshold', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS threshold numeric;` },
+  { name: 'ai_cap_alerts.alter_spent_usd', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS spent_usd numeric;` },
+  { name: 'ai_cap_alerts.alter_cap_usd', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS cap_usd numeric;` },
+  { name: 'ai_cap_alerts.alter_tenant_id', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS tenant_id integer;` },
+  { name: 'ai_cap_alerts.alter_notified_lark', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS notified_lark boolean DEFAULT false;` },
+  { name: 'ai_cap_alerts.scope_idx', sql: `CREATE INDEX IF NOT EXISTS ai_cap_alerts_scope_idx ON ai_cap_alerts (scope);` },
+  { name: 'ai_cap_alerts.tenant_idx', sql: `CREATE INDEX IF NOT EXISTS ai_cap_alerts_tenant_idx ON ai_cap_alerts (tenant_id);` },
+  { name: 'ai_cap_alerts.updated_at_idx', sql: `CREATE INDEX IF NOT EXISTS ai_cap_alerts_updated_at_idx ON ai_cap_alerts (updated_at);` },
+  { name: 'ai_cap_alerts.created_at_idx', sql: `CREATE INDEX IF NOT EXISTS ai_cap_alerts_created_at_idx ON ai_cap_alerts (created_at);` },
+  // one alert per (scope, period, threshold, shop); platform alerts have no shop, so NULL is folded to 0 (NULLs never collide in a plain unique index)
+  {
+    name: 'ai_cap_alerts.dedupe_unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS ai_cap_alerts_dedupe_idx ON ai_cap_alerts (scope, period_key, threshold, (COALESCE(tenant_id, 0)));`,
+  },
+  { name: 'payload_locked_documents_rels.ai_shop_limits_id', sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "ai_shop_limits_id" integer REFERENCES "public"."ai_shop_limits"("id") ON DELETE CASCADE ON UPDATE CASCADE;` },
+  { name: 'payload_locked_documents_rels.ai_shop_limits_id_idx', sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_ai_shop_limits_id_idx" ON "payload_locked_documents_rels" ("ai_shop_limits_id");` },
+  { name: 'payload_locked_documents_rels.ai_cap_alerts_id', sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "ai_cap_alerts_id" integer REFERENCES "public"."ai_cap_alerts"("id") ON DELETE CASCADE ON UPDATE CASCADE;` },
+  { name: 'payload_locked_documents_rels.ai_cap_alerts_id_idx', sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_ai_cap_alerts_id_idx" ON "payload_locked_documents_rels" ("ai_cap_alerts_id");` },
   {
     // planCode is a required enum, so the platform-wide row lives under FREEMIUM; /api/internal/ai-config reads it by feature code only
     name: 'f-subscription-plan-features-ai-platform-config-seed',
@@ -6517,6 +6623,8 @@ const COLLECTION_SLUGS = [
   'seo_meta_jobs', 'notifications', 'subscribers',
   'contact_submissions', 'push-subscriptions',
   'ai_usage_logs',
+  'ai-shop-limits',
+  'ai-cap-alerts',
   'template_quality_scores',
   'block_catalog_entries',
   'block_variants',

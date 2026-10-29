@@ -4,13 +4,18 @@
  */
 import { describe, expect, it } from 'vitest'
 import { draftFromData, draftToConfig, describeChanges, limitChanges, configIfChanged } from '@/lib/admin/ai-settings/draft'
+import { resolveCaps } from '@/lib/admin/ai-caps/caps-config'
 import { validateConfig } from '@/lib/admin/ai-settings/config-validation'
 import { ALL_PLAN_CODES } from '@/lib/admin/ai-settings/plan-groups'
 import type { AiSettingsData, LimitValues } from '@/lib/admin/ai-settings/types'
 
+const every = (value: string) => Object.fromEntries(ALL_PLAN_CODES.map((c) => [c, value])) as LimitValues['budget']
 const limits = (budget: string, pictures: string): LimitValues => ({
-  budget: Object.fromEntries(ALL_PLAN_CODES.map((c) => [c, budget])) as LimitValues['budget'],
-  pictures: Object.fromEntries(ALL_PLAN_CODES.map((c) => [c, pictures])) as LimitValues['pictures'],
+  budget: every(budget),
+  pictures: every(pictures),
+  monthly: every('UNLIMITED'),
+  site: every('UNLIMITED'),
+  enabled: every('YES'),
 })
 
 const data = (): AiSettingsData => ({
@@ -22,6 +27,7 @@ const data = (): AiSettingsData => ({
     images: { 'openai:gpt-image-1': 0.04 },
     models: { fast: 'anthropic:claude-haiku-5-5', image: 'openai:gpt-image-1' },
   },
+  caps: resolveCaps(null, {}),
   configUpdatedAt: '2026-10-21T16:04:00.000Z',
   configInvalid: false,
   stats: [],

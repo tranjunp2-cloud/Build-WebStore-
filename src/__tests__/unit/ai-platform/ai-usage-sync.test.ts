@@ -25,6 +25,9 @@ const aiPlatformJson = vi.hoisted(() => vi.fn())
 vi.mock('payload', () => ({ getPayload: vi.fn(async () => ({ db: { drizzle: { execute } } })) }))
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('@/lib/ai-platform/upstream', () => ({ aiPlatformJson }))
+// cap alerts have their own tests (src/__tests__/unit/ai-caps); here the cron only has to call them after the copy
+const runCapAlerts = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/admin/ai-caps/alerts', () => ({ runCapAlerts }))
 
 import { GET } from '@/app/api/cron/ai-usage-sync/route'
 import { USAGE_MAX_PAGES, USAGE_PAGE_SIZE, syncUsageEvents } from '@/lib/ai-platform/usage-sync'
@@ -190,9 +193,10 @@ describe('GET /api/cron/ai-usage-sync', () => {
 
     it('TC-AIU-SYNC-011 returns the sync result, and 500 (logged) when the sync fails', async () => {
         execute.mockResolvedValue({ rows: [] })
+        runCapAlerts.mockResolvedValue({ crossed: 0, created: 0, notified: 0 })
         aiPlatformJson.mockResolvedValueOnce({ events: [], nextAfter: 0 })
         const ok = await call('Bearer cron-secret')
-        expect(await ok.json()).toEqual({ success: true, fetched: 0, inserted: 0, pages: 1, cursor: 0 })
+        expect(await ok.json()).toEqual({ success: true, fetched: 0, inserted: 0, pages: 1, cursor: 0, alerts: { crossed: 0, created: 0, notified: 0 } })
 
         const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
         aiPlatformJson.mockRejectedValueOnce(new Error('AI platform 502'))

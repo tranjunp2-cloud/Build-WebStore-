@@ -35,15 +35,20 @@ const EXPECTED: Record<string, [number, number]> = {
     PROFESSIONAL_TM_USER: [0.9, 20], PROFESSIONAL_NON_TM_USER: [0.9, 20],
 }
 
-/** Fake store: one subscription (or none) and the plan-features rows to return for whichever plan is asked. */
-function store(sub: { plan: string; endsAt?: string; status?: string } | null, features: Record<string, string> = {}) {
+/** Fake store: one subscription (or none), the plan-features rows to return for whichever plan is asked, an optional shop override. */
+function store(sub: { plan: string; endsAt?: string; status?: string } | null, features: Record<string, string> = {}, override: Record<string, unknown> | null = null) {
     find.mockImplementation(async (args: { collection: string; where: { and: Array<Record<string, { equals?: string }>> } }) => {
         if (args.collection === 'plan-subscriptions') {
             return { docs: sub ? [{ plan: sub.plan, status: sub.status ?? 'active', endsAt: sub.endsAt ?? FUTURE }] : [] }
         }
+        if (args.collection === 'ai-shop-limits') return { docs: override ? [override] : [] }
         return { docs: Object.entries(features).map(([featureCode, value]) => ({ featureCode, value })) }
     })
 }
+
+/** The full `lim` for a plan with no new rows and no override: AI on, new budgets unlimited, source plan. */
+const lim = (plan: string, aiBudgetUsd: number | null, picturesPerDay: number | null) =>
+    ({ plan, aiBudgetUsd, picturesPerDay, enabled: true, aiBudgetUsdMonthly: null, siteBudgetUsd: null, source: 'plan' })
 
 beforeEach(() => {
     find.mockReset()
@@ -55,13 +60,13 @@ afterEach(() => vi.useRealTimers())
 describe('aiLimitsForTenant', () => {
     it.each(Object.entries(EXPECTED))('TC-AIU-PLAN-001 %s reads its plan-features rows', async (plan, [budget, pictures]) => {
         store({ plan }, { ai_budget_usd_daily: String(budget), ai_pictures_daily: String(pictures) })
-        await expect(aiLimitsForTenant(`t-${plan}`)).resolves.toEqual({ plan, aiBudgetUsd: budget, picturesPerDay: pictures })
+        await expect(aiLimitsForTenant(`t-${plan}`)).resolves.toEqual(lim(plan, budget, pictures))
         const featureQuery = find.mock.calls.find(([a]) => a.collection === 'plan-features')?.[0]
         expect(featureQuery.where.and[0]).toEqual({ planCode: { equals: plan } })
     })
 
     it('TC-AIU-PLAN-002 no subscription, expired or cancelled → FREEMIUM limits', async () => {
-        const freemium = { plan: 'FREEMIUM', aiBudgetUsd: 0.05, picturesPerDay: 1 }
+        const freemium = lim('FREEMIUM', 0.05, 1)
         store(null, { ai_budget_usd_daily: '0.05', ai_pictures_daily: '1' })
         expect(await aiLimitsForTenant('none')).toEqual(freemium)
         store({ plan: 'PROFESSIONAL_TM_USER', endsAt: PAST }, { ai_budget_usd_daily: '0.05', ai_pictures_daily: '1' })
@@ -74,17 +79,17 @@ describe('aiLimitsForTenant', () => {
 
     it('TC-AIU-PLAN-003 a missing or unreadable row falls back to the plan default, never unlimited', async () => {
         store({ plan: 'STANDARD_TM_USER' }, {})
-        expect(await aiLimitsForTenant('a')).toEqual({ plan: 'STANDARD_TM_USER', aiBudgetUsd: 0.4, picturesPerDay: 8 })
+        expect(await aiLimitsForTenant('a')).toEqual(lim('STANDARD_TM_USER', 0.4, 8))
         store({ plan: 'STARTER_NON_TM_USER' }, { ai_budget_usd_daily: 'lots', ai_pictures_daily: '-2' })
-        expect(await aiLimitsForTenant('b')).toEqual({ plan: 'STARTER_NON_TM_USER', aiBudgetUsd: 0.15, picturesPerDay: 3 })
+        expect(await aiLimitsForTenant('b')).toEqual(lim('STARTER_NON_TM_USER', 0.15, 3))
         for (const plan of PLAN_CODES) expect(DEFAULT_AI_LIMITS[plan.value]).toEqual({ aiBudgetUsd: EXPECTED[plan.value]![0], picturesPerDay: EXPECTED[plan.value]![1] })
     })
 
     it('TC-AIU-PLAN-004 UNLIMITED / YES → null; "0" stays 0 (AI off); pictures are whole numbers', async () => {
         store({ plan: 'PROFESSIONAL_TM_USER' }, { ai_budget_usd_daily: 'unlimited', ai_pictures_daily: 'YES' })
-        expect(await aiLimitsForTenant('u')).toEqual({ plan: 'PROFESSIONAL_TM_USER', aiBudgetUsd: null, picturesPerDay: null })
+        expect(await aiLimitsForTenant('u')).toEqual(lim('PROFESSIONAL_TM_USER', null, null))
         store({ plan: 'FREEMIUM' }, { ai_budget_usd_daily: '0', ai_pictures_daily: '2.9' })
-        expect(await aiLimitsForTenant('z')).toEqual({ plan: 'FREEMIUM', aiBudgetUsd: 0, picturesPerDay: 2 })
+        expect(await aiLimitsForTenant('z')).toEqual(lim('FREEMIUM', 0, 2))
     })
 
     it('TC-AIU-PLAN-005 caches per tenant for 60 s, then refetches; the map stays bounded', async () => {
@@ -92,12 +97,12 @@ describe('aiLimitsForTenant', () => {
         store({ plan: 'FREEMIUM' }, { ai_budget_usd_daily: '0.05', ai_pictures_daily: '1' })
         await aiLimitsForTenant('c1')
         await aiLimitsForTenant('c1')
-        expect(find).toHaveBeenCalledTimes(2) // subscription + features, once
+        expect(find).toHaveBeenCalledTimes(3) // subscription + features + shop override, once
         await aiLimitsForTenant('c2')
-        expect(find).toHaveBeenCalledTimes(4)
+        expect(find).toHaveBeenCalledTimes(6)
         vi.advanceTimersByTime(60_001)
         await aiLimitsForTenant('c1')
-        expect(find).toHaveBeenCalledTimes(6)
+        expect(find).toHaveBeenCalledTimes(9)
         for (let i = 0; i < 600; i++) await aiLimitsForTenant(`bulk-${i}`)
         find.mockClear()
         await aiLimitsForTenant('c1') // evicted long ago (oldest first) → read again
@@ -121,7 +126,7 @@ describe('lim claim', () => {
         vi.stubEnv('AI_PLATFORM_CONTEXT_SECRET', 'x'.repeat(40))
         store({ plan: 'STANDARD_NON_TM_USER' }, { ai_budget_usd_daily: '0.40', ai_pictures_daily: 'UNLIMITED' })
         const claims = decodeJwt(await signAgentContextToken(actor('77')))
-        expect(claims.lim).toEqual({ plan: 'STANDARD_NON_TM_USER', aiBudgetUsd: 0.4, picturesPerDay: null })
+        expect(claims.lim).toEqual(lim('STANDARD_NON_TM_USER', 0.4, null))
         expect(claims.tenant).toBe('77')
 
         clearAiLimitsCache()
