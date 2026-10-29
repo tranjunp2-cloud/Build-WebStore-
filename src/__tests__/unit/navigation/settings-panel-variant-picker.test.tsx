@@ -122,12 +122,12 @@ describe('TC-NAV-08 — active variant button reflects headerBlock.variant', () 
             </I18nProvider>,
         )
 
-        // Assert — active button has the blue tint class
+        // Assert — active state is exposed via aria-pressed (GH-2107: shared VariantChip, primary color)
         const centeredBtn = screen.getByRole('button', { name: 'Centered' })
-        expect(centeredBtn.className).toContain('bg-blue-500/10')
+        expect(centeredBtn).toHaveAttribute('aria-pressed', 'true')
 
         const defaultBtn = screen.getByRole('button', { name: 'Default' })
-        expect(defaultBtn.className).not.toContain('bg-blue-500/10')
+        expect(defaultBtn).toHaveAttribute('aria-pressed', 'false')
     })
 
     it('defaults "Default" button to active when variant is undefined', () => {
@@ -145,6 +145,6 @@ describe('TC-NAV-08 — active variant button reflects headerBlock.variant', () 
 
         // Assert
         const defaultBtn = screen.getByRole('button', { name: 'Default' })
-        expect(defaultBtn.className).toContain('bg-blue-500/10')
+        expect(defaultBtn).toHaveAttribute('aria-pressed', 'true')
     })
 })

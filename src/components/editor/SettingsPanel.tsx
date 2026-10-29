@@ -31,6 +31,9 @@ import FeatureComparisonSettings from './FeatureComparisonSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
 import { FontSelect } from './FontSelect'
+import { BlockSpacingControls, type BlockSpacingField } from './settings-block-spacing-controls'
+import { VariantChip } from './settings-variant-chip'
+import { BLOCK_ICONS, FALLBACK_BLOCK_ICON } from './block-library-icons'
 import { useEditorAgentEnabled } from './agent/editor-agent-context'
 import { ElementAskLayer, type ViewportRect } from './agent/ElementAskLayer'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
@@ -132,13 +135,13 @@ const FOOTER_SOCIAL_PLATFORMS = [
 // ─── Constants ──────────────────────────────────────────────────────────
 const HEADING_FONT_OPTIONS = [...THEME_ENUMS.fontHeading]
 const BODY_FONT_OPTIONS = [...THEME_ENUMS.fontBody]
-const labelCls = "text-[11px] font-medium text-slate-400"
+const labelCls = "text-[11px] font-medium text-[var(--editor-text-muted)]"
 
 const PHONE_COUNTRIES = [
     { code: '+60', flag: '🇲🇾', name: 'Malaysia', iso: 'my', placeholder: '+60 12 345 6789' },
     { code: '+84', flag: '🇻🇳', name: 'Vietnam', iso: 'vn', placeholder: '+84 93 123 4567' },
 ] as const
-const sectionCls = "border-t border-white/10 pt-4"
+const sectionCls = "border-t border-[var(--editor-border)] pt-4"
 // Hide newsletter variants from footer UI — feature not ready for users
 const FOOTER_HIDDEN_VARIANTS = new Set(['expanded', 'mega-footer'])
 
@@ -201,7 +204,8 @@ export type SettingsTab = 'global' | 'seo' | 'menu' | 'block'
 
 function getBlockInfo(blockType: string) {
     const meta = blockRegistry.getBlockMeta(blockType)
-    return { label: meta?.name || blockType, icon: meta?.icon || '🧩', variants: meta?.variants || [] }
+    // GH-2107: same lucide icon as the Components panel (BlockLibraryPanel), not the registry emoji
+    return { label: meta?.name || blockType, Icon: BLOCK_ICONS[blockType] ?? FALLBACK_BLOCK_ICON, variants: meta?.variants || [] }
 }
 
 function normalizePagePath(slug?: string | null) {
@@ -703,11 +707,9 @@ function SettingsPanelInner({
                 <label className="text-xs text-gray-400">{s.colorMode}</label>
                 <div className="mt-1 flex gap-2">
                     {(['dark', 'light'] as const).map(mode => (
-                        <button key={mode} onClick={() => onThemeChange('colorMode', mode)}
-                            className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors',
-                                theme.colorMode === mode ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
+                        <VariantChip key={mode} className="flex-1" active={theme.colorMode === mode} onClick={() => onThemeChange('colorMode', mode)}>
                             {mode === 'dark' ? s.dark : s.light}
-                        </button>
+                        </VariantChip>
                     ))}
                 </div>
             </div>
@@ -1409,19 +1411,9 @@ function SettingsPanelInner({
                             const current = (headerBlock as Record<string, unknown>)?.variant as string | undefined
                             const active = current === key || (!current && key === 'default')
                             return (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    onClick={() => onHeaderUpdate?.({ variant: key })}
-                                    className={cn(
-                                        'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                        active
-                                            ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                            : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                                    )}
-                                >
+                                <VariantChip key={key} active={active} onClick={() => onHeaderUpdate?.({ variant: key })}>
                                     {label}
-                                </button>
+                                </VariantChip>
                             )
                         })}
                     </div>
@@ -1562,19 +1554,13 @@ function SettingsPanelInner({
                                     { key: 'centered-stack', label: s.footerStyleCentered },
                                     { key: 'dark-gradient', label: s.dark },
                                 ] as { key: string; label: string }[]).map(({ key, label }) => (
-                                    <button
+                                    <VariantChip
                                         key={key}
-                                        type="button"
+                                        active={(footerBlock.variant as string) === key || (!footerBlock.variant && key === 'simple')}
                                         onClick={() => onFooterUpdate?.({ variant: key })}
-                                        className={cn(
-                                            'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                            (footerBlock.variant as string) === key || (!footerBlock.variant && key === 'simple')
-                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                                        )}
                                     >
                                         {label}
-                                    </button>
+                                    </VariantChip>
                                 ))}
                             </div>
                         </div>
@@ -1782,6 +1768,30 @@ function SettingsPanelInner({
     const bt = block?.blockType
     const currentBlockIndex = blockIndex ?? 0
 
+    // GH-2107: one "Layout & Spacing" UI for every block type (generic, announcement-bar, feature-comparison, pricing)
+    const commitBlockSpacing = (field: BlockSpacingField, value: number) => {
+        const prevSpacing = ((block?.blockSpacing as Record<string, unknown>) || {})
+        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, [field]: value } })
+    }
+    // Value currently stored on the block (same default as the slider's initial state)
+    const savedSpacing = (field: BlockSpacingField) =>
+        Number((block?.blockSpacing as Record<string, unknown>)?.[field] ?? _spacingDefault())
+    const renderBlockSpacing = (className: string) => (
+        <BlockSpacingControls
+            className={className}
+            title={s.layoutSpacing}
+            topLabel={s.topSpacing}
+            bottomLabel={s.bottomSpacing}
+            top={localPaddingTop}
+            bottom={localPaddingBottom}
+            savedTop={savedSpacing('paddingTop')}
+            savedBottom={savedSpacing('paddingBottom')}
+            onTopChange={setLocalPaddingTop}
+            onBottomChange={setLocalPaddingBottom}
+            onCommit={commitBlockSpacing}
+        />
+    )
+
     const focusedBlockIndexRef = useRef<number>(currentBlockIndex)
 
     // Global block routing — floating blocks use negative __editorBlockIndex
@@ -1967,7 +1977,14 @@ function SettingsPanelInner({
                         <>
                             <div className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 py-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-white">{info?.icon} {info?.label}</span>
+                                    <span className="flex min-w-0 items-center gap-2.5 text-sm font-medium text-[var(--editor-text)]">
+                                        {info && (
+                                            <span data-testid="block-settings-icon" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--editor-overlay-bg)] text-[hsl(var(--primary))]">
+                                                <info.Icon className="h-4 w-4" aria-hidden />
+                                            </span>
+                                        )}
+                                        <span className="truncate">{info?.label}</span>
+                                    </span>
                                     <span className="text-xs text-gray-500">#{currentBlockIndex + 1}</span>
                                 </div>
                             </div>
@@ -1978,61 +1995,16 @@ function SettingsPanelInner({
                                     <label className="text-xs font-medium uppercase text-gray-500">{s.variant}</label>
                                     <div className="mt-2 flex flex-wrap gap-1.5">
                                         {info?.variants.filter(v => bt !== 'footer' || !FOOTER_HIDDEN_VARIANTS.has(v)).map(v => (
-                                            <button key={v}
-                                                onClick={() => onBlockFieldChange(currentBlockIndex, 'variant', v)}
-                                                className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                                                    block.variant === v ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
+                                            <VariantChip key={v} active={block.variant === v} onClick={() => onBlockFieldChange(currentBlockIndex, 'variant', v)}>
                                                 {v.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                            </button>
+                                            </VariantChip>
                                         ))}
                                     </div>
                                 </div>
                             )}
 
                             {/* Layout & Spacing */}
-                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && block.blockType !== 'announcement-bar' && block.blockType !== 'pricing' && block.blockType !== 'feature-comparison' && (
-                                <div className={sectionCls}>
-                                    <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
-                                    <div className="mt-3 space-y-3">
-                                        <div>
-                                            <div className="flex items-center justify-between">
-                                                <span className={labelCls}>Top Spacing</span>
-                                                <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
-                                            </div>
-                                            <input
-                                                type="range"
-                                                min={0} max={120} step={4}
-                                                value={localPaddingTop}
-                                                onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
-                                                onPointerUp={(e) => {
-                                                    const val = Number((e.target as HTMLInputElement).value)
-                                                    const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                    onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
-                                                }}
-                                                className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                            />
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center justify-between">
-                                                <span className={labelCls}>Bottom Spacing</span>
-                                                <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
-                                            </div>
-                                            <input
-                                                type="range"
-                                                min={0} max={120} step={4}
-                                                value={localPaddingBottom}
-                                                onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
-                                                onPointerUp={(e) => {
-                                                    const val = Number((e.target as HTMLInputElement).value)
-                                                    const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                    onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
-                                                }}
-                                                className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && block.blockType !== 'announcement-bar' && block.blockType !== 'pricing' && block.blockType !== 'feature-comparison' && renderBlockSpacing(sectionCls)}
 
                             {bt === 'custom-html' && <p className="text-sm text-slate-400">Click the Rich text content on the page to edit text, images, links and tables inline.</p>}
                             {/* ─── Common Text Fields ──────────────────────── */}
@@ -2353,43 +2325,7 @@ function SettingsPanelInner({
                                     </div>
 
                                     {/* Layout & Spacing */}
-                                    <div className="mt-4">
-                                        <label className="text-xs font-medium uppercase text-gray-500 tracking-[0.6px]">Layout &amp; Spacing</label>
-                                        <div className="mt-3 space-y-3">
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Top Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
-                                                </div>
-                                                <input type="range" min={0} max={120} step={4}
-                                                    value={localPaddingTop}
-                                                    onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Bottom Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
-                                                </div>
-                                                <input type="range" min={0} max={120} step={4}
-                                                    value={localPaddingBottom}
-                                                    onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {renderBlockSpacing('mt-4')}
                                 </div>
                             )}
 
@@ -2591,47 +2527,7 @@ function SettingsPanelInner({
                                         onBlockUpdate={onBlockUpdate}
                                     />
                                     {/* Layout & Spacing — after comparison content, mirrors pricing pattern */}
-                                    <div className={sectionCls}>
-                                        <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
-                                        <div className="mt-3 space-y-3">
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Top Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={0} max={120} step={4}
-                                                    value={localPaddingTop}
-                                                    onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Bottom Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={0} max={120} step={4}
-                                                    value={localPaddingBottom}
-                                                    onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {renderBlockSpacing(sectionCls)}
                                 </>
                             )}
 
@@ -2781,47 +2677,7 @@ function SettingsPanelInner({
                                         pages={pages}
                                     />
                                     {/* Layout & Spacing — pricing-specific position (after Plans Management) */}
-                                    <div className={sectionCls}>
-                                        <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
-                                        <div className="mt-3 space-y-3">
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Top Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={0} max={120} step={4}
-                                                    value={localPaddingTop}
-                                                    onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Bottom Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={0} max={120} step={4}
-                                                    value={localPaddingBottom}
-                                                    onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {renderBlockSpacing(sectionCls)}
                                 </>
                             )}
 
@@ -3033,19 +2889,13 @@ function SettingsPanelInner({
                                             <label className={labelCls}>{s.whatsappPosition}</label>
                                             <div className="mt-2 grid grid-cols-2 gap-2">
                                                 {(['bottom-right', 'bottom-left'] as const).map(pos => (
-                                                    <button
+                                                    <VariantChip
                                                         key={pos}
-                                                        type="button"
+                                                        active={((effectiveBlock?.position ?? block?.position) || 'bottom-right') === pos}
                                                         onClick={() => handleBlockUpdate({ position: pos })}
-                                                        className={cn(
-                                                            'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                                            ((effectiveBlock?.position ?? block?.position) || 'bottom-right') === pos
-                                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                        )}
                                                     >
                                                         {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
-                                                    </button>
+                                                    </VariantChip>
                                                 ))}
                                             </div>
                                         </div>
