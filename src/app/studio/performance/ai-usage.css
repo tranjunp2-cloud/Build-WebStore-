@@ -240,7 +240,7 @@ details:not([open]) > .au-sort__menu { display: none; }
 .au-mini-list { display: block !important; border: 1px solid var(--border); border-radius: var(--radius); }
 .au-mini-list a { padding: 8px 10px !important; }
 .au-detail-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
-.au-title-wrap .badge { font-size: 11px; line-height: 16px; letter-spacing: .01em; }
+.au-title-wrap .badge { flex: none; font-size: 12px; line-height: 16px; letter-spacing: 0; overflow-wrap: normal; white-space: nowrap; }
 .au-title-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; overflow-wrap: anywhere; }
 .au-page .page-head .au-link:first-child { margin-bottom: 4px; }
 .au-meter { height: 6px; margin: 8px 0 4px; border-radius: 999px; background: var(--stripe-2); overflow: hidden; }
