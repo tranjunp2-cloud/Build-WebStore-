@@ -4991,6 +4991,8 @@
       "visible": "Boleh dilihat",
       "cartWidget": "Widget troli",
       "whatsappPosition": "Posisi butang",
+      "positionRight": "Kanan",
+      "positionLeft": "Kiri",
       "checkoutBehavior": "Tingkah laku daftar keluar",
       "checkoutDesc": "Daftar keluar tidak tersedia dalam pratonton, jadi kami akan memaparkan mesej ringkas. Ia berfungsi seperti biasa di laman web sebenar anda.",
       "buttonLabel": "Label butang",

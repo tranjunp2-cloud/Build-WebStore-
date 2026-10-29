@@ -4991,6 +4991,8 @@
       "visible": "Visible",
       "cartWidget": "Cart widget",
       "whatsappPosition": "Button position",
+      "positionRight": "Right",
+      "positionLeft": "Left",
       "checkoutBehavior": "Checkout behavior",
       "checkoutDesc": "Checkout isn't available in preview, so we'll show a quick message instead. It works normally on your live site.",
       "buttonLabel": "Button label",

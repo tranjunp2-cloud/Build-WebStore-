@@ -372,14 +372,20 @@ function SettingsPanelInner({
     const footerShowSocials = footerVariant !== 'minimal'
     const footerShowTagline = footerVariant === 'centered-stack' || footerVariant === 'dark-gradient'
 
-    const _spacingDefault = () => block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY || 12) : 32
-    const [localPaddingTop, setLocalPaddingTop] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? _spacingDefault()))
-    const [localPaddingBottom, setLocalPaddingBottom] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? _spacingDefault()))
+    // Spacing used when the block has no blockSpacing yet: announcement bar falls back to its paddingY
+    const spacingDefault = block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY || 12) : 32
+    // Value stored on the block (or the default) — slider initial/sync value and the "no-op save" reference
+    const savedSpacing = (field: BlockSpacingField) =>
+        Number((block?.blockSpacing as Record<string, unknown>)?.[field] ?? spacingDefault)
+    const savedTop = savedSpacing('paddingTop')
+    const savedBottom = savedSpacing('paddingBottom')
+    const [localPaddingTop, setLocalPaddingTop] = useState(savedTop)
+    const [localPaddingBottom, setLocalPaddingBottom] = useState(savedBottom)
+    // Re-sync the sliders when the stored value changes (other block selected, undo, paddingY edited)
     useEffect(() => {
-        const def = block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY || 12) : 32
-        setLocalPaddingTop(Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? def))
-        setLocalPaddingBottom(Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? def))
-    }, [block?.blockSpacing, block?.blockType])
+        setLocalPaddingTop(savedTop)
+        setLocalPaddingBottom(savedBottom)
+    }, [savedTop, savedBottom])
 
     // Resolve navigation links: prefer headerBlock.links, fallback to layout nav block
     const storeBlocks = useEditorStore(state => state.blocks)
@@ -1773,9 +1779,6 @@ function SettingsPanelInner({
         const prevSpacing = ((block?.blockSpacing as Record<string, unknown>) || {})
         onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, [field]: value } })
     }
-    // Value currently stored on the block (same default as the slider's initial state)
-    const savedSpacing = (field: BlockSpacingField) =>
-        Number((block?.blockSpacing as Record<string, unknown>)?.[field] ?? _spacingDefault())
     const renderBlockSpacing = (className: string) => (
         <BlockSpacingControls
             className={className}
@@ -1784,8 +1787,8 @@ function SettingsPanelInner({
             bottomLabel={s.bottomSpacing}
             top={localPaddingTop}
             bottom={localPaddingBottom}
-            savedTop={savedSpacing('paddingTop')}
-            savedBottom={savedSpacing('paddingBottom')}
+            savedTop={savedTop}
+            savedBottom={savedBottom}
             onTopChange={setLocalPaddingTop}
             onBottomChange={setLocalPaddingBottom}
             onCommit={commitBlockSpacing}
@@ -2894,7 +2897,7 @@ function SettingsPanelInner({
                                                         active={((effectiveBlock?.position ?? block?.position) || 'bottom-right') === pos}
                                                         onClick={() => handleBlockUpdate({ position: pos })}
                                                     >
-                                                        {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
+                                                        {pos === 'bottom-right' ? `↘ ${s.positionRight}` : `↙ ${s.positionLeft}`}
                                                     </VariantChip>
                                                 ))}
                                             </div>

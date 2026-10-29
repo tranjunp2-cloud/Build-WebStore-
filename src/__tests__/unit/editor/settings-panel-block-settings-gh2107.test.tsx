@@ -1,6 +1,7 @@
 /**
  * Unit Tests — SettingsPanel Block tab UI (GH-2107)
- * TC-GH2107-01, TC-GH2107-02, TC-GH2107-05, TC-GH2107-10, TC-GH2107-11, TC-GH2107-12
+ * TC-GH2107-01, TC-GH2107-02, TC-GH2107-05, TC-GH2107-10, TC-GH2107-11, TC-GH2107-12,
+ * TC-GH2107-15, TC-GH2107-16
  * Convention: docs/TEST_CONVENTION.md | QA: docs/qa/F05-ai-editor-testcases.md (GH-2107)
  */
 
@@ -118,5 +119,32 @@ describe('SettingsPanel Block tab (GH-2107)', () => {
         // Assert
         expect(screen.getByRole('slider', { name: 'Top spacing' })).toHaveValue('16')
         expect(screen.getByRole('slider', { name: 'Bottom spacing' })).toHaveValue('16')
+    })
+
+    it('[TC-GH2107-15] WhatsApp position chips use translated labels (ms)', () => {
+        // Arrange & Act
+        renderPanel({ blockType: 'whatsapp-button', variant: 'default', position: 'bottom-left' }, 'ms')
+
+        // Assert
+        expect(screen.getByRole('button', { name: '↘ Kanan' })).toHaveAttribute('aria-pressed', 'false')
+        expect(screen.getByRole('button', { name: '↙ Kiri' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.queryByText('↘ Right')).not.toBeInTheDocument()
+    })
+
+    it('[TC-GH2107-16] announcement bar sliders re-sync when paddingY changes and no blockSpacing is set', () => {
+        // Arrange
+        const { rerender } = renderPanel({ blockType: 'announcement-bar', variant: 'default', paddingY: 12 })
+        expect(screen.getByRole('slider', { name: 'Top spacing' })).toHaveValue('12')
+
+        // Act
+        rerender(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel {...baseProps} block={{ blockType: 'announcement-bar', variant: 'default', paddingY: 20 }} />
+            </I18nProvider>,
+        )
+
+        // Assert
+        expect(screen.getByRole('slider', { name: 'Top spacing' })).toHaveValue('20')
+        expect(screen.getByRole('slider', { name: 'Bottom spacing' })).toHaveValue('20')
     })
 })

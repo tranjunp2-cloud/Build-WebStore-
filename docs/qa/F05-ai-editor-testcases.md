@@ -409,7 +409,7 @@ QA found 7 interaction bugs on the real Editor's mobile/compact view (`/editor/[
 | **TC-F05-RT-03** | Unit | Delete dialog / tooltip / toast for Rich text | Shows "Rich text", not "Custom Html" / "custom-html" |
 | **TC-F05-RT-04** | Unit | `getBlockDisplayName` for other block types | Dashes replaced by spaces |
 
-### GH-2107: Block Settings sidebar — block icon, spacing slider, variant chips (14 Cases)
+### GH-2107: Block Settings sidebar — block icon, spacing slider, variant chips (16 Cases)
 
 Sidebar phải, tab **Block** / **Menu** / **Global**. Header dùng lucide icon như panel Components; 4 section "Layout & Spacing" (block thường, announcement-bar, feature-comparison, pricing) dùng chung `BlockSpacingControls`; 5 nhóm chip (block variant, header/footer style, color mode, WhatsApp position) dùng chung `VariantChip` (màu primary teal).
 
@@ -427,8 +427,10 @@ Sidebar phải, tab **Block** / **Menu** / **Global**. Header dùng lucide icon 
 | **TC-GH2107-10** | Unit | Label spacing locale `ms` | "Susun atur & jarak", "Jarak atas", "Jarak bawah" | `settings-panel-block-settings-gh2107.test.tsx` |
 | **TC-GH2107-11** | Unit | Pricing / Feature comparison / Announcement bar | Đúng 1 section spacing; lưu `blockSpacing` giữ key cũ | `settings-panel-block-settings-gh2107.test.tsx` |
 | **TC-GH2107-12** | Unit | Announcement bar chưa có `blockSpacing` | Slider mặc định theo `paddingY` (logic cũ giữ nguyên) | `settings-panel-block-settings-gh2107.test.tsx` |
-| **TC-GH2107-14** | Unit | Giá trị đã lưu đổi từ bên ngoài (undo / đổi block), kéo lại mà không focus (Safari) | Vẫn lưu — so với giá trị thật trên block, không dùng giá trị slider tự nhớ | `settings-block-spacing-controls.test.tsx` |
 | **TC-GH2107-13** | Manual | Light + dark: header icon, slider (Hero, Pricing, Feature comparison, Announcement bar), chip (Block / Menu / Global) | Slider có fill teal, track nhìn rõ ở cả 2 mode; chip active teal, hover thấy được, có focus ring | — |
+| **TC-GH2107-14** | Unit | Giá trị đã lưu đổi từ bên ngoài (undo / đổi block), kéo lại mà không focus (Safari) | Vẫn lưu — so với giá trị thật trên block, không dùng giá trị slider tự nhớ | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-15** | Unit | Chip vị trí WhatsApp, locale `ms` | Nhãn "↘ Kanan" / "↙ Kiri" (i18n), không còn "Right" / "Left" cố định | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-16** | Unit | Announcement bar chưa có `blockSpacing`, `paddingY` đổi 12 → 20 | Slider đồng bộ lại theo giá trị mới (20) | `settings-panel-block-settings-gh2107.test.tsx` |
 
 **Đổi test cũ:** `navigation/settings-panel-variant-picker.test.tsx` (TC-NAV-08) chuyển từ kiểm tra class `bg-blue-500/10` sang `aria-pressed` — hành vi không đổi, chỉ đổi màu.
 
