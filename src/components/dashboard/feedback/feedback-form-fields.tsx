@@ -1,10 +1,9 @@
 'use client'
 
 import type { RefObject } from 'react'
-import { Info } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { Alert } from '@/components/ui/alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FeedbackTypeControl } from './feedback-type-control'
@@ -15,9 +14,9 @@ import { MAX_DETAILS_LENGTH, type FeedbackType } from './types'
 
 const ERROR_BORDER = 'border-[hsl(var(--destructive))]'
 // Figma "sending": every control muted + dimmed while the request runs.
-const LOCKED = 'disabled:bg-[hsl(var(--muted))] disabled:opacity-60'
+const LOCKED = 'disabled:bg-[hsl(var(--muted))] disabled:opacity-50'
 const LABEL = 'text-[13px] font-semibold leading-5 text-[var(--dash-text)]'
-const HELPER = 'text-[11px] leading-4 text-[var(--dash-text-muted)]'
+const HELPER = 'text-xs leading-4 text-[var(--dash-text-muted)]'
 const ERROR_TEXT = 'text-xs leading-4 text-[hsl(var(--destructive))]'
 const REQUIRED = <span aria-hidden className="text-[hsl(var(--destructive))]">*</span>
 
@@ -47,10 +46,9 @@ export function FeedbackFormFields({ form, submitting, types, ids, areaRef, deta
                 labelledBy={ids.type}
             />
             {form.type === 'mismatch' && (
-                <div className="mt-1.5 flex items-start gap-2 rounded-lg border border-solid border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.1)] px-3 py-2.5 text-xs leading-4 text-[var(--dash-text)]">
-                    <Info aria-hidden className="mt-px h-4 w-4 shrink-0 text-[hsl(var(--primary))]" />
-                    {f.mismatchNotice}
-                </div>
+                <Alert variant="info" className="mt-1.5">
+                    <AlertDescription className="text-xs leading-4 text-[var(--dash-text)]">{f.mismatchNotice}</AlertDescription>
+                </Alert>
             )}
         </div>
 
@@ -84,9 +82,9 @@ export function FeedbackFormFields({ form, submitting, types, ids, areaRef, deta
                     aria-required
                     aria-invalid={!!form.errors.details}
                     aria-describedby={`${ids.details}-help`}
-                    className={cn('min-h-[96px] pb-6', LOCKED, form.errors.details && ERROR_BORDER)}
+                    className={cn('min-h-[96px] resize-y pb-6', LOCKED, form.errors.details && ERROR_BORDER)}
                 />
-                <span aria-hidden className="pointer-events-none absolute bottom-2 right-3 text-[11px] text-[var(--dash-text-muted)]">
+                <span aria-hidden className="pointer-events-none absolute bottom-2 right-3 text-xs text-[var(--dash-text-muted)]">
                     {form.details.length}/{MAX_DETAILS_LENGTH}
                 </span>
             </div>
@@ -101,7 +99,7 @@ export function FeedbackFormFields({ form, submitting, types, ids, areaRef, deta
         <div className="flex flex-col gap-1.5">
             <span className={LABEL}>
                 {f.fields.screenshots}{' '}
-                <span className="text-[11px] font-normal text-[var(--dash-text-muted)]">{f.fields.optional}</span>
+                <span className="text-xs font-normal text-[var(--dash-text-muted)]">{f.fields.optional}</span>
             </span>
             <ScreenshotField
                 items={form.screenshots.items}
