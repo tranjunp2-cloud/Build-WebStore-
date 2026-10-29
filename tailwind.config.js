@@ -138,6 +138,8 @@ module.exports = {
                 'pw-caret': 'pwCaret 1s steps(1) infinite',
                 'pw-ring': 'pwRing 1.6s ease-out infinite',
                 'pw-glow': 'pwGlow 2.4s ease-out infinite',
+                // Help Center intro video: ring around the big Play button until the video is watched
+                'intro-pulse': 'introPulse 2.4s cubic-bezier(.22,1,.36,1) infinite',
             },
             keyframes: {
                 fadeIn: {
@@ -181,6 +183,10 @@ module.exports = {
                 pwRing: {
                     from: { transform: 'scale(1)', opacity: '0.85' },
                     to: { transform: 'scale(1.9)', opacity: '0' },
+                },
+                introPulse: {
+                    '0%': { transform: 'scale(1)', opacity: '0.45' },
+                    '70%, 100%': { transform: 'scale(1.65)', opacity: '0' },
                 },
                 pwGlow: {
                     '0%': { boxShadow: '0 0 0 0 rgba(56,189,248,.5), 0 0 12px rgba(45,212,191,.3)' },

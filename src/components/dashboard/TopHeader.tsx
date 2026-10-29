@@ -7,6 +7,7 @@ import { NotificationBell } from './NotificationBell'
 import { UserAvatarMenu } from './UserAvatarMenu'
 import { ThemeToggle } from './theme-toggle'
 import { AppSwitcher } from './AppSwitcher'
+import { FeedbackButton } from './feedback/feedback-button'
 
 
 type TopHeaderProps = {
@@ -19,9 +20,11 @@ type TopHeaderProps = {
     onToggleCollapsed: () => void
     /** Gate the width transition until the persisted collapsed state has painted (anti-flash). */
     animateCollapse?: boolean
+    /** Current tenant name, shown in the feedback report context. */
+    storeName?: string
 }
 
-export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSidebarOpen, collapsed, onToggleCollapsed, animateCollapse = false }: TopHeaderProps) {
+export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSidebarOpen, collapsed, onToggleCollapsed, animateCollapse = false, storeName }: TopHeaderProps) {
     return (
         <header className="fixed top-0 left-0 w-full h-[56px] bg-[var(--dash-sidebar-bg)] z-50 flex items-center justify-between pr-4 md:pr-6">
             {/* LEFT segment — visually part of the sidebar: same bg (--dash-sidebar-bg) + right
@@ -107,6 +110,7 @@ export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSi
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
+                <FeedbackButton storeName={storeName} />
                 <NotificationBell />
                 <ThemeToggle />
                 <UserAvatarMenu userName={userName} userInitial={userInitial} userEmail={userEmail} />

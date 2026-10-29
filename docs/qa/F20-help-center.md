@@ -123,6 +123,21 @@ Vet can toan bo AC cua F20, dac biet: Bao mat truy cap (Auth/401), tuong tac Acc
 | **TC-F20-05-02** | `[Edge]` | Fallback EN khi khoa dich BM bi thieu | 1. Xoa khoa BM cua muc "Q&A" khoi file `bm.json`.<br>2. Chuyen sang BM. | - He thong hien text tieng Anh fallback.<br>- Khong hien raw key, khong trang trang. | Blocker | [ ] |
 | **TC-F20-05-03** | `[Negative]` | Khong hien raw i18n key bat ky trong moi truong nao | 1. Kiem tra toan bo text tren Help Center o ca 2 ngon ngu. | - Khong ton tai chuoi dang `help.x.y` hien ra tren UI.<br>- Moi key deu co chuoi dich tuong ung. | High | [ ] |
 
+#### Nhom 5B — Video gioi thieu xem lai + anh Module Guides V2 (GitHub #2065)
+
+> Thiet ke: Claude Design `PrimeWebV2 UI Prototype` → `design_handoff_help_center_video/README.md` (Split Hero v2). Dung chung `V2IntroVideo` + `V2_INTRO_MEDIA` voi popup onboarding.
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F20-05-04** | `[Regression]` | Popup onboarding van chi hien lan dau | 1. User moi vao Dashboard → dong popup (X / backdrop / Esc / Get started).<br>2. Reload Dashboard. | - Popup khong tu hien lai (`has_seen_ai_wizard`).<br>- Xem video trong Help Center khong lam popup hien lai. | High | [x] (TC-F06.09/21) |
+| **TC-F20-05-05** | `[Positive]` | Overview hien khoi Welcome chia 2 cot + video | 1. Mo `/help` (viewport ≥ 1280px), roi thu nho < 1280px. | - ≥ 1280: chu trai 55% / video phai 45%.<br>- < 1280: xep chong, video max 640px.<br>- Video dung nguon 1080p/720p + poster cua onboarding. | High | [x] |
+| **TC-F20-05-06** | `[UI State]` | Trang thai cho: thumbnail + Play + 2 chip, khong co thanh dieu khien | 1. Mo `/help` lan dau. | - Thumbnail mo, nut Play kinh mo co vong pulse, chip thoi luong + "Overview tour".<br>- Khong co thanh dieu khien; thanh chi hien khi dang phat. | Medium | [x] |
+| **TC-F20-05-07** | `[A11y]` | Phim tat khi khung video dang focus | 1. Tab vao khung video.<br>2. Nhan Space/Enter/K, ←/→, M, F. | - Space/Enter/K phat–dung; ←/→ tua 5s; M tat/bat tieng; F toan man hinh.<br>- aria-label theo trang thai (Play / Resume / Replay video: …). | Medium | [x] |
+| **TC-F20-05-08** | `[State]` | Nho tien do xem (localStorage `pw-help-intro-video`) | 1. Phat video, dung o giua.<br>2. Roi Help Center roi quay lai.<br>3. Xem het video, reload. | - Quay lai: hien vach tien do, bam Play xem tiep tu cho dung.<br>- Xem het: hien Replay, khong con pulse. | Medium | [x] |
+| **TC-F20-05-09** | `[Edge]` | Tu dung khi cuon khoi man hinh / chuyen tab | 1. Phat video.<br>2. Cuon cho khung con < 25% tren man hinh.<br>3. Phat lai roi chuyen tab Q&A. | - Video tu dung o ca 2 truong hop. | Medium | [x] |
+| **TC-F20-05-10** | `[Negative]` | Loi tai video → thong bao + Try again | 1. Chan request `/videos/*` (DevTools).<br>2. Mo `/help`. | - Hien "Couldn't load the video." + nut Try again; bam Try again tai lai video. | Medium | [x] |
+| **TC-F20-05-11** | `[Positive]` | Anh Module Guides la giao dien V2, WebP, dung kich thuoc | 1. Mo `/help/modules`, xem tung module. | - 5 anh AI Website Builder (buoc 1,2,3,4,6) la giao dien V2 theo prototype.<br>- File `.webp`, `width`/`height` khop anh that (khong meo khung). | High | [x] |
+
 ---
 
 ## 4. Bien Ban Kiem Dinh — 10-Point Checklist (Sign-Off)

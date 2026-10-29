@@ -47,7 +47,7 @@ Current automated coverage uses synthetic data. Browser/live generation checks a
 - [x] AUTO — Entity-encoded `src` (e.g. `&amp;` in signed CDN URLs) is decoded before download, so the real image is hosted instead of the 403 placeholder; source downloads send a browser User-Agent for CDNs that block the default one.
 
 ### TC-F35.M64 — Source image download resilience
-- [x] AUTO — Redirects are followed with every hop kept HTTPS/no-credentials/no-port; 403 from bot-protected CDNs is retried through a headless browser before falling back to the placeholder; images labelled with a generic content-type are accepted when the bytes are a real image.
+- [x] AUTO — Redirects are followed with every hop kept HTTPS/no-credentials/no-port; 403 from bot-protected CDNs is retried through a headless browser before falling back to the placeholder; images labelled with a generic content-type (`image`, octet-stream, or `text/plain` for PW1 uploads stored as `.txt`) are accepted when the bytes are a real image; other bytes are still rejected.
 
 ### TC-F35.M65 — Footer brand block
 - [x] AUTO — Footer uses the store logo image (not text) when its stored logo is a media id, and `dark-gradient` always shows the footer tagline (else the site SEO description) plus the site's address/phone/email with icons under the logo, with no per-footer flag; other variants never show them and keep the source footer unchanged.
