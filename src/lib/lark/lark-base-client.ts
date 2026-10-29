@@ -88,6 +88,67 @@ export async function createBaseRecord(input: CreateBaseRecordInput): Promise<{ 
     return { recordId: String(body?.data?.record?.record_id ?? '') }
 }
 
+type RecordsRef = { appToken: string; tableId: string }
+
+const recordsUrl = (ref: RecordsRef, suffix = ''): string =>
+    `${apiBase()}/bitable/v1/apps/${encodeURIComponent(ref.appToken)}/tables/${encodeURIComponent(ref.tableId)}/records${suffix}`
+
+/** Authenticated JSON call; returns Lark `data`. Throws LarkApiError unless HTTP 200 + code 0. */
+async function larkJson(method: string, url: string, payload: unknown, what: string): Promise<any> {
+    const token = await getTenantAccessToken()
+    const { status, body } = await larkFetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` },
+        ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+    })
+    if (status !== 200 || body?.code !== 0) {
+        if (status === 401 || status === 403) cachedToken = null
+        throw new LarkApiError(`Lark ${what} rejected`, body?.code ?? null, status)
+    }
+    return body?.data ?? {}
+}
+
+/** Reads one record. Person columns come back as `[{ id: open_id, name }]`. */
+export async function getBaseRecord(ref: RecordsRef & { recordId: string }): Promise<Record<string, unknown>> {
+    const data = await larkJson('GET', recordsUrl(ref, `/${encodeURIComponent(ref.recordId)}?user_id_type=open_id`), undefined, 'get record')
+    return data.record?.fields ?? {}
+}
+
+/** Changes some columns of one record; columns not named stay as they are. */
+export async function updateBaseRecord(ref: RecordsRef & { recordId: string; fields: Record<string, unknown> }): Promise<void> {
+    await larkJson('PUT', recordsUrl(ref, `/${encodeURIComponent(ref.recordId)}?user_id_type=open_id`), { fields: ref.fields }, 'update record')
+}
+
+export type BaseSearchResult = { recordId: string; fields: Record<string, unknown> }
+
+/** Records matching a Lark filter (first 200). Person columns are keyed by open_id. */
+export async function searchBaseRecords(
+    ref: RecordsRef & { filter: Record<string, unknown>; fieldNames: string[] },
+): Promise<BaseSearchResult[]> {
+    const data = await larkJson(
+        'POST',
+        recordsUrl(ref, '/search?page_size=200&user_id_type=open_id'),
+        { filter: ref.filter, field_names: ref.fieldNames },
+        'search records',
+    )
+    return (data.items ?? []).map((item: any) => ({ recordId: String(item.record_id ?? ''), fields: item.fields ?? {} }))
+}
+
+/** Sends an interactive card to a chat as the app bot. `card` is the card JSON body. */
+export async function sendChatCard(chatId: string, card: unknown): Promise<void> {
+    await larkJson(
+        'POST',
+        `${apiBase()}/im/v1/messages?receive_id_type=chat_id`,
+        { receive_id: chatId, msg_type: 'interactive', content: JSON.stringify(card) },
+        'send card',
+    )
+}
+
+/** Delayed card update: the callback token (valid ~30 min) replaces the card the user pressed. */
+export async function updateCardAfterCallback(callbackToken: string, card: unknown): Promise<void> {
+    await larkJson('POST', `${apiBase()}/interactive/v1/card/update`, { token: callbackToken, card }, 'card update')
+}
+
 export type UploadBaseImageInput = {
     /** Base (app) token the file is attached to; a file_token only works inside this Base. */
     appToken: string

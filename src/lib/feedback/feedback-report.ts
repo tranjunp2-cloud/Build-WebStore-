@@ -32,6 +32,11 @@ export const LARK_FEEDBACK_FIELDS = {
     userId: 'User ID',
     role: 'Role',
     status: 'Status',
+    priority: 'Priority',
+    owner: 'Owner',
+    submittedAt: 'Submitted At',
+    firstResponseAt: 'First Response At',
+    resolvedAt: 'Resolved At',
 } as const
 
 const TYPE_LABEL = { problem: 'Report a problem', mismatch: 'Data mismatch', suggestion: 'Suggestion' } as const
@@ -98,13 +103,14 @@ export async function submitFeedbackToLarkBase(
     idempotencyKey: string,
     meta: Omit<Meta, 'feedbackId'>,
     config: SubmitConfig,
-): Promise<{ feedbackId: string }> {
+): Promise<{ feedbackId: string; recordId: string; fields: Record<string, unknown> }> {
     const feedbackId = buildFeedbackId(idempotencyKey)
-    await createBaseRecord({
+    const fields = toLarkFields(body, { ...meta, feedbackId })
+    const { recordId } = await createBaseRecord({
         appToken: config.appToken,
         tableId: config.tableId,
         clientToken: idempotencyKey,
-        fields: toLarkFields(body, { ...meta, feedbackId }),
+        fields,
     })
-    return { feedbackId }
+    return { feedbackId, recordId, fields }
 }
