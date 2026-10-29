@@ -15,6 +15,7 @@ import { brandOf, languageName, type LocaleContent, localeTextProblem, readLocal
 import { type CopyNote, copyGuardrails, copyNotes, copyRefusal } from "./site-copy-check";
 import { missingRequired, storedKeys } from "./site-persisted";
 import { sanitizeSingleBlockRequiredFields } from "@/lib/ai/normalize-required-titles";
+import { describeProductChoice, productChoice } from "./site-products";
 import { draftPage, layoutOf, SiteToolError, siteForActor } from "./site-read";
 import { type SectionContextLoader, sectionContextLoader, STARTER_TYPES, withSectionDefaults } from "./site-section-defaults";
 
@@ -90,23 +91,24 @@ async function usablePictureRefs(tenantId: string, refs: readonly string[]): Pro
 	return (await Promise.all(media.map((ref) => isMediaRefAllowed(cms, tenantId, ref)))).every(Boolean);
 }
 
-/** Storefront product ids in the site's workspace (a product block may only show these). */
-async function knownProductIds(actor: AgentActor, tenantId: string, ids: string[]): Promise<Set<string>> {
-	if (ids.length === 0) return new Set();
-	const cms = await getPayload({ config });
-	const found = await cms.find({
-		collection: "products",
-		where: { and: [{ tenant: { equals: tenantId } }, { id: { in: ids } }] },
-		depth: 0,
-		limit: ids.length,
-		overrideAccess: false,
-		user: actor.user as unknown as User,
-		select: { name: true },
-	} as Parameters<typeof cms.find>[0]);
-	return new Set(found.docs.map((doc) => String((doc as { id: unknown }).id)));
+/** `shows`: what each product section will put on the live site (Shows N of M…), one entry per section whose products were chosen. */
+type OpCheck = { ops: PagePatchOp[]; skipped: string[]; shows?: ProductShows[] } | { error: { code: string; message: string } };
+type ProductShows = { ok: boolean; detail: string };
+
+/** Sections that list the store's products: one of each per page (a second is a copy of the first). */
+/**
+ * What a Products Grid lists: its category, its mode and (hand-picked) the set of products.
+ * Two grids with the same key show the same products. Same rule as the pending-card check in the ai-platform service.
+ */
+export function productsGridKey(grid: Record<string, unknown>): string {
+	const ids = Array.isArray(grid.selectedProductIds) ? grid.selectedProductIds.map(String) : [];
+	// a stored grid without a mode renders as "all"; a new one with products is made "fixed" before this runs
+	const mode = typeof grid.selectionMode === "string" ? grid.selectionMode : "all";
+	const category = typeof grid.category === "string" ? grid.category : "";
+	return `${category}|${mode}|${mode === "fixed" ? [...new Set(ids)].sort().join(",") : ""}`;
 }
 
-type OpCheck = { ops: PagePatchOp[]; skipped: string[] } | { error: { code: string; message: string } };
+const FEATURED_NEWEST = 'Featured Products always shows the store\'s newest products; it can\'t be given chosen ones. For specific products use a Products Grid: selectionMode "fixed" with selectedProductIds (ids from site_read view "products") and a limit of at least that many (up to 20).';
 
 /**
  * A products grid shows picked products only in "fixed" mode, and one category by its id: picking products
@@ -116,6 +118,13 @@ async function productsGridChoice(actor: AgentActor, block: PageBlock | null, fi
 	const picked = Array.isArray(fields.selectedProductIds) && fields.selectedProductIds.length > 0;
 	// drafting only (the card shows it as a change): on apply the stored plan already says so
 	if (mode === "prepare" && picked && (fields.selectionMode ?? block?.selectionMode) !== "fixed") fields.selectionMode = "fixed";
+	// the grid lists at most `limit` products (6 unless set): a fixed choice of N needs room for all N
+	if (mode === "prepare" && picked) {
+		const wanted = (fields.selectedProductIds as unknown[]).length;
+		const limit = Number(fields.limit ?? block?.limit ?? 6);
+		if (wanted > 20) return { error: { code: "too_many_products", message: "A products grid shows at most 20 products. Choose up to 20, or use several grids." } };
+		if (limit < wanted) fields.limit = wanted;
+	}
 	const category = fields.category;
 	if (typeof category !== "string" || category === "" || /^pcat_[a-z0-9]{8,40}$/.test(category)) return null;
 	const cms = await getPayload({ config });
@@ -162,6 +171,8 @@ export async function checkPagePatchOps(
 	mode: "prepare" | "apply",
 	/** drafting only: lets a new section the model left incomplete take the template's copy for what is missing */
 	sectionContext?: SectionContextLoader,
+	/** the site the sections are on: the products they list must be on sale there (omitted = the workspace's) */
+	siteId?: string | number,
 ): Promise<OpCheck> {
 	const byId = new Map(before.map((block, index) => [blockIdOf(block, index), block]));
 	const skipped: string[] = [];
@@ -181,7 +192,9 @@ export async function checkPagePatchOps(
 			? Object.entries(op.op === "set_fields" ? op.fields : op.block).flatMap(([key, value]) => (PRODUCT_ID_FIELDS.has(key) ? (Array.isArray(value) ? value : [value]).map(String) : []))
 			: [],
 	);
-	const known = await knownProductIds(actor, tenantId, [...new Set(wantedIds)].slice(0, 100));
+	const choice = await productChoice(actor, tenantId, siteId, [...new Set(wantedIds)].slice(0, 100));
+	const known = choice.known;
+	const shows: ProductShows[] = [];
 
 	/** The values an edit may write: allowed keys, pictures carried over, safe links, store products, valid per field. */
 	const cleanFields = (type: string, name: string, raw: Record<string, unknown>, current: PageBlock | null): Record<string, unknown> | { error: { code: string; message: string } } => {
@@ -189,6 +202,10 @@ export async function checkPagePatchOps(
 		const fields: Record<string, unknown> = {};
 		for (const [key, rawValue] of Object.entries(raw)) {
 			if (key === "blockType" || key === "variant" || key === "id") continue;
+			// Featured Products always shows the store's newest products: chosen products live in a Products Grid
+			if (type === "products-featured" && (key === "productIds" || key === "selectedProductIds")) {
+				return { error: { code: "use_products_grid", message: FEATURED_NEWEST } };
+			}
 			// On apply the plan's sections carry what the registry filled in when drafting (isVisible, default
 			// pictures…): those are dropped quietly and filled in again; the comparison with the plan catches the rest.
 			if (!allowed.has(key)) {
@@ -215,6 +232,8 @@ export async function checkPagePatchOps(
 					return { error: { code: "unknown_products", message: `Not products of this store: ${notInStore.slice(0, 5).join(", ")}. Use ids from site_read view "products".` } };
 				}
 				value = ids;
+				// drafting only: on apply the card already said it, and a product put off sale since is not a reason to refuse
+				if (mode === "prepare" && ids.length > 0) shows.push(describeProductChoice(name, ids, choice, (raw.includeOutOfStock ?? current?.includeOutOfStock) !== false));
 			}
 			// pictures are carried over as stored (media ids), not re-checked
 			const schema = isMediaKey(key) ? null : fieldSchema(type, key);
@@ -234,6 +253,8 @@ export async function checkPagePatchOps(
 	// keys only set_value ops wrote: several single values of one list may change together (paths "blockId path")
 	const valueKeys = new Set<string>();
 	const valuePaths = new Set<string>();
+	const insertedProductSections = new Set<string>();
+	const insertedGridKeys = new Set<string>();
 	const pathError = (block: PageBlock, path: string, what: string) => ({ error: { code: "bad_path", message: `${blockName(block)} has no ${what} at "${path}". Use a path from site_read view "block" (e.g. features.2.title, ctaButtons.0.url).` } });
 	for (const op of inputOps) {
 		if (op.op === "insert_block") {
@@ -241,6 +262,18 @@ export async function checkPagePatchOps(
 			const meta = aiVisibleBlockMetas().find((m) => m.type === type);
 			if (!meta) return { error: { code: "unknown_block_type", message: `"${type}" is not a section type you can add. See site_read view "catalog".` } };
 			if (STRUCTURAL_BLOCKS.has(type)) return { error: { code: "structural", message: FRAME } };
+			// a second Featured Products section on a page repeats the first: change that one instead
+			if (mode === "prepare" && type === "products-featured") {
+				// a section this same edit removes does not count (a swap)
+				const removed = new Set(inputOps.flatMap((o) => (o.op === "remove_block" ? [o.blockId] : [])));
+				const sameAt = before.findIndex((block, i) => block.blockType === type && !removed.has(blockIdOf(block, i)));
+				const same = sameAt >= 0 ? before[sameAt] : undefined;
+				if (same || insertedProductSections.has(type)) {
+					const where = same ? ` (id ${blockIdOf(same, sameAt)})` : " (added earlier in this edit)";
+					return { error: { code: "section_exists", message: `This page already has a ${meta.name} section${where}. Change that one (set_fields) instead of adding another.` } };
+				}
+				insertedProductSections.add(type);
+			}
 			const at = anchor(op.afterBlockId);
 			if (at && "error" in at) return at;
 			const fields = cleanFields(type, meta.name, op.block, null);
@@ -248,6 +281,17 @@ export async function checkPagePatchOps(
 			if (type === "products-grid") {
 				const problem = await productsGridChoice(actor, null, fields, mode);
 				if (problem) return problem;
+				// another grid is fine when it lists something else (a category, a hand-picked set); the same list twice is not
+				if (mode === "prepare") {
+					const key = productsGridKey(fields);
+					const removed = new Set(inputOps.flatMap((o) => (o.op === "remove_block" ? [o.blockId] : [])));
+					const sameAt = before.findIndex((block, i) => block.blockType === type && !removed.has(blockIdOf(block, i)) && productsGridKey(block) === key);
+					if (sameAt >= 0 || insertedGridKeys.has(key)) {
+						const where = sameAt >= 0 ? ` (id ${blockIdOf(before[sameAt], sameAt)})` : " (added earlier in this edit)";
+						return { error: { code: "section_exists", message: `This page already has a Products Grid listing the same products${where}. Change that one (set_fields), or give the new grid a different category or products.` } };
+					}
+					insertedGridKeys.add(key);
+				}
 			}
 			const variant = typeof op.block.variant === "string" && meta.variants.includes(op.block.variant) ? op.block.variant : meta.defaultVariant;
 			let checked = blockRegistry.validate(type, { ...fields, blockType: type, variant });
@@ -448,7 +492,7 @@ export async function checkPagePatchOps(
 			ops.push(op);
 		}
 	}
-	return { ops, skipped };
+	return { ops, skipped, ...(shows.length > 0 ? { shows } : {}) };
 }
 
 /** "features.2.title" → "features · “Fast delivery” · title": the card names the item, not its index. */
@@ -500,6 +544,8 @@ export type DraftedPageEdit = {
 	pageId: string;
 	ops: PagePatchOp[];
 	skipped: string[];
+	/** what the product sections of this edit will show on the live site (see ProductShows) */
+	shows: ProductShows[];
 	diffs: Diff[];
 	hosts: Set<string>;
 	touched: Set<string>;
@@ -539,15 +585,17 @@ export async function draftPageEdit(
 	const sectionContext = siteRef === undefined || siteRef === null ? undefined : sectionContextLoader(actor, String(siteRef));
 	// text goes to the language's copy, everything else (style, pictures, structure) to the sections
 	const parts = locale ? splitLocaleOps(inputOps, shown) : { text: [] as PagePatchOp[], base: inputOps };
-	const checkedBase = parts.base.length > 0 ? await checkPagePatchOps(actor, tenantId, before, parts.base, "prepare", sectionContext) : { ops: [] as PagePatchOp[], skipped: [] as string[] };
+	const siteId = siteRef === undefined || siteRef === null ? undefined : (siteRef as string | number);
+	const checkedBase = parts.base.length > 0 ? await checkPagePatchOps(actor, tenantId, before, parts.base, "prepare", sectionContext, siteId) : { ops: [] as PagePatchOp[], skipped: [] as string[] };
 	if ("error" in checkedBase) return checkedBase;
-	const checkedText = parts.text.length > 0 ? await checkPagePatchOps(actor, tenantId, shown, parts.text, "prepare") : { ops: [] as PagePatchOp[], skipped: [] as string[] };
+	const checkedText = parts.text.length > 0 ? await checkPagePatchOps(actor, tenantId, shown, parts.text, "prepare", undefined, siteId) : { ops: [] as PagePatchOp[], skipped: [] as string[] };
 	if ("error" in checkedText) return checkedText;
 	for (const op of checkedText.ops) {
 		const problem = locale ? localeTextProblem(op, shown, content, locale, languageName(locale), brand) : null;
 		if (problem) return { error: problem };
 	}
 	const skipped = [...checkedBase.skipped, ...checkedText.skipped];
+	const shows = [...(("shows" in checkedBase && checkedBase.shows) || []), ...(("shows" in checkedText && checkedText.shows) || [])];
 	const ops = [...checkedBase.ops, ...checkedText.ops];
 	if (ops.length === 0) return { error: { code: "no_change", message: skipped.join(" ") || "Nothing would change." } };
 	// anti-slop: filler, unverifiable claims and vague labels go back to the model unless they are the merchant's words
@@ -629,6 +677,7 @@ export async function draftPageEdit(
 		pageId: String(page.id),
 		ops,
 		skipped,
+		shows,
 		diffs,
 		hosts,
 		touched: new Set([...touched, ...touchedText]),
@@ -642,7 +691,7 @@ export async function draftPageEdit(
 }
 
 /** The card's notes shared by single- and multi-page edits. */
-export function pageEditGuardrails(hosts: Set<string>, skipped: string[], copy: CopyNote[] = [], locale: string | null = null): Guardrail[] {
+export function pageEditGuardrails(hosts: Set<string>, skipped: string[], copy: CopyNote[] = [], locale: string | null = null, shows: ProductShows[] = []): Guardrail[] {
 	return [
 		...(locale ? [{ rule: "language_copy", ok: true, detail: `Changes the ${languageName(locale)} text you are viewing; the page's original-language text stays as it is.` }] : []),
 		{ rule: "page_draft", ok: true, detail: "Goes into the page draft; your live site changes when you publish." },
@@ -650,6 +699,7 @@ export function pageEditGuardrails(hosts: Set<string>, skipped: string[], copy: 
 		{ rule: "undo", ok: true, detail: "You can undo it for 7 days while these sections stay as the assistant left them." },
 		...[...hosts].slice(0, 5).map((host) => ({ rule: "external_link", ok: true, detail: `Links to ${host} — check it is the address you want.` })),
 		...skipped.map((detail) => ({ rule: "skipped_value", ok: false, detail })),
+		...shows.map(({ ok, detail }) => ({ rule: "products_shown", ok, detail })),
 		...copyGuardrails(copy),
 	];
 }
@@ -673,7 +723,7 @@ export async function preparePagePatch(actor: AgentActor, raw: unknown): Promise
 		why: input.why,
 		risk: drafted.structural || drafted.touched.size > 5 ? "medium" : "low",
 		diffs: drafted.diffs.slice(0, 200),
-		guardrails: pageEditGuardrails(drafted.hosts, drafted.skipped, drafted.copy, drafted.locale),
+		guardrails: pageEditGuardrails(drafted.hosts, drafted.skipped, drafted.copy, drafted.locale, drafted.shows),
 		plan,
 	};
 }

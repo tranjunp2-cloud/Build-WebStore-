@@ -1,3 +1,4 @@
+import type { PointerEvent } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -7,8 +8,10 @@ interface BuilderOptionCardProps {
     icon?: LucideIcon
     selected?: boolean
     onClick?: () => void
-    onMouseEnter?: () => void
-    onMouseLeave?: () => void
+    // Pointer events (not mouse): a tap on touch fires emulated mouseenter but never a leave, so the
+    // hover state stuck. The handler gets `pointerType` to tell a real mouse from touch/pen.
+    onPointerEnter?: (event: PointerEvent<HTMLButtonElement>) => void
+    onPointerLeave?: (event: PointerEvent<HTMLButtonElement>) => void
 }
 
 // Compact horizontal tile: cyan-tinted icon badge left, label right (max 2 lines).
@@ -18,8 +21,8 @@ export function BuilderOptionCard({
     icon: Icon,
     selected,
     onClick,
-    onMouseEnter,
-    onMouseLeave,
+    onPointerEnter,
+    onPointerLeave,
 }: BuilderOptionCardProps) {
     return (
         <button
@@ -31,8 +34,8 @@ export function BuilderOptionCard({
                     : 'border border-[rgba(51,65,85,0.5)] bg-[linear-gradient(180deg,#151E2D_0%,#0F1622_100%)] py-2.5 pl-[9px] pr-[5px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] hover:border-[rgba(56,189,248,0.5)] hover:bg-[linear-gradient(180deg,rgba(56,189,248,0.1)_0%,rgba(56,189,248,0.03)_100%),#121B2A] hover:shadow-[0_0_16px_rgba(56,189,248,0.15),inset_0_1px_0_rgba(255,255,255,0.06)]',
             )}
             onClick={onClick}
-            onMouseEnter={onMouseEnter}
-            onMouseLeave={onMouseLeave}
+            onPointerEnter={onPointerEnter}
+            onPointerLeave={onPointerLeave}
             type="button"
         >
             {Icon ? (

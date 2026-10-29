@@ -16,7 +16,7 @@ export function AgentDockPlaceholder({ onWarm }: { onWarm?: () => void }) {
 	const label = LABEL[locale === "ms" ? "ms" : "en"];
 	const onOpen = () => window.dispatchEvent(new CustomEvent(AGENT_OPEN_EVENT));
 	return (
-		<div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 90 }}>
+		<div style={{ position: "fixed", right: "var(--ech-ag-dock-right, 20px)", bottom: "var(--ech-ag-dock-bottom, 20px)", zIndex: 90 }}>
 			<button
 				type="button"
 				aria-label={label}
@@ -27,6 +27,8 @@ export function AgentDockPlaceholder({ onWarm }: { onWarm?: () => void }) {
 				style={{
 					width: 48,
 					height: 48,
+					// compact on form screens (same variable as the dock's FAB)
+					zoom: "var(--ech-ag-fab-zoom, 1)",
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "center",

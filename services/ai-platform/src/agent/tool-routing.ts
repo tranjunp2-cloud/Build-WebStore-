@@ -3,6 +3,8 @@ import { tool, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import type { Capability } from "../config/capabilities";
 import { type CapabilitySet, capabilityKey, capabilitySet, TOOL_CAPABILITIES, toolAllowed, type MerchantToolName } from "./merchant-capabilities";
+import { PLATFORM_NOTE_PREFIX } from "./message-language";
+import { STAGED_LINE_PREFIX } from "./thread-memory";
 
 /**
  * Tool routing (cost): a request sends the model only the tool groups it needs, not the deployment's
@@ -154,7 +156,10 @@ export function groupsInUserTurn(turn: string): Set<ToolGroup> {
 	const groups = new Set<ToolGroup>();
 	const cut = turn.indexOf("\n\n");
 	const head = cut >= 0 && turn.startsWith("Context:") ? turn.slice(0, cut) : "";
-	const request = cut >= 0 && head ? turn.slice(cut + 2) : turn;
+	const body = cut >= 0 && head ? turn.slice(cut + 2) : turn;
+	// the platform's closing line (reply language) is not the merchant's request: "website" in it must not load the website tools
+	const note = body.lastIndexOf(`\n\n${PLATFORM_NOTE_PREFIX}`);
+	const request = note >= 0 ? body.slice(0, note) : body;
 	const module = /module "([^"]{1,40})"/.exec(head)?.[1] ?? /^Context: the merchant is on the "([^"]{1,40})" page/.exec(head)?.[1];
 	for (const group of MODULE_GROUPS[module ?? ""] ?? []) groups.add(group);
 	if (/(?:viewing|started on|Picked in the chat[^\n]*?) (?:blog post|post)\b/.test(head)) groups.add("blog");
@@ -173,7 +178,7 @@ export interface RouteInput {
 	 * all of them, so a chat's tool set only grows and its history prefix keeps hitting the cache.
 	 */
 	turns: readonly string[];
-	/** the chat's earlier replies: only their "[Staged draft …]" lines are read */
+	/** the chat's earlier replies: only their "<staged_draft …>" lines are read */
 	replies?: readonly string[];
 	/** the To do task this chat was started from */
 	taskKey?: string | null;
@@ -184,7 +189,7 @@ export function routeGroups(input: RouteInput): ToolGroup[] {
 	const groups = new Set<ToolGroup>();
 	for (const turn of input.turns) for (const group of groupsInUserTurn(turn)) groups.add(group);
 	for (const reply of input.replies ?? []) {
-		for (const line of reply.split("\n")) if (line.startsWith("[Staged draft ")) for (const group of groupsInText(line)) groups.add(group);
+		for (const line of reply.split("\n")) if (line.startsWith(STAGED_LINE_PREFIX)) for (const group of groupsInText(line)) groups.add(group);
 	}
 	for (const [pattern, keyed] of TODO_GROUPS) if (input.taskKey && pattern.test(input.taskKey)) for (const group of keyed) groups.add(group);
 	return TOOL_GROUPS.filter((group) => groups.has(group));

@@ -40,6 +40,7 @@ export interface TemplateApplyResult {
     siteId: string | number
     unmatchedBlocks?: string[]
     appliedState?: AppliedTemplateState
+    draftVersion?: string
 }
 
 interface EditorTemplateModalProps {
@@ -213,6 +214,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, pageId, onBeforeA
                 siteId: data.siteId ?? siteId,
                 unmatchedBlocks: data.unmatchedBlocks,
                 appliedState: data.appliedState,
+                draftVersion: data.draftVersion,
             })
         } catch (err) {
             onApplyFailed?.()

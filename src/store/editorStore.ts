@@ -42,11 +42,19 @@ export function keepDraftVersion(res: Response, state: { setDraftVersion: (versi
     if (version) state.setDraftVersion(version)
 }
 
-/** A save refused because the draft changed elsewhere (409 DRAFT_CHANGED), not a transient conflict. */
+/**
+ * A save refused because the draft changed elsewhere (409 DRAFT_CHANGED), not a transient conflict:
+ * the stored revision it was refused against (`draftVersion`, what "Keep my version" saves over), else null.
+ */
+export async function readDraftConflict(res: Response): Promise<{ draftVersion: string | null } | null> {
+    if (res.status !== 409) return null
+    const body = await (typeof res.clone === 'function' ? res.clone() : res).json().catch(() => null) as { code?: unknown; draftVersion?: unknown } | null
+    if (body?.code !== 'DRAFT_CHANGED') return null
+    return { draftVersion: typeof body.draftVersion === 'string' ? body.draftVersion : null }
+}
+
 export async function isDraftConflict(res: Response): Promise<boolean> {
-    if (res.status !== 409) return false
-    const body = await (typeof res.clone === 'function' ? res.clone() : res).json().catch(() => null) as { code?: unknown } | null
-    return body?.code === 'DRAFT_CHANGED'
+    return (await readDraftConflict(res)) !== null
 }
 
 export async function runSerializedEditorSave<T>(
@@ -239,6 +247,13 @@ type EditorState = {
     draftVersion: string | null
     /** a save was refused because the draft changed elsewhere: saving stops until the editor reloads */
     draftConflict: boolean
+    /** the stored revision the refused save met (409 body) — "Keep my version" saves over it */
+    conflictDraftVersion: string | null
+    /**
+     * the id of a save whose outcome is unknown (network error, 5xx — it may have been committed): the next
+     * save reuses it, so the server can tell its own committed write from someone else's (not stale)
+     */
+    unconfirmedSaveId: string | null
 }
 
 /** What an assistant step in the history is: the change it applied, or the change it took back. */
@@ -327,8 +342,14 @@ type EditorActions = {
     setAutoSaveEnabled: (val: boolean) => void
     /** the revision editor-data or a save returned (null = unknown: saves go through unchecked) */
     setDraftVersion: (version: string | null) => void
-    /** a save was refused as stale: stop saving (no retry loop) until the editor reloads */
-    markDraftConflict: () => void
+    /** a save was refused as stale: stop saving (no retry loop) until the editor reloads or keeps its version */
+    markDraftConflict: (conflictVersion?: string | null) => void
+    /** "Keep my version" after a refused save: base the draft on the revision it met and save over it */
+    keepMyVersion: () => Promise<boolean>
+    /** the id to send with the next save: the unconfirmed one (a retry), else a new one */
+    nextSaveId: () => string
+    /** after a save: 2xx / 409 → the server answered (forget the id); network error / 5xx → keep it for the retry */
+    settleSaveId: (saveId: string, status: number | null) => void
 
     // Global Blocks (F-09/F-10)
     updateGlobalBlock: (type: GlobalBlockKey, patch: BlockPatch) => void
@@ -556,6 +577,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     autoSaveTimer: null,
     draftVersion: null,
     draftConflict: false,
+    conflictDraftVersion: null,
+    unconfirmedSaveId: null,
     // F-26: Multilingual
     activeLocale: 'en',
     siteLocale: 'en',
@@ -960,13 +983,21 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                     saveUrl.searchParams.set('pageId', pageIdNow)
                 }
                 // the same body as the explicit save: sections, theme, header/footer/widgets AND the language copies
-                const body = buildSavePayload(get())
-                const res = await fetch(saveUrl.toString(), {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(body),
-                })
+                const saveId = get().nextSaveId()
+                const body = buildSavePayload(get(), { saveId })
+                let res: Response
+                try {
+                    res = await fetch(saveUrl.toString(), {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(body),
+                    })
+                } catch (transportError) {
+                    get().settleSaveId(saveId, null)
+                    throw transportError
+                }
+                get().settleSaveId(saveId, res.ok ? 200 : res.status)
 
                 const current = get()
                 if (!isEditorSaveContextCurrent(saveContext, current)) {
@@ -983,8 +1014,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                     return true
                 } else {
                     // the draft changed elsewhere: retrying would overwrite it — stop and offer a reload
-                    if (res.status === 409 && await isDraftConflict(res)) {
-                        current.markDraftConflict()
+                    const conflict = res.status === 409 ? await readDraftConflict(res) : null
+                    if (conflict) {
+                        current.markDraftConflict(conflict.draftVersion)
                         return false
                     }
                     if (res.status === 401) {
@@ -1042,11 +1074,34 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     markPublished: () => set({ hasUnpublishedChanges: false }),
     setIsSaving: (saving) => set({ isSaving: saving }),
     setAutoSaveEnabled: (val) => set({ autoSaveEnabled: val }),
-    setDraftVersion: (version) => set({ draftVersion: version, draftConflict: false }),
-    markDraftConflict: () => {
+    setDraftVersion: (version) => set({ draftVersion: version, draftConflict: false, conflictDraftVersion: null }),
+    markDraftConflict: (conflictVersion = null) => {
         const { autoSaveTimer } = get()
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
-        set({ draftConflict: true, autoSaveEnabled: false, autoSaveTimer: null, saveStatus: 'error', isSaving: false })
+        set({
+            draftConflict: true,
+            conflictDraftVersion: conflictVersion,
+            autoSaveEnabled: false,
+            autoSaveTimer: null,
+            saveStatus: 'error',
+            isSaving: false,
+        })
+    },
+    keepMyVersion: async () => {
+        const { draftConflict, conflictDraftVersion } = get()
+        if (!draftConflict || !conflictDraftVersion) return false
+        // the merchant chose to overwrite what changed elsewhere: base this editor on the revision the
+        // refused save met, so the next save passes the check and writes this tab's content over it
+        set({ draftVersion: conflictDraftVersion, draftConflict: false, conflictDraftVersion: null, autoSaveEnabled: true })
+        return get().performSave(true)
+    },
+    nextSaveId: () => get().unconfirmedSaveId ?? uuid(),
+    settleSaveId: (saveId, status) => {
+        if (status === null || status >= 500) {
+            set({ unconfirmedSaveId: saveId })
+        } else if ((status >= 200 && status < 300) || status === 409) {
+            set({ unconfirmedSaveId: null })
+        }
     },
 
     // ── Header/Footer (F-05-07) ──────────────────────────────────────────
@@ -1282,7 +1337,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             contentRevision: 0,
             autoSaveEnabled: true, autoSaveIntervalMs: 3000,
             saveStatus: 'idle', autoSaveTimer: null,
-            draftVersion: null, draftConflict: false,
+            draftVersion: null, draftConflict: false, conflictDraftVersion: null, unconfirmedSaveId: null,
             // F26-04: reset all locale-related state (was leaking across site navigations).
             activeLocale: 'en',
             siteLocale: 'en',

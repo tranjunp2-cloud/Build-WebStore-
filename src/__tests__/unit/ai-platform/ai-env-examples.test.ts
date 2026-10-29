@@ -20,3 +20,23 @@ describe('env examples name the copilot abilities [TC-AIREL-217]', () => {
         expect(lines.some((line) => line.startsWith('AI_AGENT_CAPABILITIES='))).toBe(false)
     })
 })
+
+describe('env examples set the copilot switch per environment [TC-AICP-341]', () => {
+    const activeValue = (file: string) =>
+        readFileSync(join(process.cwd(), file), 'utf8')
+            .split('\n')
+            .find((line) => line.startsWith('AI_AGENT_ENABLED='))
+            ?.slice('AI_AGENT_ENABLED='.length)
+
+    it('[TC-AICP-341] staging turns it on, production keeps it off, local dev leaves it unset (on)', () => {
+        // Arrange + Act
+        const staging = activeValue('.env.staging.example')
+        const production = activeValue('.env.production.example')
+        const local = activeValue('.env.example')
+
+        // Assert
+        expect(staging).toBe('true')
+        expect(production).toBe('false')
+        expect(local).toBeUndefined()
+    })
+})

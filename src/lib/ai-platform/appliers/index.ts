@@ -6,6 +6,7 @@ import { applyBlogDraft } from "./blog-draft";
 import { applyBlogStatus, applyBlogUpdate } from "./blog-edits";
 import type { AttachmentLoader } from "./errors";
 import { applyShopProductStatus, applyShopProductUpdate } from "./store-product";
+import { applyShopProductsBulk } from "./store-product-setup";
 import { applyStoreCategoriesPatch } from "./store-categories";
 import { applyStoreDiscountsPatch } from "./store-discounts";
 import { applyStoreCustomersPatch } from "./store-customers";
@@ -40,6 +41,8 @@ export async function applyChangeSet(
 			return applyShopProductUpdate(action.payload, actor, loadAttachment);
 		case "shop_product.set_status":
 			return applyShopProductStatus(action.payload, actor, changeSet);
+		case "shop_product.bulk.update":
+			return applyShopProductsBulk(action.payload, actor, loadAttachment);
 		case "shop_product.create_drafts":
 			return applyShopProductDrafts(action.payload, actor, changeSet, loadAttachment);
 		case "site.page_patch":

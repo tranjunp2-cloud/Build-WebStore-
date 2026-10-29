@@ -44,9 +44,12 @@ const REQUIRED_DEPLOYMENT_SECRETS = new Set([
     'VERCEL_WEBHOOK_SECRET',
 ])
 
-// AI platform wiring (services/ai-platform is a separate Vercel project). The AI layer is
-// behind AI_AGENT_ENABLED, so a manifest that forgets these vars warns instead of failing CI.
-// They are always checked, whether or not a src/ diff references them.
+// AI platform wiring (services/ai-platform is a separate Vercel project). Without
+// AI_PLATFORM_URL + AI_PLATFORM_CONTEXT_SECRET every AI feature stays off (no crash), so a
+// manifest that forgets these vars warns instead of failing CI. AI_AGENT_ENABLED only gates the
+// copilot: unset = on outside production; "false" = off everywhere; production on only when "true".
+// They are always checked, whether or not a src/ diff references them. The real values are
+// gated at deploy time instead: ci.yml deploy-production runs scripts/ci/ai-env-preflight.mjs.
 const WARN_ONLY_VARS = new Set([
     'AI_PLATFORM_URL',
     'AI_PLATFORM_CONTEXT_SECRET',

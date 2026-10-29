@@ -24,17 +24,32 @@ export function normalizeRefundReason(raw: unknown): string {
 }
 
 /**
+ * The Xendit idempotency key of one refund attempt: the order and the moment its refund CAS was won. Only one attempt
+ * can hold the CAS at a time (an unknown outcome keeps the order refunded), so a new key only comes after a rollback.
+ */
+export function xenditRefundKey(orderId: string | number, casAt: unknown): string {
+    const at = casAt instanceof Date ? casAt.getTime() : typeof casAt === 'string' || typeof casAt === 'number' ? new Date(casAt).getTime() : Number.NaN
+    return Number.isFinite(at) ? `refund-${orderId}-${at}` : `refund-${orderId}-${Date.now()}`
+}
+
+/**
  * Whether a failed Xendit call is a DEFINITE rejection: the request never took effect, so the order may go back to
  * what it was. That is a 4xx answer (the refund was refused: bad invoice, amount over what was paid, …) or a missing
  * key (nothing was sent). A timeout (408), a repeated-key conflict (409, "already being processed / done"), a 5xx, a
- * network error or an unreadable answer leave it unknown whether the money moved, so those never roll back.
+ * network error or an unreadable answer leave it unknown whether the money moved, so those never roll back. Some 4xx
+ * answers say a refund is already under way or was already made (`REFUND_IN_PROGRESS`, duplicates): unknown too.
  */
 export function isDefiniteXenditRejection(err: unknown): boolean {
     if (!(err instanceof XenditError)) return false
     if (err.code === 'XENDIT_CONFIG_ERROR') return true
     const status = err.status ?? 0
-    return status >= 400 && status < 500 && status !== 408 && status !== 409
+    if (status < 400 || status >= 500 || status === 408 || status === 409) return false
+    const errorCode = (err.raw as { error_code?: unknown } | undefined)?.error_code
+    return !(typeof errorCode === 'string' && XENDIT_REFUND_UNDER_WAY_CODES.has(errorCode))
 }
+
+/** Xendit 4xx error codes that mean a refund for this payment is running or was already made (not a refusal). */
+const XENDIT_REFUND_UNDER_WAY_CODES = new Set(['REFUND_IN_PROGRESS', 'DUPLICATE_ERROR', 'DUPLICATE_REFUND_ERROR'])
 
 /**
  * Refunds a shipped / completed order in full (Stripe, Xendit, bank transfer or COD). The one
@@ -192,7 +207,7 @@ export async function refundOrderAs(user: User, id: string, refundReason: string
                 UPDATE orders SET status = 'refunded'::enum_orders_status, payment_status = 'refunded', updated_at = NOW()
                 WHERE id = ${order.id}
                 AND status = ANY(ARRAY['shipped','completed']::enum_orders_status[])
-                RETURNING id
+                RETURNING id, updated_at
             `)
         } catch (err) {
             payload.logger.error({ err: err instanceof Error ? err.message : String(err), orderId: id }, '[Refund] Xendit CAS failed')
@@ -208,6 +223,7 @@ export async function refundOrderAs(user: User, id: string, refundReason: string
             )
         }
 
+        const refundKey = xenditRefundKey(order.id, xenditCasResult.rows[0]?.updated_at)
         let xenditRefund: { id: string; status: string }
         try {
             // Invoice API (v2): identify by invoice_id, auth via apiKey (Model C)
@@ -217,8 +233,9 @@ export async function refundOrderAs(user: User, id: string, refundReason: string
                 // Xendit MYR = major unit (RM). order.total already RM. NO *100.
                 amount: order.total,
                 reason: refundReason,
-                // One refund per order: a retry (or a lost response) gets the first answer back instead of a second refund.
-                idempotencyKey: `refund-${order.id}`,
+                // One key per refund attempt: a retry of this call gets the first answer back instead of a second refund,
+                // and a new attempt after a definite refusal is not answered with that old refusal again.
+                idempotencyKey: refundKey,
             })
         } catch (err) {
             const errText = err instanceof Error ? err.message : String(err)
@@ -226,7 +243,7 @@ export async function refundOrderAs(user: User, id: string, refundReason: string
                 // Timeout / network / 5xx / repeated-key conflict: Xendit may well have refunded the buyer. Rolling back
                 // would show a paid order whose money is gone, so the order STAYS refunded, an internal note says what
                 // to check, and nothing else runs (no buyer email, no restock) until the merchant has looked.
-                const note = `[${new Date().toISOString()}] Refund sent to Xendit; result unknown - check the Xendit dashboard (invoice ${order.xenditPaymentRequestId}, key refund-${order.id}).`
+                const note = `[${new Date().toISOString()}] Refund sent to Xendit; result unknown - check the Xendit dashboard (invoice ${order.xenditPaymentRequestId}, key ${refundKey}).`
                 await (payload.db.drizzle as any).execute(sql`
                     UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ${note} ELSE notes || E'\n' || ${note} END, updated_at = NOW()
                     WHERE id = ${order.id}

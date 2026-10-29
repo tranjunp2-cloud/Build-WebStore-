@@ -1,5 +1,7 @@
 /**
  * TC-AIREL-305 — the proxy's Undo is idempotent and says which newer change blocks it.
+ * TC-AIREL-267 — two tabs Undo at once: the one that loses (its put-back refused, or its record answered 409) reads the
+ *   change set again and answers 200 when it is reverted; otherwise the refusal stands.
  * Real: handleAgentProxy (undo route), undo-touches. Faked: the AI platform, the appliers, next/cache.
  */
 import { NextRequest } from 'next/server'
@@ -72,6 +74,7 @@ describe('Undo through the proxy [TC-AIREL-305]', () => {
     it('a refusal because a newer change touched the same section names that change', async () => {
         vi.mocked(aiPlatformJson)
             .mockResolvedValueOnce(card('cs_a', 'applied', '2026-10-22T01:00:00Z'))
+            .mockResolvedValueOnce(card('cs_a', 'applied', '2026-10-22T01:00:00Z'))
             .mockResolvedValueOnce([card('cs_a', 'applied', '2026-10-22T01:00:00Z'), card('cs_b', 'applied', '2026-10-22T02:00:00Z', 'hero', 'Shorter headline')])
         vi.mocked(applyUndo).mockRejectedValue(new ChangeSetApplyError('The Hero section was edited after the assistant changed it.', 409))
 
@@ -84,6 +87,7 @@ describe('Undo through the proxy [TC-AIREL-305]', () => {
     it('a refusal with no newer change on that part keeps the applier\'s own words', async () => {
         vi.mocked(aiPlatformJson)
             .mockResolvedValueOnce(card('cs_a', 'applied', '2026-10-22T01:00:00Z'))
+            .mockResolvedValueOnce(card('cs_a', 'applied', '2026-10-22T01:00:00Z'))
             .mockResolvedValueOnce([card('cs_a', 'applied', '2026-10-22T01:00:00Z'), card('cs_b', 'applied', '2026-10-22T02:00:00Z', 'about')])
         vi.mocked(applyUndo).mockRejectedValue(new ChangeSetApplyError('The Hero section was edited after the assistant changed it.', 409))
 
@@ -91,6 +95,47 @@ describe('Undo through the proxy [TC-AIREL-305]', () => {
 
         expect(response.status).toBe(409)
         expect((await response.json()).detail).toBe('The Hero section was edited after the assistant changed it.')
+    })
+})
+
+describe('two tabs Undo at once [TC-AIREL-267]', () => {
+    const undoneCard = card('cs_a', 'reverted', '2026-10-22T01:00:00Z')
+
+    it('the put-back is refused because the other tab already did it: 200 with the reverted card, no newer-change lookup', async () => {
+        vi.mocked(aiPlatformJson).mockResolvedValueOnce(card('cs_a', 'applied', '2026-10-22T01:00:00Z')).mockResolvedValueOnce(undoneCard)
+        vi.mocked(applyUndo).mockRejectedValue(new ChangeSetApplyError('The Hero section was edited after the assistant changed it.', 409))
+
+        const response = await undoRequest()
+
+        expect(response.status).toBe(200)
+        expect((await response.json()).status).toBe('reverted')
+        expect(vi.mocked(aiPlatformJson).mock.calls.map(([arg]) => arg.path)).toEqual(['/agent/change-sets/cs_a', '/agent/change-sets/cs_a'])
+    })
+
+    it('the revert record answers 409 because the other tab recorded first: 200 with the reverted card', async () => {
+        vi.mocked(applyUndo).mockResolvedValue({ entities: [], links: [] })
+        vi.mocked(aiPlatformJson)
+            .mockResolvedValueOnce(card('cs_a', 'applied', '2026-10-22T01:00:00Z'))
+            .mockRejectedValueOnce(Object.assign(new AiPlatformError('This change set is not applied.'), { status: 409 }))
+            .mockResolvedValueOnce(undoneCard)
+
+        const response = await undoRequest()
+
+        expect(response.status).toBe(200)
+        expect((await response.json()).status).toBe('reverted')
+    })
+
+    it('a 409 on the record while the card is still applied stays a 409', async () => {
+        vi.mocked(applyUndo).mockResolvedValue({ entities: [], links: [] })
+        vi.mocked(aiPlatformJson)
+            .mockResolvedValueOnce(card('cs_a', 'applied', '2026-10-22T01:00:00Z'))
+            .mockRejectedValueOnce(Object.assign(new AiPlatformError('Undo window closed.'), { status: 409 }))
+            .mockResolvedValueOnce(card('cs_a', 'applied', '2026-10-22T01:00:00Z'))
+
+        const response = await undoRequest()
+
+        expect(response.status).toBe(409)
+        expect((await response.json()).detail).toBe('Undo window closed.')
     })
 })
 

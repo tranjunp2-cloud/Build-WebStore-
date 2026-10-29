@@ -1,12 +1,15 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { ArrowDown, ArrowRight, ArrowUp, ExternalLink, Loader2, Rocket } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, ExternalLink, Loader2, PackageCheck, Rocket } from 'lucide-react'
 import type { BuilderPreviewMode } from '@/components/builder/BuilderPreviewPrimitives'
 import { CompletionPreviewPanel } from '@/components/builder/completion/CompletionPreviewPanel'
+import { CompletionFinishShopCard } from '@/components/builder/completion/CompletionFinishShopCard'
+import { CompletionPlaceholderList } from '@/components/builder/completion/CompletionPlaceholderList'
 import { CompletionReadyCard } from '@/components/builder/completion/CompletionReadyCard'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useI18n } from '@/i18n'
+import type { BuilderPlaceholder } from '@/store/builderStore'
 
 interface BuilderCompletionViewProps {
     siteName: string
@@ -17,6 +20,12 @@ interface BuilderCompletionViewProps {
     onOpenEditor: () => void
     onOpenPreview: () => void
     onPublish: () => void
+    /** Opens the "finish your products" task; the CTA shows only when `productCount` > 0 */
+    onFinishShop?: () => void
+    /** Products the generation created (SSE `done.productIds`) */
+    productCount?: number
+    /** Sections still holding placeholder content (SSE `done.placeholders`); informational, never blocks Publish */
+    placeholders?: BuilderPlaceholder[]
     onMoveBlock?: (blockId: string, direction: 'up' | 'down') => void
     previewContent: ReactNode
     floatingControls?: ReactNode
@@ -102,6 +111,9 @@ export default function BuilderCompletionView({
     onOpenEditor,
     onOpenPreview,
     onPublish,
+    onFinishShop,
+    productCount = 0,
+    placeholders = [],
     onMoveBlock,
     previewContent,
     floatingControls,
@@ -116,6 +128,7 @@ export default function BuilderCompletionView({
     const { t } = useI18n()
     const c = t.onboarding.completion
     const g = t.onboarding.generating
+    const showFinishShop = productCount > 0 && !!onFinishShop
     const movableBlocks = blocks.filter(
         (block) => block._id && block.blockType !== 'navigation' && block.blockType !== 'footer',
     )
@@ -139,6 +152,9 @@ export default function BuilderCompletionView({
                 siteName={siteName}
                 totalBlocks={totalBlocks}
             />
+
+            {showFinishShop ? <CompletionFinishShopCard /> : null}
+            <CompletionPlaceholderList placeholders={placeholders} />
 
             <div className="rounded-2xl border border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
                 <div className="flex items-start justify-between gap-3">
@@ -212,13 +228,30 @@ export default function BuilderCompletionView({
     // subtle text button with arrow for dashboard.
     const leftFooter = (
         <div className="grid gap-2.5">
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2.5">
+            {showFinishShop ? (
                 <CompletionPrimaryButton
-                    icon={<ExternalLink className="size-4" />}
-                    label={c.openEditor}
-                    onClick={onOpenEditor}
+                    icon={<PackageCheck className="size-4" />}
+                    label={c.finishShopButton}
+                    onClick={onFinishShop!}
                     disabled={isPublishing || isNavigating}
                 />
+            ) : null}
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2.5">
+                {showFinishShop ? (
+                    <CompletionSecondaryButton
+                        icon={<ExternalLink className="size-4" />}
+                        label={c.openEditor}
+                        onClick={onOpenEditor}
+                        disabled={isPublishing || isNavigating}
+                    />
+                ) : (
+                    <CompletionPrimaryButton
+                        icon={<ExternalLink className="size-4" />}
+                        label={c.openEditor}
+                        onClick={onOpenEditor}
+                        disabled={isPublishing || isNavigating}
+                    />
+                )}
                 <CompletionSecondaryButton
                     icon={isPublishing ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
                     label={isPublishing ? c.publishing : c.publishWebsite}

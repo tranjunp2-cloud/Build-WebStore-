@@ -5,6 +5,8 @@
  * TC-AICP-240 — vercel.json schedules the route (several passes a day so a run that ran out of time is
  * continued) and keeps git deployment disabled; db-setup registers the settings column and the new
  * notification type (the Notifications select lists it too).
+ * TC-AICP-344 — the route follows the copilot switch (real lib/ai-platform/config): with the assistant off
+ * (AI_AGENT_ENABLED=false, or production without "true") it answers success + skipped and runs nothing.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -24,12 +26,18 @@ const call = (authorization?: string, query = '') =>
 beforeEach(() => {
     vi.clearAllMocks()
     process.env.CRON_SECRET = SECRET
+    // the assistant is on: platform configured, outside production, no kill switch
+    vi.stubEnv('AI_PLATFORM_URL', 'http://ai.internal:8300')
+    vi.stubEnv('AI_PLATFORM_CONTEXT_SECRET', 'test-context-secret-at-least-32-characters')
+    vi.stubEnv('AI_AGENT_ENABLED', '')
+    vi.stubEnv('VERCEL_ENV', 'preview')
     delete process.env.NEXT_PUBLIC_SERVER_URL
     mocks.getPayload.mockResolvedValue({ marker: 'payload' })
     mocks.runAutomationBatch.mockResolvedValue({ day: '2026-10-27', scanned: 3, complete: true, nextCursor: null })
 })
 afterEach(() => {
     delete process.env.CRON_SECRET
+    vi.unstubAllEnvs()
 })
 
 describe('GET /api/cron/shop-automations [TC-AICP-231]', () => {
@@ -94,6 +102,50 @@ describe('GET /api/cron/shop-automations [TC-AICP-231]', () => {
         expect(res.status).toBe(500)
         expect(JSON.stringify(await res.json())).not.toContain('hunter2')
         log.mockRestore()
+    })
+})
+
+describe('GET /api/cron/shop-automations follows the copilot switch [TC-AICP-344]', () => {
+    it.each([
+        ['the kill switch is set', { AI_AGENT_ENABLED: 'false', VERCEL_ENV: 'preview' }],
+        ['production has no AI_AGENT_ENABLED=true', { AI_AGENT_ENABLED: '', VERCEL_ENV: 'production' }],
+    ])('[TC-AICP-344] skips the run when %s', async (_label, env) => {
+        // Arrange
+        vi.stubEnv('AI_AGENT_ENABLED', env.AI_AGENT_ENABLED)
+        vi.stubEnv('VERCEL_ENV', env.VERCEL_ENV)
+
+        // Act
+        const res = await call(`Bearer ${SECRET}`)
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(await res.json()).toEqual({ success: true, skipped: 'ai_agent_disabled' })
+        expect(mocks.getPayload).not.toHaveBeenCalled()
+        expect(mocks.runAutomationBatch).not.toHaveBeenCalled()
+    })
+
+    it('[TC-AICP-344] still answers 401 before the switch is read', async () => {
+        // Arrange
+        vi.stubEnv('AI_AGENT_ENABLED', 'false')
+
+        // Act
+        const res = await call('Bearer nope')
+
+        // Assert
+        expect(res.status).toBe(401)
+    })
+
+    it('[TC-AICP-344] runs on production when AI_AGENT_ENABLED=true', async () => {
+        // Arrange
+        vi.stubEnv('AI_AGENT_ENABLED', 'true')
+        vi.stubEnv('VERCEL_ENV', 'production')
+
+        // Act
+        const res = await call(`Bearer ${SECRET}`)
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(mocks.runAutomationBatch).toHaveBeenCalledTimes(1)
     })
 })
 

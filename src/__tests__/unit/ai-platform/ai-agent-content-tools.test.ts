@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 // TC-AICP-55 — the copilot's read views of the shop's own content: blog posts read
 // as the merchant and pinned to their workspace, article text without spacing the
-// extractor made up. (Store products are read by store-product-tools.ts, TC-AIREL-1xx in phase 6.)
+// extractor made up. (Store products are read by store-product-tools.ts, tested in store-product-tools.test.ts.)
 
 import { clipText, postPictures, postText, readPost, searchPosts } from '@/lib/ai-platform/agent-tools/content-tools'
 

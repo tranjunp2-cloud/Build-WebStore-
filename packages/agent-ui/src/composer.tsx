@@ -461,16 +461,24 @@ export const ChatComposer = forwardRef<ComposerHandle, ChatComposerProps>(functi
 					))}
 				</div>
 			)}
-			<textarea
-				ref={boxRef}
-				rows={1}
-				value={text}
-				onChange={(e) => setText(e.target.value)}
-				onKeyDown={onKeyDown}
-				onPaste={onPaste}
-				placeholder={busy ? labels.placeholderBusy : offerHint ? hint : elementPlaceholder}
-				aria-label={labels.message}
-			/>
+			{/* the Tab hint is anchored to the typing box, so a row of chips above it is never overlapped */}
+			<div className="ech-ag-cmp-box">
+				<textarea
+					ref={boxRef}
+					rows={1}
+					value={text}
+					onChange={(e) => setText(e.target.value)}
+					onKeyDown={onKeyDown}
+					onPaste={onPaste}
+					placeholder={busy ? labels.placeholderBusy : offerHint ? hint : elementPlaceholder}
+					aria-label={labels.message}
+				/>
+				{offerHint && (
+					<kbd className="ech-ag-tab-hint" aria-hidden="true">
+						{labels.useHint}
+					</kbd>
+				)}
+			</div>
 			<div className="ech-ag-c-row">
 				<button
 					ref={attachRef}
@@ -505,11 +513,6 @@ export const ChatComposer = forwardRef<ComposerHandle, ChatComposerProps>(functi
 						</span>
 						{labels.autoApprove}
 					</button>
-				)}
-				{offerHint && (
-					<kbd className="ech-ag-tab-hint" aria-hidden="true">
-						{labels.useHint}
-					</kbd>
 				)}
 				{busy && onStop ? (
 					<button type="button" className="ech-ag-send-btn is-stop" aria-label={labels.stop} title={labels.stop} onClick={onStop}>

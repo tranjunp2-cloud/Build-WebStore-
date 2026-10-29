@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AgentDockPlaceholder } from "./AgentDockPlaceholder";
 import { dockShownOn } from "./agent-dock-routes";
+import { useAgentQuietRoot } from "./agent-quiet-root";
 import { AGENT_OPEN_EVENT, holdAgentOpen } from "./agent-open-queue";
 
 const importDock = () => import("./DashboardAgentDock");
@@ -47,6 +48,8 @@ function afterLoadIdle(task: () => void): () => void {
 export function DashboardAgentDockLoader() {
 	const pathname = usePathname() ?? "/";
 	const [mounted, setMounted] = useState(false);
+	// form screens: a compact mascot tucked into the corner (globals.css), the placeholder and the dock alike
+	useAgentQuietRoot(pathname);
 
 	// hold every open request until the dock listens (it takes them from the queue)
 	useEffect(() => {

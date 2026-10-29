@@ -1,5 +1,5 @@
 import type { WorkItem } from "@ech/agent-core";
-import type { AgentGateway } from "@ech/agent-transport";
+import { type AgentGateway, AgentGatewayError } from "@ech/agent-transport";
 import { describe, expect, it, vi } from "vitest";
 import { discardOnPlatform } from "./work";
 
@@ -49,6 +49,24 @@ describe("discardOnPlatform", () => {
 			["cs_a", "reject"],
 			["cs_c", "reject"],
 		]);
+	});
+
+	it("[TC-AIREL-270] goes on past a card that answers 409 (applied meanwhile) and still rejects the rest", async () => {
+		const g = gateway();
+		g.decideChangeSet.mockRejectedValueOnce(new AgentGatewayError("This change was already applied — use Undo to take it back.", 409));
+
+		await expect(discardOnPlatform(g, item({}))).resolves.toBeUndefined();
+
+		expect(g.decideChangeSet.mock.calls.map((call) => call[0])).toEqual(["cs_a", "cs_c"]);
+	});
+
+	it("[TC-AIREL-270] still tries every card when one fails otherwise, then reports that failure", async () => {
+		const g = gateway();
+		g.decideChangeSet.mockRejectedValueOnce(new AgentGatewayError("The AI platform is unreachable.", 502));
+
+		await expect(discardOnPlatform(g, item({}))).rejects.toMatchObject({ status: 502 });
+
+		expect(g.decideChangeSet.mock.calls.map((call) => call[0])).toEqual(["cs_a", "cs_c"]);
 	});
 
 	it("[TC-WQ-062] skips a question by cancelling the run that asked it", async () => {

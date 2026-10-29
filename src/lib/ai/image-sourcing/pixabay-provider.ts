@@ -7,6 +7,7 @@ import {
 import type { StockImageCandidate } from './contracts'
 import { getProcessPixabayKeyRing, PixabayKeyRing } from './key-ring'
 import { normalizeImageTerm } from './relevance'
+import { buildStockAlt } from '../stock-alt'
 
 interface PixabayHit {
     id: number
@@ -137,7 +138,7 @@ function mapHit(hit: PixabayHit, category: string): StockImageCandidate {
         height,
         aspect: height > 0 ? width / height : 0,
         active: true,
-        alt: hit.tags?.trim() || undefined,
+        alt: buildStockAlt(hit.tags) || undefined,
     }
 }
 

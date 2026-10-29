@@ -5663,6 +5663,15 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
     name: 'blogs.ai_change_set_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS blogs_ai_change_set_id_idx ON blogs(ai_change_set_id);`,
   },
+  // Site-generator seed marker: the site's first publish promotes these drafts and clears it
+  {
+    name: 'blogs.ai_seeded',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS ai_seeded boolean DEFAULT false;`,
+  },
+  {
+    name: 'blogs.ai_seeded_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_ai_seeded_idx ON blogs(ai_seeded);`,
+  },
   // ── Scheduled shop automations (cron /api/cron/shop-automations) ──
   // Per-workspace switches + the cron's day markers: tenants.settings.automations (json).
   {
@@ -5705,6 +5714,16 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
   {
     name: 'pages.editor_revision',
     sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS editor_revision integer NOT NULL DEFAULT 0;`,
+  },
+  // the editor save that made the last bump (NULL = an AI change / other writer): a save retried after
+  // its response was lost carries the same id and is let through instead of refused as stale
+  {
+    name: 'sites.editor_last_save_id',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS editor_last_save_id varchar(64);`,
+  },
+  {
+    name: 'pages.editor_last_save_id',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS editor_last_save_id varchar(64);`,
   },
   // ── Featured Products: the section's own pictures (shown while no product is on sale, and
   // for a product without a photo) instead of the industry sample pictures — same rows as a gallery ──

@@ -4,16 +4,18 @@
  * workspace switched it on. `previewAutomations` shows what a run would say, without sending anything.
  *
  * Never throws for one recipient's failure: a notification that already exists (same dedupe key) or an email that
- * does not go out is counted, not fatal. Everything is scoped by `tenantId`.
+ * does not go out is counted, not fatal; a notification that failed for any other reason (DB down) asks for a retry
+ * so the day is not marked done. Everything is scoped by `tenantId`.
  */
 import type { Payload } from 'payload'
 import { sendEmail } from '@/lib/email/send'
-import { computeShopTodos, type TodoLocale } from '@/lib/insights/shop-todo'
+import { computeShopTodos, localizeShopTodos, readShopTodoDrafts, type TodoLocale } from '@/lib/insights/shop-todo'
 import { tenantParam } from '@/lib/reports/report-db'
 import {
     type AutomationId,
     type AutomationSettings,
     AUTOMATION_IDS,
+    automationAreas,
     automationsDue,
     digestDue,
     runsToday,
@@ -72,7 +74,8 @@ export interface TenantRunResult {
     tenantId: number
     /**
      * done: finished, mark the day. nothing_due: nothing switched on / scheduled. no_recipients: nobody to tell.
-     * retry_later: an email failed or the budget ran out, so the next pass tries again (notifications dedupe).
+     * retry_later: an email or a notification failed, or the budget ran out, so the next pass tries again
+     * (notifications dedupe, the digest day is claimed).
      */
     status: 'done' | 'nothing_due' | 'no_recipients' | 'retry_later'
     reminders: number
@@ -85,9 +88,26 @@ export interface TenantRunResult {
 
 const EMPTY = (tenantId: number, status: TenantRunResult['status']): TenantRunResult => ({ tenantId, status, reminders: 0, notifications: 0, digests: 0, digestFailures: 0, digestSent: false })
 
-async function createNotifications(payload: Payload, tenantId: number, byRecipient: Map<AutomationRecipient, AutomationReminder[]>, now: Date): Promise<number> {
+/**
+ * The unique (tenant, user, dedupe key) index rejected the row: the reminder already exists. Payload's adapter turns
+ * Postgres 23505 into a ValidationError "Value must be unique" (see product-sku-conflicts.ts); a raw driver error
+ * may still carry the code itself.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+    const e = error as { name?: string; code?: string; cause?: { code?: string }; data?: { errors?: Array<{ message?: string }> } } | null
+    if (!e || typeof e !== 'object') return false
+    if (e.code === '23505' || e.cause?.code === '23505') return true
+    return e.name === 'ValidationError' && (e.data?.errors ?? []).some((entry) => entry?.message === 'Value must be unique')
+}
+
+async function createNotifications(
+    payload: Payload,
+    tenantId: number,
+    byRecipient: Map<AutomationRecipient, AutomationReminder[]>,
+    now: Date,
+): Promise<{ created: number; failed: number }> {
     const keys = [...new Set([...byRecipient.values()].flatMap((list) => list.map((r) => r.dedupeKey)))]
-    if (keys.length === 0) return 0
+    if (keys.length === 0) return { created: 0, failed: 0 }
     const recipientIds = [...byRecipient.keys()].map((r) => r.id)
     const existing = await payload.find({
         collection: 'notifications',
@@ -123,9 +143,32 @@ async function createNotifications(payload: Payload, tenantId: number, byRecipie
             )
         }
     }
-    // a concurrent run that wins the unique (tenant, user, dedupe key) index rejects this row: the reminder exists, fine
+    // a concurrent run that wins the unique (tenant, user, dedupe key) index rejects this row: the reminder exists, fine.
+    // Anything else (connection lost, ...) did not create it: count it so the run is retried.
     const settled = await Promise.allSettled(creates)
-    return settled.filter((s) => s.status === 'fulfilled').length
+    let failed = 0
+    for (const outcome of settled) {
+        if (outcome.status === 'fulfilled' || isUniqueViolation(outcome.reason)) continue
+        failed += 1
+        console.error(`[shop-automations] tenant ${tenantId} notification failed`, outcome.reason instanceof Error ? outcome.reason.message : outcome.reason)
+    }
+    return { created: settled.filter((s) => s.status === 'fulfilled').length, failed }
+}
+
+/**
+ * The workers of a batch run in parallel and share `budget`: the emails are reserved synchronously, BEFORE the claim
+ * is awaited, so two workers can not both pass the budget check; the reservation is given back when the day could
+ * not be claimed (another run has it) or the claim threw.
+ */
+async function reserveAndClaimDigest(payload: Payload, tenantId: number, day: string, emails: number, budget: { left: number }): Promise<boolean> {
+    budget.left -= emails
+    let claimed = false
+    try {
+        claimed = await claimDigestDay(payload, tenantId, day)
+        return claimed
+    } finally {
+        if (!claimed) budget.left += emails
+    }
 }
 
 export async function runTenantAutomations(
@@ -143,16 +186,17 @@ export async function runTenantAutomations(
     const recipients = await findAutomationRecipients(payload, tenantId)
     if (recipients.length === 0) return EMPTY(tenantId, 'no_recipients')
 
-    // the To do list once per language the recipients read (texts and copilot prompts are in that language)
+    // the data is read once, only for the areas of the due automations (the website check only when site_health is
+    // due), then worded once per language the recipients read (texts and copilot prompts are in that language)
+    const drafts = await readShopTodoDrafts(payload, { tenantId, now: ctx.now, areas: automationAreas(due) })
     const reminderBy = new Map<TodoLocale, AutomationReminder[]>()
     for (const locale of new Set(recipients.map((r) => r.locale))) {
-        const items = await computeShopTodos(payload, { tenantId, now: ctx.now, locale })
-        reminderBy.set(locale, buildReminders(items, due, day))
+        reminderBy.set(locale, buildReminders(localizeShopTodos(drafts, locale), due, day))
     }
     const byRecipient = new Map(recipients.map((r) => [r, reminderBy.get(r.locale) ?? []] as const))
     const reminders = [...reminderBy.values()][0]?.length ?? 0
 
-    const notifications = await createNotifications(payload, tenantId, byRecipient, ctx.now)
+    const { created: notifications, failed: notificationFailures } = await createNotifications(payload, tenantId, byRecipient, ctx.now)
 
     let digests = 0
     let digestFailures = 0
@@ -162,8 +206,7 @@ export async function runTenantAutomations(
         // all or nothing per workspace, so a retry never mails the same owner twice
         if (mailable.length > ctx.emailBudget.left) outOfBudget = true
         // the day is taken BEFORE sending: a run that overlaps this one (cron delivered twice, an operator) mails nobody
-        else if (mailable.length > 0 && (await claimDigestDay(payload, tenantId, day))) {
-            ctx.emailBudget.left -= mailable.length
+        else if (mailable.length > 0 && (await reserveAndClaimDigest(payload, tenantId, day, mailable.length, ctx.emailBudget))) {
             for (const [recipient, list] of mailable) {
                 const mail = buildDigestEmail({ shopName: tenant.name || 'Prime Web', recipientName: recipient.name, locale: recipient.locale, reminders: list, baseUrl: ctx.baseUrl })
                 if (await sendEmail({ to: recipient.email as string, subject: mail.subject, html: mail.html })) digests += 1
@@ -173,8 +216,9 @@ export async function runTenantAutomations(
             if (digests === 0) await releaseDigestDay(payload, tenantId, day, settings.lastDigestDay)
         }
     }
-    // retry only when nothing could be sent (budget, or every email failed); once one owner got it the day is done
-    const retry = outOfBudget || (digestFailures > 0 && digests === 0)
+    // retry only when nothing could be sent (budget, or every email failed); once one owner got it the day is done.
+    // A notification that failed for a reason other than "already exists" is retried too (the rest dedupe).
+    const retry = outOfBudget || (digestFailures > 0 && digests === 0) || notificationFailures > 0
     return { tenantId, status: retry ? 'retry_later' : 'done', reminders, notifications, digests, digestFailures, digestSent: digests > 0 }
 }
 
@@ -197,7 +241,7 @@ export async function previewAutomations(
 ): Promise<AutomationPreview> {
     const tenantId = tenantParam(args.tenantId)
     const on = AUTOMATION_IDS.filter((id) => args.settings.enabled[id])
-    const items = on.length ? await computeShopTodos(payload, { tenantId, now: args.now, locale: args.locale }) : []
+    const items = on.length ? await computeShopTodos(payload, { tenantId, now: args.now, locale: args.locale, areas: automationAreas(on) }) : []
     return {
         day: shopDay(args.now),
         reminders: buildReminders(items, on, shopDay(args.now)),

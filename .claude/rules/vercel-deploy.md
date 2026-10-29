@@ -4,6 +4,9 @@ description: Vercel CI-driven deploy architecture (VERCEL_TOKEN, webhook disable
 paths:
   - "vercel.json"
   - ".github/workflows/ci.yml"
+  - ".github/workflows/ai-staging-cron.yml"
+  - "services/ai-platform/vercel.json"
+  - "scripts/ci/**"
   - ".github/actions/smart-notify/**"
   - "scripts/db-setup.js"
 ---
@@ -26,6 +29,45 @@ deploy-staging job:
   smart-notify deploy_success
 ```
 
+```
+deploy-production job: same 3 stages with `--environment=production` / `--prod`, plus the
+AI env preflight below.
+
+Preflights (`scripts/ci/*.mjs`, node builtins only — run before any `npm ci`): read only the key
+they need from the pulled `.vercel/.env.*.local` (never `source` the file — a `$`/backtick in a
+secret would run in bash) and never print values. (The prime-web Postgres preflights still source
+the file; not changed by the AI release.)
+  pg-tcp-check.mjs      AI_PLATFORM_DATABASE_URL reachable (TCP) before the ai-platform build migrates
+  ai-env-preflight.mjs  AI_PLATFORM_URL (https) + AI_PLATFORM_CONTEXT_SECRET (32+ chars):
+                        production → fails the deploy (Lark deploy_fail); empty secret = warning
+                        (Vercel Sensitive vars pull empty); staging → warning only.
+                        Repo variable ALLOW_PROD_WITHOUT_AI=true downgrades production to warnings.
+                        AI_AGENT_ENABLED is not checked (copilot off on production on purpose).
+```
+
+### AI platform (separate Vercel project)
+
+`services/ai-platform` deploys as its own Vercel project (`VERCEL_AI_PLATFORM_PROJECT_ID`, same
+`VERCEL_TOKEN` / `VERCEL_ORG_ID`), in parallel with prime-web (no `needs` either way):
+
+```
+Push to staging → deploy-ai-platform            (Node 24, --environment=staging / --target=staging)
+Push to main    → deploy-ai-platform-production (Node 24, --environment=production / --prod)
+  working-directory services/ai-platform (Vercel Root Directory left EMPTY: the CLI builds on the
+  runner, where the file: deps in ../../packages exist)
+  preflight AI_PLATFORM_DATABASE_URL reachable → vercel build runs `npm run build:vercel`
+  (services/ai-platform/vercel.json) = tsup + ai-platform DB migrations → deploy
+PR → ai-platform-check (Node 24): npm ci + typecheck + test + build (no migrations)
+```
+
+### Staging cron (`.github/workflows/ai-staging-cron.yml`)
+
+Vercel Cron fires on production deployments only; staging deploys with `--target=staging`, so the
+`crons` in `vercel.json` / `services/ai-platform/vercel.json` never run there. This workflow calls
+them instead: every 10 min `/api/cron/ai-receipts` + ai-platform `/internal/cron/thread-retention`,
+daily 01:15 UTC `/api/cron/shop-automations`. Unconfigured → exits 0 with a notice. GitHub runs
+`schedule` from the default branch only — it starts once the file is on `main`.
+
 All deploys attributed to `phuongltweb` (token owner) → bypasses Vercel's commit-author access check that blocks non-team-member commits.
 
 ## Why this exists
@@ -45,6 +87,19 @@ Vercel Pro plan rejects deploys whose commit author isn't on the Vercel team. Te
 - `VERCEL_TOKEN` — project-scoped token from `vercel.com/account/tokens`, scope `Nguyen Phuong's projects`, rotate yearly (next: 2027-04)
 - `VERCEL_ORG_ID = team_H3WAlHhz2xqvIFRcxfWevPTs`
 - `VERCEL_PROJECT_ID = prj_84DQ47BSv2hBX28w0FzjFScfbuRr`
+- `VERCEL_AI_PLATFORM_PROJECT_ID` — the separate ai-platform Vercel project (same token / org)
+- `STAGING_CRON_SECRET` — copy of the staging `CRON_SECRET` (prime-web and ai-platform use the same value); `ai-staging-cron.yml` only. Rotate together (see `env-vars.md`)
+
+## Repository variables (`vars.*`)
+
+- `STAGING_APP_URL` — `https://<staging prime-web host>`, no trailing slash (`ai-staging-cron.yml`)
+- `STAGING_AI_PLATFORM_URL` — `https://<staging ai-platform host>` (optional; thread-retention skipped when empty)
+- `ALLOW_PROD_WITHOUT_AI` — `true` only to ship production deliberately without AI: the AI env preflight then warns instead of failing
+- `CI_RUNNER` / `CI_HEAVY_RUNNER` — runner labels (default `ubuntu-latest`)
+
+## Release checklist (staging → main)
+
+- Vercel prime-web **Production**: `AI_PLATFORM_URL` (https) + `AI_PLATFORM_CONTEXT_SECRET` (32+ chars, same value as the ai-platform Production env) — else `deploy-production` fails at the AI env preflight
 
 ## CRITICAL rules
 

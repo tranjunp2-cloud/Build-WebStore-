@@ -7,6 +7,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { StateStorage } from 'zustand/middleware'
 import type { ThemeConfig } from '@/blocks/types'
+import type { BuyingMethod } from '@/lib/validations/ai'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,14 @@ export type BusinessInfo = {
     businessUrl?: string
     source?: 'form' | 'url'
     slug?: string
+    // #2103 A1: optional facts the merchant states themselves — the AI may only claim what is here
+    buyingMethods?: BuyingMethod[]
+    serviceArea?: string
+    shopFacts?: string
 }
+
+/** A section still holding placeholder content after generation (SSE `done.placeholders`). */
+export type BuilderPlaceholder = { pageSlug: string; blockType: string; label: string }
 
 type BuilderState = {
     // Session owner — used to detect cross-user localStorage contamination
@@ -54,6 +62,10 @@ type BuilderState = {
     siteId: string | null
     siteName: string | null
     progress: ProgressStep
+
+    // From the SSE `done` event: products created for the shop + sections to fill in before publishing
+    productIds: string[]
+    placeholders: BuilderPlaceholder[]
 
     // ContentBrief (from URL/Image extraction — passed to generator for high-fidelity output)
     contentBrief: Record<string, unknown> | null
@@ -81,6 +93,7 @@ type BuilderActions = {
     setSiteId: (siteId: string) => void
     setSiteName: (name: string) => void
     setBlocks: (blocks: any[]) => void
+    setGenerationExtras: (extras: { productIds: string[]; placeholders: BuilderPlaceholder[] }) => void
 
     // Session
     setUserId: (userId: string) => void
@@ -106,6 +119,8 @@ const INITIAL_STATE: BuilderState = {
     siteId: null,
     siteName: null,
     progress: { step: '', label: '', progress: 0 },
+    productIds: [],
+    placeholders: [],
     contentBrief: null,
     error: null,
 }
@@ -182,6 +197,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
             setBlocks: (blocks) => set({ blocks }),
 
+            setGenerationExtras: ({ productIds, placeholders }) => set({ productIds, placeholders }),
+
             setUserId: (userId) => set({ userId }),
 
             setError: (error) => set({ error, status: 'error' }),
@@ -212,6 +229,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                 siteId: state.siteId,
                 siteName: state.siteName,
                 progress: state.status === 'streaming' ? { step: '', label: '', progress: 0 } : state.progress,
+                productIds: state.status === 'streaming' ? [] : state.productIds,
+                placeholders: state.status === 'streaming' ? [] : state.placeholders,
                 // Never persist error — it may contain sensitive server details
                 error: null,
             }),
@@ -228,7 +247,12 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                     state.blocks = []
                     state.messages = []
                     state.progress = { step: '', label: '', progress: 0 }
+                    state.productIds = []
+                    state.placeholders = []
                 }
+                // Sessions persisted before #2103 have no extras
+                if (state && !Array.isArray(state.productIds)) state.productIds = []
+                if (state && !Array.isArray(state.placeholders)) state.placeholders = []
                 // Defensive: done status should always have step='chat' (not 'info')
                 // Handles old localStorage sessions written before this fix
                 if (state?.status === 'done' && state?.step === 'info') {

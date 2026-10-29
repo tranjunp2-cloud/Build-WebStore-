@@ -71,7 +71,7 @@ const EN: Record<ShopTodoKind, (v: TodoTextVars) => TodoText> = {
     out_of_stock: (v) => ({
         title: `${v.count} live ${plural(v.count, 'product is', 'products are')} out of stock`,
         detail: 'Active products with 0 in stock.',
-        prompt: `Which of my live products are out of stock? Show me the list and help me restock or switch off the ones I will not restock.`,
+        prompt: `Which of my live products are out of stock? Ask me how many I have of each (one list) and update the stock in one go; for the ones I will not restock, offer to move them to draft.`,
     }),
     low_stock: (v) => ({
         title: `${v.count} ${plural(v.count, 'product is', 'products are')} running low`,
@@ -93,7 +93,7 @@ const EN: Record<ShopTodoKind, (v: TodoTextVars) => TodoText> = {
     products_ai_review: (v) => ({
         title: `${v.count} AI ${plural(v.count, 'draft', 'drafts')} to review`,
         detail: 'Products drafted by AI that are not on sale until you have looked at them.',
-        prompt: `I have ${v.count} product ${plural(v.count, 'draft', 'drafts')} waiting for my review. Show me what is missing on each so I can publish them.`,
+        prompt: `I have ${v.count} product ${plural(v.count, 'draft', 'drafts')} waiting for my review. Show me what is missing on each (stock, price, photos), ask me for it in one go, and set them up so I can publish them.`,
     }),
     discounts_expiring: (v) => ({
         title: `${v.count} discount ${plural(v.count, 'code ends', 'codes end')} within ${EXPIRING_WITHIN_DAYS} days`,
@@ -146,7 +146,7 @@ const MS: Record<ShopTodoKind, (v: TodoTextVars) => TodoText> = {
     out_of_stock: (v) => ({
         title: `${v.count} produk aktif kehabisan stok`,
         detail: 'Produk aktif dengan stok 0.',
-        prompt: 'Produk aktif saya yang mana kehabisan stok? Tunjukkan senarai dan bantu saya tambah stok atau matikan yang tidak akan ditambah.',
+        prompt: 'Produk aktif saya yang mana kehabisan stok? Tanya saya berapa banyak setiap satu (satu senarai) dan kemas kini stok sekali gus; untuk yang tidak akan ditambah, tawarkan untuk menukarnya kepada draf.',
     }),
     low_stock: (v) => ({
         title: `${v.count} produk hampir habis`,
@@ -168,7 +168,7 @@ const MS: Record<ShopTodoKind, (v: TodoTextVars) => TodoText> = {
     products_ai_review: (v) => ({
         title: `${v.count} draf AI menunggu semakan`,
         detail: 'Produk yang dibuat oleh AI dan belum dijual sehingga anda menyemaknya.',
-        prompt: `Saya ada ${v.count} draf produk menunggu semakan. Tunjukkan apa yang kurang pada setiap satu supaya saya boleh menerbitkannya.`,
+        prompt: `Saya ada ${v.count} draf produk menunggu semakan. Tunjukkan apa yang kurang pada setiap satu (stok, harga, gambar), tanya saya sekali gus, dan sediakannya supaya saya boleh menerbitkannya.`,
     }),
     discounts_expiring: (v) => ({
         title: `${v.count} kod diskaun tamat dalam ${EXPIRING_WITHIN_DAYS} hari`,
@@ -216,6 +216,12 @@ export function isShopTodoKind(value: unknown): value is ShopTodoKind {
     return typeof value === 'string' && (SHOP_TODO_KINDS as readonly string[]).includes(value)
 }
 
+/** The copilot message that starts "finish my store": ask for stock / prices / real photos in one go, then set them up in one card. */
+export const FINISH_STORE_PROMPT: Record<TodoLocale, string> = {
+    en: 'Help me finish my store. Look at my products that were made by AI, have no stock or no price, or only have stock photos. Ask me once for the missing stock and prices (one list) and for real photos, then set everything up in one go.',
+    ms: 'Bantu saya siapkan kedai saya. Lihat produk saya yang dibuat oleh AI, tiada stok atau harga, atau hanya ada gambar stok. Tanya saya sekali untuk stok dan harga yang kurang (satu senarai) dan gambar sebenar, kemudian sediakan semuanya sekali gus.',
+}
+
 /**
  * The fixed message a reminder link (`?todo=<kind>`) puts in the copilot box. The link carries only the kind, never text,
  * so a crafted link cannot choose what the copilot is asked. No numbers (the link does not know how many are waiting).
@@ -233,9 +239,11 @@ const LINK_PROMPT: Partial<Record<ShopTodoKind, Record<TodoLocale, string>>> = {
         en: `Some confirmed orders are still not shipped after more than ${SHIP_AFTER_HOURS} hours. Show me which ones and help me get them shipped.`,
         ms: `Ada pesanan yang disahkan masih belum dihantar selepas lebih ${SHIP_AFTER_HOURS} jam. Tunjukkan yang mana dan bantu saya menghantarnya.`,
     },
-    products_ai_review: {
-        en: 'I have product drafts waiting for my review. Show me what is missing on each so I can publish them.',
-        ms: 'Saya ada draf produk menunggu semakan. Tunjukkan apa yang kurang pada setiap satu supaya saya boleh menerbitkannya.',
+    // the builder's "Finish your shop" link lands here: its products are on sale already, so this starts the finish flow
+    products_ai_review: FINISH_STORE_PROMPT,
+    out_of_stock: {
+        en: 'Some of my live products are out of stock. Ask me how many I have of each (one list), then update the stock in one go.',
+        ms: 'Sesetengah produk aktif saya kehabisan stok. Tanya saya berapa banyak setiap satu (satu senarai), kemudian kemas kini stok sekali gus.',
     },
     leads_waiting: {
         en: `I have contact messages nobody has answered for over ${LEAD_WAIT_HOURS} hours. Help me see who is waiting and what they asked.`,
@@ -245,4 +253,88 @@ const LINK_PROMPT: Partial<Record<ShopTodoKind, Record<TodoLocale, string>>> = {
 
 export function todoLinkPrompt(kind: ShopTodoKind, locale: TodoLocale): string {
     return LINK_PROMPT[kind]?.[locale] ?? todoText(kind, locale, { count: 0 }).prompt
+}
+
+// ── selling setup: what stops the shop from being ready to sell (the copilot's `setup` list; not part of the To do card) ──
+
+export type ShopSetupKind = 'payments_cod_only' | 'business_info_missing' | 'custom_domain_missing' | 'products_stock_photos' | 'products_setup'
+
+export const SHOP_SETUP_KINDS: readonly ShopSetupKind[] = ['products_setup', 'products_stock_photos', 'payments_cod_only', 'business_info_missing', 'custom_domain_missing']
+
+export interface SetupTextVars {
+    count: number
+    /** payments: cash on delivery is the only method on / no method is on at all */
+    codOn?: boolean
+    /** payments: Stripe onboarding is complete (so card / FPX can be switched on) */
+    stripeConnected?: boolean
+    /** business info: what is missing, in the fixed order phone, address, hours */
+    missing?: Array<'phone' | 'address' | 'hours'>
+    /** products_setup breakdown */
+    noStock?: number
+    noPrice?: number
+}
+
+const SETUP_PART: Record<TodoLocale, Record<'phone' | 'address' | 'hours', string>> = {
+    en: { phone: 'phone number', address: 'address', hours: 'opening hours' },
+    ms: { phone: 'nombor telefon', address: 'alamat', hours: 'waktu buka' },
+}
+
+const SETUP_EN: Record<ShopSetupKind, (v: SetupTextVars) => TodoText> = {
+    products_setup: (v) => ({
+        title: `${v.count} live ${plural(v.count, 'product has', 'products have')} no stock or no price`,
+        detail: [v.noStock ? `${v.noStock} with 0 in stock` : '', v.noPrice ? `${v.noPrice} with a price of 0` : ''].filter(Boolean).join(', ') + '. Buyers cannot order them.',
+        prompt: FINISH_STORE_PROMPT.en,
+    }),
+    products_stock_photos: (v) => ({
+        title: `${v.count} live ${plural(v.count, 'product shows', 'products show')} stock or AI pictures`,
+        detail: 'Buyers see pictures that are not your real products.',
+        prompt: FINISH_STORE_PROMPT.en,
+    }),
+    payments_cod_only: (v) => ({
+        title: v.codOn === false ? 'No way to pay is switched on' : 'Buyers can only pay cash on delivery',
+        detail: v.stripeConnected ? 'Card, FPX, e-wallets and bank transfer are switched off.' : 'Card, FPX, e-wallets and bank transfer are switched off, and online payments are not connected yet.',
+        prompt: 'My shop takes cash on delivery only. Tell me what I need to set up to accept cards, FPX, e-wallets or bank transfer, and where to do it.',
+    }),
+    business_info_missing: (v) => ({
+        title: `Business details missing: ${(v.missing ?? []).map((part) => SETUP_PART.en[part]).join(', ')}`,
+        detail: 'Buyers and search engines look for these on your website.',
+        prompt: 'Which business details are missing on my website (phone number, address, opening hours)? Tell me where to fill each one in.',
+    }),
+    custom_domain_missing: () => ({
+        title: 'No custom domain yet',
+        detail: 'Your shop only has its free address. Your own domain looks more trusted.',
+        prompt: 'How do I connect my own domain to my shop?',
+    }),
+}
+
+const SETUP_MS: Record<ShopSetupKind, (v: SetupTextVars) => TodoText> = {
+    products_setup: (v) => ({
+        title: `${v.count} produk aktif tiada stok atau harga`,
+        detail: [v.noStock ? `${v.noStock} dengan stok 0` : '', v.noPrice ? `${v.noPrice} dengan harga 0` : ''].filter(Boolean).join(', ') + '. Pembeli tidak boleh menempahnya.',
+        prompt: FINISH_STORE_PROMPT.ms,
+    }),
+    products_stock_photos: (v) => ({
+        title: `${v.count} produk aktif menunjukkan gambar stok atau AI`,
+        detail: 'Pembeli nampak gambar yang bukan produk sebenar anda.',
+        prompt: FINISH_STORE_PROMPT.ms,
+    }),
+    payments_cod_only: (v) => ({
+        title: v.codOn === false ? 'Tiada cara pembayaran diaktifkan' : 'Pembeli hanya boleh bayar tunai semasa penghantaran',
+        detail: v.stripeConnected ? 'Kad, FPX, e-dompet dan pindahan bank dimatikan.' : 'Kad, FPX, e-dompet dan pindahan bank dimatikan, dan pembayaran dalam talian belum disambungkan.',
+        prompt: 'Kedai saya hanya terima bayaran tunai semasa penghantaran. Beritahu saya apa yang perlu disediakan untuk menerima kad, FPX, e-dompet atau pindahan bank, dan di mana.',
+    }),
+    business_info_missing: (v) => ({
+        title: `Maklumat perniagaan belum lengkap: ${(v.missing ?? []).map((part) => SETUP_PART.ms[part]).join(', ')}`,
+        detail: 'Pembeli dan enjin carian mencarinya di laman web anda.',
+        prompt: 'Maklumat perniagaan mana yang tiada di laman web saya (nombor telefon, alamat, waktu buka)? Beritahu saya di mana untuk mengisi setiap satu.',
+    }),
+    custom_domain_missing: () => ({
+        title: 'Belum ada domain sendiri',
+        detail: 'Kedai anda hanya ada alamat percuma. Domain sendiri nampak lebih dipercayai.',
+        prompt: 'Bagaimana untuk sambungkan domain saya sendiri ke kedai saya?',
+    }),
+}
+
+export function setupText(kind: ShopSetupKind, locale: TodoLocale, vars: SetupTextVars): TodoText {
+    return (locale === 'ms' ? SETUP_MS : SETUP_EN)[kind](vars)
 }

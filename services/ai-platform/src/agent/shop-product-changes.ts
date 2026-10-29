@@ -26,7 +26,7 @@ import {
 export interface ShopBuildError {
 	error: string;
 	/** tool error code; the default is the tool's own ("no_change", "not_allowed") */
-	code?: "not_ready";
+	code?: "not_ready" | "too_many_new_photos";
 }
 
 /** A photo as the applier receives it: `existing` ones are already on the product (keep, reorder). */

@@ -120,7 +120,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                             collapsed ? 'lg:pl-[64px]' : 'lg:pl-[246px] 2xl:pl-[250px]'
                         )}
                     >
-                        <div className="p-4 sm:p-6 md:p-8">
+                        <div className="dash-content-gutter p-4 sm:p-6 md:p-8">
                             {showNoWebsiteGuard ? <DashboardEmptyState /> : children}
                         </div>
                     </main>

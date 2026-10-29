@@ -107,10 +107,15 @@ function unwrapId(value: unknown): string | number | null {
     return typeof value === 'string' || typeof value === 'number' ? value : null
 }
 
-/** Tenant ids the signed-in user belongs to, first = their default workspace (same rule as Blogs/Products). */
+/**
+ * Tenant ids the signed-in user is an ACTIVE member of, first = their default workspace (same rule as
+ * Blogs/Products). A pending or suspended membership gives no upload into, and no stock edit of, that shop's
+ * library; a membership without a status is active (the field's default, as in Tenants.ts).
+ */
 function memberTenantIds(user: unknown): Array<string | number> {
-    const entries = (user as { tenants?: Array<{ tenant?: unknown }> } | null | undefined)?.tenants ?? []
+    const entries = (user as { tenants?: Array<{ tenant?: unknown; status?: string | null }> } | null | undefined)?.tenants ?? []
     return entries.flatMap((entry) => {
+        if ((entry?.status ?? 'active') !== 'active') return []
         const id = unwrapId(entry?.tenant)
         return id == null ? [] : [id]
     })

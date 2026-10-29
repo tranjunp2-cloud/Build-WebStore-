@@ -146,11 +146,15 @@ describe('generateBlocks — name extraction', () => {
     })
 })
 
-describe('generateBlocks — contact email normalization', () => {
-    it('generates normalized email from business name', () => {
+describe('generateBlocks — contact details', () => {
+    // TC-AIAUD-162: the last-resort path knows only a name; it must not invent a phone, email or address
+    it('TC-AIAUD-162: leaves phone, email and address empty instead of inventing them', () => {
         const result = generateBlocks('Create a website called "My Cafe Shop"')
         const contactBlock = result.blocks.find(b => b.blockType === 'contact')
-        expect(contactBlock?.email).toMatch(/^hello@[a-z0-9]+\.com$/)
+        expect(contactBlock?.email ?? null).toBeNull()
+        expect(contactBlock?.phone).toBe('')
+        expect(contactBlock?.address).toBe('')
+        expect(JSON.stringify(result)).not.toMatch(/12-345 6789|hello@mycafeshop/)
     })
 })
 
@@ -204,7 +208,8 @@ describe('generateBlocks — Payload field name compliance', () => {
         expect(foundFaq).toBeDefined()
         expect(foundFaq).toHaveProperty('faqs')
         expect(Array.isArray(foundFaq!.faqs)).toBe(true)
-        expect((foundFaq!.faqs as unknown[]).length).toBeGreaterThan(0)
+        // #2103 A1: the legacy safety net invents no Q&A — the array exists but is empty
+        expect(foundFaq!.faqs).toEqual([])
         // Should NOT have legacy `items` field
         expect(foundFaq).not.toHaveProperty('items')
     })
@@ -243,22 +248,20 @@ describe('generateBlocks — industry-aware block selection', () => {
         expect(blockTypes).not.toContain('menu-display') // GH-1024 — hidden
     })
 
-    it('restaurant menu-food has non-empty categories with items', () => {
+    it('restaurant menu-food carries no invented dishes or prices (#2103 A1/A2)', () => {
         const result = generateBlocks('Create a website for a restaurant', 12345)
         const menu = result.blocks.find(b => b.blockType === 'menu-food') as Record<string, unknown> | undefined
         expect(menu).toBeDefined()
-        const categories = menu!.categories as Array<{ items: unknown[] }>
-        expect(Array.isArray(categories)).toBe(true)
-        expect(categories.length).toBeGreaterThan(0)
-        expect(categories[0]!.items.length).toBeGreaterThan(0)
+        expect(menu!.categories).toEqual([])
     })
 
-    it('restaurant review-cards has non-empty reviews array', () => {
+    it('restaurant review-cards has no invented reviewers, ratings or review count (#2103 A1)', () => {
         const result = generateBlocks('Create a website for a restaurant', 12345)
         const reviews = result.blocks.find(b => b.blockType === 'review-cards') as Record<string, unknown> | undefined
         expect(reviews).toBeDefined()
-        expect(Array.isArray(reviews!.reviews)).toBe(true)
-        expect((reviews!.reviews as unknown[]).length).toBeGreaterThan(0)
+        expect(reviews!.reviews).toEqual([])
+        expect(reviews!.showAverage).toBe(false)
+        expect(reviews!.totalReviewCount).toBeUndefined()
     })
 
     it('ecommerce fallback includes products-grid + review-cards', () => {

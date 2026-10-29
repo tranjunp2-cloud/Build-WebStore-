@@ -1053,8 +1053,8 @@ afterEach(() => {
             expect(result).toBe(true)
         })
         expect(saveBodies).toEqual([
-            { contactInfo: { email: failedEmail } },
-            { contactInfo: { phone: nextPhone } },
+            { contactInfo: { email: failedEmail }, saveId: expect.any(String) },
+            { contactInfo: { phone: nextPhone }, saveId: expect.any(String) },
         ])
         expect(settingsPanelHarness.latestProps?.site?.contactInfo).toEqual({
             phone: nextPhone,
@@ -1150,8 +1150,8 @@ afterEach(() => {
             expect(result).toBe(true)
         })
         expect(saveBodies).toEqual([
-            { contactInfo: { email: 'first@example.com' } },
-            { contactInfo: { phone: '+60 12-222 2222' } },
+            { contactInfo: { email: 'first@example.com' }, saveId: expect.any(String) },
+            { contactInfo: { phone: '+60 12-222 2222' }, saveId: expect.any(String) },
         ])
     })
 
@@ -1325,7 +1325,7 @@ afterEach(() => {
         expect(failedResult).toBe(false)
         expect(retryResult).toBe(true)
         expect(saveBodies).toEqual([
-            { contactInfo: { email: 'second@example.com' } },
+            { contactInfo: { email: 'second@example.com' }, saveId: expect.any(String) },
         ])
     })
 

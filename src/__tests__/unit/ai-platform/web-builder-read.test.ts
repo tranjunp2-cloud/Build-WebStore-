@@ -152,10 +152,22 @@ describe('readSite — site access and other views [TC-AIWB-02]', () => {
         expect(hero?.variants).toContain('centered')
     })
 
+    it('TC-AIAUD-199: the section and catalog views say variants are names only (no layout per screen size is claimed)', async () => {
+        const block = (await readSite(OWNER, { view: 'block', siteId: String(SITE_ID), pageId: String(PAGE_ID), blockId: '00000000-0000-4000-8000-0000000000b1' })) as { variants: string[]; variantsNote: string }
+        const catalog = (await readSite(OWNER, { view: 'catalog', siteId: String(SITE_ID) })) as { variantsNote: string }
+
+        expect(block.variants.length).toBeGreaterThan(0)
+        for (const note of [block.variantsNote, catalog.variantsNote]) {
+            expect(note).toMatch(/names only/)
+            expect(note).toMatch(/phone or a desktop/)
+            expect(note).toMatch(/do not offer a variant as a way to get a layout/)
+        }
+    })
+
     it('lists the store products of the workspace for product sections', async () => {
         const result = (await readSite(OWNER, { view: 'products', siteId: String(SITE_ID), query: 'batik' })) as { products: Array<{ id: string; name: string }>; note: string }
 
-        expect(result.products).toEqual([{ id: '1', name: 'Kain batik', price: 120, status: 'published' }])
+        expect(result.products).toEqual([{ id: '1', name: 'Kain batik', price: 120, status: 'published', stock: null, inStock: null, hasPhoto: false }])
         expect(result.note).toMatch(/selectedProductIds/)
     })
 })

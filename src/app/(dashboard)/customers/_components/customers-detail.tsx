@@ -14,6 +14,7 @@ import { useAgentRecordSync } from '@/lib/agent-changes/use-agent-record-sync'
 import { AgentChangedNotice, SaveConflictNotice } from '@/components/agent/agent-changed-notice'
 import { useSaveVersion } from '@/lib/save-version/use-save-version'
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
+import { SaveBarLift } from '@/components/agent/save-bar-lift'
 
 type Tab = 'default' | 'orders'
 export type EditableFields = Pick<ShopCustomerRecord, 'name' | 'rank' | 'notes'>
@@ -222,9 +223,11 @@ export function CustomersDetail({ customer }: Props) {
                 (sidebar + p-8 gutter) at lg+. */}
             {activeTab === 'default' && dirty && (
                 <div
+                    data-save-bar=""
                     className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"
                     style={{ background: 'var(--save-bar-bg)', boxShadow: 'var(--save-bar-shadow)' }}
                 >
+                    <SaveBarLift />
                     <div className="flex items-center gap-2 text-[13px]">
                         <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />
                         <span className="text-amber-600 dark:text-amber-300 font-medium">{cd.unsaved}</span>

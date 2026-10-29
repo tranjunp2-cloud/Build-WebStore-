@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { merchantUserMessage, selectedLine } from "./merchant-tools";
+import { replyLanguageNote } from "./message-language";
 
 // TC-AIWB-61 — Ask AI on an element: the user turn names exactly what the
 // merchant picked (kind, section id, path, what it says now) so the copilot
@@ -21,7 +22,7 @@ describe("Selected on the page [TC-AIWB-61]", () => {
 		const lines = pinned.split("\n");
 		expect(lines[0]).toMatch(/^Context: /);
 		expect(lines[1]).toMatch(/^Selected on the page/);
-		expect(pinned.endsWith("\n\nHấp dẫn hơn")).toBe(true);
+		expect(pinned.endsWith(`\n\nHấp dẫn hơn\n\n${replyLanguageNote("Vietnamese")}`)).toBe(true);
 
 		const unpinned = merchantUserMessage({ today: "2026-10-21", elements: [button] }, "Hấp dẫn hơn");
 		expect(unpinned).not.toContain("Selected on the page");

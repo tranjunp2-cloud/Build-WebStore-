@@ -557,12 +557,39 @@ export const QuestionOptionSchema = z.object({
 });
 export type QuestionOption = z.infer<typeof QuestionOptionSchema>;
 
-export const QuestionKindSchema = z.enum(["family", "attribute", "variants", "images", "choice"]);
+/** Most rows one quantities question holds (and one answer may carry). */
+export const MAX_QUESTION_ROWS = 20;
+/** Largest number one quantities row accepts (the product stock limit). */
+export const MAX_QUESTION_NUMBER = 1_000_000;
+
+/** A quantity as typed: not negative, at most two decimals (sen). Whether decimals are allowed at all is the question's (`decimals`). */
+export const QuantitySchema = z
+	.number()
+	.min(0)
+	.max(MAX_QUESTION_NUMBER)
+	.refine((n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, { message: "At most two decimals." });
+
+/** One line of a quantities question: the item to give a number for. */
+export const QuestionRowSchema = z.object({
+	id: z.string().min(1).max(60),
+	label: z.string().min(1).max(160),
+	suggested: z.number().min(0).max(MAX_QUESTION_NUMBER).optional(),
+});
+export type QuestionRow = z.infer<typeof QuestionRowSchema>;
+
+export const QuestionKindSchema = z.enum(["family", "attribute", "variants", "images", "choice", "quantities"]);
 export type QuestionKind = z.infer<typeof QuestionKindSchema>;
+
+/**
+ * The kind as a READER takes it (an older client or service meeting a question kind added later, or a stored run
+ * written by a newer deploy): an unknown kind becomes "choice" instead of failing the whole run / thread, so the
+ * card still renders (a choice, or a text box when it has no options) and a deploy order never breaks a chat.
+ */
+const ReadQuestionKindSchema = QuestionKindSchema.catch("choice");
 
 export const AgentQuestionSchema = z.object({
 	id: z.string().min(1).max(80),
-	kind: QuestionKindSchema,
+	kind: ReadQuestionKindSchema,
 	/** short field name for the answered row, e.g. "Family", "Fit" */
 	label: z.string().min(1).max(80),
 	title: z.string().min(1).max(200),
@@ -579,6 +606,12 @@ export const AgentQuestionSchema = z.object({
 	allowSkip: z.boolean().default(true),
 	/** picture questions: the merchant may upload files straight into the answer */
 	allowUpload: z.boolean().optional(),
+	/** quantities questions: one whole-number input per row (`suggested` = a number from the shop's own data, never invented) */
+	rows: z.array(QuestionRowSchema).max(MAX_QUESTION_ROWS).optional(),
+	/** quantities questions: what is counted, e.g. "pcs" or "RM" (shown next to every input) */
+	unit: z.string().max(20).optional(),
+	/** quantities questions: true = amounts with up to two decimals (prices); absent / false = whole numbers (stock) */
+	decimals: z.boolean().optional(),
 });
 export type AgentQuestion = z.infer<typeof AgentQuestionSchema>;
 
@@ -587,11 +620,13 @@ export type AnswerSource = z.infer<typeof AnswerSourceSchema>;
 
 export const AnsweredQuestionSchema = z.object({
 	questionId: z.string().min(1).max(80),
-	kind: QuestionKindSchema,
+	kind: ReadQuestionKindSchema,
 	label: z.string().min(1).max(80),
 	values: z.array(z.string().max(200)).max(60).default([]),
 	/** display text of the answer */
 	display: z.string().max(400),
+	/** quantities questions: the numbers given, keyed by row id (a row left empty is absent) */
+	rows: z.record(z.string(), QuantitySchema).optional(),
 	source: AnswerSourceSchema,
 	confidence: z.number().min(0).max(1).optional(),
 });
@@ -615,9 +650,16 @@ export const AnswerInputSchema = z
 		questionId: z.string().min(1).max(80),
 		values: z.array(z.string().min(1).max(200)).max(60).optional(),
 		text: z.string().trim().min(1).max(500).optional(),
+		/** quantities questions: numbers (0 or more) keyed by row id; a row left empty is left out */
+		rows: z
+			.record(z.string().min(1).max(60), QuantitySchema)
+			.refine((rows) => Object.keys(rows).length <= MAX_QUESTION_ROWS, { message: `At most ${MAX_QUESTION_ROWS} rows.` })
+			.optional(),
 		skip: z.boolean().optional(),
 	})
-	.refine((a) => a.skip || (a.values?.length ?? 0) > 0 || a.text, { message: "Pick an option, type an answer or skip." });
+	.refine((a) => a.skip || (a.values?.length ?? 0) > 0 || a.text || Object.keys(a.rows ?? {}).length > 0, {
+		message: "Pick an option, type an answer, fill in the numbers or skip.",
+	});
 export type AnswerInput = z.infer<typeof AnswerInputSchema>;
 
 /**

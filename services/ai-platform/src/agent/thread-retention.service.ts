@@ -9,13 +9,15 @@ import { STALE_RUN_ERROR } from "./stale-run";
 export const THREAD_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 /** Run starts (quota rows) are kept this long; the widest quota window is a day. */
 export const RUN_START_KEEP_MS = 2 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** What one sweep did: threads (with their runs and change sets) deleted, and stuck runs closed. */
 export type SweepCounts = PurgeCounts & { staleRuns: number };
 
 /**
  * Retention: threads idle longer than AI_THREAD_RETENTION_DAYS are deleted with
- * their runs and change sets, on boot and then hourly. Usage-ledger rows
+ * their runs and change sets (in batches, see `purgeThreadsInactiveSince`), on boot and then hourly;
+ * cached decisions older than AI_DECISION_CACHE_TTL_DAYS go too. Usage-ledger rows
  * (ai_usage_events — no content) are kept. List/get already hide expired
  * threads, so the sweep only reclaims storage.
  *
@@ -35,7 +37,8 @@ export class ThreadRetentionService implements OnApplicationBootstrap, OnApplica
 	constructor(
 		@Inject(AGENT_STORE) private readonly store: AgentStore,
 		private readonly threads: AgentThreadService,
-		@Inject(ENV) private readonly env: Pick<Env, "VERCEL" | "AI_RUN_MAX_RUNNING_MS">,
+		// AI_DECISION_CACHE_TTL_DAYS always comes with the parsed env (default 7); absent (a partial test env): no decision pruning
+		@Inject(ENV) private readonly env: Pick<Env, "VERCEL" | "AI_RUN_MAX_RUNNING_MS"> & Partial<Pick<Env, "AI_DECISION_CACHE_TTL_DAYS">>,
 	) {}
 
 	onApplicationBootstrap(): void {
@@ -58,6 +61,10 @@ export class ThreadRetentionService implements OnApplicationBootstrap, OnApplica
 			if (files) this.logger.log(`retention sweep deleted ${files} attachment(s)`);
 			// the quota only looks back a day; starts stay through chat deletes until then
 			await this.store.pruneRunStarts(new Date(now.getTime() - RUN_START_KEEP_MS));
+			// cached decisions are never read past their TTL (decision.service): drop them
+			const ttlDays = this.env.AI_DECISION_CACHE_TTL_DAYS;
+			const decisions = ttlDays ? await this.store.pruneDecisions(new Date(now.getTime() - ttlDays * DAY_MS)) : 0;
+			if (decisions) this.logger.log(`retention sweep deleted ${decisions} cached decision(s)`);
 			const maxRunningMs = runMaxRunningMs(this.env);
 			const staleRuns = await this.store.failStaleRuns(new Date(now.getTime() - maxRunningMs), STALE_RUN_ERROR, now);
 			if (staleRuns) this.logger.warn(`retention sweep closed ${staleRuns} run(s) stuck running for over ${Math.round(maxRunningMs / 1000)} s`);

@@ -108,6 +108,11 @@ function toChangeSet(raw: unknown, runUserId: string | null): ChangeSet {
 /** The change set's run (same org): who asked for it. */
 const runOfChangeSet = and(eq(aiRuns.id, aiChangeSets.runId), eq(aiRuns.organizationId, aiChangeSets.organizationId));
 
+/** A run of this shop, or one without a tenant (shops sharing an organization never see each other's). */
+function ofTenant(tenantId: string): SQL {
+	return or(isNull(aiRuns.tenantId), eq(aiRuns.tenantId, tenantId)) as SQL;
+}
+
 /** The owner's threads still inside retention. */
 function liveThreadOf(owner: ThreadOwner, activeSince: Date) {
 	return and(eq(aiThreads.organizationId, owner.organizationId), eq(aiThreads.userId, owner.userId), gte(aiThreads.updatedAt, activeSince));
@@ -122,6 +127,17 @@ function ownedThread(owner: ThreadOwner, id: string) {
 }
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/** Rows a retention pass deletes per transaction (each id is one bind parameter; Postgres allows 65 535). */
+export const RETENTION_BATCH = 500;
+
+/** `$1, $2, …` for an `IN (…)` list. */
+function idList(ids: readonly string[]): SQL {
+	return sql.join(
+		ids.map((id) => sql`${id}`),
+		sql`, `,
+	);
+}
 
 /** Starts and queue checks of one org run one at a time (transaction-scoped advisory lock). */
 async function lockRunStarts(tx: Tx, organizationId: string): Promise<void> {
@@ -144,8 +160,9 @@ async function readSlots(tx: Tx, organizationId: string, windows: RunStartWindow
 		user_name: string | null;
 		started_at: string | Date;
 		pending: boolean;
+		tenant_id: string | null;
 	}>(sql`SELECT r.id AS run_id, r.user_id, r.thread_id, t.title, r.run ->> 'prompt' AS prompt, s.user_name,
-			COALESCE((r.run ->> 'startedAt')::timestamptz, r.created_at) AS started_at, false AS pending
+			COALESCE((r.run ->> 'startedAt')::timestamptz, r.created_at) AS started_at, false AS pending, r.tenant_id
 		FROM ai_runs r
 		LEFT JOIN ai_threads t ON t.id = r.thread_id AND t.organization_id = r.organization_id
 		LEFT JOIN ai_run_starts s ON s.run_id = r.id
@@ -153,7 +170,7 @@ async function readSlots(tx: Tx, organizationId: string, windows: RunStartWindow
 			AND r.status IN ('planning', 'running', 'applying')
 			AND r.updated_at >= ${at(windows.runningSince)}
 		UNION ALL
-		SELECT s.run_id, s.user_id, s.thread_id, NULL, NULL, s.user_name, s.created_at, true
+		SELECT s.run_id, s.user_id, s.thread_id, NULL, NULL, s.user_name, s.created_at, true, NULL
 		FROM ai_run_starts s
 		WHERE s.organization_id = ${organizationId}
 			AND NOT s.queued
@@ -181,6 +198,7 @@ async function readSlots(tx: Tx, organizationId: string, windows: RunStartWindow
 			userName: row.user_name,
 			startedAt: new Date(row.started_at),
 			pending: Boolean(row.pending),
+			tenantId: row.tenant_id ?? null,
 		})),
 		queue: queue.rows.map((row) => ({ runId: row.run_id, userId: row.user_id, queuedAt: new Date(row.created_at) })),
 	};
@@ -212,9 +230,68 @@ export class DrizzleAgentStore implements AgentStore {
 			.where(and(eq(aiRuns.id, run.id), eq(aiRuns.organizationId, organizationId)));
 	}
 
-	async getRun(organizationId: string, id: string, userId?: string): Promise<AgentRun | null> {
+	async saveRunIfStatus(organizationId: string, run: AgentRun, from: readonly AgentRun["status"][]): Promise<boolean> {
+		if (from.length === 0) return false;
+		const rows = await this.db
+			.update(aiRuns)
+			.set({ status: run.status, run, updatedAt: new Date() })
+			.where(and(eq(aiRuns.id, run.id), eq(aiRuns.organizationId, organizationId), inArray(aiRuns.status, [...from])))
+			.returning({ id: aiRuns.id });
+		return rows.length > 0;
+	}
+
+	async settleRunStatus(
+		organizationId: string,
+		runId: string,
+		status: AgentRun["status"],
+		finishedAt: string,
+		from: readonly AgentRun["status"][],
+	): Promise<boolean> {
+		if (from.length === 0) return false;
+		const rows = await this.db
+			.update(aiRuns)
+			.set({
+				status,
+				// only the status and the end time: the rest stays as the run's driver last wrote it
+				run: sql`jsonb_set(jsonb_set(${aiRuns.run}, '{status}', to_jsonb(${status}::text)), '{finishedAt}', to_jsonb(${finishedAt}::text))`,
+				updatedAt: new Date(),
+			})
+			.where(and(eq(aiRuns.id, runId), eq(aiRuns.organizationId, organizationId), inArray(aiRuns.status, [...from])))
+			.returning({ id: aiRuns.id });
+		return rows.length > 0;
+	}
+
+	async claimAwaitingInput(organizationId: string, runId: string, userId: string, now: Date): Promise<RunWithState | null> {
+		const newer = alias(aiRuns, "newer_run");
+		const [row] = await this.db
+			.update(aiRuns)
+			.set({ status: "running", run: sql`jsonb_set(${aiRuns.run}, '{status}', '"running"')`, updatedAt: now })
+			.where(
+				and(
+					eq(aiRuns.id, runId),
+					eq(aiRuns.organizationId, organizationId),
+					eq(aiRuns.userId, userId),
+					eq(aiRuns.status, "awaiting_input"),
+					// a question left open when the merchant sent another message in the chat is no longer answered
+					or(
+						isNull(aiRuns.threadId),
+						notExists(
+							this.db
+								.select({ one: sql`1` })
+								.from(newer)
+								.where(and(eq(newer.threadId, aiRuns.threadId), gt(newer.createdAt, aiRuns.createdAt))),
+						),
+					),
+				),
+			)
+			.returning({ run: aiRuns.run, state: aiRuns.state, userMessage: aiRuns.userMessage });
+		return row ? { run: AgentRunSchema.parse(row.run), state: row.state, userMessage: row.userMessage } : null;
+	}
+
+	async getRun(organizationId: string, id: string, userId?: string, tenantId?: string): Promise<AgentRun | null> {
 		const conditions = [eq(aiRuns.id, id), eq(aiRuns.organizationId, organizationId)];
 		if (userId) conditions.push(eq(aiRuns.userId, userId));
+		if (tenantId) conditions.push(ofTenant(tenantId));
 		const [row] = await this.db
 			.select({ run: aiRuns.run })
 			.from(aiRuns)
@@ -365,18 +442,19 @@ export class DrizzleAgentStore implements AgentStore {
 
 	async getChangeSet(organizationId: string, id: string): Promise<StoredChangeSet | null> {
 		const [row] = await this.db
-			.select({ changeSet: aiChangeSets.changeSet, claimedAt: aiChangeSets.claimedAt, runUserId: aiRuns.userId })
+			.select({ changeSet: aiChangeSets.changeSet, claimedAt: aiChangeSets.claimedAt, runUserId: aiRuns.userId, tenantId: aiRuns.tenantId })
 			.from(aiChangeSets)
 			.leftJoin(aiRuns, runOfChangeSet)
 			.where(and(eq(aiChangeSets.id, id), eq(aiChangeSets.organizationId, organizationId)))
 			.limit(1);
-		return row ? { changeSet: toChangeSet(row.changeSet, row.runUserId), claimedAt: row.claimedAt } : null;
+		return row ? { changeSet: toChangeSet(row.changeSet, row.runUserId), claimedAt: row.claimedAt, tenantId: row.tenantId ?? null } : null;
 	}
 
 	async listChangeSets(organizationId: string, query: ChangeSetListQuery) {
 		const conditions = [eq(aiChangeSets.organizationId, organizationId)];
 		if (query.status) conditions.push(eq(aiChangeSets.status, query.status));
 		if (query.requestedBy) conditions.push(eq(aiRuns.userId, query.requestedBy));
+		if (query.tenantId) conditions.push(ofTenant(query.tenantId));
 		const rows = await this.db
 			.select({ changeSet: aiChangeSets.changeSet, runUserId: aiRuns.userId })
 			.from(aiChangeSets)
@@ -528,12 +606,12 @@ export class DrizzleAgentStore implements AgentStore {
 
 	async listThreadChangeSets(organizationId: string, threadId: string): Promise<StoredChangeSet[]> {
 		const rows = await this.db
-			.select({ changeSet: aiChangeSets.changeSet, claimedAt: aiChangeSets.claimedAt, runUserId: aiRuns.userId })
+			.select({ changeSet: aiChangeSets.changeSet, claimedAt: aiChangeSets.claimedAt, runUserId: aiRuns.userId, tenantId: aiRuns.tenantId })
 			.from(aiChangeSets)
 			.innerJoin(aiRuns, eq(aiRuns.id, aiChangeSets.runId))
 			.where(and(eq(aiChangeSets.organizationId, organizationId), eq(aiRuns.threadId, threadId)))
 			.orderBy(asc(aiChangeSets.createdAt));
-		return rows.map((row) => ({ changeSet: toChangeSet(row.changeSet, row.runUserId), claimedAt: row.claimedAt }));
+		return rows.map((row) => ({ changeSet: toChangeSet(row.changeSet, row.runUserId), claimedAt: row.claimedAt, tenantId: row.tenantId ?? null }));
 	}
 
 	async deleteThread(owner: ThreadOwner, id: string, claimedSince: Date): Promise<DeleteThreadOutcome> {
@@ -570,30 +648,44 @@ export class DrizzleAgentStore implements AgentStore {
 	}
 
 	async purgeThreadsInactiveSince(before: Date): Promise<PurgeCounts> {
-		return this.db.transaction(async (tx) => {
-			const threads = await tx
-				.delete(aiThreads)
-				.where(lt(aiThreads.updatedAt, before))
-				.returning({ id: aiThreads.id });
-			const threadIds = threads.map((row) => row.id);
-			const orphaned = and(
-				isNotNull(aiRuns.threadId),
-				notExists(tx.select({ one: sql`1` }).from(aiThreads).where(eq(aiThreads.id, aiRuns.threadId))),
-			);
-			const runIds = (
-				await tx
-					.select({ id: aiRuns.id })
-					.from(aiRuns)
-					.where(threadIds.length > 0 ? or(inArray(aiRuns.threadId, threadIds), orphaned) : orphaned)
-			).map((row) => row.id);
-			if (runIds.length === 0) return { threads: threadIds.length, runs: 0, changeSets: 0 };
-			const changeSets = await tx
-				.delete(aiChangeSets)
-				.where(inArray(aiChangeSets.runId, runIds))
-				.returning({ id: aiChangeSets.id });
-			const runs = await tx.delete(aiRuns).where(inArray(aiRuns.id, runIds)).returning({ id: aiRuns.id });
-			return { threads: threadIds.length, runs: runs.length, changeSets: changeSets.length };
-		});
+		const counts: PurgeCounts = { threads: 0, runs: 0, changeSets: 0 };
+		const add = (batch: PurgeCounts) => {
+			counts.threads += batch.threads;
+			counts.runs += batch.runs;
+			counts.changeSets += batch.changeSets;
+		};
+		// RETENTION_BATCH ids per transaction (bounded bind parameters and lock time), until a short batch:
+		// idle threads with their runs' change sets and runs, then runs orphaned by a thread deleted mid-start
+		for (let found = RETENTION_BATCH; found === RETENTION_BATCH; ) {
+			found = await this.db.transaction(async (tx) => {
+				const picked = await tx.execute<{ id: string }>(
+					sql`SELECT id FROM ai_threads WHERE updated_at < ${before.toISOString()}::timestamptz ORDER BY updated_at LIMIT ${RETENTION_BATCH} FOR UPDATE`,
+				);
+				const ids = picked.rows.map((row) => row.id);
+				if (ids.length === 0) return 0;
+				const list = idList(ids);
+				const changeSets = await tx.execute(sql`DELETE FROM ai_change_sets WHERE run_id IN (SELECT id FROM ai_runs WHERE thread_id IN (${list}))`);
+				const runs = await tx.execute(sql`DELETE FROM ai_runs WHERE thread_id IN (${list})`);
+				const threads = await tx.execute(sql`DELETE FROM ai_threads WHERE id IN (${list})`);
+				add({ threads: threads.rowCount ?? 0, runs: runs.rowCount ?? 0, changeSets: changeSets.rowCount ?? 0 });
+				return ids.length;
+			});
+		}
+		for (let found = RETENTION_BATCH; found === RETENTION_BATCH; ) {
+			found = await this.db.transaction(async (tx) => {
+				const picked = await tx.execute<{ id: string }>(
+					sql`SELECT r.id FROM ai_runs r WHERE r.thread_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ai_threads t WHERE t.id = r.thread_id) LIMIT ${RETENTION_BATCH} FOR UPDATE OF r`,
+				);
+				const ids = picked.rows.map((row) => row.id);
+				if (ids.length === 0) return 0;
+				const list = idList(ids);
+				const changeSets = await tx.execute(sql`DELETE FROM ai_change_sets WHERE run_id IN (${list})`);
+				const runs = await tx.execute(sql`DELETE FROM ai_runs WHERE id IN (${list})`);
+				add({ threads: 0, runs: runs.rowCount ?? 0, changeSets: changeSets.rowCount ?? 0 });
+				return ids.length;
+			});
+		}
+		return counts;
 	}
 
 	async failStaleRuns(staleBefore: Date, error: string, now: Date = new Date()): Promise<number> {
@@ -777,11 +869,11 @@ export class DrizzleAgentStore implements AgentStore {
 		return toWorkState(row);
 	}
 
-	async saveRunState(organizationId: string, runId: string, state: unknown): Promise<void> {
+	async saveRunState(organizationId: string, runId: string, state: unknown, onlyWhile?: AgentRun["status"]): Promise<void> {
 		await this.db
 			.update(aiRuns)
 			.set({ state: state ?? null, updatedAt: new Date() })
-			.where(and(eq(aiRuns.id, runId), eq(aiRuns.organizationId, organizationId)));
+			.where(and(eq(aiRuns.id, runId), eq(aiRuns.organizationId, organizationId), ...(onlyWhile ? [eq(aiRuns.status, onlyWhile)] : [])));
 	}
 
 	async getRunWithState(organizationId: string, runId: string, userId: string): Promise<RunWithState | null> {
@@ -896,5 +988,10 @@ export class DrizzleAgentStore implements AgentStore {
 			.insert(aiDecisions)
 			.values(values)
 			.onConflictDoUpdate({ target: [aiDecisions.organizationId, aiDecisions.fingerprint], set: decision });
+	}
+
+	async pruneDecisions(before: Date): Promise<number> {
+		const result = await this.db.delete(aiDecisions).where(lt(aiDecisions.createdAt, before));
+		return result.rowCount ?? 0;
 	}
 }

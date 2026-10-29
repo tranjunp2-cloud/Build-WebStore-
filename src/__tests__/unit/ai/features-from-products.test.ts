@@ -9,6 +9,8 @@
 
 import { describe, it, expect } from 'vitest'
 import { composeFallbackResult } from '@/lib/ai/fallback-adapter'
+import { buildGenerationFacts } from '@/lib/ai/generation-facts'
+import { runWithGenerationFacts } from '@/lib/ai/generation-facts-scope'
 import type { BusinessInfoInput } from '@/lib/ai/system-prompt'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 
@@ -50,7 +52,7 @@ describe('TC-F01-W.03 — features from user products', () => {
     expect(titlesLower.some((t) => t.includes('gyoza'))).toBe(true)
   })
 
-  it('titles wrap products with rotating category-tuned templates', () => {
+  it('titles are the merchant product names themselves — no template claims like "Handmade"/"Signature" (#2103 A1)', () => {
     const info: BusinessInfoInput = {
       businessName: 'Ramen Ichiban',
       industry: 'restaurant',
@@ -59,17 +61,7 @@ describe('TC-F01-W.03 — features from user products', () => {
     }
     const result = composeFallbackResult('ramen restaurant', 42, 'en', info)
     const cards = (findFeaturesBlock(result)?.features as FeatureCard[]) ?? []
-
-    // Restaurant templates: Specialties / Fresh / Handmade / Signature / House / Authentic
-    const restaurantSuffixes = /Specialties|Fresh|Handmade|Signature|House|Authentic/
-    for (const card of cards) {
-      expect(card.title).toMatch(restaurantSuffixes)
-    }
-    // Rotation: 3 cards → 3 different template suffixes (no dupes when products >= 3)
-    const distinctSuffixes = new Set(
-      cards.slice(0, 3).map((c) => c.title.replace(/\s*(Ramen|Sushi|Gyoza)\s*/i, '').trim()),
-    )
-    expect(distinctSuffixes.size).toBe(3)
+    expect(cards.slice(0, 3).map((c) => c.title)).toEqual(['Ramen', 'Sushi', 'Gyoza'])
   })
 
   it('capitalizes product name inside title template', () => {
@@ -81,47 +73,41 @@ describe('TC-F01-W.03 — features from user products', () => {
     }
     const result = composeFallbackResult('malaysian restaurant', 42, 'en', info)
     const cards = (findFeaturesBlock(result)?.features as FeatureCard[]) ?? []
-    // First card uses template[0] = "{P} Specialties" → "Laksa Specialties"
     expect(cards[0]!.title).toContain('Laksa')
     expect(cards[0]!.title).not.toBe('laksa') // capitalized
     expect(cards[1]!.title).toContain('Nasi lemak')
   })
 
-  it('description uses category-tuned template with product name', () => {
+  it('description is the merchant price when typed, else where to find it (no ingredient claims)', () => {
     const info: BusinessInfoInput = {
       businessName: 'Ramen Ichiban',
       industry: 'restaurant',
-      products: 'ramen, sushi',
+      products: 'ramen RM18, sushi',
       shortDescription: 'Japanese food.',
     }
-    const result = composeFallbackResult('ramen restaurant', 42, 'en', info)
+    const facts = buildGenerationFacts({ businessInfo: info })
+    const result = runWithGenerationFacts(facts, () => composeFallbackResult('ramen restaurant', 42, 'en', info))
     const cards = (findFeaturesBlock(result)?.features as FeatureCard[]) ?? []
-    expect(cards[0]!.description.toLowerCase()).toContain('ramen')
-    // restaurant template has "from scratch with locally sourced ingredients"
-    expect(cards[0]!.description.toLowerCase()).toContain('ingredients')
+    expect(cards[0]!.description).toBe('RM 18')
+    expect(cards[1]!.description).toBe('Available at Ramen Ichiban.')
+    expect(JSON.stringify(cards)).not.toMatch(/ingredients|locally sourced|signature/i)
   })
 
-  it('falls back to canned when products < 2', () => {
+  it('falls back to the claim-free trio when products < 2', () => {
     const info: BusinessInfoInput = {
       businessName: 'Solo Kitchen',
       industry: 'restaurant',
       products: 'coffee', // 1 item only
       shortDescription: 'Small kitchen.',
     }
-    // Use "restaurant" prompt to land on the restaurant blueprint (has features block)
     const result = composeFallbackResult('restaurant', 42, 'en', info)
     const features = findFeaturesBlock(result)
     expect(features).toBeDefined()
-    const cards = (features?.features as FeatureCard[]) ?? []
-    // Canned restaurant features: Authentic Recipes, Halal Certified, Fast Delivery
-    const titles = cards.map((c) => c.title)
-    const hasCanned = titles.some((t) =>
-      ['Authentic Recipes', 'Halal Certified', 'Fast Delivery'].includes(t),
-    )
-    expect(hasCanned).toBe(true)
+    const titles = ((features?.features as FeatureCard[]) ?? []).map((c) => c.title)
+    expect(titles).toEqual(['Tell us what you need', 'Easy to reach', 'Made around you'])
   })
 
-  it('falls back to canned when products empty', () => {
+  it('falls back to the claim-free trio when products empty', () => {
     const info: BusinessInfoInput = {
       businessName: 'Empty Inputs',
       industry: 'restaurant',
@@ -130,9 +116,8 @@ describe('TC-F01-W.03 — features from user products', () => {
     }
     const result = composeFallbackResult('restaurant', 42, 'en', info)
     const cards = (findFeaturesBlock(result)?.features as FeatureCard[]) ?? []
-    expect(cards.length).toBeGreaterThan(0)
-    const titles = cards.map((c) => c.title)
-    expect(titles).toContain('Authentic Recipes')
+    expect(cards.map((c) => c.title)).toEqual(['Tell us what you need', 'Easy to reach', 'Made around you'])
+    expect(JSON.stringify(cards)).not.toMatch(/halal|jakim|delivery/i)
   })
 
   it('icons rotate from category-specific pool', () => {

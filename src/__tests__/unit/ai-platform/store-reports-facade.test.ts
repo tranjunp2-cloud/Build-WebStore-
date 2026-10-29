@@ -11,6 +11,7 @@ import type { AgentActor } from '@/lib/ai-platform/context'
 import { handleAgentTool } from '@/lib/ai-platform/agent-tools/handle-agent-tool'
 import { resolveToolActor } from '@/lib/ai-platform/agent-tools/tool-actor'
 import { isAiAgentEnabled } from '@/lib/ai-platform/config'
+import { readShopSetup } from '@/lib/insights/shop-setup'
 import { computeShopTodos } from '@/lib/insights/shop-todo'
 
 const sqlLog = vi.hoisted(() => ({ queries: [] as Array<{ sql: string; params: unknown[] }>, rows: [] as Array<Record<string, unknown>> }))
@@ -18,6 +19,7 @@ const sqlLog = vi.hoisted(() => ({ queries: [] as Array<{ sql: string; params: u
 vi.mock('@/lib/ai-platform/config', () => ({ isAiAgentEnabled: vi.fn(() => true) }))
 vi.mock('@/lib/ai-platform/agent-tools/tool-actor', () => ({ resolveToolActor: vi.fn() }))
 vi.mock('@/lib/insights/shop-todo', () => ({ computeShopTodos: vi.fn() }))
+vi.mock('@/lib/insights/shop-setup', () => ({ readShopSetup: vi.fn() }))
 vi.mock('payload', async () => {
     const { PgDialect: Dialect } = await import('drizzle-orm/pg-core')
     const dialect = new Dialect()
@@ -53,6 +55,7 @@ beforeEach(() => {
     vi.mocked(isAiAgentEnabled).mockReturnValue(true)
     vi.mocked(resolveToolActor).mockReset().mockResolvedValue(OWNER)
     vi.mocked(computeShopTodos).mockReset().mockResolvedValue([])
+    vi.mocked(readShopSetup).mockReset().mockResolvedValue([])
 })
 
 describe('store.reports in the facade [TC-AICP-188]', () => {
@@ -157,8 +160,43 @@ describe('store.todos in the facade [TC-AICP-188]', () => {
     it('says plainly when nothing needs attention', async () => {
         const body = await (await call('store.todos', {})).json()
 
-        expect(body).toMatchObject({ total: 0, allClear: true, items: [] })
+        expect(body).toMatchObject({ total: 0, allClear: true, items: [], setup: [] })
         expect(computeShopTodos).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ locale: 'en', areas: expect.objectContaining({ orders: true, leads: true }) }))
+    })
+
+    it('adds the selling-setup gaps as a separate list, for the same workspace, areas and language [TC-AIAUD-138]', async () => {
+        vi.mocked(resolveToolActor).mockResolvedValue(actorOf({ role: 'custom', permissions: ['products'] }, { locale: 'ms' }))
+        vi.mocked(computeShopTodos).mockResolvedValue([item('low_stock', 2)] as never)
+        vi.mocked(readShopSetup).mockResolvedValue([
+            { id: 'products_setup', kind: 'products_setup', severity: 'high', title: '3 produk', detail: 'd', count: 3, href: '/products', prompt: 'siapkan' },
+        ] as never)
+
+        const body = await (await call('store.todos', { siteId: '9' })).json()
+
+        expect(readShopSetup).toHaveBeenCalledWith(expect.anything(), { tenantId: '4', siteId: '9', locale: 'ms', areas: { orders: false, products: true, builder: false, settings: false, leads: false } })
+        expect(body.setup).toEqual([{ kind: 'products_setup', severity: 'high', title: '3 produk', detail: 'd', count: 3, page: '/products', prompt: 'siapkan' }])
+        // the To do list itself is untouched: no setup kind in its items, and the card's loader never saw the setup read
+        expect(body.items.map((i: { kind: string }) => i.kind)).toEqual(['low_stock'])
+        expect(body).not.toHaveProperty('allClear')
+    })
+
+    it('is not "all clear" while the shop still has setup gaps, even with an empty To do list [TC-AIAUD-138]', async () => {
+        vi.mocked(readShopSetup).mockResolvedValue([{ id: 'custom_domain_missing', kind: 'custom_domain_missing', severity: 'low', title: 't', detail: 'd', count: 1, href: '/settings/domains', prompt: 'p' }] as never)
+
+        const body = await (await call('store.todos', {})).json()
+
+        expect(body).toMatchObject({ total: 0, items: [], setup: [{ kind: 'custom_domain_missing' }] })
+        expect(body).not.toHaveProperty('allClear')
+    })
+
+    it('answers the To do list even when the setup read fails [TC-AIAUD-138]', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        vi.mocked(readShopSetup).mockRejectedValue(new Error('setup down'))
+        vi.mocked(computeShopTodos).mockResolvedValue([item('low_stock', 2)] as never)
+
+        const body = await (await call('store.todos', {})).json()
+
+        expect(body).toMatchObject({ total: 1, setup: [], items: [{ kind: 'low_stock' }] })
     })
 
     it('rejects a malformed site id', async () => {

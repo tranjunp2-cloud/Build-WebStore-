@@ -56,27 +56,31 @@ async function settle(receipt: ApplyReceipt): Promise<Outcome> {
 		if (error instanceof AgentAccessError) return giveUp(error.message);
 		throw error;
 	}
-	let stored;
 	try {
-		stored = ChangeSetSchema.parse(await aiPlatformJson({ method: "GET", path: `/agent/change-sets/${id}`, token }));
+		const stored = ChangeSetSchema.parse(await aiPlatformJson({ method: "GET", path: `/agent/change-sets/${id}`, token }));
+		if (stored.status === state) {
+			await markRecorded(id, state);
+			return "alreadyRecorded";
+		}
+		if (state === "applied" && stored.status === "pending") {
+			await aiPlatformJson({ method: "POST", path: `/agent/change-sets/${id}/decision`, token, body: JSON.stringify({ decision: "approve", note: receipt.note ?? undefined, result: receipt.result }) });
+		} else if (state === "reverted" && stored.status === "applied") {
+			await aiPlatformJson({ method: "POST", path: `/agent/change-sets/${id}/revert`, token, body: JSON.stringify({ result: receipt.result }) });
+		} else {
+			return giveUp(`the card is ${stored.status}`);
+		}
 	} catch (error) {
 		if (error instanceof AiPlatformError && error.status === 404) return giveUp("the change set is gone (chat deleted?)");
+		// the platform's real answer (403 after the approver became a viewer, 422): retrying for 7 days changes nothing
+		if (error instanceof AiPlatformError && isPermanentRefusal(error.status)) return giveUp(`the AI platform refused (${error.status}): ${error.message}`);
 		throw error;
-	}
-	if (stored.status === state) {
-		await markRecorded(id, state);
-		return "alreadyRecorded";
-	}
-	if (state === "applied" && stored.status === "pending") {
-		await aiPlatformJson({ method: "POST", path: `/agent/change-sets/${id}/decision`, token, body: JSON.stringify({ decision: "approve", note: receipt.note ?? undefined, result: receipt.result }) });
-	} else if (state === "reverted" && stored.status === "applied") {
-		await aiPlatformJson({ method: "POST", path: `/agent/change-sets/${id}/revert`, token, body: JSON.stringify({ result: receipt.result }) });
-	} else {
-		return giveUp(`the card is ${stored.status}`);
 	}
 	await markRecorded(id, state);
 	return "recorded";
 }
+
+/** A 4xx other than a timeout (408) or a rate limit (429) won't change on a later run. */
+const isPermanentRefusal = (status: number): boolean => status >= 400 && status < 500 && status !== 408 && status !== 429;
 
 export async function sweepUnrecordedReceipts(options: { now?: Date; budgetMs?: number; limit?: number } = {}): Promise<SweepResult> {
 	const started = Date.now();

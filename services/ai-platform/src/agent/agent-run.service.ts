@@ -37,6 +37,7 @@ import { FlowError, type FlowOutcome, type FlowState, QuestionFlowService } from
 import type { KnownImage, ProductKnowledge, SeenProduct } from "./change-set-builders";
 import { type CampaignState, createCampaignRun } from "./campaign-group";
 import { seesTeamDrafts, stampRequester } from "./change-set-access";
+import { settledStatus } from "./change-set-decision.service";
 import { newId } from "./ids";
 import { type CapabilitySet, effectiveCapabilities } from "./merchant-capabilities";
 import { merchantInstructions } from "./merchant-instructions";
@@ -52,6 +53,7 @@ import {
 	parseSuggestions,
 	type RunFacts,
 	ruleSuggestions,
+	looksDeclined,
 	SUGGEST_NEXT_MAX_TOKENS,
 	SUGGEST_NEXT_SYSTEM,
 	SUGGEST_NEXT_TASK,
@@ -59,12 +61,15 @@ import {
 	suggestMode,
 	suggestUserTurn,
 } from "./suggest-next";
-import { messageLanguage } from "./message-language";
+import { messageLanguage, replyLanguageName, summaryInScriptOf, wrongReplyLanguage } from "./message-language";
+import { REPLY_LANGUAGE_TASK, REPLY_LANGUAGE_TIMEOUT_MS, replyInLanguageOf } from "./reply-language";
+import { picturesSkippedRefusal } from "./pictures-skipped";
 import { intentAnswer, intentForPrompt, type RunIntentInput, resolveIntent } from "./run-intents";
 import { createResultMemory, type ResultMemory, shapeToolResult } from "./tool-results";
 import { groupPurposes, type RoutingState, routedModel, routeGroups, routingEnabled, ToolRouter, USE_TOOLS, useToolsTool } from "./tool-routing";
 import { editingLanguageOf, prepareWithLanguage, readWithLanguage } from "./site-editing-language";
 import { draftTitle, productTitle, threadPreview } from "./thread-memory";
+import { stripInternalMarkers } from "./internal-markers";
 import { itemRecord } from "./receipt-records";
 import { type BudgetStop, budgetLine, RunBudget } from "./run-budget";
 import {
@@ -96,6 +101,11 @@ const PENDING_START_MS = 60_000;
 
 /** Statuses a Stop still changes: working, waiting for a slot, or paused on a question. */
 const STOPPABLE: ReadonlySet<AgentRun["status"]> = new Set(["queued", "planning", "running", "applying", "awaiting_input"]);
+/** Statuses that end a request: saved before they are streamed (see `drive`). */
+const ENDED_STATUSES: ReadonlySet<AgentRun["status"]> = new Set(["applied", "awaiting_approval", "failed", "cancelled"]);
+const ALREADY_ANSWERED = "This question was already answered.";
+/** The run still waits, but a newer message was sent in its chat: the question was left. */
+const QUESTION_LEFT = "This question is no longer open: a newer message was sent in this chat.";
 /** What an owner / admin may stop of a teammate's: only what takes or waits for a slot. */
 const TEAMMATE_STOPPABLE: ReadonlySet<AgentRun["status"]> = new Set(["queued", "planning", "running", "applying"]);
 
@@ -120,6 +130,7 @@ const STEP_PHRASE: Record<string, string> = {
 	Thinking: "step.thinking",
 	"Drafting with your answers": "step.drafting",
 	"Reading your catalog families": "step.families",
+	"Preparing a question": "step.question",
 };
 
 /** What each customer-tool read looks like in the merchant's step list (label + the chat's translated phrase key). */
@@ -229,6 +240,8 @@ interface RunState {
 	tokens?: number;
 	/** tool groups loaded for this run (AI_TOOL_ROUTING); absent = every tool is sent */
 	routing?: RoutingState;
+	/** the merchant skipped a pictures question in this run: no generated pictures unless they ask (pictures-skipped.ts) */
+	picturesSkipped?: boolean;
 }
 
 /** Attachment bytes loaded once per request (every model call of the run reuses them). */
@@ -596,19 +609,35 @@ export class AgentRunService {
 		return new RunBudget(startedAt, this.env.AI_RUN_BUDGET_MS, this.env.AI_RUN_TOKEN_BUDGET);
 	}
 
+	/** The platform's daily spend cap (AI_DAILY_BUDGET_USD): 503 before anything calls a model. */
+	private async assertCanSpend(_ctx: AiRequestContext): Promise<void> {
+		await this.spend?.assertWithinBudget();
+	}
+
 	/**
 	 * The merchant answered the open question: the flow either asks the next
 	 * one (no model call) or returns the `ask_user` result and the run continues.
+	 * The run is claimed first (`awaiting_input` → `running` in one conditional write): a second answer
+	 * (double click, two tabs, a retry) gets 409 and no model call; while it works the chat is busy
+	 * and the stale-run sweep closes it if the process is killed.
 	 */
 	async answer(ctx: AiRequestContext, runId: string, input: AnswerInput, emit: (frame: RunFrame) => void): Promise<AgentRun> {
 		const budget = this.budget(Date.now());
-		const stored = await this.store.getRunWithState(ctx.organizationId, runId, ctx.userId);
-		if (!stored) throw new AgentError("Run not found.", 404);
-		const state = stored.state as RunState | null;
-		if (stored.run.status !== "awaiting_input" || !state?.flow || !this.flows) {
-			throw new AgentError("This question was already answered.", 409);
+		await this.assertCanSpend(ctx);
+		const stored = await this.store.claimAwaitingInput(ctx.organizationId, runId, ctx.userId, new Date());
+		if (!stored) {
+			const current = await this.store.getRun(ctx.organizationId, runId, ctx.userId);
+			if (!current) throw new AgentError("Run not found.", 404);
+			throw new AgentError(current.status === "awaiting_input" ? QUESTION_LEFT : ALREADY_ANSWERED, 409);
 		}
-		let run: AgentRun = { ...stored.run, status: "running" };
+		// the claim undone: the question waits again, as it was (unless a Stop closed it meanwhile)
+		const reopen = () => this.store.saveRunIfStatus(ctx.organizationId, { ...stored.run, status: "awaiting_input" }, ["running"]);
+		const state = stored.state as RunState | null;
+		if (!state?.flow || !this.flows) {
+			await reopen();
+			throw new AgentError(ALREADY_ANSWERED, 409);
+		}
+		let run: AgentRun = stored.run;
 		emit({ type: "run.started", run });
 		if (input.text) state.merchantText += `\n${input.text.toLowerCase()}`;
 		const push = (event: RunEvent) => {
@@ -619,8 +648,24 @@ export class AgentRunService {
 		try {
 			outcome = await this.flows.answer(ctx, run.id, state.flow, input);
 		} catch (error) {
-			if (error instanceof FlowError) throw new AgentError(error.message, 409);
-			throw error;
+			if (error instanceof FlowError) {
+				await reopen();
+				throw new AgentError(error.message, 409);
+			}
+			// anything else ends the run: it must not stay claimed as `running` until the sweep finds it
+			this.logger.warn(`run ${run.id} answer failed: ${error instanceof Error ? error.message : String(error)}`);
+			// saved first, streamed after: a client that sees the run end may send the next message at once, and the chat
+			// stays busy (409 THREAD_BUSY) until the row says otherwise — same rule as `drive`'s held end
+			const failed: RunEvent = { type: "run.status", runId: run.id, status: "failed", error: userFacingError(error, state.language ?? flowLanguage(null, ctx.locale)) };
+			run = reduceRunEvent(run, failed);
+			let saved = run;
+			try {
+				saved = await this.finish(ctx, run);
+			} catch (saveError) {
+				this.logger.warn(`run ${run.id} could not be saved before its failure was sent: ${saveError instanceof Error ? saveError.message : String(saveError)}`);
+			}
+			emit(failed);
+			return saved;
 		}
 		return this.afterFlow(ctx, () => run, state, outcome, emit, push, budget);
 	}
@@ -629,10 +674,11 @@ export class AgentRunService {
 	async searchOptions(ctx: AiRequestContext, runId: string, questionId: string, query: string): Promise<QuestionOption[]> {
 		const stored = await this.store.getRunWithState(ctx.organizationId, runId, ctx.userId);
 		const state = stored?.state as RunState | null;
-		if (!stored || !state?.flow || !this.flows || !query.trim()) return [];
+		if (!stored || stored.run.status !== "awaiting_input" || !state?.flow || !this.flows || !query.trim()) return [];
 		const options = await this.flows.searchOptions(ctx, state.flow, questionId, query.slice(0, 80));
-		// picture searches are remembered so the answer can name what was found
-		if (options.some((o) => o.imageUrl)) await this.store.saveRunState(ctx.organizationId, runId, state);
+		// picture searches are remembered so the answer can name what was found — only while the question is
+		// still open: an answer claimed meanwhile owns the state (this read is older than its run)
+		if (options.some((o) => o.imageUrl)) await this.store.saveRunState(ctx.organizationId, runId, state, "awaiting_input");
 		return options;
 	}
 
@@ -670,6 +716,7 @@ export class AgentRunService {
 		const flow = state.flow as FlowState;
 		// pictures picked or uploaded in a card become usable image ids for the drafts
 		for (const image of flow.picked) if (!state.images.some((i) => i.id === image.id)) state.images.push(image);
+		if (outcome.answers.some((a) => a.kind === "images" && a.source === "skipped")) state.picturesSkipped = true;
 		push({ type: "run.ask", runId, ask: null, answers: outcome.answers });
 		push({
 			type: "run.receipt",
@@ -728,9 +775,30 @@ export class AgentRunService {
 		rawIntent?: RunIntentInput,
 	): Promise<AgentRun> {
 		let run = initial;
+		// The run's end is streamed only after it is saved: a client that sees it end may send the next message at
+		// once, and the chat is busy until the row says otherwise (409 THREAD_BUSY). Suggestions come after it.
+		let heldEnd: RunEvent | null = null;
+		let holdEnd = true;
 		const push = (event: RunEvent) => {
 			run = reduceRunEvent(run, event);
+			if (holdEnd && event.type === "run.status" && ENDED_STATUSES.has(event.status)) {
+				heldEnd = event;
+				return;
+			}
 			emit(event);
+		};
+		/** Saves the ended run, then streams its end (a failed save is logged; `finish` saves again). */
+		const releaseEnd = async () => {
+			holdEnd = false;
+			const end = heldEnd;
+			heldEnd = null;
+			if (!end) return;
+			try {
+				await this.store.saveRun(ctx.organizationId, run);
+			} catch (error) {
+				this.logger.warn(`run ${run.id} could not be saved before its end was sent: ${error instanceof Error ? error.message : String(error)}`);
+			}
+			emit(end);
 		};
 		const step = (status: "running" | "done" | "failed", label = "Drafting your request") =>
 			push({
@@ -766,7 +834,11 @@ export class AgentRunService {
 				if (closed) throw new AgentError("This request already ended, so nothing more is drafted.", 409);
 				// after reading someone else's words (a lead, an order, a file) a card is approved only by a click
 				// who asked (from the signed context, never the model): owners / admins see it as "Asked by …"
-				const changeSet = stampRequester(state.tainted ? fromOutsideText(drafted) : drafted, ctx);
+				// the one-line summary is the model's: in another script than the merchant's message it is replaced
+				const changeSet = stampRequester(
+					state.tainted ? fromOutsideText(drafted) : { ...drafted, summary: summaryInScriptOf(drafted.summary, drafted.title, run.prompt) },
+					ctx,
+				);
 				// the chat was deleted (Start over, history delete) or the run stopped elsewhere: nothing more is staged
 				const status = await this.store.getRunStatus(ctx.organizationId, run.id);
 				if (status === null || status === "cancelled") {
@@ -951,6 +1023,9 @@ export class AgentRunService {
 					if (OUTSIDE_TEXT_CUSTOMER_VIEWS.has(input.view)) state.tainted = true;
 					return read;
 				}, CUSTOMER_READ[input.view].phrase),
+			pendingChanges: async () =>
+				run.threadId ? (await this.store.listThreadChangeSets(ctx.organizationId, run.threadId)).map((stored) => stored.changeSet) : [],
+			siteText: () => ({ request: run.prompt, editingLanguage: editingLanguageOf(run.context) }),
 			sitePrepare: async (kind, input) => {
 				const read = await this.readTool(run.id, push, "site.check", "Checked the latest page", async () => {
 					if (!this.shop?.sitePrepare) throw new Error("unavailable");
@@ -1107,9 +1182,11 @@ export class AgentRunService {
 						}
 						continue;
 					}
-					const lead = result.text.trim();
+					const lead = stripInternalMarkers(result.text);
 					if (lead) push({ type: "run.status", runId: run.id, status: "running", answer: lead });
-					step("running", "Reading your catalog families");
+					// the catalog families are read only to ask about a product's details; any other question just gets prepared
+					const askLabel = parsed.data.purpose === "product_details" ? "Reading your catalog families" : "Preparing a question";
+					step("running", askLabel);
 					const { state: flow, outcome } = await this.flows.start(
 						ctx,
 						run.id,
@@ -1124,7 +1201,7 @@ export class AgentRunService {
 					state.flow = flow;
 					state.asks = (state.asks ?? 0) + 1;
 					state.language ??= flow.language;
-					step("done", "Reading your catalog families");
+					step("done", askLabel);
 					if (flow.product) await this.retitle(ctx, run.threadId, productTitle(flow.product.name, ctx.locale));
 					if (outcome.status === "ask") return this.afterFlow(ctx, () => run, state, outcome, emit, push, budget);
 					// everything answered from the catalog — straight back to the model
@@ -1135,13 +1212,15 @@ export class AgentRunService {
 					state.messages.push(this.toolError(ask.toolCallId, "Questions are not available here; draft with what you know."));
 					continue;
 				}
-				if (!result.text.trim() && !wrapUp && state.modelCalls < MAX_MODEL_CALLS_PER_RUN) {
+				// internal history records the model imitated (staged-draft lines, ids) never reach the merchant
+				const replyText = stripInternalMarkers(result.text);
+				if (!replyText && !wrapUp && state.modelCalls < MAX_MODEL_CALLS_PER_RUN) {
 					// it read (or staged) but ran out of steps before saying anything — let it answer from what it has
 					wrapUp = true;
 					continue;
 				}
 				const answer =
-					result.text.trim() ||
+					(replyText && (await this.inLanguageOfPrompt(run, replyText, abort.signal, budget, ledgerBase))) ||
 					(staged.length > 0 ? "Drafts are ready for your approval below." : "I couldn't draft anything from that.");
 				push({ type: "run.status", runId: run.id, status: staged.length > 0 ? "awaiting_approval" : "applied", answer });
 				break;
@@ -1153,6 +1232,7 @@ export class AgentRunService {
 				// an owner / admin stopped it for another request: the line they left stays on it
 				const note = this.stopNotes.get(run.id) ?? (await this.stopNoteOf(ctx.organizationId, run.id));
 				push({ type: "run.status", runId: run.id, status: staged.length > 0 ? "awaiting_approval" : "cancelled", ...(note ? { error: note } : {}) });
+				await releaseEnd();
 				return this.finish(ctx, run);
 			}
 			this.logger.warn(
@@ -1181,6 +1261,7 @@ export class AgentRunService {
 			this.stopNotes.delete(run.id);
 			this.memories.delete(run.id);
 		}
+		await releaseEnd();
 		// suggestions only while the request still has the time for them
 		const mode = suggestMode(this.env.AI_SUGGEST_MODE);
 		const roomForSuggestions = budget.remainingMs() > SUGGEST_NEXT_TIMEOUT_MS && budget.stop(state.tokens ?? 0) === null;
@@ -1193,7 +1274,9 @@ export class AgentRunService {
 				capabilities,
 			};
 			const fromRules = mode === "rules" ? ruleSuggestions(facts) : [];
-			const suggestions = fromRules.length > 0 ? fromRules : warm ? await this.suggestNext(ctx, run, staged, capabilities, ledgerBase) : [];
+			// a reply that declined (nothing staged) gets rule chips or none: the model offered the very thing declined
+			const declined = staged.length === 0 && looksDeclined(run.answer);
+			const suggestions = fromRules.length > 0 ? fromRules : warm && !declined ? await this.suggestNext(ctx, run, staged, capabilities, ledgerBase) : [];
 			if (suggestions.length > 0) push({ type: "run.status", runId: run.id, status: run.status, suggestions });
 		}
 		return this.finish(ctx, run);
@@ -1231,7 +1314,50 @@ export class AgentRunService {
 		await this.store.saveRun(ctx.organizationId, run);
 		// the run is over: its private state is no longer needed
 		await this.store.saveRunState(ctx.organizationId, run.id, null);
-		return run;
+		if (run.status !== "awaiting_approval") return run;
+		// its cards may all have been decided while it worked (a decision leaves a working run alone): settle now.
+		// Read after the write above, so a decision landing in between settles it itself.
+		const status = settledStatus(await this.store.listRunChangeSets(ctx.organizationId, run.id));
+		if (!status) return run;
+		const finishedAt = run.finishedAt ?? new Date().toISOString();
+		const settled = await this.store.settleRunStatus(ctx.organizationId, run.id, status, finishedAt, ["awaiting_approval"]);
+		return settled ? { ...run, status, finishedAt } : run;
+	}
+
+	/**
+	 * The final reply in the language of the merchant's message. The prompt pins that language, but a long chat in
+	 * another language can still win; when the reply is clearly in another language than a clear message, the fast
+	 * model rewrites it once (no tools). Any failure keeps the model's own reply.
+	 */
+	private async inLanguageOfPrompt(
+		run: AgentRun,
+		reply: string,
+		signal: AbortSignal,
+		budget: { remainingMs(): number },
+		ledgerBase: { organizationId: string; userId: string; surface: "merchant"; task: string; runId: string },
+	): Promise<string> {
+		if (wrongReplyLanguage(run.prompt, reply) === null || budget.remainingMs() <= REPLY_LANGUAGE_TIMEOUT_MS) return reply;
+		const [model] = this.models.resolveChain("fast");
+		if (!model) return reply;
+		const t0 = Date.now();
+		try {
+			const fixed = await replyInLanguageOf({ prompt: run.prompt, reply, model: model.model, abortSignal: signal });
+			await this.ledger.record({
+				...ledgerBase,
+				task: REPLY_LANGUAGE_TASK,
+				provider: model.provider,
+				model: model.modelId,
+				inputTokens: fixed?.inputTokens,
+				outputTokens: fixed?.outputTokens,
+				latencyMs: Date.now() - t0,
+				outcome: fixed ? "ok" : "refused",
+			});
+			if (fixed) this.logger.log(`run ${run.id}: reply rewritten into the language of the message`);
+			return fixed?.text ?? reply;
+		} catch (error) {
+			this.logger.debug(`reply language fix skipped: ${error instanceof Error ? error.message : String(error)}`);
+			return reply;
+		}
 	}
 
 	/**
@@ -1259,6 +1385,7 @@ export class AgentRunService {
 						content: suggestUserTurn({
 							prompt: run.prompt,
 							answer: run.answer ?? "",
+							language: replyLanguageName(run.prompt),
 							staged: staged.map((changeSet) => changeSet.title),
 							abilities: groupPurposes(capabilities),
 						}),
@@ -1314,7 +1441,8 @@ export class AgentRunService {
 	 */
 	async cancel(ctx: AiRequestContext, runId: string): Promise<AgentRun> {
 		const own = await this.store.getRun(ctx.organizationId, runId, ctx.userId);
-		const teammate = own ? null : seesTeamDrafts(ctx) ? await this.store.getRun(ctx.organizationId, runId) : null;
+		// a teammate's run of another shop sharing the organization is not theirs to see (404)
+		const teammate = own ? null : seesTeamDrafts(ctx) ? await this.store.getRun(ctx.organizationId, runId, undefined, ctx.tenantId) : null;
 		const run = own ?? teammate;
 		// someone else's run, finished or not the caller's to stop: the same answer as a missing one
 		if (!run || (teammate && !TEAMMATE_STOPPABLE.has(run.status))) throw new AgentError("Run not found.", 404);
@@ -1328,7 +1456,12 @@ export class AgentRunService {
 			return shown(stopped);
 		}
 		if (!STOPPABLE.has(run.status)) return run;
-		return shown(await this.finish(ctx, stopped));
+		// only while it is still stoppable: a run that finished (or was answered and finished) since the read keeps its end
+		if (!(await this.store.saveRunIfStatus(ctx.organizationId, stopped, [...STOPPABLE]))) {
+			return shown((await this.store.getRun(ctx.organizationId, runId)) ?? run);
+		}
+		await this.store.saveRunState(ctx.organizationId, runId, null);
+		return shown(stopped);
 	}
 
 	/**
@@ -1589,6 +1722,8 @@ export class AgentRunService {
 					phrase: { key: input.count > 1 ? "step.pictures" : "step.picture" },
 				},
 			});
+		const skipped = picturesSkippedRefusal(state.picturesSkipped, state.merchantText);
+		if (skipped) return skipped;
 		if (!this.pictures?.available || !this.shop?.saveGeneratedPicture) {
 			receipt("error", "picture generation unavailable");
 			return { images: [], error: { code: "unavailable", message: "Picture generation is not set up for this shop. Use find_images or ask for an upload." } };

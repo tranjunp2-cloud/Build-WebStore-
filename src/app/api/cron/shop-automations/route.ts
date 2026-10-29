@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { isAiAgentEnabled } from '@/lib/ai-platform/config'
 import { runAutomationBatch } from '@/lib/automations/automation-batch'
 
 export const runtime = 'nodejs'
@@ -27,7 +28,8 @@ const positiveInt = (value: string | null): number | undefined => {
  * GET /api/cron/shop-automations
  * Scheduled reminders for the shop copilot (discount codes ending, stock, orders and messages waiting, weekly
  * website health): one in-app notification per automation per day for each owner / admin, plus the digest email
- * for workspaces that turned it on. Fails closed without a valid CRON_SECRET.
+ * for workspaces that turned it on. Fails closed without a valid CRON_SECRET. Follows the copilot switch: while
+ * the assistant is off (isAiAgentEnabled, e.g. production without AI_AGENT_ENABLED=true) nothing is sent.
  *
  * Optional query: `cursor=<tenantId>` continue after that workspace, `tenant=<id>` one workspace only,
  * `force=1` ignore the "finished today" marker (the day's notifications are still never duplicated).
@@ -36,6 +38,10 @@ const positiveInt = (value: string | null): number | undefined => {
 export async function GET(req: Request) {
     if (!authorized(req.headers.get('authorization'), process.env.CRON_SECRET)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    // The reminders link into the assistant ("/orders?todo=…"), so they only go out where it runs.
+    if (!isAiAgentEnabled()) {
+        return NextResponse.json({ success: true, skipped: 'ai_agent_disabled' })
     }
 
     try {
