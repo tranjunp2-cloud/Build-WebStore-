@@ -55,21 +55,21 @@ export function FeedbackDialog({ context, types = FEEDBACK_TYPES, onClose, submi
                 <DialogContent
                     showCloseButton={false}
                     aria-describedby={done ? undefined : `${uid}-desc`}
-                    // Mobile (<sm): full-height sheet; form scrolls, footer button stays pinned.
-                    className="flex max-h-[90vh] max-w-[480px] flex-col gap-0 overflow-hidden rounded-xl p-0 max-sm:left-0 max-sm:top-0 max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:border-0 max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none"
+                    // Same popup on mobile: 16px side margin, form scrolls, footer stays visible.
+                    className="flex max-h-[90vh] max-w-[480px] max-sm:w-[calc(100%-32px)] flex-col gap-0 overflow-hidden rounded-xl p-0"
                     style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                 >
-                    <div className="flex items-start gap-3 px-6 pb-3 pt-5 max-sm:items-center max-sm:[border-bottom:1px_solid_var(--dash-border)] max-sm:px-4 max-sm:py-3">
+                    <div className="flex items-start gap-3 px-6 pb-3 pt-5">
                         <button
                             type="button"
                             onClick={requestClose}
                             disabled={submitting}
                             aria-label={f.actions.close}
-                            className="order-last rounded text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 max-sm:order-first"
+                            className="order-last rounded text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
                         >
                             <X className="h-5 w-5" />
                         </button>
-                        <DialogTitle className="flex-1 text-lg font-bold leading-7 text-[var(--dash-text)] max-sm:pr-5 max-sm:text-center max-sm:text-base">
+                        <DialogTitle className="flex-1 text-lg font-bold leading-7 text-[var(--dash-text)]">
                             {f.title}
                         </DialogTitle>
                     </div>
@@ -80,9 +80,9 @@ export function FeedbackDialog({ context, types = FEEDBACK_TYPES, onClose, submi
                         </div>
                     ) : (
                         <form onSubmit={onSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
-                            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-4 max-sm:px-4 max-sm:pt-4">
+                            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-4">
                                 <div className="flex flex-col gap-0.5 text-xs leading-4">
-                                    <DialogDescription id={`${uid}-desc`} className="text-xs text-[var(--dash-text-muted)] max-sm:hidden">
+                                    <DialogDescription id={`${uid}-desc`} className="text-xs text-[var(--dash-text-muted)]">
                                         {f.description}
                                     </DialogDescription>
                                     {context.storeName && (
@@ -118,16 +118,16 @@ export function FeedbackDialog({ context, types = FEEDBACK_TYPES, onClose, submi
                                 />
                             </div>
 
-                            <div className="flex items-center justify-end gap-3 [border-top:1px_solid_var(--dash-border)] px-6 py-4 max-sm:px-4">
+                            <div className="flex items-center justify-end gap-3 [border-top:1px_solid_var(--dash-border)] px-6 py-4">
                                 {submitting && (
-                                    <p aria-live="polite" className="mr-auto text-xs text-[var(--dash-text-muted)] max-sm:hidden">
+                                    <p aria-live="polite" className="mr-auto text-xs text-[var(--dash-text-muted)]">
                                         {f.sendingNote}
                                     </p>
                                 )}
-                                <Button type="button" variant="dashSecondary" className="px-4 max-sm:hidden" disabled={submitting} onClick={requestClose}>
+                                <Button type="button" variant="dashSecondary" className="px-4" disabled={submitting} onClick={requestClose}>
                                     {f.actions.cancel}
                                 </Button>
-                                <Button type="submit" variant="dashPrimary" className="px-4 max-sm:h-11 max-sm:flex-1" disabled={submitting}>
+                                <Button type="submit" variant="dashPrimary" className="px-4" disabled={submitting}>
                                     {submitting && <Loader2 aria-hidden className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                                     {submitting ? f.actions.sending : f.actions.send}
                                 </Button>

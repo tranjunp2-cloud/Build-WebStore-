@@ -31,7 +31,7 @@ export function FeedbackTypeControl({ value, onChange, types = FEEDBACK_TYPES, d
             role="radiogroup"
             aria-labelledby={labelledBy}
             onKeyDown={onKeyDown}
-            className="flex gap-1 rounded-xl bg-[hsl(var(--secondary))] p-1"
+            className="flex gap-1 rounded-xl bg-[hsl(var(--secondary))] p-1 max-sm:gap-0.5"
         >
             {types.map((type) => {
                 const selected = type === value
@@ -45,7 +45,7 @@ export function FeedbackTypeControl({ value, onChange, types = FEEDBACK_TYPES, d
                         disabled={disabled}
                         onClick={() => onChange(type)}
                         className={cn(
-                            'h-8 flex-auto whitespace-nowrap rounded-lg px-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed',
+                            'h-8 min-w-0 flex-auto whitespace-nowrap rounded-lg px-2 text-center text-xs transition-colors max-sm:px-1 max-sm:text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed',
                             selected
                                 ? 'bg-[hsl(var(--card))] font-semibold text-[var(--dash-text)] [border:1px_solid_hsl(var(--border))]'
                                 : 'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)]',
