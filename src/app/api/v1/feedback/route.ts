@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { extractTenantId, tenantIdForQuery, withAuth } from '@/lib/auth'
 import { feedbackTypesFor, isFeedbackWindowOpen, lookupTenantInfo } from '@/lib/feedback/feedback-availability'
 import { claimFeedbackKey, feedbackGuardKey, getFeedbackBlockSeconds, recordFeedbackSubmit } from '@/lib/feedback/feedback-spam-guard'
@@ -64,9 +64,9 @@ export const POST = withAuth(async (user, request) => {
         // Lark cannot tell us a retry from a new submit, so we remember the key: a retry does not count.
         if (await claimFeedbackKey(key.data)) {
             await recordFeedbackSubmit(guardKey)
-            // Group card is best effort and only for the first claim of a key (a retry must not post twice).
-            // notifyNewFeedback never throws, so a Lark failure cannot fail the user's submission.
-            await notifyNewFeedback({ recordId, appToken, tableId, fields })
+            // Group card: best effort, after the response, and only for the first claim of a key (a retry must
+            // not post twice). notifyNewFeedback never throws, so Lark can neither delay nor fail the submission.
+            after(() => notifyNewFeedback({ recordId, appToken, tableId, fields }))
         }
         return NextResponse.json({ feedbackId })
     } catch (err) {

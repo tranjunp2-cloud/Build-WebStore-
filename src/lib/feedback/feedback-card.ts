@@ -96,9 +96,10 @@ export function buildFeedbackCard(d: FeedbackCardData) {
             title: { tag: 'plain_text', content: `[${d.environment}] ${closed ? `[${d.status}] ` : ''}${d.feedbackId} · ${d.type}` },
         },
         elements: [
-            { tag: 'div', fields: facts.map(([label, value]) => ({ is_short: true, text: { tag: 'lark_md', content: `**${label}**\n${md(value)}` } })) },
+            // User-supplied text (store, reporter, details) goes in plain_text so it can never render as markup or a mention.
+            { tag: 'div', fields: facts.map(([label, value]) => ({ is_short: true, text: { tag: 'plain_text', content: `${label}: ${value}` } })) },
             { tag: 'hr' },
-            { tag: 'div', text: { tag: 'lark_md', content: md(preview) } },
+            { tag: 'div', text: { tag: 'plain_text', content: preview } },
             { tag: 'hr' },
             { tag: 'div', text: { tag: 'lark_md', content: statusLine(d, submittedAt) } },
             { tag: 'action', actions: buttons(d) },

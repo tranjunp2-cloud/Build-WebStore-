@@ -24,7 +24,15 @@ export function recordUrl(appToken: string, tableId: string, recordId?: string):
     return recordId ? `${table}&record=${recordId}` : table
 }
 
-/** Escape what Lark card markdown would interpret (also blocks a reporter name injecting an @all mention). */
+const MD_ENTITIES: Record<string, string> = {
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '*': '&#42;', _: '&#95;', '~': '&#126;', '`': '&#96;', '[': '&#91;', ']': '&#93;',
+}
+
+/**
+ * Entity-escape text for a lark_md element. A raw `<` can never survive, so user-supplied text (reporter name,
+ * store name) cannot form an `<at id=all>` mention or a link, whatever escape syntax lark_md understands.
+ * User text on cards goes into plain_text elements; this is for the places that need lark_md (digest lines).
+ */
 export function md(value: unknown): string {
-    return String(value ?? '').replace(/[*_~`[\]<>]/g, '\\$&')
+    return String(value ?? '').replace(/[&<>*_~`[\]]/g, (c) => MD_ENTITIES[c])
 }

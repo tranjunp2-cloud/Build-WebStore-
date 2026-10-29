@@ -12,21 +12,28 @@ import { cardDataFromFields, planAction } from './feedback-card-actions'
 import { ALLOWED_TABLE_IDS } from './feedback-card-config'
 
 export type CallbackResult = { status: number; body: unknown }
-export type Schedule = (work: Promise<unknown>) => void
+/** Runs `work` after the response has been sent. */
+export type Schedule = (work: () => Promise<unknown>) => void
+
+/** Time allowed for the Base read so the 3-second answer holds (token fetch + read). */
+const READ_BUDGET_MS = 2000
 
 const RECORD_ID = /^rec[A-Za-z0-9]{6,30}$/
+
+const asRecord = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {})
+const asString = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
 
 /** Normalises the two callback formats Lark ships: v2 (`schema: "2.0"`) and the older flat v1. */
 function readAction(payload: LarkPayload) {
     const v2 = payload.schema === '2.0'
-    const event = v2 ? payload.event ?? {} : payload
+    const event = v2 ? asRecord(payload.event) : payload
     return {
         v2,
-        appId: v2 ? (payload.header?.app_id as string | undefined) : undefined,
-        operatorOpenId: (v2 ? event.operator?.open_id : event.open_id) as string | undefined,
-        chatId: (v2 ? event.context?.open_chat_id : event.open_chat_id) as string | undefined,
-        callbackToken: v2 ? (event.token as string | undefined) : undefined,
-        value: (event.action?.value ?? {}) as Record<string, unknown>,
+        appId: v2 ? asString(asRecord(payload.header).app_id) : undefined,
+        operatorOpenId: asString(v2 ? asRecord(event.operator).open_id : event.open_id),
+        chatId: asString(v2 ? asRecord(event.context).open_chat_id : event.open_chat_id),
+        callbackToken: v2 ? asString(event.token) : undefined,
+        value: asRecord(asRecord(event.action).value),
     }
 }
 
@@ -101,7 +108,7 @@ export async function handleFeedbackCardCallback(headers: Headers, rawBody: stri
 
     let current: Record<string, unknown>
     try {
-        current = await getBaseRecord(ref)
+        current = await getBaseRecord({ ...ref, timeoutMs: READ_BUDGET_MS })
     } catch (error) {
         logFailure('read', error)
         return answer(v2, { toast: 'Could not read the Base. Try again, or open the record.', type: 'error' })
@@ -119,7 +126,7 @@ export async function handleFeedbackCardCallback(headers: Headers, rawBody: stri
     }
 
     console.info('[feedback-card]', action, recordId) // ids only: no feedback content in logs
-    schedule(writeOrRollBack(ref, plan.patch, current, callbackToken))
+    schedule(() => writeOrRollBack(ref, plan.patch, current, callbackToken))
     const next = cardDataFromFields(ref, { ...current, ...plan.patch })
     return answer(v2, { toast: plan.toast, type: 'success', card: next ? buildFeedbackCard(next) : undefined })
 }

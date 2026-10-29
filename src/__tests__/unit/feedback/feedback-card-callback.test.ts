@@ -19,8 +19,8 @@ const TOKEN = 'vtok-123'
 const ME = 'ou_me'
 const ENV_KEYS = ['LARK_APP_ID', 'LARK_BASE_APP_TOKEN', 'LARK_NOTIFY_CHAT_ID', 'LARK_CALLBACK_VERIFICATION_TOKEN', 'LARK_CALLBACK_ENCRYPT_KEY'] as const
 const saved: Record<string, string | undefined> = {}
-const pending: Promise<unknown>[] = []
-const schedule = (p: Promise<unknown>) => { pending.push(p) }
+const pending: Array<() => Promise<unknown>> = []
+const schedule = (work: () => Promise<unknown>) => { pending.push(work) }
 
 const record = (over: Record<string, unknown> = {}) => ({
     'Feedback ID': 'FB-26-000123', Type: 'Suggestion', Feature: ['Orders'], Details: 'Please add export', Status: 'New', 'Submitted At': Date.now() - 5 * 3_600_000, ...over,
@@ -38,8 +38,11 @@ const callback = (action: string, over: Record<string, unknown> = {}, value: Rec
 })
 const post = (body: unknown, headers: Record<string, string> = {}) =>
     handleFeedbackCardCallback(new Headers(headers), typeof body === 'string' ? body : JSON.stringify(body), schedule)
-const settle = () => Promise.all(pending.splice(0))
-const card = (r: { body: any }) => JSON.stringify(r.body.card.data)
+// Scheduled work runs only when the test lets the response "finish", like after().
+const settle = () => Promise.all(pending.splice(0).map((work) => work()))
+type Answer = { toast: { type: string }; card?: { data: { config: { update_multi: boolean }; header?: { template: string } } } }
+const answerOf = (r: { body: unknown }) => r.body as Answer
+const card = (r: { body: unknown }) => JSON.stringify(answerOf(r).card?.data)
 
 beforeEach(() => {
     for (const k of ENV_KEYS) saved[k] = process.env[k]
@@ -91,10 +94,13 @@ describe('TC-F44-28: card press flow', () => {
     it('Take it: answers with the redrawn card, then writes the Base row', async () => {
         const res = await post(callback('claim'))
         expect(res.status).toBe(200)
-        expect((res.body as any).toast.type).toBe('success')
+        expect(answerOf(res).toast.type).toBe('success')
         expect(card(res)).toContain(`<at id=${ME}></at>`)
         expect(card(res)).toContain('Status:** Triaging')
-        expect((res.body as any).card.data.config.update_multi).toBe(true)
+        // Nothing is written before the response is out: the write is only scheduled.
+        expect(updateBaseRecord).not.toHaveBeenCalled()
+        expect(getBaseRecord).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 2000 }))
+        expect(answerOf(res).card.data.config.update_multi).toBe(true)
         await settle()
         expect(updateBaseRecord).toHaveBeenCalledWith({
             appToken: 'bascn1', tableId: STAGING_TABLE_ID, recordId: 'recABC123', fields: { Owner: [{ id: ME }], Status: 'Triaging' },
@@ -103,8 +109,16 @@ describe('TC-F44-28: card press flow', () => {
     it('a second press on a stale card writes nothing, warns and redraws the real state', async () => {
         vi.mocked(getBaseRecord).mockResolvedValue(record({ Status: 'Resolved' }))
         const res = await post(callback('resolve'))
-        expect((res.body as any).toast.type).toBe('warning')
-        expect((res.body as any).card.data.header.template).toBe('green')
+        expect(answerOf(res).toast.type).toBe('warning')
+        expect(answerOf(res).card.data.header.template).toBe('green')
+        await settle()
+        expect(updateBaseRecord).not.toHaveBeenCalled()
+    })
+    it('a second Take it on a row someone else took writes nothing and warns', async () => {
+        vi.mocked(getBaseRecord).mockResolvedValue(record({ Status: 'Triaging', Owner: [{ id: 'ou_first' }] }))
+        const res = await post(callback('claim'))
+        expect(answerOf(res).toast.type).toBe('warning')
+        expect(card(res)).toContain('<at id=ou_first></at>')
         await settle()
         expect(updateBaseRecord).not.toHaveBeenCalled()
     })
@@ -112,10 +126,10 @@ describe('TC-F44-28: card press flow', () => {
         const prod = await post(callback('claim', {}, { table_id: PRODUCTION_TABLE_ID }))
         expect(card(prod)).toContain('[Production]')
         const v1 = await post({ token: TOKEN, open_id: ME, open_chat_id: 'oc_team', action: { value: { action: 'claim', record_id: 'recABC123', table_id: STAGING_TABLE_ID } } })
-        expect((v1.body as any).header).toBeDefined()
+        expect((v1.body as { header?: unknown }).header).toBeDefined()
     })
     it('rejects a foreign table, a forged record id, an unknown action and another chat without touching the Base', async () => {
-        const toast = async (r: Promise<{ body: any }>) => (await r).body.toast
+        const toast = async (r: Promise<{ body: unknown }>) => answerOf(await r).toast
         expect((await toast(post(callback('claim', {}, { table_id: 'tblOther' })))).type).toBe('error')
         expect((await toast(post(callback('claim', {}, { record_id: '../../apps/x' })))).type).toBe('error')
         expect((await toast(post(callback('delete_everything')))).type).toBe('error')
@@ -125,13 +139,13 @@ describe('TC-F44-28: card press flow', () => {
     it('reports a Base read failure to the presser without writing', async () => {
         vi.mocked(getBaseRecord).mockRejectedValue(new Error('down'))
         const res = await post(callback('claim'))
-        expect((res.body as any).toast.type).toBe('error')
+        expect(answerOf(res).toast.type).toBe('error')
         expect(updateBaseRecord).not.toHaveBeenCalled()
     })
     it('a failed write puts the card back to the row real state via delayed update', async () => {
         vi.mocked(updateBaseRecord).mockRejectedValue(new Error('field not found'))
         const res = await post(callback('claim'))
-        expect((res.body as any).toast.type).toBe('success')
+        expect(answerOf(res).toast.type).toBe('success')
         await settle()
         const [token, rolledBack] = vi.mocked(updateCardAfterCallback).mock.calls[0]
         expect(token).toBe('c-callback-token')

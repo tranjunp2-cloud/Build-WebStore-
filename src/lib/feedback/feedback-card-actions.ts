@@ -28,6 +28,12 @@ export function ownerOf(fields: Fields): string {
 
 /** Returns null when the action does not apply to the row's current status (a stale card). */
 export function planAction(action: string, fields: Fields, operatorOpenId: string, now = Date.now()): ActionPlan | null {
+    const plan = rawPlan(action, fields, operatorOpenId, now)
+    // A press that would change nothing is a stale card / double press: report it instead of writing.
+    return plan && Object.keys(plan.patch).length > 0 ? plan : null
+}
+
+function rawPlan(action: string, fields: Fields, operatorOpenId: string, now: number): ActionPlan | null {
     const status = plain(fields[F.status]) || 'New'
     const closed = (CLOSED_STATUSES as readonly string[]).includes(status)
     const owner = ownerOf(fields)
@@ -37,13 +43,14 @@ export function planAction(action: string, fields: Fields, operatorOpenId: strin
 
     switch (action) {
         case 'claim':
-            if (closed) return null
+            // Only an unclaimed New row can be taken; someone else's claim is not silently taken over.
+            if (status !== 'New' || (owner && owner !== operatorOpenId)) return null
             return {
                 patch: { [F.owner]: me, ...(status === 'New' ? { [F.status]: 'Triaging' } : {}) },
                 toast: "It's yours. Reply, then press Mark replied.",
             }
         case 'replied':
-            if (closed) return null
+            if (closed || (status === 'Waiting on Reporter' && fields[F.firstResponseAt])) return null
             return {
                 patch: {
                     ...claimIfUnowned,

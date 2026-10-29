@@ -32,7 +32,7 @@ Không dùng bảng Lark Production. Dọn bản ghi có store prefix `e2e-f44-`
 | US-F44-01 Gửi phản hồi | 01–14 |
 | US-F44-02 Thông báo in-app | 15–18 |
 | US-F44-03 Đồng bộ Lark Base | 19–24 |
-| US-F44-04 Thẻ nhóm Lark + nút xử lý + nhắc trễ | 25–32 |
+| US-F44-04 Thẻ nhóm Lark + nút xử lý + nhắc trễ | 25–34 |
 
 ## 4. Test cases
 
@@ -70,8 +70,12 @@ Không dùng bảng Lark Production. Dọn bản ghi có store prefix `e2e-f44-`
 | TC-F44-30 | [x] AUTO | Unit | High | **A:** các hàng mở với tuổi / First Response At / trạng thái khác nhau. **A:** chọn danh sách nhắc trễ. **A:** chỉ hàng mở, chưa trả lời, ≥ 24h (cũ nhất trước); mục ">7 ngày" chỉ In Progress / Waiting on Reporter; thứ Hai tính theo giờ MY; thẻ 1 tin có link từng record. |
 | TC-F44-31 | [x] AUTO | API | Critical | **A:** gọi `GET /api/cron/feedback-overdue-digest`. **A:** thiếu/sai CRON_SECRET; không có hàng trễ; env trỏ bảng Staging; thứ Hai/thứ Ba; Lark lỗi. **A:** 401 không đọc Base; im lặng khi trống; Staging → bỏ qua; mục stale chỉ thứ Hai; Lark lỗi → 502. |
 | TC-F44-32 | [ ] MANUAL | Integration | High | **A:** staging + app Lark đã cấu hình callback (`card.action.trigger`) và bot trong nhóm. **A:** gửi feedback, bấm Take it → Mark replied → Resolve → Reopen trên thẻ. **A:** thẻ vẽ lại cho cả nhóm sau mỗi lần bấm, hàng Base đổi đúng (Owner, Status, First Response At, Resolved At); cron prod 09:00 MY gửi thẻ nhắc khi có feedback chưa trả lời > 24h. |
+| TC-F44-33 | [x] AUTO | Unit | Critical | **A:** tên người gửi / tên store / mô tả chứa `<at id=all></at>`. **A:** vẽ thẻ nhóm và thẻ nhắc. **A:** chữ người dùng nằm trong phần tử plain_text (hoặc entity-escape, không còn `<`); thẻ chỉ có @ của Owner thật. |
+| TC-F44-34 | [x] AUTO | Unit | High | **A:** Base có > 200 hàng mở. **A:** đọc danh sách cho thẻ nhắc. **A:** đi theo page_token tới hết; dừng ở trần 1.000 hàng và log cảnh báo. |
 
 ## 5. Còn mở
+
+- Thẻ nhóm Lark: xem mục "Giới hạn đã biết" trong `plans/261029-2236-shared-lark-feedback-base/phase-02-feedback-lark-card-actions.md` (bấm đồng thời: lần ghi sau thắng; không chống phát lại; stale tính từ Submitted At).
 
 - GAP-D12 / D14: chưa có bảng Lark + app Staging → TC-19 → 24 chưa chạy được.
 - GAP-D13: nơi lưu ảnh chưa chốt → TC-09 (ảnh không public) phụ thuộc quyết định này.

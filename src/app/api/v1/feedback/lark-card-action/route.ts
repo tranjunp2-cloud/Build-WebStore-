@@ -16,10 +16,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: { message: 'Body too large.' } }, { status: 413 })
     }
     const raw = await request.text()
-    if (raw.length > MAX_CALLBACK_BODY_BYTES) {
+    if (Buffer.byteLength(raw) > MAX_CALLBACK_BODY_BYTES) {
         return NextResponse.json({ error: { message: 'Body too large.' } }, { status: 413 })
     }
     // The Base write runs after the 3-second answer; `after` keeps the function alive until it finishes.
-    const { status, body } = await handleFeedbackCardCallback(request.headers, raw, (work) => after(() => work))
+    const { status, body } = await handleFeedbackCardCallback(request.headers, raw, (work) => after(work))
     return NextResponse.json(body, { status })
 }

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { cardDataFromFields, planAction } from '@/lib/feedback/feedback-card-actions'
 import { buildFeedbackCard } from '@/lib/feedback/feedback-card'
-import { PRODUCTION_TABLE_ID, STAGING_TABLE_ID } from '@/lib/feedback/feedback-card-config'
+import { md, PRODUCTION_TABLE_ID, STAGING_TABLE_ID } from '@/lib/feedback/feedback-card-config'
 
 const ME = 'ou_me'
 const OTHER = 'ou_other'
@@ -21,15 +21,22 @@ describe('TC-F44-26: card button rules', () => {
     it('Take it: New -> Triaging with the presser as owner', () => {
         expect(planAction('claim', row(), ME, now)?.patch).toEqual({ Owner: [{ id: ME }], Status: 'Triaging' })
     })
-    it('Take it keeps the status when not New, and replaces an existing owner', () => {
-        const patch = planAction('claim', row({ Status: 'In Progress', Owner: [{ id: OTHER }] }), ME, now)?.patch
-        expect(patch).toEqual({ Owner: [{ id: ME }] })
+    it('Take it on a row someone else already took (or past New) changes nothing: stale card / double press', () => {
+        expect(planAction('claim', row({ Status: 'Triaging', Owner: [{ id: OTHER }] }), ME, now)).toBeNull()
+        expect(planAction('claim', row({ Status: 'In Progress' }), ME, now)).toBeNull()
+        expect(planAction('claim', row({ Status: 'New', Owner: [{ id: OTHER }] }), ME, now)).toBeNull()
+    })
+    it('Take it by the current owner of a New row is still allowed', () => {
+        expect(planAction('claim', row({ Owner: [{ id: ME }] }), ME, now)?.patch).toEqual({ Owner: [{ id: ME }], Status: 'Triaging' })
     })
     it('Mark replied: sets First Response At once, Waiting on Reporter, owner only when empty', () => {
         const first = planAction('replied', row(), ME, now)?.patch
         expect(first).toEqual({ Owner: [{ id: ME }], 'First Response At': now, Status: 'Waiting on Reporter' })
-        const again = planAction('replied', row({ Status: 'Waiting on Reporter', 'First Response At': 1, Owner: [{ id: OTHER }] }), ME, now)?.patch
-        expect(again).toEqual({})
+    })
+    it('Mark replied twice (already Waiting on Reporter) changes nothing; any action with an empty patch is null', () => {
+        expect(planAction('replied', row({ Status: 'Waiting on Reporter', 'First Response At': 1, Owner: [{ id: OTHER }] }), ME, now)).toBeNull()
+        const inProgress = row({ Status: 'In Progress', 'First Response At': 1, Owner: [{ id: OTHER }] })
+        expect(planAction('replied', inProgress, ME, now)?.patch).toEqual({ Status: 'Waiting on Reporter' })
     })
     it('Resolve fills First Response At, Resolved At and owner when missing', () => {
         expect(planAction('resolve', row(), ME, now)?.patch).toEqual({
@@ -79,7 +86,18 @@ describe('TC-F44-25: feedback card drawing', () => {
         const json = JSON.stringify(buildFeedbackCard(cardDataFromFields(ref(), row({ Owner: [{ id: OTHER }], 'Submitted At': sub, 'First Response At': sub + 2 * HOUR }))!))
         expect(json).toContain(`<at id=${OTHER}></at>`)
         expect(json).toContain('First reply:** 2h')
-        expect(json).not.toContain('<at id=all>')
-        expect(json).toContain('Demo \\\\*Shop\\\\*')
+        expect(json).toContain('Store: Demo *Shop*') // plain_text: shown literally, never parsed as markup
+    })
+    it('TC-F44-33: user-supplied text can never render as a mention (reporter, store, details, digest)', () => {
+        const evil = '<at id=all></at>'
+        const data = cardDataFromFields(ref(), row({ Reporter: evil, Store: evil, Details: evil, Owner: [{ id: OTHER }] }))!
+        const json = JSON.stringify(buildFeedbackCard(data))
+        // The only mention is the real owner; every user-supplied copy sits in a plain_text element.
+        expect(json.match(/<at /g)).toHaveLength(1 + 3)
+        const card = buildFeedbackCard(data)
+        const lark = JSON.stringify(card.elements.filter((e) => JSON.stringify(e).includes('lark_md')))
+        expect(lark.match(/<at /g)).toHaveLength(1)
+        expect(lark).toContain(`<at id=${OTHER}>`)
+        expect(md(evil)).not.toContain('<')
     })
 })

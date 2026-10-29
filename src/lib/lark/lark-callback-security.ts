@@ -11,7 +11,8 @@ import { createDecipheriv, createHash, timingSafeEqual } from 'node:crypto'
 
 export const MAX_CALLBACK_BODY_BYTES = 64 * 1024
 
-export type LarkPayload = Record<string, any> // shape differs between callback v1 / v2 and is validated by the caller
+/** Shape differs between callback v1 / v2; the caller narrows each field it reads. */
+export type LarkPayload = Record<string, unknown>
 export type OpenResult = { ok: true; payload: LarkPayload } | { ok: false; reason: string }
 
 /** Constant-time string comparison; false on any length mismatch or missing value. */
@@ -68,7 +69,8 @@ export function openPayload(headers: Headers, rawBody: string): OpenResult {
     }
 
     // v2 callbacks carry the token in `header`; v1 and url_verification at the top level.
-    const token = payload?.header?.token ?? payload?.token
+    const header = payload.header && typeof payload.header === 'object' ? (payload.header as Record<string, unknown>) : {}
+    const token = header.token ?? payload.token
     if (!secretsMatch(token, process.env.LARK_CALLBACK_VERIFICATION_TOKEN)) return { ok: false, reason: 'bad-token' }
     return { ok: true, payload }
 }

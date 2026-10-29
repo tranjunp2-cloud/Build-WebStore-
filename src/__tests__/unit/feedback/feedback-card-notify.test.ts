@@ -25,7 +25,7 @@ afterEach(() => {
 describe('TC-F44-29: new feedback card', () => {
     it('posts a card with action buttons to the configured chat, labelled with the environment', async () => {
         expect(await notifyNewFeedback(input(PRODUCTION_TABLE_ID))).toBe(true)
-        const [chat, card] = vi.mocked(sendChatCard).mock.calls[0] as [string, any]
+        const [chat, card] = vi.mocked(sendChatCard).mock.calls[0] as [string, { header: { title: { content: string } } }]
         expect(chat).toBe('oc_team')
         expect(card.header.title.content).toContain('[Production]')
         expect(JSON.stringify(card)).toContain('"action":"claim"')
