@@ -1,7 +1,7 @@
 import type { ImageModel, LanguageModel } from "ai";
 import type { Env } from "../config/env";
 import { createDevCopilotModel } from "./dev-copilot-model";
-import { createImageFactory, createProviderFactory, type ProviderFactory, withAnthropicEffort } from "./providers";
+import { createImageFactory, createProviderFactory, type ProviderFactory, acceptsReasoningEffort, withReasoningEffort } from "./providers";
 
 /** Features ask for a capability tier, never for a model id. */
 /** `quality` is the site generator's tier (whole-page JSON from long composed prompts). */
@@ -67,7 +67,8 @@ export function createModelRegistry(env: Env, vars: Record<string, string | unde
 				if (!factory) continue;
 				const effort = efforts[alias];
 				const model = factory(modelId);
-				resolved.push({ model: provider === "anthropic" && effort ? withAnthropicEffort(model, effort) : model, provider, modelId });
+				const applyEffort = effort != null && acceptsReasoningEffort(provider, modelId, vars);
+				resolved.push({ model: applyEffort ? withReasoningEffort(model, provider, effort) : model, provider, modelId });
 			}
 			if (resolved.length === 0) {
 				throw new ModelUnavailableError(`No configured provider for model alias "${alias}".`);

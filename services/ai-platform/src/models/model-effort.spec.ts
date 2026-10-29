@@ -1,90 +1,133 @@
 import { generateText } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseEnv } from "../config/env";
-import { createModelRegistry } from "./model-registry";
+import { createModelRegistry, type ModelAlias } from "./model-registry";
 
-const baseEnv = {
+const vars = {
 	AI_PLATFORM_DATABASE_URL: "postgres://x/y",
 	AI_PLATFORM_CONTEXT_SECRET: "test-context-secret-at-least-32-characters",
 	ANTHROPIC_API_KEY: "test-key",
 	OPENAI_API_KEY: "test-key",
+	GOOGLE_GENERATIVE_AI_API_KEY: "test-key",
+	DEEPSEEK_API_KEY: "test-key",
+	OPENROUTER_API_KEY: "test-key",
+	AI_COMPAT_LOCAL_BASE_URL: "http://compat.test/v1",
+	AI_COMPAT_LOCAL_API_KEY: "test-key",
 };
 
-/** Captures the JSON body the provider SDK sends and answers like the Anthropic Messages API. */
-function captureAnthropicRequests() {
-	const bodies: Array<Record<string, unknown>> = [];
+type Body = Record<string, unknown> & {
+	output_config?: { effort?: string };
+	reasoning_effort?: string;
+	thinking?: { type?: string };
+	generationConfig?: { thinkingConfig?: { thinkingLevel?: string; thinkingBudget?: number } };
+};
+
+/**
+ * Sends one call through the registry's model for `ref` and returns the JSON body the provider SDK
+ * put on the wire. The fake server answers 500, so the call itself fails; only the request matters.
+ */
+async function requestBodyFor(
+	ref: string,
+	extraEnv: Record<string, string> = {},
+	callReasoning?: "high",
+	alias: ModelAlias = "fast",
+): Promise<Body> {
+	const bodies: string[] = [];
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(async (_url: string, init?: { body?: string }) => {
-			bodies.push(JSON.parse(String(init?.body ?? "{}")));
-			return new Response(
-				JSON.stringify({
-					id: "msg_1",
-					type: "message",
-					role: "assistant",
-					model: "claude-haiku-5-5",
-					content: [{ type: "text", text: "ok" }],
-					stop_reason: "end_turn",
-					usage: { input_tokens: 1, output_tokens: 1 },
-				}),
-				{ status: 200, headers: { "content-type": "application/json" } },
-			);
+			bodies.push(String(init?.body ?? "{}"));
+			return new Response("{}", { status: 500 });
 		}),
 	);
-	return bodies;
+	const key = { fast: "AI_MODEL_FAST", balanced: "AI_MODEL_BALANCED", quality: "AI_MODEL_QUALITY" }[alias];
+	const env = parseEnv({ ...vars, [key]: ref, ...extraEnv });
+	const model = createModelRegistry(env, { ...vars, ...extraEnv }).resolveChain(alias)[0]!.model;
+	await generateText({ model, prompt: "hi", maxRetries: 0, ...(callReasoning ? { reasoning: callReasoning } : {}) }).catch(() => undefined);
+	return JSON.parse(bodies[0] ?? "{}") as Body;
 }
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("per-tier Anthropic effort (AI_EFFORT_*)", () => {
-	it("[TC-AIEFF-01] each tier sends its own effort to the same Haiku model", async () => {
+describe("per-tier reasoning effort for every provider (AI_EFFORT_*)", () => {
+	it("[TC-AIEFF-01] one Haiku model serves every tier with its own effort", async () => {
 		// Arrange
-		const bodies = captureAnthropicRequests();
-		const env = parseEnv({
-			...baseEnv,
-			AI_MODEL_FAST: "anthropic:claude-haiku-5-5",
-			AI_MODEL_BALANCED: "anthropic:claude-haiku-5-5",
-			AI_MODEL_QUALITY: "anthropic:claude-haiku-5-5",
-			AI_EFFORT_FAST: "low",
-			AI_EFFORT_BALANCED: "medium",
-			AI_EFFORT_QUALITY: "high",
-		});
-		const registry = createModelRegistry(env, { ...baseEnv });
+		const tiers = { AI_EFFORT_FAST: "low", AI_EFFORT_BALANCED: "medium", AI_EFFORT_QUALITY: "high" };
 
 		// Act
+		const efforts = [];
 		for (const alias of ["fast", "balanced", "quality"] as const) {
-			await generateText({ model: registry.resolveChain(alias)[0]!.model, prompt: "hi" });
+			const body = await requestBodyFor("anthropic:claude-haiku-5-5", tiers, undefined, alias);
+			efforts.push([body.model, body.output_config?.effort]);
 		}
 
 		// Assert
-		expect(bodies.map((body) => (body.output_config as { effort?: string } | undefined)?.effort)).toEqual(["low", "medium", "high"]);
-		expect(bodies.every((body) => body.model === "claude-haiku-5-5")).toBe(true);
+		expect(efforts).toEqual([
+			["claude-haiku-5-5", "low"],
+			["claude-haiku-5-5", "medium"],
+			["claude-haiku-5-5", "high"],
+		]);
 	});
 
-	it("[TC-AIEFF-02] an unset tier sends no effort (model default) and other providers are untouched", async () => {
-		// Arrange — fast has an effort but its OpenAI candidate must not carry it; balanced has none
-		const env = parseEnv({
-			...baseEnv,
-			AI_MODEL_FAST: "openai:gpt-4.1-nano, anthropic:claude-haiku-5-5",
-			AI_MODEL_BALANCED: "anthropic:claude-haiku-5-5",
-			AI_EFFORT_FAST: "low",
-		});
-		const registry = createModelRegistry(env, { ...baseEnv });
-		const bodies = captureAnthropicRequests();
+	it("[TC-AIEFF-02] each provider receives the tier effort in its own setting", async () => {
+		// Arrange
+		const low = { AI_EFFORT_FAST: "low" };
 
 		// Act
-		const [openai] = registry.resolveChain("fast");
-		await generateText({ model: openai!.model, prompt: "hi" }).catch(() => undefined); // body captured even if the fake reply is not OpenAI-shaped
-		await generateText({ model: registry.resolveChain("balanced")[0]!.model, prompt: "hi" });
+		const anthropic = await requestBodyFor("anthropic:claude-haiku-5-5", low);
+		const openai = await requestBodyFor("openai:gpt-5-mini", low);
+		const gemini3 = await requestBodyFor("google:gemini-3-flash", low);
+		const gemini25 = await requestBodyFor("google:gemini-2.5-flash", low);
+		const deepseek = await requestBodyFor("deepseek:deepseek-chat", low);
+		const openrouter = await requestBodyFor("openrouter:openai/gpt-5-mini", low);
 
 		// Assert
-		expect(openai!.provider).toBe("openai");
-		expect(JSON.stringify(bodies[0])).not.toMatch(/effort/);
-		expect(bodies[1]!.model).toBe("claude-haiku-5-5");
-		expect((bodies[1]!.output_config as { effort?: string } | undefined)?.effort).toBeUndefined();
+		expect(anthropic.output_config?.effort).toBe("low");
+		expect(openai.reasoning_effort).toBe("low");
+		expect(gemini3.generationConfig?.thinkingConfig?.thinkingLevel).toBe("low");
+		expect(gemini25.generationConfig?.thinkingConfig?.thinkingBudget).toBeGreaterThan(0);
+		expect(deepseek.thinking?.type).toBe("enabled");
+		expect(deepseek.reasoning_effort).toBe("low");
+		expect(openrouter.reasoning_effort).toBe("low");
 	});
 
-	it("[TC-AIEFF-03] an unknown effort value is refused at startup", () => {
-		expect(() => parseEnv({ ...baseEnv, AI_EFFORT_QUALITY: "extreme" })).toThrow(/AI_EFFORT_QUALITY/);
+	it("[TC-AIEFF-03] models that would reject it never get an effort", async () => {
+		// Arrange
+		const low = { AI_EFFORT_FAST: "low" };
+
+		// Act — non-reasoning OpenAI models answer 400 to reasoning_effort; compat servers opt in
+		const gpt41 = await requestBodyFor("openai:gpt-4.1-nano", low);
+		const routerLlama = await requestBodyFor("openrouter:meta-llama/llama-3.3-70b-instruct", low);
+		const compat = await requestBodyFor("compat-local:sea-lion", low);
+		const compatOptIn = await requestBodyFor("compat-local:sea-lion", { ...low, AI_COMPAT_LOCAL_REASONING: "true" });
+
+		// Assert
+		expect(JSON.stringify(gpt41)).not.toMatch(/reasoning/);
+		expect(JSON.stringify(routerLlama)).not.toMatch(/reasoning/);
+		expect(JSON.stringify(compat)).not.toMatch(/reasoning/);
+		expect(compatOptIn.reasoning_effort).toBe("low");
+	});
+
+	it("[TC-AIEFF-04] an unset tier keeps each model's default; DeepSeek stays non-thinking", async () => {
+		// Act
+		const anthropic = await requestBodyFor("anthropic:claude-haiku-5-5");
+		const deepseek = await requestBodyFor("deepseek:deepseek-chat");
+
+		// Assert
+		expect(anthropic.output_config?.effort).toBeUndefined();
+		expect(deepseek.thinking?.type).toBe("disabled");
+		expect(deepseek.reasoning_effort).toBeUndefined();
+	});
+
+	it("[TC-AIEFF-05] a call's own reasoning wins over the tier default", async () => {
+		// Act
+		const body = await requestBodyFor("anthropic:claude-haiku-5-5", { AI_EFFORT_FAST: "low" }, "high");
+
+		// Assert
+		expect(body.output_config?.effort).toBe("high");
+	});
+
+	it("[TC-AIEFF-06] an unknown effort value is refused at startup", () => {
+		expect(() => parseEnv({ ...vars, AI_EFFORT_QUALITY: "extreme" })).toThrow(/AI_EFFORT_QUALITY/);
 	});
 });

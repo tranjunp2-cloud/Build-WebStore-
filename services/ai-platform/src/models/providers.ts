@@ -3,7 +3,7 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { defaultSettingsMiddleware, type ImageModel, type LanguageModel, wrapLanguageModel } from "ai";
+import { defaultSettingsMiddleware, type ImageModel, type LanguageModel, type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 
 /** Builds a model for one provider; null = provider not configured in this environment. */
 export type ProviderFactory = ((modelId: string) => LanguageModel) | null;
@@ -37,13 +37,46 @@ const DEEPSEEK_NON_THINKING = defaultSettingsMiddleware({
 	settings: { providerOptions: { deepseek: { thinking: { type: "disabled" } } } },
 });
 
-/** Anthropic `output_config.effort` as a default every call on this model carries (a call's own value wins). */
-export function withAnthropicEffort(model: LanguageModel, effort: "low" | "medium" | "high" | "xhigh" | "max"): LanguageModel {
+/** OpenAI models that take `reasoning_effort` (o-series, gpt-5+ except chat); others reject the parameter. */
+const OPENAI_REASONING_MODEL = /^(?:openai\/)?(?:o\d|gpt-(?:[5-9]|\d{2,}))(?![\w.-]*-chat)/;
+
+/**
+ * Whether a tier effort may be sent to this model. Anthropic, Google and DeepSeek map it for every
+ * current model; OpenAI and OpenRouter only for reasoning models (a non-reasoning model answers 400 to
+ * `reasoning_effort`); an OpenAI-compatible server only when AI_COMPAT_<NAME>_REASONING=true.
+ */
+export function acceptsReasoningEffort(provider: string, modelId: string, vars: Record<string, string | undefined>): boolean {
+	if (provider === "anthropic" || provider === "google" || provider === "deepseek") return true;
+	if (provider === "openai") return OPENAI_REASONING_MODEL.test(modelId);
+	if (provider === "openrouter") return OPENAI_REASONING_MODEL.test(modelId) || /^(?:anthropic|google|deepseek)\//.test(modelId);
+	if (provider.startsWith("compat-")) return vars[`AI_COMPAT_${envKey(provider.slice("compat-".length))}_REASONING`] === "true";
+	return false;
+}
+
+/** Reasoning effort a tier asks for (AI SDK `reasoning`); each provider maps it to its own setting. */
+export type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
+/**
+ * Default `reasoning` for every call on this model (a call's own value wins). The AI SDK maps it per
+ * provider: Anthropic `output_config.effort`, OpenAI / OpenAI-compatible `reasoning_effort` (reasoning
+ * models), Gemini 3 `thinkingLevel` / Gemini 2.5 `thinkingBudget`, DeepSeek thinking + effort.
+ * DeepSeek runs non-thinking by default (DEEPSEEK_NON_THINKING); a tier effort turns thinking on there.
+ */
+export function withReasoningEffort(model: LanguageModel, provider: string, effort: ReasoningEffort): LanguageModel {
 	if (typeof model === "string") return model;
-	return wrapLanguageModel({
-		model,
-		middleware: defaultSettingsMiddleware({ settings: { providerOptions: { anthropic: { effort } } } }),
-	});
+	const middleware: LanguageModelMiddleware = {
+		specificationVersion: "v4",
+		transformParams: async ({ params }) => {
+			const own = params.reasoning != null && params.reasoning !== "provider-default";
+			if (own) return params;
+			const deepseekThinking =
+				provider === "deepseek" && effort !== "none"
+					? { providerOptions: { ...params.providerOptions, deepseek: { ...params.providerOptions?.deepseek, thinking: { type: "enabled" } } } }
+					: {};
+			return { ...params, reasoning: effort, ...deepseekThinking };
+		},
+	};
+	return wrapLanguageModel({ model, middleware });
 }
 
 const KEY_HEADERS = ["authorization", "x-api-key", "x-goog-api-key"];

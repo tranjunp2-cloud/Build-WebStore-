@@ -12,8 +12,8 @@ const ModelRefSchema = z
 		"model refs are provider:model[, provider:model…], e.g. openai:gpt-4.1-mini, anthropic:claude-haiku-4-5",
 	);
 
-/** Anthropic reasoning effort (`output_config.effort`); xhigh/max are lowered by the SDK where a model lacks them. */
-const EffortSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
+/** Reasoning effort (AI SDK `reasoning`); each provider maps it, and lowers levels a model lacks. */
+const EffortSchema = z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
 const EnvSchema = z.object({
 	NODE_ENV: z.string().default("development"),
@@ -83,9 +83,10 @@ const EnvSchema = z.object({
 	/** Picture generation (DAM "Generate", the copilot's generate_image): openai:gpt-image-1 or compat-<name>:<model>. */
 	AI_MODEL_IMAGE: ModelRefSchema.default("openai:gpt-image-1"),
 	/**
-	 * Reasoning effort per tier for Anthropic models (other providers ignore it). Lets one cheap model
-	 * (e.g. claude-haiku-5-5) serve every tier: fast = low, balanced = medium, quality = high.
-	 * Unset = the model's own default (Haiku 5.5 / Opus 5.5: medium; other current models: high).
+	 * Reasoning effort per tier, for every provider of that tier's chain (AI SDK `reasoning`: Anthropic
+	 * effort, OpenAI/compat reasoning_effort, Gemini thinking level/budget, DeepSeek thinking). Lets one
+	 * cheap model serve every tier, e.g. claude-haiku-5-5 with fast = low, balanced = medium, quality = high.
+	 * Unset = each model's own default (DeepSeek stays non-thinking).
 	 */
 	AI_EFFORT_FAST: EffortSchema.optional(),
 	AI_EFFORT_BALANCED: EffortSchema.optional(),
