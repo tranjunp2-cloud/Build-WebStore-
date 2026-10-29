@@ -40,7 +40,7 @@ export const FeedbackAreaSelect = forwardRef<HTMLButtonElement, Props>(function 
             <PopoverAnchor asChild>
             <div
                 className={cn(
-                    'flex min-h-10 w-full items-center gap-1.5 rounded-lg border border-solid border-[hsl(var(--input-border))] bg-[hsl(var(--card))] pl-2 pr-1 transition-colors focus-within:ring-1 focus-within:ring-ring',
+                    'flex min-h-10 w-full items-center gap-1.5 rounded-lg border border-solid border-[hsl(var(--input-border))] bg-[hsl(var(--card))] pl-2 pr-1 transition-colors focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))]',
                     disabled && 'cursor-not-allowed opacity-50',
                     className,
                 )}
@@ -90,7 +90,6 @@ export const FeedbackAreaSelect = forwardRef<HTMLButtonElement, Props>(function 
                             className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
                         >
                             <Checkbox
-                                className="border-solid"
                                 checked={value.includes(area)}
                                 onCheckedChange={(c) => toggle(area, c === true)}
                             />

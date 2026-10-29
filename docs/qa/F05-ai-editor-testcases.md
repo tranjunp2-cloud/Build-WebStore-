@@ -409,6 +409,31 @@ QA found 7 interaction bugs on the real Editor's mobile/compact view (`/editor/[
 | **TC-F05-RT-03** | Unit | Delete dialog / tooltip / toast for Rich text | Shows "Rich text", not "Custom Html" / "custom-html" |
 | **TC-F05-RT-04** | Unit | `getBlockDisplayName` for other block types | Dashes replaced by spaces |
 
+### GH-2107: Block Settings sidebar — block icon, spacing slider, variant chips (16 Cases)
+
+Sidebar phải, tab **Block** / **Menu** / **Global**. Header dùng lucide icon như panel Components; 4 section "Layout & Spacing" (block thường, announcement-bar, feature-comparison, pricing) dùng chung `BlockSpacingControls`; 5 nhóm chip (block variant, header/footer style, color mode, WhatsApp position) dùng chung `VariantChip` (màu primary teal).
+
+| TC-ID | Layer | Description | Assertion | Test file |
+|-------|-------|-------------|-----------|-----------|
+| **TC-GH2107-01** | Unit | Header tab Block cho `hero` | Icon lucide `panel-top`, không có emoji từ `meta.icon` | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-02** | Unit | Header cho block chưa có icon riêng | Fallback icon `puzzle` (giống panel Components) | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-03** | Unit | `VariantChip` active | `type="button"`, `aria-pressed="true"`, token primary, không còn class `blue-*` | `settings-variant-chip.test.tsx` |
+| **TC-GH2107-04** | Unit | `VariantChip` idle + click | `aria-pressed="false"`, hover `--editor-overlay-hover`, gọi `onClick` | `settings-variant-chip.test.tsx` |
+| **TC-GH2107-05** | Unit | Chip variant của block trong SettingsPanel | Trạng thái pressed đúng; click gọi `onBlockFieldChange(idx, 'variant', v)` | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-06** | Unit | Kéo slider rồi thả chuột | Lưu 1 lần; blur sau đó không lưu lặp | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-07** | Unit | Chỉnh slider bằng phím mũi tên | Lưu khi key up | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-08** | Unit | Focus rồi blur, không đổi giá trị | Không lưu | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-09** | Unit | Phần tô màu (fill) | `--fill-ratio` theo giá trị (36 → 0.3) | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-10** | Unit | Label spacing locale `ms` | "Susun atur & jarak", "Jarak atas", "Jarak bawah" | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-11** | Unit | Pricing / Feature comparison / Announcement bar | Đúng 1 section spacing; lưu `blockSpacing` giữ key cũ | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-12** | Unit | Announcement bar chưa có `blockSpacing` | Slider mặc định theo `paddingY` (logic cũ giữ nguyên) | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-13** | Manual | Light + dark: header icon, slider (Hero, Pricing, Feature comparison, Announcement bar), chip (Block / Menu / Global) | Slider có fill teal, track nhìn rõ ở cả 2 mode; chip active teal, hover thấy được, có focus ring | — |
+| **TC-GH2107-14** | Unit | Giá trị đã lưu đổi từ bên ngoài (undo / đổi block), kéo lại mà không focus (Safari) | Vẫn lưu — so với giá trị thật trên block, không dùng giá trị slider tự nhớ | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-15** | Unit | Chip vị trí WhatsApp, locale `ms` | Nhãn "↘ Kanan" / "↙ Kiri" (i18n), không còn "Right" / "Left" cố định | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-16** | Unit | Announcement bar chưa có `blockSpacing`, `paddingY` đổi 12 → 20 | Slider đồng bộ lại theo giá trị mới (20) | `settings-panel-block-settings-gh2107.test.tsx` |
+
+**Đổi test cũ:** `navigation/settings-panel-variant-picker.test.tsx` (TC-NAV-08) chuyển từ kiểm tra class `bg-blue-500/10` sang `aria-pressed` — hành vi không đổi, chỉ đổi màu.
+
 ## 4. Hành Trình E2E UAT Flow
 
 | Bước | Hành Động | Kết Quả Mong Đợi |

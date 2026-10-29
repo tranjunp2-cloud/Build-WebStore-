@@ -112,7 +112,7 @@ THEN  hỏi "Discard what you've entered?" với 2 nút Keep editing / Discard
 - [ ] Server tự gắn context (không hiện trên UI ngoài tên cửa hàng): tenant, user, role, isMigratedStore, URL trang, app version, ngôn ngữ, user agent.
 - [ ] Mã phản hồi `FB-{YY}-{6 số}` sinh ở server, chỉ dùng nội bộ (Lark, Support, dedupe).
 - [ ] Ảnh tải lên riêng từng ảnh (Vercel giới hạn body ~4.5 MB), form chỉ gửi danh sách id ảnh; ảnh không gắn với phản hồi sau 24 giờ thì xoá; kiểm tra magic-byte ở server; ảnh không public (GAP-D13).
-- [ ] Mobile 375px: form full-screen.
+- [ ] Mobile 375px: form là popup căn giữa (không full-screen), tự cuộn.
 
 ### Market Notes
 
