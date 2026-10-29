@@ -56,7 +56,7 @@ export function FeedbackDialog({ context, types = FEEDBACK_TYPES, onClose, submi
                     showCloseButton={false}
                     aria-describedby={done ? undefined : `${uid}-desc`}
                     // Same popup on mobile: 16px side margin, form scrolls, footer stays visible.
-                    className="flex max-h-[90vh] max-w-[480px] max-sm:w-[calc(100%-32px)] flex-col gap-0 overflow-hidden rounded-xl p-0"
+                    className="flex max-h-[90dvh] max-w-[480px] max-sm:w-[calc(100%-32px)] flex-col gap-0 overflow-hidden rounded-xl p-0"
                     style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                 >
                     <div className="flex items-start gap-3 px-6 pb-3 pt-5">
