@@ -104,3 +104,6 @@ coverage/
 
 # Private PW1 migration inputs/artifacts (synthetic test fixtures remain tracked)
 .migration/
+
+# Empty output dir created by services/ai-platform/scripts/vercel-build.mjs
+services/ai-platform/public/

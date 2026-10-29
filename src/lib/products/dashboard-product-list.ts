@@ -47,6 +47,7 @@ async function findProductsBatch(payload: Payload, user: AuthenticatedUser, page
                 alt: true,
             },
             createdAt: true,
+            updatedAt: true,
             hasVariants: true,
             variants: {
                 name: true,

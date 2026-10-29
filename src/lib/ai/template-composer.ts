@@ -22,7 +22,20 @@ import {
 } from './locale-structural-strings'
 import { THEME_MOODS, getCategoryCTA as getMoodCTA, type ThemeMood } from './theme-moods'
 import { getBlogSeeds } from './content/blog-seeds'
-import { pickLogosByCategory } from './content/client-logos-library'
+import {
+  groundedFaq,
+  groundedLogos,
+  groundedPricingPlans,
+  isPlanlessPricing,
+  groundedStats,
+  groundedTeam,
+  groundedTestimonials,
+  groundedLogoHeadline,
+  groundedProductBlurb,
+  groundedServiceBlurb,
+  formatPrice,
+} from './grounded-blocks'
+import { emptyFacts, type GenerationFacts } from './generation-facts'
 import {
   NEUTRAL_FALLBACK_SVG,
   PORTRAIT_FALLBACK_SVG,
@@ -318,47 +331,6 @@ const PRODUCT_FEATURE_ICONS: Record<string, string[]> = {
   travel: ['Map', 'Compass', 'Plane', 'Camera', 'Mountain', 'Globe'],
 }
 
-// Category-tuned TITLE templates for product-derived feature cards. `{P}` is
-// replaced with the capitalized product name, and templates rotate by index
-// so 3 cards never share the same suffix. Matches the spec example format:
-// "Ramen Specialties / Fresh Sushi / Handmade Gyoza".
-const FEATURE_TITLE_TEMPLATES: Record<string, string[]> = {
-  restaurant: ['{P} Specialties', 'Fresh {P}', 'Handmade {P}', 'Signature {P}', 'House {P}', 'Authentic {P}'],
-  fnb: ['Signature {P}', 'Our {P}', 'Fresh {P}', 'House {P}', 'Artisan {P}', 'Daily {P}'],
-  ecommerce: ['Premium {P}', 'Best-Selling {P}', '{P} Collection', '{P} Essentials', 'Curated {P}', 'Exclusive {P}'],
-  beauty: ['Signature {P}', 'Custom {P}', 'Premium {P}', '{P} Treatment', 'Expert {P}', 'Luxury {P}'],
-  health: ['{P} Service', 'Expert {P}', 'Comprehensive {P}', 'Specialist {P}', 'Trusted {P}'],
-  fitness: ['{P} Program', 'Signature {P}', 'Expert {P}', 'Personal {P}', 'Group {P}'],
-  education: ['{P} Program', '{P} Course', 'Comprehensive {P}', 'Expert {P}', 'Intensive {P}'],
-  tech: ['{P} Platform', 'Enterprise {P}', 'Scalable {P}', 'Advanced {P}', 'Cloud {P}'],
-  creative: ['{P} Service', 'Signature {P}', 'Premium {P}', 'Custom {P}', 'Award-winning {P}'],
-  business: ['{P} Advisory', 'Strategic {P}', '{P} Consulting', 'Expert {P}', 'Bespoke {P}'],
-  realestate: ['Featured {P}', 'Exclusive {P}', 'Premium {P}', 'Curated {P}', 'Signature {P}'],
-  events: ['{P} Package', 'Signature {P}', 'Custom {P}', 'Luxury {P}', 'Bespoke {P}'],
-  blog: ['{P} Stories', '{P} Coverage', '{P} Insights', 'Latest {P}', 'In-depth {P}'],
-  travel: ['{P} Experience', 'Guided {P}', 'Signature {P}', 'Curated {P}', 'Adventure {P}'],
-}
-
-// Category-tuned body copy template for a product. `{product}` is replaced
-// with the product name as provided by the user (first letter capitalized).
-// Kept short, benefit-oriented, Malaysia-audience friendly.
-const FEATURE_BODY_TEMPLATES: Record<string, string> = {
-  restaurant: 'Our signature {product} is crafted from scratch with locally sourced ingredients — a guest favorite.',
-  fnb: 'Enjoy our house {product} — freshly made every day using premium ingredients.',
-  ecommerce: 'Shop our best-selling {product} — quality you can feel, delivered across Malaysia.',
-  beauty: 'Experience our signature {product} treatment — personalized for your skin type and goals.',
-  health: 'Our {product} service is delivered by licensed practitioners with modern equipment.',
-  fitness: 'Train smarter with our {product} program — structured for real, lasting results.',
-  education: 'Our {product} program is designed for measurable progress and exam-ready confidence.',
-  tech: 'Ship faster with our {product} — production-ready, battle-tested, fully supported.',
-  creative: 'Our {product} service blends strategy and craft — delivered on time, on brand.',
-  business: 'Our {product} engagement is tailored to your goals, timelines, and budget.',
-  realestate: 'Browse our {product} — hand-picked listings across the Klang Valley.',
-  events: 'Let us handle your {product} — from planning to day-of coordination, covered.',
-  blog: 'Dive into our {product} coverage — curated stories that actually move the needle.',
-  travel: 'Join our {product} experience — local expertise, insider routes, zero guesswork.',
-}
-
 function capitalizeFirst(s: string): string {
   if (!s) return s
   return s.charAt(0).toUpperCase() + s.slice(1)
@@ -379,123 +351,59 @@ function featuresFromProducts(
   category: string,
   maxCards: number,
   language?: string,
+  biz?: BusinessSample,
 ): { icon: string; title: string; description: string }[] {
   const icons = PRODUCT_FEATURE_ICONS[category] ?? PRODUCT_FEATURE_ICONS['business']!
-  const titleTpls = FEATURE_TITLE_TEMPLATES[category] ?? FEATURE_TITLE_TEMPLATES['business']!
-  const bodyTpl = FEATURE_BODY_TEMPLATES[category] ?? FEATURE_BODY_TEMPLATES['business']!
+  const listed = biz?.facts?.products ?? []
 
   return products.slice(0, maxCards).map((product, idx) => {
-    const capitalized = capitalizeFirst(product)
-    const localizedDescription = language === 'ms'
-      ? `${capitalized} disediakan secara teliti oleh pasukan profesional kami mengikut keperluan setiap pelanggan.`
-      : language === 'vi'
-        ? `${capitalized} được đội ngũ chuyên nghiệp của chúng tôi thực hiện tận tâm theo nhu cầu của từng khách hàng.`
-        : bodyTpl.replace('{product}', product)
+    const match = listed.find((p) => p.name.toLowerCase() === product.toLowerCase())
     return {
       icon: icons[idx % icons.length]!,
-      title: language === 'ms' || language === 'vi'
-        ? capitalized
-        : titleTpls[idx % titleTpls.length]!.replace('{P}', capitalized),
-      description: localizedDescription,
+      title: capitalizeFirst(product),
+      // Only what the merchant told us: the product itself, its price if they gave one.
+      description: groundedProductBlurb(biz?.name ?? '', match, language),
     }
   })
 }
 
 export function buildFeatures(biz: BusinessSample, category: string, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
-  type FItem = { icon: string; title: string; description: string; title_ms?: string; description_ms?: string }
-  const featureMap: Record<string, FItem[]> = {
-    restaurant: [
-      { icon: 'Utensils', title: 'Authentic Recipes', description: 'Traditional recipes passed down through generations, using only the freshest local ingredients.', title_ms: 'Resipi Autentik', description_ms: 'Resipi tradisional yang diwarisi turun-temurun, menggunakan bahan-bahan tempatan yang paling segar.' },
-      { icon: 'Award', title: 'Halal Certified', description: 'All our ingredients and preparation methods are JAKIM halal-certified for your peace of mind.', title_ms: 'Bersijil Halal', description_ms: 'Semua bahan dan kaedah penyediaan kami bersijil halal JAKIM untuk ketenangan minda anda.' },
-      { icon: 'Truck', title: 'Fast Delivery', description: 'Available on GrabFood, Foodpanda, and direct ordering with free delivery within 5km.', title_ms: 'Penghantaran Pantas', description_ms: 'Tersedia di GrabFood, Foodpanda, dan tempahan terus dengan penghantaran percuma dalam radius 5km.' },
+  const icons = PRODUCT_FEATURE_ICONS[category] ?? PRODUCT_FEATURE_ICONS['business']!
+  const locale = language?.split('-')[0] ?? 'en'
+
+  // #2103 A1: features come from (1) the merchant's own site import, (2) the products
+  // they listed, else (3) a claim-free trio. Never certifications, SLAs, partners, counts.
+  const neutralCopy: Record<string, Array<{ title: string; description: string }>> = {
+    en: [
+      { title: 'Tell us what you need', description: 'Share your requirements and we will help you choose the right option.' },
+      { title: 'Easy to reach', description: 'Send us a message from the contact page.' },
+      { title: 'Made around you', description: 'Every order or request starts with a conversation about what you want.' },
     ],
-    ecommerce: [
-      { icon: 'ShieldCheck', title: 'Secure Payment', description: 'Pay safely with FPX, credit card, or e-wallets. All transactions are encrypted and protected.', title_ms: 'Pembayaran Selamat', description_ms: 'Bayar dengan selamat menggunakan FPX, kad kredit, atau e-dompet. Semua transaksi dienkripsi dan dilindungi.' },
-      { icon: 'Truck', title: 'Free Shipping', description: 'Enjoy free shipping on orders above RM 150. Express delivery available for RM 10.', title_ms: 'Penghantaran Percuma', description_ms: 'Nikmati penghantaran percuma untuk pesanan melebihi RM 150. Penghantaran ekspres tersedia pada RM 10.' },
-      { icon: 'RefreshCcw', title: '30-Day Returns', description: 'Not satisfied? Return within 30 days for a full refund. No questions asked.', title_ms: 'Pulangan 30 Hari', description_ms: 'Tidak berpuas hati? Pulangkan dalam masa 30 hari untuk bayaran balik penuh. Tanpa soal jawab.' },
+    ms: [
+      { title: 'Beritahu keperluan anda', description: 'Kongsikan keperluan anda dan kami akan membantu memilih pilihan yang sesuai.' },
+      { title: 'Mudah dihubungi', description: 'Hantar mesej kepada kami melalui halaman hubungi.' },
+      { title: 'Disesuaikan untuk anda', description: 'Setiap tempahan bermula dengan perbualan tentang apa yang anda mahu.' },
     ],
-    beauty: [
-      { icon: 'Sparkles', title: 'Premium Products', description: 'We use only halal-certified, dermatologist-tested products from Korea and Japan.', title_ms: 'Produk Premium', description_ms: 'Kami hanya menggunakan produk bersijil halal yang diuji oleh dermatologi dari Korea dan Jepun.' },
-      { icon: 'Clock', title: 'Easy Booking', description: 'Book your appointment online 24/7. Walk-ins welcome but booking guarantees your slot.', title_ms: 'Tempahan Mudah', description_ms: 'Tempah temujanji anda dalam talian 24/7. Pelawat tanpa temu janji dialu-alukan tetapi tempahan menjamin slot anda.' },
-      { icon: 'Heart', title: 'Personalised Care', description: 'Every treatment is customised to your skin type and concerns for the best results.', title_ms: 'Penjagaan Peribadi', description_ms: 'Setiap rawatan disesuaikan dengan jenis kulit dan kebimbangan anda untuk hasil terbaik.' },
-    ],
-    tech: [
-      { icon: 'Zap', title: 'Lightning Fast', description: 'Our infrastructure delivers sub-100ms response times with 99.9% uptime SLA.', title_ms: 'Laju Seperti Kilat', description_ms: 'Infrastruktur kami memberikan masa tindak balas bawah 100ms dengan SLA masa aktif 99.9%.' },
-      { icon: 'Shield', title: 'Enterprise Security', description: 'Bank-grade encryption, SOC 2 compliance, and regular penetration testing.', title_ms: 'Keselamatan Perusahaan', description_ms: 'Enkripsi tahap bank, pematuhan SOC 2, dan ujian penembusan berkala.' },
-      { icon: 'Headphones', title: '24/7 Support', description: 'Our Malaysian support team is available round the clock via chat, email, and phone.', title_ms: 'Sokongan 24/7', description_ms: 'Pasukan sokongan Malaysia kami sedia membantu sepanjang masa melalui sembang, e-mel, dan telefon.' },
-    ],
-    health: [
-      { icon: 'Stethoscope', title: 'Expert Doctors', description: 'Our team of experienced doctors provide comprehensive healthcare for your whole family.', title_ms: 'Doktor Pakar', description_ms: 'Pasukan doktor berpengalaman kami menyediakan penjagaan kesihatan menyeluruh untuk seluruh keluarga anda.' },
-      { icon: 'CreditCard', title: 'Insurance Accepted', description: 'We accept all major insurance panels including Great Eastern, AIA, and Prudential.', title_ms: 'Insurans Diterima', description_ms: 'Kami menerima semua panel insurans utama termasuk Great Eastern, AIA, dan Prudential.' },
-      { icon: 'Clock', title: 'Minimal Wait Time', description: 'Our efficient scheduling ensures you spend less time waiting and more time getting care.', title_ms: 'Masa Menunggu Minimum', description_ms: 'Penjadualan kami yang cekap memastikan anda menghabiskan lebih sedikit masa menunggu dan lebih banyak masa mendapat penjagaan.' },
-    ],
-    education: [
-      { icon: 'GraduationCap', title: 'Proven Results', description: 'Over 90% of our students achieve A grades in their subjects. Results speak for themselves.', title_ms: 'Keputusan Terbukti', description_ms: 'Lebih 90% pelajar kami mencapai gred A dalam mata pelajaran mereka. Keputusan berbicara sendiri.' },
-      { icon: 'Users', title: 'Small Class Sizes', description: 'Maximum 15 students per class ensures personal attention and better learning outcomes.', title_ms: 'Saiz Kelas Kecil', description_ms: 'Maksimum 15 pelajar setiap kelas memastikan perhatian peribadi dan hasil pembelajaran yang lebih baik.' },
-      { icon: 'BookOpen', title: 'Updated Curriculum', description: 'Our materials follow the latest KSSM/KBSM syllabus and SPM exam format.', title_ms: 'Kurikulum Terkini', description_ms: 'Bahan kami mengikuti silibus KSSM/KBSM terkini dan format peperiksaan SPM.' },
-    ],
-    realestate: [
-      { icon: 'Home', title: 'Premium Listings', description: 'Curated selection of the finest properties in KL, PJ, and the Klang Valley.', title_ms: 'Penyenaraian Premium', description_ms: 'Pilihan hartanah terbaik yang dikurasi di KL, PJ, dan Lembah Klang.' },
-      { icon: 'Shield', title: 'Trusted Agent', description: 'Licensed REN with over 10 years of experience and 500+ successful transactions.', title_ms: 'Ejen Dipercayai', description_ms: 'REN berlesen dengan pengalaman lebih 10 tahun dan 500+ transaksi berjaya.' },
-      { icon: 'TrendingUp', title: 'Market Insights', description: 'Get data-driven property valuations and investment advice from our expert team.', title_ms: 'Pandangan Pasaran', description_ms: 'Dapatkan penilaian hartanah berasaskan data dan nasihat pelaburan daripada pasukan pakar kami.' },
-    ],
-    fitness: [
-      { icon: 'Dumbbell', title: 'Expert Trainers', description: 'Certified personal trainers with specialisation in body transformation and sports performance.', title_ms: 'Jurulatih Pakar', description_ms: 'Jurulatih peribadi bertauliah dengan pengkhususan dalam transformasi badan dan prestasi sukan.' },
-      { icon: 'Users', title: 'Group Classes', description: 'Over 30 group classes per week including HIIT, yoga, spin, and boxing.', title_ms: 'Kelas Berkumpulan', description_ms: 'Lebih 30 kelas berkumpulan seminggu termasuk HIIT, yoga, spin, dan tinju.' },
-      { icon: 'Clock', title: 'Flexible Hours', description: 'Open from 6 AM to 11 PM daily. Train on your schedule, not ours.', title_ms: 'Waktu Fleksibel', description_ms: 'Buka dari 6 pagi hingga 11 malam setiap hari. Berlatih mengikut jadual anda, bukan jadual kami.' },
-    ],
-    creative: [
-      { icon: 'Palette', title: 'Award-Winning Design', description: 'Our team has won multiple design awards and delivered for 200+ brands across Malaysia.', title_ms: 'Reka Bentuk Pemenang Anugerah', description_ms: 'Pasukan kami telah memenangi pelbagai anugerah reka bentuk dan berkhidmat untuk 200+ jenama di seluruh Malaysia.' },
-      { icon: 'Layers', title: 'Full-Service Agency', description: 'From branding to web design to packaging — we handle everything under one roof.', title_ms: 'Agensi Perkhidmatan Penuh', description_ms: 'Dari penjenamaan hingga reka bentuk web dan pembungkusan — kami menguruskan segalanya di bawah satu bumbung.' },
-      { icon: 'Zap', title: 'Fast Turnaround', description: 'Logo in 5 days, brand identity in 2 weeks. We respect your timeline.', title_ms: 'Penyelesaian Pantas', description_ms: 'Logo dalam 5 hari, identiti jenama dalam 2 minggu. Kami menghormati jadual masa anda.' },
-    ],
-    business: [
-      { icon: 'BarChart', title: 'Data-Driven Strategy', description: 'Our consulting approach combines market data with decades of industry experience.', title_ms: 'Strategi Berasaskan Data', description_ms: 'Pendekatan perundingan kami menggabungkan data pasaran dengan dekad pengalaman industri.' },
-      { icon: 'Globe', title: 'Regional Expertise', description: 'Deep knowledge of ASEAN markets with offices in KL, Singapore, and Jakarta.', title_ms: 'Kepakaran Serantau', description_ms: 'Pengetahuan mendalam tentang pasaran ASEAN dengan pejabat di KL, Singapura, dan Jakarta.' },
-      { icon: 'Handshake', title: 'Trusted Advisor', description: 'Confidential, objective advice from experienced C-suite professionals.', title_ms: 'Penasihat Dipercayai', description_ms: 'Nasihat sulit dan objektif daripada profesional C-suite yang berpengalaman.' },
-    ],
-    fnb: [
-      { icon: 'Coffee', title: 'Quality Ingredients', description: 'We source premium beans and ingredients to deliver the authentic taste you love.', title_ms: 'Bahan Berkualiti', description_ms: 'Kami mendapatkan kacang dan bahan premium untuk menyampaikan rasa autentik yang anda sukai.' },
-      { icon: 'Wifi', title: 'Work-Friendly Space', description: 'Free Wi-Fi, power outlets at every table, and a quiet corner for focused work.', title_ms: 'Ruang Mesra Kerja', description_ms: 'Wi-Fi percuma, soket kuasa di setiap meja, dan sudut yang tenang untuk kerja berfokus.' },
-      { icon: 'Heart', title: 'Made with Love', description: 'Every drink and dish is prepared fresh, following recipes perfected over decades.', title_ms: 'Dibuat dengan Penuh Kasih', description_ms: 'Setiap minuman dan hidangan disediakan segar, mengikut resipi yang telah disempurnakan selama berdekad.' },
-    ],
-    events: [
-      { icon: 'Calendar', title: 'Flawless Planning', description: 'From venue selection to day-of coordination, we handle every detail so you can enjoy the moment.', title_ms: 'Perancangan Sempurna', description_ms: 'Dari pemilihan lokasi hingga penyelarasan hari majlis, kami menguruskan setiap butiran supaya anda boleh menikmati setiap detik.' },
-      { icon: 'Users', title: 'Experienced Team', description: 'Over 500 events delivered across weddings, corporate functions, and private celebrations.', title_ms: 'Pasukan Berpengalaman', description_ms: 'Lebih 500 acara telah disampaikan merangkumi perkahwinan, fungsi korporat, dan sambutan peribadi.' },
-      { icon: 'Star', title: 'Custom Packages', description: 'Tailored packages from intimate gatherings of 20 to grand celebrations of 500+ guests.', title_ms: 'Pakej Disesuaikan', description_ms: 'Pakej yang disesuaikan daripada perhimpunan intim 20 orang hingga perayaan besar 500+ tetamu.' },
-    ],
-    blog: [
-      { icon: 'PenTool', title: 'Expert Writers', description: 'Our team of experienced writers and editors deliver well-researched, engaging content daily.', title_ms: 'Penulis Pakar', description_ms: 'Pasukan penulis dan editor berpengalaman kami menyampaikan kandungan yang dikaji dengan baik dan menarik setiap hari.' },
-      { icon: 'TrendingUp', title: 'Trending Topics', description: 'Stay ahead with the latest insights, trends, and stories that matter to Malaysians.', title_ms: 'Topik Semasa', description_ms: 'Sentiasa terkini dengan pandangan, trend, dan cerita terbaru yang penting bagi rakyat Malaysia.' },
-      { icon: 'Mail', title: 'Weekly Newsletter', description: 'Get the best stories delivered to your inbox every week. Join 10,000+ subscribers.', title_ms: 'Surat Berita Mingguan', description_ms: 'Dapatkan cerita terbaik dihantar ke peti masuk anda setiap minggu. Sertai 10,000+ pelanggan.' },
-    ],
-    travel: [
-      { icon: 'Map', title: 'Local Expertise', description: 'Born and raised in Malaysia — we know the hidden gems, best routes, and insider tips.', title_ms: 'Kepakaran Tempatan', description_ms: 'Lahir dan dibesarkan di Malaysia — kami mengetahui permata tersembunyi, laluan terbaik, dan tip eksklusif.' },
-      { icon: 'Shield', title: 'Safe & Insured', description: 'All tours include travel insurance and are led by licensed, first-aid certified guides.', title_ms: 'Selamat & Dilindungi', description_ms: 'Semua lawatan termasuk insurans perjalanan dan dipimpin oleh pemandu berlesen dan bertauliah pertolongan cemas.' },
-      { icon: 'DollarSign', title: 'Best Price Guarantee', description: 'Competitive RM pricing with no hidden fees. Price match guarantee on all packages.', title_ms: 'Jaminan Harga Terbaik', description_ms: 'Harga RM yang kompetitif tanpa caj tersembunyi. Jaminan padanan harga untuk semua pakej.' },
+    vi: [
+      { title: 'Cho chúng tôi biết nhu cầu', description: 'Chia sẻ yêu cầu của bạn và chúng tôi sẽ giúp bạn chọn phương án phù hợp.' },
+      { title: 'Dễ dàng liên hệ', description: 'Gửi tin nhắn cho chúng tôi từ trang liên hệ.' },
+      { title: 'Làm theo mong muốn của bạn', description: 'Mỗi đơn hàng bắt đầu bằng một cuộc trò chuyện về điều bạn muốn.' },
     ],
   }
 
-  const localizeFeature = (item: FItem) => ({
-    icon: item.icon,
-    title: (language === 'ms' && item.title_ms) ? item.title_ms : item.title,
-    description: (language === 'ms' && item.description_ms) ? item.description_ms : item.description,
-  })
-
-  const canned = featureMap[category] ?? featureMap['business']!
-  // Plan 260414-2249 phase-01: when user supplies ≥2 products, emit
-  // product-derived cards instead of canned. Keeps canned count so layout
-  // variants (grid-3, grid-4) still render cleanly.
   const userProducts = biz.products ?? []
   // Skip user-provided product names when target lang is English but products contain
   // non-ASCII characters (e.g. Vietnamese diacritics). Prevents mixed-language output
   // like "Ship faster with our Phần mềm quản lý..." (GH-1184).
   const hasNonAsciiProducts = language === 'en' && userProducts.some(p => /[^\x00-\x7F]/.test(p))
+  const realFeatures = biz.facts?.features ?? []
   const features =
-    userProducts.length >= 2 && !hasNonAsciiProducts
-      ? featuresFromProducts(userProducts, category, canned.length, language)
-      : canned.map(localizeFeature)
+    realFeatures.length >= 2
+      ? realFeatures.slice(0, 6).map((f, idx) => ({ icon: icons[idx % icons.length]!, title: f.title, description: f.description }))
+      : userProducts.length >= 2 && !hasNonAsciiProducts
+        ? featuresFromProducts(userProducts, category, 6, language, biz)
+        : (neutralCopy[locale] ?? neutralCopy.en!).map((f, idx) => ({ icon: icons[idx % icons.length]!, ...f }))
   // Skip non-ASCII tagline when target is English — avoids VN subheadline in EN features block (GH-1184).
   const subheadline = (language === 'en' && biz.tagline && /[^\x00-\x7F]/.test(biz.tagline))
     ? undefined
@@ -509,48 +417,26 @@ export function buildFeatures(biz: BusinessSample, category: string, language?: 
   }
 }
 
-export function buildTestimonials(content: CategoryContent, bizName?: string, language?: string): Record<string, unknown> {
+export function buildTestimonials(
+  biz: Pick<BusinessSample, 'name' | 'facts'>,
+  language?: string,
+): Record<string, unknown> {
   const i18n = getBlockStrings(language)
+  const bizName = biz.name
+  const facts = biz.facts ?? emptyFacts(bizName)
   const headlineFull = bizName ? i18n.testimonials.headlineWithBiz(bizName) : i18n.testimonials.headline
-  const localizedQuotes: Record<string, string[]> = {
-    ms: [
-      'Perkhidmatan yang sangat teliti dan profesional. Saya berasa selesa sepanjang sesi dan amat berpuas hati dengan hasilnya.',
-      'Proses tempahan mudah, suasananya tenang, dan pasukan menerangkan setiap langkah dengan jelas.',
-      'Perkhidmatan disesuaikan dengan keperluan saya dan hasilnya benar-benar menepati jangkaan.',
-      'Pengalaman yang menyenangkan dari awal hingga akhir. Saya pasti akan membuat tempahan lagi.',
-      'Pasukannya mesra, menepati masa, dan memberi cadangan yang sesuai tanpa memaksa.',
-      'Saya menghargai perhatian terhadap setiap butiran serta layanan yang konsisten dan berkualiti.',
-    ],
-    vi: [
-      'Dịch vụ rất tận tâm và chuyên nghiệp. Tôi cảm thấy thoải mái trong suốt buổi trải nghiệm và rất hài lòng với kết quả.',
-      'Quy trình đặt lịch thuận tiện, không gian dễ chịu và đội ngũ giải thích từng bước rất rõ ràng.',
-      'Dịch vụ được điều chỉnh đúng theo nhu cầu của tôi và kết quả thực sự vượt mong đợi.',
-      'Một trải nghiệm dễ chịu từ đầu đến cuối. Tôi chắc chắn sẽ quay lại lần nữa.',
-      'Đội ngũ thân thiện, đúng giờ và đưa ra những tư vấn phù hợp mà không gây áp lực.',
-      'Tôi đánh giá cao sự chỉn chu trong từng chi tiết và chất lượng phục vụ luôn ổn định.',
-    ],
-  }
-  const locale = language?.split('-')[0] ?? 'en'
-  const fallbackQuotes = localizedQuotes[locale]
-  // Emit up to 6 so masonry/grid-4 variants have enough data (was slicing to 3 → masonry empty).
+  // #2103 A1: only real quotes from the merchant's own site. With none, ONE invitation
+  // card ("Be the first to review {brand}") — no invented person, quote or rating.
+  const items = groundedTestimonials(facts, language)
+  const hasReal = facts.reviews.length > 0
   return {
     blockType: 'testimonials',
     variant: 'cards',
     headline: headlineFull,
-    subheadline: i18n.testimonials.subheadline,
-    testimonials: content.testimonials.slice(0, 6).map((t, index) => ({
-      quote: (language === 'ms' && t.quote_ms) ? t.quote_ms
-           : (language === 'vi' && t.quote_vi) ? t.quote_vi
-           : (fallbackQuotes?.[index % fallbackQuotes.length] ?? t.quote),
-      name: t.name,
-      title: locale === 'ms' ? 'Pelanggan'
-           : locale === 'vi' ? 'Khách hàng'
-           : t.title,
-      company: t.company,
-      rating: t.rating,
-      // Next-wins plan 260419-0034 phase-02: static avatar fallback for all.
-      // Real photo URLs come from media-injector trong production gen.
-      avatarUrl: AVATAR_FALLBACK_SVG,
+    ...(hasReal ? { subheadline: i18n.testimonials.subheadline } : {}),
+    testimonials: items.map((t) => ({
+      ...t,
+      ...(hasReal ? { avatarUrl: AVATAR_FALLBACK_SVG } : {}),
     })),
   }
 }
@@ -622,7 +508,7 @@ function buildFooter(
   const supportLinks = [
     { label: i18n.footer.helpCenter, url: '/help' },
     { label: 'FAQ', url: '/faq' },
-    { label: i18n.footer.getInTouch, url: `mailto:${biz.email}` },
+    ...(biz.email ? [{ label: i18n.footer.getInTouch, url: `mailto:${biz.email}` }] : []),
   ].filter((l) => isLiveLink(l.url))
 
   const legalLinks = [
@@ -654,81 +540,16 @@ function buildFooter(
   }
 }
 
-export function buildStats(category: string, language?: string): Record<string, unknown> {
-  const statsMap: Record<string, { value: string; label: string; suffix?: string }[]> = {
-    restaurant: [
-      { value: '15', label: 'Years Serving', suffix: '+' },
-      { value: '50000', label: 'Customers Served', suffix: '+' },
-      { value: '4.8', label: 'Google Rating' },
-      { value: '200', label: 'Menu Items', suffix: '+' },
-    ],
-    ecommerce: [
-      { value: '10000', label: 'Products', suffix: '+' },
-      { value: '50000', label: 'Happy Customers', suffix: '+' },
-      { value: '99', label: 'Satisfaction Rate', suffix: '%' },
-      { value: '24', label: 'Hour Delivery', suffix: 'h' },
-    ],
-    beauty: [
-      { value: '5000', label: 'Clients Served', suffix: '+' },
-      { value: '50', label: 'Treatments Available', suffix: '+' },
-      { value: '4.9', label: 'Rating' },
-      { value: '8', label: 'Years Experience', suffix: '+' },
-    ],
-    tech: [
-      { value: '99.9', label: 'Uptime', suffix: '%' },
-      { value: '500', label: 'Clients', suffix: '+' },
-      { value: '50', label: 'Team Members', suffix: '+' },
-      { value: '24', label: 'Support', suffix: '/7' },
-    ],
-    health: [
-      { value: '20', label: 'Years Experience', suffix: '+' },
-      { value: '15000', label: 'Patients Treated', suffix: '+' },
-      { value: '10', label: 'Specialist Doctors' },
-      { value: '4.9', label: 'Patient Rating' },
-    ],
-    education: [
-      { value: '3000', label: 'Students Taught', suffix: '+' },
-      { value: '90', label: 'A-Grade Rate', suffix: '%' },
-      { value: '15', label: 'Years Teaching', suffix: '+' },
-      { value: '50', label: 'Subjects Offered', suffix: '+' },
-    ],
-    realestate: [
-      { value: '500', label: 'Properties Sold', suffix: '+' },
-      { value: '2', label: 'Total Sales Value', suffix: 'B+' },
-      { value: '10', label: 'Years Experience', suffix: '+' },
-      { value: '98', label: 'Client Satisfaction', suffix: '%' },
-    ],
-    fitness: [
-      { value: '2000', label: 'Members', suffix: '+' },
-      { value: '30', label: 'Classes Per Week', suffix: '+' },
-      { value: '15', label: 'Expert Trainers' },
-      { value: '4.8', label: 'Member Rating' },
-    ],
-    creative: [
-      { value: '200', label: 'Projects Delivered', suffix: '+' },
-      { value: '50', label: 'Brand Identities', suffix: '+' },
-      { value: '12', label: 'Awards Won' },
-      { value: '98', label: 'Client Retention', suffix: '%' },
-    ],
-    business: [
-      { value: '150', label: 'Clients Served', suffix: '+' },
-      { value: '500', label: 'Projects Completed', suffix: '+' },
-      { value: '25', label: 'Years Experience', suffix: '+' },
-      { value: '5', label: 'ASEAN Countries' },
-    ],
-    fnb: [
-      { value: '10000', label: 'Cups Served Monthly', suffix: '+' },
-      { value: '4.7', label: 'Google Rating' },
-      { value: '20', label: 'Years Heritage', suffix: '+' },
-      { value: '30', label: 'Menu Items', suffix: '+' },
-    ],
-  }
+export function buildStats(biz: Pick<BusinessSample, 'name' | 'facts'>, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
+  // #2103 A1: real numbers only (year started, products listed, site-import stats).
+  // Fewer than two → no numbers; the block renders nothing instead of fake figures.
+  const stats = groundedStats(biz.facts ?? emptyFacts(biz.name), language)
   return {
     blockType: 'stats',
     variant: 'row',
-    headline: i18n.stats.headline,
-    stats: statsMap[category] ?? statsMap['business']!,
+    ...(stats.length > 0 ? { headline: i18n.stats.headline } : {}),
+    stats,
   }
 }
 
@@ -746,29 +567,16 @@ function buildGallery(biz: BusinessSample): Record<string, unknown> {
   }
 }
 
-export function buildFAQ(content: CategoryContent, bizName?: string, language?: string): Record<string, unknown> {
+export function buildFAQ(biz: Pick<BusinessSample, 'name' | 'facts'>, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
-  const localizedItems: Record<string, Array<{ question: string; answer: string }>> = {
-    ms: [
-      { question: 'Bagaimanakah cara membuat tempahan?', answer: 'Hubungi kami melalui borang laman web, telefon, atau e-mel. Pasukan kami akan mengesahkan masa dan keperluan anda.' },
-      { question: 'Adakah tempahan awal diperlukan?', answer: 'Tempahan awal digalakkan untuk memastikan slot pilihan anda tersedia, terutama pada hujung minggu dan musim sibuk.' },
-      { question: 'Bolehkah perkhidmatan disesuaikan?', answer: 'Ya. Kami akan berbincang tentang keperluan dan pilihan anda sebelum mencadangkan perkhidmatan yang paling sesuai.' },
-      { question: 'Apakah kaedah pembayaran yang diterima?', answer: 'Kami menerima kaedah pembayaran utama yang tersedia di premis. Hubungi kami jika anda memerlukan pengesahan sebelum berkunjung.' },
-    ],
-    vi: [
-      { question: 'Tôi có thể đặt lịch bằng cách nào?', answer: 'Bạn có thể liên hệ qua biểu mẫu trên website, điện thoại hoặc email. Đội ngũ của chúng tôi sẽ xác nhận thời gian và nhu cầu của bạn.' },
-      { question: 'Tôi có cần đặt lịch trước không?', answer: 'Bạn nên đặt lịch trước để giữ khung giờ mong muốn, đặc biệt vào cuối tuần và các thời điểm đông khách.' },
-      { question: 'Dịch vụ có thể điều chỉnh theo nhu cầu không?', answer: 'Có. Chúng tôi sẽ trao đổi về nhu cầu và mong muốn của bạn trước khi đề xuất dịch vụ phù hợp nhất.' },
-      { question: 'Có những phương thức thanh toán nào?', answer: 'Chúng tôi chấp nhận các phương thức thanh toán phổ biến tại cơ sở. Vui lòng liên hệ nếu bạn cần xác nhận trước khi đến.' },
-    ],
-  }
-  const locale = language?.split('-')[0] ?? 'en'
-  const items = localizedItems[locale] ?? content.faqItems
+  const bizName = biz.name
+  // #2103 A1: only questions answerable from FACTS (contact, what we sell, how to buy, areas).
+  const items = groundedFaq(biz.facts ?? emptyFacts(bizName), language)
   return {
     blockType: 'faq',
     variant: 'accordion',
     headline: bizName ? i18n.faq.headlineWithBiz(bizName) : i18n.faq.headline,
-    items: items.map((f) => ({ question: f.question, answer: f.answer })),
+    items,
   }
 }
 
@@ -807,105 +615,10 @@ export function buildAbout(biz: BusinessSample, language?: string): Record<strin
   }
 }
 
-export function buildPricing(category: string, language?: string): Record<string, unknown> {
-  const pricingMap: Record<string, { name: string; price: string; period: string; features: string[]; highlighted: boolean }[]> = {
-    tech: [
-      { name: 'Starter', price: 'RM 99', period: '/month', features: ['1 Website', '5 GB Storage', 'SSL Certificate', 'Email Support'], highlighted: false },
-      { name: 'Business', price: 'RM 299', period: '/month', features: ['5 Websites', '50 GB Storage', 'SSL Certificate', '24/7 Support', 'Load Balancing'], highlighted: true },
-      { name: 'Enterprise', price: 'RM 499', period: '/month', features: ['Unlimited Sites', '200 GB Storage', 'Dedicated Infra', 'SLA Guarantee', 'Priority Support'], highlighted: false },
-    ],
-    education: [
-      { name: 'Single Subject', price: 'RM 200', period: '/month', features: ['1 Subject', 'Weekly Classes', 'Printed Notes', 'WhatsApp Support'], highlighted: false },
-      { name: 'SPM Package', price: 'RM 500', period: '/month', features: ['3 Subjects', 'Weekly Classes', 'Practice Papers', 'Monthly Tests', 'Parent Reports'], highlighted: true },
-      { name: 'Premium', price: 'RM 800', period: '/month', features: ['5 Subjects', 'Daily Classes', 'Mock Exams', '1-on-1 Tutoring', 'Guaranteed Results'], highlighted: false },
-    ],
-    fitness: [
-      { name: 'Basic', price: 'RM 120', period: '/month', features: ['Gym Access', 'Locker Room', 'Basic Equipment'], highlighted: false },
-      { name: 'Premium', price: 'RM 250', period: '/month', features: ['Gym + Classes', 'Personal Locker', 'Sauna Access', 'Free Towels'], highlighted: true },
-      { name: 'VIP', price: 'RM 450', period: '/month', features: ['All Access', '4 PT Sessions', 'Nutrition Plan', 'Recovery Room', 'Guest Pass'], highlighted: false },
-    ],
-    beauty: [
-      { name: 'Basic Facial', price: 'RM 120', period: '/session', features: ['Deep Cleansing', 'Mask Treatment', 'Moisturising'], highlighted: false },
-      { name: 'Glow Package', price: 'RM 350', period: '/session', features: ['Deep Cleansing', 'Microdermabrasion', 'LED Therapy', 'Premium Mask', 'Serum Treatment'], highlighted: true },
-      { name: 'Bridal Package', price: 'RM 800', period: '/package', features: ['6 Sessions', 'All Treatments', 'Bridal Makeup Trial', 'Wedding Day Makeup', 'Emergency Kit'], highlighted: false },
-    ],
-    health: [
-      { name: 'Basic Check-up', price: 'RM 250', period: '/visit', features: ['Physical Exam', 'Blood Test', 'BMI Analysis', 'Doctor Consultation'], highlighted: false },
-      { name: 'Comprehensive', price: 'RM 550', period: '/visit', features: ['Full Blood Panel', 'ECG', 'X-Ray', 'Ultrasound', 'Specialist Review'], highlighted: true },
-      { name: 'Executive', price: 'RM 1200', period: '/visit', features: ['All Tests', 'CT Scan', 'Stress Test', 'Cancer Markers', 'VIP Room', 'Report Delivery'], highlighted: false },
-    ],
-    business: [
-      { name: 'Advisory', price: 'RM 500', period: '/hour', features: ['Strategy Consultation', 'Market Analysis', 'Action Plan'], highlighted: false },
-      { name: 'Project', price: 'RM 25,000', period: '/project', features: ['Full Strategy', 'Market Research', 'Implementation Plan', 'Monthly Reviews'], highlighted: true },
-      { name: 'Retainer', price: 'RM 10,000', period: '/month', features: ['Board Advisory', 'Unlimited Consults', 'Quarterly Reports', 'Priority Access'], highlighted: false },
-    ],
-    creative: [
-      { name: 'Logo Design', price: 'RM 800', period: '/project', features: ['3 Concepts', '2 Revisions', 'Final Files', 'Brand Guidelines'], highlighted: false },
-      { name: 'Brand Identity', price: 'RM 3,500', period: '/project', features: ['Logo + Stationery', 'Brand Book', 'Social Templates', 'Unlimited Revisions'], highlighted: true },
-      { name: 'Full Agency', price: 'RM 8,000', period: '/month', features: ['All Design Work', 'Web Design', 'Social Content', 'Monthly Reports', 'Dedicated Designer'], highlighted: false },
-    ],
-    restaurant: [
-      { name: 'Set Lunch', price: 'RM 28', period: '/pax', features: ['2-course meal', 'Soft drink', 'Weekday 12-3pm', 'Dine-in only'], highlighted: false },
-      { name: 'Chef\'s Tasting', price: 'RM 128', period: '/pax', features: ['6-course menu', 'Wine pairing option', 'Seasonal ingredients', 'Reservation required'], highlighted: true },
-      { name: 'Private Event', price: 'RM 2,500', period: '/booking', features: ['Full restaurant buyout', 'Custom menu', '20-40 pax', 'Dedicated host', 'Valet parking'], highlighted: false },
-    ],
-    fnb: [
-      { name: 'Retail Box', price: 'RM 35', period: '/pack', features: ['12 pieces', 'Freshly baked', 'Self-collect at outlet', 'Walk-in welcome'], highlighted: false },
-      { name: 'Party Platter', price: 'RM 180', period: '/tray', features: ['60 pieces mixed', '48h pre-order', 'Delivery available', 'Halal certified'], highlighted: true },
-      { name: 'Corporate Catering', price: 'RM 18', period: '/pax', features: ['Minimum 30 pax', 'Buffet setup', 'Full service staff', 'KL & Selangor delivery'], highlighted: false },
-    ],
-    ecommerce: [
-      { name: 'Starter', price: 'RM 0', period: '/forever', features: ['Free shipping over RM 150', 'Standard 3-5 day delivery', 'Returns within 14 days', 'Email support'], highlighted: false },
-      { name: 'Member', price: 'RM 88', period: '/year', features: ['Free shipping all orders', 'Priority 1-2 day delivery', 'Exclusive member sales', 'WhatsApp concierge', 'Early access drops'], highlighted: true },
-      { name: 'VIP', price: 'RM 288', period: '/year', features: ['All Member perks', 'Birthday gift box', 'Personal styling session', 'Free alterations', 'Dedicated account manager'], highlighted: false },
-    ],
-    realestate: [
-      { name: 'Consultation', price: 'RM 0', period: '/session', features: ['Area market briefing', 'Property viewing tour', 'Price negotiation tips', 'No obligation'], highlighted: false },
-      { name: 'Full Service', price: '2%', period: 'of sale price', features: ['Unlimited viewings', 'Professional photos', 'Rumah123 + PropertyGuru listing', 'SPA & legal support', 'Loan application help'], highlighted: true },
-      { name: 'Premium Marketing', price: '2.5%', period: 'of sale price', features: ['All Full Service items', 'Drone + video tour', 'Social media campaign', 'Featured placement', 'International listings', 'Open house events'], highlighted: false },
-    ],
-    events: [
-      { name: 'Intimate Gathering', price: 'RM 3,500', period: '/event', features: ['Up to 30 pax', 'Venue coordination', 'Decor setup', 'Photography 2 hours'], highlighted: false },
-      { name: 'Wedding Package', price: 'RM 18,000', period: '/event', features: ['Up to 200 pax', 'Full planning + execution', 'Decor + flowers', 'MC + entertainment', 'Photography + videography', 'Bridal car'], highlighted: true },
-      { name: 'Corporate Gala', price: 'RM 35,000', period: '/event', features: ['Up to 500 pax', 'Full production', 'AV + staging', 'Live band', 'Catering coordination', 'RSVP management'], highlighted: false },
-    ],
-    travel: [
-      { name: 'Day Trip', price: 'RM 180', period: '/pax', features: ['8-hour itinerary', 'English/Malay guide', 'Transport + entry tickets', 'Lunch included'], highlighted: false },
-      { name: 'Weekend Escape', price: 'RM 680', period: '/pax', features: ['3D2N package', 'Hotel + meals', 'Airport transfer', 'Licensed tour guide', 'Cultural experiences'], highlighted: true },
-      { name: 'Custom Itinerary', price: 'RM 1,500', period: '/pax', features: ['Tailored 5-7 day plan', 'Premium hotels', 'Private vehicle', 'Dedicated guide', 'Flexible schedule', '24/7 concierge'], highlighted: false },
-    ],
-    blog: [
-      { name: 'Newsletter Free', price: 'RM 0', period: '/forever', features: ['Weekly newsletter', 'Public articles', 'Basic archive access'], highlighted: false },
-      { name: 'Member', price: 'RM 19', period: '/month', features: ['All premium articles', 'Monthly deep-dives', 'Member-only podcast', 'Comment access', 'Ad-free reading'], highlighted: true },
-      { name: 'Founding Reader', price: 'RM 190', period: '/year', features: ['All Member perks', 'Early access content', 'Direct reply channel', 'Merchandise discount', 'Annual live event invite'], highlighted: false },
-    ],
-  }
-
-  const defaultPlans = [
-    { name: 'Basic', price: 'RM 99', period: '/month', features: ['Core Features', 'Email Support', 'Standard SLA'], highlighted: false },
-    { name: 'Professional', price: 'RM 299', period: '/month', features: ['All Features', '24/7 Support', 'Priority SLA', 'Analytics'], highlighted: true },
-    { name: 'Enterprise', price: 'Custom', period: '', features: ['Custom Solution', 'Dedicated Team', 'Custom SLA', 'On-site Support'], highlighted: false },
-  ]
-
-  // Plan 260415 fix-500 — Payload Pages.ts pricing.plans[].features schema
-  // requires `[{text: string, included: boolean}]`, but the composer maps
-  // above declare features as raw `string[]`. When apply-template or page
-  // save runs the plan through Payload, it throws
-  //   TypeError: Cannot create property 'text' on string 'Core Features'
-  // because Payload tries to `feature.text = ...` on each item assuming it
-  // is an object. Normalize to the required shape here so downstream code
-  // paths don't have to branch on string vs object.
+export function buildPricing(biz: Pick<BusinessSample, 'name' | 'facts'>, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
-  const plans = (pricingMap[category] ?? defaultPlans).map((p) => ({
-    ...p,
-    features: (p.features ?? []).map((f) =>
-      typeof f === 'string' ? { text: f, included: true } : f,
-    ),
-    isPopular: p.highlighted,
-    ctaLabel: p.highlighted ? i18n.pricing.getStarted : i18n.pricing.learnMore,
-    ctaUrl: '/contact',
-  }))
-
+  // #2103 A1: plans are the merchant's own priced products — never invented tiers or perks.
+  const plans = groundedPricingPlans(biz.facts ?? emptyFacts(biz.name), i18n.pricing.learnMore, language)
   return {
     blockType: 'pricing',
     variant: 'cards',
@@ -915,111 +628,15 @@ export function buildPricing(category: string, language?: string): Record<string
   }
 }
 
-export function buildTeam(category: string, language?: string): Record<string, unknown> {
-  const teamMap: Record<string, { name: string; role: string; bio: string }[]> = {
-    health: [
-      { name: 'Dr. Tan Wei Ming', role: 'General Practitioner', bio: 'MBBS (UM), 15 years experience in family medicine.' },
-      { name: 'Dr. Aishah Binti Ahmad', role: 'Dental Surgeon', bio: 'BDS (USM), specialising in cosmetic dentistry and orthodontics.' },
-      { name: 'Dr. Priya Nair', role: 'Specialist Physician', bio: 'MRCP (UK), internal medicine with focus on diabetes management.' },
-    ],
-    tech: [
-      { name: 'Ahmad Razif', role: 'CTO', bio: '10+ years building scalable cloud infrastructure for Malaysian enterprises.' },
-      { name: 'Mei Ling Tan', role: 'Lead Developer', bio: 'Full-stack engineer with expertise in React, Node.js, and AWS.' },
-      { name: 'Raju Krishnan', role: 'Head of Support', bio: 'Ensuring 24/7 uptime and client satisfaction for 500+ businesses.' },
-    ],
-    creative: [
-      { name: 'Farid Ismail', role: 'Creative Director', bio: 'Award-winning designer with 12 years leading brand campaigns.' },
-      { name: 'Sarah Lim', role: 'Senior Designer', bio: 'Specialises in packaging and brand identity for F&B and lifestyle brands.' },
-      { name: 'Vikram Patel', role: 'Motion Designer', bio: 'Creates stunning animations and video content for digital campaigns.' },
-    ],
-    business: [
-      { name: 'Dato\' Rahman', role: 'Managing Partner', bio: '25 years of C-suite advisory across ASEAN markets.' },
-      { name: 'Jennifer Ooi', role: 'Strategy Director', bio: 'Former McKinsey consultant with deep expertise in market entry.' },
-      { name: 'Harith bin Yusof', role: 'Operations Lead', bio: 'Operational excellence specialist with manufacturing and logistics background.' },
-    ],
-    restaurant: [
-      { name: 'Chef Azman Yusof', role: 'Executive Chef', bio: 'Trained at Le Cordon Bleu Paris, 18 years running Malaysian fine-dining kitchens.' },
-      { name: 'Nurul Izzati', role: 'Restaurant Manager', bio: 'Former front-of-house at Shangri-La KL, service obsessed and fluent in BM/EN/CN.' },
-      { name: 'Pak Samad', role: 'Head of Sourcing', bio: 'Builds relationships with Cameron Highlands farmers and Tanjung Sepat fishermen for daily fresh ingredients.' },
-    ],
-    fnb: [
-      { name: 'Cikgu Aminah', role: 'Master Baker', bio: '30 years of heritage kuih recipes passed down from her grandmother in Melaka.' },
-      { name: 'Jonathan Lim', role: 'Operations Manager', bio: 'Scaled 12 outlets across Klang Valley, JAKIM halal certification specialist.' },
-      { name: 'Priya Devi', role: 'Catering Lead', bio: 'Orchestrates corporate catering for 500+ PAX events with 100% satisfaction record.' },
-    ],
-    beauty: [
-      { name: 'Jessica Wong', role: 'Principal Aesthetician', bio: 'CIDESCO certified, specialist in Korean skincare protocols and anti-ageing treatments.' },
-      { name: 'Sofia Binti Hassan', role: 'Lash & Brow Artist', bio: '8 years shaping brows for KL\'s top influencers. Natural-look expert.' },
-      { name: 'Tan Hui Ling', role: 'Senior Nail Artist', bio: 'Gelish Malaysia brand ambassador with a 5-week booking waitlist.' },
-    ],
-    education: [
-      { name: 'Mr. David Koh', role: 'Founder & Head Tutor', bio: 'First-class MSc Maths (UM), 20+ years SPM coaching with 95% A-grade record.' },
-      { name: 'Pn. Siti Hawa', role: 'Head of Bahasa Melayu', bio: 'Former SBP senior teacher, sets past-year SPM model answers used by 30+ tuition centres.' },
-      { name: 'Dr. Raymond Teh', role: 'Science Coordinator', bio: 'PhD Chemistry (Monash), simplifies the hardest concepts for Form 4-5 students.' },
-    ],
-    realestate: [
-      { name: 'Michelle Lau REN', role: 'Principal Agent', bio: 'REN 45822. Closed 80+ KLCC/Mont Kiara transactions. Mandarin, English, Cantonese.' },
-      { name: 'Firdaus Abdullah', role: 'Landed Property Specialist', bio: 'REN 39117. Shah Alam and Subang expert, helps young families find their first home.' },
-      { name: 'Shalini Murugan', role: 'Investment Consultant', bio: 'Bank-negara licensed financial planner. Advises on property loan structuring and ROI analysis.' },
-    ],
-    fitness: [
-      { name: 'Coach Adam Razak', role: 'Head Trainer', bio: 'Former national weightlifting athlete. NASM-CPT certified. 12 years coaching experience.' },
-      { name: 'Yasmin Tan', role: 'Yoga & Pilates Lead', bio: '500-hour RYT, specialises in prenatal, postnatal, and injury rehabilitation.' },
-      { name: 'Daniel Mok', role: 'Strength Coach', bio: 'Powerlifting silver medallist SEA Games 2023. Programs natural lifters for competition.' },
-    ],
-    ecommerce: [
-      { name: 'Rachel Chen', role: 'Founder & Buyer', bio: 'Curates each piece personally from Seoul, Tokyo and Milan factory partners.' },
-      { name: 'Izzah Latiff', role: 'Head of Customer Experience', bio: 'Runs the WhatsApp concierge, 2-hour response guarantee 7 days a week.' },
-      { name: 'Aaron Koh', role: 'Logistics Manager', bio: 'Pos Laju + DHL account manager, optimises 2-day Peninsular Malaysia delivery.' },
-    ],
-    events: [
-      { name: 'Natasha Zulkifli', role: 'Creative Director', bio: 'Styled 200+ weddings and galas. Featured in MingleMingle and Her World Brides.' },
-      { name: 'Kumar Raju', role: 'Production Manager', bio: 'AV + staging specialist for corporate events up to 2000 PAX. Handles KLCC, PWTC venues.' },
-      { name: 'Elaine Fong', role: 'Client Relations', bio: 'Bilingual wedding planner fluent in Mandarin and English. 0% complaint rate in 4 years.' },
-    ],
-    travel: [
-      { name: 'Hakim bin Rosli', role: 'Lead Tour Guide', bio: 'Licensed by Tourism Malaysia (PE2341). Expert on KL heritage and Melaka historical sites.' },
-      { name: 'Wei Ling Chua', role: 'Trip Designer', bio: 'Plans custom itineraries across Peninsular and East Malaysia. 8 years in outbound travel.' },
-      { name: 'Joseph Tan', role: 'Adventure Coordinator', bio: 'PADI dive master, certified jungle trek guide for Taman Negara and Mulu Caves.' },
-    ],
-    blog: [
-      { name: 'Aaron Siah', role: 'Editor in Chief', bio: 'Former features writer at The Edge Malaysia. Covers startups, tech and Malaysian economy.' },
-      { name: 'Lina Razak', role: 'Senior Writer', bio: 'Longform investigative journalist. Published in R.AGE and Malaysiakini.' },
-      { name: 'Kevin Ng', role: 'Podcast Producer', bio: 'Produces weekly interview shows with founders. 50k+ monthly listeners.' },
-    ],
-  }
-
-  const defaultTeam = [
-    { name: 'Founder', role: 'CEO & Founder', bio: 'Passionate about building great products and serving Malaysian businesses.' },
-    { name: 'Operations Lead', role: 'Head of Operations', bio: 'Ensuring smooth operations and excellent customer experience every day.' },
-    { name: 'Marketing Lead', role: 'Head of Marketing', bio: 'Growing the brand through digital marketing and community building.' },
-  ]
-
+export function buildTeam(biz: Pick<BusinessSample, 'name' | 'facts'>, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
-  const locale = language?.split('-')[0] ?? 'en'
-  const localizedMemberCopy: Record<string, Array<{ role: string; bio: string }>> = {
-    ms: [
-      { role: 'Pakar Kanan', bio: 'Berpengalaman luas dalam memberikan perkhidmatan profesional yang teliti dan disesuaikan untuk setiap pelanggan.' },
-      { role: 'Pakar Perkhidmatan', bio: 'Mengutamakan keselesaan pelanggan, hasil berkualiti, dan penerangan yang jelas pada setiap langkah.' },
-      { role: 'Penyelaras Pelanggan', bio: 'Memastikan setiap tempahan berjalan lancar dari pertanyaan pertama hingga perkhidmatan selesai.' },
-    ],
-    vi: [
-      { role: 'Chuyên gia cao cấp', bio: 'Có nhiều kinh nghiệm cung cấp dịch vụ chuyên nghiệp, chỉn chu và phù hợp với từng khách hàng.' },
-      { role: 'Chuyên viên dịch vụ', bio: 'Luôn ưu tiên sự thoải mái, chất lượng kết quả và giải thích rõ ràng trong từng bước.' },
-      { role: 'Điều phối khách hàng', bio: 'Đảm bảo mỗi lịch hẹn diễn ra thuận lợi từ lúc tư vấn đến khi hoàn tất dịch vụ.' },
-    ],
-  }
-  const localizedCopy = localizedMemberCopy[locale]
+  // #2103 A1: no invented names, credentials or bios — just the owner/brand.
   return {
     blockType: 'team',
     variant: 'grid',
     headline: i18n.team.headline,
     subheadline: i18n.team.subheadline,
-    members: (teamMap[category] ?? defaultTeam).map((m, index) => ({
-      name: m.name,
-      role: localizedCopy?.[index % localizedCopy.length]?.role ?? m.role,
-      bio: localizedCopy?.[index % localizedCopy.length]?.bio ?? m.bio,
-    })),
+    members: groundedTeam(biz.facts ?? emptyFacts(biz.name), language),
   }
 }
 
@@ -1061,18 +678,16 @@ function buildMenuFood(
     ms: 'Pilihan Kami',
     vi: 'Lựa Chọn Của Chúng Tôi',
   }
-  const libraryItems = (libCategories ?? []).flatMap((category) => {
-    if (!category || typeof category !== 'object') return []
-    const items = (category as { items?: unknown }).items
-    return Array.isArray(items) ? items : []
-  }) as Array<Record<string, unknown>>
-  const productItems = (biz.products ?? []).slice(0, 6).map((name, index) => {
-    const libraryItem = libraryItems[index % Math.max(libraryItems.length, 1)]
-    return {
-      name,
-      price: typeof libraryItem?.price === 'string' ? libraryItem.price : String(3 + index * 3),
-      currency: typeof libraryItem?.currency === 'string' ? libraryItem.currency : 'RM',
-    }
+  // #2103 A2: prices come from what the merchant typed ("Kek lapis (whole RM65…)" → 65), never
+  // from the library. An item without a merchant price stays price-less here; the generation
+  // service fills it from the product we create for it, or leaves it blank.
+  const listed = biz.facts?.products ?? []
+  const names = listed.length > 0 ? listed.map((p) => p.name) : (biz.products ?? [])
+  const productItems = names.slice(0, 12).map((name) => {
+    const match = listed.find((p) => p.name.toLowerCase() === name.toLowerCase())
+    return match?.price !== undefined
+      ? { name, price: formatPrice(match.price), currency: 'RM' }
+      : { name, price: '' }
   })
   const productCategories = productItems.length >= 2
     ? [{ name: productCategoryNames[language ?? 'en'] ?? productCategoryNames.en, items: productItems }]
@@ -1082,106 +697,54 @@ function buildMenuFood(
     blockType: 'menu-food',
     variant: 'classic',
     headline,
-    categories: productCategories ?? libCategories ?? [
-      {
-        name: 'Mains',
-        items: [
-          { name: 'Nasi Lemak Special', description: 'Coconut rice with sambal, egg, and fried chicken', price: '12.00', currency: 'RM', tag: 'halal' },
-          { name: 'Nasi Goreng Kampung', description: 'Village-style fried rice with anchovies', price: '10.00', currency: 'RM', tag: 'spicy' },
-          { name: 'Chicken Rice', description: 'Hainanese-style steamed chicken with fragrant rice', price: '11.00', currency: 'RM', tag: 'halal' },
-        ],
-      },
-      {
-        name: 'Roti & Bread',
-        items: [
-          { name: 'Roti Canai', description: 'Crispy flatbread with dhal curry', price: '3.00', currency: 'RM', tag: 'vegetarian' },
-          { name: 'Roti Telur', description: 'Flatbread stuffed with egg', price: '4.00', currency: 'RM', tag: 'halal' },
-          { name: 'Roti Bakar', description: 'Toasted bread with kaya and butter', price: '3.50', currency: 'RM' },
-        ],
-      },
-      {
-        name: 'Beverages',
-        items: [
-          { name: 'Teh Tarik', description: 'Pulled milk tea', price: '3.50', currency: 'RM', tag: 'vegetarian' },
-          { name: 'Kopi O', description: 'Traditional black coffee', price: '3.00', currency: 'RM', tag: 'vegetarian' },
-          { name: 'Fresh Lime Juice', description: 'Squeezed to order, served chilled', price: '4.50', currency: 'RM' },
-        ],
-      },
-    ],
+    categories: productCategories ?? libCategories ?? [],
   }
 }
 
-function buildBookingWidget(content: CategoryContent, category: string): Record<string, unknown> {
-  const servicesMap: Record<string, { name: string; duration: number; price: number; description: string }[]> = {
-    beauty: [
-      { name: 'Hydrating Facial', duration: 60, price: 120, description: 'Deep hydration treatment with Korean products' },
-      { name: 'Acne Treatment', duration: 45, price: 150, description: 'Targeted treatment for acne-prone skin' },
-      { name: 'Mani-Pedi Combo', duration: 90, price: 75, description: 'Classic manicure and pedicure set' },
-    ],
-    health: [
-      { name: 'General Consultation', duration: 30, price: 80, description: 'Consultation with our general practitioner' },
-      { name: 'Health Screening', duration: 60, price: 250, description: 'Comprehensive health check-up' },
-      { name: 'Dental Check-up', duration: 45, price: 150, description: 'Routine dental examination and cleaning' },
-    ],
-    fitness: [
-      { name: 'Personal Training', duration: 60, price: 80, description: 'One-on-one training session with a certified trainer' },
-      { name: 'Body Assessment', duration: 30, price: 50, description: 'Full body composition and fitness assessment' },
-      { name: 'Yoga Class', duration: 60, price: 35, description: 'Group yoga class for all levels' },
-    ],
-    restaurant: [
-      { name: 'Table for 2', duration: 90, price: 0, description: 'Intimate dining for two' },
-      { name: 'Family Table (4-6)', duration: 120, price: 0, description: 'Perfect for family gatherings' },
-      { name: 'Private Room (10+)', duration: 150, price: 200, description: 'Private dining room with deposit' },
-    ],
-  }
+function buildBookingWidget(biz: BusinessSample): Record<string, unknown> {
+  // #2103 A1: services are the merchant's own listed products (with their price when given).
+  // No invented services, durations-with-prices or opening hours.
+  const services = (biz.facts?.products ?? []).slice(0, 6).map((p) => ({
+    name: p.name,
+    duration: 60,
+    price: p.price ?? 0,
+    description: '',
+  }))
   return {
     blockType: 'booking-widget',
     variant: 'inline',
     headline: 'Book an Appointment',
     subheadline: 'Choose a service and pick your preferred time slot.',
-    services: servicesMap[category] ?? servicesMap['health']!,
+    services,
     availableDays: [1, 2, 3, 4, 5, 6],
     timeSlotInterval: 30,
     startTime: '09:00',
     endTime: '18:00',
-    showPrice: true,
+    showPrice: services.some((s) => s.price > 0),
   }
 }
 
 function buildClassSchedule(): Record<string, unknown> {
+  // #2103 A1: no invented instructors, classes or attendance numbers — the merchant adds their timetable.
   return {
     blockType: 'class-schedule',
     variant: 'grid',
     headline: 'Weekly Schedule',
-    showCapacity: true,
+    showCapacity: false,
     highlightToday: true,
-    classes: [
-      { name: 'HIIT Burn', instructor: 'Coach Amir', day: 1, startTime: '07:00', endTime: '08:00', capacity: 20, enrolled: 15, category: 'Cardio', level: 'Intermediate' },
-      { name: 'Yoga Flow', instructor: 'Sarah', day: 1, startTime: '09:00', endTime: '10:00', capacity: 15, enrolled: 12, category: 'Yoga', level: 'All Levels' },
-      { name: 'Spin Class', instructor: 'Coach Danny', day: 2, startTime: '07:00', endTime: '07:45', capacity: 25, enrolled: 20, category: 'Cardio', level: 'Advanced' },
-      { name: 'Pilates', instructor: 'Sarah', day: 3, startTime: '10:00', endTime: '11:00', capacity: 12, enrolled: 8, category: 'Pilates', level: 'Beginner' },
-      { name: 'Boxing Fit', instructor: 'Coach Amir', day: 4, startTime: '18:00', endTime: '19:00', capacity: 20, enrolled: 18, category: 'Combat', level: 'Intermediate' },
-      { name: 'Stretch & Recover', instructor: 'Sarah', day: 5, startTime: '09:00', endTime: '10:00', capacity: 15, enrolled: 6, category: 'Recovery', level: 'All Levels' },
-    ],
+    classes: [],
   }
 }
 
-function buildReviewCards(content: CategoryContent): Record<string, unknown> {
+function buildReviewCards(): Record<string, unknown> {
+  // #2103 A1: review-cards need a star rating per review, which a site import does not carry,
+  // so nothing is invented — the merchant adds real reviews.
   return {
     blockType: 'review-cards',
     variant: 'grid',
     headline: 'Customer Reviews',
-    subheadline: 'See what people are saying about us.',
-    showAverage: true,
-    totalReviewCount: 150,
-    reviews: content.testimonials.slice(0, 4).map((t, i) => ({
-      name: t.name,
-      rating: t.rating,
-      text: t.quote,
-      date: `2026-0${i + 1}-15`,
-      verified: true,
-      source: 'Google',
-    })),
+    showAverage: false,
+    reviews: [],
   }
 }
 
@@ -1190,55 +753,33 @@ function buildVideoShowcase(): Record<string, unknown> {
     blockType: 'video-showcase',
     variant: 'grid',
     headline: 'Watch & Learn',
-    subheadline: 'Explore our video content.',
-    showCategories: true,
+    showCategories: false,
     autoplay: false,
-    videos: [
-      { title: 'Getting Started Guide', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'Tutorial', duration: '5:30', description: 'Learn the basics in just 5 minutes.' },
-      { title: 'Customer Success Story', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'Testimonial', duration: '3:15', description: 'Hear how we helped transform a business.' },
-      { title: 'Behind the Scenes', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'About Us', duration: '4:00', description: 'A peek into our daily operations.' },
-    ],
+    videos: [],
   }
 }
 
-function buildDoctorProfile(content: CategoryContent): Record<string, unknown> {
+function buildDoctorProfile(): Record<string, unknown> {
+  // #2103 A1: never invent practitioners, qualifications or fees.
   return {
     blockType: 'doctor-profile',
     variant: 'cards',
-    headline: 'Our Medical Team',
-    subheadline: 'Experienced healthcare professionals dedicated to your wellbeing.',
-    doctors: [
-      { name: 'Dr. Tan Wei Ming', specialisation: 'General Practice', qualifications: ['MBBS (UM)', 'MRCP (UK)'], availableDays: [1, 2, 3, 4, 5], languages: 'English, Malay, Mandarin', consultationFee: 'RM 80', bio: '15 years of experience in family medicine.' },
-      { name: 'Dr. Aishah Ahmad', specialisation: 'Dental Surgery', qualifications: ['BDS (USM)', 'Fellowship in Cosmetic Dentistry'], availableDays: [1, 3, 5], languages: 'English, Malay', consultationFee: 'RM 150', bio: 'Specialising in cosmetic dentistry and orthodontics.' },
-      { name: 'Dr. Rajesh Kumar', specialisation: 'Orthopaedics', qualifications: ['MS Ortho (UKM)', 'FRCS (Edinburgh)'], availableDays: [2, 4, 6], languages: 'English, Malay, Tamil', consultationFee: 'RM 200', bio: 'Expert in sports injuries and joint replacement.' },
-    ],
+    headline: 'Our Team',
+    doctors: [],
   }
 }
 
 function buildPropertyCard(): Record<string, unknown> {
+  // #2103 A1: no invented listings or prices — the merchant adds their properties.
   return {
     blockType: 'property-card',
     variant: 'grid',
     headline: 'Featured Properties',
-    subheadline: 'Discover your dream home in the Klang Valley.',
     showMap: false,
     currency: 'RM',
-    properties: [
-      { title: 'Luxury Condo in KLCC', price: 1200000, location: 'KLCC, Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, type: 'sale' as const, description: 'Modern luxury condo with stunning twin tower views.' },
-      { title: 'Semi-D in Shah Alam', price: 850000, location: 'Seksyen 7, Shah Alam', bedrooms: 4, bathrooms: 3, area: 2200, type: 'sale' as const, description: 'Spacious family home in quiet neighbourhood.' },
-      { title: 'Studio in Mont Kiara', price: 2500, location: 'Mont Kiara, Kuala Lumpur', bedrooms: 1, bathrooms: 1, area: 550, type: 'rent' as const, description: 'Fully furnished studio, walking distance to MRT.' },
-    ],
+    properties: [],
   }
 }
-
-// Canned product-quick-view items. Used as fallback + padded when user supplies
-// fewer than 3 products (extracted so buildProductQuickView can reuse them).
-const CANNED_QUICK_VIEW_PRODUCTS = [
-  { name: 'Baju Kurung Moden', price: 89, originalPrice: 120, imageUrls: [PORTRAIT_FALLBACK_SVG], description: 'Elegant modern baju kurung in premium cotton.', variants: ['S', 'M', 'L', 'XL'], badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-  { name: 'Wireless Earbuds Pro', price: 199, imageUrls: [PORTRAIT_FALLBACK_SVG], description: 'Active noise cancellation with 30-hour battery life.', variants: ['Black', 'White'], badge: 'New', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-  { name: 'Organic Honey (500g)', price: 45, imageUrls: [PORTRAIT_FALLBACK_SVG], description: 'Pure Malaysian kelulut honey from Cameron Highlands.', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-  { name: 'Batik Silk Scarf', price: 65, originalPrice: 85, imageUrls: [PORTRAIT_FALLBACK_SVG], description: 'Handmade batik silk scarf in traditional Malaysian motifs.', badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-] as const
 
 /**
  * Turn user-supplied products into product-quick-view items, padded with
@@ -1246,37 +787,26 @@ const CANNED_QUICK_VIEW_PRODUCTS = [
  * the downstream Unsplash pipeline replaces these based on deriveKeywords.
  */
 function quickViewItemsFromProducts(
-  products: string[],
-  category: string,
+  biz: BusinessSample,
 ): Record<string, unknown>[] {
-  const userItems: Record<string, unknown>[] = products.map((product) => ({
-    name: capitalizeFirst(product),
-    price: 0, // unknown — storefront can edit later
+  // #2103 A1/A2: the merchant's own products with their own prices; no canned padding.
+  const listed = biz.facts?.products ?? (biz.products ?? []).map((name) => ({ name }) as { name: string; price?: number })
+  return listed.map((p) => ({
+    name: capitalizeFirst(p.name),
+    price: p.price ?? 0,
     imageUrls: [PORTRAIT_FALLBACK_SVG],
-    description: (FEATURE_BODY_TEMPLATES[category] ?? FEATURE_BODY_TEMPLATES['business']!).replace('{product}', product),
+    description: '',
     ctaLabel: 'Shop Now',
     ctaUrl: '#',
   }))
-  // Pad to 3 minimum from canned so grid variants don't collapse.
-  if (userItems.length >= 3) return userItems
-  for (const canned of CANNED_QUICK_VIEW_PRODUCTS) {
-    if (userItems.length >= 3) break
-    userItems.push({ ...canned })
-  }
-  return userItems
 }
 
-function buildProductQuickView(biz: BusinessSample, category: string): Record<string, unknown> {
-  const userProducts = biz.products ?? []
-  const products =
-    userProducts.length >= 1
-      ? quickViewItemsFromProducts(userProducts, category)
-      : (CANNED_QUICK_VIEW_PRODUCTS as readonly unknown[]).map((p) => ({ ...(p as object) }))
+function buildProductQuickView(biz: BusinessSample): Record<string, unknown> {
+  const products = quickViewItemsFromProducts(biz)
   return {
     blockType: 'product-quick-view',
     variant: 'grid',
-    headline: userProducts.length > 0 ? `Shop ${biz.name}` : 'Best Sellers',
-    subheadline: userProducts.length > 0 ? 'Our most loved picks.' : 'Shop our most popular items.',
+    headline: products.length > 0 ? `Shop ${biz.name}` : 'Shop',
     columns: 4 as const,
     showQuickView: true,
     currency: 'RM',
@@ -1285,101 +815,95 @@ function buildProductQuickView(biz: BusinessSample, category: string): Record<st
 }
 
 function buildPortfolioGrid(): Record<string, unknown> {
+  // #2103 A1: no invented clients or projects.
   return {
     blockType: 'portfolio-grid',
     variant: 'masonry',
     headline: 'Our Work',
-    subheadline: 'A selection of projects we are proud of.',
-    projects: [
-      { title: 'Brand Identity — Nasi Kandar Chain', description: 'Complete brand redesign for a national F&B chain.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Branding' },
-      { title: 'E-commerce Website', description: 'Full e-commerce platform for a fashion brand.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Web Design' },
-      { title: 'Product Packaging', description: 'Packaging design for artisan coffee brand.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Packaging' },
-      { title: 'Corporate Video', description: 'Brand story video for a tech startup.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Video' },
-      { title: 'Social Media Campaign', description: 'Instagram campaign that reached 500K impressions.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Digital' },
-      { title: 'Annual Report Design', description: 'Clean, modern annual report for a public company.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Print' },
-    ],
+    projects: [],
   }
 }
 
 export function buildServiceCards(biz: BusinessSample, category: string, language?: string): Record<string, unknown> {
-  type SItem = { title: string; description: string; icon: string; price?: string; priceUnit?: string; title_ms?: string; description_ms?: string }
+  type SItem = { title: string; icon: string; title_ms?: string }
   const servicesMap: Record<string, SItem[]> = {
     business: [
-      { title: 'Strategy Consulting', description: 'C-suite advisory and market strategy development.', icon: 'BarChart', price: 'RM 500', priceUnit: '/hour', title_ms: 'Perundingan Strategi', description_ms: 'Penasihat C-suite dan pembangunan strategi pasaran.' },
-      { title: 'Market Entry', description: 'Comprehensive market research and entry planning for ASEAN.', icon: 'Globe', price: 'From RM 25,000', priceUnit: '/project', title_ms: 'Kemasukan Pasaran', description_ms: 'Penyelidikan pasaran menyeluruh dan perancangan kemasukan untuk ASEAN.' },
-      { title: 'M&A Advisory', description: 'Due diligence and deal structuring for mergers and acquisitions.', icon: 'Handshake', price: 'From RM 50,000', priceUnit: '/project', title_ms: 'Penasihat M&A', description_ms: 'Due diligence dan penstrukturan perjanjian untuk penggabungan dan pemerolehan.' },
+      { title: 'Strategy Consulting', icon: 'BarChart', title_ms: 'Perundingan Strategi', },
+      { title: 'Market Entry', icon: 'Globe', title_ms: 'Kemasukan Pasaran', },
+      { title: 'M&A Advisory', icon: 'Handshake', title_ms: 'Penasihat M&A', },
     ],
     beauty: [
-      { title: 'Facial Treatment', description: 'Customised facials for every skin type and concern.', icon: 'Sparkles', price: 'From RM 120', priceUnit: '/session', title_ms: 'Rawatan Muka', description_ms: 'Rawatan muka yang disesuaikan untuk setiap jenis kulit dan kebimbangan.' },
-      { title: 'Nail Art', description: 'Classic to creative nail designs using premium products.', icon: 'Palette', price: 'From RM 45', priceUnit: '/session', title_ms: 'Seni Kuku', description_ms: 'Reka bentuk kuku klasik hingga kreatif menggunakan produk premium.' },
-      { title: 'Lash Extensions', description: 'Natural to dramatic lash looks that last 3-4 weeks.', icon: 'Eye', price: 'From RM 120', priceUnit: '/set', title_ms: 'Sambungan Bulu Mata', description_ms: 'Penampilan bulu mata semula jadi hingga dramatik yang tahan 3-4 minggu.' },
+      { title: 'Facial Treatment', icon: 'Sparkles', title_ms: 'Rawatan Muka', },
+      { title: 'Nail Art', icon: 'Palette', title_ms: 'Seni Kuku', },
+      { title: 'Lash Extensions', icon: 'Eye', title_ms: 'Sambungan Bulu Mata', },
     ],
     health: [
-      { title: 'General Consultation', description: 'Doctor consultation for acute and chronic conditions, all age groups.', icon: 'Stethoscope', price: 'From RM 80', priceUnit: '/visit', title_ms: 'Perundingan Umum', description_ms: 'Perundingan doktor untuk keadaan akut dan kronik, semua kumpulan umur.' },
-      { title: 'Health Screening', description: 'Comprehensive blood panel, ECG and imaging with specialist review.', icon: 'Activity', price: 'From RM 550', priceUnit: '/package', title_ms: 'Saringan Kesihatan', description_ms: 'Panel darah menyeluruh, ECG dan pengimejan dengan ulasan pakar.' },
-      { title: 'Minor Procedures', description: 'Wound dressing, vaccinations, IV drip and nebuliser therapy.', icon: 'Syringe', price: 'From RM 60', priceUnit: '/procedure', title_ms: 'Prosedur Kecil', description_ms: 'Pembalutan luka, vaksinasi, titisan IV dan terapi nebulizer.' },
+      { title: 'General Consultation', icon: 'Stethoscope', title_ms: 'Perundingan Umum', },
+      { title: 'Health Screening', icon: 'Activity', title_ms: 'Saringan Kesihatan', },
+      { title: 'Minor Procedures', icon: 'Syringe', title_ms: 'Prosedur Kecil', },
     ],
     tech: [
-      { title: 'Managed Hosting', description: '99.9% uptime SLA on AWS Singapore + KL redundancy.', icon: 'Server', price: 'From RM 299', priceUnit: '/month', title_ms: 'Pengehosan Terurus', description_ms: 'SLA masa aktif 99.9% pada AWS Singapura + redundansi KL.' },
-      { title: 'DevOps Setup', description: 'CI/CD pipelines, observability stack and on-call runbook.', icon: 'GitBranch', price: 'From RM 8,000', priceUnit: '/project', title_ms: 'Persediaan DevOps', description_ms: 'Saluran CI/CD, tumpukan kebolehperhatian dan buku panduan on-call.' },
-      { title: '24/7 Support', description: 'Dedicated account engineer with 15-minute response SLA.', icon: 'Headphones', price: 'From RM 2,500', priceUnit: '/month', title_ms: 'Sokongan 24/7', description_ms: 'Jurutera akaun khusus dengan SLA tindak balas 15 minit.' },
+      { title: 'Managed Hosting', icon: 'Server', title_ms: 'Pengehosan Terurus', },
+      { title: 'DevOps Setup', icon: 'GitBranch', title_ms: 'Persediaan DevOps', },
+      { title: '24/7 Support', icon: 'Headphones', title_ms: 'Sokongan 24/7', },
     ],
     education: [
-      { title: 'Group Classes', description: 'Small-group SPM and UPSR tuition, max 8 students per class.', icon: 'Users', price: 'From RM 200', priceUnit: '/month', title_ms: 'Kelas Berkumpulan', description_ms: 'Tuisyen kumpulan kecil SPM dan UPSR, maksimum 8 pelajar setiap kelas.' },
-      { title: '1-on-1 Tutoring', description: 'Personalised coaching with weekly progress reports to parents.', icon: 'User', price: 'From RM 120', priceUnit: '/hour', title_ms: 'Pengajaran 1-lawan-1', description_ms: 'Bimbingan peribadi dengan laporan kemajuan mingguan kepada ibu bapa.' },
-      { title: 'Exam Bootcamp', description: 'Intensive revision programme in the month before major exams.', icon: 'GraduationCap', price: 'From RM 800', priceUnit: '/bootcamp', title_ms: 'Kem Latihan Peperiksaan', description_ms: 'Program ulang kaji intensif dalam sebulan sebelum peperiksaan utama.' },
+      { title: 'Group Classes', icon: 'Users', title_ms: 'Kelas Berkumpulan', },
+      { title: '1-on-1 Tutoring', icon: 'User', title_ms: 'Pengajaran 1-lawan-1', },
+      { title: 'Exam Bootcamp', icon: 'GraduationCap', title_ms: 'Kem Latihan Peperiksaan', },
     ],
     fitness: [
-      { title: 'Personal Training', description: 'Customised 1-on-1 strength + cardio programming with nutrition plan.', icon: 'Dumbbell', price: 'From RM 150', priceUnit: '/session', title_ms: 'Latihan Peribadi', description_ms: 'Program kekuatan + kardio 1-lawan-1 yang disesuaikan dengan pelan pemakanan.' },
-      { title: 'Group Classes', description: 'HIIT, yoga, pilates and spin classes every morning and evening.', icon: 'Users', price: 'From RM 250', priceUnit: '/month', title_ms: 'Kelas Berkumpulan', description_ms: 'Kelas HIIT, yoga, pilates dan spin setiap pagi dan petang.' },
-      { title: 'Sports Rehab', description: 'Physiotherapy and injury recovery for weekend warriors and athletes.', icon: 'HeartPulse', price: 'From RM 180', priceUnit: '/session', title_ms: 'Pemulihan Sukan', description_ms: 'Fisioterapi dan pemulihan kecederaan untuk atlet dan pejuang hujung minggu.' },
+      { title: 'Personal Training', icon: 'Dumbbell', title_ms: 'Latihan Peribadi', },
+      { title: 'Group Classes', icon: 'Users', title_ms: 'Kelas Berkumpulan', },
+      { title: 'Sports Rehab', icon: 'HeartPulse', title_ms: 'Pemulihan Sukan', },
     ],
     creative: [
-      { title: 'Brand Identity', description: 'Logo, colour system, typography and full brand guidelines.', icon: 'Palette', price: 'From RM 3,500', priceUnit: '/project', title_ms: 'Identiti Jenama', description_ms: 'Logo, sistem warna, tipografi dan panduan jenama penuh.' },
-      { title: 'Web Design', description: 'Conversion-focused website design with UX audit and wireframes.', icon: 'Monitor', price: 'From RM 5,500', priceUnit: '/project', title_ms: 'Reka Bentuk Web', description_ms: 'Reka bentuk laman web berfokus penukaran dengan audit UX dan rangka kawat.' },
-      { title: 'Content Creation', description: 'Monthly social media content, photography and short-form video.', icon: 'Camera', price: 'From RM 2,800', priceUnit: '/month', title_ms: 'Penciptaan Kandungan', description_ms: 'Kandungan media sosial bulanan, fotografi dan video format pendek.' },
+      { title: 'Brand Identity', icon: 'Palette', title_ms: 'Identiti Jenama', },
+      { title: 'Web Design', icon: 'Monitor', title_ms: 'Reka Bentuk Web', },
+      { title: 'Content Creation', icon: 'Camera', title_ms: 'Penciptaan Kandungan', },
     ],
     restaurant: [
-      { title: 'Dine-In Experience', description: 'Curated multi-course menu with seasonal specials and optional wine pairing.', icon: 'Utensils', price: 'From RM 88', priceUnit: '/pax', title_ms: 'Pengalaman Makan Di Tempat', description_ms: 'Menu berbilang hidangan yang dikurasi dengan keistimewaan bermusim dan padanan minuman pilihan.' },
-      { title: 'Private Events', description: 'Restaurant buy-out for weddings, birthdays and corporate dinners.', icon: 'Calendar', price: 'From RM 2,500', priceUnit: '/event', title_ms: 'Acara Peribadi', description_ms: 'Pembelian restoran untuk perkahwinan, hari jadi dan makan malam korporat.' },
-      { title: 'Catering Service', description: 'Full-service off-site catering for groups of 20-200.', icon: 'Truck', price: 'From RM 45', priceUnit: '/pax', title_ms: 'Perkhidmatan Katering', description_ms: 'Katering luar tapak perkhidmatan penuh untuk kumpulan 20-200 orang.' },
+      { title: 'Dine-In Experience', icon: 'Utensils', title_ms: 'Pengalaman Makan Di Tempat', },
+      { title: 'Private Events', icon: 'Calendar', title_ms: 'Acara Peribadi', },
+      { title: 'Catering Service', icon: 'Truck', title_ms: 'Perkhidmatan Katering', },
     ],
     fnb: [
-      { title: 'Retail Store', description: 'Daily fresh bakes and heritage kuih available at all outlets.', icon: 'Store', price: 'From RM 5', priceUnit: '/item', title_ms: 'Kedai Runcit', description_ms: 'Barang bakar segar harian dan kuih warisan tersedia di semua cawangan.' },
-      { title: 'Party Platters', description: 'Pre-order trays and boxes for birthdays, office meetings and family gatherings.', icon: 'Package', price: 'From RM 120', priceUnit: '/tray', title_ms: 'Dulang Parti', description_ms: 'Dulang dan kotak pre-tempahan untuk hari jadi, mesyuarat pejabat dan perhimpunan keluarga.' },
-      { title: 'Corporate Catering', description: 'Buffet + plated meal service for offices in Klang Valley.', icon: 'Truck', price: 'From RM 18', priceUnit: '/pax', title_ms: 'Katering Korporat', description_ms: 'Perkhidmatan makan malam buffet dan plated untuk pejabat di Lembah Klang.' },
+      { title: 'Retail Store', icon: 'Store', title_ms: 'Kedai Runcit', },
+      { title: 'Party Platters', icon: 'Package', title_ms: 'Dulang Parti', },
+      { title: 'Corporate Catering', icon: 'Truck', title_ms: 'Katering Korporat', },
     ],
     ecommerce: [
-      { title: 'Fast Delivery', description: 'Next-day shipping to Klang Valley and 2-day nationwide delivery.', icon: 'Truck', price: 'Free', priceUnit: 'over RM 150', title_ms: 'Penghantaran Pantas', description_ms: 'Penghantaran hari berikutnya ke Lembah Klang dan penghantaran 2 hari ke seluruh negara.' },
-      { title: 'Easy Returns', description: 'Hassle-free 14-day return policy with free pickup service.', icon: 'RotateCcw', price: 'Free', priceUnit: 'returns', title_ms: 'Pemulangan Mudah', description_ms: 'Polisi pemulangan 14 hari tanpa kerumitan dengan perkhidmatan kutipan percuma.' },
-      { title: 'WhatsApp Concierge', description: 'Personal shopping assistance and styling advice on demand.', icon: 'MessageCircle', price: 'Free', priceUnit: 'all customers', title_ms: 'Concierge WhatsApp', description_ms: 'Bantuan membeli-belah peribadi dan nasihat gaya atas permintaan.' },
+      { title: 'Fast Delivery', icon: 'Truck', title_ms: 'Penghantaran Pantas', },
+      { title: 'Easy Returns', icon: 'RotateCcw', title_ms: 'Pemulangan Mudah', },
+      { title: 'WhatsApp Concierge', icon: 'MessageCircle', title_ms: 'Concierge WhatsApp', },
     ],
     realestate: [
-      { title: 'Property Viewing', description: 'Guided viewings with market briefing and neighbourhood tour.', icon: 'Home', price: 'Free', priceUnit: 'consultation', title_ms: 'Tontonan Hartanah', description_ms: 'Tontonan berpandu dengan taklimat pasaran dan lawatan kejiranan.' },
-      { title: 'Sale & Purchase', description: 'End-to-end transaction handling: negotiation, SPA, loan and legal.', icon: 'FileText', price: '2%', priceUnit: 'of sale price', title_ms: 'Jual Beli', description_ms: 'Pengendalian transaksi dari awal hingga akhir: rundingan, SPA, pinjaman dan undang-undang.' },
-      { title: 'Investment Advisory', description: 'ROI analysis, rental yield forecasting and portfolio structuring.', icon: 'TrendingUp', price: 'From RM 500', priceUnit: '/session', title_ms: 'Penasihat Pelaburan', description_ms: 'Analisis ROI, ramalan hasil sewa dan penstrukturan portfolio.' },
+      { title: 'Property Viewing', icon: 'Home', title_ms: 'Tontonan Hartanah', },
+      { title: 'Sale & Purchase', icon: 'FileText', title_ms: 'Jual Beli', },
+      { title: 'Investment Advisory', icon: 'TrendingUp', title_ms: 'Penasihat Pelaburan', },
     ],
     events: [
-      { title: 'Wedding Planning', description: 'Full-service wedding coordination from proposal to reception.', icon: 'Heart', price: 'From RM 8,000', priceUnit: '/wedding', title_ms: 'Perancangan Perkahwinan', description_ms: 'Penyelarasan perkahwinan perkhidmatan penuh dari lamaran hingga majlis.' },
-      { title: 'Corporate Events', description: 'Product launches, galas and team-building for 50-1000 PAX.', icon: 'Briefcase', price: 'From RM 15,000', priceUnit: '/event', title_ms: 'Acara Korporat', description_ms: 'Pelancaran produk, gala dan pembinaan pasukan untuk 50-1000 pax.' },
-      { title: 'Décor & Styling', description: 'Floral design, lighting and stage setup for any celebration.', icon: 'Sparkles', price: 'From RM 3,500', priceUnit: '/event', title_ms: 'Dekorasi & Penggayaan', description_ms: 'Reka bentuk bunga, pencahayaan dan persediaan pentas untuk sebarang perayaan.' },
+      { title: 'Wedding Planning', icon: 'Heart', title_ms: 'Perancangan Perkahwinan', },
+      { title: 'Corporate Events', icon: 'Briefcase', title_ms: 'Acara Korporat', },
+      { title: 'Décor & Styling', icon: 'Sparkles', title_ms: 'Dekorasi & Penggayaan', },
     ],
     travel: [
-      { title: 'Day Tours', description: 'Half-day and full-day curated experiences in KL, Penang and Melaka.', icon: 'Map', price: 'From RM 180', priceUnit: '/pax', title_ms: 'Lawatan Sehari', description_ms: 'Pengalaman dikurasi separuh hari dan sehari penuh di KL, Pulau Pinang dan Melaka.' },
-      { title: 'Multi-Day Packages', description: 'Peninsular and East Malaysia itineraries with hotels and transport.', icon: 'Backpack', price: 'From RM 680', priceUnit: '/pax', title_ms: 'Pakej Berbilang Hari', description_ms: 'Itinerari Semenanjung dan Malaysia Timur dengan hotel dan pengangkutan.' },
-      { title: 'Custom Itineraries', description: 'Tailor-made trips designed around your schedule and interests.', icon: 'Compass', price: 'From RM 1,500', priceUnit: '/pax', title_ms: 'Itinerari Tersuai', description_ms: 'Perjalanan yang dibuat khas mengikut jadual dan minat anda.' },
+      { title: 'Day Tours', icon: 'Map', title_ms: 'Lawatan Sehari', },
+      { title: 'Multi-Day Packages', icon: 'Backpack', title_ms: 'Pakej Berbilang Hari', },
+      { title: 'Custom Itineraries', icon: 'Compass', title_ms: 'Itinerari Tersuai', },
     ],
     blog: [
-      { title: 'Sponsored Articles', description: 'Long-form branded features published on our main blog.', icon: 'FileText', price: 'From RM 2,500', priceUnit: '/article', title_ms: 'Artikel Tajaan', description_ms: 'Ciri jenama bentuk panjang yang diterbitkan di blog utama kami.' },
-      { title: 'Newsletter Placements', description: 'Featured slot in our weekly newsletter reaching 20k+ readers.', icon: 'Mail', price: 'From RM 800', priceUnit: '/placement', title_ms: 'Penempatan Surat Berita', description_ms: 'Slot utama dalam surat berita mingguan kami yang mencapai 20k+ pembaca.' },
-      { title: 'Podcast Interviews', description: 'Guest spot on our flagship podcast with cross-promotion.', icon: 'Mic', price: 'From RM 1,500', priceUnit: '/episode', title_ms: 'Temu Bual Podcast', description_ms: 'Slot tetamu dalam podcast unggulan kami dengan promosi silang.' },
+      { title: 'Sponsored Articles', icon: 'FileText', title_ms: 'Artikel Tajaan', },
+      { title: 'Newsletter Placements', icon: 'Mail', title_ms: 'Penempatan Surat Berita', },
+      { title: 'Podcast Interviews', icon: 'Mic', title_ms: 'Temu Bual Podcast', },
     ],
   }
 
   const localizeService = (s: SItem) => ({
     ...s,
     title: (language === 'ms' && s.title_ms) ? s.title_ms : s.title,
-    description: (language === 'ms' && s.description_ms) ? s.description_ms : s.description,
+    // #2103 A1: category-generic service names only — no canned prices, counts, SLAs or guarantees.
+    description: groundedServiceBlurb(biz.name, language),
   })
 
   const i18n = getBlockStrings(language)
@@ -1393,7 +917,7 @@ export function buildServiceCards(biz: BusinessSample, category: string, languag
   const localizedCanned = canned.map(localizeService)
   const userServices =
     userProducts.length >= 2
-      ? featuresFromProducts(userProducts, category, 6).map((card) => ({
+      ? featuresFromProducts(userProducts, category, 6, language, biz).map((card) => ({
           title: card.title,
           description: card.description,
           icon: card.icon,
@@ -1429,55 +953,37 @@ export function buildServiceCards(biz: BusinessSample, category: string, languag
   }
 }
 
-function buildClientLogos(category?: string, seed = 0): Record<string, unknown> {
-  // Plan 260417-0837 item 1.4 — real MY brand names instead of Client A..E stubs.
-  // URL omitted until logo asset pipeline ships; renderers fall back to name-only
-  // badge when url missing (safer than broken <img>).
-  const picks = pickLogosByCategory(category, 6, seed)
+export function buildClientLogos(biz: Pick<BusinessSample, 'name' | 'facts'>, language?: string): Record<string, unknown> {
+  // #2103 A1: only payment methods the merchant has actually enabled, as name-only
+  // badges. Never third-party brands (banks, telcos, retailers) the merchant doesn't work with.
+  const logos = groundedLogos(biz.facts ?? emptyFacts(biz.name))
   return {
     blockType: 'logo-cloud',
     variant: 'row',
-    headline: 'Trusted By',
-    logos: picks.map((l) => ({
-      name: l.name,
-      logo: { url: l.url ?? '', alt: l.name },
-    })),
+    ...(logos.length > 0 ? { headline: groundedLogoHeadline(language) } : {}),
+    logos,
   }
 }
 
 function buildFeatureComparison(): Record<string, unknown> {
+  // #2103 A1: no invented plan tiers or inclusions.
   return {
     blockType: 'feature-comparison',
     variant: 'table',
-    headline: 'Compare Plans',
-    products: [
-      { name: 'Starter', highlighted: false },
-      { name: 'Professional', highlighted: true },
-      { name: 'Enterprise', highlighted: false },
-    ],
-    features: [
-      { name: 'Hosting', values: [true, true, true] },
-      { name: 'SSL Certificate', values: [true, true, true] },
-      { name: 'Load Balancing', values: [false, true, true] },
-      { name: 'Dedicated Infra', values: [false, false, true] },
-      { name: '24/7 Support', values: [false, true, true] },
-      { name: 'SLA Guarantee', values: [false, false, true] },
-    ],
+    headline: 'Compare Options',
+    products: [],
+    features: [],
   }
 }
 
 function buildPricingTable(): Record<string, unknown> {
+  // #2103 A1: no invented plans or prices.
   return {
     blockType: 'pricing-table',
     variant: 'columns',
-    headline: 'Detailed Pricing',
-    subheadline: 'Everything you need to know about our plans.',
+    headline: 'Pricing',
     billingToggle: 'monthly',
-    plans: [
-      { name: 'Starter', price: 'RM 99', currency: 'RM', description: 'Perfect for getting started', features: ['1 User', '5 GB Storage', '1,000 API Calls', 'Email Support'], cta: { label: 'Get Started', url: '/contact' }, popular: false },
-      { name: 'Professional', price: 'RM 299', currency: 'RM', description: 'For growing businesses', features: ['10 Users', '50 GB Storage', '50,000 API Calls', 'Chat + Email Support'], cta: { label: 'Get Started', url: '/contact' }, popular: true },
-      { name: 'Enterprise', price: 'RM 499', currency: 'RM', description: 'For large organisations', features: ['Unlimited Users', '500 GB Storage', 'Unlimited API Calls', 'Dedicated Support'], cta: { label: 'Contact Sales', url: '/contact' }, popular: false },
-    ],
+    plans: [],
   }
 }
 
@@ -1501,53 +1007,25 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
     case 'menu-food':
       return buildMenuFood(content, biz)
     case 'booking-widget':
-      return buildBookingWidget(content, category)
+      return buildBookingWidget(biz)
     case 'class-schedule':
       return buildClassSchedule()
     case 'review-cards':
-      return buildReviewCards(content)
+      return buildReviewCards()
     // case 'video-showcase': // temporarily hidden (aiVisible: false, archived)
     //   return buildVideoShowcase()
-    case 'doctor-profile': {
-      const items = Array.from({ length: 4 }, (_, i) => ({
-        name: `Dr. ${['Aisha', 'Rahman', 'Mei Ling', 'Kumar', 'Siti', 'Jonathan'][i % 6]} ${['Tan', 'Lee', 'Wong', 'Patel', 'Ismail', 'Lim'][i % 6]}`,
-        title: ['Consultant Physician', 'Senior Specialist', 'Chief Medical Officer', 'Head of Department'][i % 4],
-        specialty: ['Cardiology', 'Pediatrics', 'General Practice', 'Dermatology'][i % 4],
-        image: AVATAR_FALLBACK_SVG,
-        bio: `Experienced medical professional at ${biz.name}.`,
-        experience: `${10 + i} years`,
-      }))
-      return {
-        blockType: 'doctor-profile',
-        variant: 'cards',
-        headline: 'Meet Our Specialists',
-        subheadline: `Expert care at ${biz.name}`,
-        items,
-      }
-    }
+    case 'doctor-profile':
+      return buildDoctorProfile()
     case 'property-card':
       return buildPropertyCard()
     case 'product-quick-view':
-      return buildProductQuickView(biz, category)
-    case 'portfolio-grid': {
-      const items = Array.from({ length: 6 }, (_, i) => ({
-        title: `${biz.name} Project ${i + 1}`,
-        category: ['Branding', 'Web Design', 'Photography', 'Illustration'][i % 4],
-        image: NEUTRAL_FALLBACK_SVG,
-        description: `Creative project showcasing ${biz.tagline ?? 'our craft'}.`,
-      }))
-      return {
-        blockType: 'portfolio-grid',
-        variant: 'masonry',
-        headline: 'Our Work',
-        subheadline: biz.tagline ?? 'Selected projects',
-        items,
-      }
-    }
+      return buildProductQuickView(biz)
+    case 'portfolio-grid':
+      return buildPortfolioGrid()
     case 'service-cards':
       return buildServiceCards(biz, category)
     case 'logo-cloud':
-      return buildClientLogos(category)
+      return buildClientLogos(biz)
     case 'feature-comparison':
       return buildFeatureComparison()
     case 'pricing-table':
@@ -1616,12 +1094,12 @@ function buildHomePage(
       if (block) middleBlocks.push(block)
     }
     // Universal trust blocks — also cover business category signature (stats, team)
-    middleBlocks.push({ ...buildStats(category), variant: getVariant('stats', 'row') })
+    middleBlocks.push({ ...buildStats(biz), variant: getVariant('stats', 'row') })
     middleBlocks.push({ ...buildGallery(biz), variant: getVariant('gallery', 'grid') })
   }
 
   if (variant === 'professional' || variant === 'premium') {
-    middleBlocks.push({ ...buildStats(category), variant: getVariant('stats', 'row') })
+    middleBlocks.push({ ...buildStats(biz), variant: getVariant('stats', 'row') })
     middleBlocks.push({ ...buildGallery(biz), variant: getVariant('gallery', 'grid') })
 
     // Industry blocks
@@ -1635,17 +1113,20 @@ function buildHomePage(
 
   // Testimonials
   const testimonialsVariant = getVariant('testimonials', 'cards')
-  const finalTestimonialsVariant = enforceMinContent('testimonials', testimonialsVariant, content.testimonials.length)
-  middleBlocks.push({ ...buildTestimonials(content, biz.name), variant: finalTestimonialsVariant })
+  const legacyTestimonials = buildTestimonials(biz)
+  const finalTestimonialsVariant = enforceMinContent('testimonials', testimonialsVariant, (legacyTestimonials.testimonials as unknown[]).length)
+  middleBlocks.push({ ...legacyTestimonials, variant: finalTestimonialsVariant })
 
   if (variant === 'professional' || variant === 'premium') {
-    middleBlocks.push({ ...buildFAQ(content, biz.name), variant: getVariant('faq', 'accordion') })
+    middleBlocks.push({ ...buildFAQ(biz), variant: getVariant('faq', 'accordion') })
     middleBlocks.push({ ...buildCTA(biz), variant: getVariant('cta', 'banner') })
   }
 
   if (variant === 'premium') {
-    middleBlocks.push({ ...buildPricing(category), variant: getVariant('pricing', 'cards') })
-    middleBlocks.push({ ...buildTeam(category), variant: getVariant('team', 'grid') })
+    const pricing = buildPricing(biz)
+    // no priced products → no pricing section (never invented tiers)
+    if (!isPlanlessPricing(pricing)) middleBlocks.push({ ...pricing, variant: getVariant('pricing', 'cards') })
+    middleBlocks.push({ ...buildTeam(biz), variant: getVariant('team', 'grid') })
     middleBlocks.push({ ...buildNewsletter(biz), variant: getVariant('newsletter', 'inline') })
   }
 
@@ -1707,9 +1188,9 @@ function buildAboutPage(biz: BusinessSample, content: CategoryContent, category:
       buildNavigation(biz, pages, category),
       { blockType: 'hero', variant: 'minimal', headline: `Our Story`, subheadline: storyExcerpt, height: '45vh' },
       buildAbout(biz),
-      buildStats(category),
-      buildTeam(category),
-      buildTestimonials(content, biz.name),
+      buildStats(biz),
+      buildTeam(biz),
+      buildTestimonials(biz),
       buildCTA(biz, category),
       buildFooter(biz, pages),
     ],
@@ -1758,8 +1239,9 @@ function buildServicesPage(biz: BusinessSample, content: CategoryContent, catego
     }
   }
 
-  blocks.push(buildPricing(category))
-  blocks.push(buildFAQ(content, biz.name))
+  const pricing = buildPricing(biz)
+  if (!isPlanlessPricing(pricing)) blocks.push(pricing)
+  blocks.push(buildFAQ(biz))
   blocks.push(buildCTA(biz))
   blocks.push(buildFooter(biz, pages))
 
@@ -1830,6 +1312,7 @@ import {
   SERVICE_CARDS_VARIANT_BY_CATEGORY,
 } from './category-requirements'
 import { seededShufflePick, hashString } from './seeded-random'
+import { withoutLibraryIdentity } from './library-identity'
 
 /**
  * Plan 260415 — rotate structural block variants per category seed pool.
@@ -1982,46 +1465,46 @@ function buildBlockFromSpec(
       return { ...fb, ...(finalVariant ? { variant: finalVariant } : {}) }
     }
     case 'testimonials':
-      return { ...buildTestimonials(content, biz.name, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
+      return { ...buildTestimonials(biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'contact':
       return { ...buildContact(biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'footer':
       return { ...buildFooter(biz, pageNames, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'stats':
-      return { ...buildStats(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildStats(biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'gallery':
       return { ...buildGallery(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'faq':
-      return { ...buildFAQ(content, biz.name, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildFAQ(biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'cta':
       return { ...buildCTA(biz, category, mood, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'about':
       return { ...buildAbout(biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'pricing':
-      return { ...buildPricing(category, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildPricing(biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'team':
-      return { ...buildTeam(category, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildTeam(biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'newsletter':
       return { ...buildNewsletter(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'logo-cloud':
     case 'client-logos': // backward compat alias — always normalise to logo-cloud (client-logos not in Payload whitelist)
-      return { ...buildClientLogos(category, compositionSeed ?? 0), blockType: 'logo-cloud', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildClientLogos(biz, language), blockType: 'logo-cloud', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     // Industry-specific blocks
     case 'menu-food':
       return { ...buildMenuFood(content, biz, language), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'booking-widget':
-      return buildBookingWidget(content, category)
+      return buildBookingWidget(biz)
     case 'class-schedule':
       return buildClassSchedule()
     case 'review-cards':
-      return buildReviewCards(content)
+      return buildReviewCards()
     // case 'video-showcase': // temporarily hidden (aiVisible: false, archived)
     //   return buildVideoShowcase()
     // doctor-profile handled below (line ~1188) with items
     case 'property-card':
       return buildPropertyCard()
     case 'product-quick-view':
-      return buildProductQuickView(biz, category)
+      return buildProductQuickView(biz)
     case 'portfolio-grid': {
       const count = spec.count ?? 6
       const projects = Array.from({ length: count }, (_, i) => ({
@@ -2112,11 +1595,8 @@ function buildBlockFromSpec(
       return {
         blockType: 'social-proof',
         variant: resolvedVariant ?? 'cards',
-        reviews: content.testimonials.slice(0, 3).map((t) => ({
-          author: t.name,
-          content: t.quote ?? '',
-          rating: t.rating ?? 5,
-        })),
+        // #2103 A1: social-proof reviews need a rating a site import does not carry — none invented.
+        reviews: [],
       }
     case 'products-grid': {
       // Generate placeholder items — previously this returned only {variant, count}
@@ -2215,44 +1695,27 @@ function enrichSubPages(
     const insertAt = footerIdx >= 0 ? footerIdx : contactPage.layout.length
 
     // TODO(GH-820): re-enable google-maps injection when embedUrl pipeline lands
+    // #2103 A1: the contact-page FAQ is built from FACTS only (no invented opening hours,
+    // parking or walk-in policy). With nothing to say, no FAQ block is added.
     if (!hasFaq) {
-      const contactFaq: Record<ContentLang, { headline: string; items: Array<{ question: string; answer: string }> }> = {
-        en: {
-          headline: 'Visit Us',
-          items: [
-            { question: 'What are your opening hours?', answer: 'We are open 9:00 AM to 9:00 PM daily. See our Google Maps listing for real-time updates.' },
-            { question: 'Do you offer walk-ins or is booking required?', answer: 'Walk-ins welcome for most services. For peak hours and specific requests, booking is recommended.' },
-            { question: 'Is parking available?', answer: 'Yes — street parking and nearby covered parking are both within a 2-minute walk.' },
-          ],
-        },
-        ms: {
-          headline: 'Kunjungi Kami',
-          items: [
-            { question: 'Apakah waktu operasi anda?', answer: 'Kami dibuka dari 9:00 pagi hingga 9:00 malam setiap hari. Hubungi kami untuk maklumat terkini.' },
-            { question: 'Adakah pelanggan tanpa tempahan diterima?', answer: 'Pelanggan tanpa tempahan diterima untuk kebanyakan perkhidmatan, tetapi tempahan awal digalakkan pada waktu sibuk.' },
-            { question: 'Adakah tempat letak kereta tersedia?', answer: 'Ya, tempat letak kereta di jalan dan parkir berbumbung berdekatan boleh dikunjungi dengan berjalan kaki.' },
-          ],
-        },
-        vi: {
-          headline: 'Ghé Thăm Chúng Tôi',
-          items: [
-            { question: 'Giờ hoạt động của cửa hàng là khi nào?', answer: 'Chúng tôi mở cửa từ 9 giờ sáng đến 9 giờ tối hằng ngày. Vui lòng liên hệ để biết thông tin mới nhất.' },
-            { question: 'Tôi có thể đến trực tiếp hay cần đặt lịch?', answer: 'Chúng tôi tiếp nhận khách đến trực tiếp cho hầu hết dịch vụ, nhưng bạn nên đặt trước vào giờ cao điểm.' },
-            { question: 'Có chỗ đậu xe không?', answer: 'Có, chỗ đậu xe ngoài đường và bãi đậu xe có mái che đều nằm trong khoảng cách đi bộ gần.' },
-          ],
-        },
+      const contactFaqHeadline: Record<ContentLang, string> = {
+        en: 'Visit Us',
+        ms: 'Kunjungi Kami',
+        vi: 'Ghé Thăm Chúng Tôi',
       }
-      const faqCopy = contactFaq[language]
-      const insertIdx = contactPage.layout.findIndex(
-        (b) => (b as Record<string, unknown>).blockType === 'footer',
-      )
-      const beforeFooter = insertIdx >= 0 ? insertIdx : contactPage.layout.length
-      contactPage.layout.splice(beforeFooter, 0, {
-        blockType: 'faq',
-        variant: 'accordion',
-        headline: faqCopy.headline,
-        items: faqCopy.items,
-      } as unknown as Record<string, unknown>)
+      const faqItems = groundedFaq(biz.facts ?? emptyFacts(biz.name), language)
+      if (faqItems.length > 0) {
+        const insertIdx = contactPage.layout.findIndex(
+          (b) => (b as Record<string, unknown>).blockType === 'footer',
+        )
+        const beforeFooter = insertIdx >= 0 ? insertIdx : contactPage.layout.length
+        contactPage.layout.splice(beforeFooter, 0, {
+          blockType: 'faq',
+          variant: 'accordion',
+          headline: contactFaqHeadline[language],
+          items: faqItems,
+        } as unknown as Record<string, unknown>)
+      }
     }
   }
 
@@ -2320,8 +1783,12 @@ export function composeFromBlueprint(
     return null
   }
 
+  // Real generation (bizOverride present): never leak the library sample's
+  // identity or contact (name, tagline, description, phone, email, address)
+  // into a user's site — they stay empty unless the merchant supplied them.
+  // Template gallery/preview (no override) keeps the sample data.
   const biz: BusinessSample = bizOverride
-    ? { ...structuredClone(baseBiz), ...bizOverride }
+    ? withoutLibraryIdentity(structuredClone(baseBiz), bizOverride)
     : baseBiz
 
   // Use businessIndex as seed if not provided — each template gets deterministic but different variants
@@ -2373,7 +1840,9 @@ export function composeFromBlueprint(
         .map((spec) => {
           const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood, disabledSet, language)
           return applyContentValidation(block, language)
-        }),
+        })
+        // a pricing section without plans has nothing to show: skip it, never invent tiers
+        .filter((block) => !isPlanlessPricing(block)),
     }
   })
 

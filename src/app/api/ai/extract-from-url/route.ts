@@ -1,18 +1,21 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { parseRequest } from '@/lib/validations/helpers'
 import { extractFromUrlSchema, extractionResultSchema } from '@/lib/validations/ai'
 import { scrapeUrl } from '@/lib/ai/url-scraper'
-import { buildExtractionPrompt } from '@/lib/ai/url-extraction-prompt'
+import { runAiTaskForUser } from '@/lib/ai-platform/ai-tasks'
+import { AI_UNAVAILABLE_MESSAGE, isAiTasksEnabled } from '@/lib/ai-platform/config'
+import { AgentAccessError } from '@/lib/ai-platform/context'
+import type { AiSkipReason } from '@/lib/ai/generation-actor'
 import { checkUrlSafety, checkScrapedContentSafety } from '@/lib/ai/content-safety'
 
 /**
  * POST /api/ai/extract-from-url
- * Scrapes a URL and uses GPT-4o-mini to extract structured business info.
+ * Scrapes a URL and extracts structured business info with the AI platform task
+ * `site.extract-business-info` (falls back to the page meta when AI is unavailable).
  * Does NOT count as an AI generation credit (FR-15).
  */
 export const POST = withAuth(async (user, req) => {
@@ -23,8 +26,8 @@ export const POST = withAuth(async (user, req) => {
 
         const { url } = data!
 
-        // 2. Rate limit: 5 extractions/min per user
-        const rateLimit = await checkRateLimit(String(user.id), 5)
+        // 2. Rate limit: 5 extractions/hour per user
+        const rateLimit = await checkRateLimit(`ai:extract-from-url:${user.id}`, 5)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 {
@@ -66,30 +69,26 @@ export const POST = withAuth(async (user, req) => {
             )
         }
 
-        // 6. Extract business info via GPT-4o-mini
-        const { system, user: userPrompt } = buildExtractionPrompt(scrapeResult.raw.preprocessedText)
-
+        // 6. Extract business info with the AI platform task (page text is fenced as untrusted there)
         let extractedData
+        // Set when the response is scraper-only: tells the client / admins WHY (no usable workspace vs
+        // platform off vs task failure) instead of presenting a low-confidence result as a plain success.
+        let aiFallbackReason: AiSkipReason | 'ai_task_failed' | undefined
         try {
-            const openai = new OpenAI()
-            const completion = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
-                temperature: 0.3,
-                max_tokens: 2000,
-                response_format: { type: 'json_object' },
-                messages: [
-                    { role: 'system', content: system },
-                    { role: 'user', content: userPrompt },
-                ],
+            if (!isAiTasksEnabled()) {
+                aiFallbackReason = 'ai_unconfigured'
+                throw new Error(AI_UNAVAILABLE_MESSAGE)
+            }
+            const { output } = await runAiTaskForUser(user, req, 'site.extract-business-info', {
+                pageText: scrapeResult.raw.preprocessedText.slice(0, 40_000),
             })
 
-            const raw = completion.choices[0]?.message?.content || '{}'
-            const parsed = JSON.parse(raw)
-
             // 7. Validate with Zod (defaults for missing fields)
-            extractedData = extractionResultSchema.parse(parsed)
+            extractedData = extractionResultSchema.parse(output)
         } catch (aiError: unknown) {
-            console.error('[Extract URL] AI extraction failed:', aiError)
+            console.error('[Extract URL] AI extraction failed:', aiError instanceof Error ? aiError.message : aiError)
+            // No active workspace / super-admin outside the workspace / lapsed membership all surface as AgentAccessError.
+            aiFallbackReason ??= aiError instanceof AgentAccessError ? 'not_workspace_member' : 'ai_task_failed'
 
             // Fallback: return what we scraped without AI enrichment
             extractedData = extractionResultSchema.parse({
@@ -116,6 +115,7 @@ export const POST = withAuth(async (user, req) => {
                 ...extractedData,
                 confidence: finalConfidence,
             },
+            ...(aiFallbackReason ? { aiFallbackReason } : {}),
             scrapeConfidence: scrapeResult.confidence,
             warnings: scrapeResult.warnings,
             sourceUrl: url,
@@ -127,4 +127,4 @@ export const POST = withAuth(async (user, req) => {
             { status: 500 },
         )
     }
-})
+}, { csrf: true })

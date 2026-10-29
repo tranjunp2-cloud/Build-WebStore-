@@ -16,6 +16,7 @@ import {
     TableCell,
 } from '@/components/ui/table'
 import { getCustomerOrdersAction } from '../actions'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 
 type OrderRow = {
     id: number
@@ -78,16 +79,17 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
     const [loading, setLoading]       = useState(true)
     const [error, setError]           = useState(false)
 
-    const fetchOrders = useCallback(async (p: number) => {
-        setLoading(true)
-        setError(false)
+    // silent = an assistant-driven refetch: keep the rows, and a failure keeps them too
+    const fetchOrders = useCallback(async (p: number, silent = false) => {
+        if (!silent) { setLoading(true); setError(false) }
         try {
             const res = await getCustomerOrdersAction(customerId, p)
             setOrders(res.orders as OrderRow[])
             setTotal(res.total as number)
             setTotalPages(res.totalPages as number)
-        } catch {
-            setError(true)
+        } catch (err) {
+            if (silent) console.error('[Customer orders refresh]', err)
+            else setError(true)
         } finally {
             setLoading(false)
         }
@@ -95,6 +97,8 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
 
     useEffect(() => { setPage(1) }, [customerId])
     useEffect(() => { fetchOrders(page) }, [fetchOrders, page])
+    // the assistant changed an order (cancel, ship, refund...): the statuses listed here may have moved
+    useAgentChanges({ kinds: ['store_order'] }, () => { void fetchOrders(page, true) })
 
     if (loading) {
         return (

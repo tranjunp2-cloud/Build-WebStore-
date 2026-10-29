@@ -27,6 +27,7 @@ import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enfo
 import { mapBusinessInfo } from './business-info-mapper'
 import type { BusinessInfoInput } from './system-prompt'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
+import { withoutLibraryIdentity } from './library-identity'
 
 type Language = 'en' | 'ms' | 'vi'
 
@@ -181,7 +182,7 @@ export function adaptTemplateSeedToGenerationResult(
         pages,
         seo: {
             title: biz.tagline ? `${biz.name} — ${biz.tagline}` : biz.name,
-            description: truncate(biz.description ?? templateSeed.description, 160),
+            description: truncate(biz.description || templateSeed.description, 160),
         },
         language: language === 'en' || language === 'ms' || language === 'vi' ? language : 'en',
         theme: {
@@ -275,7 +276,7 @@ export function composeTemplateResult(
     }
 
     const biz: BusinessSample = bizOverride
-        ? { ...baseBiz, ...bizOverride }
+        ? withoutLibraryIdentity(baseBiz, bizOverride)
         : baseBiz
 
     // Phase 06 — the consistency check runs ONE level up in

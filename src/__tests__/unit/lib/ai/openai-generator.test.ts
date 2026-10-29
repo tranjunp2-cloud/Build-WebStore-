@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 
-// Mock OpenAI
-vi.mock('openai', () => ({ default: vi.fn() }))
+import { scripted } from '@/__tests__/helpers/scripted-ai-platform'
+vi.mock('@/lib/ai-platform/actor-scope', async (importOriginal) => {
+    const { scriptedActorScope } = await import('@/__tests__/helpers/scripted-ai-platform')
+    return scriptedActorScope(await importOriginal<any>())
+})
 vi.mock('@/blocks/registry', () => ({
     blockRegistry: {
         getAllMeta: () => [{ type: 'hero', name: 'Hero', description: 'Hero section', variants: ['centered'], editableFields: ['headline'] }],
@@ -24,6 +27,7 @@ vi.mock('@/blocks/registry', () => ({
 vi.mock('@/lib/ai/system-prompt', () => ({
     buildSystemPrompt: () => 'System prompt',
     buildUserPrompt: () => 'User prompt',
+    buildPersonalizePrompt: () => ({ system: 'Personalize system', user: 'Personalize user' }),
 }))
 
 import { generateSiteWithAI, resolveSiteGenerationMode } from '@/lib/ai/openai-generator'
@@ -40,7 +44,7 @@ const businessInfo = {
 describe('generateSiteWithAI — fallback path (no API key) [TC-F01.08]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-        delete process.env.OPENAI_API_KEY
+        scripted.create = null
     })
 
     it('falls back to rule-based generator when no OPENAI_API_KEY', async () => {
@@ -109,30 +113,29 @@ describe('generateSiteWithAI — fallback path (no API key) [TC-F01.08]', () => 
             undefined,
             undefined,
             { targetLocale: 'it' },
-        )).rejects.toThrow('OpenAI is required to generate content in Italian')
+        )).rejects.toThrow('AI is required to generate content in Italian')
     })
 })
 
 describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-        process.env.OPENAI_API_KEY = 'test-key'
+        scripted.create = null
         // Force AI-first path so these tests still exercise the GPT code path
         process.env.GEN_MODE = 'ai-first'
     })
 
     afterAll(() => {
-        delete process.env.OPENAI_API_KEY
         delete process.env.GEN_MODE
     })
 
-    it('keeps ai-first when the credit pilot succeeds', async () => {
+    it('resolves ai-first from the AI actor alone, without a credit pilot call', async () => {
         const create = vi.fn().mockResolvedValue({
             model: 'gpt-5.4-mini',
             usage: { prompt_tokens: 5, completion_tokens: 3 },
             choices: [{ message: { content: '{"ok":true}' } }],
         })
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
 
         const decision = await resolveSiteGenerationMode()
@@ -141,25 +144,21 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
             requestedGenMode: 'ai-first',
             effectiveGenMode: 'ai-first',
         })
-        expect(create).toHaveBeenCalledTimes(1)
+        expect(create).not.toHaveBeenCalled()
     })
 
-    it('switches to template-first after one pilot call when AI credit is exhausted', async () => {
-        const quotaError = Object.assign(new Error('AI credit exhausted'), {
-            status: 429,
-            code: 'insufficient_quota',
-        })
+    it('[TC-AIMV-02] a platform 429 on every split step falls back per scope to the composer, and the site still generates', async () => {
+        const quotaError = Object.assign(new Error('AI limit reached for this workspace'), { status: 429 })
         const create = vi.fn().mockRejectedValue(quotaError)
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
 
         const output = await generateSiteWithAI(businessInfo)
 
-        expect(output.requestedGenMode).toBe('ai-first')
-        expect(output.effectiveGenMode).toBe('template-first')
-        expect(output.modeReason).toBe('insufficient_quota')
+        // Home + the two subpage batches were each tried once on the platform; none succeeded.
+        expect(create).toHaveBeenCalledTimes(3)
         expect(output.result.blocks.length).toBeGreaterThan(0)
-        expect(create).toHaveBeenCalledTimes(1)
+        expect(output.result.pages?.length).toBeGreaterThan(0)
     })
 
     it('keeps Malay generation on the configured template-first pipeline', async () => {
@@ -178,7 +177,7 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
                 },
             }],
         })
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
 
         try {
@@ -205,13 +204,10 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
         }
     })
 
-    it('does not mistake a transient 429 for exhausted credit', async () => {
-        const transientRateLimit = Object.assign(new Error('Rate limit exceeded'), {
-            status: 429,
-            code: 'rate_limit_exceeded',
-        })
+    it('[TC-AIMV-02] a transient 429 is not probed before the run: the mode comes from the actor, with no model call', async () => {
+        const transientRateLimit = Object.assign(new Error('Rate limit exceeded'), { status: 429 })
         const create = vi.fn().mockRejectedValue(transientRateLimit)
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
 
         const decision = await resolveSiteGenerationMode()
@@ -220,11 +216,11 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
             requestedGenMode: 'ai-first',
             effectiveGenMode: 'ai-first',
         })
-        expect(create).toHaveBeenCalledTimes(1)
+        expect(create).not.toHaveBeenCalled()
     })
 
     it('parses valid AI response and returns blocks', async () => {
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({
             chat: {
                 completions: {
@@ -265,7 +261,7 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
 
     // TC-F01-AI-FALLBACK-SILENT-01 — OpenAI throws → fallback succeeds → no error event emitted
     it('falls back silently when OpenAI throws error (no error event)', async () => {
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({
             chat: {
                 completions: {
@@ -287,7 +283,7 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
         // New contract: category theme preset is authoritative.
         // AI output for theme colors/fonts is IGNORED — preset wins.
         // See plans/260414-1630-phase-08-audit/phase-02-happy-path-integration.md
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({
             chat: {
                 completions: {
@@ -327,7 +323,7 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
     })
 
     it('truncates SEO title to 60 chars and description to 160 chars', async () => {
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({
             chat: {
                 completions: {
@@ -354,7 +350,7 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
     })
 
     it('skips unknown block types', async () => {
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({
             chat: {
                 completions: {
@@ -390,7 +386,7 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
     // via onEvent, causing client to receive TWO 'done' events (internal + route.ts's authoritative done).
     // Fix: Filter out 'done' from forwarded events while keeping all others.
     it('does NOT forward internal done event via onEvent [TC-F01-EVT.01]', async () => {
-        const OpenAI = (await import('openai')).default as any
+        const OpenAI = scripted as any
         OpenAI.mockImplementation(() => ({
             chat: {
                 completions: {
@@ -592,7 +588,7 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
     it('preserves valid logo-cloud placeholders while stripping URLs', () => {
         const input = { blockType: 'logo-cloud', logos: ['Acme Corp', { name: 'Partner Inc', url: 'http://example.com' }] }
         const output = sanitizeBlockData(input)
-        const logos = output.logos as Array<Record<string, unknown>>
+        const logos = output.logos as unknown as Array<Record<string, unknown>>
         expect(logos).toHaveLength(2)
         expect(logos[0]).toEqual({ name: 'Acme Corp', logo: { url: '', alt: 'Acme Corp' } })
         expect(logos[1]).toEqual({ name: 'Partner Inc', logo: { url: '', alt: 'Partner Inc' } })
@@ -655,5 +651,65 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
 
         // Assert — categories preserved → drop condition false → block kept
         expect(Array.isArray(cats) && (cats as unknown[]).length > 0).toBe(true)
+    })
+})
+
+describe('[TC-AIMV-02] sitegen steps run as platform tasks when an AI actor is in scope', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        scripted.create = null
+        scripted.taskIds.length = 0
+        process.env.GEN_MODE = 'ai-first'
+    })
+
+    afterEach(() => {
+        process.env.GEN_MODE = 'ai-first'
+    })
+
+    it('without an AI actor the run is template-first with modeReason missing_api_key, and no task is sent', async () => {
+        const decision = await resolveSiteGenerationMode()
+
+        expect(decision).toEqual({
+            requestedGenMode: 'ai-first',
+            effectiveGenMode: 'template-first',
+            modeReason: 'missing_api_key',
+        })
+        expect(scripted.taskIds).toEqual([])
+    })
+
+    it('with an actor the whole-site steps are sitegen.page-blocks tasks, one per split call', async () => {
+        const pagesFor = (sys: string) => sys.includes('HOMEPAGE ONLY')
+            ? [{ title: 'Home', slug: '/', isHomepage: true, blocks: [] }]
+            : sys.includes('Contact, Blog')
+                ? [{ title: 'Contact', slug: '/contact', isHomepage: false, blocks: [] }, { title: 'Blog', slug: '/blog', isHomepage: false, blocks: [] }]
+                : [{ title: 'About', slug: '/about', isHomepage: false, blocks: [] }, { title: 'Services', slug: '/services', isHomepage: false, blocks: [] }]
+        const create = vi.fn(async (opts: any) => ({
+            model: 'test',
+            usage: { prompt_tokens: 1, completion_tokens: 1 },
+            choices: [{ message: { content: JSON.stringify({ siteName: 'Test Cafe', category: 'business', theme: {}, seo: {}, language: 'en', pages: pagesFor(String(opts.messages[0].content)) }) } }],
+        }))
+        const OpenAI = scripted as any
+        OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
+
+        await generateSiteWithAI(businessInfo)
+
+        expect(scripted.taskIds).toEqual(['sitegen.page-blocks', 'sitegen.page-blocks', 'sitegen.page-blocks'])
+    })
+
+    it('template-first sends its hero/SEO personalization to sitegen.personalize', async () => {
+        process.env.GEN_MODE = 'template-first'
+        const create = vi.fn(async () => ({
+            model: 'test',
+            usage: { prompt_tokens: 1, completion_tokens: 1 },
+            choices: [{ message: { content: JSON.stringify({ heroHeadline: 'Kopi Shah Alam', heroSubheadline: 'Sarapan tempatan.', seoTitle: 'Kopi', seoDescription: 'Kopi artisan.' }) } }],
+        }))
+        const OpenAI = scripted as any
+        OpenAI.mockImplementation(() => ({ chat: { completions: { create } } }))
+
+        const output = await generateSiteWithAI(businessInfo)
+
+        expect(output.effectiveGenMode).toBe('template-first')
+        expect(scripted.taskIds).toContain('sitegen.personalize')
+        expect(scripted.taskIds).not.toContain('sitegen.page-blocks')
     })
 })

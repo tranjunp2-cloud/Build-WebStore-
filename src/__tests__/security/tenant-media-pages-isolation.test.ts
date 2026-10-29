@@ -10,33 +10,37 @@ import {
 } from "../helpers/tenant-test-harness";
 
 describe("[TC-SEC-04] Multi-tenant Media & Blog Isolation", () => {
-  it("restricts Media updates to non-stock source provider files for authenticated users", () => {
+  it("restricts Media updates to non-stock files and to stock files of the user's own workspace", () => {
     const reqAlpha = createMockTenantReq(USER_ALPHA);
     const reqAnon = createMockTenantReq(null);
 
     const updateAlpha = typeof Media.access?.update === "function" ? Media.access.update({ req: reqAlpha } as any) : undefined;
     const updateAnon = typeof Media.access?.update === "function" ? Media.access.update({ req: reqAnon } as any) : undefined;
 
+    // stock-provider rows only when they belong to the user's own workspace (TC-AIREL-216)
     expect(updateAlpha).toEqual({
       or: [
         { sourceProvider: { exists: false } },
         { sourceProvider: { not_in: ["wikimedia", "pixabay"] } },
+        { and: [{ sourceProvider: { in: ["wikimedia", "pixabay"] } }, { tenant: { in: [TENANT_ALPHA.id] } }] },
       ],
     });
     expect(updateAnon).toBe(false);
   });
 
-  it("restricts Media deletion to non-stock source provider files", () => {
+  it("restricts Media deletion to non-stock files and to stock files of the user's own workspace", () => {
     const reqAlpha = createMockTenantReq(USER_ALPHA);
     const reqAnon = createMockTenantReq(null);
 
     const deleteAlpha = typeof Media.access?.delete === "function" ? Media.access.delete({ req: reqAlpha } as any) : undefined;
     const deleteAnon = typeof Media.access?.delete === "function" ? Media.access.delete({ req: reqAnon } as any) : undefined;
 
+    // stock-provider rows only when they belong to the user's own workspace (TC-AIREL-216)
     expect(deleteAlpha).toEqual({
       or: [
         { sourceProvider: { exists: false } },
         { sourceProvider: { not_in: ["wikimedia", "pixabay"] } },
+        { and: [{ sourceProvider: { in: ["wikimedia", "pixabay"] } }, { tenant: { in: [TENANT_ALPHA.id] } }] },
       ],
     });
     expect(deleteAnon).toBe(false);

@@ -12,12 +12,6 @@ import { CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { MeshGradient, DiagonalStripe, NoiseTexture, TypographicMark, GridLines } from '../shared/decorative'
 
-const FALLBACK_STATS: StatsConfig['stats'] = [
-    { value: '500+', label: 'Happy Customers' },
-    { value: '10+', label: 'Years Experience' },
-    { value: '4.9', label: 'Average Rating', suffix: '★' },
-]
-
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 
 type StatsSectionProps = {
@@ -390,7 +384,8 @@ function ChartBarsVariant({ headline, stats }: { headline?: string; stats: StatI
 
 export function StatsBlock({ block }: BlockProps<StatsConfig>) {
     const { headline, stats: rawStats = [], variant = 'row' } = block
-    const stats = rawStats.length > 0 ? rawStats : FALLBACK_STATS
+    // #2103 A1: never show made-up figures — with no real stats the block renders nothing.
+    const stats = rawStats
 
     /* Plan 260415 Lỗi C — empty state dev warn */
     if (!stats.length) {

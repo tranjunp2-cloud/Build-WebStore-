@@ -60,46 +60,39 @@ describe('buildBlockFromLibrary — testimonials/faq rotation (R5 fix)', () => {
         expect(firstQuotes.size).toBeGreaterThanOrEqual(2)
     })
 
-    it('TC-F01V-CR.05 — faq pool slice rotates by seed', () => {
-        const firstQs = new Set<string>()
+    it('TC-F01V-CR.05 — faq has no rotating library pool: without facts nothing is injected (#2103)', () => {
         for (const name of TEST_NAMES) {
             const seed = hashBusinessName(name)
-            const block = buildBlockFromLibrary('faq', 'beauty', { seed })
-            const items = (block?.faqs ?? block?.items) as Array<{ question: string }> | undefined
-            if (items?.[0]) firstQs.add(items[0].question)
+            expect(buildBlockFromLibrary('faq', 'beauty', { seed })).toBeNull()
         }
-        expect(firstQs.size).toBeGreaterThanOrEqual(2)
     })
 })
 
-describe('padItems — seed-rotated padding (R5 fix)', () => {
-    it('TC-F01V-CR.06 — different seeds produce different padded testimonials', () => {
-        const firstPaddedNames = new Set<string>()
-        for (const name of TEST_NAMES) {
-            const seed = hashBusinessName(name)
-            const padded = padItems('testimonials', [], 4, 'beauty', { seed }) as Array<{
-                name: string
-            }>
-            if (padded[0]?.name) firstPaddedNames.add(padded[0].name)
+describe('padItems — never pads real facts with invented items (#2103 A1)', () => {
+    it('TC-F01V-CR.06 — testimonials / faq / team / stats / pricing / logo-cloud are not padded', () => {
+        for (const bt of ['testimonials', 'faq', 'team', 'stats', 'pricing', 'logo-cloud', 'client-logos']) {
+            for (const name of TEST_NAMES) {
+                const seed = hashBusinessName(name)
+                expect(padItems(bt, [], 4, 'beauty', { seed }), `${bt}/${name}`).toEqual([])
+            }
         }
-        // 10 seeds → ≥2 distinct first-padded names
-        expect(firstPaddedNames.size).toBeGreaterThanOrEqual(2)
     })
 
-    it('TC-F01V-CR.07 — existing items preserved before padding', () => {
+    it('TC-F01V-CR.07 — existing items preserved and left as they are (no padding)', () => {
         const existing = [{ name: 'Pre-existing', quote: 'Already here', rating: 5 }]
         const padded = padItems('testimonials', existing, 4, 'beauty', { seed: 42 })
-        expect(padded[0]).toEqual(existing[0])
-        expect(padded.length).toBe(4)
+        expect(padded).toEqual(existing)
     })
 
-    it('TC-F01V-CR.08 — same seed reproduces same padding (determinism)', () => {
-        const a = padItems('testimonials', [], 4, 'beauty', { seed: 100 }) as Array<{
-            name: string
-        }>
-        const b = padItems('testimonials', [], 4, 'beauty', { seed: 100 }) as Array<{
-            name: string
-        }>
-        expect(a.map((x) => x.name)).toEqual(b.map((x) => x.name))
+    it('TC-F01V-CR.08 — same seed reproduces same result (determinism)', () => {
+        const a = padItems('features', [], 4, 'beauty', { seed: 100 })
+        const b = padItems('features', [], 4, 'beauty', { seed: 100 })
+        expect(JSON.stringify(a)).toBe(JSON.stringify(b))
+    })
+
+    it('TC-AIAUD-027 — features may still be padded (product/description based, claim-free)', () => {
+        const padded = padItems('features', [{ title: 'Kek lapis', description: 'RM 65', icon: 'Cake' }], 3, 'fnb', { seed: 1 })
+        expect(padded.length).toBeGreaterThan(1)
+        expect(JSON.stringify(padded)).not.toMatch(/halal|jakim|certified/i)
     })
 })

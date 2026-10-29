@@ -12,6 +12,7 @@ import {
 } from './_lib/customer-record'
 import { toCsv } from './_lib/csv-exporter'
 import type { CustomerRecord } from './_lib/customer-record'
+import { assertSiteOwnership, getTenantSiteIds, type LeadDbStatus, setLeadStatusAs } from '@/lib/leads/lead-service'
 
 type CustomerFilters = {
     search?: string
@@ -25,22 +26,6 @@ async function requireTenantId(): Promise<string> {
     const tenantId = await getCurrentTenantId()
     if (!tenantId) throw new Error('Unauthorized')
     return tenantId
-}
-
-// Resolve site IDs owned by this tenant (shared by list + mutation guards)
-async function getTenantSiteIds(payload: Awaited<ReturnType<typeof getPayload>>, tenantId: string): Promise<number[]> {
-    const res = await payload.find({
-        collection: 'sites',
-        where: { tenant: { equals: tenantId } },
-        limit: 100,
-        depth: 0,
-    })
-    return res.docs.map(s => s.id as number)
-}
-
-// IDOR guard — throws if record's site doesn't belong to this tenant
-function assertSiteOwnership(siteId: number | null, siteIds: number[]): void {
-    if (!siteId || !siteIds.includes(siteId)) throw new Error('Unauthorized')
 }
 
 function buildContactWhere(siteIds: number[], search: string, displayStatus: string): Where {
@@ -141,41 +126,9 @@ export async function updateContactStatusAction(rawId: number, displayStatus: st
     const tenantId = await requireTenantId()
     const dbStatus = CS_STATUS_TO_DB[displayStatus]
     if (!dbStatus) throw new Error('Invalid status')
-    const payload = await getPayload({ config: configPromise })
-
-    // Resolve email + siteId from the target record
-    const sourceDoc = await payload.findByID({ collection: 'contact-submissions', id: rawId, depth: 0 })
-    const sourceRecord = mapContactSubmission(sourceDoc as Record<string, unknown>)
-
-    // IDOR guard — verify the submission belongs to this tenant
-    const siteIds = await getTenantSiteIds(payload, tenantId)
-    assertSiteOwnership(sourceRecord.siteId, siteIds)
-
-    // Batch update all submissions for the same email + site
-    const siblings = await payload.find({
-        collection: 'contact-submissions',
-        where: {
-            and: [
-                { email: { equals: sourceRecord.email } },
-                { site: { equals: sourceRecord.siteId } },
-            ],
-        },
-        limit: 100,
-        depth: 0,
-    })
-    await Promise.all(
-        siblings.docs.map(doc =>
-            payload.update({
-                collection: 'contact-submissions',
-                id: doc.id as number,
-                data: { status: dbStatus },
-                depth: 0,
-            }),
-        ),
-    )
-
-    const updated = await payload.findByID({ collection: 'contact-submissions', id: rawId, depth: 0 })
-    return JSON.parse(JSON.stringify(mapContactSubmission(updated as Record<string, unknown>)))
+    // the write core is shared with the dashboard assistant (lib/leads/lead-service)
+    const { lead } = await setLeadStatusAs({ tenantId }, rawId, dbStatus as LeadDbStatus)
+    return JSON.parse(JSON.stringify(mapContactSubmission(lead)))
 }
 
 export async function deleteCustomerAction(rawId: number, source: string) {

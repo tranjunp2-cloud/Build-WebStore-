@@ -1,3 +1,5 @@
+import type { GenerationFacts } from '../generation-facts'
+
 export type BusinessSample = {
   name: string
   tagline: string
@@ -10,6 +12,11 @@ export type BusinessSample = {
   // Ephemeral from BusinessInfoInput wire payload, NOT persisted to Payload.
   // Populated via bizOverride in composeFromBlueprint when user supplies products.
   products?: string[]
+  /**
+   * Ephemeral, like `products`: the merchant FACTS for this generation (#2103 A1).
+   * When absent (template gallery, legacy callers) builders emit no invented claims.
+   */
+  facts?: GenerationFacts
 }
 
 export type TestimonialSample = {
@@ -48,17 +55,6 @@ export type BlogPost = {
   readTime?: string
 }
 
-/**
- * Plan 260417-0837 phase-01 item 1.4: real MY client-logo data.
- * Replaces synthetic `Partner {i+1}` stubs. `url` optional — name-only
- * render is fine until a logo media pipeline ships (see plan followup).
- */
-export type ClientLogo = {
-  name: string
-  url?: string
-  industryTag?: string
-}
-
 export type CategoryContent = {
   category: string
   locale: 'en-MY'
@@ -68,6 +64,4 @@ export type CategoryContent = {
   industryBlocks: IndustryBlockSample[]
   /** Plan 260414-2249 phase-05: 3-5 hand-curated posts per category. */
   blogSeeds?: BlogPost[]
-  /** Plan 260417-0837 phase-01: 6-8 MY client logos per category. */
-  logos?: ClientLogo[]
 }

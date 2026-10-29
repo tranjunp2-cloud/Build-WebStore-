@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { CategoryModal } from './_components/CategoryModal'
 import { useI18n } from '@/i18n'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 import {
     Plus,
     Trash2,
@@ -104,9 +105,15 @@ export default function BlogListPage() {
     const [bulkActionLoading, setBulkActionLoading] = useState(false)
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
-    const fetchPosts = useCallback(async () => {
-        setLoading(true)
-        setError(null)
+    // Only the newest request may write: a slow answer for an old filter or page must not replace a newer one.
+    const fetchSeq = useRef(0)
+    // silent: a refresh in the background (the assistant changed a post) — rows stay, no spinner, a failure keeps them
+    const fetchPosts = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+        const seq = ++fetchSeq.current
+        if (!silent) {
+            setLoading(true)
+            setError(null)
+        }
         try {
             const res = await listBlogsAction({
                 search: search || undefined,
@@ -116,20 +123,31 @@ export default function BlogListPage() {
                 limit: limit,
                 sort: sortBy,
             })
+            if (seq !== fetchSeq.current) return
 
             setPosts(res.data || [])
             setMeta(res.meta || null)
+            if (silent) setError(null)
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Something went wrong')
+            if (seq !== fetchSeq.current) return
+            if (silent) console.error('[Blog] Background refresh failed:', err)
+            else setError(err instanceof Error ? err.message : 'Something went wrong')
         } finally {
-            setLoading(false)
-            hasLoaded.current = true
+            if (seq === fetchSeq.current) {
+                setLoading(false)
+                hasLoaded.current = true
+            }
         }
     }, [search, statusFilter, categoryFilter, sortBy, page, limit])
 
     useEffect(() => {
         fetchPosts()
     }, [fetchPosts])
+
+    // The assistant created, edited or published/unpublished a post: refresh this page of the list in place
+    useAgentChanges({ kinds: ['blog_post'] }, () => {
+        void fetchPosts({ silent: true })
+    })
 
     // Fetch categories for filter dropdown
     useEffect(() => {
@@ -293,7 +311,7 @@ export default function BlogListPage() {
                     </div>
                     <h3 className="text-lg font-semibold text-foreground">{t.dashboard.blog.loadFailed}</h3>
                     <p className="text-sm text-muted-foreground">{error}</p>
-                    <Button onClick={fetchPosts} variant="dashPrimary" size="dash">
+                    <Button onClick={() => fetchPosts()} variant="dashPrimary" size="dash">
                         {t.dashboard.blog.tryAgain}
                     </Button>
                 </div>

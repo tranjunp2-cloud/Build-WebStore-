@@ -15,6 +15,8 @@ import { TrafficPerformanceClient } from '@/components/dashboard/revamp/traffic-
 import { SeoHealth } from '@/components/dashboard/revamp/seo-health'
 import { PendingOrders } from '@/components/dashboard/revamp/pending-orders'
 import { DashboardToolbarHeader } from '@/components/dashboard/revamp/dashboard-toolbar-header'
+import { AgentRefresh } from '@/lib/agent-changes/agent-refresh'
+import { dashboardRefreshKinds } from './refresh-kinds'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
 import './dashboard-revamp.css'
@@ -202,8 +204,11 @@ export default async function DashboardRoot({ searchParams }: Props) {
         )
     }
 
+    const refreshKinds = dashboardRefreshKinds(renderBlocks, { onboarding: showOnboarding, canViewOrders })
+
     return (
         <div className="dash-revamp">
+            {refreshKinds.length > 0 && <AgentRefresh kinds={refreshKinds} />}
             <div className="dash-toolbar">
                 <DashboardToolbarHeader period={period} rangeLabel={glance.rangeLabel} />
                 <div className="dt-right">

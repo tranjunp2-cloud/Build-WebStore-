@@ -26,7 +26,7 @@ type RecoveryJob = {
     idempotencyKey?: string | null
 }
 
-type RecoveryPayload = {
+export type RecoveryPayload = {
     findByID(args: Record<string, unknown>): Promise<RecoveryParent>
     find(args: Record<string, unknown>): Promise<{ docs: unknown[] }>
     create(args: Record<string, unknown>): Promise<{ id: string | number }>

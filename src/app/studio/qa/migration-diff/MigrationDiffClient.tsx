@@ -10,6 +10,7 @@ import { migrationLifecycleStatus, MIGRATION_LIFECYCLE_LABELS, type MigrationLif
 import { ReconciliationInspector } from "./ReconciliationInspector";
 import { QuickQcMenu } from "./QuickQcMenu";
 import { FieldEvidencePanel } from './FieldEvidencePanel';
+import { DeltaMigrationPanel } from './DeltaMigrationPanel';
 import { BlockComparisonPanel } from './BlockComparisonPanel';
 import { NeedsReviewToggle } from './NeedsReviewToggle';
 import { fieldEvidenceRates } from '@/lib/admin/qa/field-evidence-summary';
@@ -2852,6 +2853,9 @@ export function MigrationDiffClient({ live = false }: { live?: boolean }) {
                   : <p className="m-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100" role="status">
                     Chưa chọn được migration run VERIFIED để xem bằng chứng từng trường.
                   </p>
+              )}
+              {live && !reconciliationDemo && reconciliationSourceStoreId === activeStoreId && (
+                <DeltaMigrationPanel store={reconciliationSourceStoreId} refresh={reconciliationRefresh} />
               )}
               <ReconciliationInspector
                 scope={activeViewTab === "commerce_reconciliation" ? "commerce" : "settings"}

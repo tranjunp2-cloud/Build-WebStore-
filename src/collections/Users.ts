@@ -1,26 +1,36 @@
 import type {
+    FieldAccess,
     CollectionConfig,
     CollectionAfterChangeHook,
     CollectionBeforeChangeHook,
     CollectionBeforeOperationHook,
+    PayloadRequest,
 } from 'payload'
 import { APIError } from 'payload'
 import { isMigrationContext } from '@/lib/migration/pw1-json/runtime'
 import { randomBytes } from 'crypto'
-import { sendEmail } from '@/lib/email/send'
+import type { sendEmail as SendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
 import { staffInvitationEmail } from '@/lib/email/templates/staff-invitation'
 import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
-import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
+import { generateOTP, hashOTP, getOTPExpiry, OTP_TTL_MS, OTP_RESEND_COOLDOWN_MS } from '@/lib/otp/generate'
 import { canBypassOtpForEmail, getQcBypassCode, isValidQcBypass } from '@/lib/otp/qc-bypass'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
 import { normalizeTenants } from '@/lib/normalize-tenants'
 import { canUpdateAvatarField } from '@/lib/profile/avatar-field-access'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
-import { getTemplateConfig } from '@/lib/email/get-template-config'
+import type { getTemplateConfig as GetTemplateConfig } from '@/lib/email/get-template-config'
 import { getActivePlanSubscription, canUseWithinLimit, recordUsage, reduceUsage } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+
+// Loaded on use: both modules import the Payload config, which imports this collection.
+// A static import makes a cycle that breaks production builds (config reads Users before it exists).
+const sendEmail: typeof SendEmail = async (...args) => (await import('@/lib/email/send')).sendEmail(...args)
+const getTemplateConfig: typeof GetTemplateConfig = async (...args) =>
+    (await import('@/lib/email/get-template-config')).getTemplateConfig(...args)
+
+const isSuperAdminField: FieldAccess = ({ req }) => Boolean(req.user?.roles?.includes('super-admin'))
 
 /**
  * Single source of truth for the `roles` select options — reused by the field
@@ -148,6 +158,27 @@ async function injectUser(req: any) {
             // JWT decode failures are expected (expired/invalid tokens) — log at warn level only
             req.payload?.logger?.warn?.({ err }, 'injectUser: JWT decode failed — treating as unauthenticated')
         }
+    }
+}
+
+/**
+ * True when the user exists and is currently locked by Payload's maxLoginAttempts.
+ * Never throws: on any lookup failure we fall back to the generic "Login failed" path.
+ */
+async function isAccountLocked(req: PayloadRequest, email: string): Promise<boolean> {
+    try {
+        const { docs } = await req.payload.find({
+            collection: 'users',
+            where: { email: { equals: email.trim().toLowerCase() } },
+            limit: 1,
+            depth: 0,
+            overrideAccess: true,
+            showHiddenFields: true, // lockUntil is a hidden auth field
+        })
+        const lockUntil = (docs[0] as { lockUntil?: string | Date | null } | undefined)?.lockUntil
+        return !!lockUntil && new Date(lockUntil).getTime() > Date.now()
+    } catch {
+        return false
     }
 }
 
@@ -312,6 +343,14 @@ export const Users: CollectionConfig = {
 
                 } catch (error: unknown) {
                     console.error('[Users SSO Login Error]:', error)
+                    // Payload fails a locked account the same way as a wrong password, so look
+                    // at lockUntil directly to let the login page show the right message (GH-2053).
+                    if (await isAccountLocked(req, email)) {
+                        return Response.json(
+                            { errors: [{ message: 'Account locked', code: 'ACCOUNT_LOCKED' }] },
+                            { status: 423 },
+                        )
+                    }
                     return Response.json({ errors: [{ message: 'Login failed' }] }, { status: 401 })
                 }
             }
@@ -884,11 +923,17 @@ export const Users: CollectionConfig = {
                     // Check rate limiting: max 1 OTP per 60 seconds
                     if (user.otpExpiresAt) {
                         const lastExpiry = new Date(user.otpExpiresAt)
-                        const cooldownEnd = new Date(lastExpiry.getTime() - (4 * 60 * 1000)) // 5 min TTL - 4 min = sent 1 min ago
+                        // sentAt = expiry - TTL (TTL is 5 min in prod, 30 min in dev) — never hard-code it here
+                        const cooldownEnd = new Date(lastExpiry.getTime() - OTP_TTL_MS + OTP_RESEND_COOLDOWN_MS)
                         if (Date.now() < cooldownEnd.getTime()) {
+                            // Machine-readable code + remaining seconds so the login page can
+                            // route to /verify-otp (previous OTP is still valid) instead of
+                            // showing a generic error.
+                            const retryAfter = Math.max(1, Math.ceil((cooldownEnd.getTime() - Date.now()) / 1000))
+                            const expiresIn = Math.max(0, Math.ceil((lastExpiry.getTime() - Date.now()) / 1000))
                             return Response.json(
-                                { errors: [{ message: 'Please wait before requesting a new code.' }] },
-                                { status: 429 },
+                                { errors: [{ message: 'Please wait before requesting a new code.', code: 'OTP_COOLDOWN', retryAfter, expiresIn }] },
+                                { status: 429, headers: { 'Retry-After': String(retryAfter) } },
                             )
                         }
                     }
@@ -1192,6 +1237,10 @@ export const Users: CollectionConfig = {
             admin: {
                 description: 'Which tenants this user has access to',
             },
+            // Every tenant check (dashboard, copilot, appliers) trusts this list, so no request may write it
+            // except a super-admin's. Server flows (SSO provision, staff endpoints, site generation) write it
+            // through the Local API, which field access does not apply to.
+            access: { create: isSuperAdminField, update: isSuperAdminField },
             fields: [
                 {
                     name: 'tenant',
@@ -1322,22 +1371,26 @@ export const Users: CollectionConfig = {
             relationTo: 'users',
             admin: { hidden: true, description: 'User who last updated this record (audit trail)' },
         },
-        // ── OTP 2FA fields (hidden from admin) ──
+        // ── OTP 2FA fields (hidden from admin) ── server-managed: send-otp / verify-otp write them through the
+        // Local API. Closed to requests: a readable or writable hash (sha256 of 6 digits) would skip the OTP step.
         {
             name: 'otpHash',
             type: 'text',
             admin: { hidden: true },
+            access: { read: () => false, create: () => false, update: () => false },
         },
         {
             name: 'otpExpiresAt',
             type: 'date',
             admin: { hidden: true },
+            access: { create: () => false, update: () => false },
         },
         {
             name: 'otpAttempts',
             type: 'number',
             defaultValue: 0,
             admin: { hidden: true },
+            access: { create: () => false, update: () => false },
         },
         {
             name: 'keyString',

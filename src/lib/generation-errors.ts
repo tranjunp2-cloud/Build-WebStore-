@@ -10,6 +10,7 @@ export type GenerationErrorCode =
     | 'SERVER_ERROR'
     | 'SERVICE_UNAVAILABLE'
     | 'SSE_DISCONNECT'
+    | 'GENERATION_FAILED'
 
 export type GenerationErrorUIType = 'toast' | 'banner' | 'inline' | 'fullscreen'
 
@@ -120,6 +121,18 @@ const ERROR_MAP: Record<string, GenerationError> = {
     },
 }
 
+/** Error codes the generation stream sends in its `error` event. */
+const STREAM_ERROR_MAP: Record<string, GenerationError> = {
+    GENERATION_FAILED: {
+        code: 'GENERATION_FAILED',
+        messageEN: "We couldn't finish your website. Your details are saved — please try again.",
+        messageMS: 'Kami belum dapat menyiapkan laman web anda. Maklumat anda telah disimpan — sila cuba lagi.',
+        action: { label: 'Retry', type: 'retry' },
+        retryable: true,
+        uiType: 'banner',
+    },
+}
+
 const DEFAULT_ERROR: GenerationError = {
     code: 'SERVER_ERROR',
     messageEN: 'Something went wrong. Please try again.',
@@ -184,4 +197,15 @@ export function formatErrorMessage(
         (result, [key, value]) => result.replace(`{${key}}`, value),
         msg,
     )
+}
+
+/**
+ * Resolve the error the generation stream reported by its `code`. The stream's own `message`
+ * is never shown: the merchant always reads the copy for their UI language.
+ */
+export function getStreamGenerationError(code: unknown): GenerationError {
+    if (typeof code !== 'string') return STREAM_ERROR_MAP.GENERATION_FAILED
+    return STREAM_ERROR_MAP[code]
+        ?? Object.values(ERROR_MAP).find((entry) => entry.code === code)
+        ?? STREAM_ERROR_MAP.GENERATION_FAILED
 }

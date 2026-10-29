@@ -2,7 +2,7 @@
  * capture-generation.ts
  *
  * Start/finish helpers that write a row to `ai-generation-records` for each
- * user-triggered AI generation. Complements `log-usage.ts` (tokens/cost) with
+ * user-triggered AI generation. Complements the ai-platform ledger (tokens/cost) with
  * full prompt + block + output snapshot visibility for the admin monitoring UI.
  *
  * Usage:
@@ -152,6 +152,8 @@ export async function captureRejectedWebsiteGeneration(input: {
                 endpoint: 'site-generator',
                 user: input.userId,
                 tenant: input.tenantId ?? undefined,
+                // No prompt body is persisted for rejected captures
+                promptMode: 'hashed',
                 status: 'failed',
                 lifecycle: 'terminal',
                 outcome: 'failed',

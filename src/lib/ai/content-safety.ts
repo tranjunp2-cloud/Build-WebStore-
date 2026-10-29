@@ -23,6 +23,8 @@ export type BusinessInfoSafetyInput = {
     industry: string
     shortDescription: string
     products: string
+    shopFacts?: string
+    serviceArea?: string
 }
 
 function normalizeForSafety(value: string) {
@@ -78,6 +80,8 @@ export function checkBusinessInfoSafety(input: BusinessInfoSafetyInput) {
             input.industry,
             input.shortDescription,
             input.products,
+            input.shopFacts ?? '',
+            input.serviceArea ?? '',
         ].join(' '),
     )
 

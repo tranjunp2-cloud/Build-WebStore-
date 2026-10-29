@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><script src="./generate-blocks.js"></script><style>::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#334155;border-radius:9px}::-webkit-scrollbar-track{background:transparent}@keyframes pw-spin{to{transform:rotate(360deg)}}@keyframes pw-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes pw-pop{from{opacity:0;transform:scale(.97) translateY(10px)}to{opacity:1;transform:none}}@keyframes pw-fade{from{opacity:0}to{opacity:1}}@keyframes pw-bounce{0%,100%{transform:translateY(-30%)}50%{transform:none}}@keyframes pw-drawer{from{transform:translateX(-100%)}to{transform:none}}
+.pw-noscroll{scrollbar-width:none}.pw-noscroll::-webkit-scrollbar{display:none}
+</style></helmet>
+<div style="display:flex;height:100vh;flex-direction:column;background:#0b1120;font-family:Inter,system-ui,sans-serif;color:#fff;overflow:hidden">
+  <div style="position:relative;z-index:50;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);height:48px;flex:none;align-items:center;gap:12px;padding:0 10px 0 16px;background:#0b1120">
+    <div style="display:flex;align-items:center;gap:2px;min-width:0;overflow:visible">
+      <div style="position:relative">
+        <button onClick="{{ toggleMenu }}" style="display:flex;align-items:center;gap:10px;height:32px;padding:0 8px 0 4px;border:0;border-radius:8px;background:none;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer" style-hover="background:rgba(255,255,255,.05)"><dc-import name="Icon" n="menu" s="16" hint-size="16px,16px"></dc-import>Menu</button>
+
+      </div>
+      <button onClick="{{ toHome }}" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border:0;border-radius:8px;background:#1a2231;color:#cbd5e1;font-size:13px;font-family:inherit;cursor:pointer" style-hover="background:#222c3e;color:#fff"><dc-import name="Icon" n="house" s="14" hint-size="14px,14px"></dc-import><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">Home</sc-if></button>
+      <button onClick="{{ toTemplates }}" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border:0;border-radius:8px;background:none;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer" style-hover="background:rgba(255,255,255,.05)"><dc-import name="Icon" n="palette" s="16" hint-size="16px,16px"></dc-import><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">Templates</sc-if></button>
+      <span style="{{ histGap }}"></span><sc-if value="{{ showHist }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ undo }}" disabled="{{ noUndo }}" title="Undo (⌘Z)" style="{{ undoSt }}"><dc-import name="Icon" n="undo-2" s="14" hint-size="14px,14px"></dc-import><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">Undo</sc-if></button>
+      <button onClick="{{ redo }}" disabled="{{ noRedo }}" title="Redo (⌘⇧Z)" style="{{ redoSt }}"><dc-import name="Icon" n="redo-2" s="14" hint-size="14px,14px"></dc-import><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">Redo</sc-if></button></sc-if>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;gap:2px;padding:3px;border-radius:12px;background:#1a2231">
+        <button onClick="{{ setDesktop }}" style="{{ desktopSt }}"><dc-import name="Icon" n="monitor" s="15" hint-size="15px,15px"></dc-import>Desktop</button>
+        <button onClick="{{ setMobile }}" style="{{ mobileSt }}"><dc-import name="Icon" n="smartphone" s="15" hint-size="15px,15px"></dc-import>Mobile</button>
+      </div>
+      <button onClick="{{ openComponents }}" title="Components" style="{{ gridSt }}"><dc-import name="Icon" n="layout-grid" s="15" hint-size="15px,15px"></dc-import></button>
+      <button onClick="{{ toggleLeft }}" title="Toggle left panel" style="{{ leftBtnSt }}"><dc-import name="Icon" n="panel-left" s="15" hint-size="15px,15px"></dc-import></button>
+      <button onClick="{{ toggleRight }}" title="Toggle right panel" style="{{ rightBtnSt }}"><dc-import name="Icon" n="panel-right" s="15" hint-size="15px,15px"></dc-import></button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0">
+      <span title="{{ saveLabel }}" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8;white-space:nowrap"><span style="{{ saveDot }}"></span><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">{{ saveLabel }}</sc-if></span>
+      <span style="{{ liveSt }}"><span style="{{ liveDot }}"></span>{{ liveLabel }}</span>
+      <button onClick="{{ openPreview }}" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:0;border-radius:8px;background:none;color:#cbd5e1;font-size:13px;font-family:inherit;cursor:pointer" style-hover="background:rgba(255,255,255,.05);color:#fff"><dc-import name="Icon" n="square-arrow-out-up-right" s="15" hint-size="15px,15px"></dc-import><sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">Preview</sc-if></button>
+      <div style="position:relative">
+        <sc-if value="{{ isLive }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ toggleLiveMenu }}" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px 0 14px;border:0;border-radius:10px;background-image:linear-gradient(90deg,#3b82f6,#2dd4bf);box-shadow:0 6px 16px -6px rgba(45,212,191,.55);color:#fff;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap" style-hover="filter:brightness(1.06)"><dc-import name="Icon" n="globe" s="15" hint-size="15px,15px"></dc-import>View live<span style="{{ liveChev }}"><dc-import name="Icon" n="chevron-down" s="14" hint-size="14px,14px"></dc-import></span></button>
+        </sc-if>
+        <sc-if value="{{ isDraft }}">
+          <button onClick="{{ publishNow }}" disabled="{{ publishing }}" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 14px;border:0;border-radius:10px;background-image:linear-gradient(90deg,#3b82f6,#2dd4bf);box-shadow:0 6px 16px -6px rgba(45,212,191,.55);color:#fff;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap" style-hover="filter:brightness(1.06)"><span style="{{ pubIconSt }}"><dc-import name="Icon" n="{{ pubIcon }}" s="15" hint-size="15px,15px"></dc-import></span>{{ pubLabel }}</button>
+        </sc-if>
+        <sc-if value="{{ liveMenu }}">
+          <div style="position:absolute;top:40px;right:0;z-index:60;width:200px;border-radius:12px;border:1px solid rgba(148,163,184,.12);background:#0d1424;padding:6px;box-shadow:0 20px 40px rgba(0,0,0,.55);animation:pw-in .15s ease-out both;display:flex;flex-direction:column;gap:2px">
+            <button onClick="{{ openLive }}" style="display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border:0;border-radius:8px;background:none;color:#fff;font-size:13px;font-weight:500;font-family:inherit;text-align:left;cursor:pointer" style-hover="background:rgba(255,255,255,.06)"><span style="display:flex;color:#94a3b8"><dc-import name="Icon" n="external-link" s="15" hint-size="15px,15px"></dc-import></span>Open website</button>
+            <button onClick="{{ copyLink }}" style="display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border:0;border-radius:8px;background:none;color:#fff;font-size:13px;font-weight:500;font-family:inherit;text-align:left;cursor:pointer" style-hover="background:rgba(255,255,255,.06)"><span style="display:flex;color:#94a3b8"><dc-import name="Icon" n="{{ copyIcon }}" s="15" hint-size="15px,15px"></dc-import></span>{{ copyLabel }}</button>
+            <div style="height:1px;margin:4px 6px;background:rgba(148,163,184,.14)"></div>
+            <button onClick="{{ unpublish }}" style="display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border:0;border-radius:8px;background:none;color:#f87171;font-size:13px;font-weight:500;font-family:inherit;text-align:left;cursor:pointer" style-hover="background:rgba(239,68,68,.1)"><dc-import name="Icon" n="eye-off" s="15" hint-size="15px,15px"></dc-import>Unpublish</button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex:1;min-height:0">
+    <sc-if value="{{ leftOpen }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;width:352px;flex:none;flex-direction:column;background:#0d1526;border-right:1px solid rgba(148,163,184,.06)">
+        <div style="display:flex;flex:none;padding:0 6px;border-bottom:1px solid rgba(148,163,184,.1)">
+          <sc-for list="{{ leftTabs }}" as="lt" hint-placeholder-count="3"><button onClick="{{ lt.onClick }}" style="{{ lt.st }}"><dc-import name="Icon" n="{{ lt.icon }}" s="15" hint-size="15px,15px"></dc-import>{{ lt.label }}</button></sc-for>
+        </div>
+
+        <div style="{{ chatPaneSt }}">
+          <dc-import name="AgentAssistant" placement="inline" surface="editor" dark="{{ true }}" page-title="{{ pageName }}" page-api="{{ pageApi }}" style="flex:1;min-height:0;display:flex;flex-direction:column" hint-size="100%,100%"></dc-import>
+        </div>
+
+        <sc-if value="{{ isComponents }}">
+          <div style="flex:none;padding:14px 14px 6px">
+            <div style="position:relative">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);display:flex;color:#94a3b8"><dc-import name="Icon" n="search" s="15" hint-size="15px,15px"></dc-import></span>
+              <input value="{{ blockQ }}" onChange="{{ onBlockQ }}" placeholder="Search blocks" style="width:100%;height:40px;box-sizing:border-box;border-radius:10px;border:1px solid rgba(148,163,184,.18);background:#141d2e;padding:0 12px 0 36px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:rgba(45,212,191,.5)">
+            </div>
+          </div>
+          <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:6px 10px 12px;display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ blockGroups }}" as="bg" hint-placeholder-count="9">
+              <div style="display:flex;flex-direction:column">
+                <button onClick="{{ bg.onToggle }}" onMouseEnter="{{ bg.onEnter }}" onMouseLeave="{{ bg.onLeave }}" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;border:0;border-radius:8px;background:none;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer;text-align:left" style-hover="background:rgba(255,255,255,.03)"><span style="{{ bg.badgeSt }}"><dc-import name="Icon" n="{{ bg.icon }}" s="15" hint-size="15px,15px"></dc-import></span>{{ bg.label }}<span style="border-radius:5px;background:#1e293b;padding:0 6px;font-size:11px;line-height:17px;color:#94a3b8">{{ bg.count }}</span><span style="{{ bg.chevSt }}"><dc-import name="Icon" n="chevron-right" s="15" hint-size="15px,15px"></dc-import></span></button>
+                <sc-if value="{{ bg.open }}">
+                  <div style="display:flex;flex-direction:column;gap:4px;padding:4px 0 10px">
+                    <sc-for list="{{ bg.items }}" as="it" hint-placeholder-count="3">
+                      <div draggable="true" onDragStart="{{ it.onDrag }}" onClick="{{ it.onClick }}" onMouseEnter="{{ it.onEnter }}" onMouseLeave="{{ it.onLeave }}" style="display:flex;align-items:center;gap:12px;border-radius:10px;border:1px solid transparent;background:#141d2e;padding:7px 11px;cursor:grab;transition:background-color .2s, border-color .2s;animation:pw-in .2s ease-out both" style-hover="background:rgba(45,212,191,.08);border-color:rgba(45,212,191,.3)">
+                        <span style="{{ it.badgeSt }}"><dc-import name="Icon" n="{{ it.icon }}" s="18" hint-size="18px,18px"></dc-import></span>
+                        <div style="min-width:0;display:flex;flex-direction:column;gap:1px">
+                          <div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="font-size:14px;line-height:20px;font-weight:500;color:#fff;white-space:nowrap">{{ it.label }}</span></div>
+                          <span style="font-size:12px;line-height:16px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ it.desc }}</span>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <sc-if value="{{ blocksEmpty }}"><p style="margin:24px 0;text-align:center;font-size:13px;color:#94a3b8">No blocks match "{{ blockQ }}"</p></sc-if>
+          </div>
+          <p style="flex:none;margin:0;padding:10px 14px 14px;text-align:center;font-size:11px;line-height:16px;color:#94a3b8">Click to add or drag blocks into the preview</p>
+        </sc-if>
+
+        <sc-if value="{{ isPages }}">
+          <div style="flex:none;padding:18px 16px 12px;display:flex;flex-direction:column;gap:14px">
+            <div>
+              <p style="margin:0;font-size:15px;line-height:22px;font-weight:600;color:#fff">Page library</p>
+              <p style="margin:2px 0 0;font-size:12px;line-height:17px;color:#94a3b8;text-wrap:pretty">Pages here are for editing only. To show one on your website, add it to Menu settings on the right.</p>
+            </div>
+          </div>
+          <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 12px 12px 16px;display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ pageCards }}" as="p" hint-placeholder-count="6">
+              <div onClick="{{ p.onSelect }}" style="{{ p.cardSt }}">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;line-height:22px;font-weight:500;color:#fff">{{ p.name }}</span>
+                  <sc-if value="{{ p.home }}"><span style="display:flex;align-items:center;gap:4px;border-radius:5px;background:rgba(45,212,191,.14);padding:1px 7px;font-size:12px;line-height:18px;font-weight:500;color:#2dd4bf"><dc-import name="Icon" n="house" s="12" hint-size="12px,12px"></dc-import>Home</span></sc-if>
+                  <span style="{{ p.badgeSt }}"><span style="{{ p.dotSt }}"></span>{{ p.badge }}</span>
+                  <div style="margin-left:auto;display:flex;align-items:center;gap:2px">
+                    <button onClick="{{ p.onToggleVis }}" title="{{ p.visTitle }}" style="{{ p.visSt }}" style-hover="background:rgba(255,255,255,.08);color:#fff"><dc-import name="Icon" n="{{ p.visIcon }}" s="15" hint-size="15px,15px"></dc-import></button>
+                    <button onClick="{{ p.onDelete }}" disabled="{{ p.home }}" title="{{ p.delTitle }}" style="{{ p.delSt }}" style-hover="background:rgba(239,68,68,.12);color:#f87171"><dc-import name="Icon" n="trash-2" s="15" hint-size="15px,15px"></dc-import></button>
+                  </div>
+                </div>
+                <p style="margin:4px 0 0;font-size:12px;line-height:16px;color:#94a3b8">{{ p.path }}  ·  {{ p.date }}</p>
+                <sc-if value="{{ p.selected }}">
+                  <button onClick="{{ p.onAi }}" style="margin-top:10px;display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid rgba(45,212,191,.25);border-radius:7px;background:rgba(45,212,191,.08);color:#5eead4;font-size:12px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s" style-hover="background:rgba(45,212,191,.16);color:#99f6e4"><dc-import name="Icon" n="sparkles" s="13" hint-size="13px,13px"></dc-import>Edit with AI chat</button>
+                </sc-if>
+                <sc-if value="{{ p.confirming }}">
+                  <div onClick="{{ p.stop }}" style="margin-top:12px;border-radius:8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);padding:10px;display:flex;flex-direction:column;gap:8px;animation:pw-in .15s ease-out both">
+                    <p style="margin:0;font-size:12px;line-height:17px;color:#fecaca">Delete “{{ p.name }}”? This can’t be undone.</p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                      <button onClick="{{ p.onCancelDel }}" style="display:flex;align-items:center;justify-content:center;gap:8px;height:34px;border:0;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s;height:30px;background:#2a3446;color:#e2e8f0" style-hover="background:#334155">Cancel</button>
+                      <button onClick="{{ p.onConfirmDel }}" style="display:flex;align-items:center;justify-content:center;gap:8px;height:34px;border:0;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s;height:30px;background:#dc2626;color:#fff" style-hover="background:#ef4444">Delete</button>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <sc-if value="{{ notAdding }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ startAddPage }}" style="display:flex;width:100%;align-items:center;justify-content:center;gap:8px;height:38px;border:1px dashed rgba(148,163,184,.3);border-radius:10px;background:transparent;color:#cbd5e1;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s" style-hover="border-color:rgba(45,212,191,.55);color:#2dd4bf;background:rgba(45,212,191,.05)"><dc-import name="Icon" n="plus" s="15" hint-size="15px,15px"></dc-import>Add new page</button>
+            </sc-if>
+            <sc-if value="{{ addingPage }}">
+              <div style="border-radius:12px;border:1px solid rgba(45,212,191,.35);background:#141d2e;padding:12px;display:flex;flex-direction:column;gap:8px;animation:pw-in .2s ease-out both">
+                <label style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#94a3b8">PAGE NAME</label>
+                <input ref="{{ newPageRef }}" value="{{ newPageName }}" onChange="{{ onNewPageName }}" onKeyDown="{{ onNewPageKey }}" placeholder="e.g. Promotions" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.18);background:#0d1526;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+                <p style="margin:0;font-size:12px;color:#94a3b8">URL: <span style="color:#e2e8f0">{{ newPageSlug }}</span></p>
+                <sc-if value="{{ newPageErr }}"><p style="margin:0;font-size:12px;color:#f87171">{{ newPageErr }}</p></sc-if>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px">
+                  <button onClick="{{ cancelAddPage }}" style="display:flex;align-items:center;justify-content:center;gap:8px;height:34px;border:0;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s;background:#2a3446;color:#e2e8f0" style-hover="background:#334155">Cancel</button>
+                  <button onClick="{{ createPage }}" disabled="{{ cantCreate }}" style="{{ createSt }}">Create page</button>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+          <div style="flex:none;padding:10px 12px 12px 16px;display:flex;flex-direction:column;gap:8px;border-top:1px solid rgba(148,163,184,.08)">
+            <div style="{{ box404St }}">
+              <button onClick="{{ toggle404 }}" style="display:flex;width:100%;align-items:center;gap:12px;height:48px;padding:0 14px 0 16px;border:0;background:none;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer"><span style="display:flex;color:#94a3b8"><dc-import name="Icon" n="sliders-horizontal" s="15" hint-size="15px,15px"></dc-import></span><span style="flex:1;text-align:left">Custom 404 page</span><span style="{{ chev404St }}"><dc-import name="Icon" n="chevron-down" s="15" hint-size="15px,15px"></dc-import></span></button>
+              <sc-if value="{{ open404v }}">
+                <div style="padding:0 10px 10px;animation:pw-in .18s ease-out both">
+                  <div style="{{ card404St }}">
+                    <p style="margin:0;font-size:11px;line-height:16px;color:#94a3b8">Custom 404 page</p>
+                    <button onClick="{{ edit404 }}" style="margin-top:6px;display:flex;width:100%;align-items:center;justify-content:center;gap:8px;height:34px;border:0;border-radius:8px;background:none;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer;transition:background .15s" style-hover="background:rgba(255,255,255,.05)"><dc-import name="Icon" n="pencil" s="15" hint-size="15px,15px"></dc-import>{{ edit404Label }}</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <div style="flex:1;min-width:0;display:flex;justify-content:center;padding:16px 16px 14px">
+      <div style="{{ canvasSt }}">
+        <iframe ref="{{ siteFrame }}" onLoad="{{ onSiteLoad }}" src="assets/demo-site.html" title="Website" style="display:block;width:100%;height:100%;border:0;background:#0a0a0a"></iframe>
+      </div>
+    </div>
+
+    <sc-if value="{{ rightOpen }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;width:300px;flex:none;flex-direction:column;background:#0b1120">
+        <div style="flex:none;display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:16px 12px 8px 16px">
+          <sc-for list="{{ rightTabs }}" as="rt" hint-placeholder-count="4"><button onClick="{{ rt.onClick }}" disabled="{{ rt.disabled }}" style="{{ rt.st }}"><dc-import name="Icon" n="{{ rt.icon }}" s="14" hint-size="14px,14px"></dc-import>{{ rt.label }}</button></sc-for>
+        </div>
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:16px 12px 24px 16px;display:flex;flex-direction:column;gap:16px">
+          <sc-if value="{{ isGlobal }}" hint-placeholder-val="{{ true }}">
+            <p style="flex:none;margin:8px 0 4px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.02em;color:#2dd4bf"><dc-import name="Icon" n="settings" s="15" hint-size="15px,15px"></dc-import>GLOBAL SITE SETTINGS</p>
+            <div style="flex:none;border-radius:12px;background:#111a2b;overflow:hidden">
+              <button onClick="{{ acc.brand.toggle }}" style="display:flex;width:100%;align-items:center;justify-content:space-between;height:40px;padding:0 16px;border:0;background:#162033;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer">Brand identity<span style="{{ acc.brand.chev }}"><dc-import name="Icon" n="chevron-down" s="15" hint-size="15px,15px"></dc-import></span></button>
+              <sc-if value="{{ acc.brand.open }}" hint-placeholder-val="{{ true }}">
+                <div style="display:grid;gap:8px;padding:16px;animation:pw-in .18s ease-out both">
+                  <label style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">BUSINESS NAME</label>
+                  <input value="{{ g.businessName }}" onChange="{{ on.businessName }}" onBlur="{{ commitG }}" placeholder="" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">UPLOAD LOGO</label>
+                  <button onClick="{{ pickLogo }}" style="{{ logoDrop }}"><sc-if value="{{ noLogo }}" hint-placeholder-val="{{ true }}"><dc-import name="Icon" n="upload" s="18" hint-size="18px,18px"></dc-import><span>Click to upload</span></sc-if><sc-if value="{{ hasLogo }}" hint-placeholder-val="{{ false }}"><span style="{{ logoImg }}"></span></sc-if></button>
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">UPLOAD FAVICON</label>
+                  <button onClick="{{ pickFav }}" style="{{ favDrop }}"><sc-if value="{{ noFav }}" hint-placeholder-val="{{ true }}"><dc-import name="Icon" n="upload" s="18" hint-size="18px,18px"></dc-import><span>Click to upload</span></sc-if><sc-if value="{{ hasFav }}" hint-placeholder-val="{{ false }}"><span style="{{ favImg }}"></span></sc-if></button>
+                  <input ref="{{ logoInput }}" type="file" accept="image/*" onChange="{{ onLogo }}" style="display:none">
+                  <input ref="{{ favInput }}" type="file" accept="image/*" onChange="{{ onFav }}" style="display:none">
+                </div>
+              </sc-if>
+            </div>
+            <div style="flex:none;border-radius:12px;background:#111a2b;overflow:hidden">
+              <button onClick="{{ acc.contact.toggle }}" style="display:flex;width:100%;align-items:center;justify-content:space-between;height:40px;padding:0 16px;border:0;background:#162033;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer">Contact info<span style="{{ acc.contact.chev }}"><dc-import name="Icon" n="chevron-down" s="15" hint-size="15px,15px"></dc-import></span></button>
+              <sc-if value="{{ acc.contact.open }}">
+                <div style="display:grid;gap:8px;padding:16px;animation:pw-in .18s ease-out both">
+                  <label style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">PHONE</label>
+                  <input value="{{ g.phone }}" onChange="{{ on.phone }}" onBlur="{{ commitG }}" placeholder="" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">EMAIL</label>
+                  <input value="{{ g.email }}" onChange="{{ on.email }}" onBlur="{{ commitG }}" placeholder="" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">ADDRESS</label>
+                  <textarea value="{{ g.address }}" onChange="{{ on.address }}" onBlur="{{ commitG }}" rows="4" placeholder="" style="box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:10px 12px;font-size:14px;line-height:20px;color:#fff;outline:none;resize:none;font-family:inherit" style-focus="border-color:#2dd4bf"></textarea>
+                </div>
+              </sc-if>
+            </div>
+            <div style="flex:none;border-radius:12px;background:#111a2b;overflow:hidden">
+              <button onClick="{{ acc.local.toggle }}" style="display:flex;width:100%;align-items:center;justify-content:space-between;height:40px;padding:0 16px;border:0;background:#162033;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer">Local Business Info<span style="{{ acc.local.chev }}"><dc-import name="Icon" n="chevron-down" s="15" hint-size="15px,15px"></dc-import></span></button>
+              <sc-if value="{{ acc.local.open }}">
+                <div style="display:grid;gap:8px;padding:16px;animation:pw-in .18s ease-out both">
+                  <label style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">BUSINESS TYPE</label>
+                  <select value="{{ g.bizType }}" onChange="{{ onSel.bizType }}" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit;padding:0 10px;cursor:pointer"><option value="Restaurant">Restaurant</option><option value="Cafe">Cafe</option><option value="Retail store">Retail store</option><option value="Beauty salon">Beauty salon</option><option value="Clinic">Clinic</option><option value="Professional service">Professional service</option><option value="Other">Other</option></select>
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">OPENING HOURS</label>
+                  <textarea value="{{ g.hours }}" onChange="{{ on.hours }}" onBlur="{{ commitG }}" rows="3" placeholder="Mon–Fri 9:00–18:00" style="box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:10px 12px;font-size:14px;line-height:20px;color:#fff;outline:none;resize:none;font-family:inherit" style-focus="border-color:#2dd4bf"></textarea>
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">GOOGLE MAPS LINK</label>
+                  <input value="{{ g.maps }}" onChange="{{ on.maps }}" onBlur="{{ commitG }}" placeholder="https://maps.google.com/..." style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">PRICE RANGE</label>
+                  <select value="{{ g.price }}" onChange="{{ onSel.price }}" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit;padding:0 10px;cursor:pointer"><option value="$">$</option><option value="$$">$$</option><option value="$$$">$$$</option><option value="$$$$">$$$$</option></select>
+                </div>
+              </sc-if>
+            </div>
+            <div style="flex:none;border-radius:12px;background:#111a2b;overflow:hidden">
+              <button onClick="{{ acc.social.toggle }}" style="display:flex;width:100%;align-items:center;justify-content:space-between;height:40px;padding:0 16px;border:0;background:#162033;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer">Social links<span style="{{ acc.social.chev }}"><dc-import name="Icon" n="chevron-down" s="15" hint-size="15px,15px"></dc-import></span></button>
+              <sc-if value="{{ acc.social.open }}">
+                <div style="display:grid;gap:8px;padding:16px;animation:pw-in .18s ease-out both">
+                  <label style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">FACEBOOK</label>
+                  <input value="{{ g.fb }}" onChange="{{ on.fb }}" onBlur="{{ commitG }}" placeholder="https://facebook.com/yourpage" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">INSTAGRAM</label>
+                  <input value="{{ g.ig }}" onChange="{{ on.ig }}" onBlur="{{ commitG }}" placeholder="https://instagram.com/yourhandle" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">TIKTOK</label>
+                  <input value="{{ g.tt }}" onChange="{{ on.tt }}" onBlur="{{ commitG }}" placeholder="https://tiktok.com/@yourhandle" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">WHATSAPP</label>
+                  <input value="{{ g.wa }}" onChange="{{ on.wa }}" onBlur="{{ commitG }}" placeholder="+60 12-345 6789" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+                </div>
+              </sc-if>
+            </div>
+            <div style="flex:none;border-radius:12px;background:#111a2b;overflow:hidden">
+              <button onClick="{{ acc.theme.toggle }}" style="display:flex;width:100%;align-items:center;justify-content:space-between;height:40px;padding:0 16px;border:0;background:#162033;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer">Theme &amp; colors<span style="{{ acc.theme.chev }}"><dc-import name="Icon" n="chevron-down" s="15" hint-size="15px,15px"></dc-import></span></button>
+              <sc-if value="{{ acc.theme.open }}">
+                <div style="display:grid;gap:8px;padding:16px;animation:pw-in .18s ease-out both">
+                  <label style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">PRIMARY COLOR</label>
+                  <div style="display:flex;align-items:center;gap:8px"><input type="color" value="{{ g.primary }}" onChange="{{ onSel.primary }}" style="flex:none;width:36px;height:36px;border:1px solid rgba(148,163,184,.14);border-radius:8px;padding:2px;background:#0b1220;cursor:pointer"><input value="{{ g.primary }}" onChange="{{ on.primary }}" onBlur="{{ commitG }}" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit;flex:1;min-width:0;font-family:ui-monospace,monospace;font-size:13px" style-focus="border-color:#2dd4bf"></div>
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">SECONDARY COLOR</label>
+                  <div style="display:flex;align-items:center;gap:8px"><input type="color" value="{{ g.secondary }}" onChange="{{ onSel.secondary }}" style="flex:none;width:36px;height:36px;border:1px solid rgba(148,163,184,.14);border-radius:8px;padding:2px;background:#0b1220;cursor:pointer"><input value="{{ g.secondary }}" onChange="{{ on.secondary }}" onBlur="{{ commitG }}" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit;flex:1;min-width:0;font-family:ui-monospace,monospace;font-size:13px" style-focus="border-color:#2dd4bf"></div>
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">HEADING FONT</label>
+                  <select value="{{ g.fontH }}" onChange="{{ onSel.fontH }}" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit;padding:0 10px;cursor:pointer"><option value="Inter">Inter</option><option value="DM Sans">DM Sans</option><option value="Outfit">Outfit</option><option value="Poppins">Poppins</option><option value="Plus Jakarta Sans">Plus Jakarta Sans</option><option value="Playfair Display">Playfair Display</option><option value="Lora">Lora</option></select>
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">BODY FONT</label>
+                  <select value="{{ g.fontB }}" onChange="{{ onSel.fontB }}" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0b1220;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit;padding:0 10px;cursor:pointer"><option value="Inter">Inter</option><option value="DM Sans">DM Sans</option><option value="Outfit">Outfit</option><option value="Poppins">Poppins</option><option value="Plus Jakarta Sans">Plus Jakarta Sans</option><option value="Playfair Display">Playfair Display</option><option value="Lora">Lora</option></select>
+                  <label style="margin-top:12px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#94a3b8">COLOR MODE</label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;border-radius:10px;background:#0b1220;border:1px solid rgba(148,163,184,.14)"><button onClick="{{ setModeLight }}" style="{{ modeLightSt }}"><dc-import name="Icon" n="sun" s="14" hint-size="14px,14px"></dc-import>Light</button><button onClick="{{ setModeDark }}" style="{{ modeDarkSt }}"><dc-import name="Icon" n="moon" s="14" hint-size="14px,14px"></dc-import>Dark</button></div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isBlockSel }}">
+            <div style="flex:none;margin:8px 0 4px;display:grid;gap:4px">
+              <p style="margin:0;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.02em;color:#2dd4bf"><dc-import name="Icon" n="palette" s="15" hint-size="15px,15px"></dc-import>BLOCK SETTINGS</p>
+              <div style="display:flex;align-items:center;gap:8px;padding-left:23px"><span style="font-size:11px;color:#64748b">[{{ blk.type }}]</span><sc-if value="{{ blk.isGlobal }}"><span style="display:inline-flex;align-items:center;gap:4px;border-radius:4px;padding:2px 6px;font-size:9px;font-weight:600;line-height:1;background:rgba(59,130,246,.12);color:#3b82f6"><dc-import name="Icon" n="globe" s="12" hint-size="12px,12px"></dc-import>Global</span></sc-if></div>
+            </div>
+            <div style="flex:none;display:flex;align-items:center;justify-content:space-between;border-radius:16px;border:1px solid rgba(255,255,255,.06);background:#0f172a;padding:12px 16px"><span style="font-size:14px;font-weight:500;color:#fff">{{ blk.icon }} {{ blk.name }}</span><span style="font-size:12px;color:#6b7280">#{{ blk.num }}</span></div>
+            <sc-if value="{{ blk.hasVariants }}">
+              <div style="flex:none;display:grid;gap:8px">
+                <span style="font-size:12px;font-weight:500;text-transform:uppercase;color:#6b7280">Variant</span>
+                <div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ blk.variants }}" as="v" hint-placeholder-count="4"><button onClick="{{ v.onClick }}" style="{{ v.st }}">{{ v.label }}</button></sc-for></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ blk.hasSpacing }}">
+              <div style="flex:none;border-top:1px solid rgba(255,255,255,.1);padding-top:16px;display:grid;gap:12px">
+                <span style="font-size:12px;font-weight:500;text-transform:uppercase;color:#6b7280">Layout &amp; Spacing</span>
+                <div style="display:grid;gap:8px"><div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:500;color:#cbd5e1">Top Spacing</span><span style="font-size:10px;color:#64748b">{{ blk.topTxt }}</span></div><input type="range" min="0" max="120" step="4" value="{{ blk.top }}" onChange="{{ blk.ontop }}" onPointerUp="{{ blk.committop }}" style="width:100%;accent-color:#2dd4bf;cursor:pointer;margin:0"></div>
+                <div style="display:grid;gap:8px"><div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:500;color:#cbd5e1">Bottom Spacing</span><span style="font-size:10px;color:#64748b">{{ blk.bottomTxt }}</span></div><input type="range" min="0" max="120" step="4" value="{{ blk.bottom }}" onChange="{{ blk.onbottom }}" onPointerUp="{{ blk.commitbottom }}" style="width:100%;accent-color:#2dd4bf;cursor:pointer;margin:0"></div>
+              </div>
+            </sc-if>
+            <sc-for list="{{ blk.fields }}" as="f" hint-placeholder-count="2">
+              <div style="flex:none;display:grid;gap:6px">
+                <label style="font-size:12px;font-weight:500;color:#cbd5e1">{{ f.label }}</label>
+                <sc-if value="{{ f.isInput }}" hint-placeholder-val="{{ true }}"><input value="{{ f.value }}" onChange="{{ f.onChange }}" onBlur="{{ f.onBlur }}" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0d1526;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf"></sc-if>
+                <sc-if value="{{ f.isArea }}"><textarea value="{{ f.value }}" onChange="{{ f.onChange }}" onBlur="{{ f.onBlur }}" rows="{{ f.rows }}" style="box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0d1526;padding:10px 12px;font-size:14px;line-height:20px;color:#fff;outline:none;resize:none;font-family:inherit" style-focus="border-color:#2dd4bf"></textarea></sc-if>
+                <sc-if value="{{ f.hasUrl }}"><input value="{{ f.url }}" onChange="{{ f.onUrl }}" onBlur="{{ f.onUrlBlur }}" placeholder="Button URL" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0d1526;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf"></sc-if>
+              </div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ isBlockEmpty }}">
+            <div style="flex:none;margin-top:40px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:0 12px">
+              <span style="display:flex;width:44px;height:44px;align-items:center;justify-content:center;border-radius:12px;background:#162033;color:#94a3b8"><dc-import name="Icon" n="mouse-pointer-click" s="20" hint-size="20px,20px"></dc-import></span>
+              <p style="margin:0;font-size:14px;font-weight:500;color:#fff">No block selected</p>
+              <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8">Click a section in the preview to edit its content and style here.</p>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isSeo }}">
+            <p style="flex:none;margin:8px 0 4px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.02em;color:#2dd4bf"><dc-import name="Icon" n="search" s="15" hint-size="15px,15px"></dc-import>SEO &amp; SOCIAL</p>
+            <div style="flex:none;border-radius:12px;background:#1a2333;display:grid;gap:8px;padding:16px">
+              <p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">Search verification</p>
+              <p style="margin:0;font-size:13px;line-height:19px;color:#cbd5e1">Paste the Google Search Console verification token for this store.</p>
+              <input value="{{ gsvVal }}" onChange="{{ on.gsv }}" onBlur="{{ commitG }}" placeholder="google-site-verification token" style="height:38px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0d1526;padding:0 14px;font-size:15px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+            </div>
+            <div style="flex:none;display:grid;gap:6px">
+              <label style="font-size:12px;font-weight:500;color:#cbd5e1">URL slug</label>
+              <input value="{{ seoSlug }}" readOnly="{{ true }}" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0d1526;padding:0 12px;font-size:14px;color:#64748b;outline:none;font-family:inherit;cursor:not-allowed">
+              <p style="margin:0;font-size:11px;line-height:15px;color:#f59e0b">The slug locks after you publish, so your SEO and existing links keep working.</p>
+            </div>
+            <div style="flex:none;display:grid;gap:6px">
+              <label style="font-size:12px;font-weight:500;color:#cbd5e1">Meta title</label>
+              <input value="{{ g.metaTitle }}" onChange="{{ on.metaTitle }}" onBlur="{{ commitG }}" style="height:36px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0d1526;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+              <p style="margin:0;text-align:right;font-size:11px;color:#94a3b8">{{ titleCount }}/60 characters</p>
+            </div>
+            <div style="flex:none;display:grid;gap:6px">
+              <label style="font-size:12px;font-weight:500;color:#cbd5e1">Meta description</label>
+              <textarea value="{{ g.metaDesc }}" onChange="{{ on.metaDesc }}" onBlur="{{ commitG }}" rows="4" style="box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#0d1526;padding:10px 12px;font-size:14px;line-height:20px;color:#fff;outline:none;resize:none;font-family:inherit" style-focus="border-color:#2dd4bf"></textarea>
+              <p style="margin:0;text-align:right;font-size:11px;color:#94a3b8">{{ descCount }}/160 characters</p>
+            </div>
+            <div style="flex:none;display:grid;gap:10px">
+              <p style="margin:0;font-size:12px;font-weight:500;letter-spacing:.04em;color:#94a3b8">GOOGLE PREVIEW</p>
+              <div style="border-radius:10px;background:#fff;padding:12px 14px;display:grid;gap:3px;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="display:flex;color:#64748b"><dc-import name="Icon" n="globe" s="16" hint-size="16px,16px"></dc-import></span><span style="font-size:13px;color:#202124;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.businessName }}</span></div>
+                <p style="margin:0;font-size:12px;color:#188038;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ seoUrl }}</p>
+                <p style="margin:0;font-size:17px;line-height:22px;color:#1a0dab;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.metaTitle }}</p>
+                <p style="margin:0;font-size:13px;line-height:18px;color:#4d5156">{{ g.metaDesc }}</p>
+              </div>
+            </div>
+            <div style="flex:none;display:grid;gap:8px;margin-top:8px">
+              <label style="font-size:12px;font-weight:500;color:#cbd5e1">Social share image</label>
+              <button onClick="{{ pickSocial }}" style="{{ socialDrop }}"><sc-if value="{{ noSocial }}" hint-placeholder-val="{{ true }}"><span style="display:flex;color:#cbd5e1"><dc-import name="Icon" n="upload" s="18" hint-size="18px,18px"></dc-import></span><span style="font-size:13px;color:#cbd5e1">Click to upload social image</span></sc-if><sc-if value="{{ hasSocial }}"><span style="{{ socialImg }}"></span></sc-if></button>
+              <input ref="{{ socialInput }}" type="file" accept="image/jpeg,image/png,image/webp" onChange="{{ onSocial }}" style="display:none">
+              <p style="margin:0;font-size:11px;color:#94a3b8">Recommended size: 1200 × 630 px (JPG, PNG, or WebP)</p>
+            </div>
+            <button onClick="{{ autoSeo }}" style="{{ autoSeoSt }}"><span style="{{ autoSeoIcon }}"><dc-import name="Icon" n="{{ autoSeoIconName }}" s="16" hint-size="16px,16px"></dc-import></span>{{ autoSeoLabel }}</button>
+          </sc-if>
+
+          <sc-if value="{{ isMenu }}">
+            <p style="flex:none;margin:8px 0 4px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.02em;color:#2dd4bf"><dc-import name="Icon" n="compass" s="15" hint-size="15px,15px"></dc-import>MENU SETTINGS</p>
+            <div style="flex:none;display:grid;gap:8px;margin-top:12px">
+              <p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">Navigation style</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><sc-for list="{{ navStyles }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.onClick }}" style="{{ o.st }}">{{ o.label }}</button></sc-for></div>
+            </div>
+            <div style="flex:none;display:grid;gap:8px;margin-top:12px">
+              <p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">Navigation links</p>
+              <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="6">
+                <div style="display:flex;align-items:center;gap:10px;height:42px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#1a2333;padding:0 10px 0 14px">
+                  <span style="display:flex;color:#94a3b8;cursor:grab"><dc-import name="Icon" n="grip-vertical" s="15" hint-size="15px,15px"></dc-import></span>
+                  <sc-if value="{{ n.editing }}"><input value="{{ n.label }}" onChange="{{ n.onChange }}" onBlur="{{ n.onDone }}" onKeyDown="{{ n.onKey }}" autoFocus="{{ true }}" style="flex:1;min-width:0;height:30px;box-sizing:border-box;border-radius:6px;border:1px solid rgba(45,212,191,.5);background:#0d1526;padding:0 8px;font-size:15px;color:#fff;outline:none;font-family:inherit"></sc-if>
+                  <sc-if value="{{ n.notEditing }}" hint-placeholder-val="{{ true }}"><span style="flex:1;min-width:0;font-size:15px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.label }}</span></sc-if>
+                  <button onClick="{{ n.onEdit }}" title="Edit" style="display:flex;border:0;background:none;color:#cbd5e1;padding:4px;border-radius:6px;cursor:pointer" style-hover="color:#2dd4bf"><dc-import name="Icon" n="pencil" s="16" hint-size="16px,16px"></dc-import></button>
+                </div>
+              </sc-for>
+              <button onClick="{{ addNav }}" style="display:flex;align-items:center;justify-content:center;gap:8px;height:36px;margin-top:6px;border:1px solid rgba(45,212,191,.6);border-radius:8px;background:rgba(45,212,191,.12);color:#2dd4bf;font-size:15px;font-family:inherit;cursor:pointer" style-hover="background:rgba(45,212,191,.2)"><dc-import name="Icon" n="plus" s="15" hint-size="15px,15px"></dc-import>Add link</button>
+            </div>
+            <div style="flex:none;display:grid;gap:10px;margin-top:20px;border-radius:10px;background:#1a2333;padding:14px">
+              <p style="margin:0;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.04em;color:#fff">QUICK LANGUAGE<span title="Show a language switcher in the navigation" style="display:flex;color:#94a3b8"><dc-import name="Icon" n="info" s="13" hint-size="13px,13px"></dc-import></span></p>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:8px;background:#253043;padding:8px 12px"><span style="font-size:13px;font-weight:500;color:#fff">Turn on multi-language</span><button onClick="{{ toggleMultiLang }}" style="{{ multiLangT.track }}"><span style="{{ multiLangT.knob }}"></span></button></div>
+            </div>
+            <div style="flex:none;margin-top:16px"><p style="flex:none;margin:8px 0 4px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.02em;color:#2dd4bf"><dc-import name="Icon" n="list-tree" s="15" hint-size="15px,15px"></dc-import>BREADCRUMB SETTINGS</p></div>
+            <div style="flex:none;display:grid;gap:8px">
+              <p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">Mode</p>
+              <p style="margin:0;padding:6px 0;text-align:center;font-size:13px;font-weight:500;color:#60a5fa">Auto</p>
+              <p style="margin:0;font-size:13px;line-height:19px;color:#94a3b8">Builds the breadcrumb automatically from the page URL</p>
+              <p style="margin:4px 0 0;font-size:12px;font-weight:500;color:#cbd5e1">Home label</p>
+              <input value="{{ bcHomeVal }}" onChange="{{ on.bcHome }}" onBlur="{{ commitG }}" style="height:38px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#111a2b;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:#2dd4bf">
+              <p style="margin:4px 0 0;font-size:12px;font-weight:500;color:#cbd5e1">Separator</p>
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><sc-for list="{{ separators }}" as="o" hint-placeholder-count="5"><button onClick="{{ o.onClick }}" style="{{ o.st }}">{{ o.label }}</button></sc-for></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px"><div style="display:grid;gap:2px"><span style="font-size:12px;font-weight:500;color:#cbd5e1">Show on all pages</span><span style="font-size:12px;color:#94a3b8">Show the breadcrumb on every page</span></div><button onClick="{{ toggleBcAll }}" style="{{ bcAllT.track }}"><span style="{{ bcAllT.knob }}"></span></button></div>
+              <div style="display:grid;gap:6px;padding:10px 12px"><span style="font-size:12px;color:#94a3b8">Preview:</span><span style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="color:#60a5fa">{{ bcHomeVal }}</span><span style="color:#94a3b8">{{ bcSep }}</span><span style="color:#fff;font-weight:500">{{ bcPage }}</span></span></div>
+            </div>
+            <div style="flex:none;margin-top:12px"><p style="flex:none;margin:8px 0 4px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.02em;color:#2dd4bf"><dc-import name="Icon" n="palette" s="15" hint-size="15px,15px"></dc-import>FOOTER SETTINGS</p></div>
+            <div style="flex:none;display:grid;gap:8px">
+              <p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">Footer style</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><sc-for list="{{ footerStyles }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.onClick }}" style="{{ o.st }}">{{ o.label }}</button></sc-for></div>
+            </div>
+            <div style="flex:none;border-radius:10px;border:1px solid rgba(148,163,184,.1);background:#1a2333;overflow:hidden"><button onClick="{{ toggleBrandFooter }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;height:44px;padding:0 12px;border:0;background:none;color:#fff;font-size:15px;font-weight:500;font-family:inherit;cursor:pointer"><span style="display:flex;align-items:center;gap:8px"><dc-import name="Icon" n="building-2" s="16" hint-size="16px,16px"></dc-import>Brand &amp; logo</span><span style="{{ brandFooterOpenChev }}"><dc-import name="Icon" n="chevron-down" s="16" hint-size="16px,16px"></dc-import></span></button><sc-if value="{{ brandFooterOpen }}"><div style="display:grid;gap:8px;padding:4px 12px 14px"><p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">Tagline</p><input value="{{ ftTaglineVal }}" onChange="{{ on.ftTagline }}" onBlur="{{ commitG }}" style="height:38px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#111a2b;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit;background:#111a2b"></div></sc-if></div>
+            <div style="flex:none;border-radius:10px;border:1px solid rgba(148,163,184,.1);background:#1a2333;overflow:hidden"><button onClick="{{ toggleSocialFooter }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;height:44px;padding:0 12px;border:0;background:none;color:#fff;font-size:15px;font-weight:500;font-family:inherit;cursor:pointer"><span style="display:flex;align-items:center;gap:8px">Social media</span><span style="{{ socialFooterOpenChev }}"><dc-import name="Icon" n="chevron-down" s="16" hint-size="16px,16px"></dc-import></span></button><sc-if value="{{ socialFooterOpen }}"><div style="display:grid;gap:8px;padding:4px 12px 14px"><p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">Facebook</p><input value="{{ g.fb }}" onChange="{{ on.fb }}" onBlur="{{ commitG }}" style="height:38px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#111a2b;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit"><p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">Instagram</p><input value="{{ g.ig }}" onChange="{{ on.ig }}" onBlur="{{ commitG }}" style="height:38px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#111a2b;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit"><p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">TikTok</p><input value="{{ g.tt }}" onChange="{{ on.tt }}" onBlur="{{ commitG }}" style="height:38px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#111a2b;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit"></div></sc-if></div>
+            <div style="flex:none;display:grid;gap:8px;margin-top:4px">
+              <p style="margin:0;font-size:12px;font-weight:500;color:#cbd5e1">Copyright text</p>
+              <input value="{{ copyrightVal }}" onChange="{{ on.copyright }}" onBlur="{{ commitG }}" style="height:38px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#111a2b;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit;font-size:13px" style-focus="border-color:#2dd4bf">
+              <p style="margin:8px 0 0;font-size:12px;font-weight:500;color:#cbd5e1">Background color</p>
+              <div style="display:flex;gap:8px"><input value="{{ footerBgVal }}" onChange="{{ on.footerBg }}" onBlur="{{ commitG }}" style="height:38px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.14);background:#111a2b;padding:0 12px;font-size:14px;color:#fff;outline:none;font-family:inherit;flex:1;min-width:0;font-size:13px" style-focus="border-color:#2dd4bf"><label style="position:relative;flex:none;width:56px;height:38px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.25);background:#111a2b;padding:6px;cursor:pointer"><span style="{{ footerSwatch }}"></span><input type="color" value="{{ footerBgVal }}" onChange="{{ on.footerBg }}" onBlur="{{ commitG }}" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label></div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ menuOpen }}">
+    <div style="position:fixed;inset:0;z-index:50;font-family:Inter,system-ui,sans-serif">
+      <div onClick="{{ closeMenu }}" style="position:absolute;inset:0;background:rgba(0,0,0,.7);animation:pw-fade .2s ease-out both"></div>
+      <aside style="position:absolute;left:0;top:0;display:flex;height:100%;width:250px;box-sizing:border-box;flex-direction:column;border-right:1px solid #2A3544;background:#060B18;box-shadow:0 25px 50px -12px rgba(0,0,0,.5);animation:pw-drawer .22s ease-out both">
+        <div style="display:flex;height:65px;flex:none;align-items:center;justify-content:space-between;padding:0 16px">
+          <div style="display:flex;align-items:center;gap:8px"><img src="assets/webstore-logo.png" alt="Web Store Logo" width="28" height="28" style="object-fit:contain;filter:drop-shadow(0 0 12px rgba(6,182,212,.6))"><span style="display:flex;align-items:center;font-size:16px;font-weight:700;line-height:1;letter-spacing:-.025em"><span style="color:#fff">Web&nbsp;</span><span style="color:#06B6D4">Store</span></span></div>
+          <button onClick="{{ closeMenu }}" aria-label="Close menu" style="display:flex;width:32px;height:32px;align-items:center;justify-content:center;border-radius:12px;border:0;background:transparent;color:#9CA3AF;cursor:pointer" style-hover="background:#1F2937;color:#fff"><dc-import name="Icon" n="x" s="20" hint-size="20px,20px"></dc-import></button>
+        </div>
+        <nav class="pw-noscroll" aria-label="Editor menu" style="flex:1;display:flex;flex-direction:column;gap:4px;overflow-y:auto;overflow-x:hidden;padding:24px 12px 0">
+          <sc-for list="{{ drawerSections }}" as="sec" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <sc-if value="{{ sec.header }}"><div style="padding:8px 16px 6px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:#9CA3AF;opacity:.5;user-select:none">{{ sec.header }}</div></sc-if>
+              <sc-for list="{{ sec.items }}" as="it" hint-placeholder-count="2">
+                <button onClick="{{ it.onClick }}" style="{{ it.st }}" style-hover="{{ it.hover }}"><span style="display:flex;flex:none"><dc-import name="Icon" n="{{ it.icon }}" s="18" hint-size="18px,18px"></dc-import></span><span style="flex:1;text-align:left">{{ it.label }}</span><sc-if value="{{ it.badge }}"><span style="{{ it.badgeSt }}">{{ it.badge }}</span></sc-if></button>
+              </sc-for>
+            </div>
+          </sc-for>
+        </nav>
+        <div style="display:flex;flex-direction:column;gap:12px;flex:none;height:182px;box-sizing:border-box;border-top:1px solid #2A3544;padding:17px 12px 0">
+          <div style="display:flex;align-items:center;gap:12px">
+            <button onClick="{{ toProfile }}" title="Jun" style="display:flex;height:42px;min-width:0;flex:1;box-sizing:border-box;align-items:center;gap:12px;border-radius:16px;border:1px solid #2A3544;background:transparent;padding:1px 1px 1px 16px;cursor:pointer;font-family:inherit" style-hover="background:#1F2937">
+              <span style="display:flex;width:32px;height:32px;flex:none;align-items:center;justify-content:center;border-radius:9999px;background:#1F2937;box-shadow:0 0 0 2px rgba(45,212,191,.3);font-size:12px;font-weight:700;color:#fff">J</span>
+              <span style="min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:14px;font-weight:500;color:#fff">Jun</span>
+            </button>
+            <button aria-label="Switch to light mode" style="display:flex;width:42px;height:42px;flex:none;box-sizing:border-box;align-items:center;justify-content:center;border-radius:16px;border:1px solid #2A3544;background:transparent;color:#F59E0B;cursor:pointer" style-hover="background:#1F2937"><dc-import name="Icon" n="sun" s="20" hint-size="20px,20px"></dc-import></button>
+            <button aria-label="16 unread notifications" style="position:relative;display:flex;width:40px;height:40px;flex:none;align-items:center;justify-content:center;border-radius:16px;border:0;background:transparent;color:#9CA3AF;cursor:pointer" style-hover="background:#1F2937"><dc-import name="Icon" n="bell" s="20" hint-size="20px,20px"></dc-import><span style="position:absolute;top:0;right:-2px;display:flex;min-width:18px;height:18px;box-sizing:border-box;padding:0 4px;align-items:center;justify-content:center;border-radius:9999px;background:#FB2C36;font-size:10px;font-weight:700;color:#fff">16</span></button>
+          </div>
+          <div style="display:flex;height:42px;box-sizing:border-box;align-items:center;gap:12px;border-radius:16px;border:1px solid #2A3544;background:#161E2E;padding:0 4px 0 16px">
+            <span style="display:flex;flex:none;color:#9CA3AF"><dc-import name="Icon" n="globe" s="16" hint-size="16px,16px"></dc-import></span>
+            <div style="display:flex;flex:1;align-items:center;gap:4px"><sc-for list="{{ drawerLangs }}" as="l" hint-placeholder-count="2"><button onClick="{{ l.onClick }}" style="{{ l.st }}">{{ l.label }}</button></sc-for></div>
+          </div>
+          <button onClick="{{ drawerLogout }}" style="display:flex;height:42px;box-sizing:border-box;align-items:center;gap:12px;border-radius:16px;border:1px solid #2A3544;background:transparent;padding:0 0 0 16px;font-size:14px;font-weight:500;color:#fff;cursor:pointer;font-family:inherit" style-hover="background:#1F2937"><dc-import name="Icon" n="log-out" s="16" hint-size="16px,16px"></dc-import>Log out</button>
+        </div>
+      </aside>
+    </div>
+  </sc-if>
+  <sc-if value="{{ toast }}">
+    <div style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:8px;border-radius:10px;background:#111a2b;border:1px solid rgba(45,212,191,.3);padding:10px 16px;font-size:13px;color:#e2e8f0;box-shadow:0 12px 30px rgba(0,0,0,.5);animation:pw-in .2s ease-out both"><span style="display:flex;color:#2dd4bf"><dc-import name="Icon" n="circle-check" s="15" hint-size="15px,15px"></dc-import></span>{{ toast }}</div>
+  </sc-if>
+
+  <sc-if value="{{ tplOpen }}">
+    <div onClick="{{ closeTpl }}" style="position:fixed;inset:0;z-index:110;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(2,6,15,.7);backdrop-filter:blur(3px);animation:pw-fade .2s ease-out both">
+      <div onClick="{{ stop }}" style="width:100%;max-width:1200px;height:100%;max-height:960px;display:flex;flex-direction:column;border-radius:16px;border:1px solid rgba(148,163,184,.1);background:#0b1120;box-shadow:0 30px 60px -12px rgba(0,0,0,.7);overflow:hidden;animation:pw-pop .25s ease-out both">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:18px 22px 0">
+          <h2 style="margin:0;font-size:18px;line-height:28px;font-weight:600;color:#fff">Choose a template</h2>
+          <button onClick="{{ closeTpl }}" aria-label="Close" style="display:flex;border:0;background:none;color:#cbd5e1;padding:6px;border-radius:8px;cursor:pointer" style-hover="background:rgba(255,255,255,.06);color:#fff"><dc-import name="Icon" n="x" s="18" hint-size="18px,18px"></dc-import></button>
+        </div>
+        <div style="flex:none;padding:24px 22px 0;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:8px">
+            <div style="position:relative;flex:1;min-width:0">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);display:flex;color:#60a5fa"><dc-import name="Icon" n="sparkles" s="17" hint-size="17px,17px"></dc-import></span>
+              <input value="{{ tplQ }}" onChange="{{ onTplQ }}" onKeyDown="{{ onTplKey }}" placeholder="Search templates..." style="width:100%;height:40px;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.16);background:#111a2b;padding:0 14px 0 37px;font-size:14px;color:#fff;outline:none;font-family:inherit" style-focus="border-color:rgba(59,130,246,.6)">
+            </div>
+            <button onClick="{{ runTplSearch }}" aria-label="Search" style="flex:none;display:flex;width:40px;height:40px;align-items:center;justify-content:center;border:0;border-radius:8px;background:#1d4ed8;color:#fff;cursor:pointer" style-hover="background:#2563eb"><dc-import name="Icon" n="search" s="16" hint-size="16px,16px"></dc-import></button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px 4px">
+            <sc-for list="{{ tplCats }}" as="c" hint-placeholder-count="15"><button onClick="{{ c.onClick }}" style="{{ c.st }}">{{ c.label }}</button></sc-for>
+          </div>
+          <p style="margin:12px 0 0;font-size:12px;line-height:16px;color:#94a3b8">Showing {{ tplShown }} of {{ tplTotal }} templates</p>
+        </div>
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:16px 22px 24px">
+          <sc-if value="{{ tplEmpty }}"><div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:96px 0;color:#94a3b8;font-size:14px"><dc-import name="Icon" n="layout-template" s="36" hint-size="36px,36px"></dc-import>No templates match your search.</div></sc-if>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+            <sc-for list="{{ tplList }}" as="tp" hint-placeholder-count="6">
+              <div style="position:relative;overflow:hidden;border-radius:14px;background:#111a2b;border:1px solid rgba(148,163,184,.06);content-visibility:auto;contain-intrinsic-size:auto 386px;transition:transform .2s,box-shadow .2s" style-hover="transform:translateY(-3px);box-shadow:0 18px 30px -12px rgba(0,0,0,.6)">
+                <div style="position:relative;height:256px;overflow:hidden;background:#fff">
+                  <div style="width:1280px;height:920px;transform:scale(.28);transform-origin:top left;pointer-events:none;overflow:hidden"><dc-import name="SitePreview" blocks="{{ tp.thumb }}" theme="{{ tp.theme }}" vw="{{ 1280 }}" hint-size="1280px,920px"></dc-import></div>
+                  <div style="position:absolute;inset:auto 0 0 0;height:80px;background:linear-gradient(to bottom,transparent,rgba(17,26,43,.6));pointer-events:none"></div>
+                  <sc-if value="{{ tp.isPremium }}"><span style="position:absolute;top:12px;right:14px;display:flex;align-items:center;gap:5px;border-radius:8px;background:rgba(196,181,253,.3);padding:3px 9px;font-size:11px;font-weight:600;color:#7c6bd6;backdrop-filter:blur(6px)"><dc-import name="Icon" n="crown" s="12" hint-size="12px,12px"></dc-import>Pro</span></sc-if>
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(2,6,15,.6);opacity:0;transition:opacity .15s" style-hover="opacity:1">
+                    <button onClick="{{ tp.onPreview }}" style="display:flex;align-items:center;gap:6px;height:36px;padding:0 14px;border:0;border-radius:10px;background:rgba(255,255,255,.16);backdrop-filter:blur(6px);color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:rgba(255,255,255,.26)"><dc-import name="Icon" n="eye" s="14" hint-size="14px,14px"></dc-import>Preview</button>
+                    <button onClick="{{ tp.onUse }}" style="{{ tp.useSt }}"><span style="{{ tp.useIconSt }}"><dc-import name="Icon" n="{{ tp.useIcon }}" s="14" hint-size="14px,14px"></dc-import></span>{{ tp.useLabel }}</button>
+                  </div>
+                </div>
+                <div style="padding:18px 20px 20px">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                    <h3 style="margin:0;font-size:15px;line-height:22px;font-weight:600;color:#fff">{{ tp.name }}</h3>
+                    <div style="display:flex;flex:none;gap:4px;margin-top:3px"><span style="{{ tp.dot1 }}"></span><span style="{{ tp.dot2 }}"></span></div>
+                  </div>
+                  <p style="margin:6px 0 0;font-size:13px;line-height:19px;color:#94a3b8;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:38px">{{ tp.description }}</p>
+                  <span style="margin-top:12px;display:inline-block;border-radius:6px;background:#1e293b;padding:2px 8px;font-size:11px;line-height:16px;color:#cbd5e1">{{ tp.tag }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ tplPreview }}">
+    <div style="position:fixed;inset:0;z-index:120;display:flex;flex-direction:column;background:#0b1120;animation:pw-fade .2s ease-out both">
+      <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;height:56px;padding:0 16px 0 20px;border-bottom:1px solid rgba(148,163,184,.1)">
+        <div style="display:flex;align-items:center;gap:12px;min-width:0"><button onClick="{{ closeTplPreview }}" style="display:flex;border:0;background:none;color:#cbd5e1;padding:6px;border-radius:8px;cursor:pointer" style-hover="background:rgba(255,255,255,.06);color:#fff"><dc-import name="Icon" n="arrow-left" s="16" hint-size="16px,16px"></dc-import></button><div style="min-width:0"><p style="margin:0;font-size:14px;font-weight:600;color:#fff">{{ tplPreview.name }}</p><p style="margin:0;font-size:11px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tplPreview.description }}</p></div></div>
+        <div style="display:flex;gap:2px;padding:3px;border-radius:10px;background:#1a2231"><button onClick="{{ tplDesk }}" style="{{ tplDeskSt }}"><dc-import name="Icon" n="monitor" s="14" hint-size="14px,14px"></dc-import></button><button onClick="{{ tplMob }}" style="{{ tplMobSt }}"><dc-import name="Icon" n="smartphone" s="14" hint-size="14px,14px"></dc-import></button></div>
+        <button onClick="{{ tplPreview.onUse }}" style="{{ tplPreview.useSt }}"><span style="{{ tplPreview.useIconSt }}"><dc-import name="Icon" n="{{ tplPreview.useIcon }}" s="14" hint-size="14px,14px"></dc-import></span>{{ tplPreview.useLabel }}</button>
+      </div>
+      <div style="flex:1;min-height:0;display:flex;justify-content:center;padding:16px;background:#060a14">
+        <div style="{{ tplFrameSt }}"><dc-import name="SitePreview" blocks="{{ tplPreview.blocks }}" theme="{{ tplPreview.theme }}" hint-size="100%,100%"></dc-import></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ previewOpen }}">
+    <div style="position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;background:#0b1120;animation:pw-fade .2s ease-out both">
+      <div style="display:flex;height:48px;flex:none;align-items:center;justify-content:space-between;padding:0 16px">
+        <span style="font-size:13px;color:#94a3b8">{{ previewTitle }}</span>
+        <button onClick="{{ closePreview }}" style="display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:#1a2231;color:#fff;font-size:13px;font-family:inherit;cursor:pointer"><dc-import name="Icon" n="x" s="14" hint-size="14px,14px"></dc-import>Close</button>
+      </div>
+      <iframe src="assets/demo-site.html" title="Preview" style="flex:1;width:100%;border:0;background:#0a0a0a"></iframe>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const BLOCK_GROUPS = [
+  ['basics', 'package', 'Basics', [['panel-top', 'Hero', 'Hero banner with headline and CTA'], ['sparkles', 'Features', 'Feature highlights with icons'], ['book-open', 'About', 'About us section'], ['mouse-pointer-click', 'CTA', 'Call to action banner'], ['wrench', 'Service cards', 'Your services shown as cards']]],
+  ['content', 'file-text', 'Content', [['message-square-quote', 'Testimonials', 'Customer quotes and ratings'], ['circle-help', 'FAQ', 'Questions and answers'], ['chart-column', 'Stats', 'Key numbers at a glance'], ['type', 'Rich text', 'Free-form text content'], ['history', 'Timeline', 'Milestones in order']]],
+  ['media', 'image', 'Media', [['images', 'Gallery', 'Image grid or carousel'], ['clapperboard', 'Video', 'Embedded or background video'], ['building-2', 'Logo cloud', 'Partner and client logos']]],
+  ['business', 'briefcase', 'Business', [['users', 'Team', 'Team members with roles'], ['banknote', 'Pricing', 'Plans and price tables'], ['map-pin', 'Locations', 'Branches with map and hours']]],
+  ['commerce', 'shopping-cart', 'Commerce', [['shopping-bag', 'Product grid', 'Products from your catalogue'], ['star', 'Featured product', 'Highlight one product'], ['layout-grid', 'Categories', 'Shop by category tiles'], ['badge-percent', 'Promo banner', 'Sale or discount banner']]],
+  ['forms', 'clipboard-list', 'Form & contact', [['inbox', 'Contact form', 'Name, email and message'], ['mail', 'Newsletter', 'Email sign-up'], ['calendar-days', 'Booking', 'Appointment or table booking']]],
+  ['widgets', 'puzzle', 'Widgets', [['map', 'Map', 'Google Maps embed'], ['timer', 'Countdown', 'Timer to a launch or sale'], ['share-2', 'Social links', 'Follow us icons'], ['message-circle', 'WhatsApp button', 'Floating chat button']]],
+  ['layout', 'layout-template', 'Layout', [['move-vertical', 'Spacer', 'Empty space between sections'], ['minus', 'Divider', 'Horizontal line']]]
+];
+const TODAY = (() => { const d = new Date(); return String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
+const PAGES = [['Home', '/'], ['Menu', '/menu'], ['Gallery', '/gallery'], ['About', '/about'], ['Contact', '/contact'], ['Blog', '/blog']].map(([name, path], i) => ({ id: 'p' + i, name, path, date: TODAY, visible: true, home: i === 0, parent: null }));
+const DRAWER_NAV = [
+  [null, [['dashboard', 'Dashboard', 'Papan Pemuka', 'layout-dashboard']]],
+  [['Online Store', 'Kedai Online'], [['editor', 'Editor', 'Editor', 'layout-template'], ['blog', 'Blog', 'Blog', 'pen-line']]],
+  [['Core Operations', 'Operasi Teras'], [['orders', 'Orders', 'Pesanan', 'shopping-cart'], ['products', 'Products', 'Produk', 'package', 6], ['discounts', 'Discounts', 'Diskaun', 'percent', 9]]],
+  [['CRM', 'CRM'], [['customers', 'All Customers', 'Semua Pelanggan', 'users', 13], ['leads', 'Contact Leads', 'Kenalan', 'user-plus']]],
+  [['Settings', 'Tetapan'], [['payments', 'Payments', 'Pembayaran', 'credit-card'], ['shipping', 'Shipping', 'Penghantaran', 'truck'], ['domains', 'Domains', 'Domain', 'globe'], ['email', 'Email Templates', 'Templat E-mel', 'bell'], ['team', 'Team & Account', 'Pasukan & Akaun', 'users-round']]],
+  [['Support', 'Sokongan'], [['help', 'Help Center', 'Pusat Bantuan', 'headphones']]]
+];
+const ABOUT_V = ['simple', 'split', 'story', 'two-column', 'founder-quote', 'centered-large', 'image-overlay'];
+const CTA_V = ['banner', 'inline', 'card', 'floating-sticky', 'image-bg', 'split-testimonial', 'dark-card', 'mesh-gradient-hero'];
+const BLOCK_META = { features: { name: 'Features', icon: '✨', variants: ['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag', 'carousel'] }, contact: { name: 'Contact', icon: '📬', variants: ['form', 'info-only', 'split', 'card-float', 'minimal-inline'] }, 'products-grid': { name: 'Products Grid', icon: '🛍️', variants: ['grid-3', 'grid-4', 'list'] }, navigation: { name: 'Navigation', icon: '🧭', variants: ['default', 'centered', 'transparent', 'sidebar', 'floating'] }, hero: { name: 'Hero', icon: '🏔️', variants: ['centered', 'split-left', 'split-right', 'fullscreen', 'video', 'magazine', 'minimal', 'cards-overlay', 'gradient', 'parallax', 'slideshow', 'split-video'] }, about: { name: 'About', icon: '📖', variants: ABOUT_V }, carousel: { name: 'Carousel', icon: '🎠', variants: ['images', 'cards', 'testimonials'] }, 'products-featured': { name: 'Featured Products', icon: '⭐', variants: ['hero-product', 'carousel'] }, cta: { name: 'CTA', icon: '📣', variants: CTA_V }, 'blog-list': { name: 'Blog List', icon: '📰', variants: ['cards', 'list'] }, footer: { name: 'Footer', icon: '🔻', variants: ['simple', 'minimal', 'centered-stack', 'dark-gradient'] } };
+const slugify = (t) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const TPL_CATS = [['all', 'All'], ['restaurant', 'Restaurant'], ['ecommerce', 'E-commerce'], ['beauty', 'Beauty'], ['tech', 'Tech'], ['health', 'Health'], ['education', 'Education'], ['realestate', 'Real estate'], ['fitness', 'Fitness'], ['creative', 'Creative'], ['business', 'Business'], ['bakery', 'Cafe & bakery'], ['events', 'Events'], ['blog', 'Blog'], ['travel', 'Travel']];
+const KW = { restaurant: 'restaurant', ecommerce: 'online store', beauty: 'beauty spa', tech: 'tech startup', health: 'dental clinic', education: 'education', realestate: 'real estate property', fitness: 'gym fitness', creative: 'portfolio creative', business: 'consulting company', bakery: 'bakery cafe', events: 'wedding events', blog: 'blog magazine', travel: 'travel tours' };
+const RAW = {
+  travel: [['Backpacker Fresh', 'Energetic budget-travel site with compact layout, vibrant colors, and quick booking.', '#16a34a', '#65a30d', 1], ['Wanderlust Classic', 'Clean travel agency template for tour packages and destinations.', '#0891b2', '#0e7490', 1], ['Island Escape', 'Resort and island getaway template with rooms, gallery and booking.', '#2563eb', '#1e3a8a', 1], ['Adventure Trail', 'Outdoor adventure tours with itineraries and trip highlights.', '#9a3412', '#78350f', 1]],
+  ecommerce: [['Activewear Performance', 'A high-energy sports retail template for activewear, footwear, and performance apparel.', '#059669', '#2dd4bf', 1], ['Sports Equipment Pro', 'A bold sports-commerce template for training equipment, team gear, and fitness accessories.', '#2563eb', '#334155', 1], ['Minimal Boutique', 'Elegant fashion storefront with product grid and lookbook.', '#0f172a', '#a3a3a3', 0], ['Home Living', 'Furniture and home decor shop with collections and stories.', '#78716c', '#d6d3d1', 1], ['Gadget Hub', 'Electronics store with deals, categories and reviews.', '#0ea5e9', '#6366f1', 0]],
+  restaurant: [['Saigon Bistro', 'Bold restaurant template with menu highlights and reviews.', '#b91c1c', '#f59e0b', 1], ['Nasi Lemak House', 'Warm local eatery template with menu, hours and delivery links.', '#16a34a', '#facc15', 0], ['Fine Dining Noir', 'Dark, elegant fine-dining template with reservations.', '#a16207', '#1c1917', 1], ['Street Food Co', 'Playful street-food template with combos and order buttons.', '#ea580c', '#fde047', 0]],
+  beauty: [['Hana Spa', 'Calm, elegant spa & beauty template with services and booking.', '#db2777', '#9d174d', 1], ['Glow Studio', 'Modern beauty studio with treatments, pricing and gallery.', '#e11d48', '#fda4af', 0], ['Nail Atelier', 'Chic nail salon template with styles gallery and booking.', '#c026d3', '#f0abfc', 0], ['Barber Classic', 'Vintage barbershop template with services and walk-in hours.', '#1f2937', '#b45309', 1]],
+  tech: [['Nexa Cloud', 'SaaS landing page with features, pricing and testimonials.', '#6366f1', '#22d3ee', 0], ['DevTools Pro', 'Developer tool site with docs links, pricing and changelog.', '#0f172a', '#22c55e', 1], ['AI Startup', 'Futuristic AI product launch page with waitlist.', '#7c3aed', '#06b6d4', 1], ['IT Services', 'Managed IT services company with solutions and contact.', '#1d4ed8', '#64748b', 0]],
+  health: [['Glow Clinic', 'Clean clinic template with treatments, team and contact.', '#0d9488', '#db2777', 0], ['Smile Dental', 'Friendly dental practice with services and appointments.', '#0284c7', '#7dd3fc', 0], ['Wellness Centre', 'Holistic wellness centre with programmes and practitioners.', '#15803d', '#bbf7d0', 1], ['Physio Care', 'Physiotherapy clinic with treatments and booking.', '#0369a1', '#38bdf8', 0]],
+  education: [['Bright Academy', 'Tuition centre template with courses, tutors and enrolment.', '#2563eb', '#facc15', 0], ['Online Course', 'Course landing page with curriculum, reviews and pricing.', '#7c3aed', '#f472b6', 1], ['Kids Learning', 'Colourful kindergarten and kids programme template.', '#f97316', '#22c55e', 0], ['Language School', 'Language school with levels, schedules and trial class.', '#dc2626', '#1d4ed8', 0]],
+  realestate: [['Urban Realty', 'Property agency template with listings and agents.', '#0f766e', '#134e4a', 1], ['Luxury Homes', 'Premium property showcase with galleries and enquiries.', '#a16207', '#1c1917', 1], ['Condo Launch', 'New condo launch page with floor plans and registration.', '#1d4ed8', '#93c5fd', 0], ['Rent & Stay', 'Rental listings template with filters and contact.', '#0891b2', '#e2e8f0', 0]],
+  fitness: [['Iron Gym', 'High-energy gym template with classes, trainers and plans.', '#dc2626', '#111827', 1], ['Yoga Flow', 'Calm yoga studio with schedule and memberships.', '#65a30d', '#d9f99d', 0], ['CrossFit Box', 'Bold CrossFit box with WODs and trial sign-up.', '#f59e0b', '#1f2937', 0], ['Personal Trainer', 'Personal trainer page with programmes and results.', '#0ea5e9', '#0f172a', 0]],
+  creative: [['Studio Folio', 'Minimal portfolio for designers and studios.', '#0f172a', '#f43f5e', 0], ['Photographer', 'Image-first portfolio with galleries and booking.', '#171717', '#a3a3a3', 1], ['Agency Bold', 'Creative agency site with case studies and team.', '#7c3aed', '#facc15', 1], ['Freelancer CV', 'Personal CV site with skills, work and contact.', '#2563eb', '#94a3b8', 0]],
+  business: [['Corporate Prime', 'Professional corporate site with services and about.', '#1e3a8a', '#64748b', 0], ['Consulting Firm', 'Consulting firm template with expertise and insights.', '#0f766e', '#cbd5e1', 1], ['Logistics Co', 'Logistics company with services, coverage and quotes.', '#ea580c', '#1f2937', 0], ['Law Office', 'Trustworthy law firm template with practice areas.', '#78350f', '#e7e5e4', 1]],
+  bakery: [['Brew & Co', 'Warm café template with menu, gallery and table booking.', '#b45309', '#78350f', 0], ['Sweet Crumbs', 'Bakery template with cakes, pre-orders and pickup.', '#db2777', '#fde68a', 0], ['Kopi Corner', 'Cosy kopitiam template with drinks menu and hours.', '#92400e', '#fef3c7', 1], ['Patisserie Fine', 'Elegant patisserie with collections and custom orders.', '#a16207', '#fafaf9', 1]],
+  events: [['Wedding Bliss', 'Romantic wedding planner template with packages and gallery.', '#be185d', '#fbcfe8', 1], ['Event Hall', 'Venue rental template with halls, capacity and enquiry.', '#4338ca', '#c7d2fe', 0], ['Conference 2026', 'Conference page with speakers, agenda and tickets.', '#0f172a', '#22d3ee', 1], ['Party Planner', 'Fun party planning template with themes and booking.', '#f97316', '#a855f7', 0]],
+  blog: [['Daily Journal', 'Clean personal blog with featured posts and newsletter.', '#0f172a', '#f59e0b', 0], ['Food Stories', 'Food blog with recipes, categories and search.', '#dc2626', '#fde68a', 0], ['Tech Digest', 'Tech news magazine with categories and trending.', '#2563eb', '#0f172a', 1], ['Travel Diary', 'Travel blog with destinations and photo essays.', '#0891b2', '#fef9c3', 0]]
+};
+const TEMPLATES = []; Object.keys(RAW).forEach(cat => RAW[cat].forEach(([name, description, primary, secondary, pro], i) => TEMPLATES.push({ id: cat + i, name, description, primary, secondary, isPremium: !!pro, cat, tag: cat })));
+const dot = (c) => ({ display: 'block', width: 14, height: 14, borderRadius: 99, background: c });
+const tplGen = {}; function genTpl(t) { if (!tplGen[t.id]) { const g = window.PWGenerate ? window.PWGenerate.generateBlocks(t.name + ' - ' + KW[t.cat]) : { blocks: [], theme: {} }; tplGen[t.id] = { blocks: g.blocks || [], theme: { ...(g.theme || {}), primaryColor: t.primary, secondaryColor: t.secondary } }; } return tplGen[t.id]; }
+const now = () => new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const clone = (x) => JSON.parse(JSON.stringify(x));
+
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    const site = p.site || {};
+    const name = site.name || 'vdvd';
+    const g = { businessName: name, phone: '+60 12-345-6789', email: 'hello@company.com', address: '12 Jalan Ampang, Kuala Lumpur', bizType: 'Retail store', hours: 'Mon–Sat 10:00–20:00\nSun 11:00–18:00', maps: '', price: '$$', fb: '', ig: '', tt: '', wa: '', primary: '#c2410c', secondary: '#1f2937', fontH: 'Outfit', fontB: 'Inter', mode: 'Light', metaTitle: name + ' — Official website', metaDesc: 'Discover ' + name + '. Fresh ingredients, warm hospitality and an unforgettable experience.', nav: ['Home', 'Menu', 'Gallery', 'About', 'Contact', 'Blog'], logo: '', fav: '' };
+    this.state = { g, history: [clone(g)], hi: 0, left: true, right: true, leftTab: 'chat', rightTab: 'global', view: 'desktop', brandOpen: true, contactOpen: true, menuOpen: false, liveMenu: false, copied: false, saving: false, savedAt: now(), toast: '', pages: PAGES, page: 'p0', adding: false, newPageName: '', confirmDel: null, pageMenu: null, renaming: null, renameVal: '', dragId: null, dragOver: null, blockQ: '', openGroups: ['basics'], tpl: false, tplQ: '', tplApplied: '', tplCat: 'all', tplPrev: null, tplDevice: 'desktop', applying: null, preview: null, thinking: false, thinkLabel: '', chatInput: '', auto: false, attach: '', chat: [] };
+    this.timers = [];
+    this.chatBox = React.createRef(); this.siteFrame = React.createRef(); this.newPageRef = React.createRef(); this.renameRef = React.createRef(); this.attachInput = React.createRef(); this.socialInput = React.createRef(); this.logoInput = React.createRef(); this.favInput = React.createRef();
+    const AGENT_MSG = { page: 'The assistant updated this page', seo: "The assistant updated this page's SEO", languages: 'The assistant changed the website languages' };
+    this.pageApi = {
+      read: () => this.readPage(),
+      locate: (el) => this.locateEl(el),
+      openSeo: () => this.setState({ right: true, rightTab: 'seo' }),
+      setSeo: (k, v) => this.setState(s => ({ g: { ...s.g, [k]: v } }), this.commit),
+      notify: (kind, title, undone) => { this.flash(undone ? 'Undid: ' + title : (AGENT_MSG[kind] || AGENT_MSG.page)); this.autosave(); }
+    };
+  }
+  ensureTick() { if (this.frameTick && this.tickAlive && Date.now() - this.tickAlive < 2000) return; clearInterval(this.frameTick); this.frameTick = setInterval(() => { this.tickAlive = Date.now(); this.attachFrame(); this.attachBlocks(); }, 400); this.tickAlive = Date.now(); }
+  onSiteLoad = () => { this.attachFrame(); this.attachBlocks(); try { const inner = this.siteFrame.current.contentDocument.getElementById('spa-frame'); if (inner && !inner.__pwLoad) { inner.__pwLoad = true; inner.addEventListener('load', () => { this.attachFrame(); this.attachBlocks(); }); } } catch (e) {} };
+  componentDidMount() { this.ensureTick(); window.addEventListener('keydown', this.onKey); this.onDocClick = () => { if (this.state.pageMenu) this.setState({ pageMenu: null }); }; window.addEventListener('click', this.onDocClick); this.onR = () => this.setState({ vw: window.innerWidth }); window.addEventListener('resize', this.onR); this.onR(); }
+  componentWillUnmount() { clearInterval(this.frameTick); this.frameTick = null; this.timers.forEach(clearTimeout); window.removeEventListener('keydown', this.onKey); window.removeEventListener('click', this.onDocClick); window.removeEventListener('resize', this.onR); }
+  componentDidUpdate() { this.ensureTick(); this.syncNav(); const el = this.chatBox.current; if (el) el.scrollTop = el.scrollHeight; }
+  onKey = (e) => {
+    if (e.key === 'Escape' && this.state.pageMenu) return this.setState({ pageMenu: null });
+    if (e.key === 'Escape') { if (this.state.tplPrev) return this.setState({ tplPrev: null }); this.setState({ menuOpen: false, liveMenu: false, preview: null, tpl: false }); }
+    if (!(e.metaKey || e.ctrlKey) || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
+  };
+  innerDoc() {
+    try { const outer = this.siteFrame.current && this.siteFrame.current.contentDocument; const inner = outer && outer.getElementById('spa-frame'); const d = inner && inner.contentDocument; return d && d.readyState !== 'loading' && d.body ? d : null; } catch (e) { return null; }
+  }
+  attachBlocks() {
+    const d = this.innerDoc();
+    if (this.selEl && (!d || !this.selEl.isConnected || this.selEl.ownerDocument !== d)) { this.selEl = null; this.setState(s => ({ blk: null, rightTab: s.rightTab === 'block' ? 'global' : s.rightTab })); }
+    if (!d || d.__pwBlocks || !d.querySelector('[data-block-type]')) return;
+    d.__pwBlocks = true;
+    const st = d.createElement('style');
+    st.textContent = '[data-block-type]{cursor:pointer}[data-block-type]:not([data-pw-selected]):hover{outline:2px dashed rgba(45,212,191,.55);outline-offset:-2px}[data-pw-selected]{outline:2px solid #2dd4bf!important;outline-offset:-2px}';
+    d.head.appendChild(st);
+    d.addEventListener('click', (e) => {
+      if (this.editingNav || e.target.isContentEditable) return;
+      const el = e.target.closest('[data-block-type]');
+      const a = e.target.closest('a'), navLink = e.target.closest('header .shell-nav > a');
+      if (a && !navLink) { e.preventDefault(); e.stopPropagation(); }
+      if (el) { this.selectBlock(d, el); if (this.state.left && this.state.leftTab === 'chat') window.dispatchEvent(new CustomEvent('ech-agent:pick', { detail: { element: this.pickElement(e.target, el), add: e.shiftKey } })); }
+      else { this.clearSel(); this.setState(s => ({ blk: null, rightTab: s.rightTab === 'block' ? 'global' : s.rightTab })); }
+    }, true);
+  }
+  readPage() {
+    const d = this.innerDoc(), g = this.state.g, secs = [];
+    if (d) Array.from(d.querySelectorAll('[data-block-type]')).forEach(el => {
+      const type = el.getAttribute('data-block-type'), q = (sel) => el.querySelector(sel);
+      const head = q('h1, h2'), sub = head && head.nextElementSibling && head.nextElementSibling.tagName === 'P' ? head.nextElementSibling : null;
+      secs.push({ el, type, name: (BLOCK_META[type] || { name: type }).name, fields: { headline: head, subheadline: sub, ctaLabel: type === 'hero' || type === 'cta' ? q('a.button') : null } });
+    });
+    return { page: this.pageName(), business: g.businessName, bizType: g.bizType, seo: { title: g.metaTitle, desc: g.metaDesc }, sections: secs };
+  }
+  locateEl(el) {
+    const d = this.innerDoc(); if (!d || !el || !el.isConnected || el.ownerDocument !== d) return;
+    const w = d.defaultView; w.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + w.scrollY - 80), behavior: 'smooth' });
+    if (el.hasAttribute('data-block-type')) this.selectBlock(d, el);
+  }
+  pickElement(target, block) {
+    const type = block.getAttribute('data-block-type'), name = (BLOCK_META[type] || { name: type }).name;
+    const clean = (n) => (n.textContent || '').replace(/\s+/g, ' ').trim();
+    const btn = target.closest('a.button, button'), img = target.closest('img'), txt = target.closest('h1, h2, h3, h4, h5, h6, p, li, blockquote');
+    let kind = type === 'navigation' ? 'menu' : type === 'footer' ? 'footer' : 'section', node = null, label = type === 'navigation' ? 'Menu' : name;
+    if (btn && block.contains(btn) && clean(btn)) { kind = 'button'; node = btn; label = clean(btn); }
+    else if (img && block.contains(img)) { kind = 'image'; label = img.getAttribute('alt') || 'Picture'; }
+    else if (txt && block.contains(txt) && clean(txt) && kind !== 'menu') { kind = 'text'; node = txt; label = clean(txt); }
+    const hl = node || img || block;
+    hl.__pwKey = hl.__pwKey || 'k' + Math.random().toString(36).slice(2, 8);
+    return { kind, key: hl.__pwKey, label: label.length > 48 ? label.slice(0, 47) + '\u2026' : label, value: node ? clean(node) : '', node, hl, block, section: name };
+  }
+  clearSel() { if (this.selEl) this.selEl.removeAttribute('data-pw-selected'); this.selEl = null; }
+  selectBlock(d, el) {
+    this.clearSel(); this.selEl = el; el.setAttribute('data-pw-selected', '');
+    const type = el.getAttribute('data-block-type'), all = Array.from(d.querySelectorAll('[data-block-type]'));
+    const q = (sel) => el.querySelector(sel);
+    const head = q('h1, h2'), sub = head && head.nextElementSibling && head.nextElementSibling.tagName === 'P' ? head.nextElementSibling : null;
+    const F = [];
+    const add = (key, label, node, kind, rows) => node && F.push({ key, label, node, kind, rows: rows || 2 });
+    if (type === 'footer') { add('logoText', 'Logo text', q('.footer-logo'), 'input'); add('tagline', 'Tagline', q('.footer-tagline'), 'area', 2); }
+    else if (type !== 'navigation') {
+      add('sectionLabel', 'Section label', q('.eyebrow, .section-label'), 'input');
+      add('headline', 'Headline', head, 'input');
+      if (type === 'about') add('body', 'Body text', sub, 'area', 4); else if (['hero', 'cta', 'features', 'products-grid'].includes(type)) add('subheadline', 'Subheadline', sub, 'area', 2); else if (type === 'contact') add('subtext', 'Subtext', sub, 'area', 2);
+      if (type === 'hero' || type === 'cta') { const b = q('a.button'); if (b) F.push({ key: 'ctaLabel', label: 'CTA button', node: b, kind: 'input', url: true }); }
+    }
+    this.blkNodes = Object.fromEntries(F.map(f => [f.key, f.node]));
+    const cs = d.defaultView.getComputedStyle(el), snap = (v) => Math.min(120, Math.round(parseFloat(v || 0) / 4) * 4);
+    const vals = Object.fromEntries(F.map(f => [f.key, f.node.textContent.trim().replace(/\s+/g, ' ')]));
+    if (this.blkNodes.ctaLabel) vals.ctaUrl = this.blkNodes.ctaLabel.getAttribute('href') || '';
+    this.setState({ rightTab: 'block', right: true, blk: { type, variant: el.getAttribute('data-block-variant') || '', num: all.indexOf(el) + 1, fields: F.map(({ key, label, kind, rows, url }) => ({ key, label, kind, rows, url })), vals, top: snap(cs.paddingTop), bottom: snap(cs.paddingBottom) } });
+  }
+  blkVals() {
+    const b = this.state.blk; if (!b) return null;
+    const M = BLOCK_META[b.type] || { name: b.type, icon: '🧩', variants: [] };
+    const setVal = (k) => (e) => { const v = e.target.value; this.setState(s => ({ blk: { ...s.blk, vals: { ...s.blk.vals, [k]: v } } })); };
+    const push = (k) => () => { const n = this.blkNodes[k], v = this.state.blk.vals[k]; if (n && v != null) n.textContent = v; };
+    const pad = (k) => (e) => { const v = Number(e.target.value); this.setState(s => ({ blk: { ...s.blk, [k]: v } })); };
+    const commit = (k) => (e) => { if (this.selEl) this.selEl.style[k === 'top' ? 'paddingTop' : 'paddingBottom'] = Number(e.target.value) + 'px'; };
+    const vars = M.variants.filter(v => b.type !== 'footer' || !['expanded', 'mega-footer'].includes(v));
+    return { type: b.type, name: M.name, icon: M.icon, num: b.num, isGlobal: ['navigation', 'footer', 'breadcrumb'].includes(b.type),
+      hasVariants: vars.length > 1, hasSpacing: !['navigation', 'footer', 'announcement-bar', 'pricing', 'feature-comparison'].includes(b.type),
+      variants: vars.map(v => { const on = b.variant === v; return { label: v.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), onClick: () => { if (this.selEl) this.selEl.setAttribute('data-block-variant', v); this.setState(s => ({ blk: { ...s.blk, variant: v } })); },
+        st: { borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer', transition: 'background .15s', border: '1px solid ' + (on ? 'rgba(59,130,246,.3)' : 'transparent'), background: on ? 'rgba(59,130,246,.15)' : 'rgba(255,255,255,.05)', color: on ? '#60a5fa' : '#6b7280' } }; }),
+      top: b.top, bottom: b.bottom, topTxt: b.top + 'px', bottomTxt: b.bottom + 'px', ontop: pad('top'), onbottom: pad('bottom'), committop: commit('top'), commitbottom: commit('bottom'),
+      fields: b.fields.map(f => ({ label: f.label, isInput: f.kind === 'input', isArea: f.kind === 'area', rows: f.rows, value: b.vals[f.key] || '', onChange: setVal(f.key), onBlur: push(f.key),
+        hasUrl: !!f.url, url: b.vals.ctaUrl || '', onUrl: setVal('ctaUrl'), onUrlBlur: () => { const n = this.blkNodes.ctaLabel; if (n) n.setAttribute('href', this.state.blk.vals.ctaUrl || '#'); } })) };
+  }
+  navLinks(d) { return Array.from(d.querySelectorAll('header .shell-nav > a')); }
+  attachFrame = () => {
+    const d = this.innerDoc(); if (!d || d.__pwNav) return;
+    const nav = d.querySelector('header .shell-nav'); if (!nav) return;
+    d.__pwNav = true;
+    const st = d.createElement('style');
+    st.textContent = 'header .shell-nav > a{cursor:text!important;border-radius:4px;transition:box-shadow .15s,background .15s}header .shell-nav > a:hover{box-shadow:0 0 0 1px #fff,0 0 0 3px #2dd4bf;}header .shell-nav > a[contenteditable=true]{box-shadow:0 0 0 2px #2dd4bf!important;background:rgba(45,212,191,.08);outline:none;cursor:text}';
+    d.head.appendChild(st);
+    if (!this.navSeeded) {
+      this.navSeeded = true;
+      const labels = this.navLinks(d).map(a => a.textContent.trim());
+      this.setState(s => ({ g: { ...s.g, nav: labels }, history: s.history.map((hh, i) => i === 0 ? { ...hh, nav: labels } : hh) }));
+    } else this.syncNav(true);
+    nav.addEventListener('click', (e) => {
+      const a = e.target.closest('a'); if (!a || !nav.contains(a)) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (a.isContentEditable) return;
+      this.editNav(d, a);
+    }, true);
+  };
+  editNav(d, a) {
+    const idx = this.navLinks(d).filter(x => x.style.display !== 'none').indexOf(a);
+    const before = a.textContent;
+    a.contentEditable = 'true'; a.spellcheck = false; a.focus();
+    const r = d.createRange(); r.selectNodeContents(a); const sel = d.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    this.editingNav = true;
+    const done = (save) => {
+      a.removeEventListener('blur', onBlur); a.removeEventListener('keydown', onKey);
+      a.contentEditable = 'false'; this.editingNav = false;
+      const v = a.textContent.replace(/\s+/g, ' ').trim();
+      if (!save || !v) { a.textContent = before; return; }
+      a.textContent = v;
+      if (v === before) return;
+      this.setState(s => { const nav = s.g.nav.slice(); nav[idx] = v; return { g: { ...s.g, nav } }; }, () => { this.commit(); this.flash('Menu item renamed to \u201c' + v + '\u201d'); });
+    };
+    const onBlur = () => done(true);
+    const onKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); a.blur(); } if (e.key === 'Escape') { e.preventDefault(); done(false); a.blur(); } };
+    a.addEventListener('blur', onBlur); a.addEventListener('keydown', onKey);
+  }
+  syncNav(force) {
+    if (this.editingNav || !this.navSeeded) return;
+    const d = this.innerDoc(); if (!d) return;
+    const nav = d.querySelector('header .shell-nav'); if (!nav) return;
+    const want = this.state.g.nav; let links = this.navLinks(d);
+    while (links.length < want.length) { const c = links[links.length - 1].cloneNode(true); c.removeAttribute('aria-current'); c.setAttribute('data-spa-href', '/'); c.dataset.pwAdded = '1'; nav.appendChild(c); links = this.navLinks(d); }
+    links.forEach((a, i) => { if (i < want.length) { a.style.display = ''; if (a.textContent !== want[i]) a.textContent = want[i]; } else a.style.display = 'none'; });
+  }
+  autosave() {
+    clearTimeout(this.saveT);
+    this.setState({ saving: true });
+    this.saveT = setTimeout(() => { this.setState({ saving: false, savedAt: now() }); const s = this.props.site; if (s && this.props.updateSite && this.state.g.businessName !== s.name) this.props.updateSite(s.id, { name: this.state.g.businessName }); }, 800);
+    this.timers.push(this.saveT);
+  }
+  commit = () => {
+    this.setState(s => {
+      if (JSON.stringify(s.g) === JSON.stringify(s.history[s.hi])) return null;
+      const history = s.history.slice(0, s.hi + 1).concat([clone(s.g)]).slice(-50);
+      return { history, hi: history.length - 1 };
+    }, () => this.autosave());
+  };
+  undo = () => { if (this.state.hi > 0) { this.setState(s => ({ g: clone(s.history[s.hi - 1]), hi: s.hi - 1 })); this.autosave(); } };
+  redo = () => { if (this.state.hi < this.state.history.length - 1) { this.setState(s => ({ g: clone(s.history[s.hi + 1]), hi: s.hi + 1 })); this.autosave(); } };
+  flash(t) { this.setState({ toast: t }); clearTimeout(this.toastT); this.toastT = setTimeout(() => this.setState({ toast: '' }), 2200); this.timers.push(this.toastT); }
+  scenario(txt, page) {
+    const t = txt.toLowerCase();
+    if (/friendl|rewrite|top section|hero|headline/.test(t)) return { reply: 'I rewrote the top section of ' + page + ' with a warmer, more welcoming tone.', title: 'HERO SECTION', changes: [['type', 'Headline', 'rewritten to sound friendlier and more personal'], ['type', 'Subheadline', 'shorter, conversational copy'], ['mouse-pointer-click', 'Buttons', 'labels updated to match the new tone']] };
+    if (/faq|question/.test(t)) return { reply: 'I added a FAQ section near the bottom of ' + page + ' with 4 common questions for your shop.', title: 'NEW SECTION · FAQ', changes: [['list-plus', 'Q1', 'Do you deliver across Malaysia?'], ['list-plus', 'Q2', 'What payment methods do you accept?'], ['list-plus', 'Q3', 'Can I return or exchange an item?'], ['list-plus', 'Q4', 'How long does delivery take?']] };
+    if (/malay|translate|bahasa/.test(t)) return { reply: 'I translated all the text on ' + page + ' into Bahasa Malaysia. Brand names and prices stay unchanged.', title: 'TRANSLATION · MALAY', changes: [['languages', 'Navigation', 'menu labels translated'], ['languages', 'Sections', 'headlines, body text and buttons translated'], ['languages', 'Footer', 'contact and copyright text translated']] };
+    if (/seo/.test(t)) return { reply: 'I checked the SEO on ' + page + '. Here\u2019s what I\u2019ll fix:', title: 'SEO CHECK', changes: [['search', 'Meta title', 'shortened to 55 characters with your main keyword'], ['file-text', 'Meta description', 'rewritten to 150 characters with a clear call to action'], ['image', 'Images', 'alt text added to 6 images'], ['type', 'Headings', 'one H1 per page, H2s reordered']] };
+    if (/colou?r|font|theme/.test(t)) return { reply: 'I updated the site theme as requested.', title: 'GLOBAL THEME', changes: [['palette', 'Theme', txt]] };
+    return { reply: 'Here\u2019s what I\u2019ll change on ' + page + ':', title: 'PROPOSED CHANGES', changes: [['square-pen', page, txt]] };
+  }
+  sendChat = (preset) => {
+    const txt = (typeof preset === 'string' ? preset : this.state.chatInput).trim(); if (!txt || this.state.thinking) return;
+    const page = this.pageName(), file = this.state.attach;
+    this.setState(s => ({ chatInput: '', attach: '', thinking: true, thinkLabel: 'Reading the page...', chat: [...s.chat, { id: Date.now(), role: 'user', content: txt, file }] }));
+    this.timers.push(setTimeout(() => this.setState({ thinkLabel: 'Planning changes...' }), 700));
+    this.timers.push(setTimeout(() => {
+      const sc = this.scenario(txt, page), id = Date.now() + 1, auto = this.state.auto;
+      this.setState(s => ({ thinking: false, chat: [...s.chat, { id, role: 'assistant', content: sc.reply, title: sc.title, changes: sc.changes, status: auto ? 'applied' : 'pending' }] }));
+      if (auto) this.autosave();
+    }, 1700));
+  };
+  setStatus(id, status) { this.setState(s => ({ chat: s.chat.map(m => m.id === id ? { ...m, status } : m) })); if (status === 'applied') { this.autosave(); this.flash('Changes applied'); } }
+  useTpl(t) {
+    if (this.state.applying) return;
+    this.setState({ applying: t.id });
+    this.timers.push(setTimeout(() => { this.setState({ applying: null, tpl: false, tplPrev: null }); this.flash('Template “' + t.name + '” applied'); this.autosave(); }, 1000));
+  }
+  pageVals() {
+    const s = this.state;
+    const B = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 34, border: 0, borderRadius: 8, fontSize: 13, fontWeight: 500, fontFamily: 'inherit', transition: 'all .15s' };
+    const nm = s.newPageName.trim(), slug = '/' + (slugify(nm) || 'new-page');
+    const dup = nm && s.pages.some(p => p.path === slug || p.name.toLowerCase() === nm.toLowerCase());
+    const create = () => { if (!nm || dup) return; const id = 'p' + Date.now(); this.setState(st => ({ pages: [...st.pages, { id, name: nm, path: slug, date: TODAY, visible: false, home: false }], page: id, adding: false, newPageName: '' })); this.flash('Page \u201c' + nm + '\u201d created \u2014 add it to Menu to show it'); this.autosave(); };
+    return {
+      addingPage: s.adding, notAdding: !s.adding, newPageRef: this.newPageRef,
+      startAddPage: () => { this.setState({ adding: true, newPageName: '' }); setTimeout(() => this.newPageRef.current && this.newPageRef.current.focus(), 30); },
+      cancelAddPage: () => this.setState({ adding: false, newPageName: '' }),
+      newPageName: s.newPageName, onNewPageName: (e) => this.setState({ newPageName: e.target.value }),
+      onNewPageKey: (e) => { if (e.key === 'Enter') create(); if (e.key === 'Escape') { e.stopPropagation(); this.setState({ adding: false }); } },
+      newPageSlug: slug, newPageErr: dup ? 'A page with this name or URL already exists' : '', cantCreate: !nm || dup, createPage: create,
+      createSt: { ...B, background: !nm || dup ? '#1e293b' : 'linear-gradient(90deg,#3b82f6,#2dd4bf)', color: !nm || dup ? '#64748b' : '#fff', fontWeight: 600, cursor: !nm || dup ? 'not-allowed' : 'pointer' },
+      pageCards: s.pages.map(p => { const sel = s.page === p.id, conf = s.confirmDel === p.id;
+        const badge = sel ? 'Editing' : p.visible ? 'Live' : 'Hidden';
+        const bc = sel ? ['rgba(56,189,248,.14)', '#7dd3fc', '#38bdf8'] : p.visible ? ['rgba(34,197,94,.14)', '#4ade80', '#22c55e'] : ['rgba(148,163,184,.14)', '#94a3b8', '#64748b'];
+        return { ...p, selected: sel, confirming: conf, notConfirming: !conf, badge,
+          badgeSt: { display: 'flex', alignItems: 'center', gap: 5, borderRadius: 5, background: bc[0], padding: '1px 7px', fontSize: 12, lineHeight: '18px', fontWeight: 500, color: bc[1] },
+          dotSt: { width: 6, height: 6, borderRadius: 9, background: bc[2] },
+          cardSt: { position: 'relative', flex: 'none', borderRadius: 12, padding: '10px 8px 12px 14px', cursor: sel ? 'default' : 'pointer', transition: 'background .15s,border-color .15s', background: sel ? 'rgba(45,212,191,.06)' : '#172033', border: `1px solid ${sel ? 'rgba(45,212,191,.3)' : 'rgba(148,163,184,.06)'}`, boxShadow: sel ? 'inset 3px 0 0 #2dd4bf' : 'none' },
+          onSelect: () => { if (!sel) this.setState({ page: p.id, confirmDel: null }); },
+          onAi: (e) => { e.stopPropagation(); this.setState({ leftTab: 'chat' }); },
+          stop: (e) => e.stopPropagation(),
+          visLabel: p.visible ? 'Visible' : 'Hidden', visIcon: p.visible ? 'eye' : 'eye-off', visTitle: p.home ? 'The Home page is always visible' : p.visible ? 'Hide from website' : 'Show on website',
+          visSt: { ...{ display: 'flex', flex: 'none', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', border: 0, borderRadius: 7, background: 'none', transition: 'all .15s' }, color: p.visible ? '#cbd5e1' : '#64748b', cursor: p.home ? 'not-allowed' : 'pointer', opacity: p.home ? .4 : 1 },
+          onToggleVis: (e) => { e.stopPropagation(); if (p.home) return; this.setState(st => ({ pages: st.pages.map(x => x.id === p.id ? { ...x, visible: !x.visible } : x) })); this.flash(p.name + (p.visible ? ' hidden from your website' : ' is now visible')); this.autosave(); },
+          delTitle: p.home ? 'The Home page can\u2019t be deleted' : 'Delete page',
+          delSt: { ...{ display: 'flex', flex: 'none', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', border: 0, borderRadius: 7, background: 'none', transition: 'all .15s' }, color: '#94a3b8', cursor: p.home ? 'not-allowed' : 'pointer', opacity: p.home ? .3 : 1 },
+          onDelete: (e) => { e.stopPropagation(); if (!p.home) this.setState({ confirmDel: p.id }); },
+          onCancelDel: (e) => { e.stopPropagation(); this.setState({ confirmDel: null }); },
+          onConfirmDel: (e) => { e.stopPropagation(); this.setState(st => ({ pages: st.pages.filter(x => x.id !== p.id), confirmDel: null, page: st.page === p.id ? st.pages[0].id : st.page })); this.flash('Page \u201c' + p.name + '\u201d deleted'); this.autosave(); } }; }),
+      open404v: !!s.open404, toggle404: () => this.setState({ open404: !s.open404 }),
+      edit404: () => { this.setState({ page: '404', confirmDel: null }); this.flash('Editing 404 page'); },
+      edit404Label: s.page === '404' ? 'Editing 404 page' : 'Edit 404 page',
+      chev404St: { display: 'flex', color: '#94a3b8', transition: 'transform .2s', transform: s.open404 ? 'rotate(180deg)' : 'none' },
+      box404St: { borderRadius: 12, border: '1px solid rgba(148,163,184,.06)', background: '#0b1220', overflow: 'hidden' },
+      card404St: { borderRadius: 10, background: '#1a2231', padding: '10px 12px 8px', boxShadow: s.page === '404' ? 'inset 0 0 0 1px rgba(45,212,191,.35)' : 'none' }
+    };
+  }
+  pageName() { const s = this.state; if (s.page === '404') return '404 page'; const p = s.pages.find(x => x.id === s.page) || s.pages[0]; return p ? p.name : 'Home'; }
+  readFile(e, key) { const f = e.target.files && e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { this.setState(s => ({ g: { ...s.g, [key]: r.result } }), this.commit); }; r.readAsDataURL(f); e.target.value = ''; }
+
+  tplVals() {
+    const s = this.state, q = s.tplQ.trim().toLowerCase();
+    const list = TEMPLATES.filter(t => (s.tplCat === 'all' || t.cat === s.tplCat) && (!q || (t.name + ' ' + t.description + ' ' + t.cat).toLowerCase().includes(q)));
+    const useBtn = (t) => { const a = s.applying === t.id; return { useLabel: a ? 'Applying...' : 'Use this template', useIcon: a ? 'loader-circle' : 'sparkles', useIconSt: { display: 'flex', animation: a ? 'pw-spin 1s linear infinite' : 'none' }, onUse: () => this.useTpl(t),
+      useSt: { display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', border: 0, borderRadius: 10, backgroundImage: 'linear-gradient(90deg,#3b82f6,#2dd4bf)', color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', opacity: a ? .7 : 1, whiteSpace: 'nowrap' } }; };
+    const pv = s.tplPrev && TEMPLATES.find(t => t.id === s.tplPrev);
+    const sq = (on) => ({ display: 'flex', width: 30, height: 28, alignItems: 'center', justifyContent: 'center', border: 0, borderRadius: 7, cursor: 'pointer', background: on ? 'linear-gradient(90deg,#3b82f6,#2dd4bf)' : 'transparent', color: '#fff' });
+    return {
+      tplOpen: s.tpl, closeTpl: () => this.setState({ tpl: false }), stop: (e) => e.stopPropagation(),
+      tplQ: s.tplQ, onTplQ: (e) => this.setState({ tplQ: e.target.value }), onTplKey: () => {}, runTplSearch: () => this.forceUpdate(),
+      tplCats: TPL_CATS.map(([k, label]) => { const on = s.tplCat === k; return { label, onClick: () => this.setState({ tplCat: k }),
+        st: { height: 24, padding: '0 10px', border: 0, borderRadius: 6, fontSize: 13, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .15s', background: on ? '#2563eb' : '#1e293b', color: on ? '#fff' : '#cbd5e1' } }; }),
+      tplShown: list.length, tplTotal: TEMPLATES.length, tplEmpty: !list.length,
+      tplList: s.tpl ? list.map(t => { const g = genTpl(t); return { ...t, ...useBtn(t), thumb: g.blocks.slice(0, 2), theme: g.theme, dot1: dot(t.primary), dot2: dot(t.secondary), onPreview: () => this.setState({ tplPrev: t.id }) }; }) : [],
+      tplPreview: pv ? { ...pv, ...useBtn(pv), ...genTpl(pv) } : null,
+      closeTplPreview: () => this.setState({ tplPrev: null }),
+      tplDesk: () => this.setState({ tplDevice: 'desktop' }), tplMob: () => this.setState({ tplDevice: 'mobile' }),
+      tplDeskSt: sq(s.tplDevice === 'desktop'), tplMobSt: sq(s.tplDevice === 'mobile'),
+      tplFrameSt: { width: s.tplDevice === 'mobile' ? 390 : '100%', maxWidth: '100%', height: '100%', overflowY: 'auto', borderRadius: 12, background: '#fff', transition: 'width .35s ease' }
+    };
+  }
+  renderVals() {
+    const s = this.state, g = s.g, go = this.props.go || ((screen, o) => { window.location.href = 'PrimeWeb Prototype.dc.html#screen=' + screen + (o && o.dashTab ? '&tab=' + o.dashTab : ''); });
+    const site = this.props.site || {};
+    const published = s.published ?? (site.isPublished !== false);
+    const setG = (k) => (e) => this.setState({ g: { ...s.g, [k]: e.target.value } });
+    const slug = (g.businessName || 'site').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '') || 'site';
+    const liveUrl = 'https://' + slug + '.web-v2.dev.ecommerce.asia';
+    const hist = (dis) => ({ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 10px', border: 0, borderRadius: 8, background: 'none', color: '#94a3b8', fontSize: 13, fontFamily: 'inherit', cursor: dis ? 'default' : 'pointer', opacity: dis ? .45 : 1 });
+    const seg = (on) => ({ display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 14px', border: 0, borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .2s', color: '#fff', background: on ? 'linear-gradient(90deg,#3b82f6,#2dd4bf)' : 'transparent' });
+    const sq = (on) => ({ display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', border: 0, borderRadius: 8, cursor: 'pointer', transition: 'all .15s', background: on ? '#2a3446' : 'transparent', color: on ? '#fff' : '#94a3b8' });
+    const drop = (has) => ({ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, height: 100, borderRadius: 10, border: '1px dashed rgba(148,163,184,.25)', background: '#0a1120', color: '#94a3b8', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer', overflow: 'hidden' });
+    const pick = (on) => ({ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 32, border: 0, borderRadius: 8, background: on ? '#14274a' : '#1e2737', color: on ? '#93c5fd' : '#94a3b8', fontSize: 13, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .15s' });
+    const sw = (on) => ({ track: { position: 'relative', flex: 'none', width: 36, height: 20, border: 0, borderRadius: 999, background: on ? '#2dd4bf' : '#475569', cursor: 'pointer', transition: 'background .2s', padding: 0 }, knob: { position: 'absolute', top: 2, left: on ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' } });
+    const chev = (open) => ({ display: 'flex', color: '#94a3b8', transition: 'transform .2s', transform: open ? 'none' : 'rotate(180deg)' });
+    const canSend = s.chatInput.trim() && !s.thinking;
+    return {
+      menuOpen: s.menuOpen, toggleMenu: () => this.setState({ menuOpen: !s.menuOpen, liveMenu: false }), closeMenu: () => this.setState({ menuOpen: false }),
+      drawerSections: DRAWER_NAV.map(([hdr, items]) => ({ header: hdr ? (s.locale === 'ms' ? hdr[1] : hdr[0]) : '', items: items.map(([k, en, my, icon, n]) => { const on = k === 'editor';
+        return { icon, label: s.locale === 'ms' ? my : en, badge: n ? String(n) : '', onClick: () => { this.setState({ menuOpen: false }); if (!on) go('dashboard', { dashTab: k === 'dashboard' ? 'home' : k }); },
+          badgeSt: { display: 'flex', height: 20, minWidth: 20, boxSizing: 'border-box', alignItems: 'center', justifyContent: 'center', borderRadius: 9999, padding: '0 6px', fontSize: 11, fontWeight: 600, lineHeight: 1, background: on ? 'rgba(45,212,191,.15)' : '#1F2937', color: on ? '#2DD4BF' : '#9CA3AF' },
+          st: { display: 'flex', alignItems: 'center', gap: 12, height: 34, padding: '0 16px', borderRadius: 12, border: 0, fontSize: 13, fontWeight: 500, lineHeight: 1.43, fontFamily: 'inherit', cursor: 'pointer', transition: 'background-color .15s,color .15s', background: on ? 'rgba(45,212,191,.12)' : 'transparent', color: on ? '#2DD4BF' : '#9CA3AF', boxShadow: on ? '0 0 16px rgba(45,212,191,.25)' : 'none' },
+          hover: on ? '' : 'background:#1F2937;color:#fff' }; }) })),
+      drawerLangs: [['ms', 'MY'], ['en', 'EN']].map(([k, l]) => { const on = (s.locale || 'en') === k; return { label: l, onClick: () => this.setState({ locale: k }), st: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, height: 30, border: 0, fontSize: 12, fontWeight: 600, lineHeight: 1.33, fontFamily: 'inherit', cursor: 'pointer', background: on ? '#2DD4BF' : 'transparent', color: on ? '#0B1120' : '#9CA3AF', boxShadow: on ? '0 0 12px rgba(45,212,191,.4)' : 'none' } }; }),
+      toProfile: () => { this.setState({ menuOpen: false }); go('dashboard', { dashTab: 'team' }); },
+      drawerLogout: () => { this.setState({ menuOpen: false }); go('auth', { authMode: 'login' }); },
+      menuItems: [['layout-dashboard', 'Dashboard', () => go('dashboard', { dashTab: 'home' })], ['globe', 'My websites', () => go('dashboard', { dashTab: 'sites' })], ['sparkles', 'Create new with AI', () => go('builder')], ['log-out', 'Exit editor', () => go('dashboard', { dashTab: 'home' })]].map(([icon, label, fn]) => ({ icon, label, onClick: () => { this.setState({ menuOpen: false }); fn(); } })),
+      toHome: () => go('dashboard', { dashTab: 'home' }),
+      toTemplates: () => this.setState({ tpl: true, menuOpen: false, liveMenu: false }),
+      ...this.tplVals(),
+      undo: this.undo, redo: this.redo, noUndo: s.hi === 0, noRedo: s.hi >= s.history.length - 1,
+      undoSt: hist(s.hi === 0), redoSt: hist(s.hi >= s.history.length - 1),
+      desktopSt: seg(s.view === 'desktop'), mobileSt: seg(s.view === 'mobile'),
+      setDesktop: () => this.setState({ view: 'desktop' }), setMobile: () => this.setState({ view: 'mobile' }),
+      gridSt: sq(s.left && s.leftTab === 'components'), leftBtnSt: sq(s.left), rightBtnSt: sq(s.right),
+      openComponents: () => this.setState({ left: true, leftTab: s.left && s.leftTab === 'components' ? 'chat' : 'components' }),
+      toggleLeft: () => this.setState({ left: !s.left }), toggleRight: () => this.setState({ right: !s.right }),
+      saveLabel: s.saving ? 'Saving...' : 'Saved', saveDot: { width: 6, height: 6, borderRadius: 9, background: s.saving ? '#facc15' : '#22c55e' },
+      liveLabel: published ? 'LIVE' : 'DRAFT',
+      liveSt: { display: 'flex', alignItems: 'center', gap: 6, height: 22, padding: '0 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, letterSpacing: '.04em', background: published ? 'rgba(34,197,94,.12)' : 'rgba(234,179,8,.12)', color: published ? '#4ade80' : '#facc15' },
+      liveDot: { width: 6, height: 6, borderRadius: 9, background: published ? '#22c55e' : '#eab308' },
+      openPreview: () => this.setState({ preview: 'preview', liveMenu: false }),
+      openLive: () => this.setState({ preview: 'live', liveMenu: false }),
+      liveMenu: s.liveMenu, toggleLiveMenu: () => this.setState({ liveMenu: !s.liveMenu, menuOpen: false, copied: false }),
+      liveUrl, copyLabel: s.copied ? 'Copied!' : 'Copy link', copyIcon: s.copied ? 'check' : 'copy',
+      copyLink: () => { try { navigator.clipboard.writeText(liveUrl); } catch (e) {} this.setState({ copied: true }); this.timers.push(setTimeout(() => this.setState({ liveMenu: false, copied: false }), 900)); },
+      isLive: published, isDraft: !published,
+      liveChev: { display: 'flex', marginLeft: 2, transition: 'transform .2s', transform: s.liveMenu ? 'rotate(180deg)' : 'none' },
+      unpublish: () => { this.setState({ published: false, liveMenu: false }); site.id && this.props.updateSite && this.props.updateSite(site.id, { isPublished: false }); this.flash('Website unpublished'); },
+      publishing: !!s.publishing, pubLabel: s.publishing ? 'Publishing...' : 'Publish', pubIcon: s.publishing ? 'loader-circle' : 'rocket',
+      pubIconSt: { display: 'flex', animation: s.publishing ? 'pw-spin 1s linear infinite' : 'none' },
+      publishNow: () => { if (s.publishing) return; this.setState({ publishing: true }); this.timers.push(setTimeout(() => { this.setState({ publishing: false, published: true }); site.id && this.props.updateSite && this.props.updateSite(site.id, { isPublished: true }); this.flash('Website is live'); }, 1000)); },
+      previewOpen: !!s.preview, previewTitle: s.preview === 'live' ? liveUrl : 'Preview — ' + g.businessName, closePreview: () => this.setState({ preview: null }),
+      leftOpen: s.left, rightOpen: s.right,
+      leftTabs: [['chat', 'AI Chat', 'message-circle'], ['components', 'Components', 'zap'], ['pages', 'Pages', 'file-text']].map(([k, label, icon]) => ({ label, icon, onClick: () => this.setState({ leftTab: k }),
+        st: { display: 'flex', alignItems: 'center', gap: 8, height: 44, padding: '0 16px', border: 0, borderBottom: `2px solid ${s.leftTab === k ? '#2dd4bf' : 'transparent'}`, marginBottom: -1, background: 'none', color: s.leftTab === k ? '#2dd4bf' : '#94a3b8', fontSize: 13, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer', transition: 'color .15s' } })),
+      isChat: s.leftTab === 'chat', chatPaneSt: { display: s.leftTab === 'chat' ? 'flex' : 'none', position: 'relative', flex: 1, minHeight: 0, flexDirection: 'column' }, pageApi: this.pageApi, isComponents: s.leftTab === 'components', isPages: s.leftTab === 'pages',
+      chatBox: this.chatBox, thinking: s.thinking, thinkLabel: s.thinkLabel, chatEmpty: !s.chat.length && !s.thinking, noChat: !s.chat.length,
+      pageName: this.pageName(),
+      startOver: () => { this.timers.forEach(clearTimeout); this.setState({ chat: [], thinking: false, chatInput: '', attach: '' }); },
+      startOverSt: { display: 'flex', alignItems: 'center', gap: 6, height: 28, padding: '0 8px', border: 0, borderRadius: 6, background: 'none', color: s.chat.length ? '#cbd5e1' : '#475569', fontSize: 13, fontFamily: 'inherit', cursor: s.chat.length ? 'pointer' : 'default' },
+      suggestions: [['Friendlier hero', 'Rewrite the top section to sound friendlier'], ['Add a FAQ', 'Add a FAQ section with 4 questions about my shop'], ['Check SEO', 'Check the SEO of this page'], ['Translate page', 'Translate this page into Malay']].map(([label, prompt]) => ({ label, prompt, onClick: () => this.sendChat(prompt) })),
+      chat: s.chat.map(m => { const u = m.role === 'user'; const st = m.status; return { user: u, ai: !u, content: m.content, hasFile: !!m.file, file: m.file,
+        hasChanges: !u && !!m.changes, changesTitle: m.title, pending: st === 'pending',
+        changes: (m.changes || []).map(([icon, target, text]) => ({ icon, target, text })),
+        badge: st === 'applied' ? 'APPLIED' : st === 'rejected' ? 'REJECTED' : 'NEEDS APPROVAL',
+        badgeSt: { borderRadius: 4, padding: '2px 6px', fontSize: 10, background: st === 'applied' ? 'rgba(34,197,94,.15)' : st === 'rejected' ? 'rgba(148,163,184,.15)' : 'rgba(234,179,8,.15)', color: st === 'applied' ? '#4ade80' : st === 'rejected' ? '#94a3b8' : '#facc15' },
+        approve: () => this.setStatus(m.id, 'applied'), reject: () => this.setStatus(m.id, 'rejected') }; }),
+      attachInput: this.attachInput, hasAttach: !!s.attach, attachName: s.attach,
+      pickAttach: () => this.attachInput.current && this.attachInput.current.click(),
+      onAttach: (e) => { const f = e.target.files && e.target.files[0]; if (f) this.setState({ attach: f.name }); e.target.value = ''; },
+      clearAttach: () => this.setState({ attach: '' }),
+      toggleAuto: () => this.setState({ auto: !s.auto }),
+      autoTrack: { position: 'relative', width: 26, height: 14, borderRadius: 99, background: s.auto ? '#2dd4bf' : '#334155', transition: 'background .2s' },
+      autoKnob: { position: 'absolute', top: 2, left: s.auto ? 14 : 2, width: 10, height: 10, borderRadius: 99, background: '#fff', transition: 'left .2s' },
+      chatInput: s.chatInput, onChatInput: (e) => this.setState({ chatInput: e.target.value }),
+      onChatKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendChat(); } },
+      sendChat: () => this.sendChat(), sendDisabled: !canSend,
+      sendSt: { flex: 'none', display: 'flex', width: 34, height: 34, alignItems: 'center', justifyContent: 'center', border: 0, borderRadius: 10, background: canSend ? 'linear-gradient(135deg,#2dd4bf,#14b8a6)' : 'rgba(45,212,191,.35)', color: canSend ? '#fff' : 'rgba(255,255,255,.6)', cursor: canSend ? 'pointer' : 'default', transition: 'all .15s' },
+      blockQ: s.blockQ, onBlockQ: (e) => this.setState({ blockQ: e.target.value }),
+      ...(() => { const q = s.blockQ.trim().toLowerCase(); const add = (label) => { this.flash(label + ' added to ' + this.pageName()); this.autosave(); };
+        const hv = (key, sz, r) => { const on = s.hovBlk === key; return { onEnter: () => this.setState({ hovBlk: key }), onLeave: () => this.setState(st => st.hovBlk === key ? { hovBlk: '' } : null),
+          badgeSt: { display: 'flex', flex: 'none', width: sz, height: sz, boxSizing: 'border-box', alignItems: 'center', justifyContent: 'center', borderRadius: r, color: on ? '#5eead4' : '#94a3b8', background: on ? 'rgba(45,212,191,.12)' : (sz < 30 ? 'transparent' : '#1e293b'), border: '1px solid ' + (on ? 'rgba(45,212,191,.35)' : 'transparent'), transform: on ? 'scale(1.05)' : 'none', transition: 'transform .2s, color .2s, background-color .2s, border-color .2s' } }; };
+        const groups = BLOCK_GROUPS.map(([k, icon, label, items]) => { const its = items.filter(([, l, d]) => !q || (l + ' ' + d).toLowerCase().includes(q)); const open = q ? its.length > 0 : s.openGroups.includes(k);
+          return { k, icon, label, ...hv('g:' + k, 24, 7), count: its.length, open, hide: q && !its.length, onToggle: () => this.setState(st => ({ openGroups: st.openGroups.includes(k) ? st.openGroups.filter(x => x !== k) : [...st.openGroups, k] })),
+            chevSt: { marginLeft: 'auto', display: 'flex', color: '#94a3b8', transition: 'transform .2s', transform: open ? 'rotate(90deg)' : 'none' },
+            items: its.map(([ic, l, d]) => ({ icon: ic, label: l, desc: d, ...hv('i:' + l, 36, 8), onClick: () => add(l), onDrag: (e) => { try { e.dataTransfer.setData('text/plain', l); } catch (x) {} } })) }; }).filter(g => !g.hide);
+        return { blockGroups: groups, blocksEmpty: !groups.length }; })(),
+      ...this.pageVals(),
+      canvasSt: { width: s.view === 'mobile' ? 390 : '100%', maxWidth: '100%', height: '100%', borderRadius: 12, overflow: 'hidden', background: '#0a0a0a', transition: 'width .35s ease', boxShadow: '0 0 0 1px rgba(148,163,184,.06)' },
+      rightTabs: [['global', 'Global', 'settings', false], ['seo', 'SEO', 'search', false], ['menu', 'Menu', 'compass', false], ['block', 'Block', 'palette', false]].map(([k, label, icon, disabled]) => { const on = s.rightTab === k; return { label, icon, disabled, onClick: () => !disabled && this.setState({ rightTab: k }),
+        st: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 32, borderRadius: 10, border: `1px solid ${on ? 'rgba(45,212,191,.45)' : 'transparent'}`, background: on ? 'linear-gradient(90deg,#155e63,#1e3a6e)' : 'transparent', color: disabled ? '#475569' : on ? '#fff' : '#cbd5e1', fontSize: 11, fontWeight: 500, fontFamily: 'inherit', cursor: disabled ? 'not-allowed' : 'pointer', transition: 'all .15s' } }; }),
+      isGlobal: s.rightTab === 'global', isBlock: s.rightTab === 'block', isBlockSel: s.rightTab === 'block' && !!s.blk, isBlockEmpty: s.rightTab === 'block' && !s.blk, blk: this.blkVals() || {}, isSeo: s.rightTab === 'seo', isMenu: s.rightTab === 'menu',
+      g, commitG: this.commit,
+      on: Object.fromEntries(['businessName', 'phone', 'email', 'address', 'metaTitle', 'metaDesc', 'gsv', 'bcHome', 'ftTagline', 'copyright', 'footerBg', 'hours', 'maps', 'fb', 'ig', 'tt', 'wa', 'primary', 'secondary'].map(k => [k, setG(k)])),
+      acc: Object.fromEntries(['brand', 'contact', 'local', 'social', 'theme'].map(k => { const open = (s.acc || { brand: true })[k]; return [k, { open: !!open, toggle: () => this.setState(st => ({ acc: { ...(st.acc || { brand: true }), [k]: !open } })), chev: { display: 'flex', color: '#94a3b8', transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none' } }]; })),
+      onSel: Object.fromEntries(['bizType', 'price', 'fontH', 'fontB', 'primary', 'secondary'].map(k => [k, (e) => this.setState({ g: { ...s.g, [k]: e.target.value } }, this.commit)])),
+      setModeLight: () => this.setState({ g: { ...s.g, mode: 'Light' } }, this.commit), setModeDark: () => this.setState({ g: { ...s.g, mode: 'Dark' } }, this.commit),
+      modeLightSt: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 30, border: 0, borderRadius: 7, fontSize: 13, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer', background: g.mode === 'Light' ? '#2a3446' : 'transparent', color: g.mode === 'Light' ? '#fff' : '#94a3b8' },
+      modeDarkSt: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 30, border: 0, borderRadius: 7, fontSize: 13, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer', background: g.mode === 'Dark' ? '#2a3446' : 'transparent', color: g.mode === 'Dark' ? '#fff' : '#94a3b8' },
+      logoInput: this.logoInput, favInput: this.favInput,
+      pickLogo: () => this.logoInput.current && this.logoInput.current.click(), pickFav: () => this.favInput.current && this.favInput.current.click(),
+      onLogo: (e) => this.readFile(e, 'logo'), onFav: (e) => this.readFile(e, 'fav'),
+      logoDrop: drop(!!g.logo), favDrop: drop(!!g.fav), hasLogo: !!g.logo, noLogo: !g.logo, hasFav: !!g.fav, noFav: !g.fav, logoImg: { display: 'block', width: '80%', height: 60, background: g.logo ? `center/contain no-repeat url(${g.logo})` : 'none' }, favImg: { display: 'block', width: 40, height: 40, background: g.fav ? `center/contain no-repeat url(${g.fav})` : 'none' },
+      seoSlug: (() => { if (s.page === '404') return '404'; const p = s.pages.find(x => x.id === s.page) || s.pages[0]; return p && p.path !== '/' ? p.path.slice(1) : ''; })(),
+      seoUrl: (() => { const p = s.page === '404' ? '/404' : ((s.pages.find(x => x.id === s.page) || s.pages[0] || {}).path || '/'); return liveUrl + (p === '/' ? '' : p); })(),
+      socialInput: this.socialInput, pickSocial: () => this.socialInput.current && this.socialInput.current.click(), onSocial: (e) => this.readFile(e, 'social'),
+      socialDrop: drop(!!g.social), hasSocial: !!g.social, noSocial: !g.social, socialImg: { display: 'block', width: '100%', height: '100%', borderRadius: 8, background: g.social ? 'center/cover no-repeat url(' + g.social + ')' : 'none' },
+      autoSeo: () => { if (s.seoBusy) return; this.setState({ seoBusy: true }); this.timers.push(setTimeout(() => { const pn = this.pageName(), bn = g.businessName || ''; this.setState(st => ({ seoBusy: false, g: { ...st.g, metaTitle: (pn + ' | ' + bn).slice(0, 60), metaDesc: ('Discover ' + bn + ' — ' + pn.toLowerCase() + '. Quality service, easy contact and up-to-date information in one place.').slice(0, 160) } }), this.commit); }, 1400)); },
+      autoSeoLabel: s.seoBusy ? 'Optimizing…' : 'Automatic SEO optimization', autoSeoIconName: s.seoBusy ? 'loader-circle' : 'sparkles',
+      autoSeoIcon: { display: 'flex', animation: s.seoBusy ? 'pw-spin 1s linear infinite' : 'none' },
+      autoSeoSt: { flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, marginTop: 8, border: 0, borderRadius: 10, background: 'linear-gradient(90deg,#3b82f6,#2dd4bf)', color: '#fff', fontSize: 15, fontWeight: 500, fontFamily: 'inherit', cursor: s.seoBusy ? 'wait' : 'pointer', opacity: s.seoBusy ? .8 : 1 },
+      gsvVal: g.gsv || '', titleCount: g.metaTitle.length, descCount: g.metaDesc.length,
+      navItems: g.nav.map((label, i) => { const editing = s.navEdit === i; return { label, editing, notEditing: !editing, onEdit: () => this.setState({ navEdit: editing ? null : i }),
+        onChange: (e) => { const nav = s.g.nav.slice(); nav[i] = e.target.value; this.setState({ g: { ...s.g, nav } }); },
+        onDone: () => this.setState({ navEdit: null }, this.commit), onKey: (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.stopPropagation(); this.setState({ navEdit: null }, this.commit); } } }; }),
+      addNav: () => this.setState(st => ({ navEdit: st.g.nav.length, g: { ...st.g, nav: [...st.g.nav, 'New link'] } })),
+      navStyles: ['Default', 'Centered', 'Transparent', 'Sidebar', 'Floating'].map(label => ({ label, onClick: () => this.setState(st => ({ g: { ...st.g, navStyle: label } }), this.commit), st: pick((g.navStyle || 'Centered') === label) })),
+      footerStyles: ['Simple', 'Minimal', 'Centered', 'Dark'].map(label => ({ label, onClick: () => this.setState(st => ({ g: { ...st.g, footerStyle: label } }), this.commit), st: pick((g.footerStyle || 'Simple') === label) })),
+      separators: ['/', '>', '\u2192', '\u2022', '|'].map(label => ({ label, onClick: () => this.setState(st => ({ g: { ...st.g, bcSep: label } }), this.commit), st: { ...pick((g.bcSep || '/') === label), height: 38, fontSize: 16, background: (g.bcSep || '/') === label ? '#1e3a5f' : 'transparent', color: (g.bcSep || '/') === label ? '#60a5fa' : '#fff' } })),
+      multiLangT: sw(!!g.multiLang), toggleMultiLang: () => this.setState(st => ({ g: { ...st.g, multiLang: !st.g.multiLang } }), this.commit),
+      bcAllT: sw(g.bcAll !== false), toggleBcAll: () => this.setState(st => ({ g: { ...st.g, bcAll: st.g.bcAll === false } }), this.commit),
+      bcHomeVal: g.bcHome ?? 'Home', bcSep: g.bcSep || '/', bcPage: s.page === '404' ? '404' : this.pageName(),
+      brandFooterOpen: !!s.brandFooterOpen, toggleBrandFooter: () => this.setState({ brandFooterOpen: !s.brandFooterOpen }), brandFooterOpenChev: chev(!s.brandFooterOpen),
+      socialFooterOpen: !!s.socialFooterOpen, toggleSocialFooter: () => this.setState({ socialFooterOpen: !s.socialFooterOpen }), socialFooterOpenChev: chev(!s.socialFooterOpen),
+      ftTaglineVal: g.ftTagline || '', copyrightVal: g.copyright ?? '\u00a9 ' + new Date().getFullYear() + ' Your Company. All rights reserved.',
+      footerBgVal: g.footerBg || '#0f172a', footerSwatch: { display: 'block', width: '100%', height: '100%', borderRadius: 3, border: '1px solid rgba(255,255,255,.7)', boxSizing: 'border-box', background: g.footerBg || '#0f172a' },
+      toast: s.toast, siteFrame: this.siteFrame, onSiteLoad: this.onSiteLoad,
+      wide: (s.vw || 1600) >= 1280, showHist: (s.vw || 1600) >= 1000, histGap: { width: (s.vw || 1600) >= 1280 ? 16 : 0, flex: 'none' }
+    };
+  }
+}
+</script>
+</body>
+</html>

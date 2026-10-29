@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { BusinessInfo } from '@/store/builderStore'
+import { useI18n } from '@/i18n'
 
 interface ExtractionReviewProps {
     extractedData: {
@@ -10,23 +11,44 @@ interface ExtractionReviewProps {
         shortDescription: string
         products: string
     }
+    /** Real customer reviews / FAQ answers found on the page — they are used on the new site as they are */
+    testimonialCount?: number
+    faqCount?: number
     onApply: (data: Partial<BusinessInfo>) => void
     onSkip: () => void
 }
 
-export function ExtractionReview({ extractedData, onApply, onSkip }: ExtractionReviewProps) {
+export function ExtractionReview({ extractedData, testimonialCount = 0, faqCount = 0, onApply, onSkip }: ExtractionReviewProps) {
+    const { t, ti } = useI18n()
+    const r = t.onboarding.form.extractionReview
     const [data, setData] = useState(extractedData)
+    const hasRealContent = testimonialCount > 0 || faqCount > 0
 
     return (
         <div className="space-y-4">
             <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-                <h3 className="text-sm font-semibold text-blue-300">Review extracted info</h3>
-                <p className="mt-1 text-xs text-slate-400">Edit any fields before applying to your form.</p>
+                <h3 className="text-sm font-semibold text-blue-300">{r.title}</h3>
+                <p className="mt-1 text-xs text-slate-400">{r.subtitle}</p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4" role="status">
+                {hasRealContent ? (
+                    <>
+                        <h4 className="text-xs font-semibold text-slate-200">{r.realContentTitle}</h4>
+                        <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-xs text-slate-300">
+                            {testimonialCount > 0 ? <li>{ti(r.testimonialsFound, { count: testimonialCount })}</li> : null}
+                            {faqCount > 0 ? <li>{ti(r.faqFound, { count: faqCount })}</li> : null}
+                        </ul>
+                        <p className="mt-1.5 text-xs text-slate-400">{r.realContentNote}</p>
+                    </>
+                ) : (
+                    <p className="text-xs text-slate-400">{r.noRealContent}</p>
+                )}
             </div>
 
             <div className="space-y-3">
                 <div>
-                    <label className="text-[11px] font-medium text-slate-400">Business Name</label>
+                    <label className="text-[11px] font-medium text-slate-400">{r.businessName}</label>
                     <input
                         type="text"
                         value={data.businessName}
@@ -35,7 +57,7 @@ export function ExtractionReview({ extractedData, onApply, onSkip }: ExtractionR
                     />
                 </div>
                 <div>
-                    <label className="text-[11px] font-medium text-slate-400">Industry</label>
+                    <label className="text-[11px] font-medium text-slate-400">{r.industry}</label>
                     <input
                         type="text"
                         value={data.industry}
@@ -44,7 +66,7 @@ export function ExtractionReview({ extractedData, onApply, onSkip }: ExtractionR
                     />
                 </div>
                 <div>
-                    <label className="text-[11px] font-medium text-slate-400">Description</label>
+                    <label className="text-[11px] font-medium text-slate-400">{r.description}</label>
                     <textarea
                         value={data.shortDescription}
                         onChange={(e) => setData({ ...data, shortDescription: e.target.value })}
@@ -53,7 +75,7 @@ export function ExtractionReview({ extractedData, onApply, onSkip }: ExtractionR
                     />
                 </div>
                 <div>
-                    <label className="text-[11px] font-medium text-slate-400">Products / Services</label>
+                    <label className="text-[11px] font-medium text-slate-400">{r.products}</label>
                     <textarea
                         value={data.products}
                         onChange={(e) => setData({ ...data, products: e.target.value })}
@@ -69,14 +91,14 @@ export function ExtractionReview({ extractedData, onApply, onSkip }: ExtractionR
                     onClick={onSkip}
                     className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-white/10"
                 >
-                    Skip & enter manually
+                    {r.skip}
                 </button>
                 <button
                     type="button"
                     onClick={() => onApply(data)}
                     className="flex-1 rounded-xl bg-gradient-to-r from-blue-500 to-teal-400 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                 >
-                    Apply to form
+                    {r.apply}
                 </button>
             </div>
         </div>

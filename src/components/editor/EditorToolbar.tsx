@@ -198,11 +198,14 @@ interface EditorToolbarProps {
     publishSuccess: boolean
     canUndo: boolean
     canRedo: boolean
+    /** the step Undo / Redo would take, for the tooltip ("AI: Change hero headline") */
+    undoStepLabel?: string
+    redoStepLabel?: string
     viewport: 'desktop' | 'mobile'
     compact?: boolean
-    /** Phase 04: shared with the compact Tools-sheet AI-chat panel (Phase 03) — drives the
-     * "Processing…" save-status label and disables Publish/Update while an AI edit is in flight. */
-    aiRunning?: boolean
+    /** A template is being applied — drives the "Processing…" save-status label and
+     * disables Publish/Update until it lands. */
+    busy?: boolean
     onOpenMenu: () => void
     onOpenTemplates?: () => void
     onPageSelected: (pageId: string) => void
@@ -239,9 +242,11 @@ export function EditorToolbar({
     publishSuccess,
     canUndo,
     canRedo,
+    undoStepLabel,
+    redoStepLabel,
     viewport,
     compact = false,
-    aiRunning = false,
+    busy = false,
     onOpenMenu,
     onOpenTemplates,
     onPageSelected,
@@ -261,7 +266,7 @@ export function EditorToolbar({
 }: EditorToolbarProps) {
     const { t } = useI18n()
     const et = t.editor.toolbar
-    const [statusNow, setStatusNow] = React.useState(() => Date.now())
+    const [statusNow, setStatusNow] = React.useState(() => lastSavedAt ?? 0)
 
     React.useEffect(() => {
         setStatusNow(Date.now())
@@ -348,8 +353,8 @@ export function EditorToolbar({
                     <div className="mx-1 h-4 w-px shrink-0 bg-white/[0.06]" />
 
                     <div className="flex min-w-0 items-center gap-1">
-                        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', aiRunning ? 'animate-pulse bg-blue-400' : isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
-                        <span className="truncate text-[11px] text-slate-400 min-[768px]:text-xs">{aiRunning ? processingLabel : saveStatusLabel}</span>
+                        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', busy ? 'animate-pulse bg-blue-400' : isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
+                        <span className="truncate text-[11px] text-slate-400 min-[768px]:text-xs">{busy ? processingLabel : saveStatusLabel}</span>
                     </div>
                 </div>
 
@@ -405,7 +410,7 @@ export function EditorToolbar({
                                 type="button"
                                 size="sm"
                                 onClick={onRepublish}
-                                disabled={isPublishing || isSaving || aiRunning}
+                                disabled={isPublishing || isSaving || busy}
                                 className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4"
                             >
                                 {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>}
@@ -422,7 +427,7 @@ export function EditorToolbar({
                                     type="button"
                                     size="sm"
                                     className={cn(
-                                        'h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4',
+                                        'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-teal-400/15 hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4',
                                         (hasUnsavedChanges || hasUnpublishedChanges) && 'hidden min-[768px]:inline-flex',
                                     )}
                                 >
@@ -468,7 +473,7 @@ export function EditorToolbar({
                             type="button"
                             size="sm"
                             onClick={onPublish}
-                            disabled={isPublishing || publishSuccess || aiRunning}
+                            disabled={isPublishing || publishSuccess || busy}
                             className={cn(
                                 'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4',
                                 publishSuccess && 'from-emerald-500 to-emerald-400',
@@ -541,7 +546,7 @@ export function EditorToolbar({
                     onClick={onUndo}
                     disabled={!canUndo}
                     className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[var(--editor-text)] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
-                    title={et.undoShortcut}
+                    title={canUndo && undoStepLabel ? et.undoStepTooltip.replace('{label}', undoStepLabel) : et.undoShortcut}
                 >
                     <Undo2 className="h-4 w-4 shrink-0" />
                     <span className="hidden lg:inline">{et.undo}</span>
@@ -552,7 +557,7 @@ export function EditorToolbar({
                     onClick={onRedo}
                     disabled={!canRedo}
                     className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[var(--editor-text)] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
-                    title={et.redoShortcut}
+                    title={canRedo && redoStepLabel ? et.redoStepTooltip.replace('{label}', redoStepLabel) : et.redoShortcut}
                 >
                     <Redo2 className="h-4 w-4 shrink-0" />
                     <span className="hidden lg:inline">{et.redo}</span>
@@ -675,7 +680,7 @@ export function EditorToolbar({
                                 type="button"
                                 size="sm"
                                 onClick={onRepublish}
-                                disabled={isPublishing || isSaving || aiRunning}
+                                disabled={isPublishing || isSaving || busy}
                                 className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95"
                             >
                                 {isPublishing ? (
@@ -692,7 +697,7 @@ export function EditorToolbar({
                                 <Button
                                     type="button"
                                     size="sm"
-                                    className="h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-emerald-500/15 hover:shadow-emerald-500/25 hover:opacity-95"
+                                    className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-teal-400/15 hover:shadow-teal-400/25 hover:opacity-95"
                                 >
                                     <Globe className="h-3.5 w-3.5" />
                                     {et.viewLive}
@@ -737,7 +742,7 @@ export function EditorToolbar({
                         type="button"
                         size="sm"
                         onClick={onPublish}
-                        disabled={isPublishing || publishSuccess || aiRunning}
+                        disabled={isPublishing || publishSuccess || busy}
                         className={cn(
                             'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-4 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95',
                             publishSuccess && 'from-emerald-500 to-emerald-400',

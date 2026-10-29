@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+/** How a shop's customers can buy — the optional "How do customers buy from you?" chips of the builder form. */
+export const BUYING_METHODS = ['delivery', 'pickup', 'walk_in', 'booking', 'cod', 'online_payment'] as const
+export type BuyingMethod = (typeof BUYING_METHODS)[number]
+
 export const generateSiteSchema = z.object({
     businessInfo: z.object({
         businessName: z.string().min(1),
@@ -15,6 +19,10 @@ export const generateSiteSchema = z.object({
         phone: z.string().max(40).optional(),
         email: z.string().email().max(100).optional().or(z.literal('')),
         address: z.string().max(300).optional(),
+        // #2103 A1: optional grounding facts the merchant states themselves (never invented by the AI).
+        buyingMethods: z.array(z.enum(BUYING_METHODS)).max(BUYING_METHODS.length).optional(),
+        serviceArea: z.string().max(120).optional(),
+        shopFacts: z.string().max(500).optional(),
     }),
     extraInstructions: z.string().optional(),
     language: z.enum(['en', 'ms', 'vi', 'auto']).optional(),
@@ -85,21 +93,6 @@ export const extractionResultSchema = z.object({
     suggestedBlocks: z.array(z.string()).optional(),
     detectedLanguage: z.enum(['en', 'ms', 'vi']).default('en'),
     confidence: z.enum(['high', 'medium', 'low']).default('medium'),
-})
-
-export const editBlockSchema = z.object({
-    instruction: z.string().min(1),
-    block: z.record(z.unknown()).nullable().optional(),
-    blockIndex: z.number().nullable().optional(),
-    allBlocks: z.array(z.record(z.unknown())).optional(),
-    theme: z.record(z.unknown()).optional(),
-    siteName: z.string().optional(),
-    currentPageSlug: z.string().optional(),
-    currentPageTitle: z.string().optional(),
-    chatHistory: z.array(z.object({
-        role: z.enum(['user', 'assistant']),
-        content: z.string().max(300),
-    })).max(10).optional(),
 })
 
 export const rewriteTextSchema = z.object({

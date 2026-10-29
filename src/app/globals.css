@@ -346,6 +346,46 @@ html:not(.dark) {
   .dash-shell-root:not(.dash-sidebar-mini) { --dash-content-pl: calc(250px + 2rem); }
 }
 
+/* A fixed save bar (`data-save-bar`: product, payments, shipping, discount and customer forms while they have
+   unsaved changes) sits bottom-4 across the content; the ECH Agent mascot (agent-ui `.ech-ag-float-root`, bottom
+   right) lifts above it instead of covering its buttons. The bar wraps to two rows on narrow screens.
+   The bars mount `<SaveBarLift />` (components/agent/save-bar-lift), which sets `data-save-bar` on <html> while
+   one is shown — a plain attribute selector, not `:root:has(...)` (that re-checks the whole document on every DOM change). */
+:root[data-save-bar] { --ech-ag-dock-bottom: 88px; }
+@media (max-width: 640px) {
+  :root[data-save-bar] { --ech-ag-dock-bottom: 132px; }
+}
+
+/* Page content always scrolls clear of the ECH Agent mascot: bottom gutter = the mascot's bottom offset (raised above a
+   save bar when one is mounted) + its 48px + 24px, so an in-page control at the end of a page (a settings switch, a
+   last row action) is never stuck under the launcher. */
+.dash-shell-root .dash-content-gutter {
+  padding-bottom: calc(var(--ech-ag-dock-bottom, 20px) + 72px);
+}
+
+/* Form screens (`data-agent-quiet`, set by agent-quiet-root from agent-dock-routes `quietOn`): the mascot is compact
+   (80%) and tucked 6px from the edge, so it clears right-aligned row controls (a card's switch sits ~55px in). */
+:root[data-agent-quiet] {
+  --ech-ag-dock-right: 6px;
+  --ech-ag-fab-zoom: 0.8;
+}
+
+/* Form screens on a phone (<= 640px): there is no room to tuck a 38px mascot beside a card's right-aligned switch (it
+   covered the "Bank transfer" switch at the bottom of the screen). The closed launcher becomes an edge tab: 70% size
+   and 12px past the right edge, so about 22px of the mascot shows and still opens the chat with a tap. Page padding
+   (16px) plus card padding keep controls clear of it. The unread badge moves to the visible left side. Not the open
+   panel (it keeps its own full-screen sheet) and not the other screens. The placeholder reads the same variables. */
+@media (max-width: 640px) {
+  :root[data-agent-quiet] {
+    --ech-ag-dock-right: -12px;
+    --ech-ag-fab-zoom: 0.7;
+  }
+  :root[data-agent-quiet] .ech-ag-fab:not(.open) .ech-ag-fab-badge {
+    right: auto;
+    left: -8px;
+  }
+}
+
 .dash-shell .bg-zinc-950,
 .dash-shell .bg-\[\#0B1120\],
 .dash-shell .bg-\[\#0f1729\],
@@ -842,6 +882,8 @@ html:not(.dark) .editor-shell .text-cyan-400 { color: #0e7490; }
 html:not(.dark) .editor-shell .text-cyan-200\/70 { color: #155e75; }
 html:not(.dark) .editor-shell .text-amber-300 { color: #92400e; }
 html:not(.dark) .editor-shell .text-amber-300\/80 { color: #92400e; }
+/* Ask AI (copilot) buttons and chips: teal-300 reads on the dark chrome only */
+html:not(.dark) .editor-shell .text-teal-300 { color: #0f766e; }
 html:not(.dark) .editor-shell .text-amber-400 { color: #b45309; }
 html:not(.dark) .editor-shell .text-amber-400\/70 { color: #b45309; }
 html:not(.dark) .editor-shell .text-emerald-400 { color: #15803d; }
@@ -952,6 +994,7 @@ html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.12\]:hover { background-col
 html:not(.dark) .editor-shell .block-action-toolbar .text-slate-400,
 html:not(.dark) .editor-shell .block-action-toolbar .text-slate-300 { color: #94a3b8; }
 html:not(.dark) .editor-shell .block-action-toolbar .text-amber-300 { color: #fcd34d; }
+html:not(.dark) .editor-shell .block-action-toolbar .text-teal-300 { color: #5eead4; }
 html:not(.dark) .editor-shell .block-action-toolbar .text-red-400 { color: #f87171; }
 html:not(.dark) .editor-shell .block-action-toolbar .bg-white\/10 { background-color: rgba(255,255,255,0.1); }
 html:not(.dark) .editor-shell .block-action-toolbar .hover\:bg-white\/10:hover { background-color: rgba(255,255,255,0.1); }
@@ -959,7 +1002,7 @@ html:not(.dark) .editor-shell .block-action-toolbar .hover\:bg-white\/10:hover {
 /* ── Editor Shell: input/textarea/select visibility in light mode ─────────── */
 /* bg overrides turn input bgs white (same as page bg) → need distinct bg */
 html:not(.dark) .editor-shell input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"]),
-html:not(.dark) .editor-shell textarea,
+html:not(.dark) .editor-shell textarea:not(.ech-ag textarea),
 html:not(.dark) .editor-shell select {
   background-color: #F8FAFC !important;
   border-color: rgba(0, 0, 0, 0.15) !important;

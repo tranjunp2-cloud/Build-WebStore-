@@ -12,8 +12,10 @@ import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { withPayloadRetry, classifyTransientError } from '@/lib/payload-retry'
 import { stripOrphanMediaRefs, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
-import { buildEnumSets } from '@/lib/theme/enums'
-import { mergeGlobalBlocks } from '@/lib/sites/merge-global-blocks'
+import { sanitizeTheme } from '@/lib/theme/sanitize-theme'
+import { mergeGlobalBlocks, type GlobalBlocks } from '@/lib/sites/merge-global-blocks'
+import { canonicalJson } from '@/lib/ai/generation-snapshot-hash'
+import { bumpEditorRevision, DraftChangedError, formatDraftVersion, ownsLastWrite, parseDraftVersion, readEditorRevision, staleParts, txExec, type EditorRevision } from '@/lib/sites/editor-revision'
 import { sanitizeLegacyOpeningHours } from '@/components/editor/local-business/opening-hours-utils'
 import type { OpeningHourRow } from '@/components/editor/local-business/types'
 import {
@@ -24,21 +26,42 @@ import {
     type TenantTransactionRequest,
 } from '@/lib/payload/tenant-row-lock'
 
+type SiteFrames = {
+    theme?: unknown
+    headerBlock?: unknown
+    footerBlock?: unknown
+    globalBlocks?: unknown
+}
 
-/** Only persist theme fields defined in the Sites collection schema.
- *  Extra keys (from AI or stale client state) are stripped so Payload
- *  does not throw a validation error (BUG-F05-025). */
-const ALLOWED_THEME_KEYS = new Set([
-    'primaryColor', 'secondaryColor', 'backgroundColor',
-    'fontHeading', 'fontBody', 'borderRadius', 'colorMode',
-    'accentColor', 'surfaceColor', 'textColor', 'mutedColor',
-    'spacingPreset', 'shadowPreset',
-])
+const sameJson = (left: unknown, right: unknown) => canonicalJson(left ?? null) === canonicalJson(right ?? null)
+/** What the editor shows for a header / footer / widgets: the pending draft, else the live value (editor-data). */
+const draftOf = (pending: unknown, live: unknown) => (pending != null ? pending : live ?? null)
+const asRecord = (value: unknown): Record<string, unknown> =>
+    value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 
-/** Valid enum values for select fields — strip invalid selections so
- *  Payload does not throw "This field has an invalid selection".
- *  Sourced from `@/lib/theme/enums` so save + AI prompt stay in sync. */
-const SELECT_FIELD_VALUES: Record<string, Set<string>> = buildEnumSets()
+/**
+ * Whether this save changes the site part of the draft (theme, menu, footer, widgets) compared to what is
+ * stored — the same values the route would write. Every save sends these frames, so only a real change
+ * counts as a site write: an unchanged theme / menu neither needs the site revision to match nor bumps it
+ * (otherwise each autosave would make every other tab's next save stale).
+ */
+function siteFramesChanged(stored: Record<string, unknown>, sent: SiteFrames): boolean {
+    if (sent.theme && !sameJson(sanitizeTheme(asRecord(sent.theme)), sanitizeTheme(asRecord(stored.theme)))) return true
+    for (const [field, pendingField] of [['headerBlock', 'pendingHeaderBlock'], ['footerBlock', 'pendingFooterBlock']] as const) {
+        if (sent[field] === undefined) continue
+        // the route stores the sent value as pending; null pending = the live one shows
+        if (!sameJson(draftOf(sent[field], stored[field]), draftOf(stored[pendingField], stored[field]))) return true
+    }
+    if (sent.globalBlocks !== undefined) {
+        const storedDraft = draftOf(stored.pendingGlobalBlocks, stored.globalBlocks)
+        const merged = mergeGlobalBlocks(
+            (stored.pendingGlobalBlocks ?? stored.globalBlocks ?? null) as GlobalBlocks,
+            sent.globalBlocks as GlobalBlocks,
+        )
+        if (!sameJson(draftOf(merged, stored.globalBlocks), storedDraft)) return true
+    }
+    return false
+}
 
 class SavePageNotFoundError extends Error {
     readonly pageId: string
@@ -48,21 +71,6 @@ class SavePageNotFoundError extends Error {
         this.name = 'SavePageNotFoundError'
         this.pageId = pageId
     }
-}
-
-
-
-function sanitizeTheme(raw: Record<string, unknown>): Record<string, unknown> {
-    const clean: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(raw)) {
-        if (ALLOWED_THEME_KEYS.has(key) && value !== undefined && value !== null && value !== '') {
-            // Validate select field values — drop invalid selections
-            const validValues = SELECT_FIELD_VALUES[key]
-            if (validValues && !validValues.has(String(value))) continue
-            clean[key] = value
-        }
-    }
-    return clean
 }
 
 
@@ -132,7 +140,7 @@ export async function PATCH(
         const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
-        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, localBusiness, socialLinks, branding, seo, isDraft, localeContent, pendingLocaleConfirm } = data!
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, localBusiness, socialLinks, branding, seo, isDraft, localeContent, pendingLocaleConfirm, base, saveId } = data!
 
         let validatedLocalBusiness: unknown
         if (localBusiness !== undefined) {
@@ -173,7 +181,7 @@ export async function PATCH(
                 }
             }
         }
-        const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
+        const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as unknown as Record<string, unknown>[]) : undefined
 
         const numericSiteId = Number(siteId)
         if (!Number.isSafeInteger(numericSiteId) || numericSiteId < 1) {
@@ -183,16 +191,18 @@ export async function PATCH(
             return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
         }
 
-        type PageDoc = NonNullable<Awaited<ReturnType<typeof payload.findByID>>>
+        type PageDoc = NonNullable<Awaited<ReturnType<typeof payload.findByID>>> & {
+            site?: number | { id?: number | string } | null
+        }
         type SiteUpdateData = Partial<{
             theme: unknown;
             themeCustomized: boolean;
             name: unknown;
             locale: "en" | "ms";
-            shippingConfig: unknown;
             pendingHeaderBlock: unknown;
             pendingFooterBlock: unknown;
             pendingGlobalBlocks: unknown;
+            shippingConfig: unknown;
             contactInfo: unknown;
             localBusiness: unknown;
             socialLinks: unknown;
@@ -214,8 +224,8 @@ export async function PATCH(
             }
         }
 
-        const resolvePage = async (transactionReq: TenantTransactionRequest): Promise<PageDoc | null> => {
-            if (!normalizedBlocks && !localeContent) return null
+        const resolvePage = async (transactionReq: TenantTransactionRequest, forRevision = false): Promise<PageDoc | null> => {
+            if (!forRevision && !normalizedBlocks && !localeContent) return null
 
             if (pageId && /^\d+$/.test(pageId)) {
                 let requestedPage: PageDoc | null = null
@@ -268,6 +278,8 @@ export async function PATCH(
             return (pagesResult.docs[0] as PageDoc | undefined) ?? null
         }
 
+        // the revision this save leaves (sent back so the editor's next save is based on it)
+        let savedRevision: EditorRevision | null = null
         const persistSave = () => withTenantRowLock(payload, siteTenantId, async (transactionReq) => {
             await lockTenantSiteRows(payload, siteTenantId, [numericSiteId], transactionReq)
 
@@ -289,7 +301,23 @@ export async function PATCH(
             // fields are written, while holding the same lock as template swap.
             const page = await resolvePage(transactionReq)
 
-
+            // Refuse a save made from an older draft than the stored one: it would overwrite what was
+            // written since (another tab, an approved copilot change). Only the parts this save CHANGES
+            // count: the theme / menu / footer / widgets are sent with every save, unchanged ones are no write.
+            const exec = txExec(payload, transactionReq)
+            const siteFrames: SiteFrames = { theme, headerBlock, footerBlock, globalBlocks }
+            const siteFramesSent = Object.values(siteFrames).some((value) => value !== undefined)
+            const writes = {
+                site: siteFramesChanged(lockedSite as unknown as Record<string, unknown>, siteFrames),
+                page: Boolean(page && (normalizedBlocks || localeContent)),
+            }
+            // a save that writes no page still reports the open page's revision (the editor keeps one base)
+            const revisionPage = page ?? await resolvePage(transactionReq, true).catch(() => null)
+            const revisionPageId = revisionPage ? Number(revisionPage.id) : null
+            const current = await readEditorRevision(exec, numericSiteId, revisionPageId)
+            const baseRevision = parseDraftVersion(base)
+            const stale = staleParts(baseRevision, current, writes, saveId)
+            if (stale.length > 0) throw new DraftChangedError(current, stale)
 
             const siteUpdateData: SiteUpdateData = {}
             if (theme) siteUpdateData.theme = sanitizeTheme(theme as Record<string, unknown>)
@@ -318,7 +346,7 @@ export async function PATCH(
                 await payload.update({
                     collection: 'sites',
                     id: numericSiteId,
-                    data: siteUpdateData,
+                    data: siteUpdateData as Record<string, unknown>,
                     req: transactionReq,
                 })
             }
@@ -345,6 +373,17 @@ export async function PATCH(
                     `,
                 )
             }
+
+            await bumpEditorRevision(exec, numericSiteId, { site: writes.site, pageIds: writes.page && page ? [page.id] : [] }, saveId)
+            const after = await readEditorRevision(exec, numericSiteId, revisionPageId)
+            // Never hand the editor a revision it has not seen: a part this save did not check stays at the
+            // base it sent (a settings save, an unchanged theme on a site changed elsewhere), so a later save
+            // that does change that part is still checked against what this tab loaded.
+            const siteSeen = writes.site || (siteFramesSent && baseRevision !== null
+                && (baseRevision.site === current.site || ownsLastWrite(current, 'site', saveId)))
+            savedRevision = baseRevision
+                ? { site: siteSeen ? after.site : baseRevision.site, page: writes.page ? after.page : baseRevision.page }
+                : { site: after.site, page: after.page }
         })
 
         try {
@@ -360,7 +399,7 @@ export async function PATCH(
             if (!normalizedBlocks || !isImageFkError) throw updateErr
 
             console.warn(`[Save] Retry without image refs after: ${errorMessage.slice(0, 160)}`)
-            cleanupNonNumericImageFields(normalizedBlocks as Record<string, unknown>[])
+            cleanupNonNumericImageFields(normalizedBlocks as unknown as Record<string, unknown>[])
             // Only strip logo-cloud logos[] image refs when the FK error is logo-related.
             // Stripping valid logo Media IDs due to an unrelated block FK error silently
             // destroys all logo images (200 response, data gone).
@@ -368,14 +407,14 @@ export async function PATCH(
             // GH-1381: same guard for gallery images[] — an unrelated block's FK error must not
             // wipe valid gallery Media IDs (silent data loss: success response, image gone on reload).
             const isGalleryFkError = /pages_blocks_gallery|pages_v_blocks_gallery/i.test(errorMessage)
-            for (const block of normalizedBlocks as Record<string, unknown>[]) {
+            for (const block of normalizedBlocks as unknown as Record<string, unknown>[]) {
                 for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
                     if (typeof block[field] === 'number') delete block[field]
                 }
                 for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos', 'properties', 'doctors', 'events', 'posts', 'caseStudies']) {
                     const arr = block[arrayField]
                     if (!Array.isArray(arr)) continue
-                    for (const item of arr as Record<string, unknown>[]) {
+                    for (const item of arr as unknown as Record<string, unknown>[]) {
                         if (item && typeof item === 'object') {
                             for (const f of ['image', 'logo', 'avatar']) {
                                 // Don't wipe valid logo Media IDs unless the FK error is logos-related
@@ -389,9 +428,9 @@ export async function PATCH(
                 }
                 // menu-food: clean nested categories[].items[].image numeric Payload IDs
                 if (block.blockType === 'menu-food' && Array.isArray(block.categories)) {
-                    for (const cat of block.categories as Record<string, unknown>[]) {
+                    for (const cat of block.categories as unknown as Record<string, unknown>[]) {
                         if (cat && Array.isArray(cat.items)) {
-                            for (const item of cat.items as Record<string, unknown>[]) {
+                            for (const item of cat.items as unknown as Record<string, unknown>[]) {
                                 if (item && typeof item.image === 'number') delete item.image
                             }
                         }
@@ -401,13 +440,21 @@ export async function PATCH(
             await withPayloadRetry(persistSave)
         }
 
-        return NextResponse.json({
-            success: true,
-            message: 'Saved successfully',
-        })
+        const draftVersion = savedRevision ? formatDraftVersion(savedRevision) : undefined
+        return NextResponse.json(
+            { success: true, message: 'Saved successfully', ...(draftVersion ? { draftVersion } : {}) },
+            draftVersion ? { headers: { 'x-draft-version': draftVersion } } : undefined,
+        )
 
     } catch (error: unknown) {
 
+        if (error instanceof DraftChangedError) {
+            // not retryable: the editor must reload the newer draft first
+            return NextResponse.json(
+                { error: error.message, code: 'DRAFT_CHANGED', parts: error.parts, draftVersion: formatDraftVersion(error.current) },
+                { status: 409 },
+            )
+        }
         if (error instanceof SavePageNotFoundError) {
             return NextResponse.json({ error: error.message, pageId: error.pageId }, { status: 404 })
         }

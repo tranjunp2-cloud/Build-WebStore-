@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-10-22
+last_updated: 2026-10-28
 ---
 
 # Project Changelog
@@ -14,6 +14,22 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ---
 
 ## [Unreleased] — Staging
+
+### F01 — AI gen dùng thông tin liên hệ của user thay vì dữ liệu mẫu (GH-2048)
+
+- Block Contact không còn phone/email/address mẫu theo category (vd `grow@dannytandigital.my`) trên site gen thật, gồm cả trang Home (gap-fill ở `content-injection.ts`). Gallery/preview không có override vẫn giữ dữ liệu mẫu.
+- Phone/email trống trong wizard được điền theo thứ tự ưu tiên: form > `sites.contactInfo` đã có > account (`user.email`/`user.phone`, bỏ email QC `@primeweb.local`). Regenerate không ghi đè contact chủ site đã sửa; PW1 migration không dùng account của owner.
+- `sites.contactInfo` được ghi khi gen (chỉ field có giá trị), nên Global > Contact info khớp với block. Address rỗng trừ khi user nhập. Footer bỏ link `mailto:` khi không có email.
+- Logic ở `src/lib/ai/user-contact-defaults.ts`; test TC-F01-W.02 (đổi) + TC-F01-W.09 (mới).
+
+### F02 — Login: đúng thông báo khi OTP cooldown và khóa tài khoản (GH-2053)
+
+- `send-otp` 429 trả thêm `code: 'OTP_COOLDOWN'` + `retryAfter` (giây) + header `Retry-After`. Login page không còn báo "Connection problem" khi OTP vừa gửi <60s: chuyển sang `/verify-otp` với countdown khớp mã cũ (`src/lib/auth/login-otp-cooldown.ts`). Lỗi gửi OTP khác dùng `auth.errors.otpSendFailed`.
+- Login endpoint trả `423` + `code: 'ACCOUNT_LOCKED'` khi `payload.login` thất bại và `lockUntil` còn hiệu lực (tra qua `isAccountLocked`, lỗi tra cứu → fallback `401 Login failed`). Login page hiện `auth.errors.accountLocked` (copy GH-1701 đã duyệt, giữ nguyên), sai mật khẩu thường giữ "Incorrect email or password". Cooldown send-otp tính theo `OTP_TTL_MS` (trước đây cứng 5 phút → dev TTL 30 phút bị cooldown ~26 phút). Không đổi schema. Tests: TC-F02.44 – TC-F02.48.
+
+### F34 — SSO upgrade/downgrade cùng gói không xóa usage (GH-2011)
+
+- `upsertPlanSubscription()` chỉ chạy `clearUsage()` + `recountStaffUsage()` khi `plan` đổi (`plan` đã gồm gói + loại TM; row migrate từ PW1 không có `packCode` nên không so `packCode`). SSO retry hoặc gửi lại đúng gói hiện tại thì usage (vd. `template_limit`) giữ nguyên; subscription (`startsAt`/`endsAt`/`status`) và `Tenants.plan` vẫn được cập nhật. Khớp spec #1246 ("clearUsage gọi khi đổi plan"). Không đổi API/schema. Tests: TC-SUB-046, TC-SUB-047, TC-SUB-048.
 
 ### F05 — Redesign Pages panel / Page library (US-F05-02, GH-1984)
 

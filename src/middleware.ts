@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildMaintenanceHtml } from '@/lib/maintenance'
+import { isShopTodoKind } from '@/lib/insights/shop-todo-text'
+import { withFrameProtection } from '@/lib/auth/frame-protection'
 
 const ADMIN_PATHS = ['/admin', '/api']
 // Studio internal admin — requires super-admin role (checked below)
@@ -280,15 +282,19 @@ export async function middleware(req: NextRequest) {
             return res
         }
 
+        // A reminder link (`/orders?todo=<kind>`, from the automations digest email) keeps its task through sign-in.
+        // Only a known kind survives: free text in a link (`?ask=`) is never carried across the login.
+        const todo = req.nextUrl.searchParams.get('todo')
+        const returnUrl = isShopTodoKind(todo) ? `${pathname}?todo=${todo}` : pathname
         if (!hasToken) {
             url.pathname = '/login'
-            url.searchParams.set('returnUrl', pathname)
+            url.searchParams.set('returnUrl', returnUrl)
             return NextResponse.redirect(url)
         }
         if (hasToken && !mfaVerified) {
             url.pathname = '/verify-otp'
             if (tokenEmail) url.searchParams.set('email', tokenEmail)
-            url.searchParams.set('returnUrl', pathname)
+            url.searchParams.set('returnUrl', returnUrl)
             return NextResponse.redirect(url)
         }
     }
@@ -305,7 +311,8 @@ export async function middleware(req: NextRequest) {
     }
 
     // ── Main platform (primeweb.app) — Dashboard & marketing ───────────────
-    return NextResponse.next()
+    // the dashboard and the editor may only be framed by this origin (storefront hosts returned above, untouched)
+    return withFrameProtection(NextResponse.next(), pathname)
 }
 
 export const config = {

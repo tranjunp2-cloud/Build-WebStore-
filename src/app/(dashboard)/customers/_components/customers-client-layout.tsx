@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n'
 import { CustomersListToolbar } from './customers-list-toolbar'
 import { CustomersListTable } from './customers-list-table'
 import { getShopCustomersAction, exportShopCustomersCsvAction } from '../actions'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
 import type { RankFilter, DateFilter } from './customers-list-toolbar'
 import type { SortKey } from '../_lib/shop-customer-record'
@@ -93,9 +94,10 @@ export function ShopCustomersClientLayout() {
     // (c is stable per locale, but ESLint cannot verify property access on outer objects)
     const loadFailedMsg = c.loadFailed
 
-    const load = useCallback(async () => {
+    // silent = an assistant-driven refetch: keep the rows on screen, no spinner, no toast on failure
+    const load = useCallback(async (silent = false) => {
         const gen = ++genRef.current
-        setLoading(true)
+        if (!silent) setLoading(true)
         try {
             const { dateFrom, dateTo } = toDateRange(dateFilter, customFrom, customTo)
             const res = await getShopCustomersAction({
@@ -112,9 +114,10 @@ export function ShopCustomersClientLayout() {
             if (gen !== genRef.current) return
             setRecords(res.data)
             setTotal(res.meta.total)
-        } catch {
+        } catch (err) {
             if (gen !== genRef.current) return
-            toast.error(loadFailedMsg)
+            if (silent) console.error('[Customers refresh]', err)
+            else toast.error(loadFailedMsg)
         } finally {
             // Only the latest call clears the loading spinner
             if (gen === genRef.current) setLoading(false)
@@ -122,6 +125,11 @@ export function ShopCustomersClientLayout() {
     }, [search, rankFilter, dateFilter, customFrom, customTo, page, limit, sortBy, sortDir, loadFailedMsg])
 
     useEffect(() => { load() }, [load])
+
+    // The assistant approved / undid a customer change: fetch the current page again (same filters, sort, page)
+    const loadRef = useRef(load)
+    loadRef.current = load
+    useAgentChanges({ kinds: ['store_customer'] }, () => { void loadRef.current(true) })
 
     // Stable handler refs via useCallback([], []) — state setters have stable identity per React.
     // Prevents child re-renders and debounce reset on every parent render.

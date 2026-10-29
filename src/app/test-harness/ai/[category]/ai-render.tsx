@@ -114,7 +114,7 @@ export async function renderAIHarness(category: string, slug: string | undefined
                     <div className="bg-red-50 border border-red-300 rounded-lg p-6">
                         <h1 className="text-2xl font-bold text-red-700 mb-2">AI gen failed for {category}</h1>
                         <pre className="text-sm text-red-600 whitespace-pre-wrap">{(err as Error).message}</pre>
-                        <p className="mt-4 text-sm text-gray-700">Check: OPENAI_API_KEY in .env.local, OpenAI quota.</p>
+                        <p className="mt-4 text-sm text-gray-700">Check: AI_PLATFORM_URL + AI_PLATFORM_CONTEXT_SECRET in .env.local (without an AI actor the harness renders the rule-based site).</p>
                     </div>
                 </div>
             )

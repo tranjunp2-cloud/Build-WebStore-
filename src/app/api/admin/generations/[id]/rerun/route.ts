@@ -14,8 +14,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withSuperAdmin, checkRateLimit } from '@/lib/admin/api-utils'
-import { generateSiteWithAI } from '@/lib/ai/openai-generator'
+import { generateSiteWithAI, resolveSiteGenerationMode } from '@/lib/ai/openai-generator'
 import { finishCapture, startCapture } from '@/lib/ai/capture-generation'
+import { resolveGenerationRecordActor } from '@/lib/ai/generation-actor'
+import { runWithAiActor } from '@/lib/ai-platform/actor-scope'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -83,11 +85,23 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             payload,
         })
         try {
-            const { result } = await generateSiteWithAI(businessInfo)
+            // Runs as the merchant who made the request, billed to their workspace.
+            // No actor → rule-based, with the reason recorded (not a plain success).
+            const { actor, skipReason } = await resolveGenerationRecordActor(payload, { user: record.user, tenant: record.tenant })
+            const { result, modeReason, aiSkipReason } = actor
+                ? await runWithAiActor(actor, () => generateSiteWithAI(businessInfo))
+                : await generateSiteWithAI(businessInfo, undefined, 'auto', undefined, undefined, undefined, {
+                    modeDecision: await resolveSiteGenerationMode(skipReason),
+                })
             await finishCapture(capture, {
                 status: 'success',
                 selectedBlocks: result.blocks.map((block) => String((block as { blockType?: unknown }).blockType ?? '')),
-                outputSnapshot: { path: 'admin-rerun-composition', siteName: result.siteName },
+                outputSnapshot: {
+                    path: 'admin-rerun-composition',
+                    siteName: result.siteName,
+                    ...(modeReason ? { modeReason } : {}),
+                    ...(aiSkipReason ? { aiSkipReason } : {}),
+                },
             })
 
             return NextResponse.json({
@@ -95,6 +109,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
                     message: 'Rerun completed',
                     siteName: result.siteName,
                     blockCount: result.blocks.length,
+                    ...(modeReason ? { modeReason } : {}),
+                    ...(aiSkipReason ? { aiSkipReason } : {}),
                 },
             })
         } catch (err) {

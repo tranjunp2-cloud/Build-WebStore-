@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { runSerializedEditorSave, useEditorStore } from '@/store/editorStore'
+import { draftBase, readDraftConflict, runSerializedEditorSave, useEditorStore } from '@/store/editorStore'
+import { buildSavePayload } from '@/lib/editor/save-payload'
 
 const mockBlocks = [
     { blockType: 'hero', heading: 'Welcome', subheading: 'Hello' },
@@ -49,7 +50,7 @@ describe('EditorStore', () => {
 
             // Assert — slot no longer contains the deleted link, survivors keep their BM labels
             const h = useEditorStore.getState().headerBlock as Record<string, unknown>
-            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as Array<Record<string, unknown>>
+            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as unknown as Array<Record<string, unknown>>
             expect(msLinks).toHaveLength(2)
             expect(msLinks.map(l => l.url)).toEqual(['/', '/about'])
             expect(msLinks.find(l => l.url === '/')?.label).toBe('Utama') // translation preserved
@@ -67,7 +68,7 @@ describe('EditorStore', () => {
             } as never)
 
             const h = useEditorStore.getState().headerBlock as Record<string, unknown>
-            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as Array<Record<string, unknown>>
+            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as unknown as Array<Record<string, unknown>>
             expect(msLinks).toHaveLength(4)
             expect(msLinks.find(l => l.url === '/contact')?.label).toBe('Contact') // new link → base label
             expect(msLinks.find(l => l.url === '/about')?.label).toBe('Tentang')   // existing translation kept
@@ -447,6 +448,101 @@ describe('EditorStore', () => {
             expect(global.fetch).toHaveBeenCalledTimes(1)
         })
 
+        it('[TC-AIWB-41] sends the draft revision as base and keeps the one the save returns', async () => {
+            useEditorStore.getState().setDraftVersion('3.7')
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true, status: 200, headers: new Headers({ 'x-draft-version': '4.8' }) })
+
+            useEditorStore.getState().updateBlock(0, { heading: 'Based save' })
+            await vi.advanceTimersByTimeAsync(3000)
+
+            const body = JSON.parse((global.fetch as any).mock.calls[0][1].body)
+            expect(body.base).toBe('3.7')
+            expect(useEditorStore.getState().draftVersion).toBe('4.8')
+        })
+
+        it('[TC-AIWB-41] a save refused as stale (409 DRAFT_CHANGED) stops saving instead of retrying over the newer draft', async () => {
+            useEditorStore.getState().setDraftVersion('3.7')
+            const refused = { ok: false, status: 409, json: async () => ({ code: 'DRAFT_CHANGED' }) }
+            ;(global.fetch as any).mockResolvedValueOnce({ ...refused, clone: () => refused })
+
+            useEditorStore.getState().updateBlock(0, { heading: 'Stale tab edit' })
+            await vi.advanceTimersByTimeAsync(3000)
+            await vi.advanceTimersByTimeAsync(40000)
+            useEditorStore.getState().updateBlock(0, { heading: 'Another edit' })
+            await vi.advanceTimersByTimeAsync(3000)
+
+            const state = useEditorStore.getState()
+            expect(state.draftConflict).toBe(true)
+            expect(state.hasUnsavedChanges).toBe(true)
+            expect(await state.performSave(true)).toBe(false)
+            expect(global.fetch).toHaveBeenCalledTimes(1)
+        })
+
+        it('[TC-AIWB-118] a save whose outcome is unknown (network error) keeps its saveId: the next save reuses it, a 2xx forgets it', async () => {
+            // Arrange — the first try fails in transit (it may have been committed), then the server answers
+            ;(global.fetch as any)
+                .mockRejectedValueOnce(new Error('Network error'))
+                .mockResolvedValueOnce({ ok: true, status: 200, headers: new Headers({ 'x-draft-version': '4.8' }) })
+                .mockResolvedValueOnce({ ok: true, status: 200, headers: new Headers() })
+            useEditorStore.getState().setDraftVersion('3.7')
+
+            // Act — an edit, its failed save, another edit (clears the retry timer) and its save, then one more save
+            useEditorStore.getState().updateBlock(0, { heading: 'First' })
+            await vi.advanceTimersByTimeAsync(3000)
+            const unconfirmed = useEditorStore.getState().unconfirmedSaveId
+            useEditorStore.getState().updateBlock(0, { heading: 'Second' })
+            await vi.advanceTimersByTimeAsync(3000)
+            useEditorStore.getState().updateBlock(0, { heading: 'Third' })
+            await vi.advanceTimersByTimeAsync(3000)
+
+            // Assert
+            const bodies = (global.fetch as any).mock.calls.map((call: [string, RequestInit]) => JSON.parse(call[1].body as string))
+            expect(bodies).toHaveLength(3)
+            expect(typeof bodies[0].saveId).toBe('string')
+            expect(unconfirmed).toBe(bodies[0].saveId)
+            expect(bodies[1]).toMatchObject({ saveId: bodies[0].saveId, base: '3.7' })
+            expect(bodies[2].saveId).not.toBe(bodies[0].saveId)
+            expect(bodies[2].base).toBe('4.8')
+            expect(useEditorStore.getState().unconfirmedSaveId).toBeNull()
+        })
+
+        it('[TC-AIWB-118] a 5xx keeps the saveId for the retry; a 409 forgets it', async () => {
+            // Arrange
+            const store = useEditorStore.getState()
+
+            // Act + Assert
+            store.settleSaveId('save-a', 504)
+            expect(useEditorStore.getState().unconfirmedSaveId).toBe('save-a')
+            expect(useEditorStore.getState().nextSaveId()).toBe('save-a')
+            store.settleSaveId('save-a', 409)
+            expect(useEditorStore.getState().unconfirmedSaveId).toBeNull()
+            expect(useEditorStore.getState().nextSaveId()).not.toBe('save-a')
+        })
+
+        it('[TC-AIWB-119] Keep my version after a refused save: bases the draft on the revision it met, re-enables autosave and saves over it', async () => {
+            // Arrange — the save is refused against the stored revision 5.9
+            useEditorStore.getState().setDraftVersion('3.7')
+            const refused = { ok: false, status: 409, json: async () => ({ code: 'DRAFT_CHANGED', parts: ['site'], draftVersion: '5.9' }) }
+            ;(global.fetch as any)
+                .mockResolvedValueOnce({ ...refused, clone: () => refused })
+                .mockResolvedValueOnce({ ok: true, status: 200, headers: new Headers({ 'x-draft-version': '6.10' }) })
+            useEditorStore.getState().updateBlock(0, { heading: 'Mine' })
+            await vi.advanceTimersByTimeAsync(3000)
+            expect(useEditorStore.getState()).toMatchObject({ draftConflict: true, conflictDraftVersion: '5.9', autoSaveEnabled: false })
+
+            // Act
+            const saved = await useEditorStore.getState().keepMyVersion()
+
+            // Assert
+            expect(saved).toBe(true)
+            const body = JSON.parse((global.fetch as any).mock.calls[1][1].body)
+            expect(body.base).toBe('5.9')
+            expect(body.blocks[0].heading).toBe('Mine')
+            expect(useEditorStore.getState()).toMatchObject({
+                draftConflict: false, conflictDraftVersion: null, autoSaveEnabled: true, draftVersion: '6.10', hasUnsavedChanges: false,
+            })
+        })
+
         it('TC-F12.10 & TC-F12.11: should retry on network error with backoff (5s, 10s, 20s)', async () => {
             ;(global.fetch as any)
                 .mockRejectedValueOnce(new Error('Network error'))
@@ -498,6 +594,38 @@ describe('EditorStore', () => {
 
             expect(requestBody.blocks).toEqual([])
             expect(useEditorStore.getState().saveStatus).toBe('saved')
+        })
+    })
+
+    describe('save bodies and the refused save [TC-AIWB-120]', () => {
+        it('[TC-AIWB-120] the editor save (buildSavePayload) and the settings save (draftBase) carry the base and the saveId', () => {
+            // Arrange
+            useEditorStore.getState().init('site-1', mockBlocks, mockTheme, 'Test Site')
+            useEditorStore.getState().setDraftVersion('3.7')
+
+            // Act
+            const editorBody = buildSavePayload(useEditorStore.getState(), { saveId: 'save-a' })
+            const settingsBody = draftBase(useEditorStore.getState(), 'save-b')
+
+            // Assert
+            expect(editorBody).toMatchObject({ base: '3.7', saveId: 'save-a' })
+            expect(settingsBody).toEqual({ base: '3.7', saveId: 'save-b' })
+            expect(draftBase({ draftVersion: null })).toEqual({})
+        })
+
+        it('[TC-AIWB-120] readDraftConflict returns the revision a stale save met, and nothing for a transient 409', async () => {
+            // Arrange
+            const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status })
+
+            // Act
+            const stale = await readDraftConflict(reply(409, { code: 'DRAFT_CHANGED', draftVersion: '5.9' }))
+            const transient = await readDraftConflict(reply(409, { retryable: true }))
+            const failed = await readDraftConflict(reply(500, { code: 'DRAFT_CHANGED' }))
+
+            // Assert
+            expect(stale).toEqual({ draftVersion: '5.9' })
+            expect(transient).toBeNull()
+            expect(failed).toBeNull()
         })
     })
 

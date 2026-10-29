@@ -16,6 +16,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Ticket, History } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 import { Tabs, TabsList, TabsTrigger, TabsCount } from '@/components/ui/tabs'
 
 const TABS = [
@@ -35,6 +36,10 @@ export function DiscountsTabNav() {
         history: null,
     })
 
+    // bumped when the assistant applies / undoes a change, so the counts are read again
+    const [reloadTick, setReloadTick] = useState(0)
+    useAgentChanges({ kinds: ['store_discount'] }, () => setReloadTick((n) => n + 1))
+
     useEffect(() => {
         let alive = true
         const readTotal = (url: string) =>
@@ -52,7 +57,7 @@ export function DiscountsTabNav() {
         return () => {
             alive = false
         }
-    }, [])
+    }, [reloadTick])
 
     // Usage History owns its subtree; Codes is the exact /discounts root only
     // (so /discounts/new and /discounts/[id] don't light up either tab).

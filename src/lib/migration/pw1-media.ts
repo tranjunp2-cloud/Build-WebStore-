@@ -65,9 +65,10 @@ export async function downloadSourceImage(value: string) {
         console.warn(`[PW1 media] Source is a video (${mimetype}); using placeholder`)
         return placeholderImage()
     }
-    // Some storage hosts label images "image" or octet-stream; the bytes are validated below
+    // Some storage hosts label images "image" or octet-stream, and PW1 stores some JPEG uploads with a
+    // `.txt` name served as text/plain; the bytes are validated below (non-image bytes are still rejected)
     const typedAsImage = mimetype.startsWith('image/')
-    if (!typedAsImage && !['image', 'application/octet-stream', 'binary/octet-stream'].includes(mimetype)) throw new Error('Source media is not a supported raster image')
+    if (!typedAsImage && !['image', 'application/octet-stream', 'binary/octet-stream', 'text/plain'].includes(mimetype)) throw new Error('Source media is not a supported raster image')
     const limit = 30 * 1024 * 1024
     if (Number(response.headers.get('content-length')) > limit) { await response.body.cancel(); throw new Error('Source image exceeds 30 MiB') }
     const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0

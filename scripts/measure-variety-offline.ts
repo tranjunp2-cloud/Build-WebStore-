@@ -5,12 +5,12 @@
  * this script imports the generator in-process. No auth, no rate limit,
  * no dev server, no media pipeline (image uniqueness metric is skipped).
  *
- * Prereqs:
- *   - OPENAI_API_KEY in env
- *   - Node 20+ (tsx)
+ * The AI steps run on the AI platform as a signed-in merchant (an AI actor);
+ * this offline script has none, so it measures the template/rule-based
+ * generator. Measure the AI path with measure-variety.ts (HTTP, real session).
  *
  * Usage:
- *   OPENAI_API_KEY=sk-... pnpm tsx scripts/measure-variety-offline.ts \
+ *   pnpm tsx scripts/measure-variety-offline.ts \
  *     --category=beauty --runs=20 --label=baseline
  */
 
@@ -140,7 +140,7 @@ async function main() {
     const categories = args.category ? [args.category] : Object.keys(fixtures)
 
     console.log(`[measure-variety-offline] Starting runs across ${categories.length} categories, ${args.runs}/cat`)
-    console.log(`[measure-variety-offline] Model: ${process.env.OPENAI_API_KEY ? 'OpenAI enabled' : 'NO API KEY — falling back'}`)
+    console.log('[measure-variety-offline] No AI actor offline — measuring the template/rule-based generator')
 
     const allResults: Record<string, GenResult[]> = {}
 

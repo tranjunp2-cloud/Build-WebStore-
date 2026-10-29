@@ -276,8 +276,15 @@ const KNOWN_GROUP_PREFIXES = [
   'easy_parcel_integration',
 ]
 
-function getMigrationColumns() {
-  const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
+// Group prefixes that only exist on one table. A global 'settings' would let a brand-new top-level
+// field `x` on ANY collection "match" an unrelated existing `settings_x` column.
+const TABLE_GROUP_PREFIXES = {
+  __proto__: null, // table names come from SQL text: no inherited keys (`constructor`, …)
+  // Tenants.settings group (AI shop automations) → settings_* columns
+  tenants: ['settings'],
+}
+
+function getMigrationColumns(content = fs.readFileSync(DB_SETUP_PATH, 'utf8')) {
   const columns = new Set()
 
   // Match ALTER TABLE xxx ADD COLUMN IF NOT EXISTS yyy <type>
@@ -292,7 +299,7 @@ function getMigrationColumns() {
     // Also register without known group prefix (e.g., payment_config_enable_cod → enable_cod).
     // For upload/relationship columns ending in _id, also register without the _id suffix
     // so diff-based checks (which use bare field names) can match them.
-    for (const prefix of KNOWN_GROUP_PREFIXES) {
+    for (const prefix of [...KNOWN_GROUP_PREFIXES, ...(TABLE_GROUP_PREFIXES[table] ?? [])]) {
       if (col.startsWith(`${prefix}_`)) {
         const withoutPrefix = col.slice(prefix.length + 1)
         columns.add(`${table}.${withoutPrefix}`)
@@ -844,6 +851,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  getMigrationColumns,
   getArrayNestedFieldNames,
   getFieldRoles,
   isPathMissingAtRef,

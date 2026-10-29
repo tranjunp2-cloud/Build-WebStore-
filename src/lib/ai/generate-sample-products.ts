@@ -6,18 +6,20 @@
  * Called from generate-site/route.ts via Promise.allSettled.
  */
 
-import OpenAI from 'openai'
 import { getLocaleLabel } from '@/lib/locale-labels'
+import { AiUnavailableError, completeComposed } from '@/lib/ai-platform/actor-scope'
 import type { BasePayload } from 'payload'
-import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
 import { resolveBusinessCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
 import {
     searchPhotos,
+    photoMatchesTerms,
     PixabayError,
     PIXABAY_CATEGORY_BY_COMPOSER,
 } from './pixabay-client'
+import { parseProducts, type ParsedProduct } from './business-info-mapper'
+import { photoMatchesProductType } from './product-type-match'
 import { uploadImageUrl } from './upload-media'
 import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import { SAMPLE_PRODUCTS_BY_CATEGORY } from './content/sample-products'
@@ -67,12 +69,6 @@ export interface PreparedSampleProductsResult {
 }
 
 
-function getOpenAI(): OpenAI | null {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
-    return new OpenAI({ apiKey: key, timeout: 12_000, maxRetries: 0 })
-}
-
 async function mapWithConcurrency<T, R>(
     items: readonly T[],
     concurrency: number,
@@ -90,28 +86,29 @@ async function mapWithConcurrency<T, R>(
     return results
 }
 
-/** Returns true when the OpenAI error is a hard quota/credit limit (no point retrying). */
+/**
+ * True when no model can answer this run (no AI actor, or the workspace's AI
+ * quota is used up) — no point retrying; the curated products take over.
+ */
 function isQuotaExhausted(err: unknown): boolean {
-    // Structural check instead of instanceof so this works in test environments
-    // where OpenAI.APIError may be undefined (mock doesn't expose the class).
-    if (!(err instanceof Error)) return false
-    const status = (err as { status?: unknown }).status
-    if (status !== 429) return false
-    const code = (err as { code?: string | null }).code
-    if (!code) return false // unknown code — retry rather than abort on ambiguous 429
-    return code === 'insufficient_quota'
+    if (err instanceof AiUnavailableError) return true
+    // Structural check: the platform client's error carries the HTTP status.
+    return err instanceof Error && (err as { status?: unknown }).status === 429
 }
 
-/** Tier 1: ask GPT-4.1-nano for `count` products tailored to the business. */
+/**
+ * Tier 1: ask the AI platform (`sitegen.sample-products`) for `count` products tailored to the business.
+ *
+ * #2103 A3: when the merchant listed products (`listed`), the model only writes copy for EXACTLY
+ * those — the names (and any price the merchant typed) are never taken from the model.
+ */
 async function generateSampleProductsAI(
     businessInfo: BusinessInfoInput,
     language: string,
     count = 6,
     excludeNames: readonly string[] = [],
+    listed: readonly ParsedProduct[] = [],
 ): Promise<Array<SampleProduct & { _imageKeyword: string }>> {
-    const openai = getOpenAI()
-    if (!openai) throw new Error('OPENAI_API_KEY not set')
-
     const includeBM = language === 'ms' || language === 'auto'
     const targetLanguage = language !== 'auto' && language !== 'en' && language !== 'ms'
         ? getLocaleLabel(language).full
@@ -120,30 +117,31 @@ async function generateSampleProductsAI(
 Products MUST be specific, realistic items the business would actually sell — never generic placeholders.
 Names should be 2-5 words, distinct from each other.
 Image keywords MUST describe the physical product in 2-3 plain English words.
+Never invent certifications (halal, ISO), awards, discounts, origin claims or customer counts in descriptions.
 Output strictly JSON matching the requested schema. No markdown.`
 
     const exclusion = excludeNames.length
         ? `Do NOT repeat or rephrase these existing names: ${excludeNames.map(n => `"${n}"`).join(', ')}.`
         : ''
+    const listedBlock = listed.length > 0
+        ? `The merchant listed EXACTLY these ${listed.length} products. Return exactly ${listed.length} entries, in this order, one per product. Keep each "name" exactly as written (do not rename, merge, add or drop any):
+${listed.map((p, i) => `${i + 1}. "${p.name}"${p.price !== undefined ? ` (merchant price RM${p.price} — keep it)` : ''}`).join('\n')}`
+        : (businessInfo.products ? `Products hint: ${businessInfo.products}` : '')
     const prompt = `Generate ${count} sample products for a ${businessInfo.industry} business called "${businessInfo.businessName}".
-${businessInfo.products ? `Products hint: ${businessInfo.products}` : ''}
+${listedBlock}
 ${exclusion}
 ${targetLanguage ? `Write product names and customer-facing descriptions in ${targetLanguage}.` : ''}
 Return JSON: {"products":[{"name":"...","shortDescription":"max 100 chars","description":"2-3 sentences","price":number${includeBM ? ',"descriptionBM":"Bahasa Melayu translation"' : ''},"imageKeyword":"2-3 word English-only Unsplash search query (e.g. pet shampoo bottle, cat carrier bag)","weight":number (estimated shipping weight in kg for this specific product, minimum 0.1),"length":number (estimated length in cm),"width":number (estimated width in cm),"height":number (estimated height in cm)}]}
 Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a chair is heavier than earrings). No markdown. JSON only.`
 
-    const completion = await openai.chat.completions.create({
-        model: selectModel('product-description'),
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt },
-        ],
+    const completion = await completeComposed('sitegen.sample-products', {
+        system: systemPrompt,
+        user: prompt,
         temperature: 0.4,
-        max_tokens: Math.min(1500, (includeBM ? 450 : 300) * count),
-        response_format: { type: 'json_object' },
+        maxOutputTokens: Math.min(6000, (includeBM ? 450 : 300) * count),
     })
 
-    const content = completion.choices[0]?.message?.content ?? ''
+    const content = completion.content
     const parsed = JSON.parse(content) as { products?: unknown[] }
     if (!Array.isArray(parsed.products) || parsed.products.length === 0) {
         throw new Error('AI returned empty products array')
@@ -162,7 +160,8 @@ Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a ch
     const toBoundedNumber = (v: unknown, min: number, max: number): number | undefined =>
         typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined
 
-    return (parsed.products as Array<Record<string, unknown>>).slice(0, count).map((p) => ({
+    const rows = (parsed.products as unknown as Array<Record<string, unknown>>).slice(0, count)
+    const toProduct = (p: Record<string, unknown>) => ({
         name: String(p.name ?? ''),
         shortDescription: String(p.shortDescription ?? '').slice(0, 100),
         description: String(p.description ?? ''),
@@ -177,7 +176,35 @@ Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a ch
         sku: '',       // overridden in withImages.push
         inventory: 0,  // overridden in withImages.push
         _imageKeyword: String(p.imageKeyword ?? ''),
-    }))
+    })
+
+    if (listed.length === 0) return rows.map(toProduct)
+    // Merchant list is authoritative: one product per listed entry, the model only fills the copy.
+    return listed.map((entry, i) => mergeListedProduct(entry, rows[i] ? toProduct(rows[i]!) : undefined))
+}
+
+/** A product exactly as the merchant listed it, with AI copy when we have it. */
+function mergeListedProduct(
+    entry: ParsedProduct,
+    ai: (SampleProduct & { _imageKeyword: string }) | undefined,
+): SampleProduct & { _imageKeyword: string } {
+    return {
+        name: entry.name,
+        shortDescription: ai?.shortDescription ?? '',
+        description: ai?.description ?? '',
+        ...(ai?.descriptionBM ? { descriptionBM: ai.descriptionBM } : {}),
+        // Merchant price wins; otherwise the AI estimate (0 when AI gave none).
+        price: entry.price ?? ai?.price ?? 0,
+        weight: ai?.weight,
+        length: ai?.length,
+        width: ai?.width,
+        height: ai?.height,
+        imageId: undefined,
+        status: 'active' as const,
+        sku: '',
+        inventory: 0,
+        _imageKeyword: ai?._imageKeyword ?? '',
+    }
 }
 
 /** Tier 2: deterministic curated products from library, keyed by category. */
@@ -331,12 +358,18 @@ async function fetchProductImage(
 /**
  * Generate product copy without performing image-provider work. F38 uses this
  * phase so product demands can join the generation-scoped image resolver.
+ *
+ * #2103 A3: when the merchant listed products, the result has exactly those (≤20,
+ * names + typed prices untouched) — no library top-up. With nothing listed we keep
+ * the previous behaviour: 6 AI/curated sample products.
  */
 export async function prepareSampleProducts(
     businessInfo: BusinessInfoInput,
     language: string,
 ): Promise<PreparedSampleProductsResult> {
-    // The OpenAI client has retries disabled. Curated products are a complete,
+    const listed = parseProducts(businessInfo.products)
+    const target = listed.length > 0 ? listed.length : 6
+    // The platform task allows a single attempt. Curated products are a complete,
     // deterministic fallback, so a second/third model attempt only extends p95.
     const MAX_RETRIES = 1
     let rawProducts: Array<SampleProduct & { _imageKeyword: string }> = []
@@ -344,7 +377,7 @@ export async function prepareSampleProducts(
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            const result = await generateSampleProductsAI(businessInfo, language, 6)
+            const result = await generateSampleProductsAI(businessInfo, language, target, [], listed)
             if (result.length > 0) {
                 rawProducts = result
                 aiSucceeded = true
@@ -353,33 +386,39 @@ export async function prepareSampleProducts(
             console.warn(`[sample-products] AI attempt ${attempt}/${MAX_RETRIES} returned 0 products`)
         } catch (err) {
             if (isQuotaExhausted(err)) {
-                console.warn('[sample-products] OpenAI quota exhausted, skipping retries')
+                console.warn('[sample-products] AI unavailable or quota used up, skipping retries')
                 break
             }
             console.warn(`[sample-products] AI attempt ${attempt}/${MAX_RETRIES} failed:`, (err as Error).message)
         }
     }
 
-    const canUseEnglishCuratedFallback = language === 'en' || language === 'ms' || language === 'auto'
-    if (!aiSucceeded) {
-        rawProducts = canUseEnglishCuratedFallback ? getFallbackProducts(businessInfo) : []
-    } else if (rawProducts.length < 6) {
-        const needed = 6 - rawProducts.length
-        if (canUseEnglishCuratedFallback) {
-            const fallback = getFallbackProducts(businessInfo)
-            const existingNames = new Set(rawProducts.map(p => p.name.toLowerCase()))
-            const fills = fallback.filter(p => !existingNames.has(p.name.toLowerCase())).slice(0, needed)
-            rawProducts = [...rawProducts, ...fills]
-        } else {
-            try {
-                const topup = await generateSampleProductsAI(
-                    businessInfo, language, needed,
-                    rawProducts.map(p => p.name),
-                )
-                rawProducts = [...rawProducts, ...topup].slice(0, 6)
-            } catch (err) {
-                const message = isQuotaExhausted(err) ? 'quota exhausted' : (err as Error).message
-                console.warn(`[sample-products] localized AI top-up failed: ${message}`)
+    if (listed.length > 0) {
+        // The merchant's list is the catalogue. If the model failed, the products still exist
+        // (name + typed price) so the storefront matches what they asked for.
+        if (!aiSucceeded) rawProducts = listed.map((entry) => mergeListedProduct(entry, undefined))
+    } else {
+        const canUseEnglishCuratedFallback = language === 'en' || language === 'ms' || language === 'auto'
+        if (!aiSucceeded) {
+            rawProducts = canUseEnglishCuratedFallback ? getFallbackProducts(businessInfo) : []
+        } else if (rawProducts.length < target) {
+            const needed = target - rawProducts.length
+            if (canUseEnglishCuratedFallback) {
+                const fallback = getFallbackProducts(businessInfo)
+                const existingNames = new Set(rawProducts.map(p => p.name.toLowerCase()))
+                const fills = fallback.filter(p => !existingNames.has(p.name.toLowerCase())).slice(0, needed)
+                rawProducts = [...rawProducts, ...fills]
+            } else {
+                try {
+                    const topup = await generateSampleProductsAI(
+                        businessInfo, language, needed,
+                        rawProducts.map(p => p.name),
+                    )
+                    rawProducts = [...rawProducts, ...topup].slice(0, target)
+                } catch (err) {
+                    const message = isQuotaExhausted(err) ? 'quota exhausted' : (err as Error).message
+                    console.warn(`[sample-products] localized AI top-up failed: ${message}`)
+                }
             }
         }
     }
@@ -395,6 +434,38 @@ export async function prepareSampleProducts(
             imageKeyword: _imageKeyword,
         })),
     }
+}
+
+/**
+ * #2103 A3: pick a pool photo for each product by relevance, never by position.
+ * A photo is used when its tags match the product's own terms (AI keyword or the merchant's
+ * name) AND name the product's type (serum, cake, shirt … — see product-type-match), each photo
+ * at most once. A product with no matching photo gets none — a wrong
+ * picture on a product is worse than the storefront placeholder.
+ */
+export function matchPoolPhotosToProducts(
+    products: ReadonlyArray<{ name: string; imageKeyword?: string }>,
+    photos: ReadonlyArray<{ id: string; alt: string }>,
+    uploadedIds: ReadonlyMap<string, number>,
+): Array<number | undefined> {
+    const used = new Set<string>()
+    return products.map((product) => {
+        const terms = [product.imageKeyword, product.name]
+            .map((t) => (t ?? '').trim())
+            .filter((t) => t.length > 0)
+        if (terms.length === 0) return undefined
+        const hit = photos.find(
+            (photo) =>
+                !used.has(photo.id) &&
+                uploadedIds.has(photo.id) &&
+                photoMatchesTerms(photo.alt, terms) &&
+                // the photo must show this KIND of product: an ingredient match ("orange" for a Vitamin C Serum) is not enough
+                photoMatchesProductType(photo.alt, product),
+        )
+        if (!hit) return undefined
+        used.add(hit.id)
+        return uploadedIds.get(hit.id)
+    })
 }
 
 /**
@@ -480,8 +551,8 @@ export function assignResolvedSampleProductImages(
 }
 
 /**
- * Generate 6 sample products for a newly created site.
- * Tier 1: AI. Tier 2: curated library. Image network work uses bounded concurrency.
+ * Generate the sample products for a newly created site (the merchant's own list, else 6).
+ * Tier 1: AI. Tier 2: curated library (only when nothing was listed). Image network work uses bounded concurrency.
  * Never throws — returns whatever was successfully generated (may be []).
  * Set PIXABAY_FALLBACK_ONLY=1 to skip search entirely and use gallery URLs only.
  */

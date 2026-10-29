@@ -22,31 +22,6 @@ import type { BuilderPreviewMode } from '../../../components/builder/BuilderPrev
 // ── Mocks ────────────────────────────────────────────────────────────────
 
 vi.mock('@/components/builder/BuilderPreviewPrimitives', () => ({
-    BuilderPreviewModeToggle: ({
-        mode,
-        onChange,
-    }: {
-        mode: string
-        onChange: (mode: string) => void
-    }) => (
-        <div data-testid="preview-mode-toggle">
-            <button
-                data-testid="toggle-desktop"
-                onClick={() => onChange('desktop')}
-                type="button"
-            >
-                Desktop
-            </button>
-            <button
-                data-testid="toggle-mobile"
-                onClick={() => onChange('mobile')}
-                type="button"
-            >
-                Mobile
-            </button>
-            <span data-testid="current-mode">{mode}</span>
-        </div>
-    ),
     BuilderPreviewSurface: ({
         children,
         mode,
@@ -143,6 +118,16 @@ describe('BuilderCompletionView', () => {
             expect(
                 screen.getByText(/See the preview.*open the editor.*publish now/i),
             ).toBeInTheDocument()
+        })
+    })
+
+    // ── TC-F01.12: Draft badge on the "is ready!" card ───────────────────
+    describe('Draft badge (TC-F01.12)', () => {
+        it('renders the Draft badge with the localized label next to the ready message', () => {
+            renderCompletion()
+            const badge = screen.getByTestId('completion-draft-badge')
+            expect(badge).toHaveTextContent(en.onboarding.completion.draftBadge)
+            expect(badge).toHaveClass('bg-yellow-500/20', 'text-yellow-400')
         })
     })
 
@@ -258,6 +243,15 @@ describe('BuilderCompletionView', () => {
             const btn = screen.getByRole('button', { name: /View Full Preview/i })
             fireEvent.click(btn)
             expect(onOpenPreview).toHaveBeenCalledTimes(1)
+        })
+
+        it('slides the toggle thumb to the mobile slot only in mobile mode', () => {
+            const { rerender } = renderCompletion()
+            expect(screen.getByTestId('preview-mode-thumb')).toHaveClass('translate-x-0')
+            expect(screen.getByTestId('toggle-desktop')).toHaveAttribute('aria-pressed', 'true')
+            rerender(<BuilderCompletionView {...DEFAULT_PROPS} previewMode="mobile" />)
+            expect(screen.getByTestId('preview-mode-thumb')).toHaveClass('translate-x-[104px]')
+            expect(screen.getByTestId('toggle-mobile')).toHaveAttribute('aria-pressed', 'true')
         })
 
         it('passes current previewMode to the preview surface', () => {
@@ -413,5 +407,82 @@ describe('BuilderCompletionView', () => {
             )
             expect(screen.getByText(/\+0s/)).toBeInTheDocument()
         })
+    })
+})
+
+// ── #2103 A1/A3: finish-your-shop CTA + "replace before you publish" list ────
+
+describe('BuilderCompletionView — finish your shop + placeholders (#2103)', () => {
+    const c = en.onboarding.completion
+    const PLACEHOLDERS = [
+        { pageSlug: 'home', blockType: 'testimonials', label: 'Customer reviews' },
+        { pageSlug: 'about', blockType: 'team', label: 'Team members' },
+    ]
+
+    function renderWith(extra: Partial<React.ComponentProps<typeof BuilderCompletionView>> = {}) {
+        const props = {
+            ...DEFAULT_PROPS,
+            onDashboard: vi.fn(),
+            onOpenEditor: vi.fn(),
+            onPublish: vi.fn(),
+            onFinishShop: vi.fn(),
+            ...extra,
+        }
+        render(<BuilderCompletionView {...props} />)
+        return props
+    }
+
+    beforeEach(() => vi.clearAllMocks())
+
+    it('TC-AIAUD-057: shows the "Finish your shop" CTA only when products were created', () => {
+        const props = renderWith({ productCount: 4 })
+
+        fireEvent.click(screen.getByRole('button', { name: c.finishShopButton }))
+
+        expect(props.onFinishShop).toHaveBeenCalledTimes(1)
+        expect(screen.getByText(c.finishShopDescription)).toBeInTheDocument()
+        // the other actions stay
+        expect(screen.getByRole('button', { name: c.openEditor })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: c.publishWebsite })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: new RegExp(c.goToDashboard) })).toBeInTheDocument()
+    })
+
+    it('TC-AIAUD-057: no CTA without products (zero, absent) or without a handler', () => {
+        const { unmount } = render(<BuilderCompletionView {...DEFAULT_PROPS} productCount={0} onFinishShop={vi.fn()} />)
+        expect(screen.queryByRole('button', { name: c.finishShopButton })).not.toBeInTheDocument()
+        unmount()
+
+        const second = render(<BuilderCompletionView {...DEFAULT_PROPS} onFinishShop={vi.fn()} />)
+        expect(screen.queryByRole('button', { name: c.finishShopButton })).not.toBeInTheDocument()
+        second.unmount()
+
+        render(<BuilderCompletionView {...DEFAULT_PROPS} productCount={3} />)
+        expect(screen.queryByRole('button', { name: c.finishShopButton })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: c.openEditor })).toBeInTheDocument()
+    })
+
+    it('TC-AIAUD-058: lists the sections to replace and still lets the merchant publish', () => {
+        const props = renderWith({ placeholders: PLACEHOLDERS })
+
+        expect(screen.getByText(c.placeholdersTitle)).toBeInTheDocument()
+        expect(screen.getByText('Customer reviews')).toBeInTheDocument()
+        expect(screen.getByText('Team members')).toBeInTheDocument()
+
+        const publish = screen.getByRole('button', { name: c.publishWebsite })
+        expect(publish).toBeEnabled()
+        fireEvent.click(publish)
+        expect(props.onPublish).toHaveBeenCalledTimes(1)
+    })
+
+    it('TC-AIAUD-058: no list when there are no placeholders, and a long list is shortened', () => {
+        const { unmount } = render(<BuilderCompletionView {...DEFAULT_PROPS} placeholders={[]} />)
+        expect(screen.queryByText(c.placeholdersTitle)).not.toBeInTheDocument()
+        unmount()
+
+        const many = Array.from({ length: 9 }, (_, i) => ({ pageSlug: 'home', blockType: 'stats', label: `Section ${i + 1}` }))
+        render(<BuilderCompletionView {...DEFAULT_PROPS} placeholders={many} />)
+        expect(screen.getByText('Section 6')).toBeInTheDocument()
+        expect(screen.queryByText('Section 7')).not.toBeInTheDocument()
+        expect(screen.getByText('+3 more')).toBeInTheDocument()
     })
 })

@@ -9,6 +9,8 @@ import { describe, it, expect } from 'vitest'
 import {
   mapBusinessInfo,
   parseProductsString,
+  parseProducts,
+  MAX_LISTED_PRODUCTS,
   dedupeNonEmpty,
   normalizePhone,
   normalizeEmail,
@@ -161,5 +163,44 @@ describe('TC-F01-W.01 — mapBusinessInfo', () => {
       expect(result.email).toBeUndefined()
       expect(result.address).toBeUndefined()
     })
+  })
+})
+
+
+// ── #2103 A2 — paren-aware product list with prices ───────────────────────────
+const ISSUE_INPUT = 'Kek lapis (whole RM65, half RM35), kuih raya box RM48, birthday from RM120'
+
+describe('TC-AIAUD-006..009 — parseProducts (#2103 A2)', () => {
+  it('TC-AIAUD-006: the issue input parses to 3 products with prices 65 / 48 / 120', () => {
+    // Arrange / Act
+    const products = parseProducts(ISSUE_INPUT)
+    // Assert — commas inside (...) do not split; first price in parens is the default
+    expect(products).toEqual([
+      { name: 'Kek lapis', price: 65 },
+      { name: 'kuih raya box', price: 48 },
+      { name: 'birthday', price: 120, startingPrice: true },
+    ])
+  })
+
+  it('TC-AIAUD-007: parseProductsString returns clean names only (no prices, no paren price groups)', () => {
+    expect(parseProductsString(ISSUE_INPUT)).toEqual(['Kek lapis', 'kuih raya box', 'birthday'])
+    // non-price parens stay part of the name
+    expect(parseProductsString('Nasi lemak (large), teh tarik')).toEqual(['Nasi lemak (large)', 'teh tarik'])
+  })
+
+  it('TC-AIAUD-008: thousands separators, decimals, "-" and "@" separators and newlines', () => {
+    expect(parseProducts('Sofa RM1,200; Cushion @ RM12.50\nLamp - RM 30')).toEqual([
+      { name: 'Sofa', price: 1200 },
+      { name: 'Cushion', price: 12.5 },
+      { name: 'Lamp', price: 30 },
+    ])
+  })
+
+  it('TC-AIAUD-009: no price → name only; duplicates dropped; capped at 20', () => {
+    expect(parseProducts('ramen, Ramen, sushi')).toEqual([{ name: 'ramen' }, { name: 'sushi' }])
+    const many = Array.from({ length: 30 }, (_, i) => `item ${i + 1}`).join(', ')
+    expect(parseProducts(many)).toHaveLength(MAX_LISTED_PRODUCTS)
+    expect(parseProducts('')).toEqual([])
+    expect(parseProducts(undefined)).toEqual([])
   })
 })

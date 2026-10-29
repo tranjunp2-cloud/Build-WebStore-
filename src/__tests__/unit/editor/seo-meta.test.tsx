@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
+import { EDITOR_AI_ASK_EVENT, EditorAgentProvider, type EditorAiAskDetail } from '@/components/editor/agent/editor-agent-context'
 import { I18nProvider } from '@/i18n'
 import { toast } from 'sonner'
 import '@testing-library/jest-dom'
@@ -64,163 +65,53 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
             expect(screen.getByText('This description may be cut short in Google Search.')).toBeInTheDocument()
         })
 
-        it('TC-F05.29b: Auto-Gen AI LLM API Call flow', async () => {
-            let mockPage = { id: 'page-1', title: 'Home', slug: '/', isHomepage: true, seoTitle: 'SEO Title', seoDescription: 'SEO Desc' }
-            render(
-                <I18nProvider defaultLocale="en">
-                    <SettingsPanel
-                        block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
-                        onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
-                        site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
-                        currentPageId="page-1"
-                        pages={[mockPage as unknown as React.ComponentProps<typeof SettingsPanel>['pages'][0]]}
-                        onPageUpdate={vi.fn().mockImplementation(async (id, changes) => {
-                            mockPage = { ...mockPage, ...changes }
-                            return mockPage
-                        })}
-                    />
-                </I18nProvider>
-            )
-            fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
-            
-            const aiButton = screen.getByText('Automatic SEO optimization')
-            
-            ;(global.fetch as Mock).mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
-                    title: 'Generated Title',
-                    description: 'Generated Description',
-                    slug: 'generated-slug' 
-                })
-            })
-
-            fireEvent.click(aiButton)
-
-            expect(toast.loading).toHaveBeenCalledWith('Generating SEO with AI...')
-            expect(global.fetch).toHaveBeenCalledWith('/api/sites/site-1/pages/page-1/generate-seo', expect.any(Object))
-
-            await waitFor(() => {
-                expect(toast.success).toHaveBeenCalledWith('SEO generated successfully.', expect.any(Object))
-            })
-            
-            // Because onPageUpdate resolves mocked state, local variables sync.
-            // Using waitFor here because handleSeoUpdate is async and setSeoTitleInput resolves post-await.
-            await waitFor(() => {
-                 expect(screen.getByDisplayValue('Generated Title')).toBeInTheDocument()
-                 expect(screen.getByDisplayValue('Generated Description')).toBeInTheDocument()
-            })
-        })
-
-        it('shows a styled comparison dialog and leaves metadata unchanged when cancelled', async () => {
-            const onPageUpdate = vi.fn()
-            const confirmSpy = vi.spyOn(window, 'confirm')
-
-            render(
-                <I18nProvider defaultLocale="en">
+        const seoPanel = (agent: boolean) => (
+            <I18nProvider defaultLocale="en">
+                <EditorAgentProvider enabled={agent}>
                     <SettingsPanel
                         block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
                         onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
                         site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
                         currentPageId="page-1"
                         pages={[{ id: 'page-1', title: 'About', slug: 'about', isHomepage: false, seoTitle: 'Existing Title', seoDescription: 'Existing Description' }] as unknown as React.ComponentProps<typeof SettingsPanel>['pages']}
-                        onPageUpdate={onPageUpdate}
+                        onPageUpdate={vi.fn()}
                     />
-                </I18nProvider>
-            )
+                </EditorAgentProvider>
+            </I18nProvider>
+        )
 
-            ;(global.fetch as Mock).mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
-                    hasExisting: true,
-                    existing: {
-                        title: 'Existing Title',
-                        description: 'Existing Description',
-                    },
-                    proposed: {
-                        title: 'Proposed Title',
-                        description: 'Proposed Description',
-                        slug: 'proposed-about',
-                    },
-                }),
-            })
-
+        it('[TC-AIWB-61] without the assistant the SEO tab has no AI button and calls nothing', () => {
+            render(seoPanel(false))
             fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
-            fireEvent.click(screen.getByRole('button', { name: 'Automatic SEO optimization' }))
 
-            const dialog = await screen.findByRole('dialog', { name: 'Replace existing SEO metadata?' })
-            expect(dialog).toBeInTheDocument()
-            expect(screen.getByTestId('seo-current-title')).toHaveTextContent('Existing Title')
-            expect(screen.getByTestId('seo-proposed-title')).toHaveTextContent('Proposed Title')
-            expect(screen.getByTestId('seo-current-description')).toHaveTextContent('Existing Description')
-            expect(screen.getByTestId('seo-proposed-description')).toHaveTextContent('Proposed Description')
-            expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
-            expect(confirmSpy).not.toHaveBeenCalled()
-            expect(toast.dismiss).toHaveBeenCalledWith('seo-loading')
-
-            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-
-            await waitFor(() => {
-                expect(screen.queryByRole('dialog', { name: 'Replace existing SEO metadata?' })).not.toBeInTheDocument()
-            })
-            expect(onPageUpdate).not.toHaveBeenCalled()
-            expect(toast.info).toHaveBeenCalledWith('SEO changes discarded')
+            expect(screen.queryByRole('button', { name: 'Ask AI' })).toBeNull()
+            expect(screen.queryByText('Automatic SEO optimization')).toBeNull()
+            // the old generate-seo route is gone: the panel only hands off to the chat, so no AI call and no write
+            const aiCalls = (global.fetch as Mock).mock.calls.filter(([url, init]) => /\/api\/ai\//.test(String(url)) || ['POST', 'PUT', 'PATCH'].includes(String((init as RequestInit | undefined)?.method ?? '').toUpperCase()))
+            expect(aiCalls).toEqual([])
         })
 
-        it('applies the proposed metadata only after overwrite confirmation', async () => {
-            let mockPage = {
-                id: 'page-1',
-                title: 'About',
-                slug: 'about',
-                isHomepage: false,
-                seoTitle: 'Existing Title',
-                seoDescription: 'Existing Description',
-            }
-            const onPageUpdate = vi.fn().mockImplementation(async (_id, changes) => {
-                mockPage = { ...mockPage, ...changes }
-                return mockPage
-            })
-
-            render(
-                <I18nProvider defaultLocale="en">
-                    <SettingsPanel
-                        block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
-                        onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
-                        site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
-                        currentPageId="page-1"
-                        pages={[mockPage as unknown as React.ComponentProps<typeof SettingsPanel>['pages'][0]]}
-                        onPageUpdate={onPageUpdate}
-                    />
-                </I18nProvider>
-            )
-
-            ;(global.fetch as Mock).mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
-                    hasExisting: true,
-                    existing: {
-                        title: 'Existing Title',
-                        description: 'Existing Description',
-                    },
-                    proposed: {
-                        title: 'Proposed Title',
-                        description: 'Proposed Description',
-                        slug: 'proposed-about',
-                    },
-                }),
-            })
-
+        it('[TC-AIWB-61] Ask AI on SEO opens the ask box and hands the page SEO to the chat (no direct write)', async () => {
+            const onAsk = vi.fn()
+            window.addEventListener(EDITOR_AI_ASK_EVENT, onAsk)
+            render(seoPanel(true))
             fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
-            fireEvent.click(screen.getByRole('button', { name: 'Automatic SEO optimization' }))
-            fireEvent.click(await screen.findByRole('button', { name: 'Replace SEO' }))
 
-            await waitFor(() => {
-                expect(onPageUpdate).toHaveBeenCalledWith('page-1', { seoTitle: 'Proposed Title' })
-                expect(onPageUpdate).toHaveBeenCalledWith('page-1', { seoDescription: 'Proposed Description' })
-                expect(onPageUpdate).toHaveBeenCalledWith('page-1', { slug: 'proposed-about' })
-                expect(toast.success).toHaveBeenCalledWith('SEO generated successfully.')
-            })
-            expect(screen.queryByRole('dialog', { name: 'Replace existing SEO metadata?' })).not.toBeInTheDocument()
+            fireEvent.click(screen.getByRole('button', { name: 'Ask AI' }))
+            const box = await screen.findByRole('textbox', { name: 'What should change?' })
+            fireEvent.change(box, { target: { value: 'Shorter, mention the new collection' } })
+            fireEvent.submit(box.closest('form')!)
+
+            expect(onAsk).toHaveBeenCalledTimes(1)
+            const detail = (onAsk.mock.calls[0]![0] as CustomEvent<EditorAiAskDetail>).detail
+            expect(detail.prompt).toBe('Shorter, mention the new collection')
+            expect(detail.element).toEqual({ kind: 'seo', label: 'About', pageId: 'page-1', path: 'seoTitle', value: 'Existing Title' })
+            // the old generate-seo route is gone: the panel only hands off to the chat, so no AI call and no write
+            const aiCalls = (global.fetch as Mock).mock.calls.filter(([url, init]) => /\/api\/ai\//.test(String(url)) || ['POST', 'PUT', 'PATCH'].includes(String((init as RequestInit | undefined)?.method ?? '').toUpperCase()))
+            expect(aiCalls).toEqual([])
+            window.removeEventListener(EDITOR_AI_ASK_EVENT, onAsk)
         })
+
     })
 
     describe('TC-F05.29a: JSON-LD Schema Validation', () => {

@@ -105,11 +105,6 @@ vi.mock('@/lib/detect-locale', () => ({
     detectLocaleFromText: vi.fn().mockResolvedValue('en'),
 }))
 
-vi.mock('@/lib/generation-errors', () => ({
-    getGenerationError: vi.fn(),
-    formatErrorMessage: vi.fn(),
-}))
-
 vi.mock('@/lib/ai/coerce-video-variants', () => ({
     coerceVideoVariants: vi.fn((x: unknown) => x),
 }))
@@ -289,6 +284,88 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
         expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/sites/site-123/publish'))).toBe(true)
     })
 
+    function mockSiteApis(draftVersion = '5.2') {
+        fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = String(input)
+            if (url.includes('/editor-data')) {
+                return { ok: true, json: async () => ({ draftVersion }) } as Response
+            }
+            if (url.includes('/publish')) {
+                return { ok: true, json: async () => ({ data: { id: 'site-123', url: 'http://localhost/site-123' } }) } as Response
+            }
+            return { ok: true, headers: new Headers({ 'x-draft-version': '5.3' }), json: async () => ({ success: true }) } as unknown as Response
+        })
+    }
+
+    const saveBodies = () => fetchMock.mock.calls
+        .filter(([input]) => String(input).includes('/api/sites/site-123/save'))
+        .map(([, init]) => JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>)
+
+    it('TC-AIAUD-055: a manual save after an edit is a draft save against the draft revision', async () => {
+        mockSiteApis('5.2')
+        render(<AIBuilderPageClient userId="user-1" />)
+
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Move Block' })).toBeInTheDocument())
+        fireEvent.click(screen.getByRole('button', { name: 'Move Block' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Publish Website' }))
+
+        await waitFor(() => expect(saveBodies()).toHaveLength(1))
+        expect(saveBodies()[0]).toMatchObject({ isDraft: true, base: '5.2' })
+    })
+
+    it('TC-AIAUD-055: the autosave after an edit is a draft save against the draft revision', async () => {
+        mockSiteApis('5.2')
+        render(<AIBuilderPageClient userId="user-1" />)
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Move Block' })).toBeInTheDocument())
+
+        fireEvent.click(screen.getByRole('button', { name: 'Move Block' }))
+
+        // the 2s autosave debounce
+        await waitFor(() => expect(saveBodies()).toHaveLength(1), { timeout: 4000 })
+        expect(saveBodies()[0]).toMatchObject({ isDraft: true, base: '5.2' })
+        expect(saveBodies()[0].blocks).toBeTruthy()
+    })
+
+    async function runGeneration(doneData: Record<string, unknown>) {
+        useBuilderStore.setState({
+            step: 'info', status: 'idle', businessInfo: null, blocks: [], theme: null, siteId: null, siteName: '',
+        })
+        const encoder = new TextEncoder()
+        const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(encoder.encode(`event: done\ndata: ${JSON.stringify(doneData)}\n\n`))
+                controller.close()
+            },
+        })
+        fetchMock.mockResolvedValue({ ok: true, body } as Response)
+        render(<AIBuilderPageClient userId="user-1" />)
+        fireEvent.click(screen.getByRole('button', { name: 'Generate Website' }))
+        await waitFor(() => expect(useBuilderStore.getState().status).toBe('done'))
+    }
+
+    it('TC-AIAUD-056: the done event hands productIds and placeholders to the store', async () => {
+        await runGeneration({
+            siteId: 'site-123', siteName: 'Bakery', totalBlocks: 3, totalPages: 1, timeMs: 1000,
+            productIds: ['11', '12'],
+            placeholders: [{ pageSlug: 'home', blockType: 'testimonials', label: 'Customer reviews' }],
+        })
+
+        const state = useBuilderStore.getState()
+        expect(state.productIds).toEqual(['11', '12'])
+        expect(state.placeholders).toEqual([{ pageSlug: 'home', blockType: 'testimonials', label: 'Customer reviews' }])
+    })
+
+    it('TC-AIAUD-056: a done event without them (older server) or with junk leaves both empty', async () => {
+        await runGeneration({
+            siteId: 'site-123', siteName: 'Bakery', totalBlocks: 3, totalPages: 1, timeMs: 1000,
+            productIds: 'nope', placeholders: [null, { label: '' }, 42],
+        })
+
+        const state = useBuilderStore.getState()
+        expect(state.productIds).toEqual([])
+        expect(state.placeholders).toEqual([])
+    })
+
     it('TC-GENPERF-W3-33: keeps the generation stream open after 75 seconds', async () => {
         // Arrange
         vi.useFakeTimers()
@@ -341,7 +418,7 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
         expect(useBuilderStore.getState().status).toBe('done')
     })
 
-    it('preserves an explicit SSE server error instead of replacing it with a disconnect', async () => {
+    it('[TC-AIAUD-172] shows the localized stream error for its code instead of a disconnect or the raw server text', async () => {
         useBuilderStore.setState({
             step: 'info',
             status: 'idle',
@@ -356,7 +433,7 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
             start(controller) {
                 controller.enqueue(encoder.encode(
                     'event: generation_accepted\ndata: {"generationRequestId":"request-2"}\n\n' +
-                    'event: error\ndata: {"message":"Generation failed while saving pages"}\n\n',
+                    'event: error\ndata: {"message":"Server-side text in another language","code":"GENERATION_FAILED"}\n\n',
                 ))
                 controller.close()
             },
@@ -375,7 +452,9 @@ describe('AIBuilderPageClient — no-user-edits save guard (BUG-F01-26)', () => 
 
         const state = useBuilderStore.getState()
         expect(state.status).toBe('error')
-        expect(state.error?.message).toBe('Generation failed while saving pages')
+        expect(state.error?.code).toBe('GENERATION_FAILED')
+        expect(state.error?.message).toBe("We couldn't finish your website. Your details are saved — please try again.")
+        expect(state.error?.message).not.toContain('Server-side text')
         expect(state.error?.message).not.toContain('Connection lost')
     })
 })

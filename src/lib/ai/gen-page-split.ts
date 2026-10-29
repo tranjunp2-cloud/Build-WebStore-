@@ -13,16 +13,15 @@
  * resolves them deterministically (when known) and both prompts inject them.
  */
 
-import type OpenAI from 'openai'
+import { completeComposed } from '@/lib/ai-platform/actor-scope'
 import { getNavLabels, hasDedicatedStrings, type NavLabels } from './block-i18n'
-import { selectModel } from './config'
 import { buildNavigation } from './template-composer'
 import { normalizeComposerCategory } from './composer-category-resolver'
 import type { BusinessSample } from './content/types'
 import { composeTemplateResult } from './fallback-adapter'
+import { parseProductsString } from './business-info-mapper'
 import type { BusinessInfoInput } from './system-prompt'
 import type { GenerationResult } from './generate-blocks'
-import { logAiUsage } from './log-usage'
 import { detectLanguageFromText } from '@/lib/language-detection'
 import {
     resolveLocaleStructuralStrings,
@@ -33,11 +32,10 @@ import {
 // 4-subpage call produced ~6000+ output tokens for vi content and was the
 // long pole (~80s ≈ no win over the mega-call, since home is only ~2k of the
 // ~7.5k total tokens). Two 2-page batches halve the long pole.
-// Batch 2 keeps its own model route so it can be tuned independently via
-// AI_MODEL_SITEGEN_SUB_LIGHT. Both routes default to GPT-5.4 mini.
-const SUBPAGE_BATCHES: ReadonlyArray<{ pages: readonly string[]; slugs: readonly string[]; light: boolean }> = [
-    { pages: ['About', 'Services/Products'], slugs: ['/about', '/services'], light: false },
-    { pages: ['Contact', 'Blog'], slugs: ['/contact', '/blog'], light: true },
+// Every call is the platform task `sitegen.page-blocks` (the quality tier).
+const SUBPAGE_BATCHES: ReadonlyArray<{ pages: readonly string[]; slugs: readonly string[] }> = [
+    { pages: ['About', 'Services/Products'], slugs: ['/about', '/services'] },
+    { pages: ['Contact', 'Blog'], slugs: ['/contact', '/blog'] },
 ]
 
 /** '/About ' → 'about' — one comparison form for model-emitted slugs. */
@@ -244,53 +242,30 @@ type SplitCallOutcome = {
 }
 
 async function runSplitCall(
-    openai: OpenAI,
-    model: string,
     systemPrompt: string,
     userPrompt: string,
     timeoutMs = 38_000,
 ): Promise<SplitCallOutcome> {
     const start = Date.now()
     try {
-        const completion = await openai.chat.completions.create({
-            model,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-            ],
-            temperature: 0.7,
-            response_format: { type: 'json_object' },
-        }, { timeout: timeoutMs })
-        const choice = completion.choices[0]
-        const content = choice?.message?.content
+        const completion = await completeComposed(
+            'sitegen.page-blocks',
+            { system: systemPrompt, user: userPrompt, temperature: 0.7 },
+            { signal: AbortSignal.timeout(timeoutMs) },
+        )
+        const content = completion.content
         if (!content) throw new Error('Empty AI response')
-        if (choice?.finish_reason === 'length') {
-            console.warn(`[gen-page-split] AI response truncated due to token limit (finish_reason: length)`)
-        }
-        const usage = completion.usage
-        return { parsed: safeParseJson(content), model: completion.model, tokensIn: usage?.prompt_tokens ?? 0, tokensOut: usage?.completion_tokens ?? 0, durationMs: Date.now() - start }
+        return { parsed: safeParseJson(content), model: completion.model, tokensIn: completion.inputTokens, tokensOut: completion.outputTokens, durationMs: Date.now() - start }
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
-        return { parsed: null, model, tokensIn: 0, tokensOut: 0, durationMs: Date.now() - start, errorMessage }
+        return { parsed: null, model: 'sitegen.page-blocks', tokensIn: 0, tokensOut: 0, durationMs: Date.now() - start, errorMessage }
     }
-}
-
-function logOutcome(outcome: SplitCallOutcome): void {
-    logAiUsage({
-        endpoint: 'site-generation',
-        model: outcome.model,
-        tokensIn: outcome.tokensIn,
-        tokensOut: outcome.tokensOut,
-        durationMs: outcome.durationMs,
-        success: outcome.parsed !== null,
-        errorCode: outcome.errorMessage,
-    })
 }
 
 /** Supports both the scoped `pages: [home]` shape and the legacy root-level
  *  `blocks` shape, in case GPT ignores the scoped hint. */
 function extractHomePage(parsed: Record<string, unknown>): Record<string, unknown> | null {
-    const pages = Array.isArray(parsed.pages) ? (parsed.pages as Record<string, unknown>[]) : null
+    const pages = Array.isArray(parsed.pages) ? (parsed.pages as unknown as Record<string, unknown>[]) : null
     // Slug forced to '/' regardless of what the model emitted: a scope-ignoring
     // home call can return a subpage (same failure class measured on batches
     // 2026-07-03), and its slug would collide with the real batch page at
@@ -303,7 +278,7 @@ function extractHomePage(parsed: Record<string, unknown>): Record<string, unknow
 }
 
 function extractSubPages(parsed: Record<string, unknown>): Record<string, unknown>[] {
-    const pages = Array.isArray(parsed.pages) ? (parsed.pages as Record<string, unknown>[]) : []
+    const pages = Array.isArray(parsed.pages) ? (parsed.pages as unknown as Record<string, unknown>[]) : []
     return pages.map((p) => ({ ...p, isHomepage: false }))
 }
 
@@ -337,7 +312,7 @@ export function applyDeterministicChrome(
     businessInfo: BusinessInfoInput,
     blockLang: string,
 ): void {
-    const pages = Array.isArray(merged.pages) ? (merged.pages as Record<string, unknown>[]) : []
+    const pages = Array.isArray(merged.pages) ? (merged.pages as unknown as Record<string, unknown>[]) : []
     if (pages.length === 0) return
 
     const slugs = pages.map((p) => (typeof p.slug === 'string' && p.slug ? p.slug : '/'))
@@ -354,7 +329,7 @@ export function applyDeterministicChrome(
     )
     if (blockLang.split('-')[0] !== 'en' && !localeStrings) {
         const service = splitServices(businessInfo.products)[0] ?? businessInfo.businessName
-        const links = Array.isArray(nav.links) ? nav.links as Record<string, unknown>[] : []
+        const links = Array.isArray(nav.links) ? nav.links as unknown as Record<string, unknown>[] : []
         nav.links = links.map((link) => ({
             ...link,
             label: link.url === '/services' ? service : businessInfo.businessName,
@@ -370,11 +345,11 @@ export function applyDeterministicChrome(
         }
     }
 
-    const homeBlocks = Array.isArray(pages[0]?.blocks) ? (pages[0]!.blocks as Record<string, unknown>[]) : []
+    const homeBlocks = Array.isArray(pages[0]?.blocks) ? (pages[0]!.blocks as unknown as Record<string, unknown>[]) : []
     const homeFooter = homeBlocks.find((b) => b.blockType === 'footer') ?? null
 
     pages.forEach((page, i) => {
-        const blocks = Array.isArray(page.blocks) ? (page.blocks as Record<string, unknown>[]) : []
+        const blocks = Array.isArray(page.blocks) ? (page.blocks as unknown as Record<string, unknown>[]) : []
         const body = blocks.filter((b) => b.blockType !== 'navigation' && (i === 0 || b.blockType !== 'footer'))
         // structuredClone (not spread): downstream passes mutate blocks in
         // place (structure enforcer, grid alignment) — pages must not share
@@ -394,11 +369,11 @@ export function applyDeterministicChrome(
  */
 export function syncFooterAcrossPages(pages: Array<{ blocks?: unknown[] }>): void {
     if (pages.length < 2) return
-    const homeBlocks = Array.isArray(pages[0]?.blocks) ? (pages[0]!.blocks as Record<string, unknown>[]) : []
+    const homeBlocks = Array.isArray(pages[0]?.blocks) ? (pages[0]!.blocks as unknown as Record<string, unknown>[]) : []
     const homeFooter = homeBlocks.find((b) => b?.blockType === 'footer')
     if (!homeFooter) return
     for (let i = 1; i < pages.length; i++) {
-        const blocks = Array.isArray(pages[i]?.blocks) ? (pages[i]!.blocks as Record<string, unknown>[]) : []
+        const blocks = Array.isArray(pages[i]?.blocks) ? (pages[i]!.blocks as unknown as Record<string, unknown>[]) : []
         pages[i]!.blocks = [...blocks.filter((b) => b?.blockType !== 'footer'), structuredClone(homeFooter)]
     }
 }
@@ -440,11 +415,8 @@ function composerFallback(gr: GenerationResult, scope: 'home' | 'subpages'): Rec
 }
 
 function splitServices(products: string): string[] {
-    const services = products
-        .split(/[\n,;|]+/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-    return services.length > 0 ? services : []
+    // #2103 A2: paren-aware split + prices stripped ("Kek lapis (whole RM65, half RM35)" is ONE service).
+    return parseProductsString(products.replace(/\|/g, ','))
 }
 
 function blockSectionLabel(
@@ -587,8 +559,6 @@ export function materializeLocaleSafePage(
 }
 
 export type ParallelSplitInput = {
-    openai: OpenAI
-    model: string
     systemPrompt: string
     userPromptText: string
     promptText: string
@@ -598,7 +568,7 @@ export type ParallelSplitInput = {
     blockLang: string
 }
 
-/** Call A (home) ∥ Call B/C (subpage batches), logs usage for all, falls
+/** Call A (home) ∥ Call B/C (subpage batches) on the AI platform, falls
  *  back per-scope to the deterministic composer (never the whole gen).
  *  If ANY subpage batch fails, ALL subpages come from the composer — mixing
  *  GPT pages with composer pages would produce an inconsistent page set
@@ -607,21 +577,16 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     const brief = buildBrief(input.blockLang)
     const [homeOutcome, ...batchOutcomes] = await Promise.all([
         runSplitCall(
-            input.openai, input.model,
             buildHomeSystemPrompt(input.systemPrompt, brief),
             scopedUserPrompt(input.userPromptText, 'generate ONLY the Homepage page (pages array with exactly 1 entry).'),
         ),
         ...SUBPAGE_BATCHES.map((batch) =>
             runSplitCall(
-                input.openai,
-                batch.light ? selectModel('site-generation-subpages-light') : input.model,
                 buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
                 scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
             ),
         ),
     ])
-    logOutcome(homeOutcome)
-    batchOutcomes.forEach(logOutcome)
     console.info(
         `[AI][GEN_PARALLEL_PAGES] home=${homeOutcome.durationMs}ms ` +
             batchOutcomes.map((o, i) => `subs${i + 1}=${o.durationMs}ms`).join(' ') +
@@ -649,7 +614,7 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     // the deterministic plan; the slug is then rewritten to the canonical
     // '/x' form (kills 'about' vs '/about' ambiguity in one move).
     const extractBatchPages = (o: SplitCallOutcome, i: number): Record<string, unknown>[] => {
-        const pages = Array.isArray(o.parsed?.pages) ? (o.parsed!.pages as Record<string, unknown>[]) : []
+        const pages = Array.isArray(o.parsed?.pages) ? (o.parsed!.pages as unknown as Record<string, unknown>[]) : []
         const bySlug = new Map<string, Record<string, unknown>>()
         for (const p of pages) {
             const key = canonicalSlug(p.slug)
@@ -686,7 +651,6 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
             failedIdx.map((i) => {
                 const batch = SUBPAGE_BATCHES[i]!
                 return runSplitCall(
-                    input.openai, input.model,
                     buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
                     scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
                     10_000,
@@ -695,7 +659,6 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
         )
         retries.forEach((o, k) => {
             const i = failedIdx[k]!
-            logOutcome(o)
             batchOutcomes[i] = o
             batchPages[i] = extractBatchPages(o, i)
         })
@@ -751,7 +714,7 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     const merged = mergeSplitParsed(homeParsed, subsParsed)
     if (input.blockLang.split('-')[0] !== 'en') {
         const localeStrings = resolveLocaleStructuralStrings(input.blockLang, merged.localeStrings)
-        const pages = Array.isArray(merged.pages) ? merged.pages as Record<string, unknown>[] : []
+        const pages = Array.isArray(merged.pages) ? merged.pages as unknown as Record<string, unknown>[] : []
         let repairedLocaleMismatch = false
         merged.pages = pages.map((page) => {
             const isHomepage = page.isHomepage === true || canonicalSlug(page.slug) === ''

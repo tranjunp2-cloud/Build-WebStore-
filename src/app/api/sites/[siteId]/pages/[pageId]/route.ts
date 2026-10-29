@@ -12,6 +12,7 @@ import { isNotFoundError } from '@/lib/api/is-not-found-error'
 import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { sql } from 'drizzle-orm'
+import { isReservedPageSlug } from '@/lib/utils/reserved-page-slugs'
 
 const updatePageSchema = z.object({
     isVisible: z.boolean().optional(),
@@ -129,6 +130,11 @@ export const PATCH = withFeatureGuard('website_builder')(withAuth<RouteContext>(
             }
             normalizedSlug = normalizedSlug.startsWith('/') ? normalizedSlug : `/${normalizedSlug}`
             if (normalizedSlug === '//') normalizedSlug = '/'
+
+            // Same guard as page creation: /checkout is served by a fixed storefront route
+            if (isReservedPageSlug(normalizedSlug)) {
+                return NextResponse.json({ error: 'This slug is reserved and cannot be used.' }, { status: 400 })
+            }
 
             const duplicatePages = await payload.find({
                 collection: 'pages',

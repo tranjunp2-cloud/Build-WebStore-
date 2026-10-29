@@ -31,6 +31,8 @@ import FeatureComparisonSettings from './FeatureComparisonSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
 import { FontSelect } from './FontSelect'
+import { useEditorAgentEnabled } from './agent/editor-agent-context'
+import { ElementAskLayer, type ViewportRect } from './agent/ElementAskLayer'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { StepItem } from '@/blocks/step-process/config'
 import type { FeatureComparisonConfig } from '@/blocks/feature-comparison/config'
@@ -65,10 +67,6 @@ import { MapsEmbedPreview } from './local-business/maps-embed-preview'
 import { CompletionChecklist } from './local-business/completion-checklist'
 import type { LocalBusinessData } from './local-business/types'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-    SeoOverwriteConfirmDialog,
-    type SeoMetadataPreview,
-} from './SeoOverwriteConfirmDialog'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
 function stripHtmlForDisplay(value: unknown): string {
@@ -143,18 +141,6 @@ const PHONE_COUNTRIES = [
 const sectionCls = "border-t border-white/10 pt-4"
 // Hide newsletter variants from footer UI — feature not ready for users
 const FOOTER_HIDDEN_VARIANTS = new Set(['expanded', 'mega-footer'])
-
-type SeoProposal = SeoMetadataPreview & {
-    slug?: string | null
-}
-
-type PendingSeoOverwrite = {
-    pageId: string
-    isHomepage: boolean
-    existing: SeoMetadataPreview
-    proposed: SeoProposal
-    warning?: string
-}
 
 /** Ensure phone number is displayed with country code prefix (e.g. "+60123456789"). */
 function preparePhoneForDisplay(phone: string, countryCode: string): string {
@@ -450,10 +436,9 @@ function SettingsPanelInner({
         setAnnShowLink(sl === true || (sl === undefined && !!(b?.linkText || b?.linkUrl)))
     }, [blockIndex, block?.showLink, block?.linkText, block?.linkUrl])
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
-    const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
-    const [pendingSeoOverwrite, setPendingSeoOverwrite] = useState<PendingSeoOverwrite | null>(null)
-    const [isApplyingSeoOverwrite, setIsApplyingSeoOverwrite] = useState(false)
-    const currentPageIdRef = useRef(currentPageId)
+    // the SEO tab's AI button asks the copilot chat (Ask AI); no button without the assistant
+    const agentOn = useEditorAgentEnabled()
+    const [seoAsk, setSeoAsk] = useState<ViewportRect | null>(null)
     const [seoSlugInput, setSeoSlugInput] = useState('')
     const [seoTitleInput, setSeoTitleInput] = useState('')
     const [seoDescriptionInput, setSeoDescriptionInput] = useState('')
@@ -481,12 +466,8 @@ function SettingsPanelInner({
     const settingsFocusFallbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
 
-    useEffect(() => {
-        currentPageIdRef.current = currentPageId
-        setPendingSeoOverwrite((pending) => (
-            pending && pending.pageId !== currentPageId ? null : pending
-        ))
-    }, [currentPageId])
+    // an Ask AI box opened for one page never stays over another
+    useEffect(() => setSeoAsk(null), [currentPageId])
 
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
@@ -1201,68 +1182,6 @@ function SettingsPanelInner({
         setSeoDescriptionInput(updatedPage.seoDescription || '')
     }
 
-    const applySeoProposal = async (
-        proposed: SeoProposal,
-        targetPageId: string,
-        targetIsHomepage: boolean,
-    ): Promise<boolean> => {
-        if (currentPageIdRef.current !== targetPageId) return false
-
-        if (proposed.title) setSeoTitleInput(proposed.title)
-        if (proposed.description) setSeoDescriptionInput(proposed.description)
-        if (proposed.slug && !targetIsHomepage) setSeoSlugInput(proposed.slug)
-
-        if (proposed.title) {
-            await handleSeoUpdate('seoTitle', proposed.title)
-            if (currentPageIdRef.current !== targetPageId) return false
-        }
-        if (proposed.description) {
-            await handleSeoUpdate('seoDescription', proposed.description)
-            if (currentPageIdRef.current !== targetPageId) return false
-        }
-        if (proposed.slug && !targetIsHomepage) {
-            await handleSeoUpdate('slug', proposed.slug)
-            if (currentPageIdRef.current !== targetPageId) return false
-        }
-        return true
-    }
-
-    const cancelSeoOverwrite = () => {
-        if (isApplyingSeoOverwrite) return
-        setPendingSeoOverwrite(null)
-        toast.info(s.seoCancelled)
-    }
-
-    const confirmSeoOverwrite = async () => {
-        if (!pendingSeoOverwrite || isApplyingSeoOverwrite) return
-        if (pendingSeoOverwrite.pageId !== currentPageIdRef.current) {
-            setPendingSeoOverwrite(null)
-            toast.info(s.seoCancelled)
-            return
-        }
-
-        const pending = pendingSeoOverwrite
-        setIsApplyingSeoOverwrite(true)
-        try {
-            const applied = await applySeoProposal(
-                pending.proposed,
-                pending.pageId,
-                pending.isHomepage,
-            )
-            if (!applied) {
-                toast.info(s.seoCancelled)
-                return
-            }
-            toast.success(s.seoGenerated)
-            if (pending.warning) toast.warning(pending.warning)
-            setPendingSeoOverwrite(null)
-        } catch {
-            toast.error(s.seoError)
-        } finally {
-            setIsApplyingSeoOverwrite(false)
-        }
-    }
-
     const seoTitleValue = seoTitleInput
     const seoDescriptionValue = seoDescriptionInput
     const seoSlugValue = seoSlugInput
@@ -1345,6 +1264,7 @@ function SettingsPanelInner({
                 <div>
                     <label className={labelCls}>{s.metaTitle}</label>
                     <Input
+                        data-settings-focus="seoTitle"
                         value={seoTitleValue}
                         onChange={(e) => setSeoTitleInput(e.target.value)}
                         onBlur={(e: FieldBlurEvent) => void handleSeoUpdate('seoTitle', e.target.value)}
@@ -1361,6 +1281,7 @@ function SettingsPanelInner({
                 <div>
                     <label className={labelCls}>{s.metaDescription}</label>
                     <Textarea
+                        data-settings-focus="seoDescription"
                         rows={4}
                         value={seoDescriptionValue}
                         onChange={(e) => setSeoDescriptionInput(e.target.value)}
@@ -1412,69 +1333,40 @@ function SettingsPanelInner({
                     />
                 </div>
 
+                {agentOn ? (
                 <div className="pt-2">
                     <button
                         type="button"
-                        disabled={isGeneratingSEO}
-                        onClick={async () => {
-                            if (!currentPageId || !site?.id) return
-                            const requestPageId = currentPageId
-                            const requestIsHomepage = isHomepage
-                            setIsGeneratingSEO(true)
-                            const loadingToastId = toast.loading(s.generatingSeo)
-                            try {
-                                const res = await fetch(`/api/sites/${site.id}/pages/${requestPageId}/generate-seo`, {
-                                    method: 'POST'
-                                })
-                                if (res.ok) {
-                                    const data = await res.json()
-                                    const proposed = (data.proposed || data) as SeoProposal
-                                    if (currentPageIdRef.current !== requestPageId) {
-                                        toast.info(s.seoCancelled, { id: loadingToastId })
-                                        return
-                                    }
-                                    // AC-16, BR-06: confirm before overwriting existing meta
-                                    if (data.hasExisting) {
-                                        toast.dismiss(loadingToastId)
-                                        setPendingSeoOverwrite({
-                                            pageId: requestPageId,
-                                            isHomepage: requestIsHomepage,
-                                            existing: data.existing || {},
-                                            proposed,
-                                            warning: data.warning,
-                                        })
-                                        return
-                                    }
-                                    const applied = await applySeoProposal(
-                                        proposed,
-                                        requestPageId,
-                                        requestIsHomepage,
-                                    )
-                                    if (!applied) {
-                                        toast.info(s.seoCancelled, { id: loadingToastId })
-                                        return
-                                    }
-                                    toast.success(s.seoGenerated, { id: loadingToastId })
-                                    if (data.warning) toast.warning(data.warning)
-                                } else {
-                                    toast.error(s.seoFailed, { id: loadingToastId })
-                                }
-                            } catch (error) {
-                                toast.error(s.seoError, { id: loadingToastId })
-                            } finally {
-                                setIsGeneratingSEO(false)
-                            }
+                        disabled={!currentPageId}
+                        onClick={(event) => {
+                            const box = event.currentTarget.getBoundingClientRect()
+                            setSeoAsk({ top: box.top, left: box.left, width: box.width, height: box.height })
                         }}
                         className="flex w-full items-center justify-center gap-2 rounded-lg bg-[linear-gradient(90deg,hsl(var(--info))_0%,hsl(var(--primary))_100%)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-50"
                     >
-                        {isGeneratingSEO ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        ) : (
-                            <Sparkles className="h-4 w-4" aria-hidden />
-                        )}
-                        {isGeneratingSEO ? s.generating : s.autoSeo}
+                        <Sparkles className="h-4 w-4" aria-hidden />
+                        {t.editor.elementAsk.title}
                     </button>
+                    {seoAsk && currentPageId && (() => {
+                        const panel = panelScrollRef.current?.getBoundingClientRect()
+                        return (
+                            <ElementAskLayer
+                                element={{
+                                    kind: 'seo',
+                                    label: activePage?.title || s.metaTitle,
+                                    pageId: String(currentPageId),
+                                    path: 'seoTitle',
+                                    ...(seoTitleValue ? { value: seoTitleValue.slice(0, 300) } : {}),
+                                }}
+                                anchor={seoAsk}
+                                bounds={{ left: panel?.left ?? 0, right: panel?.right ?? window.innerWidth }}
+                                currentValue={seoTitleValue || undefined}
+                                onClose={() => setSeoAsk(null)}
+                            />
+                        )
+                    })()}
                 </div>
+                ) : null}
             </div>
         )
     }
@@ -2559,6 +2451,7 @@ function SettingsPanelInner({
                                                 <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300"><X className="h-4 w-4" aria-hidden /></button>
                                             </div>
                                             <Input defaultValue={stripHtmlForDisplay(btn.label)} placeholder={s.label}
+                                                data-settings-focus={`ctaButtons.${i}.label`}
                                                 onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'label', e.target.value)}
                                                 variant="editor"
                                                 className={editorInputClassName} />
@@ -2567,6 +2460,7 @@ function SettingsPanelInner({
                                                 return (
                                                     <>
                                                         <Input defaultValue={btn.url || ''} placeholder={s.url}
+                                                            data-settings-focus={`ctaButtons.${i}.url`}
                                                             onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'url', e.target.value)}
                                                             variant="editor"
                                                             className={hiddenBtn ? `${editorInputClassName} ring-2 ring-red-500/70` : editorInputClassName} />
@@ -3188,15 +3082,6 @@ function SettingsPanelInner({
                     ) : null}
                 </div>
             </div>
-            <SeoOverwriteConfirmDialog
-                open={Boolean(pendingSeoOverwrite)}
-                current={pendingSeoOverwrite?.existing || {}}
-                proposed={pendingSeoOverwrite?.proposed || {}}
-                copy={s.seoOverwriteDialog}
-                isApplying={isApplyingSeoOverwrite}
-                onCancel={cancelSeoOverwrite}
-                onConfirm={() => void confirmSeoOverwrite()}
-            />
         </div>
     )
 }

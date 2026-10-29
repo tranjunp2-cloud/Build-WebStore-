@@ -38,17 +38,36 @@ vi.mock('@/i18n', () => ({
                     promoStep1: 'Describe',
                     promoStep2: 'Generate',
                     promoStep3: 'Refine',
+                    blueprintCaption: 'AI builds this template from your details',
+                    blueprintReady: 'All set',
+                    blueprintCount: '{count} of 4 details added',
                     errors: {
                         businessName: 'Please enter your business name',
                         industry: 'Please select an industry',
                         products: 'Please describe your products / services',
                         shortDescription: 'Please describe your business',
                     },
+                    optionalLabel: 'Optional',
+                    buyingMethodsLabel: 'How do customers buy from you?',
+                    buyingMethodsHint: 'Only the ways you pick are mentioned.',
+                    buyingMethodOptions: {
+                        delivery: 'Delivery', pickup: 'Pickup', walk_in: 'Walk-in',
+                        booking: 'Booking', cod: 'Cash on delivery', online_payment: 'Online payment',
+                    },
+                    serviceAreaLabel: 'Areas you serve',
+                    serviceAreaPlaceholder: 'e.g. Klang Valley',
+                    shopFactsLabel: 'Facts we can say about your shop',
+                    shopFactsPlaceholder: 'e.g. Started in 2019',
+                    shopFactsHint: 'Only add what is true.',
+                    tabManual: 'Describe business',
+                    tabUrl: 'Import from a link',
                     errorMessage: 'Generation failed, please try again.',
                     retryWithCurrent: 'Retry with current information',
                 }
             }
-        }
+        },
+        ti: (template: string, vars: Record<string, string | number>) =>
+            template.replace(/\{(\w+)\}/g, (_, key: string) => String(vars[key] ?? '')),
     })
 }))
 
@@ -145,12 +164,6 @@ vi.mock('@/components/builder/onboarding/BuilderStepScreen', () => ({
     ),
 }))
 
-vi.mock('@/components/builder/onboarding/BuilderPromoCard', () => ({
-    BuilderPromoCard: (props: { title: string; description: string }) => (
-        <div data-testid="promo-card">{props.title}</div>
-    ),
-}))
-
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 const MOCK_INDUSTRIES = [
@@ -227,11 +240,24 @@ describe('BusinessInfoForm Component', () => {
             })
         })
 
-        it('renders promo card in right pane', async () => {
+        it('TC-F01.04: renders live blueprint with 0/4 details in right pane', async () => {
             render(<BusinessInfoForm />)
             await waitFor(() => {
-                expect(screen.getByTestId('promo-card')).toBeInTheDocument()
+                expect(screen.getByRole('img', { name: '0 of 4 details added' })).toBeInTheDocument()
             })
+            expect(screen.getByTestId('right-pane')).toHaveTextContent('AI Builder')
+            expect(screen.getByText('AI builds this template from your details')).toBeInTheDocument()
+        })
+
+        it('TC-F01.04: blueprint fills live as business name is typed', async () => {
+            render(<BusinessInfoForm />)
+            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
+
+            const nameInput = screen.getByTestId('left-body').querySelector('input')!
+            fireEvent.change(nameInput, { target: { value: 'My Coffee Shop' } })
+
+            expect(screen.getByRole('img', { name: '1 of 4 details added' })).toBeInTheDocument()
+            expect(screen.getByTestId('right-pane')).toHaveTextContent('My Coffee Shop')
         })
     })
 

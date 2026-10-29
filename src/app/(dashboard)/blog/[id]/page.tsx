@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { getBlogByIdAction } from '../actions'
+import { isAiAgentEnabled } from '@/lib/ai-platform/config'
 import BlogEditorPageClient from './BlogEditorPageClient'
 
 type BlogEditorPageProps = {
@@ -21,5 +22,5 @@ export default async function BlogEditorPage({ params }: BlogEditorPageProps) {
         }
     }
 
-    return <BlogEditorPageClient />
+    return <BlogEditorPageClient agentEnabled={isAiAgentEnabled()} />
 }

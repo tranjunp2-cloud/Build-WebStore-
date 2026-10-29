@@ -99,3 +99,26 @@ describe('[TC-F37-03-48] Blog public slug validation', () => {
         expect(validateBlogSlug('news-launch')).toBe(true)
     })
 })
+
+describe('Blogs Collection Hooks - aiSeeded marker (#2103 M1)', () => {
+    const hook = Blogs.hooks!.beforeChange![0] as CollectionBeforeChangeHook
+    const req = { user: { id: 'user-1', tenants: [{ tenant: 'tenant-A' }] }, payload: { find: vi.fn(), findByID: vi.fn() } } as any
+    const run = (data: Record<string, unknown>, original: Record<string, unknown>, context: Record<string, unknown> = {}) =>
+        hook({ data, originalDoc: { id: 'b1', tenant: 'tenant-A', site: 'site-A', ...original }, operation: 'update', req, context } as any) as Promise<Record<string, unknown>>
+
+    it('TC-AIAUD-204: an owner unpublishing / publishing / scheduling a seeded post clears the marker', async () => {
+        expect((await run({ status: 'draft' }, { status: 'published', aiSeeded: true })).aiSeeded).toBe(false)
+        expect((await run({ status: 'published' }, { status: 'draft', aiSeeded: true })).aiSeeded).toBe(false)
+        expect((await run({ status: 'scheduled' }, { status: 'draft', aiSeeded: true })).aiSeeded).toBe(false)
+    })
+
+    it('TC-AIAUD-205: edits that keep the status, owner posts and the site-publish promotion leave the marker alone', async () => {
+        // same status / no status in the update
+        expect(await run({ title: 'New title' }, { status: 'draft', aiSeeded: true })).not.toHaveProperty('aiSeeded')
+        expect(await run({ status: 'draft' }, { status: 'draft', aiSeeded: true })).not.toHaveProperty('aiSeeded')
+        // a post the generator never seeded
+        expect(await run({ status: 'published' }, { status: 'draft', aiSeeded: false })).not.toHaveProperty('aiSeeded')
+        // the system's promotion (publishSeededBlogPosts sets aiSeeded itself)
+        expect(await run({ status: 'published' }, { status: 'draft', aiSeeded: true }, { promoteAiSeeded: true })).not.toHaveProperty('aiSeeded')
+    })
+})

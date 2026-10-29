@@ -23,6 +23,8 @@ const BASE_BRANCH = process.argv[2] || 'origin/staging'
 // Env vars that are always available (built-in, not secrets)
 const BUILT_IN_VARS = new Set([
     'NODE_ENV', 'PORT', 'HOSTNAME', 'HOME', 'PATH', 'CI', 'VERCEL',
+    // Vercel system env (production | preview | development), set by the platform on every deploy
+    'VERCEL_ENV',
     'NEXT_PUBLIC_SERVER_URL', 'NEXT_PUBLIC_APP_ENV',
     'NEXT_PUBLIC_PLATFORM_DOMAIN',
     'DATABASE_URI', 'DATABASE_URL',
@@ -40,6 +42,18 @@ const BUILT_IN_VARS = new Set([
 // documented secret in both target environments.
 const REQUIRED_DEPLOYMENT_SECRETS = new Set([
     'VERCEL_WEBHOOK_SECRET',
+])
+
+// AI platform wiring (services/ai-platform is a separate Vercel project). Without
+// AI_PLATFORM_URL + AI_PLATFORM_CONTEXT_SECRET every AI feature stays off (no crash), so a
+// manifest that forgets these vars warns instead of failing CI. AI_AGENT_ENABLED only gates the
+// copilot: unset = on outside production; "false" = off everywhere; production on only when "true".
+// They are always checked, whether or not a src/ diff references them. The real values are
+// gated at deploy time instead: ci.yml deploy-production runs scripts/ci/ai-env-preflight.mjs.
+const WARN_ONLY_VARS = new Set([
+    'AI_PLATFORM_URL',
+    'AI_PLATFORM_CONTEXT_SECRET',
+    'AI_AGENT_ENABLED',
 ])
 
 // ─── Parse env vars from a file ──────────────────────────────────
@@ -97,23 +111,33 @@ function main() {
         newVars.set(varName, 'required deployment secret')
     }
 
+    for (const varName of WARN_ONLY_VARS) {
+        if (!newVars.has(varName)) newVars.set(varName, 'AI platform (warn-only)')
+    }
+
     console.log(`\n[env-check] Checking ${newVars.size} env var(s):`)
     for (const [v] of newVars) {
         console.log(`   process.env.${v}`)
     }
 
     const errors = []
+    const warnings = []
 
     for (const [varName] of newVars) {
         for (const [env, vars] of Object.entries(envVars)) {
             if (!vars.has(varName)) {
-                errors.push({
+                const target = WARN_ONLY_VARS.has(varName) ? warnings : errors
+                target.push({
                     var: varName,
                     env,
                     file: envFiles[env],
                 })
             }
         }
+    }
+
+    for (const w of warnings) {
+        console.warn(`\n⚠️  ${w.var} — missing from: ${w.file} (warn-only, AI platform)`)
     }
 
     if (errors.length > 0) {
@@ -139,7 +163,8 @@ function main() {
         process.exit(1)
     }
 
-    console.log('\n[env-check] ✅ All required env vars registered in staging + production env files')
+    const warnNote = warnings.length > 0 ? ` (${warnings.length} warn-only AI platform var(s) missing, see above)` : ''
+    console.log(`\n[env-check] ✅ All required env vars registered in staging + production env files${warnNote}`)
     process.exit(0)
 }
 

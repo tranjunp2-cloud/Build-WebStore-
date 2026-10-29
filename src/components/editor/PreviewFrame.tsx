@@ -2,7 +2,11 @@
 
 import React, { memo, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { GripVertical, Loader2 } from 'lucide-react'
-import { InlineEditPopover } from './InlineEditPopover'
+import type { ContextElement } from '@ech/agent-core'
+import { useEditorAgentEnabled } from './agent/editor-agent-context'
+import { ElementAskLayer, type ViewportRect } from './agent/ElementAskLayer'
+import { imageElement, sectionElement, textElement } from './agent/element-context'
+import { globalPartElement, pickOnCanvas } from './agent/canvas-pick'
 import { RichTextToolbar } from './RichTextToolbar'
 import { ImageToolbar } from './ImageToolbar'
 import { BlockActionBar } from './BlockActionBar'
@@ -36,14 +40,12 @@ interface PreviewFrameProps {
     viewport: 'desktop' | 'mobile'
     selectedBlock: number | null
     onBlockSelect?: (blockIndex: number | null, blockType?: string) => void
-    onInlineEditApplied?: (content: string, blockIndex: number, detail?: { instruction: string; originalText: string; rewrittenText: string; blockType: string }) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
     onDeleteBlock?: (index: number) => void
     onDuplicateBlock?: (index: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
     onImageReplaced?: () => void
     onPageNavigate?: (pageId: string) => void
-    onBlockAIEdit?: (blockIndex: number, blockType: string) => void
     disableDragDrop?: boolean
     /**
      * F05 compact canvas (mobile + iPad): hide the floating `BlockActionBar`
@@ -224,14 +226,12 @@ function PreviewFrameInner({
     viewport,
     selectedBlock,
     onBlockSelect,
-    onInlineEditApplied,
     onReorderBlocks,
     onDeleteBlock,
     onDuplicateBlock,
     onBlockDrop,
     onImageReplaced,
     onPageNavigate,
-    onBlockAIEdit,
     disableDragDrop = false,
     hideBlockActionBar = false,
     onInlineEditSave,
@@ -244,7 +244,7 @@ function PreviewFrameInner({
 }: PreviewFrameProps) {
     const { t } = useI18n()
     const { upload: uploadImage } = useUploadProgress()
-    const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
+    const { blocks, updateBlock, editBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
     const isCartLocked = useMemo(
         () => blocks.some(b => COMMERCE_BLOCK_TYPES.has((b as Record<string, unknown>).blockType as string ?? '')),
         [blocks],
@@ -281,7 +281,23 @@ function PreviewFrameInner({
             return next
         })
     }, [])
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    // Web builder copilot on: Ask AI on an element goes to the chat (ElementAskLayer), not the old rewrite popover
+    const agentOn = useEditorAgentEnabled()
+    const agentOnRef = useRef(agentOn)
+    const pageIdRef = useRef(pageId)
+    useEffect(() => {
+        agentOnRef.current = agentOn
+        pageIdRef.current = pageId
+    }, [agentOn, pageId])
+    // a click on the canvas → its chip in the AI chat (the iframe reports boxes in its own viewport)
+    const pickInChat = useCallback((element: ContextElement, rect: HoverRect | null | undefined, add: unknown, precise: boolean) => {
+        if (!agentOnRef.current) return
+        const frame = frameElementRef.current?.getBoundingClientRect()
+        const from = frame && rect ? { x: frame.left + rect.left, y: frame.top + rect.top, width: rect.width, height: rect.height } : undefined
+        pickOnCanvas({ element, add: add === true, ...(from ? { from } : {}) }, precise)
+    }, [])
+    // Ask AI on a section or a picture (text asks ride on isEditing): the element and its box on the canvas
+    const [elementAsk, setElementAsk] = useState<{ element: ContextElement; rect: HoverRect; currentValue?: string } | null>(null)
     const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number; blockType: string; originalText: string; scrollYAtStart: number } | null>(null)
     // GH-1367 Bug 3: keeps the iframe frozen while the inline-edit save flushes in the
     // background, even though the text toolbar (gated by textEditingData) is already hidden.
@@ -383,7 +399,11 @@ function PreviewFrameInner({
         if (newHtml === undefined || Number.isNaN(blockIndex)) return false
 
         const currentBlocks = blocksRef.current
-        const block = currentBlocks[blockIndex]
+        const rawBlock = currentBlocks[blockIndex]
+        // A section with an id is edited as the canvas shows it (its language copy over the section) and written
+        // back like the settings panel does (section + language copy together). Header/footer keep their own path.
+        const routed = Boolean(rawBlock?.id) && rawBlock.blockType !== 'navigation' && rawBlock.blockType !== 'footer'
+        const block = rawBlock && routed ? useEditorStore.getState().getDisplayBlock(rawBlock) : rawBlock
         const matchHtml = oldHtml ?? searchKey
         const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, matchHtml) : null
         if (!fieldPath || !block) return false
@@ -417,11 +437,16 @@ function PreviewFrameInner({
 
         if (originalValue === valueToSave) return true
 
-        const clone = JSON.parse(JSON.stringify(currentBlocks))
-        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, valueToSave)
-        updateBlock(blockIndex, nextBlock)
+        const topKey = fieldPath[0]
+        const nextBlock = updateValueAtPath(JSON.parse(JSON.stringify(block)) as Record<string, unknown>, fieldPath, valueToSave)
+        if (routed && typeof topKey === 'string') {
+            // only the field that holds the text (a list as a whole), never the whole section
+            editBlock(blockIndex, { [topKey]: nextBlock[topKey] }, undefined, { canvasTyped: true })
+        } else {
+            updateBlock(blockIndex, nextBlock, undefined, { canvasTyped: true })
+        }
         return true
-    }, [updateBlock])
+    }, [updateBlock, editBlock])
 
     const syncDragPosition = useCallback((clientY: number, sourceIndex?: number) => {
         if (!frameElement) return
@@ -582,6 +607,9 @@ function PreviewFrameInner({
                 const blockType = e.data.layout?.blockType as string | undefined
                 const isGlobalClick = blockType !== undefined && ['navigation', 'footer', 'breadcrumb'].includes(blockType)
                 if (!Number.isNaN(blockIndex)) {
+                    const clicked = blocksRef.current[blockIndex]
+                    const part = isGlobalClick ? globalPartElement(blockType, pageIdRef.current) : clicked && blockIndex >= 0 ? sectionElement({ block: clicked, blockIndex, pageId: pageIdRef.current }) : null
+                    if (part) pickInChat(part, e.data.layout as HoverRect | undefined, e.data.shiftKey, false)
                     onBlockSelect?.(blockIndex, blockType)
                     setHoverData(null)
                     if (isGlobalClick) {
@@ -614,6 +642,11 @@ function PreviewFrameInner({
                 // Global blocks (nav, footer, breadcrumb) are not inline-editable — ignore
                 const globalBlockTypes = ['navigation', 'footer', 'breadcrumb']
                 if (globalBlockTypes.includes(e.data.blockType)) return
+                // The assistant's change is being put into the page: text typed now would be replaced by it. The box closes.
+                if (useEditorStore.getState().isApplyingAi) {
+                    frameElementRef.current?.contentWindow?.postMessage({ type: 'STOP_TEXT_EDITING' }, window.location.origin)
+                    return
+                }
                 // Cancel any pending STOPPED cleanup (race: stop fires before start on re-click)
                 if (textEditStopTimerRef.current) {
                     clearTimeout(textEditStopTimerRef.current)
@@ -635,6 +668,13 @@ function PreviewFrameInner({
                 setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex, blockType: e.data.blockType ?? '', originalText: e.data.originalText ?? '', scrollYAtStart: startScrollY })
                 currentLiveTextRef.current = e.data.originalText ?? null
                 setImageClickData(null)
+                const editedBlock = blocksRef.current[e.data.blockIndex]
+                if (editedBlock) {
+                    const text = e.data.originalText ?? ''
+                    const fieldPath = findStringFieldPath(editedBlock, text, text, [], true)
+                    const stored = fieldPath ? getValueAtPath(editedBlock as Record<string, unknown>, fieldPath) : undefined
+                    pickInChat(textElement({ block: editedBlock, blockIndex: e.data.blockIndex, fieldPath, value: typeof stored === 'string' ? stored : text, pageId: pageIdRef.current }), e.data.rect, e.data.shiftKey, true)
+                }
             } else if (e.data?.type === 'TEXT_EDITING_STOPPED') {
                 textEditStopTimerRef.current = window.setTimeout(() => {
                     textEditStopTimerRef.current = null
@@ -697,6 +737,11 @@ function PreviewFrameInner({
                 if (['navigation', 'footer', 'breadcrumb', 'logo-cloud', 'custom-html', 'rich-text'].includes(e.data.blockType)) return
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType, imageIndex: e.data.imageIndex, totalImagesInBlock: e.data.totalImagesInBlock })
                 setTextEditingData(null)
+                const pictured = blocksRef.current[e.data.blockIndex]
+                if (pictured && e.data.src) {
+                    const fieldPath = findStringFieldPath(pictured, e.data.src, e.data.src)
+                    pickInChat(imageElement({ block: pictured, blockIndex: e.data.blockIndex, fieldPath, src: e.data.src, pageId: pageIdRef.current }), e.data.rect, e.data.shiftKey, true)
+                }
             } else if (e.data?.type === 'SELECTION_STATE') {
                 setWysiwygState(e.data.state)
             } else if (e.data?.type === 'IMAGE_HOVERED') {
@@ -802,7 +847,7 @@ function PreviewFrameInner({
             window.removeEventListener('message', handleMessage)
         }
         // Stable deps only — blocks/dragState/isEditing accessed via refs to prevent listener churn
-    }, [applyInlineEditPayload, cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, onLocaleSwitch, setIsEditing, updateBlock, selectedBlock])
+    }, [applyInlineEditPayload, cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, onLocaleSwitch, pickInChat, setIsEditing, updateBlock, selectedBlock])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -842,7 +887,6 @@ function PreviewFrameInner({
         setDragState(null)
         setDropIndex(null)
         setIsEditing(false)
-        setIsSubmitting(false)
         setTextEditingData(null)
         // GH-1367 Bug 3: also release the inline-edit save freeze. A token-guarded save .finally()
         // may skip clearing it (stale session); reset it here so navigation/key changes can't leave
@@ -900,7 +944,7 @@ function PreviewFrameInner({
             // Skip URL-based strategies for blocks where imageIndex precisely identifies the array slot.
             // Strategies 1-5 can false-positive on OTHER array items (e.g. testimonials[0].avatar
             // matching when the user clicked testimonials[1]); Strategy 7 handles these correctly.
-            const ARRAY_BLOCK_TYPES = new Set(['carousel', 'portfolio-grid', 'team', 'testimonials', 'social-proof', 'logo-cloud'])
+            const ARRAY_BLOCK_TYPES = new Set(['carousel', 'portfolio-grid', 'team', 'testimonials', 'social-proof', 'logo-cloud', 'products-featured'])
             const hasArrayIndex = imageClickData.imageIndex !== undefined && ARRAY_BLOCK_TYPES.has(imageClickData.blockType)
 
             // Strategy 1: Find URL string match in block data (text fields with URL)
@@ -1050,7 +1094,7 @@ function PreviewFrameInner({
                     const idx = imageClickData.imageIndex
                     const currentBlock = blocks[blockIndex] as Record<string, unknown>
                     const currentImages = Array.isArray(currentBlock.images)
-                        ? [...currentBlock.images as Array<Record<string, unknown>>]
+                        ? [...currentBlock.images as unknown as Array<Record<string, unknown>>]
                         : []
                     const totalSlots = Math.max(
                         imageClickData.totalImagesInBlock ?? 0,
@@ -1082,13 +1126,14 @@ function PreviewFrameInner({
                         testimonials: { arrayField: 'testimonials', imageSubField: 'avatar' },
                         'social-proof': { arrayField: 'reviews', imageSubField: 'avatar' },
                         'logo-cloud': { arrayField: 'logos', imageSubField: 'logo' },
+                        'products-featured': { arrayField: 'images', imageSubField: 'image' },
                     }
                     const arrayConfig = ARRAY_IMAGE_CONFIG[imageClickData.blockType]
                     if (arrayConfig) {
                         const idx = imageClickData.imageIndex
                         const currentBlock = blocks[blockIndex] as Record<string, unknown>
                         const currentArray = Array.isArray(currentBlock[arrayConfig.arrayField])
-                            ? [...currentBlock[arrayConfig.arrayField] as Array<Record<string, unknown>>]
+                            ? [...currentBlock[arrayConfig.arrayField] as unknown as Array<Record<string, unknown>>]
                             : []
                         // Pad array to idx if block has fewer items than rendered fallback slots
                         while (currentArray.length <= idx) {
@@ -1253,76 +1298,6 @@ function PreviewFrameInner({
             window.cancelAnimationFrame(animationFrameId)
         }
     }, [isDragging, dragSourceIndex, frameElement, syncDragPosition])
-
-    const handleInlineRewrite = useCallback(async (instruction: string) => {
-        // Use hoverData if available, otherwise fall back to textEditingData context
-        const blockIndex = hoverData?.blockIndex ?? textEditingData?.blockIndex ?? -1
-        const blockType = hoverData?.blockType ?? textEditingData?.blockType ?? ''
-        const text = hoverData?.text ?? currentLiveTextRef.current ?? textEditingData?.originalText ?? ''
-        // When falling back to textEditingData (no hoverData), use exact-match only —
-        // the fuzzy pass risks matching a different field with the same short substring.
-        const fieldPath = hoverData?.fieldPath ??
-            (textEditingData && blocks[textEditingData.blockIndex]
-                ? findStringFieldPath(blocks[textEditingData.blockIndex], text, text, [], true)
-                : null)
-
-        if (blockIndex < 0) return
-        const block = blocks[blockIndex]
-        if (!block || !fieldPath) {
-            return
-        }
-
-        setIsSubmitting(true)
-
-        try {
-            const response = await fetch('/api/ai/rewrite-text', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    text,
-                    instruction,
-                    context: `${blockType} section`,
-                }),
-            })
-
-            if (!response.ok) {
-                throw new Error('Failed to rewrite text')
-            }
-
-            const data = await response.json()
-            const rewritten = typeof data.rewritten === 'string' ? data.rewritten.trim() : ''
-
-            if (!rewritten) {
-                throw new Error('AI returned empty content')
-            }
-
-            const currentValue = getValueAtPath(block as Record<string, unknown>, fieldPath)
-            const nextValue =
-                typeof currentValue === 'string' && currentValue.includes(text)
-                    ? currentValue.replace(text, rewritten)
-                    : rewritten
-
-            const nextBlock = updateValueAtPath(block as Record<string, unknown>, fieldPath, nextValue)
-            updateBlock(blockIndex, nextBlock)
-
-            onInlineEditApplied?.(
-                `Updated ${blockType} text: "${text}" → "${rewritten}"`,
-                blockIndex,
-                { instruction, originalText: text, rewrittenText: rewritten, blockType },
-            )
-
-            setIsEditing(false)
-            setHoverData(prev => prev ? { ...prev, text: rewritten } : prev)
-        } catch (error) {
-            console.error('Inline rewrite failed', error)
-            toast.error(t.editor.preview.inlineEditFailed, {
-                description: 'Please try again.',
-            })
-        } finally {
-            setIsSubmitting(false)
-        }
-    }, [blocks, hoverData, textEditingData, onInlineEditApplied, updateBlock])
 
     // BUG-FIX: Prevent iframe reloading in the middle of typing due to background auto-saves.
     // If the user is actively editing text, freeze the iframeKey so it doesn't navigate.
@@ -1504,10 +1479,15 @@ function PreviewFrameInner({
                                         onDuplicate={() => {
                                             onDuplicateBlock?.(selectedLayout.blockIndex)
                                         }}
-                                        onAIEdit={() => {
+                                        onAIEdit={agentOn && selectedLayout.blockIndex >= 0 && blocks[selectedLayout.blockIndex] ? () => {
                                             onBlockSelect?.(selectedLayout.blockIndex)
-                                            onBlockAIEdit?.(selectedLayout.blockIndex, selectedLayout.blockType)
-                                        }}
+                                            const block = blocks[selectedLayout.blockIndex]!
+                                            // Ask AI on the section, anchored just under its action bar
+                                            setElementAsk({
+                                                element: sectionElement({ block, blockIndex: selectedLayout.blockIndex, pageId }),
+                                                rect: { top: selectedLayout.top, left: selectedLayout.left, width: selectedLayout.width, height: 8 },
+                                            })
+                                        } : undefined}
                                         onDelete={() => setDeleteConfirmIndex(selectedLayout.blockIndex)}
                                         deleteDisabled={selectedLayout.blockType === 'cartWidget' && isCartLocked}
                                         deleteDisabledTitle={t.editor.settings.cartDeleteLocked}
@@ -1645,68 +1625,34 @@ function PreviewFrameInner({
                     </div>
                 ) : null}
 
-                {/* AI popover unified — position:fixed to escape overflow-hidden */}
-                {isEditing && overlayOffset && (hoverData || textEditingData) && (() => {
+                {/* Ask AI on a text or a button → the copilot chat (ElementAskLayer, portalled) */}
+                {agentOn && isEditing && overlayOffset && (hoverData || textEditingData) && (() => {
                     const targetData = textEditingData || hoverData!
                     if (!targetData.rect) return null
                     const currentScrollOffset = textEditingData ? scrollOffset : 0
                     const adjustedTop = targetData.rect.top - currentScrollOffset
-
-                    const POPOVER_EST_HEIGHT = 200
                     const cRect = containerElement?.getBoundingClientRect() ?? { top: 0, left: 0, right: window.innerWidth }
                     const canvasWidth = (cRect.right ?? window.innerWidth) - cRect.left
 
                     const absTop = cRect.top + overlayOffset.top + adjustedTop
                     const absLeft = cRect.left + overlayOffset.left + targetData.rect.left
 
-                    // Determine layout space
-                    const toolbarHeight = textEditingData ? 48 : 0
-                    const neededSpaceBelow = POPOVER_EST_HEIGHT + 8 + (textEditingData && ((absTop - 12) < 48) ? 48 : 0)
-                    const availableSpaceBelow = window.innerHeight - (absTop + targetData.rect.height)
-
-                    // Prefer showing BELOW unless there is no space below AND there is enough space above
-                    let showBelow = true
-                    if (availableSpaceBelow < neededSpaceBelow) {
-                        const neededSpaceAbove = POPOVER_EST_HEIGHT + toolbarHeight
-                        if (absTop - 12 >= neededSpaceAbove) {
-                            showBelow = false
-                        }
-                    }
-
-                    // Center horizontally within canvas, but don't spill off screen
-                    const popoverWidth = Math.min(360, canvasWidth - 16)
-                    let popoverLeft = absLeft + (targetData.rect.width / 2) - (popoverWidth / 2)
-                    const minLeft = cRect.left + 8
-                    const maxLeft = cRect.left + canvasWidth - popoverWidth - 8
-                    popoverLeft = Math.max(minLeft, Math.min(popoverLeft, maxLeft))
-
+                    // the field under the pointer, else the one matched exactly by the text being edited
+                    const blockIndex = hoverData?.blockIndex ?? textEditingData?.blockIndex ?? -1
+                    const block = blockIndex >= 0 ? blocks[blockIndex] : undefined
+                    if (!block) return null
+                    const text = hoverData?.text ?? currentLiveTextRef.current ?? textEditingData?.originalText ?? ''
+                    const fieldPath = hoverData?.fieldPath ?? (textEditingData ? findStringFieldPath(block, text, text, [], true) : null)
+                    const stored = fieldPath ? getValueAtPath(block as Record<string, unknown>, fieldPath) : undefined
+                    const element = textElement({ block, blockIndex, fieldPath, value: typeof stored === 'string' ? stored : text, pageId })
                     return (
-                        <div
-                            data-inline-edit-popover
-                            className="z-[210] pointer-events-auto"
-                            style={showBelow ? {
-                                position: 'fixed',
-                                top: absTop + targetData.rect.height + 8 + (textEditingData && absTop - 12 < 48 ? 48 : 0), // Push down further if toolbar shifted below
-                                left: popoverLeft,
-                                width: popoverWidth,
-                            } : {
-                                position: 'fixed',
-                                top: absTop - 12 - (textEditingData ? 48 : 0), // Push up above the toolbar if text editing
-                                left: popoverLeft,
-                                transform: 'translateY(-100%)',
-                                width: popoverWidth,
-                            }}
-                            onMouseDown={(e) => e.stopPropagation()}
-                        >
-                            <InlineEditPopover
-                                blockType={targetData.blockType}
-                                currentText={textEditingData ? textEditingData.originalText : hoverData?.text || ''}
-                                isSubmitting={isSubmitting}
-                                isMobile={viewport === 'mobile'}
-                                onClose={() => setIsEditing(false)}
-                                onSubmit={handleInlineRewrite}
-                            />
-                        </div>
+                        <ElementAskLayer
+                            element={element}
+                            anchor={{ top: absTop, left: absLeft, width: targetData.rect.width, height: targetData.rect.height }}
+                            bounds={{ left: cRect.left, right: cRect.left + canvasWidth }}
+                            currentValue={element.value}
+                            onClose={() => setIsEditing(false)}
+                        />
                     )
                 })()}
 
@@ -1746,8 +1692,28 @@ function PreviewFrameInner({
                                 ...(viewport === 'mobile' ? { width: TOOLBAR_WIDTH } : {}),
                             }}
                         >
-                            <RichTextToolbar onCommand={handleExecCommand} activeState={wysiwygState} />
+                            <RichTextToolbar onCommand={handleExecCommand} activeState={wysiwygState} canAskAI={agentOn} />
                         </div>
+                    )
+                })()}
+
+                {/* Ask AI on a section or a picture → the copilot chat */}
+                {elementAsk && overlayOffset && (() => {
+                    const cRect = containerElement?.getBoundingClientRect() ?? { top: 0, left: 0, right: window.innerWidth }
+                    const anchor: ViewportRect = {
+                        top: cRect.top + overlayOffset.top + elementAsk.rect.top,
+                        left: cRect.left + overlayOffset.left + elementAsk.rect.left,
+                        width: elementAsk.rect.width,
+                        height: elementAsk.rect.height,
+                    }
+                    return (
+                        <ElementAskLayer
+                            element={elementAsk.element}
+                            anchor={anchor}
+                            bounds={{ left: cRect.left, right: cRect.right ?? window.innerWidth }}
+                            currentValue={elementAsk.element.kind === 'image' ? undefined : elementAsk.element.value}
+                            onClose={() => setElementAsk(null)}
+                        />
                     )
                 })()}
 
@@ -1772,6 +1738,15 @@ function PreviewFrameInner({
                             <ImageToolbar
                                 onImageSelect={handleImageReplace}
                                 isProcessing={isImageProcessing}
+                                onAskAI={agentOn && blocks[imageClickData.blockIndex] ? () => {
+                                    const block = blocks[imageClickData.blockIndex]!
+                                    const fieldPath = findStringFieldPath(block, imageClickData.src, imageClickData.src)
+                                    setElementAsk({
+                                        element: imageElement({ block, blockIndex: imageClickData.blockIndex, fieldPath, src: imageClickData.src, pageId }),
+                                        rect: imageClickData.rect,
+                                    })
+                                    setImageClickData(null)
+                                } : undefined}
                             />
                         </div>
                     )

@@ -551,6 +551,25 @@
         "explore": "Teroka CMS"
       }
     },
+    "v2Intro": {
+      "badge": "WebStore V2",
+      "title": "Kedai anda telah berpindah ke Web Store",
+      "description": "V2 kini satu-satunya tempat untuk mengurus kedai anda dan menerima data baharu. Data sedia ada anda telah dipindahkan ke kedai semasa anda.",
+      "getStarted": "Mula sekarang",
+      "close": "Tutup",
+      "videoComingSoon": "Video akan datang",
+      "loadingVideo": "Memuatkan video…",
+      "video": {
+        "play": "Main video",
+        "pause": "Jeda",
+        "replay": "Main semula",
+        "seek": "Cari kedudukan video",
+        "mute": "Senyapkan",
+        "unmute": "Nyahsenyap",
+        "fullScreen": "Skrin penuh",
+        "exitFullScreen": "Keluar skrin penuh"
+      }
+    },
     "step1Description": "Kongsi beberapa maklumat asas supaya AI boleh bina laman web yang sesuai untuk anda.",
     "generating": {
       "title": "Cipta laman web dengan AI",
@@ -558,6 +577,21 @@
       "startingMessage": "Mula membina laman web anda…",
       "creatingTitle": "Membina laman web anda…",
       "creatingSubtitle": "AI sedang menilai perniagaan anda dan membangunkan reka bentuk",
+      "stageBrief": "Ringkasan perniagaan",
+      "stageInsights": "Cadangan AI",
+      "insightStyle": "Gaya",
+      "insightPalette": "Palet",
+      "insightTypography": "Tipografi",
+      "styleModern": "Moden & Kemas",
+      "styleClassic": "Klasik & Elegan",
+      "previewReady": "Pratonton sedia",
+      "captionReading": "Membaca butiran perniagaan anda",
+      "captionStyle": "Memilih gaya yang sesuai dengan jenama anda",
+      "captionPlanning": "Merancang bahagian halaman anda",
+      "captionWriting": "Menulis kandungan untuk {name}",
+      "captionPainting": "Menggunakan warna, fon dan imej",
+      "captionAssembling": "Menyusun pratonton laman web anda",
+      "captionFinishing": "Menambah sentuhan akhir",
       "stepAnalyzing": "Menyemak butiran perniagaan anda",
       "stepGenerating": "Mencipta kandungan & reka bentuk",
       "stepPreparing": "Menyediakan pratonton",
@@ -602,6 +636,7 @@
       "copyFailed": "Tidak dapat menyalin pautan. Sila cuba lagi.",
       "yourWebsite": "Laman web anda",
       "previewPreparing": "Menyediakan pratonton anda...",
+      "draftBadge": "Draf",
       "savingDraft": "Menyimpan draf...",
       "savedAt": "Disimpan {time}",
       "saveFailed": "Tidak dapat menyimpan. Cuba lagi.",
@@ -610,7 +645,13 @@
       "generated": "dijana",
       "generationTime": "{seconds}s",
       "createdSuccessfully": "Laman web \"{name}\" siap digunakan!",
-      "viewPreviewHint": "Lihat pratonton di sebelah kanan, buka editor untuk membuat perubahan, atau terbitkan sekarang."
+      "viewPreviewHint": "Lihat pratonton di sebelah kanan, buka editor untuk membuat perubahan, atau terbitkan sekarang.",
+      "placeholdersTitle": "Gantikan sebelum anda menerbitkan",
+      "placeholdersHint": "Bahagian ini masih mengandungi kandungan contoh. Gantikan dengan maklumat sebenar anda di editor. Anda masih boleh menerbitkan pada bila-bila masa.",
+      "placeholdersMore": "+{count} lagi",
+      "finishShopTitle": "Siapkan kedai anda",
+      "finishShopDescription": "Produk anda belum ada stok atau foto sebenar. Pembantu akan meminta maklumat tersebut daripada anda.",
+      "finishShopButton": "Siapkan kedai anda"
     },
     "form": {
       "businessName": "Nama perniagaan",
@@ -630,8 +671,11 @@
       "promoStep1": "Masukkan butiran perniagaan anda",
       "promoStep2": "AI mencipta kandungan dan reka bentuk",
       "promoStep3": "Pratonton dan terbitkan",
+      "blueprintCaption": "AI membina templat ini daripada butiran anda",
+      "blueprintReady": "Sedia — AI bersedia membina laman web anda",
+      "blueprintCount": "{count} daripada 4 butiran ditambah",
       "industryOptions": {
-        "restaurant": "Restoran / kafe / F&B",
+        "restaurant": "Restoran / makan di tempat",
         "ecommerce": "Kedai / fesyen / e-dagang",
         "beauty": "Kecantikan / spa / kesejahteraan",
         "tech": "Teknologi / IT / SaaS",
@@ -641,7 +685,7 @@
         "fitness": "Gim / kecergasan / yoga",
         "creative": "Portfolio / freelancer / agensi",
         "business": "Perniagaan / korporat",
-        "fnb": "F&B / kafe / bakeri",
+        "fnb": "Kafe / bakeri / pencuci mulut",
         "events": "Acara / perkahwinan",
         "blog": "Blog / media / majalah",
         "travel": "Perjalanan / pelancongan"
@@ -653,10 +697,10 @@
         "products": "Sila terangkan produk atau perkhidmatan anda"
       },
       "tabManual": "Huraikan perniagaan",
-      "tabUrl": "Muat masuk dari URL",
-      "urlLabel": "URL laman web",
+      "tabUrl": "Import daripada pautan",
+      "urlLabel": "Pautan laman web, Instagram atau Facebook anda",
       "urlPlaceholder": "https://laman-web-anda.com",
-      "urlHint": "Tampal alamat laman web sedia ada anda.",
+      "urlHint": "Tampal alamat laman web, halaman Instagram atau Facebook anda. Kami hanya membaca maklumat yang terbuka kepada umum.",
       "extractButton": "Ekstrak",
       "extracting": "Sedang Mengekstrak...",
       "analyzingWebsite": "Menganalisis laman web...",
@@ -683,7 +727,38 @@
       "slugAvailable": "Tersedia",
       "slugChecking": "Menyemak ketersediaan…",
       "slugCheckError": "Tidak dapat menyemak nama. Cuba lagi.",
-      "slugHelperText": "Anda boleh tukar ini kemudian di Tetapan > Domain."
+      "slugHelperText": "Anda boleh tukar ini kemudian di Tetapan > Domain.",
+      "optionalLabel": "Pilihan",
+      "buyingMethodsLabel": "Bagaimana pelanggan membeli daripada anda?",
+      "buyingMethodsHint": "Laman web hanya akan menyebut cara yang anda pilih di sini.",
+      "buyingMethodOptions": {
+        "delivery": "Penghantaran",
+        "pickup": "Ambil sendiri",
+        "walk_in": "Datang terus ke kedai",
+        "booking": "Tempahan",
+        "cod": "Bayar semasa terima",
+        "online_payment": "Bayaran dalam talian"
+      },
+      "serviceAreaLabel": "Kawasan perkhidmatan anda",
+      "serviceAreaPlaceholder": "cth. Lembah Klang, Pulau Pinang",
+      "shopFactsLabel": "Fakta yang boleh kami nyatakan tentang kedai anda",
+      "shopFactsPlaceholder": "cth. Bermula pada 2019. Sijil halal (hanya jika benar). Menang Kafe Terbaik 2023.",
+      "shopFactsHint": "Tambah hanya yang benar. AI tidak akan mereka tahun, sijil atau anugerah.",
+      "extractionReview": {
+        "title": "Semak maklumat yang diekstrak",
+        "subtitle": "Ubah mana-mana medan sebelum dimasukkan ke dalam borang anda.",
+        "businessName": "Nama perniagaan",
+        "industry": "Industri",
+        "description": "Penerangan",
+        "products": "Produk / Perkhidmatan",
+        "skip": "Langkau & isi secara manual",
+        "apply": "Masukkan ke dalam borang",
+        "realContentTitle": "Kandungan sebenar ditemui",
+        "testimonialsFound": "{count} ulasan pelanggan",
+        "faqFound": "{count} jawapan soalan lazim",
+        "realContentNote": "Ini disalin daripada halaman anda dan digunakan pada laman web baharu anda seperti asal.",
+        "noRealContent": "Tiada ulasan pelanggan atau soalan lazim ditemui pada halaman itu, jadi tiada yang akan disalin."
+      }
     }
   },
   "email": {
@@ -1737,6 +1812,16 @@
         "aiChatSuggestion2": "Set sukan: kemeja-T RM 80, seluar pendek RM 60, 20 dalam stok setiap satu",
         "aiChatSuggestion3Label": "+ Kosmetik pukal",
         "aiChatSuggestion3": "Kosmetik pukal: gincu RM 35, krim muka RM 90, 15 dalam stok setiap satu",
+        "askAiLabel": "Terangkan produk untuk ditambah",
+        "askAiPlaceholder": "Terangkan produk untuk ditambah, cth. Jaket kulit RM 500, 10 dalam stok; Topi besbol RM 50…",
+        "askAiPlaceholderShort": "Terangkan produk untuk ditambah…",
+        "askAiSend": "Tanya AI",
+        "askAiTry": "Cuba:",
+        "askAiFromPhotos": "Daripada foto",
+        "askAiFromPhotosPrompt": "Cipta produk daripada foto yang saya lampirkan.",
+        "askAiExample": "3 gaun musim panas, RM 120 setiap satu",
+        "askAiExamplePrompt": "3 gaun musim panas, RM 120 setiap satu, saiz S–L",
+        "askAiDraftNote": "Disimpan sebagai draf untuk anda semak — tiada yang dijual sehingga anda luluskan",
         "aiChatBtn": "Jana Draf",
         "aiReviewTooltip": "Dicipta oleh AI — perlu semakan",
         "aiReviewAriaLabel": "Draf ciptaan AI menunggu semakan"
@@ -1967,6 +2052,11 @@
           "metaDescMax": "(maksimum 160 aksara)",
           "urlSlug": "URL slug",
           "urlSlugHint": "Biarkan kosong untuk jana daripada tajuk",
+          "aiSuggestion": "Cadangan AI",
+          "aiSuggestionNow": "Sekarang",
+          "aiSuggestionEmpty": "(kosong)",
+          "aiSuggestionUse": "Guna ini",
+          "aiSuggestionDiscard": "Buang",
           "color": "Warna",
           "size": "Saiz",
           "attributes": "Maklumat terperinci (atribut)",
@@ -2188,6 +2278,7 @@
       "fieldEmail": "Email",
       "fieldLatestDate": "Tarikh terkini",
       "timelineEntry": "Mesej",
+      "replySent": "Balasan dihantar",
       "loadDetailsFailed": "Gagal memuatkan butiran ini. Sila cuba lagi.",
       "sourceBadgeContact": "Borang maklum balas",
       "sourceBadgeNewsletter": "Langganan buletin utama",
@@ -2631,6 +2722,42 @@
           "topUp": "Tambah nilai"
         }
       },
+      "automations": {
+        "title": "Automasi",
+        "subtitle": "Setiap pagi (9:00 waktu Malaysia) pembantu menyemak kedai anda dan meninggalkan peringatan di loceng. Ketik peringatan untuk menyelesaikannya bersama pembantu.",
+        "ownerOnly": "Hanya pemilik atau admin boleh menukar automasi.",
+        "items": {
+          "discounts": { "title": "Kod diskaun", "desc": "Kod yang tamat dalam 3 hari, atau sudah habis digunakan tetapi masih dihidupkan." },
+          "stock": { "title": "Stok", "desc": "Produk aktif yang kehabisan stok atau hampir habis." },
+          "orders_waiting": { "title": "Pesanan menunggu", "desc": "Pesanan untuk disahkan, bukti pembayaran untuk disemak, dan pesanan disahkan yang belum dihantar selepas sehari." },
+          "leads": { "title": "Mesej belum dibalas", "desc": "Mesej borang hubungan yang tiada siapa balas selama dua hari." },
+          "site_health": { "title": "Kesihatan laman web", "desc": "Pautan rosak, perubahan belum diterbitkan dan halaman tanpa tajuk carian. Disemak pada hari Isnin." }
+        },
+        "digestTitle": "Ringkasan e-mel",
+        "digestDesc": "Satu e-mel dengan semua yang memerlukan anda, dihantar kepada pemilik dan admin. Dimatikan secara lalai.",
+        "frequency": "Kekerapan",
+        "daily": "Setiap hari",
+        "weekly": "Hari Isnin sahaja",
+        "quiet": "Senyap secara reka bentuk: paling banyak satu peringatan setiap semakan sehari, dan satu e-mel ringkasan.",
+        "save": "Simpan",
+        "saving": "Menyimpan...",
+        "saved": "Automasi disimpan.",
+        "saveFirst": "Simpan perubahan anda dahulu.",
+        "runNow": "Jalankan sekarang",
+        "running": "Menyemak...",
+        "previewTitle": "Apa yang akan dihantar sekarang",
+        "previewNote": "Pratonton sahaja: tiada apa dihantar dan tiada e-mel keluar.",
+        "previewEmpty": "Tiada apa yang memerlukan anda sekarang, jadi tiada peringatan akan dihantar.",
+        "fix": "Selesaikan dengan pembantu",
+        "mondayOnly": "Ditinggalkan untuk hari Isnin: {names}.",
+        "errors": {
+          "unauthorized": "Sila log masuk semula.",
+          "forbidden": "Hanya pemilik atau admin boleh menukar automasi.",
+          "invalid": "Tetapan itu tidak sah.",
+          "rate_limited": "Terlalu banyak semakan. Cuba lagi sebentar lagi.",
+          "failed": "Sesuatu tidak kena. Sila cuba lagi."
+        }
+      },
       "emailTemplates": {
         "title": "Templat e-mel",
         "subtitle": "Sesuaikan email pesanan dan akaun yang dihantar oleh kedai anda kepada pembeli dan diri anda. Perubahan hanya digunakan untuk kedai anda. Tetapan set semula kekal disimpan dan boleh dipulihkan pada bila-bila masa.",
@@ -3037,7 +3164,40 @@
         "generateFailed": "Tidak dapat menjana isi kandungan. Sila cuba lagi.",
         "noContentGenerated": "Tiada kandungan berjaya dijana. Sila cuba lagi",
         "authorLoading": "Memuat naik",
-        "authorFallback": "Pengguna"
+        "authorFallback": "Pengguna",
+        "aiTab": "Penulis AI",
+        "settingsTab": "Tetapan",
+        "aiMarkTag": "AI",
+        "aiUndoPart": "Buat asal bahagian ini",
+        "aiKeepPart": "Simpan",
+        "aiDraftTitle": "Draf AI dalam editor",
+        "aiEditTitle": "Perubahan AI pada catatan ini",
+        "aiPendingNote": "tiada yang disimpan sehingga anda simpannya.",
+        "aiAppliedTitle": "Perubahan AI digunakan",
+        "aiAppliedNote": "buat asal mana-mana bahagian, atau semuanya.",
+        "aiSavedTitle": "Draf AI disimpan sebagai catatan draf",
+        "aiSavedNote": "bahagian bertanda adalah daripada AI; ubah apa-apa, kemudian simpan.",
+        "aiKeepAll": "Simpan semua",
+        "aiDiscard": "Buang",
+        "aiAskChanges": "Minta perubahan",
+        "aiUndoAll": "Buat asal semua",
+        "aiDone": "Selesai",
+        "aiPartTitle": "tajuk",
+        "aiPartContent": "artikel",
+        "aiPartCover": "foto muka depan",
+        "aiPartSeo": "SEO",
+        "aiLocked": "Simpan atau buang draf AI dahulu",
+        "aiWriting": "AI sedang menulis — draf akan muncul di sini",
+        "aiSeoFill": "Tulis dengan AI",
+        "aiSeoWriting": "Menulis dalam bahasa catatan…",
+        "aiSeoFilled": "Diisi oleh AI",
+        "aiSeoUndo": "Buat asal",
+        "aiSeoFailed": "Teks SEO tidak dapat ditulis. Cuba lagi.",
+        "aiSeoNeedsText": "Tulis tajuk atau sedikit teks dahulu",
+        "aiKeepFailed": "Perubahan AI tidak dapat digunakan. Cuba lagi.",
+        "aiStale": "Perubahan AI ini dibuat daripada versi lama catatan, jadi tiada yang diubah.",
+        "aiAskAgain": "Tanya semula",
+        "aiSaveFirst": "Simpan suntingan anda dahulu — perubahan AI dibuat daripada catatan yang disimpan."
       },
       "categoryModal": {
         "title": "Urus kategori",
@@ -3096,6 +3256,25 @@
       },
       "noMatches": "Tiada pos yang ditemui berdasarkan pilihan carian anda",
       "resetFilters": "Set semula pilihan carian"
+    },
+    "agentChanged": {
+      "product": "Pembantu telah mengemas kini produk ini.",
+      "post": "Pembantu telah mengemas kini catatan ini.",
+      "discount": "Pembantu telah mengemas kini diskaun ini.",
+      "customer": "Pembantu telah mengemas kini pelanggan ini.",
+      "template": "Pembantu telah mengemas kini templat e-mel ini.",
+      "reload": "Muat semula",
+      "keepMine": "Kekalkan milik saya",
+      "loadLatest": "Muat yang terkini",
+      "saveAnyway": "Simpan juga milik saya (gantikan perubahan mereka)",
+      "conflict": {
+        "product": "Produk ini telah diubah selepas anda membukanya.",
+        "post": "Catatan ini telah diubah selepas anda membukanya.",
+        "discount": "Diskaun ini telah diubah selepas anda membukanya.",
+        "customer": "Pelanggan ini telah diubah selepas anda membukanya.",
+        "template": "Templat e-mel ini telah diubah selepas anda membukanya."
+      },
+      "changedElsewhere": "Diubah di tempat lain — dimuat semula"
     },
     "tenantAccessWatcher": {
       "sessionExpiredTitle": "Sesi tamat",
@@ -3342,6 +3521,35 @@
           "other": "{count} item"
         }
       },
+      "todo": {
+        "title": "Isu",
+        "subtitle": "Apa yang memerlukan perhatian anda sekarang",
+        "count": {
+          "one": "{count} isu",
+          "other": "{count} isu"
+        },
+        "emptyTitle": "Tiada isu sekarang",
+        "emptyDesc": "Pesanan, stok dan semakan laman web yang memerlukan anda akan dipaparkan di sini.",
+        "unavailableTitle": "Isu tidak tersedia",
+        "unavailableDesc": "Kami tidak dapat memuatkan isu anda buat masa ini. Sila cuba lagi kemudian.",
+        "askAi": "Tanya AI",
+        "askAiLabel": "Minta AI membantu: {title}",
+        "open": "Buka",
+        "openLabel": "Buka halaman untuk: {title}",
+        "more": "dan {count} lagi",
+        "openChat": "Buka sembang",
+        "openChatLabel": "Buka sembang untuk: {title}",
+        "group": {
+          "now": "Segera",
+          "you": "Perlukan anda",
+          "week": "Tidak lama lagi"
+        },
+        "severity": {
+          "high": "Segera",
+          "medium": "Tidak lama lagi",
+          "low": "Kemudian"
+        }
+      },
       "customize": {
         "button": "Sesuaikan",
         "title": "Sesuaikan papan pemuka",
@@ -3357,6 +3565,7 @@
         "moveDown": "Alih ke bawah",
         "close": "Tutup",
         "blockOnboarding": "Senarai semak permulaan",
+        "blockTodo": "Isu",
         "blockGlance": "Statistik sekilas pandang",
         "blockTraffic": "Trafik & prestasi",
         "blockSeo": "Kesihatan SEO",
@@ -3454,6 +3663,7 @@
       "passwordMinLength": "Kata laluan mestilah mengandungi sekurang-kurangnya 8 aksara",
       "timeout": "Proses mengambil masa terlalu lama. Sila cuba lagi.",
       "incorrect": "Email atau kata laluan tidak tepat. Sila cuba lagi.",
+      "otpSendFailed": "Tidak dapat menghantar kod pengesahan. Sila cuba lagi.",
       "connection": "Masalah rangkaian. Sila semak semula sambungan internet anda dan cuba lagi.",
       "serviceAccountUI": "Akaun perkhidmatan tidak boleh di log masuk. Sila gunakan akaun peribadi.",
       "missingCredentials": "Sila masukkan email dan kata laluan anda",
@@ -3466,6 +3676,8 @@
     "loading": "Memuat Naik.....",
     "otpSentTitle": "Kod pengesahan telah dihantar.",
     "otpSentDesc": "Semak email anda untuk mendapatkan kod 6 digit.",
+    "otpAlreadySentTitle": "Kod pengesahan telah dihantar.",
+    "otpAlreadySentDesc": "Gunakan kod yang kami e-melkan sebentar tadi.",
     "otpEmailIssue": "Penghantaran e-mel tertunda",
     "otpEmailIssueDesc": "Kod berjaya disimpan, namun sekiranya tidak mendapat E-mel. Sila klik semula \"Hantar Semula Kod\" pada skrin di halaman seterusnya.",
     "success": {
@@ -3619,8 +3831,23 @@
     "overview": {
       "title": "Pusat bantuan",
       "subtitle": "Pelajari cara menggunakan sistem pengurusan laman web anda.",
-      "welcomeTitle": "Selamat datang ke EchPrime!",
-      "welcomeDesc": "EchPrime membantu anda membina dan mengurus laman web profesional dengan AI. Cipta laman web, tulis artikel blog mesra SEO, serta jejak trafik dan prestasi laman web anda. Berikut ialah gambaran keseluruhan ciri-ciri utamanya.",
+      "welcomeTitle": "Selamat datang ke Web Store!",
+      "intro": {
+        "desc": "Web Store membantu anda membina dan mengurus laman web profesional dengan AI dalam beberapa minit.",
+        "lead1": "Tonton video 1 minit ini untuk mengetahui cara:",
+        "leadN": "Tonton video {n} minit ini untuk mengetahui cara:",
+        "points": [
+          "Cipta laman web & tulis blog mesra SEO",
+          "Jejak trafik dan prospek secara automatik",
+          "Sambungkan domain anda sendiri dalam 3 langkah"
+        ],
+        "durationChip": "{d} min",
+        "tag": "Lawatan ringkas",
+        "title": "Lawatan ringkas Web Store",
+        "resume": "Sambung video",
+        "error": "Video tidak dapat dimuatkan.",
+        "retry": "Cuba lagi"
+      },
       "featuresTitle": "Ciri utama",
       "features": {
         "dashboardTitle": "Papan pemuka",
@@ -3631,9 +3858,7 @@
         "blogDesc": "Tulis artikel blog mesra SEO untuk menarik lebih ramai pelanggan.",
         "settingsTitle": "Tetapan",
         "settingsDesc": "Sediakan domain anda dan jemput pentadbir lain."
-      },
-      "needHelpTitle": "Perlukan bantuan lanjut?",
-      "needHelpDesc": "Masih perlukan bantuan? Hubungi pasukan sokongan kami melalui WhatsApp atau email. "
+      }
     },
     "modules": {
       "lazyScreenshot": {
@@ -4135,13 +4360,17 @@
       "dismiss": "Tutup"
     },
     "compactLayout": {
-      "aiEditing": "AI sedang mengedit reka bentuk anda…",
+      "aiEditing": "AI sedang menyunting…",
       "openAIChat": "Buka Chat AI",
       "openChatAndTools": "Buka Chat AI & Alatan",
       "moveUp": "Alih Ke Atas",
       "moveDown": "Alih Ke Bawah",
       "deleteBlock": "Padam Blok",
-      "deletedBlock": "{type} dipadam"
+      "deletedBlock": "{type} dipadam",
+      "openTools": "Buka Alatan",
+      "stopFailed": "Tidak dapat menghentikan AI. Cuba lagi.",
+      "busy": "Mengemas kini reka bentuk anda…",
+      "stopAI": "Hentikan AI"
     },
     "toolbar": {
       "publish": "Terbitkan",
@@ -4163,6 +4392,8 @@
       "redo": "Ulang semula",
       "undoShortcut": "Undur (Cmd/Ctrl+Z)",
       "redoShortcut": "Ulang semula (Cmd/Ctrl+Shift+Z)",
+      "undoStepTooltip": "Buat asal: {label} (Ctrl/Cmd+Z)",
+      "redoStepTooltip": "Buat semula: {label} (Ctrl/Cmd+Shift+Z)",
       "openMenu": "Buka menu",
       "desktop": "Paparan utama",
       "mobile": "Mudah alih",
@@ -4237,7 +4468,13 @@
       "viewAction": "Lihat",
       "saveSuccess": "Perubahan disimpan",
       "manualSaveSuccess": "Disimpan!",
-      "saveFailed": "Tidak dapat menyimpan. Cuba lagi."
+      "saveFailed": "Tidak dapat menyimpan. Cuba lagi.",
+      "publishNeedsFix": "Lengkapkan ini sebelum menyiarkan",
+      "publishShowField": "Tunjuk",
+      "draftChanged": "Halaman ini telah diubah di tempat lain (tab lain atau perubahan AI yang diluluskan). Suntingan terbaru anda tidak disimpan — muat semula untuk teruskan dari versi terkini.",
+      "reloadAction": "Muat semula",
+      "keepMineAction": "Kekalkan versi saya",
+      "keepMineHint": "Kekalkan versi saya akan simpan suntingan anda menggantikan perubahan lain itu."
     },
     "maintenance": {
       "banner": "Laman web anda dalam mod penyelenggaraan. Pengunjung akan melihat halaman yang sedang diselenggara",
@@ -4279,6 +4516,7 @@
       "createPage": "Cipta halaman",
       "duplicatePage": "Halaman dengan nama atau URL ini sudah wujud",
       "invalidPageName": "Gunakan sekurang-kurangnya satu huruf atau nombor",
+      "reservedPage": "URL ini digunakan oleh sistem. Sila pilih nama halaman lain.",
       "editing404Page": "Menyunting halaman 404",
       "deleteInlineConfirm": "Padam “{name}”? Anda boleh buat asal dalam beberapa saat.",
       "pageShown": "{name} kini boleh dilihat",
@@ -4306,7 +4544,27 @@
       "inputPlaceholder": "Beritahu AI apa yang ingin diubah...",
       "send": "Hantar",
       "newLine": "baris baru",
-      "stopAI": "Hentikan AI"
+      "stopAI": "Hentikan AI",
+      "agentPageUpdated": "Pembantu telah mengemas kini halaman ini",
+      "agentChangeUndone": "Dibuat asal: {title}",
+      "themeUndoneLive": "Tema kembali pada laman langsung anda. Buat semula untuk mengembalikannya.",
+      "themeRedoneLive": "Tema pada laman langsung anda berubah semula. Buat asal untuk menariknya balik.",
+      "agentPagesUpdated": "Pembantu telah mengubah beberapa halaman",
+      "agentPagesListUpdated": "Pembantu telah mengemas kini halaman dan menu anda",
+      "agentNavUpdated": "Pembantu telah mengubah menu dan pengaki",
+      "agentLanguagesUpdated": "Pembantu telah menukar bahasa laman web",
+      "agentPublished": "Laman web anda kini dalam talian",
+      "agentThemeUpdated": "Pembantu telah mengemas kini tema anda",
+      "agentEditsReplaced": "Perubahan pembantu telah digunakan. Suntingan yang anda buat semasa ia sedang digunakan telah diganti — buat semula jika masih perlu.",
+      "agentSeoUpdated": "Pembantu telah mengemas kini SEO halaman ini",
+      "agentTranslationUpdated": "Pembantu telah menterjemah halaman ini",
+      "agentTranslationShown": "Pembantu telah menterjemah halaman ini — kini memaparkan terjemahan",
+      "agentTranslationNotAdded": "Pembantu telah menterjemah halaman ini ke {language}. Tambah {language} sebagai bahasa kedua (Menu → Bahasa pantas) untuk melihatnya pada halaman.",
+      "agentLocateMissing": "Bahagian ini muncul di halaman selepas anda meluluskan perubahan.",
+      "localeAutoTranslated": "AI telah menterjemah {count} bahagian ke {language}. Semak nama dan harga sebelum anda terbitkan.",
+      "undoTranslation": "Buat asal terjemahan",
+      "translationUndone": "Terjemahan dibuang. Bahagian itu menunjukkan teks asal.",
+      "localeTranslateFailed": "{count} bahagian halaman tidak dapat diterjemah ke {language}. Ia kekal dalam teks asal buat masa ini. Cuba lagi sebentar lagi, atau minta pembantu menterjemah halaman."
     },
     "menu": {
       "dashboard": "Papan pemuka",
@@ -5017,6 +5275,72 @@
     },
     "menuDrawer": {
       "defaultUserName": "Pengguna"
+    },
+    "elementAsk": {
+      "title": "Tanya AI",
+      "placeholder": "Apa yang perlu diubah?",
+      "now": "Kini:",
+      "hint": "Enter untuk hantar · Esc",
+      "send": "Hantar ke sembang AI",
+      "close": "Tutup",
+      "kinds": {
+        "text": "Teks",
+        "button": "Butang",
+        "image": "Gambar",
+        "section": "Bahagian",
+        "seo": "SEO",
+        "menu": "Menu",
+        "footer": "Footer",
+        "page": "Halaman"
+      },
+      "suggestions": {
+        "text": [
+          "Lebih ringkas",
+          "Lebih mesra",
+          "Terjemah ke bahasa Inggeris"
+        ],
+        "button": [
+          "Lebih ringkas",
+          "Nyatakan apa berlaku bila diklik",
+          "Terjemah ke bahasa Inggeris"
+        ],
+        "image": [
+          "Cari gambar yang lebih baik",
+          "Jana gambar baharu",
+          "Tulis teks alt"
+        ],
+        "section": [
+          "Tulis semula bahagian ini",
+          "Tambah gambar",
+          "Terjemah ke bahasa Inggeris"
+        ],
+        "seo": [
+          "Tulis tajuk dan penerangan",
+          "Lebih ringkas",
+          "Terjemah ke bahasa Inggeris"
+        ],
+        "menu": [
+          "Tambah item menu",
+          "Susun semula menu"
+        ],
+        "footer": [
+          "Tambah pautan hubungan",
+          "Tulis semula slogan"
+        ],
+        "page": [
+          "Baiki halaman ini",
+          "Tulis SEO",
+          "Terjemah ke bahasa Inggeris"
+        ]
+      },
+      "walker": {
+        "label": "Perubahan oleh pembantu",
+        "prev": "Perubahan sebelumnya",
+        "next": "Perubahan seterusnya",
+        "done": "Selesai",
+        "changed": "Diubah AI",
+        "missing": "Tiada lagi di halaman — mungkin telah dibuang."
+      }
     }
   },
   "previewPage": {
@@ -5061,6 +5385,7 @@
       "description": "Deskripsi",
       "sku": "SKU:",
       "outOfStock": "Stok habis",
+      "soldOut": "Habis dijual",
       "addToCart": "🛒 Tambah ke troli",
       "selectVariant": "Pilih varian",
       "allProducts": "Semua produk",
@@ -5305,6 +5630,380 @@
       "uploadFailed": "Tidak dapat memuat naik gambar anda. Guna fail JPG atau PNG di bawah 5MB dan cuba lagi.",
       "saveFailed": "Tidak dapat menyimpan profil anda. Semak sambungan anda dan cuba lagi.",
       "networkError": "Ralat rangkaian. Sila cuba lagi."
+    }
+  },
+  "landingV2": {
+    "nav": {
+      "menu": "Menu utama",
+      "items": {
+        "how": "Cara ia berfungsi",
+        "features": "Ciri-ciri",
+        "templates": "Templat",
+        "faq": "Soalan lazim"
+      },
+      "lang": "Tukar ke English",
+      "langName": "Bahasa Melayu",
+      "langLabel": "MY",
+      "signIn": "Log masuk",
+      "cta": "Mula secara percuma",
+      "toggle": "Buka atau tutup menu",
+      "skip": "Langkau ke kandungan"
+    },
+    "hero": {
+      "eyebrow": "Pembina laman web & kedai dalam talian berkuasa AI",
+      "t1": "Terangkan perniagaan anda.",
+      "t2": "AI membina kedai dalam talian anda.",
+      "sub": "Web Store menukar beberapa butiran tentang perniagaan anda menjadi kedai dalam talian yang lengkap dan mesra mudah alih — kemudian mengurus pembayaran, penghantaran dan setiap pesanan dari satu papan pemuka.",
+      "cta2": "Lihat cara ia berfungsi",
+      "trust": [
+        "Bahasa Inggeris & Bahasa Melayu",
+        "Pembayaran & penghantaran terbina dalam",
+        "56 templat sedia guna"
+      ],
+      "soon": "Video akan datang",
+      "seek": "Cari kedudukan",
+      "video": {
+        "watch": "Tonton pengenalan",
+        "play": "Main video",
+        "pause": "Jeda",
+        "replay": "Main semula",
+        "mute": "Senyapkan",
+        "unmute": "Nyahsenyap",
+        "fullscreen": "Skrin penuh",
+        "exitFullscreen": "Keluar skrin penuh"
+      }
+    },
+    "how": {
+      "label": "Cara ia berfungsi",
+      "title": "Dari idea ke pesanan pertama dalam tiga langkah",
+      "s1t": "Terangkan perniagaan anda",
+      "s1d": "Pilih industri anda, kemudian tambah nama perniagaan, penerangan ringkas dan apa yang anda jual.",
+      "mName": "Nama perniagaan",
+      "mNameV": "Kopi Senja",
+      "industries": [
+        "Restoran / kafe / F&B",
+        "Kedai / fesyen / e-dagang",
+        "Kecantikan / spa / kesejahteraan",
+        "Kesihatan / pergigian / klinik"
+      ],
+      "s2t": "AI mencipta laman web anda",
+      "s2d": "AI menulis kandungan dan menyusun setiap bahagian. Ubah apa sahaja dalam editor visual, atau minta sahaja kepada AI.",
+      "mGen": "Mencipta laman web anda...",
+      "genSteps": [
+        "Menyemak maklumat perniagaan anda",
+        "Mencipta kandungan & reka bentuk",
+        "Menyediakan pratonton"
+      ],
+      "s3t": "Terbitkan dan mula menjual",
+      "s3d": "Terbitkan laman anda, terima bayaran kad, FPX dan DuitNow QR, dan hantar pesanan dengan EasyParcel.",
+      "mLive": "Aktif",
+      "mPay": "Bayaran diterima · Pesanan #1042"
+    },
+    "feat": {
+      "label": "Ciri-ciri",
+      "title": "Semua yang anda perlukan untuk menjual dalam talian, di satu tempat",
+      "sub": "Bina laman anda, terima bayaran, hantar pesanan dan kembangkan perniagaan — tanpa perlu menggunakan banyak alat berasingan.",
+      "aiT": "Pembina laman web AI",
+      "aiD": "Jawab empat soalan dan dapatkan laman web lengkap yang mesra mudah alih, ditulis khusus untuk perniagaan anda.",
+      "aiInd": "Restoran / kafe / F&B",
+      "aiBrief": "Kopi istimewa dan kuih di Bangsar. Makan di kedai, bungkus dan pesanan dalam talian.",
+      "edT": "Editor visual",
+      "edD": "Klik mana-mana teks untuk mengeditnya, seret blok untuk menyusun semula dan buat asal sebarang perubahan.",
+      "edSample": "Kopi segar, setiap pagi",
+      "agT": "ECH Agent",
+      "agD": "Setiap hari ia menyenaraikan perkara yang memerlukan perhatian anda dan menyediakan penyelesaiannya. Tiada apa yang berubah sehingga anda meluluskannya.",
+      "agQ1": "3 pesanan menunggu pengesahan",
+      "agQ1f": "paling lama menunggu 2 jam",
+      "agQ1go": "Sahkan pesanan",
+      "agQ2": "2 produk hampir habis",
+      "agQ2f": "kurang daripada 10 lagi",
+      "agQ2go": "Lihat senarai",
+      "payT": "Kaedah pembayaran tempatan",
+      "payD": "Kad dan FPX melalui Stripe, serta DuitNow QR dan tunai semasa penghantaran.",
+      "payChips": [
+        "Kad",
+        "FPX",
+        "DuitNow QR",
+        "COD"
+      ],
+      "payNote": "Dana terus ke akaun bank anda",
+      "shipT": "Penghantaran dengan EasyParcel",
+      "shipD": "Pilih kurier, tempah pengambilan atau serahan di kaunter dan cetak label terus dari pesanan. Atau uruskan penghantaran sendiri.",
+      "shipM1": "Label sedia",
+      "shipM2": "Pengambilan ditempah",
+      "ordT": "Pesanan, pelanggan & diskaun",
+      "ordD": "Sahkan, penuhi dan bayar balik pesanan, lihat sejarah setiap pelanggan dan cipta kod diskaun.",
+      "ordRows": [
+        [
+          "#1042",
+          "Dibayar"
+        ],
+        [
+          "#1041",
+          "Untuk disahkan"
+        ],
+        [
+          "#1040",
+          "Dihantar"
+        ]
+      ],
+      "ordCode": "RAYA10 · diskaun 10%",
+      "seoT": "Kesihatan SEO",
+      "seoD": "Lihat prestasi laman anda dalam carian dan apa yang perlu dibetulkan seterusnya.",
+      "tplT": "56 templat, 14 industri",
+      "tplD": "Mulakan dengan reka bentuk untuk industri anda dan tukar pada bila-bila masa.",
+      "langT": "Bahasa Inggeris & Bahasa Melayu",
+      "langD": "Tukar seluruh papan pemuka anda antara Bahasa Inggeris dan Bahasa Melayu.",
+      "notT": "Pemberitahuan masa nyata",
+      "notD": "Ketahui tentang pesanan baharu, stok rendah dan pembayaran gagal sebaik sahaja ia berlaku.",
+      "notM1": "Pesanan baharu",
+      "notM2": "Amaran stok rendah"
+    },
+    "deep": {
+      "editor": {
+        "label": "Editor AI",
+        "title": "Edit seperti dokumen. Tanya seperti berbual.",
+        "sub": "Setiap bahagian laman anda boleh diedit terus, dan AI sentiasa sedia apabila anda lebih suka menerangkan perubahan.",
+        "points": [
+          "Seret komponen ke halaman, atau klik untuk menambahnya",
+          "Edit teks terus dengan bar alat pemformatan penuh",
+          "Pilih daripada 12 susun atur hero",
+          "Minta AI menulis semula satu bahagian atau satu ayat",
+          "Buat asal dan buat semula apa sahaja, pratonton pada desktop dan mudah alih"
+        ]
+      },
+      "agent": {
+        "label": "ECH Agent",
+        "title": "Pembantu yang tahu apa yang diperlukan kedai anda hari ini",
+        "sub": "ECH Agent membaca pesanan dan stok anda, kemudian memberi anda senarai tugasan ringkas dengan penyelesaian yang sudah disediakan.",
+        "points": [
+          "Senarai kerja harian: pesanan untuk disahkan, produk yang habis stok atau hampir habis",
+          "Menyediakan perubahan — tambah stok, nyahaktifkan, sahkan — dan menunggu klik anda",
+          "Perubahan produk boleh dibuat asal dalam tempoh 7 hari"
+        ]
+      },
+      "sell": {
+        "label": "Jual & hantar",
+        "title": "Terima bayaran dan hantar pesanan, semua di satu tempat",
+        "sub": "Sambungkan akaun pembayaran dan kurier yang anda sudah gunakan. Pesanan, pelanggan dan kod diskaun berada dalam papan pemuka yang sama.",
+        "points": [
+          "Pembayaran kad dan FPX melalui Stripe",
+          "Pindahan bank DuitNow QR dan tunai semasa penghantaran",
+          "Tempah kurier EasyParcel dan cetak label terus dari pesanan",
+          "Sahkan, penuhi dan bayar balik pesanan",
+          "Profil pelanggan dan kod diskaun"
+        ]
+      },
+      "seo": {
+        "label": "Mudah ditemui",
+        "title": "Mudah ditemui di Google",
+        "sub": "Semak kesihatan SEO anda, betulkan apa yang kurang dan terbitkan kandungan baharu dengan penulis blog AI.",
+        "points": [
+          "Gambaran keseluruhan kesihatan SEO yang menunjukkan apa yang perlu dibetulkan",
+          "AI menulis catatan blog, tajuk SEO dan penerangan meta"
+        ]
+      }
+    },
+    "templates": {
+      "label": "Templat",
+      "title": "56 templat untuk 14 industri",
+      "sub": "Mulakan dengan reka bentuk yang dibuat untuk perniagaan anda. Tukar pada bila-bila masa — teks dan imej anda dikekalkan jika boleh.",
+      "cta": "Lihat semua templat",
+      "cats": {
+        "all": "Semua",
+        "restaurant": "Restoran",
+        "ecommerce": "E-dagang",
+        "beauty": "Kecantikan",
+        "tech": "Teknologi",
+        "health": "Kesihatan",
+        "education": "Pendidikan",
+        "realestate": "Hartanah",
+        "fitness": "Kecergasan",
+        "creative": "Kreatif",
+        "business": "Perniagaan",
+        "fnb": "Kafe & bakeri",
+        "events": "Acara",
+        "blog": "Blog",
+        "travel": "Pelancongan"
+      },
+      "prev": "Templat sebelumnya",
+      "next": "Templat seterusnya"
+    },
+    "faq": {
+      "label": "Soalan lazim",
+      "title": "Soalan lazim",
+      "sub": "Semua yang perlu anda tahu sebelum bermula. Panduan langkah demi langkah tersedia di Pusat Bantuan selepas anda log masuk.",
+      "groups": [
+        {
+          "id": "start",
+          "name": "Bermula",
+          "items": [
+            {
+              "q": "Adakah saya perlu kemahiran reka bentuk atau pengekodan?",
+              "a": "Tidak. Terangkan perniagaan anda dan AI akan membina laman web. Kemudian edit secara visual — klik teks untuk mengubahnya, seret blok untuk mengalihkannya."
+            },
+            {
+              "q": "Bagaimana AI membina laman web saya?",
+              "a": "Masukkan nama perniagaan anda, pilih industri dan terangkan apa yang anda jual. AI akan menghasilkan laman web lengkap dalam masa kira-kira 30–60 saat."
+            },
+            {
+              "q": "Boleh saya sunting apa yang dibina oleh AI?",
+              "a": "Ya. Tukar teks, imej, bahagian, warna dan fon dalam editor visual, atau minta AI menulis semula mana-mana bahagian untuk anda."
+            },
+            {
+              "q": "Adakah laman web saya berfungsi pada telefon?",
+              "a": "Ya. Setiap laman web responsif sepenuhnya, dan anda boleh pratonton paparan desktop dan mudah alih sebelum menerbitkannya."
+            },
+            {
+              "q": "Bolehkah saya menukar templat kemudian?",
+              "a": "Ya. Pilih mana-mana daripada 56 templat dalam editor. Susun atur dan tema baharu akan digunakan, dan teks serta imej anda dikekalkan jika boleh."
+            },
+            {
+              "q": "Berapakah kosnya?",
+              "a": "Anda boleh bermula secara percuma — tanpa perlu kemahiran reka bentuk atau pengekodan."
+            }
+          ]
+        },
+        {
+          "id": "sell",
+          "name": "Jualan & pesanan",
+          "items": [
+            {
+              "q": "Kaedah pembayaran apa yang boleh digunakan pelanggan saya?",
+              "a": "Kad dan FPX melalui Stripe, serta pindahan bank DuitNow QR dan tunai semasa penghantaran. Bayaran dalam talian dimasukkan terus ke akaun bank anda yang dipautkan."
+            },
+            {
+              "q": "Bagaimanakah penghantaran berfungsi?",
+              "a": "Sambungkan EasyParcel untuk memilih kurier, menempah pengambilan atau serahan di kaunter dan mencetak label terus dari pesanan anda, dengan penjejakan untuk setiap bungkusan. Anda juga boleh menghantar sendiri dan memasukkan nombor penjejakan."
+            },
+            {
+              "q": "Apakah yang dilakukan oleh ECH Agent?",
+              "a": "Ia menyemak kedai anda setiap hari dan menyenaraikan perkara yang memerlukan perhatian — pesanan untuk disahkan, produk yang habis stok atau hampir habis. Ia menyediakan perubahan, dan tiada apa yang dilaksanakan sehingga anda meluluskannya."
+            },
+            {
+              "q": "Boleh pasukan saya membantu mengurus kedai?",
+              "a": "Ya. Jemput staf melalui email dari Tetapan dan berikan setiap orang peranan Viewer atau Manager."
+            }
+          ]
+        },
+        {
+          "id": "grow",
+          "name": "Domain & pertumbuhan",
+          "items": [
+            {
+              "q": "Boleh saya guna domain sendiri?",
+              "a": "Ya. Tambah domain anda di Tetapan → Domain, kemudian kemas kini rekod DNS di penyedia domain anda. Perubahan biasanya berkuat kuasa dalam masa 15 minit hingga 48 jam."
+            },
+            {
+              "q": "Bagaimana Web Store membantu SEO saya?",
+              "a": "Widget kesihatan SEO menilai laman anda dan menunjukkan isu seperti tajuk meta yang hilang atau imej yang tidak dioptimumkan. Dengan satu klik, AI boleh membaikinya untuk anda."
+            },
+            {
+              "q": "Boleh AI menulis catatan blog untuk saya?",
+              "a": "Ya. Masukkan topik dan pilih nada — profesional, mesra atau memujuk — dan AI akan menyediakan tajuk, rangka kandungan dan meta SEO untuk anda."
+            },
+            {
+              "q": "Bolehkah saya menggunakan Web Store dalam Bahasa Melayu?",
+              "a": "Ya. Tukar papan pemuka antara Bahasa Inggeris dan Bahasa Melayu pada bila-bila masa."
+            }
+          ]
+        }
+      ]
+    },
+    "final": {
+      "title": "Bersedia untuk membuka kedai dalam talian anda?",
+      "sub": "Mulakan secara percuma dan biarkan AI membina versi pertama kedai anda.",
+      "cta": "Mula secara percuma"
+    },
+    "footer": {
+      "tagline": "Pembina laman web AI dan kedai dalam talian untuk perniagaan yang sedang berkembang.",
+      "rights": "© 2026 Web Store. Hak cipta terpelihara."
+    },
+    "tour": {
+      "label": "Jelajah produk",
+      "title": "Satu platform, dari draf pertama hingga jualan harian",
+      "sub": "Lihat bagaimana setiap bahagian Web Store berfungsi bersama."
+    },
+    "theme": {
+      "toLight": "Tukar ke tema cerah",
+      "toDark": "Tukar ke tema gelap"
+    },
+    "mock": {
+      "ship": {
+        "parcel": "Pesanan #1042 · 1.2 kg",
+        "to": "Ke Petaling Jaya, Selangor"
+      },
+      "ord": {
+        "amounts": [
+          "RM 48.00",
+          "RM 126.50",
+          "RM 32.00"
+        ]
+      },
+      "seo": {
+        "r1": "Tajuk & penerangan halaman",
+        "r2": "3 imej perlukan teks alt",
+        "health": "Kesihatan SEO"
+      },
+      "lang": {
+        "sample": "Orders",
+        "sampleMs": "Pesanan"
+      },
+      "notif": {
+        "m1": "#1042 · RM 48.00 · FPX",
+        "m2": "Kopi Arabica 250g · tinggal 6",
+        "now": "Baru sahaja",
+        "ago": "5 minit lalu"
+      },
+      "ed": {
+        "hero": "Hero",
+        "dup": "Pendua",
+        "ai": "Edit dengan AI",
+        "ask": "Jadikan tajuk lebih mesra",
+        "done": "Tajuk dikemas kini",
+        "from": "Kopi segar, setiap pagi",
+        "to": "Kopi pagi anda, dibancuh dengan kasih sayang",
+        "undo": "Buat asal",
+        "keep": "Simpan",
+        "input": "Minta AI ubah apa sahaja…",
+        "small": "Kopi istimewa & kuih di Bangsar",
+        "btn": "Pesan sekarang"
+      },
+      "ag": {
+        "cap": "Kerja hari ini",
+        "q3": "1 produk habis stok",
+        "q3f": "Kopi Arabica 250g",
+        "q3go": "Tambah stok",
+        "appr": "Menunggu kelulusan anda",
+        "item": "Kopi Arabica 250g",
+        "edit": "Edit · inventori",
+        "approve": "Luluskan",
+        "undo": "Boleh dibuat asal dalam 7 hari"
+      },
+      "sell": {
+        "items": "2 item",
+        "paid": "Dibayar · FPX",
+        "label": "Label EasyParcel sedia",
+        "l1": "Kopi Senja adunan rumah 250g",
+        "l2": "Kotak kuih lapis (6 keping)",
+        "methods": "Kaedah pembayaran",
+        "stripe": "Kad · FPX",
+        "duitnow": "Pindahan bank",
+        "cod": "Tunai semasa penghantaran",
+        "total": "RM 48.00"
+      },
+      "seoD": {
+        "cap": "Kesihatan SEO",
+        "ok1": "Tajuk ditetapkan pada setiap halaman",
+        "ok2": "Penerangan meta sudah ditulis",
+        "warn": "3 imej perlukan teks alt",
+        "blog": "Penulis blog AI",
+        "topic": "Topik",
+        "topicV": "Tempat kopi terbaik di Bangsar",
+        "title": "Tajuk dijana",
+        "titleV": "Tempat Warga Bangsar Minum Kopi Pagi: Panduan Orang Tempatan",
+        "gen": "Jana"
+      }
     }
   }
 }

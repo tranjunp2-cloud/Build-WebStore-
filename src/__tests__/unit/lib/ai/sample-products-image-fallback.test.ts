@@ -9,13 +9,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockSearchPhotos, mockUploadImageUrl, mockFindOrCreateCartonMedia, mockFindByID, mockGetProductImages, mockOpenAICreate } = vi.hoisted(() => ({
+const { mockSearchPhotos, mockUploadImageUrl, mockFindOrCreateCartonMedia, mockFindByID, mockGetProductImages, mockRunTask } = vi.hoisted(() => ({
     mockSearchPhotos: vi.fn(),
     mockUploadImageUrl: vi.fn(),
     mockFindOrCreateCartonMedia: vi.fn(),
     mockFindByID: vi.fn(),
     mockGetProductImages: vi.fn(),
-    mockOpenAICreate: vi.fn(),
+    mockRunTask: vi.fn(),
 }))
 
 vi.mock('@/lib/ai/pixabay-client', () => ({
@@ -65,22 +65,22 @@ vi.mock('@/lib/images/industry-images', () => ({
 // while never running. businessInfo.industry = 'business' below, and the real
 // resolver returns 'business' for it — same category the spy used to force.
 
-vi.mock('@/lib/ai/config', () => ({
-    selectModel: vi.fn().mockReturnValue('gpt-4.1-nano'),
-}))
 
 // Prototype-based (not mockImplementation returning an object) — survives vi.clearAllMocks()
 // in beforeEach, matching the proven pattern in src/__tests__/api/ai.test.ts.
-vi.mock('openai', () => {
-    const OpenAI = vi.fn()
-    OpenAI.prototype.chat = { completions: { create: mockOpenAICreate } }
-    return { default: OpenAI }
-})
+vi.mock('@/lib/ai-platform/task-client', () => ({ getAiTaskClient: () => ({ runTask: mockRunTask }) }))
 
 import {
-    generateSampleProducts,
-    prepareSampleProducts,
+    generateSampleProducts as generateSampleProductsInScope,
+    prepareSampleProducts as prepareSampleProductsInScope,
 } from '@/lib/ai/generate-sample-products'
+import { runWithAiActor } from '@/lib/ai-platform/actor-scope'
+
+// The AI steps run only inside an AI actor scope (the migrated site's workspace owner).
+const ACTOR = { user: { id: 7 }, tenantId: '1', organizationId: 'org_1', role: 'owner' } as never
+const PLATFORM_USAGE = { model: 'test', inputTokens: 10, outputTokens: 5 }
+const generateSampleProducts: typeof generateSampleProductsInScope = (...args) => runWithAiActor(ACTOR, () => generateSampleProductsInScope(...args))
+const prepareSampleProducts: typeof prepareSampleProductsInScope = (...args) => runWithAiActor(ACTOR, () => prepareSampleProductsInScope(...args))
 
 const mockPayload = {
     findByID: mockFindByID,
@@ -108,14 +108,15 @@ beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     delete process.env.PIXABAY_FALLBACK_ONLY
     // Default: Tier-1 AI call fails, forcing the Tier-2 curated fallback path — matches this file's
-    // original behavior before mockOpenAICreate was extracted to a hoisted, per-test-overridable mock.
-    process.env.OPENAI_API_KEY = 'test-key'
-    mockOpenAICreate.mockRejectedValue(new Error('no openai'))
+    // original behavior before mockRunTask was extracted to a hoisted, per-test-overridable mock.
+    vi.stubEnv('AI_PLATFORM_URL', 'http://ai.internal:8300')
+    vi.stubEnv('AI_PLATFORM_CONTEXT_SECRET', 'test-context-secret-at-least-32-characters')
+    mockRunTask.mockRejectedValue(new Error('no openai'))
 })
 
 afterEach(() => {
     vi.restoreAllMocks()
-    delete process.env.OPENAI_API_KEY
+    vi.unstubAllEnvs()
 })
 
 describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
@@ -288,15 +289,13 @@ describe('[TC-F38-RES-08] deferred product image assignment', () => {
 
 describe('[TC-GENPERF-W3] bounded sample-product preparation', () => {
     it('[TC-GENPERF-W3-06] fills a partial AI result from curated data without a second model call', async () => {
-        mockOpenAICreate.mockResolvedValueOnce({
-            choices: [{ message: { content: JSON.stringify({ products: [{
+        mockRunTask.mockResolvedValueOnce({ output: { products: [{
                 name: 'AI Product',
                 shortDescription: 'Short desc',
                 description: 'Full desc',
                 price: 50,
                 imageKeyword: 'ai product',
-            }] }) } }],
-        })
+            }] }, usage: PLATFORM_USAGE })
         mockSearchPhotos.mockResolvedValue([])
         mockUploadImageUrl.mockResolvedValue(77)
         mockFindByID.mockResolvedValue({ id: 77 })
@@ -305,7 +304,7 @@ describe('[TC-GENPERF-W3] bounded sample-product preparation', () => {
 
         expect(products).toHaveLength(6)
         expect(products[0]!.name).toBe('AI Product')
-        expect(mockOpenAICreate).toHaveBeenCalledTimes(1)
+        expect(mockRunTask).toHaveBeenCalledTimes(1)
     })
 
     it('[TC-GENPERF-W3-07] caps image search at two six-second queries per product', async () => {
@@ -382,9 +381,7 @@ describe('[TC-GH1458-P2] AI-estimated weight/dimensions', () => {
     function mockAIResponse(products: Record<string, unknown>[]) {
         // 6 products so aiSucceeded=true with no top-up call needed (generateSampleProductsAI is
         // always called with count=6 first).
-        mockOpenAICreate.mockResolvedValueOnce({
-            choices: [{ message: { content: JSON.stringify({ products }) } }],
-        })
+        mockRunTask.mockResolvedValueOnce({ output: { products }, usage: PLATFORM_USAGE })
     }
 
     it('[TC-GH1458-P2-01] passes through AI-estimated weight/dimensions per product', async () => {
@@ -463,18 +460,68 @@ describe('[TC-GH1458-P2] AI-estimated weight/dimensions', () => {
         await generateSampleProducts(businessInfo, 'it', 'tenant-1', mockPayload)
 
         // Assert
-        const request = mockOpenAICreate.mock.calls[0]?.[0] as { messages?: Array<{ content?: string }> }
-        expect(request.messages?.[1]?.content).toContain('Write product names and customer-facing descriptions in Italian.')
+        const request = mockRunTask.mock.calls[0]?.[1] as { user?: string }
+        expect(request?.user).toContain('Write product names and customer-facing descriptions in Italian.')
     })
 
     it('[TC-F26-11-04] does not inject English curated products when Italian AI generation fails', async () => {
         // Arrange
-        mockOpenAICreate.mockRejectedValue(new Error('OpenAI unavailable'))
+        mockRunTask.mockRejectedValue(new Error('OpenAI unavailable'))
 
         // Act
         const { products } = await generateSampleProducts(businessInfo, 'it', 'tenant-1', mockPayload)
 
         // Assert
         expect(products).toEqual([])
+    })
+})
+
+// ── #2103 A3 — exactly the merchant's listed products ────────────────────────
+describe('[TC-AIAUD-028..030] prepareSampleProducts — merchant list is the catalogue (#2103 A3)', () => {
+    const LISTED = 'Kek lapis (whole RM65, half RM35), kuih raya box RM48, birthday from RM120'
+    const info = { businessName: 'Dapur Kak Yah', industry: 'business', products: LISTED }
+
+    it('[TC-AIAUD-028] creates exactly the 3 listed products with the merchant names and typed prices', async () => {
+        // Arrange — the model echoes different names and its own prices
+        mockRunTask.mockResolvedValueOnce({ output: { products: [
+            { name: 'Layer Cake Deluxe', shortDescription: 'S1', description: 'D1', price: 99, imageKeyword: 'layer cake' },
+            { name: 'Festive Cookie Tin', shortDescription: 'S2', description: 'D2', price: 77, imageKeyword: 'cookie tin' },
+            { name: 'Custom Cake', shortDescription: 'S3', description: 'D3', price: 55, imageKeyword: 'custom cake' },
+        ] }, usage: PLATFORM_USAGE })
+
+        // Act
+        const { products } = await prepareSampleProducts(info, 'en')
+
+        // Assert
+        expect(products.map((p) => [p.name, p.price])).toEqual([['Kek lapis', 65], ['kuih raya box', 48], ['birthday', 120]])
+        expect(products.map((p) => p.description)).toEqual(['D1', 'D2', 'D3'])
+        expect(products.map((p) => p.imageKeyword)).toEqual(['layer cake', 'cookie tin', 'custom cake'])
+        // stays active with stock 0 (storefront shows sold out)
+        expect(products.every((p) => p.status === 'active')).toBe(true)
+    })
+
+    it('[TC-AIAUD-029] never tops up from the curated library when the model returns fewer or fails', async () => {
+        mockRunTask.mockResolvedValueOnce({ output: { products: [
+            { name: 'x', shortDescription: 'S1', description: 'D1', price: 10, imageKeyword: 'k' },
+        ] }, usage: PLATFORM_USAGE })
+        const partial = await prepareSampleProducts(info, 'en')
+        expect(partial.products.map((p) => p.name)).toEqual(['Kek lapis', 'kuih raya box', 'birthday'])
+        expect(partial.products.map((p) => p.price)).toEqual([65, 48, 120])
+
+        mockRunTask.mockRejectedValue(new Error('model down'))
+        const failed = await prepareSampleProducts(info, 'en')
+        expect(failed.products.map((p) => p.name)).toEqual(['Kek lapis', 'kuih raya box', 'birthday'])
+        expect(failed.products.map((p) => p.price)).toEqual([65, 48, 120])
+        expect(JSON.stringify(failed.products)).not.toMatch(/Business Card|Notebook|Pen Set/)
+    })
+
+    it('[TC-AIAUD-030] caps at 20 listed products; with nothing listed the previous 6-product fallback stays', async () => {
+        const many = Array.from({ length: 25 }, (_, i) => `Item ${i + 1}`).join(', ')
+        const capped = await prepareSampleProducts({ ...info, products: many }, 'en')
+        expect(capped.products).toHaveLength(20)
+
+        const none = await prepareSampleProducts({ ...info, products: '' }, 'en')
+        expect(none.products).toHaveLength(6)
+        expect(['Business Card', 'Notebook', 'Pen Set', 'Folder', 'Stamp', 'Label']).toContain(none.products[0]!.name)
     })
 })

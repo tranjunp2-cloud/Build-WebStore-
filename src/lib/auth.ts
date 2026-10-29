@@ -3,14 +3,20 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextResponse } from 'next/server'
 import type { User } from 'payload'
+import { validateCsrf } from '@/lib/ai-platform/csrf'
 
 /**
  * Get the currently authenticated user from Payload CMS session.
  * Use this in Server Components and Route Handlers.
  *
+ * `requireMfa`: only a session that passed the OTP step counts. The token
+ * `POST /api/users/login` returns after the password alone (Payload's own
+ * token) has no `mfa_verified` claim; the middleware keeps it out of pages,
+ * but API routes are not behind the middleware.
+ *
  * @returns The user object or null if not authenticated
  */
-export async function getCurrentUser(req?: Request) {
+export async function getCurrentUser(req?: Request, options: { requireMfa?: boolean } = {}) {
     let token: string | undefined
 
     // 1. Try Authorization header first (for API calls)
@@ -40,6 +46,11 @@ export async function getCurrentUser(req?: Request) {
         })
 
         if (authResult?.user) {
+            if (options.requireMfa) {
+                const { decodeJwt } = await import('jose')
+                // payload.auth() already verified the signature; only the claim is read here
+                if (decodeJwt(token).mfa_verified !== true) return null
+            }
             return authResult.user
         }
 
@@ -140,9 +151,18 @@ export function withAuth<TContext extends { params: Promise<any> } = never>(
     handler: (user: User, req: Request, ctx: TContext) => Promise<NextResponse>,
     options?: {
         unauthorizedResponse?: (req: Request) => NextResponse
+        /**
+         * Same-origin check (Origin, else Referer, host must equal Host) before auth runs; a
+         * cross-site request gets 403. A request with neither header (server-to-server, scripts)
+         * passes and still needs a valid session. Opt-in: used by the /api/ai/* POST routes.
+         */
+        csrf?: boolean
     },
 ) {
     return async (req: Request, ctx: TContext): Promise<NextResponse> => {
+        if (options?.csrf && !validateCsrf(req)) {
+            return NextResponse.json({ error: 'CSRF verification failed.' }, { status: 403 })
+        }
         const user = await getCurrentUser(req)
         if (!user) {
             if (options?.unauthorizedResponse) {

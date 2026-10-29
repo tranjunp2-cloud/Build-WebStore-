@@ -21,6 +21,7 @@ const { bootstrapSeed } = require('./bootstrap-seed');
 const { seedMalaysiaGeo } = require('./seed-malaysia-geo-boot');
 const { runPw1MigrationSchema } = require('./pw1-migration-schema');
 const { runPw1JsonMigrationSchema } = require('./pw1-json-migration-schema');
+const { runPw1DeltaMigrationSchema } = require('./pw1-delta-migration-schema');
 const { runPw1EvidenceSchema } = require('./pw1-evidence-schema');
 const { runContentSlugTenantMigration } = require('./pw1-content-schema');
 // Matching collection DDL (atomic helper): ALTER TABLE products ALTER COLUMN short_description TYPE varchar;
@@ -5617,6 +5618,169 @@ CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY,
     name: 'users.sso_avatar_synced_at',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_avatar_synced_at timestamp(3) with time zone;`,
   },
+  // ── AI release (#1978): copilot, website languages, automations, apply receipts ──
+  // ── Contact Submissions: replies the shop sent (copilot "reply to a lead") — array table ──
+  {
+    name: 'contact_submissions_replies.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS contact_submissions_replies (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      subject varchar,
+      body varchar,
+      sent_at timestamp(3) with time zone,
+      sent_by varchar
+    );`,
+  },
+  {
+    name: 'contact_submissions_replies.alter_columns',
+    sql: `ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS subject varchar;
+      ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS body varchar;
+      ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS sent_at timestamp(3) with time zone;
+      ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS sent_by varchar;`,
+  },
+  {
+    name: 'contact_submissions_replies.indexes',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_replies_order_idx ON contact_submissions_replies (_order);
+      CREATE INDEX IF NOT EXISTS contact_submissions_replies_parent_id_idx ON contact_submissions_replies (_parent_id);`,
+  },
+  // Payload trash on blogs: a trashed post keeps its row with deleted_at set (restorable; AI copilot undo)
+  {
+    name: 'blogs.deleted_at',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS deleted_at timestamp(3) with time zone;`,
+  },
+  {
+    name: 'blogs.deleted_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_deleted_at_idx ON blogs(deleted_at);`,
+  },
+  // Copilot blog drafts: the change set that created the post (replay key of appliers/blog-draft.ts)
+  {
+    name: 'blogs.ai_change_set_id',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS ai_change_set_id varchar;`,
+  },
+  {
+    name: 'blogs.ai_change_set_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_ai_change_set_id_idx ON blogs(ai_change_set_id);`,
+  },
+  // Site-generator seed marker: the site's first publish promotes these drafts and clears it
+  {
+    name: 'blogs.ai_seeded',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS ai_seeded boolean DEFAULT false;`,
+  },
+  {
+    name: 'blogs.ai_seeded_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_ai_seeded_idx ON blogs(ai_seeded);`,
+  },
+  // ── Scheduled shop automations (cron /api/cron/shop-automations) ──
+  // Per-workspace switches + the cron's day markers: tenants.settings.automations (json).
+  {
+    name: 'tenants.settings_automations',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_automations jsonb;`,
+  },
+  // New notification type. The column is an enum when Payload created it (pushDevSchema) and a varchar when
+  // the table came from notifications.create_table above, so only extend the enum if it exists.
+  {
+    name: 'notifications.type_automation_reminder',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_notifications_type') THEN
+        ALTER TYPE enum_notifications_type ADD VALUE IF NOT EXISTS 'AUTOMATION_REMINDER';
+      END IF;
+    END $$;`,
+  },
+  // ── F26: the translations as published — locale_content is the editor's draft copy; the live
+  //    site reads this one, set on publish (empty until the next publish: the site shows as before) ──
+  {
+    name: 'pages.published_locale_content',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS published_locale_content jsonb DEFAULT '{}';`,
+  },
+  // Media owner workspace (AI copilot library + `media:<id>` ownership). Nullable: legacy rows keep NULL
+  // and are reachable only as pictures their workspace's sites, pages, products or blogs already use.
+  {
+    name: 'media.tenant_id',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'media.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS media_tenant_idx ON media (tenant_id);`,
+  },
+  // ── Editor draft revision: every content write (editor save, approved AI change, template)
+  // bumps it; a save made from an older revision is refused instead of overwriting (raw column,
+  // not a Payload field — read/written by src/lib/sites/editor-revision.ts) ──
+  {
+    name: 'sites.editor_revision',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS editor_revision integer NOT NULL DEFAULT 0;`,
+  },
+  {
+    name: 'pages.editor_revision',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS editor_revision integer NOT NULL DEFAULT 0;`,
+  },
+  // the editor save that made the last bump (NULL = an AI change / other writer): a save retried after
+  // its response was lost carries the same id and is let through instead of refused as stale
+  {
+    name: 'sites.editor_last_save_id',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS editor_last_save_id varchar(64);`,
+  },
+  {
+    name: 'pages.editor_last_save_id',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS editor_last_save_id varchar(64);`,
+  },
+  // ── Featured Products: the section's own pictures (shown while no product is on sale, and
+  // for a product without a photo) instead of the industry sample pictures — same rows as a gallery ──
+  {
+    name: 'pages_blocks_products_featured_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_products_featured_images" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      image_id integer, caption varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_products_featured_images.indexes',
+    sql: `CREATE INDEX IF NOT EXISTS pages_blocks_products_featured_images_order_idx ON "pages_blocks_products_featured_images" (_order);
+      CREATE INDEX IF NOT EXISTS pages_blocks_products_featured_images_parent_id_idx ON "pages_blocks_products_featured_images" (_parent_id);
+      CREATE INDEX IF NOT EXISTS pages_blocks_products_featured_images_image_idx ON "pages_blocks_products_featured_images" (image_id);`,
+  },
+  {
+    name: '_pages_v_blocks_products_featured_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_products_featured_images" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      image_id integer, caption varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_products_featured_images.indexes',
+    sql: `CREATE INDEX IF NOT EXISTS _pages_v_blocks_products_featured_images_order_idx ON "_pages_v_blocks_products_featured_images" (_order);
+      CREATE INDEX IF NOT EXISTS _pages_v_blocks_products_featured_images_parent_id_idx ON "_pages_v_blocks_products_featured_images" (_parent_id);
+      CREATE INDEX IF NOT EXISTS _pages_v_blocks_products_featured_images_image_idx ON "_pages_v_blocks_products_featured_images" (image_id);`,
+  },
+  // ── AI copilot apply receipts (raw table, not a Payload collection — read/written by
+  // src/lib/ai-platform/apply-receipts.ts). prime-web's own note that an approved change (or its
+  // undo) ran here, with the result: a retry re-sends it instead of applying twice, and the
+  // /api/cron/ai-receipts sweep records on ai-platform what it never heard about (recorded_at NULL) ──
+  {
+    name: 'ai_change_set_applies.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_change_set_applies (
+      change_set_id varchar PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      user_id varchar,
+      state varchar NOT NULL DEFAULT 'applying' CHECK (state IN ('applying', 'applied', 'reverted')),
+      result jsonb,
+      note text,
+      request_id varchar,
+      recorded_at timestamp(3) with time zone,
+      created_at timestamp(3) with time zone NOT NULL DEFAULT now(),
+      updated_at timestamp(3) with time zone NOT NULL DEFAULT now()
+    );`,
+  },
+  {
+    name: 'ai_change_set_applies.unrecorded_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_change_set_applies_unrecorded_idx ON ai_change_set_applies (updated_at) WHERE recorded_at IS NULL AND state IN ('applied', 'reverted');`,
+  },
 ];
 
 // PERF: cache applied migration names in a state table so subsequent builds
@@ -5673,6 +5837,7 @@ async function runMigrations(pool) {
   await runPw1MigrationSchema(pool);
   await runPw1JsonMigrationSchema(pool);
   await runPw1EvidenceSchema(pool);
+  await runPw1DeltaMigrationSchema(pool);
 
   console.log(
     `[db-setup] Migration summary: skipped=${skipped}, applied=${ran}, always-run=${alwaysRan}, failed=${failed}, total=${MIGRATIONS.length}`,

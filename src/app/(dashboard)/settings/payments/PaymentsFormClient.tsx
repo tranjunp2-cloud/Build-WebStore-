@@ -14,6 +14,7 @@ import { StripeConnectedBar } from './StripeConnectedBar';
 import { XenditConnectBlock } from './XenditConnectBlock';
 import { XenditConnectedBar } from './XenditConnectedBar';
 import { PaymentMethodCard } from './PaymentMethodCard';
+import { SaveBarLift } from '@/components/agent/save-bar-lift'
 
 type Media = {
     id: string | number;
@@ -982,9 +983,11 @@ export function PaymentsFormClient({
                 left edge with the content column (sidebar + p-8 gutter) at lg+. */}
             {isDirty && (
             <div
+                data-save-bar=""
                 className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"
                 style={{ background: 'var(--save-bar-bg)', boxShadow: 'var(--save-bar-shadow)' }}
             >
+                <SaveBarLift />
                 <div className="flex items-center gap-2 text-[13px]">
                     {isDirty ? (
                         <>

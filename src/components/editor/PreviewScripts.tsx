@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { type CanvasRevealHint, clearRevealRing, findRevealElement, scrollRevealIntoView, showRevealRing } from '@/lib/editor/reveal/canvas-reveal'
 
 const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 
@@ -38,12 +39,22 @@ export function PreviewScripts() {
         // Blocks whose images come from external product catalog — image editing not supported
         // Rich text owns image selection/replacement through its inline editor.
         const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid', 'custom-html', 'rich-text'])
+        // ...except a section's own pictures inside them (Featured Products while no product is on sale)
+        const isReadOnlyImage = (el: Element, blockType: string) => imageReadOnlyBlockTypes.has(blockType) && !el.hasAttribute('data-section-picture')
         // Mobile/tablet compact chrome (PreviewFrame sets ?compact=1 when disableDragDrop is
         // on) — inline WYSIWYG text editing is desktop-only per F05-v2; text on mobile/tablet
         // is edited via the block-settings sheet's fields instead. Image edit stays enabled.
         const isCompactPreview = new URLSearchParams(window.location.search).get('compact') === '1'
 
         let hoveredEl: HTMLElement | null = null
+        let lastLocateToken: string | null = null
+        /** A page section by index, or the menu / footer by type. */
+        const locateSection = (index?: number, blockType?: string): HTMLElement | null =>
+            (blockType
+                ? document.querySelector(`[data-block-type="${CSS.escape(blockType)}"]`)
+                : typeof index === 'number' && index >= 0
+                    ? document.querySelector(`[data-block-index="${index}"]:not([data-block-type="navigation"]):not([data-block-type="footer"])`)
+                    : null) as HTMLElement | null
         let hoverTimer: number | null = null
         let hoveredBlock: Element | null = null
 
@@ -123,7 +134,7 @@ export function PreviewScripts() {
                 // parent-frame IMAGE_HOVERED hint so it doesn't compete with the overlay button.
                 if (imgEl.closest('[data-media-overlay]')) return
                 const imgBlockType = blockContainer.getAttribute('data-block-type') || ''
-                if (!imageReadOnlyBlockTypes.has(imgBlockType)) {
+                if (!isReadOnlyImage(imgEl, imgBlockType)) {
                     if (hoverTimer) clearTimeout(hoverTimer)
                     hoverTimer = window.setTimeout(() => {
                         const rect = imgEl.getBoundingClientRect()
@@ -407,6 +418,7 @@ export function PreviewScripts() {
                 blockType: blockContainer.getAttribute('data-block-type') || '',
                 originalText: currentEditingEl.innerText?.trim() || '',
                 scrollY: window.scrollY,
+                shiftKey: e.shiftKey,
             }, parentOrigin)
             // Immediately push correct font/size/color state for the newly activated element
             postSelectionState()
@@ -580,7 +592,7 @@ export function PreviewScripts() {
                 if (!blockContainer) return null
                 const blockType = blockContainer.getAttribute('data-block-type')
                 if (blockType && excludedBlockTypes.includes(blockType)) return null
-                if (blockType && imageReadOnlyBlockTypes.has(blockType)) return null
+                if (blockType && isReadOnlyImage(el, blockType)) return null
                 return { blockContainer, blockType }
             }
 
@@ -610,6 +622,7 @@ export function PreviewScripts() {
                     window.parent.postMessage({
                         type: 'BLOCK_CONTAINER_CLICKED',
                         blockIndex,
+                        shiftKey: e.shiftKey,
                         layout: {
                             top: clickTop, left: rect.left,
                             width: rect.width, height: rect.height - clickTopDelta,
@@ -687,7 +700,8 @@ export function PreviewScripts() {
                     blockIndex,
                     blockType,
                     imageIndex,
-                    totalImagesInBlock
+                    totalImagesInBlock,
+                    shiftKey: e.shiftKey,
                 }, parentOrigin)
             }
         }
@@ -1173,6 +1187,30 @@ export function PreviewScripts() {
                         el.style.boxShadow = 'inset 0 0 0 2px #3b82f6'
                     }
                 }
+            }
+            // A copilot change shown on the canvas: scroll to the section (or menu / footer) and
+            // outline it for a moment. The editor sends it a few times while a page loads; the
+            // token makes only the first one that finds the element act.
+            // `hint` narrows it to the element inside (the button, the picture: lib/editor/reveal), `label`
+            // tags it ("AI changed · Hero · Button 1").
+            if (e.data?.type === 'AI_LOCATE') {
+                const { token, index, blockType, hint, label } = e.data as { token?: string; index?: number; blockType?: string; hint?: CanvasRevealHint; label?: string }
+                if (!token || token === lastLocateToken) return
+                const section = locateSection(index, blockType)
+                if (!section) return
+                lastLocateToken = token
+                const target = findRevealElement(section, hint ?? {})
+                scrollRevealIntoView(target)
+                showRevealRing(target, { label })
+                return
+            }
+            // A chat chip under the pointer: outline its element, no scroll, no tag; no index clears it.
+            if (e.data?.type === 'AI_HIGHLIGHT') {
+                const { index, hint } = e.data as { index?: number; hint?: CanvasRevealHint }
+                const section = typeof index === 'number' ? locateSection(index) : null
+                if (!section) return clearRevealRing()
+                showRevealRing(findRevealElement(section, hint ?? {}), { quiet: true, holdMs: Infinity })
+                return
             }
             if (e.data?.type === 'SCROLL_TO_BLOCK') {
                 const idx = e.data.index

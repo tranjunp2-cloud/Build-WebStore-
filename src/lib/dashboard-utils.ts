@@ -273,6 +273,7 @@ export function getMockRank(keyword: string): number {
  */
 export type DashboardBlockId = 'onboarding' | 'glance' | 'traffic' | 'seo' | 'orders'
 
+// the Issues block ('todo') is gone: issues live in the assistant's dock; a saved layout's 'todo' is dropped below
 const ALL_BLOCK_IDS: DashboardBlockId[] = ['onboarding', 'glance', 'traffic', 'seo', 'orders']
 
 /** Default visible blocks, in order. `orders` intentionally remains OFF by default. */

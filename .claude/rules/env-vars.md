@@ -47,6 +47,8 @@ Vercel Dashboard env vars → vercel pull (in CI) → .vercel/.env.staging.local
 Next CI run will `vercel pull` the new var into the runner automatically. No GitHub secret needed (unless it's a CI-tooling secret like `VERCEL_TOKEN`).
 
 **CI will block PR** if code uses `process.env.NEW_VAR` but env files are missing the key (`scripts/check-env-vars.js`).
+Exception: `WARN_ONLY_VARS` in that script (`AI_PLATFORM_URL`, `AI_PLATFORM_CONTEXT_SECRET`, `AI_AGENT_ENABLED`) only warn — AI is off without them, nothing crashes. Production values are gated at deploy time instead (`ci.yml` → `scripts/ci/ai-env-preflight.mjs`, see `vercel-deploy.md`).
+`services/ai-platform` has its own `services/ai-platform/.env.example` (its own Vercel project); CI does not check it.
 
 ## Env files structure
 
@@ -62,7 +64,11 @@ Next CI run will `vercel pull` the new var into the runner automatically. No Git
 | Secret | Service | Required for |
 |--------|---------|-------------|
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` | AWS SES | Email/OTP |
-| `OPENAI_API_KEY` | OpenAI | AI Builder, SEO auto-gen |
+| `AI_PLATFORM_URL` | ECH AI platform (`services/ai-platform`) | Every AI feature — https base URL of the ai-platform Vercel project, no trailing slash. prime-web holds no model keys (models are called only by ai-platform). Unset = AI off: onboarding rule-based, auto SEO stops, `/api/ai/*` 503 |
+| `AI_PLATFORM_CONTEXT_SECRET` | ECH AI platform | Signs the context token — 32+ chars (shorter = treated as unset), **same value** in the ai-platform project |
+| `AI_AGENT_ENABLED` | ECH AI platform | Copilot switch: unset = on outside production; `"false"` = off everywhere (kill switch); production on only when `"true"` |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis | Distributed rate limits (incl. AI copilot limits) |
+| `CRON_SECRET` | Vercel Cron | Bearer for `/api/cron/*` (missing = 401). Staging copy lives in GitHub secret `STAGING_CRON_SECRET` (see below) |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe | Payments |
 | `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | AWS S3 | File/media upload |
 | `PAYLOAD_SECRET` | Payload CMS | JWT signing |
@@ -75,6 +81,7 @@ Next CI run will `vercel pull` the new var into the runner automatically. No Git
 - NEVER commit real secrets to `.env.example` — use placeholders only
 - App env vars belong in **Vercel Dashboard**, not GitHub Secrets
 - GitHub Secrets only for: CI tooling (`VERCEL_TOKEN`, `BOT_*`, `GH_BOT_TOKEN`), test creds (`E2E_*`), bot routing (`LARK_WEBHOOK_*`)
+- Exception: `STAGING_CRON_SECRET` (GitHub secret) is a **copy** of the staging app `CRON_SECRET` (= staging ai-platform `CRON_SECRET`) used by `.github/workflows/ai-staging-cron.yml` — rotate all of them together
 - Local dev: copy `.env.example` → `.env.local`, fill real values OR run `vercel pull --environment=development`
 - Check Vercel env vars: `vercel env ls --token=$VERCEL_TOKEN`
 - Check GitHub secrets: `gh secret list`

@@ -1,7 +1,11 @@
 import { ScrollToTop } from '@/components/storefront/scroll-to-top'
+import { localizedSiteAndPage, siteBrand } from '@/lib/i18n/locale-display'
+import { getCachedPublishedTranslations, readPageTranslations } from '@/lib/i18n/page-translations'
+import { siteLanguagesOf, VISITOR_LANGUAGE_COOKIE, visitorLanguage } from '@/lib/site-languages'
+import { LiveLanguageProvider } from '@/components/site-renderer/live-language'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { getPayload } from 'payload'
 import { getCurrentUser } from '@/lib/auth'
 import config from '@payload-config'
@@ -349,7 +353,19 @@ export default async function TenantSitePage({ params }: Props) {
         notFound()
     }
 
-    const { site, page, pages, isOwner } = data
+    const { pages, isOwner } = data
+    // visitors get the site's primary language (Menu → Quick language): the pages as written plus
+    // that language's published copy — an owner looking at a site not yet live reads the draft one
+    // (release: Payload documents are untyped here, so the site's fields are named for the language helpers)
+    const siteDoc = data.site as unknown as Parameters<typeof siteLanguagesOf>[0] & Parameters<typeof localizedSiteAndPage>[0] & { id: string | number; status?: unknown; name?: unknown }
+    const draft = isOwner && siteDoc.status !== 'published'
+    const slots = draft
+        ? await readPageTranslations(data.page.id, 'draft')
+        : await getCachedPublishedTranslations(String(siteDoc.id), data.page.id)
+    // ...or the language the visitor chose in the menu's language switcher, when the site has it
+    const languages = siteLanguagesOf(siteDoc, draft ? 'edited' : 'live')
+    const language = visitorLanguage(languages, (await cookies()).get(VISITOR_LANGUAGE_COOKIE)?.value)
+    const { site, page } = localizedSiteAndPage(siteDoc, data.page as unknown as { layout?: unknown }, language, slots, siteBrand(siteDoc))
 
     // GH-727 Phase 03: resolve seeded IMAGE_LIBRARY → S3 mappings (best-effort, never throws).
     const payload = await getPayload({ config })
@@ -361,13 +377,15 @@ export default async function TenantSitePage({ params }: Props) {
     return (
         <>
         <ScrollToTop />
-        <SiteRenderer
-            site={{ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
-            page={page as unknown as PageData}
-            pages={pages as unknown as NavPage[]}
-            siteId={String(site.id)}
-            isOwner={isOwner}
-        />
+        <LiveLanguageProvider languages={languages} active={language}>
+            <SiteRenderer
+                site={{ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
+                page={page as unknown as PageData}
+                pages={pages as unknown as NavPage[]}
+                siteId={String(site.id)}
+                isOwner={isOwner}
+            />
+        </LiveLanguageProvider>
         </>
     )
 }

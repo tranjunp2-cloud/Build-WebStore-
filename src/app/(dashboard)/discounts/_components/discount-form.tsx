@@ -12,6 +12,10 @@ import { DiscountSaveBar } from './discount-save-bar'
 import { draftValueToStored } from '@/lib/discounts/draft-value'
 import { MAX_FIXED_DISCOUNT_RM } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
+import { useAgentRecordSync } from '@/lib/agent-changes/use-agent-record-sync'
+import { AgentChangedNotice, SaveConflictNotice } from '@/components/agent/agent-changed-notice'
+import { useSaveVersion } from '@/lib/save-version/use-save-version'
+import { toDiscountDoc } from '../_lib/to-discount-doc'
 
 export interface DiscountDoc {
     id: string
@@ -25,6 +29,7 @@ export interface DiscountDoc {
     startsAt?: string | null
     expiresAt?: string | null
     createdAt?: string
+    updatedAt?: string
 }
 
 interface DiscountFormProps {
@@ -79,13 +84,20 @@ const buildInit = (discount?: DiscountDoc): DiscountDraft => {
     }
 }
 
-export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
+export function DiscountForm({ discount: loaded, tenantName }: DiscountFormProps) {
     const router = useRouter()
     const { t, ti } = useI18n()
     const dv = t.dashboard.discounts.validation
     const dt = t.dashboard.discounts.toast
 
+    // The record on screen: the server-rendered one, replaced when the assistant changes it
+    const [discount, setDiscount] = useState(loaded)
+    useEffect(() => { setDiscount(loaded) }, [loaded])
     const isNew = !discount
+    // the discount's updatedAt as loaded: sent with each save so a newer change is never written over
+    const version = useSaveVersion(loaded?.updatedAt)
+    const setVersion = version.set
+    useEffect(() => { setVersion(discount?.updatedAt) }, [discount, setVersion])
 
     const init = useMemo(() => buildInit(discount), [discount])
     const [draft, setDraft] = useState<DiscountDraft>(init)
@@ -99,6 +111,22 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
     }, [])
 
     const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(init), [draft, init])
+
+    // Fetch the discount again; a new `discount` rebuilds `init`, which resets the draft. A deleted one leaves for the
+    // list, as the server page does. A failed background fetch keeps the form as it is.
+    const reload = useCallback(async () => {
+        if (!discount) return
+        try {
+            const res = await fetch(`/api/v1/discounts/${discount.id}`, { credentials: 'include' })
+            if (res.status === 404) { router.replace('/discounts'); return }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const json = await res.json()
+            setDiscount(toDiscountDoc(json.data))
+        } catch (err) {
+            console.error('[Discount reload]', err)
+        }
+    }, [discount?.id, router])
+    const sync = useAgentRecordSync({ kind: 'store_discount', id: discount?.id, dirty, reload })
 
     // Warn on unload when dirty
     useEffect(() => {
@@ -171,12 +199,13 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
             const res = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(isNew ? payload : { ...payload, expectedUpdatedAt: version.current() }),
             })
 
             const json = await res.json()
 
             if (!res.ok) {
+                if (version.refused(json)) return
                 if (json?.error?.code === 'DUPLICATE_CODE') {
                     setErrors((e) => ({ ...e, code: dt.duplicateCodeField }))
                     toast.error(dt.duplicateCode, { description: dt.duplicateCodeDesc })
@@ -185,6 +214,7 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 throw new Error(json?.error?.message ?? dt.saveFailed)
             }
 
+            version.set(json.data?.updatedAt)
             // Clear dirty before navigation to avoid beforeunload warning
             setDraft(init)
             toast.success(isNew ? dt.created : dt.saved)
@@ -209,6 +239,15 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
     // already used by ProductForm/customers-detail/shipping.
     return (
         <div className="flex flex-col min-h-0 pb-24">
+            {version.conflicted ? (
+                <div className="pb-4">
+                    <SaveConflictNotice record="discount" onLoadLatest={sync.reloadNow} onSaveAnyway={() => { version.overwrite(); void handleSave() }} />
+                </div>
+            ) : sync.stale && (
+                <div className="pb-4">
+                    <AgentChangedNotice record="discount" onReload={sync.reloadNow} onKeep={sync.keepMine} />
+                </div>
+            )}
             <DiscountFormHeader
                 isNew={isNew}
                 code={discount?.code}

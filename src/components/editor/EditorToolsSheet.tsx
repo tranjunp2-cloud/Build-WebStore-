@@ -1,10 +1,11 @@
 'use client'
 
-import type { ComponentProps } from 'react'
+import { useEffect, useState, type ComponentProps } from 'react'
 import { FileText, MessageCircle, Settings2, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
-import { AIChatPanel } from './AIChatPanel'
+import { EditorAiChatSlot } from './agent/EditorAiChatSlot'
+import { useEditorAgentEnabled } from './agent/editor-agent-context'
 import { BlockLibraryPanel } from './BlockLibraryPanel'
 import { PageManagerPanel } from './PageManagerPanel'
 import { SettingsPanel } from './SettingsPanel'
@@ -14,7 +15,7 @@ export type ToolsSheetTab = 'chat' | 'components' | 'pages' | 'settings'
 /** One prop bundle per hosted panel — built in page.tsx from the SAME handlers the
  * desktop sidebar/right-panel mounts already use (no forked business logic). */
 export interface ToolsSheetPanelProps {
-    chat: ComponentProps<typeof AIChatPanel>
+    chat: ComponentProps<typeof EditorAiChatSlot>
     components: ComponentProps<typeof BlockLibraryPanel>
     pages: ComponentProps<typeof PageManagerPanel>
     settings: ComponentProps<typeof SettingsPanel>
@@ -41,22 +42,36 @@ export interface EditorToolsSheetProps {
  */
 export function EditorToolsSheet({ open, activeTab, onTabChange, onClose, panelProps }: EditorToolsSheetProps) {
     const { t } = useI18n()
+    const agentOn = useEditorAgentEnabled()
+    const shownTab = !agentOn && activeTab === 'chat' ? 'components' : activeTab
+    // Once opened, the chat stays mounted (hidden) while the sheet is closed or on another tab, so a
+    // reply being written keeps going and the bottom bar can show it and stop it.
+    const chatShown = open && agentOn && shownTab === 'chat'
+    const [chatKept, setChatKept] = useState(false)
+    useEffect(() => {
+        if (chatShown) setChatKept(true)
+    }, [chatShown])
+    useEffect(() => {
+        if (!agentOn) setChatKept(false)
+    }, [agentOn])
 
-    if (!open) return null
+    if (!open && !(agentOn && chatKept)) return null
 
-    const visibleTabs = [
+    const allTabs = [
         { id: 'chat' as const, label: t.editor.sidebar.aiChat, icon: <MessageCircle className="h-4 w-4" aria-hidden /> },
         { id: 'components' as const, label: t.editor.sidebar.components, icon: <Zap className="h-4 w-4" aria-hidden /> },
         { id: 'pages' as const, label: t.editor.sidebar.pages, icon: <FileText className="h-4 w-4" aria-hidden /> },
         { id: 'settings' as const, label: t.editor.sidebar.settings, icon: <Settings2 className="h-4 w-4" aria-hidden /> },
     ]
+    // no AI chat tab when the assistant is off for this deployment
+    const visibleTabs = agentOn ? allTabs : allTabs.filter((tab) => tab.id !== 'chat')
 
     return (
         // Phase 06: ≥768 centers the sheet horizontally (`items-center`) instead of the
         // phone's edge-to-edge stretch; the panel itself carries the width/height cap
         // below. Both breakpoints sit flush against the bottom edge (top corners only,
         // no bottom margin). Phone (<768) is untouched (still `justify-end` stretch).
-        <div className="fixed inset-0 z-50 flex flex-col justify-end min-[768px]:items-center">
+        <div className={cn('fixed inset-0 z-50 flex flex-col justify-end min-[768px]:items-center', !open && 'hidden')}>
             <div
                 className="absolute inset-0 bg-black/60"
                 onClick={onClose}
@@ -80,11 +95,11 @@ export function EditorToolsSheet({ open, activeTab, onTabChange, onClose, panelP
                             type="button"
                             role="tab"
                             data-testid={`editor-tools-tab-${tab.id}`}
-                            aria-selected={activeTab === tab.id}
+                            aria-selected={shownTab === tab.id}
                             onClick={() => onTabChange(tab.id)}
                             className={cn(
                                 'relative flex min-h-[44px] flex-1 items-center justify-center gap-1.5 px-2 text-[11px] font-medium transition-colors min-[768px]:min-h-12 min-[768px]:gap-2 min-[768px]:px-3 min-[768px]:text-sm',
-                                activeTab === tab.id
+                                shownTab === tab.id
                                     ? "text-[hsl(var(--primary))] after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:rounded-full after:bg-[hsl(var(--primary))] after:content-['']"
                                     : 'rounded-lg text-[var(--editor-text-muted)] hover:bg-[var(--editor-overlay-hover)]',
                             )}
@@ -96,10 +111,14 @@ export function EditorToolsSheet({ open, activeTab, onTabChange, onClose, panelP
                 </div>
 
                 <div className="min-h-0 flex-1">
-                    {activeTab === 'chat' ? <AIChatPanel {...panelProps.chat} /> : null}
-                    {activeTab === 'components' ? <BlockLibraryPanel {...panelProps.components} /> : null}
-                    {activeTab === 'pages' ? <PageManagerPanel {...panelProps.pages} /> : null}
-                    {activeTab === 'settings' ? <SettingsPanel {...panelProps.settings} fullWidth /> : null}
+                    {chatShown || (agentOn && chatKept) ? (
+                        <div className={cn('h-full', shownTab !== 'chat' && 'hidden')}>
+                            <EditorAiChatSlot {...panelProps.chat} />
+                        </div>
+                    ) : null}
+                    {shownTab === 'components' ? <BlockLibraryPanel {...panelProps.components} /> : null}
+                    {shownTab === 'pages' ? <PageManagerPanel {...panelProps.pages} /> : null}
+                    {shownTab === 'settings' ? <SettingsPanel {...panelProps.settings} fullWidth /> : null}
                 </div>
             </div>
         </div>

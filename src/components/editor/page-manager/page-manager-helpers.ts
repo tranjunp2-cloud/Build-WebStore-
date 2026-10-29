@@ -1,5 +1,6 @@
 import { getDisplayPageTitle } from '@/store/editorStore'
 import type { PageData } from '@/store/editorStore'
+import { isReservedPageSlug } from '@/lib/utils/reserved-page-slugs'
 import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
 
 /** System pages (404) live in the footer section, never in the regular page list. */
@@ -84,7 +85,7 @@ export function getPageStatus(
     return { kind: 'draft', noLink: false, tooltip: draftBecauseSite ? labels.tooltipDraftSite : labels.tooltipDraft }
 }
 
-export type NewPageValidation = { slug: string; error: null | 'empty' | 'invalid' | 'duplicate' }
+export type NewPageValidation = { slug: string; error: null | 'empty' | 'invalid' | 'duplicate' | 'reserved' }
 
 /**
  * Client-side check for the "Add new page" form. Compares against every
@@ -96,6 +97,7 @@ export function validateNewPageTitle(title: string, pages: PageData[], locale: s
     const slug = slugifyPageTitle(name)
     if (!name) return { slug, error: 'empty' }
     if (!slug) return { slug, error: 'invalid' }
+    if (isReservedPageSlug(slug)) return { slug, error: 'reserved' }
 
     const lowerName = name.toLowerCase()
     const path = `/${slug}`

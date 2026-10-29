@@ -12,9 +12,11 @@ import { Heading, Body, Caption } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
+import { resolveGalleryImages } from '../gallery/resolve-images'
 import { handleCartClick } from '@/lib/storefront/editor-intercept'
 import type { ThemeConfig } from '../types'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
+import { soldOutLabel } from '../shared/sold-out-label'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 
@@ -32,6 +34,19 @@ interface FeaturedProduct {
     imageAlt?: string
     tags: string[]
     isFallback?: boolean
+    /** position in the section's own picture list (editor click-to-replace), for slides that are not products */
+    pictureIndex?: number
+}
+
+/** A product with nothing left still shows (the merchant chose it); it says so instead of looking buyable. */
+const isSoldOut = (product: Pick<FeaturedProduct, 'inventory' | 'isFallback'>) => !product.isFallback && product.inventory <= 0
+
+function SoldOutBadge({ site, className = 'left-3 top-3' }: { site?: unknown; className?: string }) {
+    return (
+        <span data-testid="sold-out-badge" className={`absolute z-20 rounded-full bg-black/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white ${className}`}>
+            {soldOutLabel(site)}
+        </span>
+    )
 }
 
 function ProductsFeaturedSection({ children }: { children: React.ReactNode }) {
@@ -42,12 +57,13 @@ function ProductsFeaturedSection({ children }: { children: React.ReactNode }) {
     )
 }
 
-function HeroProductView({ product, block, theme, siteBasePath, siteName }: {
+function HeroProductView({ product, block, theme, siteBasePath, siteName, site }: {
     product: FeaturedProduct
     block: { sectionLabel?: string }
     theme: ThemeConfig
     siteBasePath: string
     siteName?: string
+    site?: unknown
 }) {
     const isFallback = product.isFallback ?? false
 
@@ -62,11 +78,13 @@ function HeroProductView({ product, block, theme, siteBasePath, siteName }: {
                             <img
                                 src={product.image}
                                 alt={buildProductAlt(product.imageAlt, product.name, siteName)}
+                                {...(product.pictureIndex !== undefined ? { 'data-image-index': product.pictureIndex, 'data-section-picture': '' } : {})}
                                 className="w-full h-auto object-cover transform scale-110 drop-shadow-2xl mix-blend-multiply dark:mix-blend-normal"
                             />
                         ) : (
                             <div className="w-full aspect-square bg-black/5 flex items-center justify-center text-8xl opacity-20">🛍️</div>
                         )}
+                        {isSoldOut(product) && <SoldOutBadge site={site} />}
                     </div>
                 </div>
 
@@ -190,40 +208,34 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
     // Fallback: carousel needs more items than hero-product
     const fallbackCount = variant === 'carousel' ? 6 : 2
     const fallbackImages = getGalleryImages(category, fallbackCount)
+    // the section's own pictures (a row without one shows a sample, like a gallery)
+    const ownRows = Array.isArray(block.images) ? block.images : []
+    const pictures = resolveGalleryImages(ownRows, fallbackImages)
+    const ownUrls = ownRows.flatMap((row) => (row?.image && typeof row.image === 'object' && row.image.url ? [row.image.url] : []))
+    const pictureSlide = (picture: (typeof pictures)[number], i: number): FeaturedProduct => ({
+        id: `fallback-${i}`,
+        slug: '',
+        name: picture.caption || headline,
+        price: '',
+        priceRaw: 0,
+        currency: 'MYR',
+        inventory: 0,
+        description: subheadline || '',
+        image: picture.image?.url || null,
+        imageAlt: picture.image?.alt,
+        tags: [],
+        isFallback: true,
+        pictureIndex: i,
+    })
     const displayProducts: FeaturedProduct[] = products.length > 0
         ? products.map((p, i) => ({
             ...p,
-            image: p.image ?? fallbackImages[i] ?? fallbackImages[0] ?? null,
+            // a product without a photo: the section's own pictures, then a sample
+            image: p.image ?? (ownUrls.length > 0 ? ownUrls[i % ownUrls.length] : null) ?? fallbackImages[i] ?? fallbackImages[0] ?? null,
         }))
         : variant === 'carousel'
-            ? fallbackImages.map((img, i) => ({
-                id: `fallback-${i}`,
-                slug: '',
-                name: headline,
-                price: '',
-                priceRaw: 0,
-                currency: 'MYR',
-                inventory: 0,
-                description: subheadline || '',
-                image: img ?? null,
-                tags: [],
-                isFallback: true,
-            }))
-            : [
-                {
-                    id: 'fallback-1',
-                    slug: '',
-                    name: headline,
-                    price: '',
-                    priceRaw: 0,
-                    currency: 'MYR',
-                    inventory: 0,
-                    description: subheadline || '',
-                    image: fallbackImages[0] ?? null,
-                    tags: [],
-                    isFallback: true,
-                },
-            ]
+            ? pictures.map(pictureSlide)
+            : pictures.slice(0, 1).map(pictureSlide)
 
     const product = displayProducts[0]!
     const siteRec = site as Record<string, unknown>
@@ -253,10 +265,12 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                         <div key={p.id} className="snap-center w-[85vw] sm:w-[500px] flex-shrink-0 relative rounded-3xl overflow-hidden group">
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
                             {p.image ? (
-                                <img src={p.image} alt={buildProductAlt(p.imageAlt, p.name, site?.name ?? undefined)} className="w-full h-[500px] object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700" />
+                                <img src={p.image} alt={buildProductAlt(p.imageAlt, p.name, site?.name ?? undefined)} className="w-full h-[500px] object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700"
+                                    {...(p.pictureIndex !== undefined ? { 'data-image-index': p.pictureIndex, 'data-section-picture': '' } : {})} />
                             ) : (
                                 <div className="w-full h-[500px] bg-black/5 flex items-center justify-center text-6xl opacity-20">🛍️</div>
                             )}
+                            {isSoldOut(p) && <SoldOutBadge site={site} className="left-5 top-5" />}
                             <div className="absolute bottom-0 left-0 p-8 z-20 w-full text-white">
                                 <Heading level={3} className="mb-2">{p.name}</Heading>
                                 {p.price && <Body size="lg" className="font-medium" style={{ color: 'var(--brand-primary)' }}>{p.price}</Body>}
@@ -294,6 +308,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
             theme={theme}
             siteBasePath={siteBasePath}
             siteName={site?.name ?? undefined}
+            site={site}
         />
     )
 }
