@@ -1,7 +1,7 @@
 import type { ImageModel, LanguageModel } from "ai";
 import type { Env } from "../config/env";
 import { createDevCopilotModel } from "./dev-copilot-model";
-import { createImageFactory, createProviderFactory, type ProviderFactory } from "./providers";
+import { createImageFactory, createProviderFactory, type ProviderFactory, acceptsReasoningEffort, type ReasoningEffort, withReasoningEffort } from "./providers";
 
 /** Features ask for a capability tier, never for a model id. */
 /** `quality` is the site generator's tier (whole-page JSON from long composed prompts). */
@@ -25,6 +25,9 @@ export interface ModelRegistry {
 	/** Picture models (`AI_MODEL_IMAGE`), configured providers only; empty = generation off. */
 	resolveImageChain?(): ResolvedImageModel[];
 }
+
+/** Tier efforts when AI_EFFORT_* is unset: cheap and quick for small tasks, deeper for the copilot and site generation. */
+export const DEFAULT_TIER_EFFORT: Record<ModelAlias, ReasoningEffort> = { fast: "low", balanced: "medium", quality: "high" };
 
 export class ModelUnavailableError extends Error {}
 
@@ -53,6 +56,14 @@ export function createModelRegistry(env: Env, vars: Record<string, string | unde
 		return factories.get(provider) ?? null;
 	};
 	const chains: Record<ModelAlias, string> = { fast: env.AI_MODEL_FAST, balanced: env.AI_MODEL_BALANCED, quality: env.AI_MODEL_QUALITY };
+	const efforts: Record<ModelAlias, Env["AI_EFFORT_FAST"]> = { fast: env.AI_EFFORT_FAST, balanced: env.AI_EFFORT_BALANCED, quality: env.AI_EFFORT_QUALITY };
+	/** The effort a candidate gets: the env value, else the tier default (DeepSeek only on an explicit value). */
+	const effortFor = (alias: ModelAlias, provider: string): ReasoningEffort | undefined => {
+		const explicit = efforts[alias];
+		if (explicit === "default") return undefined;
+		if (explicit) return explicit;
+		return provider === "deepseek" ? undefined : DEFAULT_TIER_EFFORT[alias];
+	};
 
 	return {
 		resolveChain(alias) {
@@ -63,7 +74,11 @@ export function createModelRegistry(env: Env, vars: Record<string, string | unde
 					continue;
 				}
 				const factory = factoryFor(provider);
-				if (factory) resolved.push({ model: factory(modelId), provider, modelId });
+				if (!factory) continue;
+				const effort = effortFor(alias, provider);
+				const model = factory(modelId);
+				const applyEffort = effort != null && acceptsReasoningEffort(provider, modelId, vars);
+				resolved.push({ model: applyEffort ? withReasoningEffort(model, provider, effort) : model, provider, modelId });
 			}
 			if (resolved.length === 0) {
 				throw new ModelUnavailableError(`No configured provider for model alias "${alias}".`);
