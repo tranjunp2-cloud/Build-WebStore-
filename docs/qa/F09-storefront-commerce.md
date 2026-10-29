@@ -602,3 +602,17 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.64d** | Unit | High | Switching variants updates button state reactively | Click Red → Blue updates title & passes variantName | GH-1084 Phase01 | [x] |
 | **TC-F09.64e** | Unit | Medium | Out-of-stock variant button disabled | stock=0 → disabledclick ignored | GH-1084 Phase01 | [x] |
 | **TC-F09.64f** | Unit | Medium | Empty/undefined variants handled gracefully | hasVariants=true + variants=[] → no selector | GH-1084 Phase01 | [x] |
+
+### TC-F09.265–273: Variant product price display + labels (GH-2082)
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.265** | Unit | High | `variantPriceRange` trả giá thấp nhất/cao nhất của biến thể | `{min,max}`; null khi không có biến thể có giá | GH-2082 | [x] |
+| **TC-F09.266** | Unit | Critical | Giá gốc 0 + biến thể giá khác nhau, chưa chọn biến thể | Hiện "From RM 59.00", không hiện RM 0.00 | GH-2082 | [x] |
+| **TC-F09.267** | Unit | Medium | Mọi biến thể cùng giá | Hiện đúng giá đó, không có chữ "From" | GH-2082 | [x] |
+| **TC-F09.268** | Unit | High | Chọn biến thể (EN) | Hiện giá biến thể, nhãn "Variant", "3 left"; không còn "Phân loại"/"Còn" | GH-2082 | [x] |
+| **TC-F09.269** | Unit | Medium | Locale BM | Nhãn "Varian", "Tinggal 10" | GH-2082 | [x] |
+| **TC-F09.270** | Unit | High | `listingPrice` cho thẻ sản phẩm (grid / featured / quick view) | Biến thể: giá thấp nhất, isFrom khi giá khác nhau, bỏ compare-at gốc; SP thường giữ nguyên | GH-2082 | [x] |
+| **TC-F09.271** | Unit | High | Thẻ grid của SP biến thể giá gốc 0 | Hiện "From RM 59.00", không hiện RM 0.00 | GH-2082 | [x] |
+| **TC-F09.272** | Unit | High | JSON-LD `offers` của SP biến thể (`buildProductOffers`) | `AggregateOffer` với `lowPrice`/`highPrice` theo biến thể; `offerCount` chỉ đếm biến thể có giá; còn hàng khi có biến thể stock > 0 | GH-2082 | [x] |
+| **TC-F09.273** | Unit | Medium | JSON-LD `offers` của SP thường / SP biến thể không có giá | `Offer` với giá gốc, tình trạng theo `inventory` | GH-2082 | [x] |

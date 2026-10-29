@@ -5397,7 +5397,10 @@
       "priceRange": "Julat harga",
       "applyFilter": "Gunakan penapis",
       "stockLimitMessage": "Anda telah menambah semua stok yang tersedia ({cartQty}/{inventory}) ke dalam troli",
-      "stockLimitToast": "Troli anda telah mencapai had stok yang dibernarkan"
+      "stockLimitToast": "Troli anda telah mencapai had stok yang dibernarkan",
+      "variantLabel": "Varian",
+      "fromPrice": "Dari {price}",
+      "stockLeft": "Tinggal {count}"
     },
     "blog": {
       "title": "Blog",

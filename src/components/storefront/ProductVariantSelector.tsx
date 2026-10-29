@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/i18n'
+import { variantPriceRange } from '@/lib/storefront/variant-price-range'
 
 type Variant = {
     name: string
@@ -25,12 +27,17 @@ function formatPrice(price: number, currency: string) {
 }
 
 export function ProductVariantSelector({ variants, currency, primaryColor, basePrice, baseCompareAtPrice, onSelect }: Props) {
+    const { t, ti } = useI18n()
     const [selected, setSelected] = useState<Variant | null>(null)
 
     if (!variants.length) return null
 
-    const displayPrice = selected?.price ?? basePrice
-    const displayCompareAt = selected != null ? selected.compareAtPrice : baseCompareAtPrice
+    // Before a pick, price from the variants (the base price may be 0 when only variants are priced).
+    // The base compare-at belongs to the base price, not the variants, so no discount badge until a variant is picked.
+    const range = variantPriceRange(variants)
+    const showFrom = selected == null && range != null && range.min !== range.max
+    const displayPrice = selected?.price ?? range?.min ?? basePrice
+    const displayCompareAt = selected != null ? selected.compareAtPrice : range != null ? null : baseCompareAtPrice
     const hasDiscount = displayCompareAt != null && displayCompareAt > displayPrice
     const discountPercent = hasDiscount ? Math.round((1 - displayPrice / displayCompareAt!) * 100) : 0
 
@@ -50,7 +57,9 @@ export function ProductVariantSelector({ variants, currency, primaryColor, baseP
                 aria-atomic="true"
             >
                 <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)' }}>
-                    {formatPrice(displayPrice, currency)}
+                    {showFrom
+                        ? ti(t.storefront.products.fromPrice, { price: formatPrice(displayPrice, currency) })
+                        : formatPrice(displayPrice, currency)}
                 </span>
                 {hasDiscount && (
                     <>
@@ -67,7 +76,7 @@ export function ProductVariantSelector({ variants, currency, primaryColor, baseP
             {/* Variant buttons */}
             <div style={{ marginBottom: '24px' }}>
                 <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '10px' }}>
-                    Phân loại
+                    {t.storefront.products.variantLabel}
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {variants.map((v) => {
@@ -78,7 +87,7 @@ export function ProductVariantSelector({ variants, currency, primaryColor, baseP
                                 key={v.name}
                                 type="button"
                                 disabled={isOos}
-                                title={isOos ? 'Hết hàng' : undefined}
+                                title={isOos ? t.storefront.products.outOfStock : undefined}
                                 onClick={() => handleSelect(v)}
                                 style={{
                                     padding: '8px 16px',
@@ -97,7 +106,7 @@ export function ProductVariantSelector({ variants, currency, primaryColor, baseP
                                 {v.name}
                                 {isOos && (
                                     <span style={{ marginLeft: '6px', fontSize: '11px', opacity: 0.8 }}>
-                                        (Hết hàng)
+                                        ({t.storefront.products.outOfStock})
                                     </span>
                                 )}
                             </button>
@@ -106,7 +115,7 @@ export function ProductVariantSelector({ variants, currency, primaryColor, baseP
                 </div>
                 {selected && selected.stock > 0 && (
                     <p style={{ fontSize: '12px', marginTop: '8px', color: selected.stock > 5 ? '#22c55e' : '#f59e0b' }}>
-                        Còn {selected.stock}
+                        {ti(t.storefront.products.stockLeft, { count: selected.stock })}
                     </p>
                 )}
             </div>

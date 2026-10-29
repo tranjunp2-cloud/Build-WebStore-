@@ -9,6 +9,7 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { ProductsFeaturedBlock } from '@/blocks/products-featured'
+import { I18nProvider } from '@/i18n'
 
 const products = vi.hoisted(() => ({ docs: [] as Array<Record<string, unknown>> }))
 
@@ -26,7 +27,7 @@ const site = { id: 1, name: 'Kedai', siteType: 'ecommerce' } as never
 
 describe('Featured Products own pictures [TC-AIWB-48]', () => {
     it('no product on sale: its own pictures with their captions, the rest of the rows samples', async () => {
-        const { container } = render(<ProductsFeaturedBlock block={block({ images: [{ image: { id: 43, url: 'https://media.test/own-1.jpg' }, caption: 'Hijab' }, { image: null }] })} theme={{} as never} site={site} />)
+        const { container } = render(<ProductsFeaturedBlock block={block({ images: [{ image: { id: 43, url: 'https://media.test/own-1.jpg' }, caption: 'Hijab' }, { image: null }] })} theme={{} as never} site={site} />, { wrapper: I18nProvider })
 
         await waitFor(() => expect(container.querySelectorAll('img')).toHaveLength(2))
         const imgs = [...container.querySelectorAll('img')]
@@ -38,7 +39,7 @@ describe('Featured Products own pictures [TC-AIWB-48]', () => {
     })
 
     it('without own pictures: 6 sample slides', async () => {
-        const { container } = render(<ProductsFeaturedBlock block={block()} theme={{} as never} site={site} />)
+        const { container } = render(<ProductsFeaturedBlock block={block()} theme={{} as never} site={site} />, { wrapper: I18nProvider })
 
         await waitFor(() => expect(container.querySelectorAll('img')).toHaveLength(6))
     })
@@ -48,7 +49,7 @@ describe('Featured Products own pictures [TC-AIWB-48]', () => {
             { id: 'prod_a', name: 'Abaya', price: 10, images: [{ image: { url: 'https://cdn.test/abaya.jpg' } }] },
             { id: 'prod_b', name: 'Tudung', price: 12, images: [] },
         ]
-        const { container } = render(<ProductsFeaturedBlock block={block({ images: [{ image: { id: 43, url: 'https://media.test/own-1.jpg' } }] })} theme={{} as never} site={site} />)
+        const { container } = render(<ProductsFeaturedBlock block={block({ images: [{ image: { id: 43, url: 'https://media.test/own-1.jpg' } }] })} theme={{} as never} site={site} />, { wrapper: I18nProvider })
 
         await waitFor(() => expect(container.querySelectorAll('img')).toHaveLength(2))
         const imgs = [...container.querySelectorAll('img')]

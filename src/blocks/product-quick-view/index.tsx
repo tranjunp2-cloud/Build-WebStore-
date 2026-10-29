@@ -18,6 +18,8 @@ import {
 } from '@/lib/design-tokens'
 import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
+import { listingPrice } from '@/lib/storefront/variant-price-range'
+import { useI18n } from '@/i18n'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 
@@ -35,6 +37,18 @@ type QuickViewProductWithCurrency = QuickViewProduct & {
     _id?: string            // Payload doc id (live API only)
     _inventory?: number     // stock count (live API only)
     _compareAtPrice?: number
+    _priceFrom?: boolean    // variant prices differ: shown as "From <price>"
+}
+
+/** "RM 59.00", or "From RM 59.00" when a live variant product's variant prices differ. */
+function formatListingPrice(
+    product: QuickViewProductWithCurrency,
+    currency: string,
+    fromTemplate: string,
+    ti: (template: string, vars: Record<string, string | number>) => string,
+): string {
+    const price = `${currency} ${product.price.toFixed(2)}`
+    return product._priceFrom ? ti(fromTemplate, { price }) : price
 }
 
 const PRODUCT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
@@ -100,6 +114,7 @@ function QuickViewModal({
     siteBasePath: string
     siteName?: string
 }) {
+    const { t, ti } = useI18n()
     const router = useRouter()
     const [selectedImage, setSelectedImage] = useState(0)
     const images = product.imageUrls.length > 0 ? product.imageUrls : []
@@ -181,7 +196,7 @@ function QuickViewModal({
 
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-2xl font-bold" style={{ color: 'var(--brand-primary)' }}>
-                                {currency} {product.price.toFixed(2)}
+                                {formatListingPrice(product, currency, t.storefront.products.fromPrice, ti)}
                             </span>
                             {product.originalPrice && product.originalPrice > product.price && (
                                 <Body size="small" className="line-through opacity-40">
@@ -275,6 +290,7 @@ function ProductCard({
     onQuickView: (p: QuickViewProductWithCurrency) => void
     siteName?: string
 }) {
+    const { t, ti } = useI18n()
     const currency = product._currency ?? defaultCurrency
     return (
         <div
@@ -312,7 +328,7 @@ function ProductCard({
                 <Heading level={4} className="text-sm mb-1 line-clamp-1">{product.name}</Heading>
                 <div className="flex items-center gap-2">
                     <span className="font-bold" style={{ color: 'var(--brand-primary)' }}>
-                        {currency} {product.price.toFixed(2)}
+                        {formatListingPrice(product, currency, t.storefront.products.fromPrice, ti)}
                     </span>
                     {product.originalPrice && product.originalPrice > product.price && (
                         <Caption className="line-through opacity-40">
@@ -362,7 +378,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                 const mapped: QuickViewProductWithCurrency[] = docs.map((doc) => {
                     const images = doc.images as Array<{ image?: { url?: string }; alt?: string }> | undefined
                     const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
-                    const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
+                    const { amount: price, isFrom, compareAtPrice } = listingPrice(doc)
                     const { imageUrls, imageAlts } = pairImagesWithAlts(images)
                     return {
                         name: String(doc.name || ''),
@@ -375,7 +391,8 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                         _currencyCode: currencyCode,
                         _id: doc.id ? String(doc.id) : undefined,
                         _inventory: Number(doc.inventory) || 0,
-                        _compareAtPrice: typeof doc.compareAtPrice === 'number' ? doc.compareAtPrice : undefined,
+                        _compareAtPrice: compareAtPrice,
+                        _priceFrom: isFrom,
                     }
                 })
                 setLiveProducts(mapped)

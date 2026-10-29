@@ -8,6 +8,7 @@ import { RichText } from '../shared/RichText'
 import { Heading } from '../shared/Typography'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
 import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
+import { useI18n } from '@/i18n'
 import type { ProductItem } from './filter-types'
 import { soldOutLabel } from '../shared/sold-out-label'
 
@@ -29,6 +30,7 @@ function formatCompareAtPrice(price: number, currency: string) {
 }
 
 export function ProductCard({ product, variant, theme, siteBasePath, siteName, site }: ProductCardProps) {
+    const { t, ti } = useI18n()
     const pdpHref = product.slug ? `${siteBasePath}/products/${product.slug}` : '#'
     const hasDiscount = typeof product.compareAtPrice === 'number' && product.compareAtPrice > product.priceRaw
 
@@ -104,7 +106,7 @@ export function ProductCard({ product, variant, theme, siteBasePath, siteName, s
 
                     <div className={`flex items-center gap-2.5 ${variant === 'list' ? 'mt-auto pt-3 md:pt-5' : 'pt-3 sm:pt-4'}`}>
                         <RichText
-                            text={product.price}
+                            text={product.priceFrom ? ti(t.storefront.products.fromPrice, { price: product.price }) : product.price}
                             as="p"
                             className={variant === 'list' ? 'text-[12px] font-heading md:text-xl' : 'text-[12px] font-heading sm:text-lg'}
                             style={{ color: 'var(--text-primary)' }}

@@ -5397,7 +5397,10 @@
       "priceRange": "Price range",
       "applyFilter": "Apply filters",
       "stockLimitMessage": "You've added all available stock ({cartQty}/{inventory}) to your cart",
-      "stockLimitToast": "Your cart has reached the available stock limit"
+      "stockLimitToast": "Your cart has reached the available stock limit",
+      "variantLabel": "Variant",
+      "fromPrice": "From {price}",
+      "stockLeft": "{count} left"
     },
     "blog": {
       "title": "Blog",
