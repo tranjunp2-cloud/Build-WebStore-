@@ -1151,11 +1151,13 @@
         "errorFailed": "Tidak dapat menyelesaikan pembetulan AI. Sila cuba lagi.",
         "errorQuota": "Had penggunaan AI telah dicapai. Sila cuba lagi nanti.",
         "errorUnavailable": "Perkhidmatan AI tidak tersedia buat masa ini. Sila cuba lagi sebentar nanti.",
+        "errorBusy": "AI sedang sibuk sekarang. Sila cuba lagi dalam seminit.",
         "partialFailed": "{count} item tidak dapat dijana: {names} ({reason})",
         "andMore": "+{count} lagi",
         "reasonTimeout": "AI mengambil masa terlalu lama",
         "reasonQuota": "had penggunaan AI dicapai",
         "reasonUnavailable": "AI tidak tersedia",
+        "reasonBusy": "AI sedang sibuk",
         "reasonFailed": "penjanaan gagal",
         "retryFailed": "Cuba semula item yang gagal",
         "undoPartial": "Sesetengah pembaikan tidak dapat dibatalkan. Perubahan yang selebihnya sedia untuk dicuba semula."

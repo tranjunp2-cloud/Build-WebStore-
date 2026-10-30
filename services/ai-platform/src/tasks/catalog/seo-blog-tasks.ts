@@ -80,6 +80,42 @@ Rules:
 - Meta Description: 150-160 characters, professional and engaging, explain what the page is about.`;
 		},
 	}),
+	"seo.generate-meta-batch": defineTask({
+		id: "seo.generate-meta-batch",
+		alias: "fast",
+		promptVersion: "seo-generate-meta-batch@1",
+		temperature: 0.7,
+		// 20 items x (title + description + id + JSON) is ~2k tokens; headroom for longer Malay/Vietnamese text.
+		maxOutputTokens: 3_000,
+		// One call answers a whole fix-all chunk; prime-web's stream budget (50 s) must still fit a retry after it.
+		timeoutMs: 30_000,
+		maxRetries: 0,
+		deadlineMs: 30_000,
+		// Same rules as seo.generate-meta, applied to every item of the list.
+		instructions: () => `You are an SEO expert. Generate metadata for several pages and products of one website.
+Return one entry per listed item in "items", each with the item's "id" copied exactly as given, the meta title (<60 chars) in "metaTitle" and the meta description (150-160 chars) in "metaDescription".
+Answer every listed item exactly once and never invent ids.`,
+		prompt: (input) => {
+			const keywords = input.keywords ?? [];
+			const keywordLine = keywords.length
+				? `\nTarget Keywords: ${keywords.join(", ")}\n- Naturally incorporate 1-2 target keywords per item if relevant\n- Keyword density must not exceed 2%\n- Do NOT force keywords unnaturally`
+				: "";
+			const list = input.items
+				.map((item) => {
+					const noun = item.type === "product" ? "product" : "web page";
+					const fallback = item.type === "product" ? "No description provided." : "No content provided.";
+					return `- id: ${JSON.stringify(item.id)} | ${noun}: ${JSON.stringify(item.itemName)} | context: ${JSON.stringify(item.context || fallback)}`;
+				})
+				.join("\n");
+			return `Generate SEO meta tags for the following items of the business "${input.siteName}".${keywordLine}
+Rules:
+- Meta Title: Max 60 characters including "${input.siteName}". For a product: product name + "${input.siteName}" + "Buy Online Malaysia" if possible. For a web page: page name + "${input.siteName}" + "Malaysia".
+- Meta Description: 150-160 characters, compelling. For a product: highlight benefits and end with a call-to-action to buy. For a web page: professional and engaging, explain what the page is about.
+
+Items:
+${list}`;
+		},
+	}),
 	"seo.fix-meta": defineTask({
 		id: "seo.fix-meta",
 		alias: "fast",

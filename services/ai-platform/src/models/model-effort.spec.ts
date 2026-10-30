@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseEnv } from "../config/env";
-import { createModelRegistry, type ModelAlias } from "./model-registry";
+import { createModelRegistry, DEFAULT_TIER_EFFORT, type ModelAlias } from "./model-registry";
 
 const vars = {
 	AI_PLATFORM_DATABASE_URL: "postgres://x/y",
@@ -108,7 +108,7 @@ describe("per-tier reasoning effort for every provider (AI_EFFORT_*)", () => {
 		expect(compatOptIn.reasoning_effort).toBe("low");
 	});
 
-	it("[TC-AIEFF-04] an unset tier uses its default effort; `default` sends none; DeepSeek stays non-thinking", async () => {
+	it("[TC-AIEFF-04] an unset tier uses its default effort (fast = thinking off); `default` sends none; DeepSeek stays non-thinking", async () => {
 		// Act
 		const unsetFast = await requestBodyFor("anthropic:claude-haiku-5-5");
 		const unsetQuality = await requestBodyFor("anthropic:claude-haiku-5-5", {}, undefined, "quality");
@@ -116,11 +116,25 @@ describe("per-tier reasoning effort for every provider (AI_EFFORT_*)", () => {
 		const deepseek = await requestBodyFor("deepseek:deepseek-chat");
 
 		// Assert
-		expect(unsetFast.output_config?.effort).toBe("low");
+		expect(unsetFast.output_config?.effort).toBeUndefined();
+		expect(unsetFast.thinking?.type).toBe("disabled");
 		expect(unsetQuality.output_config?.effort).toBe("high");
 		expect(modelOwn.output_config?.effort).toBeUndefined();
 		expect(deepseek.thinking?.type).toBe("disabled");
 		expect(deepseek.reasoning_effort).toBeUndefined();
+	});
+
+	it("[TC-AIEFF-13] a fast-tier Claude request carries thinking disabled and no effort, balanced still thinks", async () => {
+		// Act
+		const fast = await requestBodyFor("anthropic:claude-haiku-5-5");
+		const balanced = await requestBodyFor("anthropic:claude-haiku-5-5", {}, undefined, "balanced");
+
+		// Assert
+		expect(DEFAULT_TIER_EFFORT).toEqual({ fast: "none", balanced: "medium", quality: "high" });
+		expect(fast.thinking).toEqual({ type: "disabled" });
+		expect(fast.output_config?.effort).toBeUndefined();
+		expect(balanced.output_config?.effort).toBe("medium");
+		expect(balanced.thinking?.type).not.toBe("disabled");
 	});
 
 	it("[TC-AIEFF-07] the default chains run Claude Haiku 5.5 first, a current OpenAI model as fallback", () => {

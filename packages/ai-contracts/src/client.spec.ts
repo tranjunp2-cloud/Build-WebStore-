@@ -36,4 +36,29 @@ describe("createAiClient [TC-AICP-15]", () => {
 		});
 		expect(AiClientError).toBeDefined();
 	});
+
+	it("[TC-AIRATE-06] carries the platform's problem code and Retry-After on the error", async () => {
+		const busy = vi.fn(
+			async () =>
+				new Response(JSON.stringify({ detail: "The AI is busy right now. Try again in a minute.", code: "provider_rate_limited" }), {
+					status: 429,
+					headers: { "content-type": "application/json", "retry-after": "2" },
+				}),
+		);
+		const ai = createAiClient({ baseUrl: "http://ai", token: () => "t", fetcher: busy as unknown as typeof fetch });
+
+		const error = await ai.runTask("content.seo-meta", { locale: "en-US", title: "x" }).catch((e: unknown) => e);
+
+		expect(error).toBeInstanceOf(AiClientError);
+		expect(error).toMatchObject({ status: 429, code: "provider_rate_limited", retryAfterMs: 2_000 });
+
+		const plain = createAiClient({
+			baseUrl: "http://ai",
+			token: () => "t",
+			fetcher: (async () => Response.json({ detail: "Your workspace reached today's AI limit." }, { status: 429 })) as unknown as typeof fetch,
+		});
+		const quota = (await plain.runTask("content.seo-meta", { locale: "en-US", title: "x" }).catch((e: unknown) => e)) as AiClientError;
+		expect(quota.code).toBeUndefined();
+		expect(quota.retryAfterMs).toBeUndefined();
+	});
 });

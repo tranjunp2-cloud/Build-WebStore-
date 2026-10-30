@@ -19,10 +19,9 @@ export const FIX_ALL_MAX_DURATION_S = 60
 export const FIX_ALL_SETUP_RESERVE_MS = 10_000
 
 /**
- * Overall budget of the generation stream. Sized so that the default 9-item
- * batch (3 waves of 4 concurrent calls, each capped at 15s per call) fits,
- * while staying below `maxDuration` so the platform never kills the function
- * mid-stream.
+ * Overall budget of the generation stream. Sized so that one batch call (30 s
+ * platform deadline) plus one retry after a short backoff fits, while staying
+ * below `maxDuration` so the platform never kills the function mid-stream.
  */
 export const FIX_ALL_TIMEOUT_MS =
     FIX_ALL_MAX_DURATION_S * 1_000 - FIX_ALL_SETUP_RESERVE_MS
@@ -32,6 +31,16 @@ export const FIX_ALL_FLUSH_MARGIN_MS = 3_000
 
 /** Floor so a slow setup still leaves the first wave a chance to answer. */
 export const FIX_ALL_MIN_STREAM_MS = 5_000
+
+/** Most items in one `seo.generate-meta-batch` call (the platform contract's limit). */
+export const FIX_ALL_BATCH_SIZE = 20
+/** Batch calls in flight at once; the provider rate limit is what the old 4-at-a-time per-item calls ran into. */
+export const FIX_ALL_BATCH_CONCURRENCY = 2
+/** Pause before the one automatic retry (a provider `Retry-After` replaces it, capped). */
+export const FIX_ALL_RETRY_BACKOFF_MS = 1_500
+export const FIX_ALL_RETRY_BACKOFF_MAX_MS = 5_000
+/** A retry needs at least this much of the stream budget left after the backoff, else it cannot finish. */
+export const FIX_ALL_MIN_RETRY_WINDOW_MS = 6_000
 
 /**
  * Budget for the stream given how long the request already ran before it opened
@@ -47,10 +56,20 @@ export function fixAllStreamBudgetMs(elapsedBeforeStreamMs: number): number {
 export const FIX_ALL_KEEPALIVE_MS = 10_000
 export const FIX_ALL_KEEPALIVE_FRAME = ': ping\n\n'
 
-export type FixFailureReason = 'timeout' | 'quota' | 'unavailable' | 'failed'
+/**
+ * `quota` = the workspace's own daily AI limit (or provider billing): waiting a minute does not help.
+ * `busy` = the AI provider is rate limiting right now: a retry in a minute does.
+ */
+export type FixFailureReason =
+    | 'timeout'
+    | 'quota'
+    | 'busy'
+    | 'unavailable'
+    | 'failed'
 
 const FAILURE_REASONS: readonly FixFailureReason[] = [
     'quota',
+    'busy',
     'unavailable',
     'timeout',
     'failed',
@@ -63,7 +82,7 @@ export function normalizeFixFailureReason(value: unknown): FixFailureReason {
 
 /**
  * The reason to show for a mixed batch: the one a seller can act on first
- * (quota/unavailable need waiting; timeout/failed just retry).
+ * (quota/busy/unavailable need waiting; timeout/failed just retry).
  */
 export function dominantFixFailureReason(
     reasons: readonly FixFailureReason[],
@@ -97,6 +116,16 @@ export interface FixAllTimeoutEvent {
     pending: FixAllTargetRef[]
 }
 
+/** Reasons a second attempt a moment later can fix; `quota` and `failed` would just fail again. */
+const RETRYABLE_REASONS: readonly FixFailureReason[] = ['timeout', 'busy', 'unavailable']
+
+export function isRetryableFixFailure(reason: FixFailureReason): boolean {
+    return RETRYABLE_REASONS.includes(reason)
+}
+
+/** Platform problem code of a provider rate limit (HTTP 429), as carried by `AiClientError.code`. */
+const PROVIDER_RATE_LIMITED_CODE = 'provider_rate_limited'
+
 const MAX_CAUSE_DEPTH = 4
 const UNAVAILABLE_CODES = new Set([
     'ECONNREFUSED',
@@ -123,8 +152,11 @@ function reasonFromStatus(status: number): FixFailureReason | null {
 export function classifyFixFailure(error: unknown): {
     reason: FixFailureReason
     status?: number
+    /** The platform's `Retry-After` hint, when the failure carried one. */
+    retryAfterMs?: number
 } {
     let status: number | undefined
+    let retryAfterMs: number | undefined
     let reason: FixFailureReason | null = null
     let current: unknown = error
 
@@ -137,8 +169,14 @@ export function classifyFixFailure(error: unknown): {
             name?: unknown
             status?: unknown
             code?: unknown
+            retryAfterMs?: unknown
             message?: unknown
             cause?: unknown
+        }
+        // A provider rate limit (busy) is also a 429: tell it apart from the workspace limit by its code.
+        if (node.code === PROVIDER_RATE_LIMITED_CODE) reason ??= 'busy'
+        if (typeof node.retryAfterMs === 'number' && node.retryAfterMs > 0) {
+            retryAfterMs ??= node.retryAfterMs
         }
         if (typeof node.status === 'number') {
             status ??= node.status
@@ -159,5 +197,6 @@ export function classifyFixFailure(error: unknown): {
     return {
         reason: reason ?? 'failed',
         ...(status !== undefined ? { status } : {}),
+        ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
     }
 }

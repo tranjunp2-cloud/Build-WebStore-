@@ -1,9 +1,11 @@
+import { AI_TASKS, SEO_META_BATCH_MAX_ITEMS } from "@ech/ai-contracts";
 import { MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vitest";
 import type { AiRequestContext } from "../../auth/context-token";
 import { parseEnv } from "../../config/env";
 import type { UsageLedger } from "../../ledger/usage-ledger";
 import { TaskEngine } from "../task-engine.service";
+import { TASK_DEFINITIONS } from "./index";
 
 const ctx: AiRequestContext = { organizationId: "org_1", userId: "user_1" };
 const usage = {
@@ -67,6 +69,54 @@ describe("seo/blog tasks [TC-AICP-20]", () => {
 		expect(prompt).toContain('sold by \\"ShoeStore\\"');
 		expect(prompt).toContain("Buy Online Malaysia");
 		expect(prompt).not.toContain("Target Keywords");
+	});
+
+	it("[TC-F37-04-41] seo.generate-meta-batch lists every item with its id and answers a strict items array", async () => {
+		const answer = {
+			items: [
+				{ id: "products:7", metaTitle: "Shoes | ShoeStore", metaDescription: "Buy now" },
+				{ id: "pages:3", metaTitle: "About | ShoeStore", metaDescription: "Who we are" },
+			],
+		};
+		const { engine, calls } = capturingEngine(answer);
+
+		const result = await engine.run(ctx, "seo.generate-meta-batch", {
+			siteName: "ShoeStore",
+			keywords: ["running shoes"],
+			items: [
+				{ id: "products:7", type: "product", itemName: "Running Shoes", context: "Light and fast" },
+				{ id: "pages:3", type: "page", itemName: "About" },
+			],
+		});
+
+		expect(result.output).toEqual(answer);
+		expect(result.promptVersion).toBe("seo-generate-meta-batch@1");
+		expect(calls[0]).toMatchObject({ temperature: 0.7, maxOutputTokens: 3_000 });
+		expect(calls[0]!.schema).toMatchObject({ type: "object", additionalProperties: false, required: ["items"] });
+		const itemSchema = (calls[0]!.schema as { properties: { items: { items: unknown } } }).properties.items.items;
+		expectStrictObject(itemSchema, ["id", "metaTitle", "metaDescription"]);
+		const prompt = JSON.stringify(calls[0]!.prompt);
+		expect(prompt).toContain('id: \\"products:7\\"');
+		expect(prompt).toContain('id: \\"pages:3\\"');
+		expect(prompt).toContain("Running Shoes");
+		expect(prompt).toContain("Light and fast");
+		expect(prompt).toContain("No content provided.");
+		expect(prompt).toContain("Buy Online Malaysia");
+		expect(prompt).toContain("Target Keywords: running shoes");
+	});
+
+	it("[TC-F37-04-42] seo.generate-meta-batch takes 1..20 items and sizes its budget for a 20-item answer", () => {
+		const item = (n: number) => ({ id: `pages:${n}`, type: "page" as const, itemName: `Page ${n}` });
+		const parse = (count: number) =>
+			AI_TASKS["seo.generate-meta-batch"].input.safeParse({ siteName: "Kedai", items: Array.from({ length: count }, (_, i) => item(i)) }).success;
+		const definition = TASK_DEFINITIONS["seo.generate-meta-batch"];
+
+		expect(parse(0)).toBe(false);
+		expect(parse(1)).toBe(true);
+		expect(parse(SEO_META_BATCH_MAX_ITEMS)).toBe(true);
+		expect(parse(SEO_META_BATCH_MAX_ITEMS + 1)).toBe(false);
+		expect(definition).toMatchObject({ alias: "fast", maxRetries: 0, deadlineMs: 30_000, timeoutMs: 30_000 });
+		expect(definition.maxOutputTokens!).toBeGreaterThanOrEqual(SEO_META_BATCH_MAX_ITEMS * 100);
 	});
 
 	it("seo.fix-meta sends the page content as the prompt with low temperature", async () => {
