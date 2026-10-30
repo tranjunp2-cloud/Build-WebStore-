@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
 import sharp from 'sharp'
 import { s3Storage } from '@payloadcms/storage-s3'
-import { s3PublicUrl } from './lib/media/s3-public-url'
+import { MEDIA_OBJECT_ACL, s3PublicUrl } from './lib/media/s3-public-url'
 
 import { Tenants } from './collections/Tenants'
 import { Users } from './collections/Users'
@@ -217,6 +217,7 @@ export default buildConfig({
               },
             },
             bucket: process.env.S3_BUCKET as string,
+            acl: MEDIA_OBJECT_ACL,
             config: {
               endpoint: process.env.S3_ENDPOINT,
               region: process.env.S3_REGION || 'us-east-1',

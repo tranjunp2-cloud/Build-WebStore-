@@ -40,6 +40,19 @@ describe('TC-F30-HMO-015: createMediaPresignedPost enforces size + type in the p
         expect(params.Expires).toBeGreaterThan(0)
     })
 
+    it('pins the public-read ACL so the object is served from its public URL', async () => {
+        // Arrange
+        const maxFileBytes = 1024
+
+        // Act
+        await createMediaPresignedPost({ key: 'k.png', contentType: 'image/png', maxFileBytes })
+
+        // Assert
+        const [, params] = createPresignedPostMock.mock.calls[0] as [unknown, Record<string, unknown>]
+        expect(params.Conditions).toContainEqual(['eq', '$acl', 'public-read'])
+        expect((params.Fields as Record<string, string>).acl).toBe('public-read')
+    })
+
     it('keeps a stable multipart allowance for every policy', async () => {
         // Arrange
         const maxFileBytes = 12345

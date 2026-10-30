@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import type { Payload } from 'payload';
 import { F42CatalogScopeError } from './f42-source-contract';
 
@@ -58,29 +58,55 @@ export async function readWebsiteCatalogScope(payload: Payload): Promise<Website
     // A matching ID alone does not bind the namespace-free legacy ledger.
     // For VERIFIED_REUSE the original active owner remains authoritative;
     // the later inactive SKIP row never establishes ownership by itself.
+    const deltaProof = await deltaIdentityProof(payload, candidate);
     const provenance = await db.execute(sql`
       SELECT EXISTS (
         SELECT 1 FROM pw1_migration_stores m
-        WHERE NOT EXISTS (
+        WHERE NOT (EXISTS (
           SELECT 1 FROM migration_entity_map e JOIN migration_runs r ON r.run_id=e.run_id
           WHERE e.source_system='pw1' AND r.source_system='pw1'
             AND e.source_instance_id=${candidate.sourceInstance} AND r.source_instance_id=${candidate.sourceInstance}
             AND r.target_instance_id=${candidate.targetInstance} AND r.source_store_id=m.source_store_id
             AND e.source_entity='sites' AND e.source_id=m.source_store_id AND e.target_collection='sites'
             AND e.target_id=m.site_id::text AND e.claim_active=true AND e.state IN ('CREATED','VERIFIED','SKIPPED')
-        ) OR NOT EXISTS (
+        ) OR ${deltaProof('sites', 'sites', sql`m.site_id`)}) OR NOT (EXISTS (
           SELECT 1 FROM migration_entity_map e JOIN migration_runs r ON r.run_id=e.run_id
           WHERE e.source_system='pw1' AND r.source_system='pw1'
             AND e.source_instance_id=${candidate.sourceInstance} AND r.source_instance_id=${candidate.sourceInstance}
             AND r.target_instance_id=${candidate.targetInstance} AND r.source_store_id=m.source_store_id
             AND e.source_entity='stores' AND e.source_id=m.source_store_id AND e.target_collection='tenants'
             AND e.target_id=m.tenant_id::text AND e.claim_active=true AND e.state IN ('CREATED','VERIFIED','SKIPPED')
-        )
+        ) OR ${deltaProof('stores', 'tenants', sql`m.tenant_id`)})
       ) AS unproven
     `) as { rows: Array<{ unproven: boolean }> };
     if (provenance.rows[0]?.unproven) throw new F42CatalogScopeError('UNPROVEN_LEGACY_IDENTITY');
   }
   return candidate ? { sourceInstance: candidate.sourceInstance, targetInstance: candidate.targetInstance } : undefined;
+}
+
+/**
+ * Identity proof for stores created by the PW1 delta migration (`migrate:pw1:delta`), which records them in its
+ * own ledger (`pw1_delta_map`) instead of `migration_entity_map`. A delta row counts only when it maps the same
+ * PW1 store to the same tenant/site as the website ledger and its run used the snapshot of this import binding.
+ * Without the delta tables (delta never ran) no store can be proven this way.
+ * `pw1_delta_map` has no instance columns (its key is source_entity + source_id), so the namespace is bound
+ * only through the run's snapshot, which must match a `migration_runs` row of this binding.
+ */
+async function deltaIdentityProof(payload: Payload, scope: WebsiteCatalogBinding) {
+  const tables = await payload.db.drizzle.execute(sql`
+    SELECT to_regclass('pw1_delta_map') IS NOT NULL AND to_regclass('pw1_delta_runs') IS NOT NULL AS ok
+  `) as { rows: Array<{ ok: boolean }> };
+  const available = Boolean(tables.rows[0]?.ok);
+  return (sourceEntity: 'sites' | 'stores', targetCollection: 'sites' | 'tenants', targetId: SQL) => available
+    ? sql`EXISTS (
+        SELECT 1 FROM pw1_delta_map d JOIN pw1_delta_runs dr ON dr.run_id=d.run_id
+        WHERE d.source_entity=${sourceEntity} AND d.source_id=m.source_store_id AND d.store_id=m.source_store_id
+          AND d.target_collection=${targetCollection} AND d.target_id=${targetId}::text
+          AND EXISTS (SELECT 1 FROM migration_runs r WHERE r.source_system='pw1'
+            AND r.source_instance_id=${scope.sourceInstance} AND r.target_instance_id=${scope.targetInstance}
+            AND r.source_snapshot_id=dr.snapshot_id)
+      )`
+    : sql`false`;
 }
 
 export function websiteCatalogSources(scope: WebsiteCatalogBinding | undefined) {
