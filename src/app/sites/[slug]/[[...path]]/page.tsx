@@ -13,6 +13,7 @@ import type { Metadata } from 'next'
 import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRenderer'
 import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
 import type { SiteData } from '@/blocks/types'
+import { publicAuthorName, toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 import type { PageData } from '@/store/editorStore'
 import { StorefrontBlogList } from '@/components/site-renderer/StorefrontBlogList'
 import DOMPurify from 'isomorphic-dompurify'
@@ -292,9 +293,7 @@ export default async function TenantSitePage({ params }: Props) {
         const post = blogPost as BlogPost
         const thumbUrl = typeof post.thumbnail === 'object' ? post.thumbnail?.url : null
         const catName = typeof post.category === 'object' ? post.category?.name : null
-        const authorName = typeof post.author === 'object'
-            ? [post.author?.firstName, post.author?.lastName].filter(Boolean).join(' ') || post.author?.email
-            : null
+        const authorName = publicAuthorName(post.author)
         const publishDate = post.publishedAt || post.createdAt
 
         const jsonLd = {
@@ -379,9 +378,9 @@ export default async function TenantSitePage({ params }: Props) {
         <ScrollToTop />
         <LiveLanguageProvider languages={languages} active={language}>
             <SiteRenderer
-                site={{ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
-                page={page as unknown as PageData}
-                pages={pages as unknown as NavPage[]}
+                site={toPublicSite({ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 }) as unknown as SiteData}
+                page={toPublicDoc(page) as unknown as PageData}
+                pages={toPublicDoc(pages) as unknown as NavPage[]}
                 siteId={String(site.id)}
                 isOwner={isOwner}
             />

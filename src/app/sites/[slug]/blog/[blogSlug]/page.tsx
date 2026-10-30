@@ -18,6 +18,7 @@ import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 import { hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
 import { proseThemeVars } from '@/lib/theme/prose-theme'
+import { publicAuthorName, toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 
 export const dynamic = 'force-dynamic'
 
@@ -151,10 +152,7 @@ export default async function BlogDetailPage({ params }: Props) {
     const category = typeof post.category === 'object' && post.category
         ? (post.category as Record<string, unknown>).name as string
         : null
-    const author = typeof post.author === 'object' && post.author
-        ? ([(post.author as any).firstName, (post.author as any).lastName].filter(Boolean).join(' '))
-          || ((post.author as Record<string, unknown>).email as string) || null
-        : null
+    const author = publicAuthorName(post.author)
     const publishedAt = post.publishedAt
         ? new Date(post.publishedAt as string).toLocaleDateString('en-US', {
             year: 'numeric', month: 'long', day: 'numeric',
@@ -166,7 +164,7 @@ export default async function BlogDetailPage({ params }: Props) {
         typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
     ) ?? []).includes(String(tenant.id))
 
-    const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
+    const siteWithContext = toPublicSite({ ...site, tenantSlug: slug, siteBasePath: base })
 
     const origin = resolveStorefrontOrigin(tenant as any, { fallbackHostname: tenantHostname, slug })
     const articleJsonLd = origin ? {
@@ -194,7 +192,7 @@ export default async function BlogDetailPage({ params }: Props) {
     return (
         <SiteLayoutShell
             site={siteWithContext as SiteRendererProps['site']}
-            pages={pages as unknown as NavPage[]}
+            pages={toPublicDoc(pages) as unknown as NavPage[]}
             isOwner={isOwner}
         >
             <ScrollToTop />

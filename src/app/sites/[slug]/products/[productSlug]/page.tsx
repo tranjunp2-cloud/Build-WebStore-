@@ -8,6 +8,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ProductAddToCartSection } from '@/components/storefront/product-add-to-cart-section'
 import { ProductImageGallery } from '@/components/storefront/ProductImageGallery'
+import { toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 import { getCurrentUser } from '@/lib/auth'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { getServerI18n } from '@/i18n/server'
@@ -178,7 +179,7 @@ export default async function ProductDetailPage({ params }: Props) {
         typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
     ) ?? []).includes(String(tenant.id))
 
-    const images = p.images || []
+    const images = toPublicDoc(p.images || [])
     const hasDiscount = p.compareAtPrice && p.compareAtPrice > p.price
     const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice!) * 100) : 0
     const attributes = p.attributes || []
@@ -202,7 +203,7 @@ export default async function ProductDetailPage({ params }: Props) {
     }
 
     const base = await getSiteBasePath(slug)
-    const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
+    const siteWithContext = toPublicSite({ ...site, tenantSlug: slug, siteBasePath: base })
 
     const origin = resolveStorefrontOrigin(tenant as any, { fallbackHostname: tenantHostname, slug })
     const crumbs = [
@@ -221,7 +222,7 @@ export default async function ProductDetailPage({ params }: Props) {
     return (
         <SiteLayoutShell
             site={siteWithContext as SiteRendererProps['site']}
-            pages={pages as unknown as NavPage[]}
+            pages={toPublicDoc(pages) as unknown as NavPage[]}
             isOwner={isOwner}
             forceCartWidget
         >

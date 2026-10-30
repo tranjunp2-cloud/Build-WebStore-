@@ -90,9 +90,6 @@ export async function GET(req: Request) {
             merchantQrCodeUrl,
             enableCod: tenantCodEnabled && (paymentConfig?.enableCod ?? true),
             enableQrBanking: tenantQrEnabled && (paymentConfig?.enableQrBanking ?? true),
-            bankName: paymentConfig?.bankName ?? null,
-            bankAccountNo: paymentConfig?.bankAccountNo ?? null,
-            bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
             shippingConfig: (site as any).shippingConfig ?? null,
             theme: (site as any).theme ?? null,
 
