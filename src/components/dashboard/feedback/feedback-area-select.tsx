@@ -1,11 +1,13 @@
 'use client'
 
-import { forwardRef } from 'react'
+import { forwardRef, useState } from 'react'
 import { ChevronDown, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useMediaQuery } from '@/hooks/use-media-query'
+import { FeedbackAreaMobileSheet } from './feedback-area-mobile-sheet'
+import { FeedbackAreaOptionsList } from './feedback-area-options-list'
 import { FEEDBACK_AREAS, type FeedbackArea } from './types'
 
 /** Tags shown before the rest collapse into "+N". */
@@ -20,13 +22,15 @@ type Props = {
     className?: string
 }
 
-/** Multi-select for the Feature field: a popover of checkboxes, shown like the single Select trigger. */
+/** Multi-select for the Feature field: checkbox popover on desktop, bottom sheet on mobile (< 640px). */
 export const FeedbackAreaSelect = forwardRef<HTMLButtonElement, Props>(function FeedbackAreaSelect(
     { id, value, onChange, disabled, describedBy, className },
     ref,
 ) {
     const { t, ti } = useI18n()
     const f = t.dashboard.feedback.fields
+    const [open, setOpen] = useState(false)
+    const isMobile = useMediaQuery('(max-width: 639px)')
     // Keep the canonical option order regardless of click order.
     const toggle = (area: FeedbackArea, checked: boolean) =>
         onChange(FEEDBACK_AREAS.filter((a) => (a === area ? checked : value.includes(a))))
@@ -35,7 +39,9 @@ export const FeedbackAreaSelect = forwardRef<HTMLButtonElement, Props>(function 
     const extra = selected.length - shown.length
 
     return (
-        <Popover>
+        <>
+        {/* One open state: the popover shows it on desktop, the sheet on mobile. */}
+        <Popover open={open && !isMobile} onOpenChange={setOpen}>
             {/* Anchor = the whole input, so the list is as wide as the field and sits below it. */}
             <PopoverAnchor asChild>
             <div
@@ -49,7 +55,7 @@ export const FeedbackAreaSelect = forwardRef<HTMLButtonElement, Props>(function 
                     {shown.map((area) => (
                         <span
                             key={area}
-                            className="inline-flex max-w-[160px] items-center gap-1 rounded-md bg-[hsl(var(--primary)/0.1)] py-0.5 pl-2 pr-1 text-xs text-[hsl(var(--primary))]"
+                            className="inline-flex max-w-[160px] items-center gap-1 rounded-md bg-muted py-0.5 pl-2 pr-1 text-xs text-[var(--dash-text)]"
                         >
                             <span className="truncate">{f.areaOptions[area]}</span>
                             <button
@@ -57,7 +63,7 @@ export const FeedbackAreaSelect = forwardRef<HTMLButtonElement, Props>(function 
                                 disabled={disabled}
                                 aria-label={ti(f.removeArea, { name: f.areaOptions[area] })}
                                 onClick={() => toggle(area, false)}
-                                className="rounded p-0.5 hover:bg-[hsl(var(--primary)/0.15)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                className="rounded p-0.5 hover:bg-[var(--dash-border)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             >
                                 <X aria-hidden className="h-3 w-3" />
                             </button>
@@ -72,32 +78,22 @@ export const FeedbackAreaSelect = forwardRef<HTMLButtonElement, Props>(function 
                         type="button"
                         disabled={disabled}
                         aria-describedby={describedBy}
+                        aria-expanded={open}
                         className="flex h-9 min-w-0 flex-1 items-center justify-between gap-2 rounded-md px-1 text-left text-sm focus:outline-none disabled:cursor-not-allowed"
                     >
                         <span className={cn('line-clamp-1', selected.length && 'sr-only', !selected.length && 'text-muted-foreground')}>
                             {selected.length ? selected.map((a) => f.areaOptions[a]).join(', ') : f.areaPlaceholder}
                         </span>
-                        <ChevronDown aria-hidden className="ml-auto h-4 w-4 shrink-0 opacity-50" />
+                        <ChevronDown aria-hidden className={cn('ml-auto h-4 w-4 shrink-0 opacity-50 transition-transform', open && 'rotate-180')} />
                     </button>
                 </PopoverTrigger>
             </div>
             </PopoverAnchor>
-            <PopoverContent align="start" className="w-[var(--radix-popper-anchor-width)] p-1">
-                <div role="group" aria-labelledby={id} className="flex flex-col">
-                    {FEEDBACK_AREAS.map((area) => (
-                        <label
-                            key={area}
-                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
-                        >
-                            <Checkbox
-                                checked={value.includes(area)}
-                                onCheckedChange={(c) => toggle(area, c === true)}
-                            />
-                            {f.areaOptions[area]}
-                        </label>
-                    ))}
-                </div>
+            <PopoverContent align="start" className="max-h-[320px] w-[var(--radix-popper-anchor-width)] overflow-y-auto p-1">
+                <FeedbackAreaOptionsList value={value} onChange={onChange} labelledBy={id} />
             </PopoverContent>
         </Popover>
+        <FeedbackAreaMobileSheet open={open && isMobile} onOpenChange={setOpen} value={value} onChange={onChange} />
+        </>
     )
 })

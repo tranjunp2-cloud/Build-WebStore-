@@ -3584,7 +3584,7 @@
     "feedback": {
       "button": "Send feedback",
       "title": "Send feedback",
-      "description": "Your store details and the page you're on are attached automatically.",
+      "description": "Your feedback and bug reports help us improve the Web Store.",
       "context": {
         "store": "Store: {store}"
       },
@@ -3601,11 +3601,16 @@
         "areaError": "Please choose at least one feature.",
         "areaMore": "+{count}",
         "removeArea": "Remove {name}",
+        "areaSelectAll": "Select all",
+        "areaSheetTitle": "Choose features",
+        "areaClearAll": "Clear all",
+        "areaDone": "Done",
+        "areaDoneCount": "Done ({count})",
         "areaOptions": {
-          "products": "Products & stock",
+          "products": "Products & inventory",
           "orders": "Orders",
           "customers": "Customers",
-          "discounts": "Discounts",
+          "discounts": "Promotions",
           "design": "Design & pages",
           "payments": "Payments",
           "shipping": "Shipping",
@@ -3650,7 +3655,7 @@
       },
       "success": {
         "title": "Feedback sent",
-        "notifyNote": "We'll notify you in Prime Web (the bell icon) when there's an update."
+        "notifyNote": "We'll notify you in Web Store (the bell icon) when there's an update."
       }
     }
   },

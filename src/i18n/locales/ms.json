@@ -3584,7 +3584,7 @@
     "feedback": {
       "button": "Hantar maklum balas",
       "title": "Hantar maklum balas",
-      "description": "Butiran kedai anda dan halaman yang sedang dilihat dilampirkan secara automatik.",
+      "description": "Maklum balas dan laporan pepijat anda membantu kami menambah baik Web Store.",
       "context": {
         "store": "Kedai: {store}"
       },
@@ -3601,11 +3601,16 @@
         "areaError": "Sila pilih sekurang-kurangnya satu ciri.",
         "areaMore": "+{count}",
         "removeArea": "Buang {name}",
+        "areaSelectAll": "Pilih semua",
+        "areaSheetTitle": "Pilih ciri",
+        "areaClearAll": "Kosongkan semua",
+        "areaDone": "Selesai",
+        "areaDoneCount": "Selesai ({count})",
         "areaOptions": {
-          "products": "Produk & stok",
+          "products": "Produk & inventori",
           "orders": "Pesanan",
           "customers": "Pelanggan",
-          "discounts": "Diskaun",
+          "discounts": "Promosi",
           "design": "Reka bentuk & halaman",
           "payments": "Pembayaran",
           "shipping": "Penghantaran",
@@ -3650,7 +3655,7 @@
       },
       "success": {
         "title": "Maklum balas dihantar",
-        "notifyNote": "Kami akan memaklumkan anda dalam Prime Web (ikon loceng) apabila ada kemas kini."
+        "notifyNote": "Kami akan memaklumkan anda dalam Web Store (ikon loceng) apabila ada kemas kini."
       }
     }
   },
