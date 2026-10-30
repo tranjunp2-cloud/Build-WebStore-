@@ -3676,7 +3676,7 @@
       "connection": "Connection problem. Please check your internet and try again.",
       "serviceAccountUI": "Service accounts can't sign in here. Use a personal account instead.",
       "missingCredentials": "Please enter your email and password",
-      "accountLocked": "Your account is locked after too many failed sign-in attempts. Reset your password or try again later.",
+      "accountLocked": "Too many unsuccessful sign-in attempts. Please try again in 15 minutes or reset your password.",
       "sessionExpired": "Your session has expired. Please sign in again."
     },
     "emailPlaceholder": "you@example.com",

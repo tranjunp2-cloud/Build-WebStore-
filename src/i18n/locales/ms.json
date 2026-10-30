@@ -3676,7 +3676,7 @@
       "connection": "Masalah rangkaian. Sila semak semula sambungan internet anda dan cuba lagi.",
       "serviceAccountUI": "Akaun perkhidmatan tidak boleh di log masuk. Sila gunakan akaun peribadi.",
       "missingCredentials": "Sila masukkan email dan kata laluan anda",
-      "accountLocked": "Akaun anda telah dikunci kerana terlalu banyak percubaan log masuk yang gagal. Sila tetapkan semula kata laluan anda atau cuba lagi kemudian",
+      "accountLocked": "Terlalu banyak percubaan log masuk yang tidak berjaya. Sila cuba lagi dalam 15 minit atau tetapkan semula kata laluan anda.",
       "sessionExpired": "Sesi anda telah tamat. Sila log masuk semula."
     },
     "emailPlaceholder": "anda@contoh.com",

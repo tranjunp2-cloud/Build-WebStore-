@@ -26,6 +26,8 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 - `send-otp` 429 trả thêm `code: 'OTP_COOLDOWN'` + `retryAfter` (giây) + header `Retry-After`. Login page không còn báo "Connection problem" khi OTP vừa gửi <60s: chuyển sang `/verify-otp` với countdown khớp mã cũ (`src/lib/auth/login-otp-cooldown.ts`). Lỗi gửi OTP khác dùng `auth.errors.otpSendFailed`.
 - Login endpoint trả `423` + `code: 'ACCOUNT_LOCKED'` khi `payload.login` thất bại và `lockUntil` còn hiệu lực (tra qua `isAccountLocked`, lỗi tra cứu → fallback `401 Login failed`). Login page hiện `auth.errors.accountLocked` (copy GH-1701 đã duyệt, giữ nguyên), sai mật khẩu thường giữ "Incorrect email or password". Cooldown send-otp tính theo `OTP_TTL_MS` (trước đây cứng 5 phút → dev TTL 30 phút bị cooldown ~26 phút). Không đổi schema. Tests: TC-F02.44 – TC-F02.48.
+- Câu khóa đổi thành "Too many unsuccessful sign-in attempts. Please try again in 15 minutes or reset your password." (en + ms).
+- Đổi mật khẩu giờ gỡ khóa ngay: Payload không tự xóa `lockUntil`/`loginAttempts` khi reset, nên user reset xong vẫn bị khóa đủ 15 phút. Thêm 2 hook ở `src/lib/auth/clear-login-lock-on-password-change.ts`: `beforeChange` (password đổi qua `payload.update` — SSO reset, Profile, admin panel) và `afterOperation` `resetPassword` (reset qua email). Link reset sai/hết hạn không gỡ khóa. Không đổi schema. Tests: TC-F02.49 – TC-F02.58.
 
 ### F34 — SSO upgrade/downgrade cùng gói không xóa usage (GH-2011)
 
