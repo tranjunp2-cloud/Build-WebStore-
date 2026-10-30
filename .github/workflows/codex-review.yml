@@ -38,7 +38,7 @@ jobs:
       review_mode: ${{ steps.gen_diff.outputs.review_mode }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/merge
           fetch-depth: 0
