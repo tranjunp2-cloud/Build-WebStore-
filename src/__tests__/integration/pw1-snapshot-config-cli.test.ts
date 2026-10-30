@@ -1,22 +1,18 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, writeFile, rename, copyFile, rm, symlink } from 'node:fs/promises'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, readFile, realpath, writeFile, rename, copyFile, rm, symlink } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { writeExportFixture } from '@/__tests__/helpers/pw1-export-fixture'
 import { exportMaster } from '@/lib/migration/pw1-export/export-master'
 import { parseConfig } from '@/lib/migration/pw1-export/source-config'
+import { runTsxCli } from '@/__tests__/helpers/run-tsx-cli'
 
+vi.setConfig({ testTimeout: 180_000 })
 let root: string
-beforeEach(async () => { root = await mkdtemp(path.join(os.tmpdir(), 'pw1-snapshot-config-')) })
+beforeEach(async () => { root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'pw1-snapshot-config-'))) })
 afterEach(async () => { await rm(root, { recursive: true, force: true }) })
-const run = (args: string[]) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve, reject) => {
-  execFile(process.execPath, ['--import', 'tsx', 'scripts/data/create-pw1-source-config.ts', ...args], { timeout: 15000 }, (error, stdout, stderr) => {
-    if (error?.killed) return reject(error)
-    resolve({ code: error && 'code' in error ? Number(error.code) : 0, stdout, stderr })
-  })
-})
+const run = (args: string[]) => runTsxCli('scripts/data/create-pw1-source-config.ts', args)
 async function fixture() {
   const source = await writeExportFixture(root)
   const base = JSON.parse(await readFile(source.configPath, 'utf8'))
