@@ -204,7 +204,7 @@ jobs:
         # repo and recalculated every 6-12 h). Coverage is a report, not a gate:
         # a failed upload must not turn a green test run red.
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/
@@ -273,7 +273,7 @@ jobs:
         # Missing when the upload hit the artifact quota; the parse step below
         # already handles a missing coverage-summary.json.
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-report
           path: coverage/
@@ -295,7 +295,7 @@ jobs:
           echo "statements=$STATEMENTS" >> "$GITHUB_OUTPUT"
 
       - name: Comment quality metrics on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const coverage = {
@@ -479,7 +479,7 @@ jobs:
         # Next.js incremental build reuses .next/cache between runs.
         # First build after lockfile change is still cold (~5 min),
         # subsequent builds drop to ~1-2 min.
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .next/cache
@@ -665,7 +665,7 @@ jobs:
         # Next.js incremental build reuses .next/cache between runs.
         # First build after lockfile change is still cold (~5 min),
         # subsequent builds drop to ~1-2 min.
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .next/cache
@@ -1137,7 +1137,7 @@ jobs:
           echo "commit subject: $SUBJECT"
 
       - name: Cache Next.js build output
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .next/cache

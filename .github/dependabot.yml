@@ -1,5 +1,7 @@
 # Dependabot — Auto dependency update PRs
 # Targets staging branch (per team workflow: feature/fix PRs → staging)
+# Monthly and grouped: each run opens at most one PR per group, so CI runners
+# are not flooded with one full CI run per package.
 version: 2
 
 updates:
@@ -7,30 +9,46 @@ updates:
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
-      interval: 'weekly'
-      day: 'monday'
-    open-pull-requests-limit: 5
+      interval: 'monthly'
+    open-pull-requests-limit: 2
     target-branch: 'staging'
     labels:
       - 'dependencies'
       - 'chore'
     commit-message:
       prefix: 'chore(deps)'
+    ignore:
+      # Major upgrades (next, nanoid, jsdom, ckeditor…) change APIs — do them in a planned PR.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # Must equal the drizzle-orm version pinned by @payloadcms/drizzle; bump it by hand
+      # together with the payload group, otherwise every SQL helper fails typecheck.
+      - dependency-name: 'drizzle-orm'
     groups:
+      # Payload packages move together, in their own PR (needs drizzle-orm bumped by hand).
+      payload:
+        patterns:
+          - 'payload'
+          - '@payloadcms/*'
       minor-and-patch:
+        patterns:
+          - '*'
         update-types:
           - 'minor'
           - 'patch'
 
-  # GitHub Actions versions
+  # GitHub Actions versions — one PR for all actions
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
-      interval: 'weekly'
-      day: 'monday'
+      interval: 'monthly'
     target-branch: 'staging'
     labels:
       - 'ci'
       - 'dependencies'
     commit-message:
       prefix: 'ci(actions)'
+    groups:
+      github-actions:
+        patterns:
+          - '*'
