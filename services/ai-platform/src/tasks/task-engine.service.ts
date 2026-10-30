@@ -12,7 +12,6 @@ import { SHOP_CAPS, type ShopCaps } from "../cost/shop-caps";
 import { aiBudgetMicros, assertAiEnabled, planOf } from "../cost/shop-limits";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { estimateCostMicros } from "../ledger/price-book";
-import { anthropicEffortOptions } from "../models/anthropic-effort";
 import { errorUsage, tokenUsageOf } from "../ledger/sdk-usage";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { isProviderBillingError, isProviderRateLimitError, PROVIDER_RATE_LIMITED, runWithFallback } from "../models/fallback";
@@ -116,7 +115,6 @@ export class TaskEngine {
 					maxOutputTokens: sampling.maxOutputTokens ?? definition.maxOutputTokens,
 					timeout: attemptTimeout(),
 					maxRetries: definition.maxRetries ?? 1,
-					...anthropicEffortOptions(candidate, alias),
 				});
 				const answer = textMode
 					? validateTextOutput(schema, result)

@@ -23,7 +23,6 @@ import { ORG_BATTERY, type OrgBattery } from "../cost/org-battery";
 import { SHOP_CAPS, type ShopCaps } from "../cost/shop-caps";
 import { aiBudgetMicros, assertAiEnabled, planOf } from "../cost/shop-limits";
 import { tokenUsageOf, UsageTally } from "../ledger/sdk-usage";
-import { anthropicEffortOptions } from "../models/anthropic-effort";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { runWithFallback } from "../models/fallback";
@@ -1153,7 +1152,6 @@ export class AgentRunService {
 							abortSignal: abort.signal,
 							// steps finished before a failure were billed: the error row carries them
 							onStepFinish: (step) => tally.add(step.usage),
-							...anthropicEffortOptions(candidate, "balanced"),
 						});
 					},
 					{
