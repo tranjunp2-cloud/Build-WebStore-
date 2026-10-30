@@ -9,6 +9,8 @@ export type ArtifactContent =
   | Iterable<string>
   | AsyncIterable<string>
   | ((hashes: Record<string, string>) => string)
+/** Bounds open file handles while staged artifacts are fsynced concurrently. */
+const SYNC_BATCH_SIZE = 16
 export async function writeArtifacts(
   outputDir: string,
   inputRoot: string | undefined,
@@ -72,7 +74,6 @@ export async function writeArtifacts(
             nextReport = bytes + 1024 * 1024
           }
         }
-        await f.sync()
       } finally {
         await f.close()
       }
@@ -83,6 +84,22 @@ export async function writeArtifacts(
         check.update(chunk)
       if (check.digest('hex') !== hashes[name])
         throw new ExportError('ARTIFACT_READBACK_FAILED')
+    }
+    // Every staged file is fsynced before publish. Syncing concurrently lets the filesystem
+    // batch journal commits; one-by-one fsync costs seconds per file on a busy disk.
+    const staged = Object.keys(files)
+    progress?.({ phase: 'sync-artifacts', completed: 0, total: staged.length })
+    for (let i = 0; i < staged.length; i += SYNC_BATCH_SIZE) {
+      await Promise.all(
+        staged.slice(i, i + SYNC_BATCH_SIZE).map(async (name) => {
+          const f = await open(path.join(staging, name), 'r')
+          try {
+            await f.sync()
+          } finally {
+            await f.close()
+          }
+        }),
+      )
     }
     await beforePublish()
     // Exclusive reservation gives no-clobber semantics even against non-cooperating creators.

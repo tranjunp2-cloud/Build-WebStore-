@@ -2,18 +2,21 @@ import { readFixtureMasterText, writeFixtureMaster } from '@/__tests__/helpers/p
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { writeExportFixture } from '../helpers/pw1-export-fixture'
 import { MASTER_SHA256, LEGACY_MASTER_SHA256 } from '@/lib/migration/pw1-export/master-version'
-// Each test spawns one or more real CLI subprocesses (15s cap each via execFile); the
-// default 5s test timeout flakes on slower CI runners before the subprocess finishes.
-vi.setConfig({ testTimeout: 60_000 })
+// Each test spawns several real CLI subprocesses. On shared CI runners an export can take
+// tens of seconds (tsx cold start + fsync under disk contention), so the per-subprocess cap
+// stays generous and every test gets room for all of its sequential runs.
+const SUBPROCESS_TIMEOUT_MS = 60_000
+vi.setConfig({ testTimeout: 180_000 })
 let root: string
 beforeEach(async () => {
-  root = await mkdtemp(path.join(os.tmpdir(), 'pw1-cli-test-'))
+  // The exporter rejects symlinked output parents; macOS os.tmpdir() lives under /var -> /private/var.
+  root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'pw1-cli-test-')))
 })
 afterEach(async () => {
   await rm(root, { recursive: true, force: true })
@@ -26,7 +29,7 @@ const run = (args: string[]) =>
         ['--import', 'tsx', 'scripts/data/export-pw1-master.ts', ...args],
         {
           cwd: process.cwd(),
-          timeout: 15000,
+          timeout: SUBPROCESS_TIMEOUT_MS,
           env: {
             ...process.env,
             DATABASE_URI: 'postgres://invalid.invalid/no-network',
@@ -36,7 +39,11 @@ const run = (args: string[]) =>
         },
         (error, stdout, stderr) => {
           if (error && 'killed' in error && error.killed) {
-            reject(error)
+            reject(
+              new Error(
+                `export-pw1-master killed by ${error.signal ?? 'signal'} (timeout ${SUBPROCESS_TIMEOUT_MS}ms); stderr:\n${stderr}`,
+              ),
+            )
             return
           }
           resolve({
@@ -136,7 +143,7 @@ describe('PW1 export real CLI subprocess', () => {
     const overwritten = await run(exportArgs(input, configPath, one))
     expect(overwritten.code).toBe(1)
     expect(await readFixtureMasterText(one)).toBe(bytes)
-  }, 30000)
+  })
   it('TC-F42-EXP-016: globally conflicting Users block both Stores without claiming their rows mapped', async () => {
     const { input, configPath } = await writeExportFixture(root),
       output = path.join(root, 'collision')
@@ -307,7 +314,7 @@ describe('PW1 export real CLI subprocess', () => {
     const schema = await run(['--validate-only', '--artifact-dir', output])
     expect(schema.code).toBe(1)
     expect(schema.stderr).toContain('MASTER_SCHEMA_INVALID')
-  }, 30000)
+  })
 })
 
 
@@ -337,7 +344,7 @@ it('TC-F42-EXP-016: rejects tampered summary even with updated hash; accepts art
   const legacy = await run(['--validate-only', '--artifact-dir', output])
   expect(legacy.code, legacy.stderr).toBe(0)
   expect(JSON.parse(legacy.stdout).integrityStatus).toBe('valid')
-}, 30000)
+})
 
 
 it('TC-F42-077: keeps approved Store deferral separate from blocking and validates its manifest', async () => {
