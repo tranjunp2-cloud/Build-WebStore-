@@ -212,3 +212,26 @@ describe('[TC-AIAUD-173] getStreamGenerationError', () => {
         }
     })
 })
+
+// ── TC-F01.112 (GH-2153): 409 from generate-site, told apart by the body code ──
+describe('[TC-F01.112] getGenerationError — 409 generation blocked', () => {
+    it('SITE_ALREADY_EXISTS in the body maps to a non-retryable "open your dashboard" error', () => {
+        const error = getGenerationError(409, { success: false, error: { code: 'SITE_ALREADY_EXISTS' } })
+
+        expect(error.code).toBe('SITE_ALREADY_EXISTS')
+        expect(error.retryable).toBe(false)
+        expect(error.action.type).toBe('dashboard')
+    })
+
+    it('any other 409 means a generation is already running', () => {
+        const error = getGenerationError(409, { success: false, error: { code: 'GENERATION_IN_PROGRESS' } })
+
+        expect(error.code).toBe('GENERATION_IN_PROGRESS')
+        expect(error.retryable).toBe(false)
+    })
+
+    it('stream error events carry the same codes', () => {
+        expect(getStreamGenerationError('SITE_ALREADY_EXISTS').code).toBe('SITE_ALREADY_EXISTS')
+        expect(getStreamGenerationError('GENERATION_IN_PROGRESS').code).toBe('GENERATION_IN_PROGRESS')
+    })
+})
