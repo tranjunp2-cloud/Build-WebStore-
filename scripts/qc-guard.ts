@@ -27,8 +27,9 @@
 // rebuilds, etc.). Substring match — so `ep-blue-king-a1qufqjg` blocks
 // both the direct and `-pooler` variants of the same endpoint.
 const KNOWN_NON_QC_HOSTS: readonly string[] = [
-  'ep-blue-king-a1qufqjg', // staging Neon endpoint (2026-04-13)
-  // 'ep-XXX-prod', // TODO: add when production Neon endpoint provisioned
+  'ep-blue-king-a1qufqjg', // old staging Neon branch `staging` (stale since 2026-10-12)
+  'ep-tiny-star-a1xy9aka', // live staging DB: branch pw1-migrated-261010 (Vercel staging since 2026-10-10)
+  'ep-orange-sea-b3nmsmny', // production Neon endpoint (project dark-glitter-99257254, 2026-10-29)
 ]
 
 export function assertQcEnv(): void {

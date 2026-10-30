@@ -28,12 +28,19 @@ export const APP_SWITCHER_APPS: SwitcherApp[] = [
  * portal exists — swap the values below when SSO ships. Local/dev falls back to /dashboard.
  */
 const SSO_PORTAL_URL_BY_ENV: Record<string, string> = {
-    production: 'https://sso.ecommercehub.my/', // production SSO portal
+    production: 'https://sso.ecommercehub.unifi.com.my/', // production SSO portal
     staging: 'https://sso.dev.ecommercehub.my/', // staging SSO portal
     development: 'https://sso.dev.ecommercehub.my/', // local dev → hit staging SSO to test the flow
 }
 
+function withTrailingSlash(url: string): string {
+    return url.endsWith('/') ? url : `${url}/`
+}
+
 // Fallback to the PRODUCTION portal: a misconfigured/missing env in a prod build must never
 // silently route real users to the staging SSO. Local/staging always set NEXT_PUBLIC_APP_ENV.
-export const SSO_PORTAL_URL =
-    SSO_PORTAL_URL_BY_ENV[process.env.NEXT_PUBLIC_APP_ENV ?? ''] ?? SSO_PORTAL_URL_BY_ENV.production
+// NEXT_PUBLIC_SSO_BASE_URL (also used by account settings) overrides the per-env table when set.
+export const SSO_PORTAL_URL = withTrailingSlash(
+    process.env.NEXT_PUBLIC_SSO_BASE_URL?.trim() ||
+        (SSO_PORTAL_URL_BY_ENV[process.env.NEXT_PUBLIC_APP_ENV ?? ''] ?? SSO_PORTAL_URL_BY_ENV.production),
+)

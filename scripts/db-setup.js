@@ -58,6 +58,15 @@ function createPool() {
   });
 }
 
+// Production deploys must never bootstrap an empty DB: --migrate-only skips every migration
+// when there are no tables, and the following `templates:seed` then crashes. Staging/local/qc-test
+// legitimately start from an empty DB, so only production is guarded.
+// APP_ENV / NEXT_PUBLIC_APP_ENV win when set (staging may run as a Vercel "production" target).
+function isProductionDeploy(env = process.env) {
+  const appEnv = env.APP_ENV || env.NEXT_PUBLIC_APP_ENV;
+  return (appEnv || env.VERCEL_ENV) === 'production';
+}
+
 async function getTableCount(pool) {
   const result = await pool.query(
     "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
@@ -6721,6 +6730,12 @@ async function main() {
       const tableCount = await getTableCount(pool);
       console.log(`[db-setup] Tables in public schema: ${tableCount}`);
 
+      if (tableCount === 0 && isProductionDeploy()) {
+        console.error('::error::[db-setup] production DB is empty — restore the staging dump first');
+        await pool.end().catch(() => {});
+        process.exit(1);
+      }
+
       if (tableCount > 0) {
         await runMigrations(pool);
         await cleanupApprovedDuplicateIndexes(pool);
@@ -6909,6 +6924,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  isProductionDeploy,
   runContentSlugTenantMigration,
   MIGRATIONS,
   APPROVED_DUPLICATE_INDEX_PAIRS,

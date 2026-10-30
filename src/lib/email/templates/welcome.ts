@@ -19,8 +19,14 @@ interface WelcomeEmailData {
     locale?: EmailLocale
 }
 
+// Absolute dashboard link built from the app's public base URL (set per Vercel environment).
+function defaultDashboardUrl(): string {
+    const base = (process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
+    return `${base || 'http://localhost:3000'}/dashboard`
+}
+
 export function welcomeEmail(data: WelcomeEmailData, config?: EmailTemplateConfig): { subject: string; html: string } {
-    const { userName, dashboardUrl = 'https://primeweb.app/dashboard', locale = 'en' } = data
+    const { userName, dashboardUrl = defaultDashboardUrl(), locale = 'en' } = data
     const base = (locales[locale] || locales.en).welcome
     const vars = { userName, dashboardUrl }
     const t = mergeTemplateConfig(base, config ?? null, vars, {
