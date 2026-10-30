@@ -54,6 +54,9 @@ import {
     FIX_ALL_MAX_DURATION_S,
     FIX_ALL_TIMEOUT_MS,
     classifyFixFailure,
+    dominantFixFailureReason,
+    isRetryableFixFailure,
+    normalizeFixFailureReason,
     fixAllStreamBudgetMs,
     FIX_ALL_FLUSH_MARGIN_MS,
     FIX_ALL_MIN_STREAM_MS,
@@ -673,5 +676,24 @@ describe('POST /api/seo/fix-all — budget and per-item failures [TC-F37-04-30..
         expect(classifyFixFailure(new AiClientError('m', 500))).toEqual({ reason: 'failed', status: 500 })
         expect(classifyFixFailure('timeout 429')).toEqual({ reason: 'failed' })
         expect(classifyFixFailure(null)).toEqual({ reason: 'failed' })
+    })
+
+    it('[TC-F37-04-52] a provider rate limit is "busy", the workspace limit stays "quota"', () => {
+        const providerBusy = new AiClientError('The AI is busy right now. Try again in a minute.', 429, 'provider_rate_limited', 2_000)
+
+        expect(classifyFixFailure(new Error('x', { cause: providerBusy }))).toEqual({ reason: 'busy', status: 429, retryAfterMs: 2_000 })
+        expect(classifyFixFailure(providerBusy).reason).toBe('busy')
+        // no code = the org's daily task limit
+        expect(classifyFixFailure(new AiClientError("Your workspace reached today's AI limit.", 429))).toEqual({ reason: 'quota', status: 429 })
+        // billing exhaustion (402) is not a retryable busy moment
+        expect(classifyFixFailure(new AiClientError('no credit', 402, 'provider_insufficient_quota')).reason).not.toBe('busy')
+    })
+
+    it('[TC-F37-04-52] only timeout, busy and unavailable are retryable; busy is a known client-side reason', () => {
+        expect((['timeout', 'busy', 'unavailable', 'quota', 'failed'] as const).filter(isRetryableFixFailure)).toEqual(['timeout', 'busy', 'unavailable'])
+        expect(normalizeFixFailureReason('busy')).toBe('busy')
+        expect(normalizeFixFailureReason('nonsense')).toBe('failed')
+        expect(dominantFixFailureReason(['failed', 'timeout', 'busy'])).toBe('busy')
+        expect(dominantFixFailureReason(['busy', 'quota'])).toBe('quota')
     })
 })

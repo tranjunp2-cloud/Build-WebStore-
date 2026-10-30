@@ -18,6 +18,7 @@ import { canBypassOtpForEmail, getQcBypassCode, isValidQcBypass } from '@/lib/ot
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
 import { normalizeTenants } from '@/lib/normalize-tenants'
 import { canUpdateAvatarField } from '@/lib/profile/avatar-field-access'
+import { clearLoginLockAfterPasswordReset, clearLoginLockOnPasswordUpdate } from '@/lib/auth/clear-login-lock-on-password-change'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
 import type { getTemplateConfig as GetTemplateConfig } from '@/lib/email/get-template-config'
@@ -186,7 +187,7 @@ export const Users: CollectionConfig = {
     slug: 'users',
     auth: {
         maxLoginAttempts: 5,
-        lockTime: 15 * 60 * 1000, // 15 minutes
+        lockTime: 15 * 60 * 1000, // 15 minutes — keep in sync with i18n auth.errors.accountLocked copy
         forgotPassword: {
             generateEmailHTML: async (args) => {
                 const token = args?.token || ''
@@ -254,8 +255,9 @@ export const Users: CollectionConfig = {
     },
     hooks: {
         beforeOperation: [rejectInvalidRoleFilter],
-        beforeChange: [setAuditFields],
+        beforeChange: [setAuditFields, clearLoginLockOnPasswordUpdate],
         afterChange: [sendWelcomeEmailHook],
+        afterOperation: [clearLoginLockAfterPasswordReset],
     },
     endpoints: [
         {

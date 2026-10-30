@@ -14,6 +14,7 @@ import { StripeConnectedBar } from './StripeConnectedBar';
 import { XenditConnectBlock } from './XenditConnectBlock';
 import { XenditConnectedBar } from './XenditConnectedBar';
 import { PaymentMethodCard } from './PaymentMethodCard';
+import { XENDIT_ENABLED } from '@/lib/payment/xendit-visibility';
 import { SaveBarLift } from '@/components/agent/save-bar-lift'
 
 type Media = {
@@ -761,29 +762,31 @@ export function PaymentsFormClient({
                 )}
             </section>
 
-            {/* ─── Xendit (F34) ─── */}
-            <section className="space-y-[14px]">
-                <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
-                    <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
-                        {pt.xenditSectionTitle}
-                    </h2>
-                    <span className="ml-auto text-[12px] text-slate-500">{pt.xenditPoweredBy}</span>
-                </div>
+            {/* ─── Xendit (F34) — temporarily hidden, see xendit-visibility.ts ─── */}
+            {XENDIT_ENABLED && (
+                <section className="space-y-[14px]">
+                    <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
+                        <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
+                        <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
+                            {pt.xenditSectionTitle}
+                        </h2>
+                        <span className="ml-auto text-[12px] text-slate-500">{pt.xenditPoweredBy}</span>
+                    </div>
 
-                {xenditIsConnected ? (
-                    <XenditConnectedBar
-                        accountId={null}
-                        tenantId={tenantId ?? ''}
-                        onDisconnect={handleXenditDisconnect}
-                    />
-                ) : (
-                    <XenditConnectBlock
-                        tenantId={tenantId}
-                        onSaveKeys={handleSaveXenditKeys}
-                    />
-                )}
-            </section>
+                    {xenditIsConnected ? (
+                        <XenditConnectedBar
+                            accountId={null}
+                            tenantId={tenantId ?? ''}
+                            onDisconnect={handleXenditDisconnect}
+                        />
+                    ) : (
+                        <XenditConnectBlock
+                            tenantId={tenantId}
+                            onSaveKeys={handleSaveXenditKeys}
+                        />
+                    )}
+                </section>
+            )}
 
             {/* ─── Manual Methods ─── */}
             <section className="space-y-[14px]">

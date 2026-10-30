@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { xenditCheckoutSchema } from '@/lib/validations/orders'
 import { createInvoice } from '@/lib/payment/xendit'
 import { XenditError } from '@/lib/payment/xendit-client'
+import { XENDIT_ENABLED } from '@/lib/payment/xendit-visibility'
 import { buildOrderItems } from '../stripe-checkout/build-order-items'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
@@ -46,6 +47,11 @@ function setCookieToken(res: NextResponse, orderId: string | number, orderNumber
  * Returns { type: 'redirect', sessionUrl: invoice_url }.
  */
 export async function POST(request: NextRequest) {
+    // GH-2132: temporarily disabled — reject before touching the body or DB
+    if (!XENDIT_ENABLED) {
+        return NextResponse.json({ success: false, error: { code: 'PAYMENT_METHOD_DISABLED', message: 'Xendit is not available for this store' } }, { status: 422 })
+    }
+
     const rawBody = await request.json().catch(() => null)
     if (!rawBody) {
         return NextResponse.json({ success: false, error: { code: 'INVALID_BODY', message: 'Request body is required' } }, { status: 400 })

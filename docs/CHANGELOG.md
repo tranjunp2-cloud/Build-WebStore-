@@ -15,6 +15,13 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F34 — Tạm ẩn Xendit ở Settings > Payments và checkout (GH-2132)
+
+- Section Xendit biến mất khỏi `/settings/payments` cho mọi tenant (đã/chưa kết nối); checkout storefront không còn "Pay with Xendit" và Xendit không tính vào `hasPaymentMethods`.
+- `POST /api/orders/xendit-checkout` trả 422 `PAYMENT_METHOD_DISABLED`. Đơn Xendit đang dở (retry, webhook, reconcile, cancel, refund) không đổi.
+- Công tắc duy nhất `XENDIT_ENABLED` ở `src/lib/payment/xendit-visibility.ts` (tạm thời — đặt `true` để bật lại). Không đổi schema/env. Tenant chỉ bật mỗi Xendit sẽ không đặt hàng được cho tới khi bật lại.
+- Server action `saveXenditKeys` cũng bị chặn khi cờ tắt (`disconnectXendit` vẫn dùng được). Test TC-F34X-24-01..07, 09..11 (08 manual).
+
 ### F01 — AI gen dùng thông tin liên hệ của user thay vì dữ liệu mẫu (GH-2048)
 
 - Block Contact không còn phone/email/address mẫu theo category (vd `grow@dannytandigital.my`) trên site gen thật, gồm cả trang Home (gap-fill ở `content-injection.ts`). Gallery/preview không có override vẫn giữ dữ liệu mẫu.
@@ -26,6 +33,8 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 - `send-otp` 429 trả thêm `code: 'OTP_COOLDOWN'` + `retryAfter` (giây) + header `Retry-After`. Login page không còn báo "Connection problem" khi OTP vừa gửi <60s: chuyển sang `/verify-otp` với countdown khớp mã cũ (`src/lib/auth/login-otp-cooldown.ts`). Lỗi gửi OTP khác dùng `auth.errors.otpSendFailed`.
 - Login endpoint trả `423` + `code: 'ACCOUNT_LOCKED'` khi `payload.login` thất bại và `lockUntil` còn hiệu lực (tra qua `isAccountLocked`, lỗi tra cứu → fallback `401 Login failed`). Login page hiện `auth.errors.accountLocked` (copy GH-1701 đã duyệt, giữ nguyên), sai mật khẩu thường giữ "Incorrect email or password". Cooldown send-otp tính theo `OTP_TTL_MS` (trước đây cứng 5 phút → dev TTL 30 phút bị cooldown ~26 phút). Không đổi schema. Tests: TC-F02.44 – TC-F02.48.
+- Câu khóa đổi thành "Too many unsuccessful sign-in attempts. Please try again in 15 minutes or reset your password." (en + ms).
+- Đổi mật khẩu giờ gỡ khóa ngay: Payload không tự xóa `lockUntil`/`loginAttempts` khi reset, nên user reset xong vẫn bị khóa đủ 15 phút. Thêm 2 hook ở `src/lib/auth/clear-login-lock-on-password-change.ts`: `beforeChange` (password đổi qua `payload.update` — SSO reset, Profile, admin panel) và `afterOperation` `resetPassword` (reset qua email). Link reset sai/hết hạn không gỡ khóa. Không đổi schema. Tests: TC-F02.49 – TC-F02.58.
 
 ### F34 — SSO upgrade/downgrade cùng gói không xóa usage (GH-2011)
 

@@ -192,6 +192,16 @@ describe('generateAutoSEOMeta — ECH AI platform path [TC-F08-03-01]', () => {
         }))
     })
 
+    it('[TC-F37-04-54] a busy provider (provider_rate_limited) is thrown to the caller, not hidden behind the template', async () => {
+        mockRunTask.mockRejectedValue(new AiClientError('The AI is busy right now. Try again in a minute.', 429, 'provider_rate_limited'))
+
+        const error = await generateAutoSEOMeta('product', 'Item', 'Shop', undefined, [], undefined, ACTOR).catch((e: unknown) => e)
+
+        expect(error).toBeInstanceOf(Error)
+        expect((error as Error).cause).toMatchObject({ status: 429, code: 'provider_rate_limited' })
+        expect(mockFinishCapture).toHaveBeenCalledWith(CAPTURE, expect.objectContaining({ status: 'failed' }))
+    })
+
     it('throws and records a failed capture for non-quota platform errors [TC-F08-03-01]', async () => {
         mockRunTask.mockRejectedValue(new Error('Network connection timeout'))
 

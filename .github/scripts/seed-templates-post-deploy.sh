@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Post-deploy template seed — plan 260419-2022 Phase 03.
-# Waits for $DEPLOY_URL healthy, then force-reseeds via Bearer $SEED_TOKEN.
+# Waits for $DEPLOY_URL healthy, then seeds via Bearer $SEED_TOKEN.
+# SEED_FORCE=true (default, staging) deletes + recreates templates; SEED_FORCE=false
+# (production) never deletes — the route upserts/skips existing templates.
 # Fails (exit 1) on timeout, non-200, or body success != true.
 #
 # Required env: DEPLOY_URL (e.g. https://web-v2.dev.ecommercehub.my), SEED_TOKEN
+# Optional env: SEED_FORCE (true|false, default true)
 
 set -euo pipefail
 
@@ -13,11 +16,17 @@ set -euo pipefail
 # Mask token in any downstream logs even if it slips into an error body.
 echo "::add-mask::${SEED_TOKEN}"
 
+SEED_FORCE="${SEED_FORCE:-true}"
+case "$SEED_FORCE" in
+  true|false) ;;
+  *) echo "::error::[seed] SEED_FORCE must be true or false (got '${SEED_FORCE}')"; exit 1 ;;
+esac
+
 DEPLOY_URL="${DEPLOY_URL%/}"
-SEED_URL="${DEPLOY_URL}/api/templates/seed?v3=true&force=true"
+SEED_URL="${DEPLOY_URL}/api/templates/seed?v3=true&force=${SEED_FORCE}"
 HEALTH_URL="${DEPLOY_URL}/api/health"
 
-echo "[seed] target=${DEPLOY_URL}"
+echo "[seed] target=${DEPLOY_URL} force=${SEED_FORCE}"
 
 # 1. Wait up to 120s for deploy health (try /api/health then /)
 deadline=$(( $(date +%s) + 120 ))

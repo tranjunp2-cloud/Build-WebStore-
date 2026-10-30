@@ -4,6 +4,7 @@
  *   TC-F37-04-37 → partial results go to review with a failed-items note
  *   TC-F37-04-38 → "Retry failed items" re-sends only the failed items and merges results
  *   TC-F37-04-39 → nothing generated shows the real reason (not always "took too long")
+ *   TC-F37-04-53 → provider rate limit ("busy") has its own message, distinct from the usage limit
  */
 
 import React from 'react'
@@ -145,6 +146,7 @@ describe('AIFixModal partial results and failures [TC-F37-04-37..39]', () => {
     it.each([
         ['timeout', aifix.errorTimeout],
         ['quota', aifix.errorQuota],
+        ['busy', aifix.errorBusy],
         ['unavailable', aifix.errorUnavailable],
         ['failed', aifix.errorFailed],
     ])('[TC-F37-04-39] when every item fails with %s the modal shows that reason', async (reason, message) => {
@@ -184,5 +186,35 @@ describe('AIFixModal partial results and failures [TC-F37-04-37..39]', () => {
         renderModal()
 
         await waitFor(() => expect(screen.getAllByText(aifix.errorTimeout).length).toBeGreaterThan(0))
+    })
+
+    it('[TC-F37-04-53] a busy provider shows the busy message, not the usage-limit one, and keeps "Retry failed items"', async () => {
+        // Arrange — two fixes arrive, two items hit the provider rate limit
+        fetchMock.mockResolvedValueOnce(
+            streamResponse(sse(fix('1'), fix('2'), failed('3', 'busy'), failed('4', 'busy'), { done: true, succeeded: 2, failed: 2 })),
+        )
+
+        // Act
+        renderModal()
+
+        // Assert
+        const note = await screen.findByTestId('aifix-failed-note')
+        expect(note.textContent).toContain("2 items couldn't be generated: Page 3, Page 4 (the AI is busy)")
+        expect(note.textContent).not.toContain(aifix.reasonQuota)
+        expect(screen.getByText(aifix.retryFailed)).toBeTruthy()
+        expect(aifix.errorBusy).toBe('The AI is busy right now. Please try again in a minute.')
+    })
+
+    it('[TC-F37-04-53] a mixed batch leads with the reason the seller can act on first (quota, then busy)', async () => {
+        fetchMock.mockResolvedValueOnce(
+            streamResponse(
+                sse(failed('1', 'busy'), failed('2', 'failed'), failed('3', 'busy'), failed('4', 'timeout'), { done: true, succeeded: 0, failed: 4 }),
+            ),
+        )
+
+        renderModal()
+
+        await waitFor(() => expect(screen.getAllByText(aifix.errorBusy).length).toBeGreaterThan(0))
+        expect(screen.queryByText(aifix.errorQuota)).toBeNull()
     })
 })

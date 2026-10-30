@@ -337,3 +337,17 @@
 | **Rationale** | Billplz OAuth là **partner-only** (docs public không mô tả; endpoints Doorkeeper quan sát được trên dashboard domain nhưng client_id/secret, scopes, token→credential contract chưa public). Chờ OAuth approval chặn toàn bộ feature mà không có lý do business — Stripe Connect tương đương cũng có manual fallback. |
 | **Impact** | **Outreach:** email `team@billplz.com` xin partner access + confirm contract (credentials, scopes, credential retrieval endpoint, refresh semantics). **Code:** US-F43-07 build skeleton (state nonce+TTL+single-use — không clone eternal `HMAC(tenantId)` của Stripe) sau cờ `BILLPLZ_CLIENT_ID`; credential adapter chỉ implement sau khi contract confirmed. **Docs:** `plans/261005-1427-billplz-payment/phase-07-oauth.md`; issue #1918 label `blocked`. |
 | **Status** | ⚠️ Dev-decided (validated with owner 2026-10-05) — **pending BA confirm**; implementation blocked pending Billplz response |
+
+---
+
+## PD-025 — F44 Feedback: Success Toast thay Success Screen, bỏ dòng Store
+
+| | |
+|---|---|
+| **Date** | 2026-10-30 |
+| **Decision** | Gửi feedback thành công → **đóng form + hiện toast** "Feedback sent" (kèm câu báo thông báo qua chuông trong Web Store). Bỏ màn thành công + nút Close. Bỏ dòng "Store: {tên cửa hàng}" khỏi header form. Mô tả form đổi theo Figma ("…help us improve the Web Store."). |
+| **Options** | 1. Giữ màn thành công trong modal; 2. Toast only |
+| **Chosen** | **Option 2.** Theo Figma (frames 07/09/13) + yêu cầu owner. |
+| **Rationale** | Toast nhẹ hơn, không bắt user bấm thêm nút Close; tên cửa hàng không cần trên UI vì server tự gắn context. |
+| **Impact** | **Code:** `feedback-dialog.tsx` (toast + đóng form), xoá `feedback-success-view.tsx`; logic submit/context không đổi. **Docs:** US-F44-01 AC-2, Additional Criteria; TC-F44-05. **Issue:** #2136. Nhãn trên Lark Base giữ nguyên ("Products & stock", "Discounts"). |
+| **Status** | ⚠️ Dev-decided (validated with owner 2026-10-30) — **pending BA confirm** |

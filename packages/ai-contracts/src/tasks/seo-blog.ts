@@ -40,6 +40,32 @@ export const SeoGenerateMetaOutputSchema = z.object({
 	metaDescription: z.string(),
 });
 
+/** Most items one `seo.generate-meta-batch` call takes; callers chunk longer lists. */
+export const SEO_META_BATCH_MAX_ITEMS = 20;
+/** Per-item context cap of the batch task (a page's/product's opening text is enough for a meta tag). */
+export const SEO_META_BATCH_CONTEXT_MAX_CHARS = 1_000;
+
+/** lib/seo fix-all — meta title + description for several pages/products in one call, matched back by `id`. */
+export const SeoGenerateMetaBatchInputSchema = z.object({
+	siteName: z.string().min(1).max(200),
+	keywords: KeywordsSchema,
+	items: z
+		.array(
+			z.object({
+				/** Caller's own key (echoed back unchanged); must be unique within the call. */
+				id: z.string().min(1).max(100),
+				type: z.enum(["page", "product"]),
+				itemName: z.string().min(1).max(300),
+				context: z.string().max(SEO_META_BATCH_CONTEXT_MAX_CHARS).optional(),
+			}),
+		)
+		.min(1)
+		.max(SEO_META_BATCH_MAX_ITEMS),
+});
+export const SeoGenerateMetaBatchOutputSchema = z.object({
+	items: z.array(z.object({ id: z.string(), metaTitle: z.string(), metaDescription: z.string() })),
+});
+
 /** /api/seo/fix — meta title + description from a page's block text. */
 export const SeoFixMetaInputSchema = z.object({
 	siteName: z.string().max(200),
@@ -80,6 +106,7 @@ export const SeoBlogMetaOutputSchema = z.object({
 export const SEO_BLOG_TASKS = {
 	"seo.page-meta": { input: SeoPageMetaInputSchema, output: SeoPageMetaOutputSchema },
 	"seo.generate-meta": { input: SeoGenerateMetaInputSchema, output: SeoGenerateMetaOutputSchema },
+	"seo.generate-meta-batch": { input: SeoGenerateMetaBatchInputSchema, output: SeoGenerateMetaBatchOutputSchema },
 	"seo.fix-meta": { input: SeoFixMetaInputSchema, output: SeoFixMetaOutputSchema },
 	"copy.blog-post": { input: CopyBlogPostInputSchema, output: CopyBlogPostOutputSchema },
 	"seo.blog-meta": { input: SeoBlogMetaInputSchema, output: SeoBlogMetaOutputSchema },

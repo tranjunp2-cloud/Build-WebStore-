@@ -1151,11 +1151,13 @@
         "errorFailed": "Couldn't finish the AI fix. Please try again.",
         "errorQuota": "The AI usage limit was reached. Please try again later.",
         "errorUnavailable": "The AI service isn't available right now. Please try again in a moment.",
+        "errorBusy": "The AI is busy right now. Please try again in a minute.",
         "partialFailed": "{count} items couldn't be generated: {names} ({reason})",
         "andMore": "+{count} more",
         "reasonTimeout": "the AI took too long",
         "reasonQuota": "AI usage limit reached",
         "reasonUnavailable": "AI unavailable",
+        "reasonBusy": "the AI is busy",
         "reasonFailed": "generation failed",
         "retryFailed": "Retry failed items",
         "undoPartial": "Some fixes could not be undone. The remaining changes are ready to retry."
@@ -3584,7 +3586,7 @@
     "feedback": {
       "button": "Send feedback",
       "title": "Send feedback",
-      "description": "Your store details and the page you're on are attached automatically.",
+      "description": "Your feedback and bug reports help us improve the Web Store.",
       "context": {
         "store": "Store: {store}"
       },
@@ -3601,11 +3603,16 @@
         "areaError": "Please choose at least one feature.",
         "areaMore": "+{count}",
         "removeArea": "Remove {name}",
+        "areaSelectAll": "Select all",
+        "areaSheetTitle": "Choose features",
+        "areaClearAll": "Clear all",
+        "areaDone": "Done",
+        "areaDoneCount": "Done ({count})",
         "areaOptions": {
-          "products": "Products & stock",
+          "products": "Products & inventory",
           "orders": "Orders",
           "customers": "Customers",
-          "discounts": "Discounts",
+          "discounts": "Promotions",
           "design": "Design & pages",
           "payments": "Payments",
           "shipping": "Shipping",
@@ -3650,7 +3657,7 @@
       },
       "success": {
         "title": "Feedback sent",
-        "notifyNote": "We'll notify you in Prime Web (the bell icon) when there's an update."
+        "notifyNote": "We'll notify you in Web Store (the bell icon) when there's an update."
       }
     }
   },
@@ -3676,7 +3683,7 @@
       "connection": "Connection problem. Please check your internet and try again.",
       "serviceAccountUI": "Service accounts can't sign in here. Use a personal account instead.",
       "missingCredentials": "Please enter your email and password",
-      "accountLocked": "Your account is locked after too many failed sign-in attempts. Reset your password or try again later.",
+      "accountLocked": "Too many unsuccessful sign-in attempts. Please try again in 15 minutes or reset your password.",
       "sessionExpired": "Your session has expired. Please sign in again."
     },
     "emailPlaceholder": "you@example.com",

@@ -1151,11 +1151,13 @@
         "errorFailed": "Tidak dapat menyelesaikan pembetulan AI. Sila cuba lagi.",
         "errorQuota": "Had penggunaan AI telah dicapai. Sila cuba lagi nanti.",
         "errorUnavailable": "Perkhidmatan AI tidak tersedia buat masa ini. Sila cuba lagi sebentar nanti.",
+        "errorBusy": "AI sedang sibuk sekarang. Sila cuba lagi dalam seminit.",
         "partialFailed": "{count} item tidak dapat dijana: {names} ({reason})",
         "andMore": "+{count} lagi",
         "reasonTimeout": "AI mengambil masa terlalu lama",
         "reasonQuota": "had penggunaan AI dicapai",
         "reasonUnavailable": "AI tidak tersedia",
+        "reasonBusy": "AI sedang sibuk",
         "reasonFailed": "penjanaan gagal",
         "retryFailed": "Cuba semula item yang gagal",
         "undoPartial": "Sesetengah pembaikan tidak dapat dibatalkan. Perubahan yang selebihnya sedia untuk dicuba semula."
@@ -3584,7 +3586,7 @@
     "feedback": {
       "button": "Hantar maklum balas",
       "title": "Hantar maklum balas",
-      "description": "Butiran kedai anda dan halaman yang sedang dilihat dilampirkan secara automatik.",
+      "description": "Maklum balas dan laporan pepijat anda membantu kami menambah baik Web Store.",
       "context": {
         "store": "Kedai: {store}"
       },
@@ -3601,11 +3603,16 @@
         "areaError": "Sila pilih sekurang-kurangnya satu ciri.",
         "areaMore": "+{count}",
         "removeArea": "Buang {name}",
+        "areaSelectAll": "Pilih semua",
+        "areaSheetTitle": "Pilih ciri",
+        "areaClearAll": "Kosongkan semua",
+        "areaDone": "Selesai",
+        "areaDoneCount": "Selesai ({count})",
         "areaOptions": {
-          "products": "Produk & stok",
+          "products": "Produk & inventori",
           "orders": "Pesanan",
           "customers": "Pelanggan",
-          "discounts": "Diskaun",
+          "discounts": "Promosi",
           "design": "Reka bentuk & halaman",
           "payments": "Pembayaran",
           "shipping": "Penghantaran",
@@ -3650,7 +3657,7 @@
       },
       "success": {
         "title": "Maklum balas dihantar",
-        "notifyNote": "Kami akan memaklumkan anda dalam Prime Web (ikon loceng) apabila ada kemas kini."
+        "notifyNote": "Kami akan memaklumkan anda dalam Web Store (ikon loceng) apabila ada kemas kini."
       }
     }
   },
@@ -3676,7 +3683,7 @@
       "connection": "Masalah rangkaian. Sila semak semula sambungan internet anda dan cuba lagi.",
       "serviceAccountUI": "Akaun perkhidmatan tidak boleh di log masuk. Sila gunakan akaun peribadi.",
       "missingCredentials": "Sila masukkan email dan kata laluan anda",
-      "accountLocked": "Akaun anda telah dikunci kerana terlalu banyak percubaan log masuk yang gagal. Sila tetapkan semula kata laluan anda atau cuba lagi kemudian",
+      "accountLocked": "Terlalu banyak percubaan log masuk yang tidak berjaya. Sila cuba lagi dalam 15 minit atau tetapkan semula kata laluan anda.",
       "sessionExpired": "Sesi anda telah tamat. Sila log masuk semula."
     },
     "emailPlaceholder": "anda@contoh.com",

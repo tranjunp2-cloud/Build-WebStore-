@@ -41,7 +41,7 @@ THEN  header ở mọi trang có nút "Send feedback" / "Hantar maklum balas"
 ```gherkin
 GIVEN form đang mở
 WHEN  user chọn Loại, chọn ít nhất 1 Tính năng, nhập Mô tả 10–2000 ký tự rồi bấm gửi
-THEN  phản hồi được lưu, màn thành công hiện "Feedback sent" + câu báo sẽ thông báo qua biểu tượng chuông + nút Close
+THEN  phản hồi được lưu, form đóng và hiện toast "Feedback sent" + câu báo sẽ thông báo trong Web Store qua biểu tượng chuông (PD-025)
   AND KHÔNG hiện mã phản hồi, KHÔNG có câu cam kết thời gian xử lý
 ```
 
@@ -109,7 +109,7 @@ THEN  hỏi "Discard what you've entered?" với 2 nút Keep editing / Discard
 
 ### Additional Criteria
 
-- [ ] Server tự gắn context (không hiện trên UI ngoài tên cửa hàng): tenant, user, role, isMigratedStore, URL trang, app version, ngôn ngữ, user agent.
+- [ ] Server tự gắn context (không hiện trên UI, kể cả tên cửa hàng — PD-025): tenant, user, role, isMigratedStore, URL trang, app version, ngôn ngữ, user agent.
 - [ ] Mã phản hồi `FB-{YY}-{6 số}` sinh ở server, chỉ dùng nội bộ (Lark, Support, dedupe).
 - [ ] Ảnh tải lên riêng từng ảnh (Vercel giới hạn body ~4.5 MB), form chỉ gửi danh sách id ảnh; ảnh không gắn với phản hồi sau 24 giờ thì xoá; kiểm tra magic-byte ở server; ảnh không public (GAP-D13).
 - [ ] Mobile 375px: form là popup căn giữa (không full-screen), tự cuộn.

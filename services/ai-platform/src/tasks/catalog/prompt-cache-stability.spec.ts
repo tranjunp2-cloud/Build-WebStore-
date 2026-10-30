@@ -29,6 +29,7 @@ const CACHE_STABLE_FIELDS: { [K in AiTaskId]: readonly (keyof AiTaskInput<K> & s
 	"copy.rewrite-text": ["language", "context"],
 	"seo.page-meta": ["language"],
 	"seo.generate-meta": [],
+	"seo.generate-meta-batch": [],
 	"seo.fix-meta": [],
 	// tone = one of the blog editor's presets (Professional / Friendly / Persuasive).
 	"copy.blog-post": ["language", "tone"],
@@ -84,6 +85,10 @@ const SAMPLES: { [K in AiTaskId]: [AiTaskInput<K>, AiTaskInput<K>] } = {
 	"seo.generate-meta": [
 		{ type: "product", itemName: "Batik Scarf", siteName: "Kedai Batik", context: "Silk", keywords: ["batik"] },
 		{ type: "page", itemName: "About", siteName: "Kuih Mak Teh", context: "Family bakery", keywords: [] },
+	],
+	"seo.generate-meta-batch": [
+		{ siteName: "Kedai Batik", keywords: ["batik"], items: [{ id: "products:1", type: "product", itemName: "Batik Scarf", context: "Silk" }] },
+		{ siteName: "Kuih Mak Teh", keywords: [], items: [{ id: "pages:9", type: "page", itemName: "About" }, { id: "pages:10", type: "page", itemName: "Menu" }] },
 	],
 	"seo.fix-meta": [
 		{ siteName: "Kedai Batik", pageContent: "Heading: Welcome" },

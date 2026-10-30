@@ -125,6 +125,10 @@
       {
         "key": "editor.pageManager.restored",
         "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "auth.errors.accountLocked",
+        "reason": "Lockout copy revised after user feedback (GH-2053): states the 15-minute wait and the reset-password option; password reset now unlocks the account."
       }
     ],
     "sourceContentConflictHold": [
@@ -821,7 +825,8 @@
       "editor.pageManager.pageNamePlaceholder": { "valueType": "scalar", "en": "51cc0a6fafce4327577059afabe1abb1f3617601bcec4458443bd7742ab2c356", "ms": "3869c9c2e4688e87c36968636b1b27b33ea3d1ba4d6b2bfdc659257b4c8d1202" },
       "editor.pageManager.pageCreated": { "valueType": "scalar", "en": "f8a7e1c23f6c71097d22d1eaf97ca83e5b13a5a2fe83d3aef271d2f8c39e2d21", "ms": "41ea8e606e2b37415a313b279025e6f6ee0031fc52ff919ade64dc5a0676e16a" },
       "editor.pageManager.pageHidden": { "valueType": "scalar", "en": "02758b3e22bbf4d00bfd3a37aa9861f3beec136c31a2f2c91e3c98bed6b7f0b1", "ms": "963217fb1e99d5e6b156e9134b9e1f9ac619269265d720bc5ff3596433028bc6" },
-      "editor.pageManager.restored": { "valueType": "scalar", "en": "208fd4f2a2257e334044150d0999e6a57586c65dab1a1faaf93469dea437df98", "ms": "db4d2ac577f73742c220aa036c89ecad5cae3026e4fb721463869d0a1281b32d" }
+      "editor.pageManager.restored": { "valueType": "scalar", "en": "208fd4f2a2257e334044150d0999e6a57586c65dab1a1faaf93469dea437df98", "ms": "db4d2ac577f73742c220aa036c89ecad5cae3026e4fb721463869d0a1281b32d" },
+      "auth.errors.accountLocked": { "valueType": "scalar", "en": "efbb3db4b93b5ccdb6efc14f9bc6dadb3399365c4e0e8fc7066f1e7d2b91fab9", "ms": "5d74426e1e5a3381cbaa67547f7443916e0c35442c81672c7661f83a333a0d7c" }
     }
   },
   "contractOverrides": [

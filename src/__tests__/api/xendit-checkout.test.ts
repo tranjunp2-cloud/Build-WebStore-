@@ -1,6 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ─── Mocks ────────────────────────────────────────────────────────────
+
+// GH-2132 kill switch — enabled by default so existing TCs exercise the real flow; toggled off in the hidden suite below
+const xenditFlag = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/payment/xendit-visibility', () => ({
+    get XENDIT_ENABLED() { return xenditFlag.enabled },
+}))
 
 const mockFindByID = vi.fn()
 const mockCreate = vi.fn()
@@ -327,5 +333,30 @@ describe('POST /api/orders/xendit-checkout [shipping]', () => {
         expect(created.shippingCourier).toBeUndefined()
         expect(created.shippingServiceId).toBeUndefined()
         expect(created.parcelWeight).toBe(500) // weight default 500g still recorded
+    })
+})
+
+// ─── GH-2132: Xendit temporarily hidden ───────────────────────────────
+
+describe('POST /api/orders/xendit-checkout [temporarily disabled]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        xenditFlag.enabled = false
+    })
+
+    afterEach(() => {
+        xenditFlag.enabled = true
+    })
+
+    it('[TC-F34X-24-03] rejects with 422 PAYMENT_METHOD_DISABLED before any DB read; no order, no invoice', async () => {
+        const res = await POST(mockRequest(VALID_REQUEST_BODY) as any)
+        const json = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(json.error.code).toBe('PAYMENT_METHOD_DISABLED')
+        expect(mockFindByID).not.toHaveBeenCalled()
+        expect(mockCreate).not.toHaveBeenCalled()
+        expect(mockCreateInvoice).not.toHaveBeenCalled()
+        expect(mockBuildOrderItems).not.toHaveBeenCalled()
     })
 })

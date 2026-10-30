@@ -109,8 +109,9 @@ async function generateMetaOnPlatform(
             await finishCapture(cap, { status: 'failed', error: 'aborted' })
             throw new DOMException('Aborted', 'AbortError')
         }
-        // Workspace quota reached: same template fallback as the legacy rate-limit path.
-        if (error instanceof AiClientError && error.status === 429) {
+        // Workspace quota reached: same template fallback as the legacy rate-limit path. A provider that is
+        // merely busy (`provider_rate_limited`) is not a quota: the caller decides whether to retry.
+        if (error instanceof AiClientError && error.status === 429 && error.code !== 'provider_rate_limited') {
             const rateFallback = cappedTemplateMeta(type, itemName, siteName)
             await finishCapture(cap, { status: 'success', outputSnapshot: { path: 'rate-limit-fallback', ...rateFallback } })
             return rateFallback

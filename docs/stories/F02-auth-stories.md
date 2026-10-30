@@ -108,7 +108,7 @@ THEN  set auth cookie (lưu phiên đăng nhập)
 ```gherkin
 GIVEN user nhập sai email hoặc password
 WHEN  submit form
-THEN  hiện alert banner "Incorrect email or password" (nếu tài khoản đang bị khóa sau 5 lần sai → "Your account is locked after too many failed sign-in attempts…", API 423 — GH-2053)
+THEN  hiện alert banner "Incorrect email or password" (nếu tài khoản đang bị khóa sau 5 lần sai → "Too many unsuccessful sign-in attempts. Please try again in 15 minutes or reset your password.", API 423 — GH-2053)
   AND toast.error (thông báo đỏ) message
   AND KHÔNG redirect, giữ nguyên trang
   AND password field cleared

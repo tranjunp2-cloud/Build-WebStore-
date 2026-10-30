@@ -59,7 +59,9 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # PR runs are superseded by newer pushes; pushes to staging/main are never cancelled
+  # because their deploy jobs run DB migrations and a mid-flight cancel can leave them half-applied.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ──────────────────────────────────────
@@ -687,6 +689,9 @@ jobs:
         env:
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
           SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+          # Production never force-reseeds: force deletes + recreates templates and cascades
+          # to template_versions / quality_scores / content packs.
+          SEED_FORCE: 'false'
         run: bash .github/scripts/seed-templates-post-deploy.sh
 
       - name: Notify deploy success
