@@ -24,6 +24,8 @@
 #   deploy-production (push main,    no needs — CI already ran on PR)
 #   deploy-ai-platform            (push staging) — separate Vercel project, same 3-stage flow
 #   deploy-ai-platform-production (push main)    — separate Vercel project, same 3-stage flow
+#   deploy-scope (push / manual run on staging, main): picks which of the two projects the
+#     push changed; the four deploy jobs above run only for their side (manual run = both)
 #   notify-fail (PR only, if failure)
 name: CI
 
@@ -382,15 +384,61 @@ jobs:
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
+  # Job 5b: Deploy scope — which project(s) this push changed (staging / main)
+  # ──────────────────────────────────────
+  # services/ai-platform/** → ai-platform only; packages/agent-core|ai-contracts/** (ai-platform links
+  # them via file:) and ci.yml → both; docs/, plans/, .claude/, top-level *.md → neither; anything
+  # else → web. Every case it cannot read (manual run, new branch, missing commit) deploys both,
+  # so a deploy is never silently dropped. A manual run (Actions → CI → Run workflow) redeploys both.
+  deploy-scope:
+    name: "Deploy: Scope"
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      web: ${{ steps.scope.outputs.web }}
+      ai: ${{ steps.scope.outputs.ai }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pick projects
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          both() { printf 'web=true\nai=true\n' >> "$GITHUB_OUTPUT"; echo "Deploy both: $1"; exit 0; }
+          [ "$EVENT" = push ] || both "manual run"
+          case "$BEFORE" in ""|0000000000000000000000000000000000000000) both "no previous commit" ;; esac
+          git fetch --no-tags --depth=1 origin "$BEFORE" || both "previous commit $BEFORE not fetchable"
+          files=$(git diff --name-only "$BEFORE" "$SHA") || both "diff failed"
+          [ -n "$files" ] || both "empty diff"
+          web=false; ai=false
+          while IFS= read -r f; do
+            case "$f" in
+              .github/workflows/ci.yml|packages/agent-core/*|packages/ai-contracts/*) web=true; ai=true ;;
+              services/ai-platform/*) ai=true ;;
+              docs/*|plans/*|.claude/*) ;;
+              *) if [[ "$f" == */* || "$f" != *.md ]]; then web=true; fi ;;
+            esac
+          done <<< "$files"
+          printf 'web=%s\nai=%s\n' "$web" "$ai" >> "$GITHUB_OUTPUT"
+          echo "Changed files: $(wc -l <<< "$files") → web=$web ai-platform=$ai"
+
+  # ──────────────────────────────────────
   # Job 6: Deploy to Vercel (staging branch)
   # ──────────────────────────────────────
   deploy-staging:
     name: "Deploy: Vercel (staging)"
-    # Only `needs` the ai-platform deploy (same push trigger, so never skipped):
-    # prime-web on staging calls AI_PLATFORM_URL, so it must not go live ahead
-    # of a failed ai-platform deploy. quality-check/test run on the PR only.
-    needs: deploy-ai-platform
-    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    # Waits for the ai-platform deploy: prime-web on staging calls AI_PLATFORM_URL, so it must
+    # not go live ahead of a failed ai-platform deploy. A skipped one (push did not touch
+    # ai-platform) is fine. quality-check/test run on the PR only.
+    needs: [deploy-scope, deploy-ai-platform]
+    if: "!cancelled() && github.ref == 'refs/heads/staging' && needs.deploy-scope.outputs.web == 'true' && needs.deploy-ai-platform.result != 'failure'"
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 45
     concurrency:
@@ -575,8 +623,8 @@ jobs:
   deploy-production:
     name: "Deploy: Vercel (production)"
     # Waits for the ai-platform production deploy — see deploy-staging.
-    needs: deploy-ai-platform-production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [deploy-scope, deploy-ai-platform-production]
+    if: "!cancelled() && github.ref == 'refs/heads/main' && needs.deploy-scope.outputs.web == 'true' && needs.deploy-ai-platform-production.result != 'failure'"
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 45
     concurrency:
@@ -727,8 +775,9 @@ jobs:
   # ──────────────────────────────────────
   deploy-ai-platform:
     name: "Deploy: AI Platform (staging)"
-    # No `needs` — same rationale as deploy-staging (CI already ran on the PR).
-    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    # Only deploy-scope: CI already ran on the PR.
+    needs: deploy-scope
+    if: github.ref == 'refs/heads/staging' && needs.deploy-scope.outputs.ai == 'true'
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     concurrency:
@@ -825,8 +874,9 @@ jobs:
   # ──────────────────────────────────────
   deploy-ai-platform-production:
     name: "Deploy: AI Platform (production)"
-    # No `needs` — same rationale as deploy-staging (CI already ran on the PR).
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Only deploy-scope: CI already ran on the PR.
+    needs: deploy-scope
+    if: github.ref == 'refs/heads/main' && needs.deploy-scope.outputs.ai == 'true'
     runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     concurrency:
