@@ -380,7 +380,7 @@ jobs:
 
       - name: Checkout (for lark-notify composite action)
         if: github.event.label.name == 'qa:failed'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           token: ${{ secrets.GH_BOT_TOKEN || github.token }}
 
@@ -543,7 +543,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout (for lark-notify composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           token: ${{ secrets.GH_BOT_TOKEN || github.token }}
 
@@ -640,7 +640,7 @@ jobs:
       issues: write
       repository-projects: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: .github/scripts
       - name: Estimate and set dates
