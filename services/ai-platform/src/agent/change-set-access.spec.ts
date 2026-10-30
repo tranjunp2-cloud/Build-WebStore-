@@ -75,7 +75,7 @@ async function workspace(extra: (who: AiRequestContext) => Partial<ChangeSet> = 
 		await store.insertChangeSet("org_1", draft(`cs_${who.userId}`, `run_${who.userId}`, { requestedBy: { id: who.userId, name: who.name ?? null }, ...extra(who) }));
 	}
 	const decisions = new ChangeSetDecisionService(store);
-	const controller = new AgentController({} as never, decisions, store, {} as never, {} as never, env, {} as never, { nudge: async () => 0 } as never);
+	const controller = new AgentController({} as never, decisions, store, {} as never, {} as never, env, {} as never, { nudge: async () => 0 } as never, {} as never);
 	return { store, decisions, controller };
 }
 
@@ -217,7 +217,7 @@ describe("who asked, and what the caller may do [TC-AISEC-075]", () => {
 		const store = new InMemoryAgentStore();
 		await store.createRun(editor, run("run_old"));
 		await store.insertChangeSet("org_1", draft("cs_old", "run_old"));
-		const controller = new AgentController({} as never, new ChangeSetDecisionService(store), store, {} as never, {} as never, env, {} as never, {} as never);
+		const controller = new AgentController({} as never, new ChangeSetDecisionService(store), store, {} as never, {} as never, env, {} as never, {} as never, {} as never);
 
 		// Act
 		const seenByOwner = await controller.getChangeSet(owner, "cs_old");
@@ -290,7 +290,7 @@ function copilot() {
 	const runs = new AgentRunService(store, models, ledger, env, threads);
 	const work = new AgentWorkService(store, threads);
 	const decisions = new ChangeSetDecisionService(store);
-	const controller = new AgentController(runs, decisions, store, threads, {} as never, env, work, { nudge: async () => 0 } as never);
+	const controller = new AgentController(runs, decisions, store, threads, {} as never, env, work, { nudge: async () => 0 } as never, {} as never);
 	return { store, runs, work, controller };
 }
 

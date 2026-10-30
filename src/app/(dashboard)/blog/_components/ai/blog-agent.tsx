@@ -4,6 +4,7 @@ import '@ech/agent-ui/styles.css'
 import type { AgentThread, ChangeSet } from '@ech/agent-core'
 import { AgentProvider, useChangeSets, useDecideChangeSet, useUndoChangeSet } from '@ech/agent-react'
 import { sessionThreadHint, useAgentChatRuntime } from '@ech/agent-react/chat'
+import { useAiChatQuota } from '@/components/ai-quota/ai-chat-quota'
 import { AgentAssistantPanel } from '@ech/agent-ui'
 import { useRouter } from 'next/navigation'
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef, useState } from 'react'
@@ -55,6 +56,7 @@ function BlogAgentState({ blogId, children }: { blogId: string; children: ReactN
     const pin = useMemo(() => ({ module: 'blog', ...(isNew ? {} : { entity: { kind: 'blog_post' as const, id: blogId } }) }), [blogId, isNew])
     const hint = useMemo(() => sessionThreadHint(blogThreadKey(blogId)), [blogId])
     const chat = useAgentChatRuntime({ context: pin, hint, restoreLatest: false, scope: blogChats })
+    const quota = useAiChatQuota({ busy: chat.busy })
     const allPending = useChangeSets({ status: 'pending' })
     const decideChangeSet = useDecideChangeSet()
     const undoChangeSet = useUndoChangeSet()
@@ -108,6 +110,8 @@ function BlogAgentState({ blogId, children }: { blogId: string; children: ReactN
             suggestions={agentStarters('blog', locale)}
             labels={labels}
             locale={locale}
+            notice={quota.notice}
+            locked={quota.locked}
         />
     )
     const value: BlogAgentValue = {

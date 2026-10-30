@@ -319,6 +319,7 @@ Two dashboard code paths read the shared `analytics` collection:
 | **TC-F37-04-52** | AC-05 | Func | `busy` vs `quota` | `api/seo-fix-all.test.ts` `[x] AUTO` | `AiClientError` 429 with code `provider_rate_limited` -> `busy` (with `retryAfterMs`); 429 without code -> `quota`; only timeout/busy/unavailable are retryable. | Org limit != provider busy |
 | **TC-F37-04-53** | AC-05 / UX | Func | Modal busy message | `ai-fix-modal-partial.test.tsx` `[x] AUTO` | All-busy shows "The AI is busy right now. Please try again in a minute."; partial note says "(the AI is busy)"; Retry failed items stays; en/ms keys equal. | Not "AI isn't available" |
 | **TC-F37-04-54** | AC-05 | Func | Per-item path keeps throwing on busy | `unit/lib/ai/generate-meta-openai.test.ts` `[x] AUTO` | `provider_rate_limited` is thrown (cause kept), not replaced by the template; org-quota 429 still falls back to the template. | Other callers unchanged |
+| **TC-AIEFF-14** | AC-05 | Func | Task call keeps the tier's effort | `services/ai-platform/src/tasks/task-engine-effort.spec.ts` `[x] AUTO` | Through the real registry + task engine, `seo.generate-meta` on Claude Haiku 5.5 is sent with `max_tokens` 300, `thinking: disabled` and no `output_config.effort`; an explicit `AI_EFFORT_FAST=medium` reaches the request as `medium`. The engine adds no provider-level effort of its own (it made the SDK ignore the tier's `reasoning`). | Haiku no longer thinks inside a 300-token answer |
 
 ### Phase 3 local gate evidence
 

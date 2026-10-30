@@ -253,3 +253,32 @@ describe("Approve all in the wide review [TC-AICP-223]", () => {
 		expect(renderToStaticMarkup(<ReviewSheet changeSet={{ ...blog, confirmText: "x" }} onApprove={() => undefined} campaign={campaign} />)).not.toContain("Approve all");
 	});
 });
+
+// TC-AIWB-129 — several drafts of one request (group kind "set", e.g. 3 blog posts): the label alone, still Approve all.
+describe("a set of drafts from one request [TC-AIWB-129]", () => {
+	const set = ["a", "b", "c"].map((id, index) =>
+		card(id, undefined, { action: { kind: "blog.create_draft", payload: {} }, group: { id: "set_1", label: "Rainy season tips", kind: "set", step: index + 1 } }),
+	);
+
+	it("shows the set's label without the Campaign prefix, with Approve all above the first card", () => {
+		// Act
+		const first = renderToStaticMarkup(<CampaignHeader changeSet={set[0]!} turnCards={set} onApprove={async () => undefined} />);
+		const second = renderToStaticMarkup(<CampaignHeader changeSet={set[1]!} turnCards={set} onApprove={async () => undefined} />);
+
+		// Assert
+		expect(text(first)).toBe("Rainy season tips Approve all (3)");
+		expect(text(second)).toBe("Rainy season tips");
+	});
+
+	it("approves the set's cards one after the other in their order", async () => {
+		// Arrange
+		const approved: string[] = [];
+
+		// Act
+		const outcome = await approveCampaign(campaignCards([set[2]!, set[0]!, set[1]!], "set_1"), async (c) => void approved.push(c.id));
+
+		// Assert
+		expect(approved).toEqual(["a", "b", "c"]);
+		expect(outcome).toEqual({ approved: 3 });
+	});
+});

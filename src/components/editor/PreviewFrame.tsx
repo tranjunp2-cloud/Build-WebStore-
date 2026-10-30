@@ -4,6 +4,7 @@ import React, { memo, useEffect, useState, useCallback, useRef, useMemo } from '
 import { GripVertical, Loader2 } from 'lucide-react'
 import type { ContextElement } from '@ech/agent-core'
 import { useEditorAgentEnabled } from './agent/editor-agent-context'
+import { useAiAllowanceOut } from '@/components/ai-quota/use-ai-usage'
 import { ElementAskLayer, type ViewportRect } from './agent/ElementAskLayer'
 import { imageElement, sectionElement, textElement } from './agent/element-context'
 import { globalPartElement, pickOnCanvas } from './agent/canvas-pick'
@@ -281,8 +282,10 @@ function PreviewFrameInner({
             return next
         })
     }, [])
-    // Web builder copilot on: Ask AI on an element goes to the chat (ElementAskLayer), not the old rewrite popover
-    const agentOn = useEditorAgentEnabled()
+    // Web builder copilot on: Ask AI on an element goes to the chat (ElementAskLayer), not the old rewrite popover.
+    // The shop's AI allowance used up → no Ask AI anywhere on the canvas (the chat says when it is back)
+    const aiOut = useAiAllowanceOut()
+    const agentOn = useEditorAgentEnabled() && !aiOut
     const agentOnRef = useRef(agentOn)
     const pageIdRef = useRef(pageId)
     useEffect(() => {

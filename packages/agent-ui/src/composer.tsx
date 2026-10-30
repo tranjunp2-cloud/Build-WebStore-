@@ -152,6 +152,8 @@ export interface ChatComposerProps {
 	onQueue?: (text: string) => void;
 	/** the auto-approve switch in the footer (omitted: no switch) */
 	autoApprove?: { on: boolean; onChange: (on: boolean) => void };
+	/** the host closed the box for now (e.g. the shop's AI allowance is used up): nothing can be typed or sent */
+	locked?: { placeholder: string };
 	labels?: Partial<ComposerLabels>;
 }
 
@@ -247,7 +249,7 @@ function MediaPicker({
  * photos), the page-context chip and send.
  */
 export const ChatComposer = forwardRef<ComposerHandle, ChatComposerProps>(function ChatComposer(
-	{ attachments, attachmentError, onFiles, onRemove, onPick, listMedia, context, elements, canSend, onSend, busy, onStop, hint, onQueue, autoApprove, labels: overrides },
+	{ attachments, attachmentError, onFiles, onRemove, onPick, listMedia, context, elements, canSend, onSend, busy, onStop, hint, onQueue, autoApprove, locked, labels: overrides },
 	ref,
 ) {
 	const labels = { ...DEFAULT_COMPOSER_LABELS, ...overrides };
@@ -289,7 +291,7 @@ export const ChatComposer = forwardRef<ComposerHandle, ChatComposerProps>(functi
 		return () => document.removeEventListener("pointerdown", onDown, true);
 	}, [menu]);
 
-	const ready = canSend(text) && !busy;
+	const ready = !locked && canSend(text) && !busy;
 	const submit = () => {
 		if (busy && onQueue && text.trim()) {
 			onQueue(text.trim());
@@ -302,7 +304,7 @@ export const ChatComposer = forwardRef<ComposerHandle, ChatComposerProps>(functi
 		void onSend(value);
 	};
 
-	const offerHint = Boolean(hint) && !busy && text === "";
+	const offerHint = !locked && Boolean(hint) && !busy && text === "";
 	// a thing on the page attached: ask about it in its own words
 	const attached = elements?.items ?? [];
 	const firstKind = attached[0] ? (labels.elementKinds[attached[0].kind] ?? attached[0].kind).toLowerCase() : "";
@@ -470,8 +472,9 @@ export const ChatComposer = forwardRef<ComposerHandle, ChatComposerProps>(functi
 					onChange={(e) => setText(e.target.value)}
 					onKeyDown={onKeyDown}
 					onPaste={onPaste}
-					placeholder={busy ? labels.placeholderBusy : offerHint ? hint : elementPlaceholder}
+					placeholder={locked ? locked.placeholder : busy ? labels.placeholderBusy : offerHint ? hint : elementPlaceholder}
 					aria-label={labels.message}
+					disabled={Boolean(locked)}
 				/>
 				{offerHint && (
 					<kbd className="ech-ag-tab-hint" aria-hidden="true">
@@ -488,6 +491,7 @@ export const ChatComposer = forwardRef<ComposerHandle, ChatComposerProps>(functi
 					title={labels.attach}
 					aria-haspopup="menu"
 					aria-expanded={menu !== "closed"}
+					disabled={Boolean(locked)}
 					onClick={() => setMenu(menu === "closed" ? "menu" : "closed")}
 				>
 					<Icon name="paperclip" />

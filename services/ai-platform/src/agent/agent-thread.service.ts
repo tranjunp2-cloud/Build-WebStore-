@@ -1,10 +1,11 @@
 import type { KnownImage } from "./change-set-builders";
 import { type AgentThread, type AgentThreadDetail, AgentDomainSchema, type ChangeSet, type EntityRef, type StartRunInput } from "@ech/agent-core";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import type { ModelMessage } from "ai";
 import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
+import { SettingsService } from "../settings/settings.service";
 import { AgentError } from "./agent-errors";
 import { AGENT_STORE, type AgentStore, type ThreadOwner, type ThreadRunRecord } from "./agent-store";
 import { currentState } from "./change-set-expiry";
@@ -69,11 +70,12 @@ export class AgentThreadService {
 	constructor(
 		@Inject(AGENT_STORE) private readonly store: AgentStore,
 		@Inject(ENV) private readonly env: Env,
+		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
 	) {}
 
 	/** Threads last active before this are expired (hidden now, deleted by the sweep). */
 	activeSince(now: Date = new Date()): Date {
-		return new Date(now.getTime() - this.env.AI_THREAD_RETENTION_DAYS * DAY_MS);
+		return new Date(now.getTime() - (this.settings?.runtimeEnv() ?? this.env).AI_THREAD_RETENTION_DAYS * DAY_MS);
 	}
 
 	/**

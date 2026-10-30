@@ -427,7 +427,7 @@ describe("a repeated start attaches to the first run [TC-AISEC-128]", () => {
 	it("the controller answers a repeated JSON start with the first run instead of a second one", async () => {
 		// Arrange
 		const { service, store, threads, env, gate } = setup({ AI_MAX_RUNNING_RUNS_PER_ORG: "0" });
-		const controller = new AgentController(service, {} as never, store, threads, {} as never, env, {} as never, { nudge: async () => undefined } as never);
+		const controller = new AgentController(service, {} as never, store, threads, {} as never, env, {} as never, { nudge: async () => undefined } as never, {} as never);
 		const sent: Array<{ code: number; body: AgentRun }> = [];
 		const reply = () => ({ code: (code: number) => ({ send: async (body: AgentRun) => void sent.push({ code, body }) }) }) as unknown as FastifyReply;
 		const request = { headers: { accept: "application/json" } } as FastifyRequest;

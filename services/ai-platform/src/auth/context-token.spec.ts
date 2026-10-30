@@ -1,6 +1,14 @@
 import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
-import { CONTEXT_TOKEN_AUDIENCE, CONTEXT_TOKEN_ISSUER, ContextTokenError, verifyContextToken } from "./context-token";
+import {
+	CONTEXT_TOKEN_AUDIENCE,
+	CONTEXT_TOKEN_ISSUER,
+	ContextTokenError,
+	USAGE_SYNC_TOKEN_AUDIENCE,
+	USAGE_SYNC_TOKEN_SUBJECT,
+	verifyContextToken,
+	verifyUsageSyncToken,
+} from "./context-token";
 
 const secret = "test-context-secret-at-least-32-characters";
 
@@ -61,5 +69,61 @@ describe("verifyContextToken", () => {
 		expect(b?.name).toHaveLength(80);
 		expect(c).not.toHaveProperty("name");
 		expect(await verifyContextToken(await sign({ org: "org_1" }), secret)).not.toHaveProperty("name");
+	});
+});
+
+describe("shop limits claim `lim` [TC-AIPRC-09]", () => {
+	const lim = { plan: "pro", aiBudgetUsd: 5, picturesPerDay: 50 };
+
+	it("maps a valid claim to ctx.limits (null = unlimited) and omits it when absent", async () => {
+		expect((await verifyContextToken(await sign({ org: "o", lim }), secret)).limits).toEqual(lim);
+		const unlimited = { plan: "max", aiBudgetUsd: null, picturesPerDay: null };
+		expect((await verifyContextToken(await sign({ org: "o", lim: unlimited }), secret)).limits).toEqual(unlimited);
+		expect(await verifyContextToken(await sign({ org: "o" }), secret)).not.toHaveProperty("limits");
+	});
+
+	it.each([
+		["negative budget", { ...lim, aiBudgetUsd: -1 }],
+		["fractional pictures", { ...lim, picturesPerDay: 1.5 }],
+		["negative pictures", { ...lim, picturesPerDay: -3 }],
+		["plan over 40 characters", { ...lim, plan: "p".repeat(41) }],
+		["empty plan", { ...lim, plan: "" }],
+		["missing field", { plan: "pro", aiBudgetUsd: 1 }],
+		["string budget", { ...lim, aiBudgetUsd: "5" }],
+	])("refuses the token on %s", async (_name, bad) => {
+		await expect(verifyContextToken(await sign({ org: "o", lim: bad }), secret)).rejects.toThrow(ContextTokenError);
+	});
+});
+
+describe("verifyUsageSyncToken", () => {
+	const signSync = (options: { aud?: string; sub?: string; iat?: number; key?: string } = {}) =>
+		new SignJWT({})
+			.setProtectedHeader({ alg: "HS256" })
+			.setIssuer(CONTEXT_TOKEN_ISSUER)
+			.setAudience(options.aud ?? USAGE_SYNC_TOKEN_AUDIENCE)
+			.setSubject(options.sub ?? USAGE_SYNC_TOKEN_SUBJECT)
+			.setIssuedAt(options.iat)
+			.setExpirationTime("1h")
+			.sign(new TextEncoder().encode(options.key ?? secret));
+
+	it("accepts a fresh token with the sync audience and subject", async () => {
+		await expect(verifyUsageSyncToken(await signSync(), secret)).resolves.toBeUndefined();
+	});
+
+	it("refuses another audience (a context token), another subject, another key and a token older than 5 minutes", async () => {
+		const old = Math.floor(Date.now() / 1000) - 6 * 60;
+		for (const token of [
+			await signSync({ aud: CONTEXT_TOKEN_AUDIENCE }),
+			await signSync({ sub: "usr_1" }),
+			await signSync({ key: "another-secret-that-is-at-least-32-chars" }),
+			await signSync({ iat: old }),
+		]) {
+			await expect(verifyUsageSyncToken(token, secret)).rejects.toBeInstanceOf(ContextTokenError);
+		}
+		await expect(verifyUsageSyncToken("not-a-jwt", secret)).rejects.toBeInstanceOf(ContextTokenError);
+	});
+
+	it("is not accepted as a context token", async () => {
+		await expect(verifyContextToken(await signSync(), secret)).rejects.toBeInstanceOf(ContextTokenError);
 	});
 });

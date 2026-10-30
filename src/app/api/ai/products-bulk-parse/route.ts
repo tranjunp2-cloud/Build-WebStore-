@@ -14,6 +14,7 @@ import {
 } from '@/lib/ai/bulk-category-matching'
 import { describeAiTaskFailure, runAiTaskForUser } from '@/lib/ai-platform/ai-tasks'
 import { isAiTasksEnabled } from '@/lib/ai-platform/config'
+import { parseProductsInChunks } from '@/lib/ai/bulk-parse-chunks'
 
 export const maxDuration = 60
 // Platform call must settle (answer or aiTimeout) before the function is killed.
@@ -154,6 +155,13 @@ function detectMerchantFacingLocale(result: BulkParseResult): string | null {
     return text ? detectTextLocale(text) : null
 }
 
+/** The model answered, but not with a product list: the outer handler's `parseError`. */
+class InvalidBulkParseError extends Error {
+    constructor() {
+        super('Invalid AI response structure')
+    }
+}
+
 /** Platform task failure → the error codes the bulk-create modal already understands. */
 function bulkParseTaskFailure(error: unknown): NextResponse {
     const failure = describeAiTaskFailure(error)
@@ -254,20 +262,37 @@ export const POST = withAuth(async (user, req) => {
         }
 
         let parsedResult: unknown
+        let unparsed: string[] = []
         try {
-            const { output } = await runAiTaskForUser(user, req, 'catalog.bulk-parse-products', {
+            const taskOptions = (signal: AbortSignal) => ({ tenantId: String(tenantId), signal })
+            const chunked = await parseProductsInChunks({
                 promptText,
-                locale,
-                categoryCandidates,
-            }, { tenantId: String(tenantId), signal: AbortSignal.timeout(PLATFORM_DEADLINE_MS) })
-            parsedResult = output
+                deadlineAt: Date.now() + PLATFORM_DEADLINE_MS,
+                split: async (text, signal) => {
+                    const { output } = await runAiTaskForUser(user, req, 'catalog.split-products', { promptText: text }, taskOptions(signal))
+                    return output.items.map((item) => item.text)
+                },
+                parse: async (text, signal) => {
+                    const { output } = await runAiTaskForUser(user, req, 'catalog.bulk-parse-products', {
+                        promptText: text,
+                        locale,
+                        categoryCandidates,
+                    }, taskOptions(signal))
+                    if (!isValidBulkParseResult(output)) throw new InvalidBulkParseError()
+                    return output
+                },
+            })
+            parsedResult = { products: chunked.products }
+            unparsed = chunked.unparsed
         } catch (error) {
+            if (error instanceof InvalidBulkParseError) throw error
             console.error('[AI Bulk Parse Error]', error instanceof Error ? error.message : error)
             return bulkParseTaskFailure(error)
         }
         if (!isValidBulkParseResult(parsedResult)) {
-            throw new Error('Invalid AI response structure')
+            throw new InvalidBulkParseError()
         }
+        if (unparsed.length > 0) console.warn('[AI Bulk Parse] chunks left unparsed', { pieces: unparsed.length })
         const { result: canonicalResult, reasonCounts } = canonicalizeBulkParseResult(parsedResult, categoryCandidates)
         payload.logger.info(
             { categoryGuard: reasonCounts },
@@ -286,7 +311,7 @@ export const POST = withAuth(async (user, req) => {
                 { error: 'merchantLanguageMismatch', retryable: true },
                 { status: 422 })
         }
-        return NextResponse.json({ generationId, ...canonicalResult })
+        return NextResponse.json({ generationId, ...canonicalResult, ...(unparsed.length > 0 ? { unparsed } : {}) })
     } catch (error) {
         console.error('[AI Bulk Parse Error]', error)
         

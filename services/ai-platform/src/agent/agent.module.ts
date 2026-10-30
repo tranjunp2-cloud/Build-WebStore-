@@ -3,6 +3,7 @@ import { DecisionService } from "../decide/decision.service";
 import { ImagesModule } from "../images/images.module";
 import { LedgerModule } from "../ledger/ledger.module";
 import { HttpShopTools, SHOP_TOOLS } from "../shop/shop-tools";
+import { TasksModule } from "../tasks/tasks.module";
 import { AgentController } from "./agent.controller";
 import { AgentRunService } from "./agent-run.service";
 import { AGENT_STORE } from "./agent-store";
@@ -17,7 +18,7 @@ import { StaleRunSweeper } from "./stale-run-sweeper";
 import { ThreadRetentionService } from "./thread-retention.service";
 
 @Module({
-	imports: [LedgerModule, ImagesModule],
+	imports: [LedgerModule, ImagesModule, TasksModule],
 	controllers: [AgentController, InternalCronController],
 	providers: [
 		AgentRunService,

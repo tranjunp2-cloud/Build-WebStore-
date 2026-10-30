@@ -90,6 +90,25 @@ export const CopyBlogPostOutputSchema = z.object({
 	seoDescription: z.string(),
 });
 
+/**
+ * Copilot "write several posts": the article of ONE post whose title and sections the copilot already planned.
+ * Each post of the set is its own call, run in parallel by the platform (one answer for all would not fit).
+ */
+export const CopyBlogPostDraftInputSchema = z.object({
+	title: z.string().trim().min(5).max(160),
+	/** the <h2> sections, in order */
+	outline: z.array(z.string().trim().min(2).max(200)).min(2).max(8),
+	/** facts to use: what the merchant said, the shop's products, prices, place (empty = none) */
+	notes: z.string().max(2_000).default(""),
+	language: z.enum(["en", "ms", "vi"]),
+	shopName: z.string().max(200).default(""),
+});
+export const CopyBlogPostDraftOutputSchema = z.object({
+	contentHtml: z.string().min(200).max(30_000),
+	seoTitle: z.string().min(5).max(70),
+	seoDescription: z.string().min(20).max(170),
+});
+
 /** Blog editor ✦ — meta title + description for one post, written in the post's own language. */
 export const SeoBlogMetaInputSchema = z.object({
 	title: z.string().trim().max(300).default(""),
@@ -109,5 +128,6 @@ export const SEO_BLOG_TASKS = {
 	"seo.generate-meta-batch": { input: SeoGenerateMetaBatchInputSchema, output: SeoGenerateMetaBatchOutputSchema },
 	"seo.fix-meta": { input: SeoFixMetaInputSchema, output: SeoFixMetaOutputSchema },
 	"copy.blog-post": { input: CopyBlogPostInputSchema, output: CopyBlogPostOutputSchema },
+	"copy.blog-post-draft": { input: CopyBlogPostDraftInputSchema, output: CopyBlogPostDraftOutputSchema },
 	"seo.blog-meta": { input: SeoBlogMetaInputSchema, output: SeoBlogMetaOutputSchema },
 } as const;

@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { resolveTenantOrganization, toPlatformUserId, verifyTenantMembership } from "@/lib/auth/bridge-token";
 import type { PlatformUser } from "@/types/user";
 import { getAiPlatformContextSecret } from "./config";
+import { aiLimitsForTenant, type AiLimits } from "./plan-limits";
 
 export const AI_CONTEXT_TOKEN_ISSUER = "prime-web";
 export const AI_CONTEXT_TOKEN_AUDIENCE = "ai-platform";
@@ -117,11 +118,26 @@ export const PRIME_WEB_AGENT_CAPABILITIES = [
 	"store_reports",
 ] as const;
 
+/**
+ * The shop's plan limits for the `lim` claim. If they can't be read (DB incident) the claim is left out and
+ * ai-platform applies its own env fallback — a token is never refused over it.
+ */
+async function limitsClaim(tenantId: string | undefined): Promise<AiLimits | undefined> {
+	if (!tenantId) return undefined;
+	try {
+		return await aiLimitsForTenant(tenantId);
+	} catch (error) {
+		console.warn(`[ai-platform] plan limits unavailable for tenant ${tenantId}; token sent without lim:`, error instanceof Error ? error.message : error);
+		return undefined;
+	}
+}
+
 /** Short-lived HS256 token ai-platform trusts instead of any browser input. */
 export async function signAgentContextToken(actor: AgentActor): Promise<string> {
 	const secret = getAiPlatformContextSecret();
 	if (!secret) throw new Error("AI_PLATFORM_CONTEXT_SECRET is not configured.");
 	const name = agentDisplayName(actor.user);
+	const lim = await limitsClaim(actor.tenantId);
 	return new SignJWT({
 		org: actor.organizationId,
 		tenant: actor.tenantId,
@@ -130,6 +146,7 @@ export async function signAgentContextToken(actor: AgentActor): Promise<string> 
 		...(name ? { name } : {}),
 		...(actor.locale ? { locale: actor.locale } : {}),
 		caps: [...PRIME_WEB_AGENT_CAPABILITIES],
+		...(lim ? { lim } : {}),
 	})
 		.setProtectedHeader({ alg: "HS256" })
 		.setIssuer(AI_CONTEXT_TOKEN_ISSUER)

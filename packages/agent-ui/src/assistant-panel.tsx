@@ -1,5 +1,5 @@
 import type { AgentThread, ChangeSet, ContextElement, FieldDiff } from "@ech/agent-core";
-import { type MutableRefObject, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { type MutableRefObject, type ReactNode, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { approveCampaign, campaignCards, campaignQueue, DEFAULT_CAMPAIGN_LABELS, stoppedLine } from "./campaign-group";
 import { type AgentChatHistoryLabels, DEFAULT_CHAT_HISTORY_LABELS } from "./chat-history";
 import { AgentChatThread, type AgentChatView, type ChatLabels, type ChatSuggestion, DEFAULT_CHAT_LABELS } from "./chat";
@@ -125,6 +125,10 @@ export interface AgentAssistantPanelProps {
 	 * badge counts every open item and raises one at a time while closed, chats are tasks.
 	 */
 	work?: AgentPanelWork;
+	/** a line the host shows right above the composer (e.g. the AI allowance running low or used up) */
+	notice?: ReactNode;
+	/** the host closed the chat for now: no starters or next-step chips, the composer shows this placeholder and can't send */
+	locked?: { placeholder: string };
 }
 
 const AUTO_APPROVE_KEY = "ech-agent:auto-approve";
@@ -358,6 +362,8 @@ export function AgentAssistantPanel({
 	singleChat = false,
 	helloHint,
 	work,
+	notice,
+	locked,
 }: AgentAssistantPanelProps) {
 	const [wide, setWide] = useState(false);
 	// open state when the host does not control it: taking an item from the mascot's bubble opens the dock
@@ -447,7 +453,7 @@ export function AgentAssistantPanel({
 		if (queue.length < 2) return undefined;
 		const text = { ...DEFAULT_CAMPAIGN_LABELS, ...labels?.chat?.campaign };
 		return {
-			tag: text.tag.replace("{label}", group.label),
+			tag: (group.kind === "set" ? text.setTag : text.tag).replace("{label}", group.label),
 			approveAll: text.approveAll.replace("{n}", String(queue.length)),
 			onApproveAll: async () => {
 				const stopped = stoppedLine(await approveCampaign(cards, (card) => decide(card, "approve")), labels?.chat?.campaign);
@@ -700,6 +706,8 @@ export function AgentAssistantPanel({
 				questionLabels={labels?.question}
 				draftLabels={labels?.draft}
 				empty={workPanel?.empty}
+				notice={notice}
+				locked={locked}
 			/>
 			)}
 		</AgentFloatDock>

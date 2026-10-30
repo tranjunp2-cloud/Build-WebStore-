@@ -1,4 +1,4 @@
-import type { ChangeSet } from "@ech/agent-core";
+import type { ChangeSet, ChangeSetGroup } from "@ech/agent-core";
 import { useState } from "react";
 import { canDecideDraft } from "./draft-access";
 import { fill } from "./fill";
@@ -11,6 +11,8 @@ import { Icon } from "./icons";
 export interface CampaignLabels {
 	/** "Campaign: {label}" */
 	tag: string;
+	/** a set of drafts from one request (group kind `set`): "{label}" */
+	setTag: string;
 	/** "Approve all ({n})" */
 	approveAll: string;
 	/** "Approving {done} of {n}…" */
@@ -25,6 +27,7 @@ export interface CampaignLabels {
 
 export const DEFAULT_CAMPAIGN_LABELS: CampaignLabels = {
 	tag: "Campaign: {label}",
+	setTag: "{label}",
 	approveAll: "Approve all ({n})",
 	progress: "Approving {done} of {n}…",
 	stopped: "Stopped at “{title}”: {message}. The rest is still waiting.",
@@ -122,18 +125,20 @@ export async function approveCampaign(
 	return { approved: queue.length };
 }
 
-export function CampaignTag({ label, labels }: { label: string; labels?: Partial<CampaignLabels> }) {
+export function CampaignTag({ label, kind, labels }: { label: string; kind?: ChangeSetGroup["kind"]; labels?: Partial<CampaignLabels> }) {
 	const text = { ...DEFAULT_CAMPAIGN_LABELS, ...labels };
 	return (
 		<span className="ech-ag-camp-tag">
 			<Icon name="sparkles" size={12} />
-			{fill(text.tag, { label })}
+			{fill(kind === "set" ? text.setTag : text.tag, { label })}
 		</span>
 	);
 }
 
 export interface CampaignBarProps {
 	label: string;
+	/** `set` shows the label alone (several drafts of one request), else "Campaign: …" */
+	kind?: ChangeSetGroup["kind"];
 	/** every card of the campaign (all replies of the chat) */
 	cards: readonly ChangeSet[];
 	/** the same call as a card's own Approve */
@@ -142,7 +147,7 @@ export interface CampaignBarProps {
 }
 
 /** Above the first card of a campaign: its tag and "Approve all (n)" while some cards are waiting. */
-export function CampaignBar({ label, cards, onApprove, labels }: CampaignBarProps) {
+export function CampaignBar({ label, kind, cards, onApprove, labels }: CampaignBarProps) {
 	const text = { ...DEFAULT_CAMPAIGN_LABELS, ...labels };
 	const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 	const [stopped, setStopped] = useState<string | null>(null);
@@ -156,7 +161,7 @@ export function CampaignBar({ label, cards, onApprove, labels }: CampaignBarProp
 	};
 	return (
 		<div className="ech-ag-camp">
-			<CampaignTag label={label} labels={labels} />
+			<CampaignTag label={label} kind={kind} labels={labels} />
 			{queue.length > 1 && (
 				<button type="button" className="ech-ag-button is-sm is-primary" disabled={progress !== null} onClick={() => void run()}>
 					{progress ? <Icon name="loader-circle" className="ech-ag-spin" size={14} /> : <Icon name="check" size={14} />}
@@ -199,10 +204,10 @@ export function CampaignHeader({
 	// one bar per campaign: on the first card of the newest reply that has cards of it
 	const newest = [...(allCards ?? turnCards)].reverse().find((card) => card.group?.id === group.id);
 	const barHere = first?.id === changeSet.id && (!newest || turnCards.some((card) => card.id === newest.id));
-	if (barHere && onApprove) return <CampaignBar label={group.label} cards={campaignCards(allCards ?? turnCards, group.id)} onApprove={onApprove} labels={labels} />;
+	if (barHere && onApprove) return <CampaignBar label={group.label} kind={group.kind} cards={campaignCards(allCards ?? turnCards, group.id)} onApprove={onApprove} labels={labels} />;
 	return (
 		<div className="ech-ag-camp">
-			<CampaignTag label={group.label} labels={labels} />
+			<CampaignTag label={group.label} kind={group.kind} labels={labels} />
 		</div>
 	);
 }

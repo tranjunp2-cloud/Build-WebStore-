@@ -19,6 +19,10 @@ import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { runMaxRunningMs } from "../config/limits";
+import { ORG_BATTERY, type OrgBattery } from "../cost/org-battery";
+import { SHOP_CAPS, type ShopCaps } from "../cost/shop-caps";
+import { aiBudgetMicros, assertAiEnabled, planOf } from "../cost/shop-limits";
+import { tokenUsageOf, UsageTally } from "../ledger/sdk-usage";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { runWithFallback } from "../models/fallback";
@@ -27,6 +31,7 @@ import { MODEL_REGISTRY } from "../models/models.module";
 import { ImageService } from "../images/image.service";
 import { cacheableInstructions } from "../models/prompt-cache";
 import { SHOP_TOOLS, type ShopTools } from "../shop/shop-tools";
+import { TaskEngine } from "../tasks/task-engine.service";
 import { AgentError } from "./agent-errors";
 import { AGENT_STORE, type AgentStore, type AttachmentRecord, type ReservedStart, type RunStartWindows } from "./agent-store";
 import { AgentThreadService } from "./agent-thread.service";
@@ -43,6 +48,8 @@ import { type CapabilitySet, effectiveCapabilities } from "./merchant-capabiliti
 import { merchantInstructions } from "./merchant-instructions";
 import {
 	askUserOptions,
+	type BlogPostsWriteInput,
+	type BlogPostWritten,
 	createMerchantTools,
 	type FindImagesInput,
 	type GenerateImageInput,
@@ -69,6 +76,8 @@ import { createResultMemory, type ResultMemory, shapeToolResult } from "./tool-r
 import { groupPurposes, type RoutingState, routedModel, routeGroups, routingEnabled, ToolRouter, USE_TOOLS, useToolsTool } from "./tool-routing";
 import { editingLanguageOf, prepareWithLanguage, readWithLanguage } from "./site-editing-language";
 import { draftTitle, productTitle, threadPreview } from "./thread-memory";
+import type { RuntimeEnv } from "../settings/runtime-keys";
+import { SettingsService } from "../settings/settings.service";
 import { stripInternalMarkers } from "./internal-markers";
 import { itemRecord } from "./receipt-records";
 import { type BudgetStop, budgetLine, RunBudget } from "./run-budget";
@@ -351,7 +360,18 @@ export class AgentRunService {
 		@Optional() @Inject(SHOP_TOOLS) private readonly shop?: ShopTools,
 		@Optional() private readonly pictures?: ImageService,
 		@Optional() @Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
+		@Optional() @Inject(ORG_BATTERY) private readonly battery?: OrgBattery,
+		@Optional() @Inject(SHOP_CAPS) private readonly shopCaps?: ShopCaps,
+		// Prime Studio's runtime knobs and timeouts (Studio -> env -> default); absent = env only
+		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
+		// platform tasks the copilot runs itself (the articles of propose_blog_posts)
+		@Optional() private readonly tasks?: TaskEngine,
 	) {}
+
+	/** The runtime knobs as Studio sets them, else env. */
+	private get rt(): RuntimeEnv {
+		return this.settings?.runtimeEnv() ?? this.env;
+	}
 
 	/** What each driving run already fed the model (repeated parts of reads become pointers). */
 	private readonly memories = new Map<string, () => ResultMemory>();
@@ -388,10 +408,16 @@ export class AgentRunService {
 		request: { threadId?: string; clientRequestId?: string } = {},
 		now: Date = new Date(),
 	): Promise<ReservedStart> {
-		// the platform's daily spend cap (AI_DAILY_BUDGET_USD): 503 before anything is reserved
-		await this.spend?.assertWithinBudget();
+		// AI switched off for the shop's plan: 403 before anything else is looked at
+		assertAiEnabled(ctx);
+		// the platform's spend caps (daily / monthly; Free pauses first): 503 before anything is reserved
+		await this.spend?.assertWithinBudget(planOf(ctx));
+		// the shop's own AI battery (its plan's budget, else AI_DAILY_BUDGET_USD_PER_ORG): 429 with the time it is back
+		await this.battery?.assertAvailable(ctx.organizationId, aiBudgetMicros(ctx, this.env));
+		// the shop's calendar-month allowance: 429
+		await this.shopCaps?.assertAvailable(ctx);
 		const runId = newId("run");
-		const caps = queueCaps(this.env);
+		const caps = queueCaps(this.rt);
 		const reserved = await this.store.reserveRunStart(
 			ctx,
 			runId,
@@ -399,10 +425,10 @@ export class AgentRunService {
 			(counts) => {
 				// one active run per chat: a second message while it works would race the first one's history
 				if (counts.threadActive > 0) throw new AgentError(THREAD_BUSY, 409);
-				if (counts.orgDay >= this.env.AI_DAILY_RUN_LIMIT_PER_ORG) {
+				if (counts.orgDay >= this.rt.AI_DAILY_RUN_LIMIT_PER_ORG) {
 					throw new AgentError("Your workspace reached today's AI request limit. Try again tomorrow.", 429);
 				}
-				if (counts.userMinute >= this.env.AI_RUNS_PER_MINUTE_PER_USER) {
+				if (counts.userMinute >= this.rt.AI_RUNS_PER_MINUTE_PER_USER) {
 					throw new AgentError("Too many AI requests in a minute. Please wait a moment.", 429);
 				}
 				// too many working (the shop's or this person's): wait in the queue instead of a refusal
@@ -526,7 +552,7 @@ export class AgentRunService {
 			// a document's text was written by someone else (a supplier, a customer): its cards need a click
 			...(documents.length > 0 ? { tainted: true } : {}),
 			// only the tool groups this message needs are sent (page, record, words of the message and the last turn)
-			...(routingEnabled(this.env.AI_TOOL_ROUTING)
+			...(routingEnabled(this.rt.AI_TOOL_ROUTING)
 				? {
 						routing: {
 							groups: routeGroups({
@@ -555,8 +581,8 @@ export class AgentRunService {
 		emit: (frame: RunFrame) => void,
 		since: number,
 	): Promise<{ admitted: true; at: Date } | { admitted: false; run: AgentRun }> {
-		const deadline = since + maxQueueWaitMs(this.env);
-		const caps = queueCaps(this.env);
+		const deadline = since + maxQueueWaitMs(this.rt);
+		const caps = queueCaps(this.rt);
 		const abort = new AbortController();
 		this.active.set(run.id, abort);
 		const end = async (event: Extract<RunEvent, { type: "run.status" }>, save: boolean) => {
@@ -606,12 +632,13 @@ export class AgentRunService {
 
 	/** This request's model budget: the deadline counts from the request's start. */
 	private budget(startedAt: number): RunBudget {
-		return new RunBudget(startedAt, this.env.AI_RUN_BUDGET_MS, this.env.AI_RUN_TOKEN_BUDGET);
+		return new RunBudget(startedAt, this.rt.AI_RUN_BUDGET_MS, this.env.AI_RUN_TOKEN_BUDGET);
 	}
 
 	/** The platform's daily spend cap (AI_DAILY_BUDGET_USD): 503 before anything calls a model. */
-	private async assertCanSpend(_ctx: AiRequestContext): Promise<void> {
-		await this.spend?.assertWithinBudget();
+	private async assertCanSpend(ctx: AiRequestContext): Promise<void> {
+		assertAiEnabled(ctx);
+		await this.spend?.assertWithinBudget(planOf(ctx));
 	}
 
 	/**
@@ -815,7 +842,7 @@ export class AgentRunService {
 		// what this deployment (and this request's signed token) lets the copilot do
 		const capabilities = effectiveCapabilities(this.env.AI_AGENT_CAPABILITIES, ctx.capabilities);
 		// tool routing: the groups this run loaded; a run that has them all is sent exactly as unrouted
-		const router = routingEnabled(this.env.AI_TOOL_ROUTING) && state.routing ? new ToolRouter(capabilities, state.routing) : null;
+		const router = routingEnabled(this.rt.AI_TOOL_ROUTING) && state.routing ? new ToolRouter(capabilities, state.routing) : null;
 		const routed = router !== null && !router.complete;
 		const instructionsNow = () => (router && routed ? merchantInstructions(router.capabilities, capabilities) : merchantInstructions(capabilities));
 		// reads of this run, for the rule-made suggestions
@@ -869,6 +896,7 @@ export class AgentRunService {
 			currentPage: () =>
 				this.readTool(run.id, push, "page.current", "Checked the page you're on", async () => currentPage(run, state), "page.current"),
 			images: () => state.images,
+			...(this.tasks ? { writeBlogPosts: (input: BlogPostsWriteInput) => this.writeBlogPosts(ctx, run.id, input, push) } : {}),
 			findImages: (input) => this.findImages(ctx, run.id, state, input, push),
 			generateImages: (input) => this.generateImages(ctx, run.id, state, input, push),
 			seenProducts: () => state.products ?? [],
@@ -1094,12 +1122,15 @@ export class AgentRunService {
 				);
 				const messages = await this.hydrate(ctx, state.messages, attachments);
 				const chain = this.models.resolveChain("balanced");
+				let attemptUsage = new UsageTally();
 				const { value: result, model, latencyMs } = await runWithFallback(
 					chain,
 					(candidate) => {
 						lastModel = candidate;
 						// a fallback attempt only has the reads of earlier, successful calls in its messages
 						attemptMemory = new Map(committedMemory);
+						const tally = new UsageTally();
+						attemptUsage = tally;
 						return generateText({
 							// routed: the provider gets only the loaded groups' tools (every tool still runs if called)
 							model: routed && router ? routedModel(candidate.model, () => router.sentTools(toolNames)) : candidate.model,
@@ -1122,9 +1153,11 @@ export class AgentRunService {
 							maxOutputTokens: this.env.AI_MAX_OUTPUT_TOKENS,
 							// each attempt (a fallback too) gets its own limit, cut to what is left of the run's time. The limit
 							// covers up to 6 tool steps (and a picture), so it stays model + picture time even without pictures.
-							timeout: { totalMs: budget.callTimeoutMs(this.env.AI_MODEL_TIMEOUT_MS + this.env.AI_IMAGE_TIMEOUT_MS) },
+							timeout: { totalMs: budget.callTimeoutMs((this.settings?.tierTimeoutMs("balanced") ?? this.env.AI_MODEL_TIMEOUT_MS) + (this.settings?.imageTimeoutMs() ?? this.env.AI_IMAGE_TIMEOUT_MS)) },
 							maxRetries: 1,
 							abortSignal: abort.signal,
+							// steps finished before a failure were billed: the error row carries them
+							onStepFinish: (step) => tally.add(step.usage),
 						});
 					},
 					{
@@ -1135,6 +1168,7 @@ export class AgentRunService {
 								...ledgerBase,
 								provider: candidate.provider,
 								model: candidate.modelId,
+								...attemptUsage.forFailure(error),
 								latencyMs: ms,
 								outcome: "error",
 								errorCode: error instanceof Error ? error.name : "unknown",
@@ -1146,9 +1180,7 @@ export class AgentRunService {
 					...ledgerBase,
 					provider: model.provider,
 					model: model.modelId,
-					inputTokens: result.totalUsage.inputTokens,
-					outputTokens: result.totalUsage.outputTokens,
-					cachedInputTokens: result.totalUsage.inputTokenDetails?.cacheReadTokens,
+					...tokenUsageOf(result.totalUsage),
 					latencyMs,
 					outcome: staged.length > 0 || ask ? "ok" : "refused",
 				});
@@ -1263,7 +1295,7 @@ export class AgentRunService {
 		}
 		await releaseEnd();
 		// suggestions only while the request still has the time for them
-		const mode = suggestMode(this.env.AI_SUGGEST_MODE);
+		const mode = suggestMode(this.rt.AI_SUGGEST_MODE);
 		const roomForSuggestions = budget.remainingMs() > SUGGEST_NEXT_TIMEOUT_MS && budget.stop(state.tokens ?? 0) === null;
 		if (mode !== "off" && roomForSuggestions && !abort.signal.aborted && (run.status === "applied" || run.status === "awaiting_approval")) {
 			const facts: RunFacts = {
@@ -1400,9 +1432,7 @@ export class AgentRunService {
 				task: SUGGEST_NEXT_TASK,
 				provider: model.provider,
 				model: model.modelId,
-				inputTokens: result.totalUsage.inputTokens,
-				outputTokens: result.totalUsage.outputTokens,
-				cachedInputTokens: result.totalUsage.inputTokenDetails?.cacheReadTokens,
+				...tokenUsageOf(result.totalUsage),
 				latencyMs: Date.now() - t0,
 				outcome: "ok",
 			});
@@ -1613,6 +1643,53 @@ export class AgentRunService {
 			this.logger.warn(`family schema unavailable while drafting: ${String(error)}`);
 		}
 		return knowledge;
+	}
+
+	/**
+	 * The articles of propose_blog_posts: one copy.blog-post-draft task per post, all at once. Each runs under the
+	 * shop's own limits (battery, daily cap) and is counted with this run; a post that fails says why, the rest stay.
+	 */
+	private async writeBlogPosts(
+		ctx: AiRequestContext,
+		runId: string,
+		input: BlogPostsWriteInput,
+		push: (event: RunEvent) => void,
+	): Promise<BlogPostWritten[]> {
+		const tasks = this.tasks;
+		if (!tasks) return input.posts.map(() => ({ ok: false, reason: "Writing posts is not available here." }));
+		const t0 = Date.now();
+		const written = await Promise.all(
+			input.posts.map(async (post): Promise<BlogPostWritten> => {
+				try {
+					const { output } = await tasks.run(
+						ctx,
+						"copy.blog-post-draft",
+						{ title: post.title, outline: post.outline, notes: post.notes ?? "", language: input.locale },
+						undefined,
+						{ runId },
+					);
+					return { ok: true, ...(output as { contentHtml: string; seoTitle: string; seoDescription: string }) };
+				} catch (error) {
+					this.logger.warn(`blog post "${post.title.slice(0, 60)}" not written: ${error instanceof Error ? error.message : String(error)}`);
+					return { ok: false, reason: error instanceof AgentError ? error.message : "The AI could not write this post." };
+				}
+			}),
+		);
+		const n = written.filter((post) => post.ok).length;
+		push({
+			type: "run.receipt",
+			runId,
+			receipt: {
+				id: newId("rcpt"),
+				tool: "blog.write_posts",
+				summary: `Wrote ${n} of ${input.posts.length} blog posts`,
+				phrase: { key: "blog.write_posts", values: { n } },
+				durationMs: Date.now() - t0,
+				status: n === input.posts.length ? "ok" : "error",
+				entityIds: [],
+			},
+		});
+		return written;
 	}
 
 	private async findImages(

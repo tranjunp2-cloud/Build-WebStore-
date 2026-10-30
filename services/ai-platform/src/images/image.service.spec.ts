@@ -81,6 +81,20 @@ describe("ImageService [TC-AICP-58]", () => {
 	});
 });
 
+describe("pictures per plan from the token [TC-AIPRC-08]", () => {
+	const plan = (picturesPerDay: number | null): AiRequestContext => ({ ...ctx, limits: { plan: "pro", aiBudgetUsd: 5, picturesPerDay } });
+
+	it("uses the plan's cap over the env fallback", async () => {
+		await expect(setup({ models: [drawing()], used: 3, limit: "100" }).service.generate(plan(3), { prompt: "a cover photo" })).rejects.toMatchObject({ status: 429 });
+		await expect(setup({ models: [drawing()], used: 3, limit: "1" }).service.generate(plan(50), { prompt: "a cover photo" })).resolves.toHaveLength(1);
+	});
+
+	it("null = unlimited, no claim = env", async () => {
+		await expect(setup({ models: [drawing()], used: 9999, limit: "1" }).service.generate(plan(null), { prompt: "a cover photo" })).resolves.toHaveLength(1);
+		await expect(setup({ models: [drawing()], used: 1, limit: "1" }).service.generate(ctx, { prompt: "a cover photo" })).rejects.toMatchObject({ status: 429 });
+	});
+});
+
 function slowDrawing(ms: number, fail?: () => Error) {
 	return new MockImageModelV4({
 		doGenerate: async () => {

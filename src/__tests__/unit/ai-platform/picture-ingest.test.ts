@@ -90,6 +90,44 @@ describe('stock photo into media [TC-AIREL-76]', () => {
     })
 })
 
+// TC-AIWB-130 — Approve all applies blog cards one after the other while the page refreshes: a media create can
+// resolve with an id whose row the drizzle race rolled back (GH-1185). The picture is created once more, not dropped.
+describe('a media row lost after its create [TC-AIWB-130]', () => {
+    const notFound = () => Object.assign(new Error('Not Found'), { name: 'NotFound', status: 404 })
+
+    it('creates the picture again when the row it was given is gone, and returns the new row', async () => {
+        // Arrange
+        cms.create.mockReset().mockResolvedValueOnce({ id: 134 }).mockResolvedValueOnce({ id: 136 })
+        cms.findByID.mockImplementationOnce(async () => { throw notFound() })
+
+        // Act
+        const doc = await ingest(PIXABAY, 'Coffee powder')
+
+        // Assert
+        expect(cms.create).toHaveBeenCalledTimes(2)
+        expect(doc).toEqual({ id: 136, url: '/api/media/file/136.jpg' })
+    })
+
+    it('gives up with the error when the second row is lost too', async () => {
+        // Arrange
+        cms.create.mockReset().mockResolvedValueOnce({ id: 134 }).mockResolvedValueOnce({ id: 135 })
+        cms.findByID.mockImplementationOnce(async () => { throw notFound() }).mockImplementationOnce(async () => { throw notFound() })
+
+        // Act + Assert
+        await expect(ingest(PIXABAY, 'Coffee powder')).rejects.toMatchObject({ name: 'NotFound' })
+        expect(cms.create).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not create again for any other read error', async () => {
+        // Arrange
+        cms.findByID.mockImplementationOnce(async () => { throw new Error('connection reset') })
+
+        // Act + Assert
+        await expect(ingest(PIXABAY, 'Coffee powder')).rejects.toThrow('connection reset')
+        expect(cms.create).toHaveBeenCalledTimes(1)
+    })
+})
+
 describe('chat attachment into media, and refused sources [TC-AIREL-77]', () => {
     it('stores the merchant\'s own upload with no stock provenance', async () => {
         const load = vi.fn(async () => ({ buffer: JPEG, mime: 'image/webp', name: 'att_1.webp' }))

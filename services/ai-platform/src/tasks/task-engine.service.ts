@@ -7,13 +7,18 @@ import { AgentError } from "../agent/agent-errors";
 import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
+import { ORG_BATTERY, type OrgBattery } from "../cost/org-battery";
+import { SHOP_CAPS, type ShopCaps } from "../cost/shop-caps";
+import { aiBudgetMicros, assertAiEnabled, planOf } from "../cost/shop-limits";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { estimateCostMicros } from "../ledger/price-book";
+import { errorUsage, tokenUsageOf } from "../ledger/sdk-usage";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { isProviderBillingError, isProviderRateLimitError, PROVIDER_RATE_LIMITED, runWithFallback } from "../models/fallback";
 import type { ModelRegistry } from "../models/model-registry";
 import { MODEL_REGISTRY } from "../models/models.module";
 import { cacheableInstructions } from "../models/prompt-cache";
+import { SettingsService } from "../settings/settings.service";
 import { TASK_DEFINITIONS } from "./catalog";
 import type { TaskDefinition } from "./task-definition";
 
@@ -45,20 +50,27 @@ export class TaskEngine {
 		@Inject(USAGE_LEDGER) private readonly ledger: UsageLedger,
 		@Inject(ENV) private readonly env: Env,
 		@Optional() @Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
+		@Optional() @Inject(ORG_BATTERY) private readonly battery?: OrgBattery,
+		@Optional() @Inject(SHOP_CAPS) private readonly shopCaps?: ShopCaps,
+		// Prime Studio: task -> tier overrides, tier timeouts, runtime knobs; absent = catalog tiers and env
+		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
 	) {}
 
-	async run(ctx: AiRequestContext, taskId: string, rawInput: unknown, requestId?: string): Promise<RunTaskResponse> {
+	/** `runId`: the copilot run the call works for (its usage rows are counted with that chat). */
+	async run(ctx: AiRequestContext, taskId: string, rawInput: unknown, requestId?: string, options: { runId?: string } = {}): Promise<RunTaskResponse> {
 		if (!isAiTaskId(taskId)) throw new AgentError(`Unknown AI task "${taskId}".`, 404);
 		const contract = AI_TASKS[taskId];
 		const parsed = contract.input.safeParse(rawInput);
 		if (!parsed.success) {
 			throw new AgentError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "), 400);
 		}
-		await this.assertQuota(ctx);
+		await this.assertQuota(ctx, taskId);
 
 		const definition = TASK_DEFINITIONS[taskId as AiTaskId] as (typeof TASK_DEFINITIONS)[AiTaskId];
 		const input = parsed.data as never;
-		const chain = this.models.resolveChain(definition.alias);
+		// the tier a Studio override moved the task to, else the catalog's
+		const alias = this.settings?.taskTier(taskId, definition.alias) ?? definition.alias;
+		const chain = this.models.resolveChain(alias, definition.effort ? { effort: definition.effort } : undefined);
 		const schema = (definition.modelOutput?.(input) ?? contract.output) as ZodType;
 		const jsonMode = definition.outputMode === "json";
 		const textMode = definition.outputMode === "text";
@@ -75,6 +87,7 @@ export class TaskEngine {
 				userId: ctx.userId,
 				surface: "system",
 				task: taskId,
+				...(options.runId ? { runId: options.runId } : {}),
 				provider: m.provider,
 				model: m.modelId,
 				latencyMs,
@@ -86,7 +99,7 @@ export class TaskEngine {
 		const chainBudgetMs = chainBudgetFor(definition);
 		const deadline = chainBudgetMs ? Date.now() + chainBudgetMs : null;
 		const attemptTimeout = () => {
-			const perAttempt = definition.timeoutMs ?? this.env.AI_MODEL_TIMEOUT_MS;
+			const perAttempt = definition.timeoutMs ?? this.settings?.tierTimeoutMs(alias) ?? this.env.AI_MODEL_TIMEOUT_MS;
 			return deadline ? Math.max(1, Math.min(perAttempt, deadline - Date.now())) : perAttempt;
 		};
 		let failures = 0;
@@ -120,6 +133,7 @@ export class TaskEngine {
 					const rateLimited = !billing && isProviderRateLimitError(error);
 					if (rateLimited) rateLimitFailures++;
 					return record("error", candidate, ms, {
+						...errorUsage(error),
 						errorCode: billing
 							? "provider_insufficient_quota"
 							: rateLimited
@@ -148,11 +162,7 @@ export class TaskEngine {
 			throw new AgentError("The AI could not complete this task.", 503);
 		});
 
-		const usage = {
-			inputTokens: value.totalUsage.inputTokens,
-			outputTokens: value.totalUsage.outputTokens,
-			cachedInputTokens: value.totalUsage.inputTokenDetails?.cacheReadTokens,
-		};
+		const usage = tokenUsageOf(value.totalUsage);
 		await record("ok", model, latencyMs, usage);
 		return {
 			taskId,
@@ -171,12 +181,19 @@ export class TaskEngine {
 		};
 	}
 
-	private async assertQuota(ctx: AiRequestContext): Promise<void> {
-		// the platform's daily spend cap (AI_DAILY_BUDGET_USD) before the org's own quota
-		await this.spend?.assertWithinBudget();
+	private async assertQuota(ctx: AiRequestContext, taskId: string): Promise<void> {
+		// AI switched off for the shop's plan: 403 before anything else
+		assertAiEnabled(ctx);
+		// the platform's spend caps (daily / monthly; Free pauses first) before the org's own quota
+		await this.spend?.assertWithinBudget(planOf(ctx));
+		// then the shop's AI battery (its plan's budget, else AI_DAILY_BUDGET_USD_PER_ORG)
+		await this.battery?.assertAvailable(ctx.organizationId, aiBudgetMicros(ctx, this.env));
+		// the shop's calendar-month allowance, and for website-setup tasks (sitegen.*) the website budget
+		await this.shopCaps?.assertAvailable(ctx, taskId);
 		const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-		const used = await this.ledger.countSince(ctx.organizationId, since);
-		if (used >= this.env.AI_DAILY_TASK_LIMIT_PER_ORG) {
+		// only task calls (surface 'system'): copilot steps, decisions, suggestions and pictures have their own limits
+		const used = await this.ledger.countSince(ctx.organizationId, since, { surface: "system" });
+		if (used >= (this.settings?.runtimeEnv() ?? this.env).AI_DAILY_TASK_LIMIT_PER_ORG) {
 			throw new AgentError("Your workspace reached today's AI limit. Try again tomorrow.", 429);
 		}
 	}

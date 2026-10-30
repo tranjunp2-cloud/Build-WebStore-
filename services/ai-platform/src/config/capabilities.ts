@@ -7,7 +7,7 @@
 export const CAPABILITIES = [
 	/** the website editor: site_read and every propose_page_* / site / theme / navigation / publish tool */
 	"site",
-	/** blog posts: propose_blog_post, the blog_post kind of read / search / update / status tools */
+	/** blog posts: propose_blog_post / propose_blog_posts, the blog_post kind of read / search / update / status tools */
 	"blog",
 	/** find_images with source "stock" (Pixabay) */
 	"stock_photos",

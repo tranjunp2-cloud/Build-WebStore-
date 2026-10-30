@@ -5,7 +5,7 @@ import { z } from "zod";
 import { type Capability, parseCapabilityList } from "./capabilities";
 
 /** One ref (`provider:model`) or a comma-separated fallback chain of refs. */
-const ModelRefSchema = z
+export const ModelRefSchema = z
 	.string()
 	.regex(
 		/^\s*[a-z0-9-]+:[A-Za-z0-9._:/@-]+\s*(,\s*[a-z0-9-]+:[A-Za-z0-9._:/@-]+\s*)*$/,
@@ -69,6 +69,11 @@ const EnvSchema = z.object({
 			return parsed.capabilities;
 		}),
 	AI_PLATFORM_CONTEXT_SECRET: z.string().min(32, "AI_PLATFORM_CONTEXT_SECRET must be at least 32 characters"),
+	/**
+	 * Encrypts the provider keys saved in Prime Studio (AES-256-GCM, HKDF-derived). Unset = derived from
+	 * AI_PLATFORM_CONTEXT_SECRET. Changing either one makes the saved keys unreadable until they are entered again.
+	 */
+	AI_PROVIDER_SECRETS_KEY: z.string().min(32, "AI_PROVIDER_SECRETS_KEY must be at least 32 characters").optional(),
 	OPENAI_API_KEY: z.string().optional(),
 	OPENROUTER_API_KEY: z.string().optional(),
 	ANTHROPIC_API_KEY: z.string().optional(),
@@ -98,6 +103,7 @@ const EnvSchema = z.object({
 	/** Generated pictures per organization per day (each picture counts). */
 	AI_DAILY_IMAGE_LIMIT_PER_ORG: z.coerce.number().int().min(0).default(20),
 	AI_MODEL_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(60_000),
+	/** Abuse safety cap on copilot starts per org per day; the shop's AI budget is what normally binds. */
 	AI_DAILY_RUN_LIMIT_PER_ORG: z.coerce.number().int().min(0).default(200),
 	AI_RUNS_PER_MINUTE_PER_USER: z.coerce.number().int().min(0).default(6),
 	/** Copilot runs one person may have working (planning / running / applying) at once; more wait in the queue. 0 = no cap. */
@@ -108,6 +114,7 @@ const EnvSchema = z.object({
 	AI_QUEUE_POLL_MS: z.coerce.number().int().min(100).max(30_000).default(1_500),
 	/** Longest a run waits in the queue; also capped so the wait plus AI_RUN_BUDGET_MS stays within 290 s. */
 	AI_QUEUE_MAX_WAIT_MS: z.coerce.number().int().min(0).max(600_000).default(90_000),
+	/** Abuse safety cap on task calls per org per day; the shop's AI budget normally binds first. */
 	AI_DAILY_TASK_LIMIT_PER_ORG: z.coerce.number().int().min(0).default(1_000),
 	/** Copilot threads (+ their runs and change sets) are deleted this long after their last activity. */
 	AI_THREAD_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
@@ -142,6 +149,8 @@ const EnvSchema = z.object({
 	AI_TOOL_ROUTING: z.enum(["on", "off"]).default("on"),
 	/** Next-message suggestions: `rules` = from what the run did, a tiny FAST-model call only when no rule fits; `model` = always that call; `off`. */
 	AI_SUGGEST_MODE: z.enum(["rules", "model", "off"]).default("rules"),
+	/** One shop's AI battery: its AI spend allowance (USD) over the last rolling 24 h, pictures excluded. Empty = refused with 429. */
+	AI_DAILY_BUDGET_USD_PER_ORG: z.coerce.number().positive().default(1),
 	/** Global daily AI spend cap in USD (every org, Malaysia day, from the ledger's cost); unset = 20, 0 = off. Above it runs and tasks get 503. */
 	AI_DAILY_BUDGET_USD: z.coerce
 		.number()

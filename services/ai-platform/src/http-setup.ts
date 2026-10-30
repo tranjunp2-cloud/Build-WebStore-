@@ -5,6 +5,7 @@ import type { FastifyReply, FastifyRequest, RawRequestDefaultExpression } from "
 import type { AiRequestContext } from "./auth/context-token";
 import type { Env } from "./config/env";
 import { attachmentBodyLimit, formatLimit } from "./config/limits";
+import { SettingsService } from "./settings/settings.service";
 import { logRequest, logServerError, REQUEST_ID_HEADER, requestIdFor, runWithRequestId, shouldLogRequest } from "./observability/request-context";
 
 /** BFF → service attachment uploads (see AttachmentService). */
@@ -75,6 +76,13 @@ class AppExceptionFilter extends BaseExceptionFilter {
  */
 export function configureApp(app: NestFastifyApplication, env: Env): void {
 	const limit = attachmentBodyLimit(env);
+	// Prime Studio's request-log mode when the settings module is present (test apps have none)
+	let settings: SettingsService | null = null;
+	try {
+		settings = app.get(SettingsService, { strict: false });
+	} catch {
+		// no settings module in this app: env only
+	}
 	const fastify = app.getHttpAdapter().getInstance();
 	fastify.addContentTypeParser(ATTACHMENT_CONTENT_TYPE, { parseAs: "string", bodyLimit: limit }, (_request, body, done) => {
 		try {
@@ -92,7 +100,7 @@ export function configureApp(app: NestFastifyApplication, env: Env): void {
 	fastify.addHook("preHandler", (request, _reply, done) => runWithRequestId(request.id, done));
 	fastify.addHook("onResponse", async (request, reply) => {
 		const ms = Math.round(reply.elapsedTime);
-		if (!shouldLogRequest(reply.statusCode, ms, env.AI_LOG_REQUESTS)) return;
+		if (!shouldLogRequest(reply.statusCode, ms, (settings?.runtimeEnv() ?? env).AI_LOG_REQUESTS)) return;
 		const org = (request as FastifyRequest & { aiContext?: AiRequestContext }).aiContext?.organizationId;
 		logRequest({ reqId: request.id, method: request.method, route: routeOf(request), status: reply.statusCode, ms, ...(org ? { org } : {}) });
 	});

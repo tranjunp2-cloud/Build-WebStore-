@@ -48,9 +48,24 @@ export const CatalogBulkParseProductsOutputSchema = z.looseObject({
 	products: z.array(BulkParseProductSchema),
 });
 
+/**
+ * Long bulk-add text → one piece of the merchant's own words per product, so prime-web can parse the list in
+ * small parallel chunks (one long answer would hit the output limit and the time budget).
+ */
+export const CatalogSplitProductsInputSchema = z.object({
+	promptText: z.string().trim().min(1).max(6_000),
+});
+export const CatalogSplitProductsOutputSchema = z.object({
+	items: z.array(z.object({ text: z.string().trim().min(1).max(2_000) })).max(80),
+});
+
 export const CATALOG_BUILDER_TASKS = {
 	"catalog.bulk-parse-products": {
 		input: CatalogBulkParseProductsInputSchema,
 		output: CatalogBulkParseProductsOutputSchema,
+	},
+	"catalog.split-products": {
+		input: CatalogSplitProductsInputSchema,
+		output: CatalogSplitProductsOutputSchema,
 	},
 } as const;

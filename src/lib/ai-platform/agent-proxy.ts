@@ -27,7 +27,7 @@ import { getWorkList, putWorkState, workStateKey } from "./work/work-routes";
 const ID = "[A-Za-z0-9_-]{1,64}";
 /** Browser-reachable upstream routes. claim/release stay server-internal. */
 const ALLOWED: ReadonlyArray<{ method: string; pattern: RegExp }> = [
-	{ method: "GET", pattern: new RegExp(`^(insights|conversations|autonomy|runs|change-sets|threads)$`) },
+	{ method: "GET", pattern: new RegExp(`^(insights|conversations|autonomy|runs|change-sets|threads|usage)$`) },
 	{ method: "GET", pattern: new RegExp(`^(runs|change-sets|threads)/${ID}$`) },
 	{ method: "POST", pattern: /^runs$/ },
 	// clarifying questions: answer (streams like a run) and search the open question's options

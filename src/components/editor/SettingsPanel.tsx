@@ -35,6 +35,7 @@ import { BlockSpacingControls, type BlockSpacingField } from './settings-block-s
 import { VariantChip } from './settings-variant-chip'
 import { BLOCK_ICONS, FALLBACK_BLOCK_ICON } from './block-library-icons'
 import { useEditorAgentEnabled } from './agent/editor-agent-context'
+import { useAiAllowanceOut } from '@/components/ai-quota/use-ai-usage'
 import { ElementAskLayer, type ViewportRect } from './agent/ElementAskLayer'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { StepItem } from '@/blocks/step-process/config'
@@ -447,7 +448,9 @@ function SettingsPanelInner({
     }, [blockIndex, block?.showLink, block?.linkText, block?.linkUrl])
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
     // the SEO tab's AI button asks the copilot chat (Ask AI); no button without the assistant
-    const agentOn = useEditorAgentEnabled()
+    // no SEO Ask AI while the shop's AI allowance is used up
+    const aiOut = useAiAllowanceOut()
+    const agentOn = useEditorAgentEnabled() && !aiOut
     const [seoAsk, setSeoAsk] = useState<ViewportRect | null>(null)
     const [seoSlugInput, setSeoSlugInput] = useState('')
     const [seoTitleInput, setSeoTitleInput] = useState('')

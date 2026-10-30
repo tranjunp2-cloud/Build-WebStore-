@@ -1,16 +1,8 @@
-import { Settings } from 'lucide-react'
-import { ComingSoonEmpty } from '../_components/coming-soon-empty'
+import { redirect } from 'next/navigation'
 
 export const metadata = { title: 'Settings' }
 
+/** The only settings page so far is AI limits & prices. */
 export default function SettingsPage() {
-    return (
-        <div style={{ padding: 'var(--pad)' }}>
-            <ComingSoonEmpty
-                icon={Settings}
-                title="Settings"
-                description="Admin preferences, API keys, integration configuration."
-            />
-        </div>
-    )
+    redirect('/studio/settings/ai')
 }

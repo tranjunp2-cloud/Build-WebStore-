@@ -108,6 +108,30 @@ describe("TaskEngine", () => {
 			engine.run(ctx, "content.seo-meta", { locale: "en-US", title: "x" }),
 		).rejects.toBeInstanceOf(AgentError);
 	});
+
+	it("counts only task calls (surface 'system') against the daily task limit", async () => {
+		// Arrange: the org already made many copilot / picture calls; none is a task call
+		const asked: unknown[] = [];
+		const ledger: UsageLedger = {
+			record: async () => undefined,
+			countSince: async (_org, _since, filter) => {
+				asked.push(filter);
+				return filter?.surface === "system" ? 0 : 999;
+			},
+		};
+		const engine = new TaskEngine(
+			{ resolveChain: () => [{ provider: "openai", modelId: "m", model: jsonModel({ fields: { name: "x" } }) }] },
+			ledger,
+			parseEnv({ AI_PLATFORM_DATABASE_URL: "postgres://x/y", AI_PLATFORM_CONTEXT_SECRET: "test-context-secret-at-least-32-characters", AI_DAILY_TASK_LIMIT_PER_ORG: "5" }),
+		);
+
+		// Act
+		const result = await engine.run(ctx, "content.translate", { targetLocale: "ms-MY", fields: { name: "x" } });
+
+		// Assert
+		expect(result.output).toEqual({ fields: { name: "x" } });
+		expect(asked).toEqual([{ surface: "system" }]);
+	});
 });
 
 describe("TaskEngine JSON output mode [TC-AICP-28]", () => {

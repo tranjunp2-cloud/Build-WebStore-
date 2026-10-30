@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { picturesPerDay } from "../cost/shop-limits";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { generateImage } from "ai";
 import { z } from "zod";
 import { AgentError } from "../agent/agent-errors";
@@ -6,10 +7,12 @@ import type { AiRequestContext } from "../auth/context-token";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
 import { imageOutputFormat } from "../config/limits";
+import { assertAiEnabled, planOf } from "../cost/shop-limits";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { MODEL_REGISTRY } from "../models/models.module";
 import type { ModelRegistry } from "../models/model-registry";
+import { SettingsService } from "../settings/settings.service";
 import { IMAGE_TASK, PICTURE_QUOTA, type PictureQuota } from "./picture-quota";
 
 export { IMAGE_TASK };
@@ -63,6 +66,8 @@ export class ImageService {
 		@Inject(PICTURE_QUOTA) private readonly quota: PictureQuota,
 		// the platform's daily spend cap (AI_DAILY_BUDGET_USD), like runs and tasks; LedgerModule provides it
 		@Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
+		// Prime Studio: picture timeout and format; absent = env
+		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
 	) {}
 
 	get available(): boolean {
@@ -77,14 +82,17 @@ export class ImageService {
 		const parsed = ImageRequestSchema.safeParse(request);
 		if (!parsed.success) throw new AgentError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "), 400);
 		const input = parsed.data;
-		// 503 above the daily spend cap: before any picture is reserved or drawn
-		await this.spend?.assertWithinBudget();
+		// 403 when the plan has no AI; 503 above the platform caps: before any picture is reserved or drawn
+		assertAiEnabled(ctx);
+		await this.spend?.assertWithinBudget(planOf(ctx));
 		const chain = this.models.resolveImageChain?.() ?? [];
 		if (chain.length === 0) throw new AgentError("Picture generation is not set up in this environment.", 503);
 
 		const now = options.now ?? new Date();
 		const reservation = await this.quota.reserve(ctx, { pictures: input.count, since: new Date(now.getTime() - DAY_MS), now }, (used) => {
-			const left = this.env.AI_DAILY_IMAGE_LIMIT_PER_ORG - used;
+			const limit = picturesPerDay(ctx, this.env);
+			if (limit === null) return; // the plan has no picture cap
+			const left = limit - used;
 			if (left >= input.count) return;
 			throw new AgentError(
 				left > 0 ? `Only ${left} more picture${left === 1 ? "" : "s"} can be generated today.` : "Your workspace reached today's picture limit. Try again tomorrow.",
@@ -92,7 +100,7 @@ export class ImageService {
 			);
 		});
 
-		const format = imageOutputFormat(this.env);
+		const format = this.settings ? this.settings.imageFormat() : imageOutputFormat(this.env);
 		let lastError: unknown;
 		let reached = false;
 		for (const candidate of chain) {
@@ -103,7 +111,7 @@ export class ImageService {
 					prompt: input.prompt,
 					n: input.count,
 					size: SIZES[input.aspect],
-					abortSignal: AbortSignal.timeout(this.env.AI_IMAGE_TIMEOUT_MS),
+					abortSignal: AbortSignal.timeout(this.settings?.imageTimeoutMs() ?? this.env.AI_IMAGE_TIMEOUT_MS),
 					maxRetries: 0,
 					providerOptions: { openai: { quality: "medium", ...(format ? { outputFormat: format, ...(format === "png" ? {} : { outputCompression: 85 }) } : {}) } },
 				});

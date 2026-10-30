@@ -97,7 +97,7 @@ describe("tools per capability set [TC-AIREL-32]", () => {
 			["site"],
 			["ask_user", "current_page", "site_read", "propose_page_patch", "propose_site_patch", "propose_new_page", "propose_page_seo", "propose_page_translation", "propose_theme_change", "propose_navigation", "propose_site_languages", "propose_publish"],
 		],
-		["blog + stock photos", ["blog", "stock_photos"], ["ask_user", "find_images", "read_item", "search_items", "current_page", "propose_update", "propose_status_change", "propose_blog_post"]],
+		["blog + stock photos", ["blog", "stock_photos"], ["ask_user", "find_images", "read_item", "search_items", "current_page", "propose_update", "propose_status_change", "propose_blog_post", "propose_blog_posts"]],
 		["stock photos only", ["stock_photos"], ["ask_user", "find_images", "current_page"]],
 		["image generation only", ["image_generation"], ["ask_user", "generate_image", "current_page"]],
 		["inventory", ["inventory"], ["ask_user", "current_page", "inventory_read", "propose_inventory"]],

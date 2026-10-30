@@ -42,6 +42,7 @@ import { AgentWorkService, WORK_KEY_MAX } from "./agent-work.service";
 import { AttachmentService, AttachmentUploadSchema } from "./attachment.service";
 import { forCaller, seesTeamDrafts } from "./change-set-access";
 import { ChangeSetDecisionService } from "./change-set-decision.service";
+import { UsageQuotaService } from "../ledger/usage-quota";
 import { keepStreamAlive } from "./sse-keepalive";
 import { THREAD_BUSY } from "./run-queue";
 import { StaleRunSweeper } from "./stale-run-sweeper";
@@ -130,6 +131,7 @@ export class AgentController {
 		@Inject(ENV) private readonly env: Env,
 		private readonly work: AgentWorkService,
 		private readonly staleRuns: StaleRunSweeper,
+		private readonly usage: UsageQuotaService,
 	) {}
 
 	/**
@@ -199,6 +201,12 @@ export class AgentController {
 	@Put("autonomy/:domain")
 	setAutonomy() {
 		throw new NotImplementedException({ title: "Not implemented", detail: "Autonomy levels are fixed to 'stage'." });
+	}
+
+	/** The workspace's daily allowances (assistant runs, writing tasks, pictures) and whether AI is paused today. */
+	@Get("usage")
+	orgUsage(@AiContext() ctx: AiRequestContext) {
+		return this.usage.read(ctx);
 	}
 
 	@Get("runs")

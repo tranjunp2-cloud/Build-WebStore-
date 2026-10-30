@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { and, count, eq, gte, ne, sql } from "drizzle-orm";
 import { DB, type Database } from "../database/database.module";
 import { aiUsageEvents } from "../database/schema";
+import { rowMicros } from "../cost/org-battery";
 import { estimateCostMicros, type TokenUsage } from "./price-book";
 
 export interface UsageEvent extends TokenUsage {
@@ -19,8 +20,13 @@ export interface UsageEvent extends TokenUsage {
 
 export interface UsageLedger {
 	record(event: UsageEvent): Promise<void>;
-	/** Successful + refused calls since `since` (failed attempts don't burn quota); one task only when given. */
-	countSince(organizationId: string, since: Date, task?: string): Promise<number>;
+	/** Successful + refused calls since `since` (failed attempts don't burn quota); narrowed to a task and/or surface when given. */
+	countSince(organizationId: string, since: Date, filter?: UsageFilter): Promise<number>;
+}
+
+export interface UsageFilter {
+	task?: string;
+	surface?: UsageEvent["surface"];
 }
 
 export const USAGE_LEDGER = Symbol("AI_PLATFORM_USAGE_LEDGER");
@@ -32,7 +38,7 @@ export class DrizzleUsageLedger implements UsageLedger {
 
 	constructor(@Inject(DB) private readonly db: Database) {}
 
-	async countSince(organizationId: string, since: Date, task?: string): Promise<number> {
+	async countSince(organizationId: string, since: Date, filter: UsageFilter = {}): Promise<number> {
 		const [row] = await this.db
 			.select({ value: count() })
 			.from(aiUsageEvents)
@@ -41,19 +47,21 @@ export class DrizzleUsageLedger implements UsageLedger {
 					eq(aiUsageEvents.organizationId, organizationId),
 					gte(aiUsageEvents.createdAt, since),
 					ne(aiUsageEvents.outcome, "error"),
-					task ? eq(aiUsageEvents.task, task) : undefined,
+					filter.task ? eq(aiUsageEvents.task, filter.task) : undefined,
+					filter.surface ? eq(aiUsageEvents.surface, filter.surface) : undefined,
 				),
 			);
 		return row?.value ?? 0;
 	}
 
 	/**
-	 * Every org's ledgered cost since `since`, in USD micros (the daily spend guard). Served by
-	 * `ai_usage_events_created_idx (created_at) INCLUDE (cost_usd_micros)`: an index-only range scan.
+	 * Every org's cost since `since`, in USD micros (the daily spend guard): the recorded price, and for
+	 * rows without one the tokens at the fallback rates, exactly as the shop battery counts them.
+	 * One range scan on `ai_usage_events_created_idx`.
 	 */
 	async costSinceMicros(since: Date): Promise<number> {
 		const [row] = await this.db
-			.select({ value: sql<string | null>`COALESCE(SUM(${aiUsageEvents.costUsdMicros}), 0)` })
+			.select({ value: sql<string | null>`COALESCE(SUM(${rowMicros()}), 0)` })
 			.from(aiUsageEvents)
 			.where(gte(aiUsageEvents.createdAt, since));
 		return Number(row?.value ?? 0);

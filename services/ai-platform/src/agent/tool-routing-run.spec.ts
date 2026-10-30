@@ -122,7 +122,7 @@ describe("loading more tools mid-request [TC-AISEC-082]", () => {
 		const call = model.doGenerateCalls[0] as Call;
 
 		// Assert
-		expect(toolNames(call)).toHaveLength(34);
+		expect(toolNames(call)).toHaveLength(35);
 		expect(toolNames(call)).not.toContain("use_tools");
 		expect(systemText(call)).toBe(JSON.stringify([{ role: "system", content: merchantInstructions(full) }]));
 	});
