@@ -187,6 +187,7 @@ export const DEFAULT_CHAT_LABELS: ChatLabels = {
 		"store.todos": "Checked what needs you",
 		"site.check": "Checked the latest page",
 		found: "{n} found",
+		"blog.write_posts": "Wrote {n} blog posts",
 		"media.stock": "Found {n} stock photos for “{subject}”",
 		"media.library": "Found {n} photos in your library for “{subject}”",
 		"media.generated": "Made {n} picture(s)",

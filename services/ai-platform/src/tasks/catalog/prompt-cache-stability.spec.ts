@@ -34,10 +34,12 @@ const CACHE_STABLE_FIELDS: { [K in AiTaskId]: readonly (keyof AiTaskInput<K> & s
 	// tone = one of the blog editor's presets (Professional / Friendly / Persuasive).
 	"copy.blog-post": ["language", "tone"],
 	"seo.blog-meta": [],
+	"copy.blog-post-draft": ["language", "shopName"],
 	"i18n.translate-blocks": ["targetLocale"],
 	"i18n.translate-product-field": ["sourceLocale", "targetLocale", "format"],
 	// The tenant's whole leaf-category list: stable per tenant between catalog edits.
 	"catalog.bulk-parse-products": ["locale", "categoryCandidates"],
+	"catalog.split-products": [],
 	// prime-web constants (block registry, THEME_ENUMS): identical for every site.
 	"site.extract-business-info": [],
 	// Caller-composed steps: `system` is the generator's static step prompt (per
@@ -114,6 +116,11 @@ const SAMPLES: { [K in AiTaskId]: [AiTaskInput<K>, AiTaskInput<K>] } = {
 		{ promptText: "batik scarf RM50", locale: "ms", categoryCandidates: [{ id: 1, path: "Apparel > Scarves" }] },
 		{ promptText: "rattan basket 30rm, merah", locale: "ms", categoryCandidates: [{ id: 1, path: "Apparel > Scarves" }] },
 	],
+	"copy.blog-post-draft": [
+		{ title: "How to keep batik bright", outline: ["Washing", "Drying"], notes: "", language: "en", shopName: "Kedai Batik" },
+		{ title: "Picking a silk scarf", outline: ["Weight", "Colour"], notes: "RM50", language: "en", shopName: "Kedai Batik" },
+	],
+	"catalog.split-products": [{ promptText: "batik scarf RM50, rattan basket 30rm" }, { promptText: "kopi 1kg RM40, teh tarik RM8" }],
 	"site.extract-business-info": [{ pageText: "Kedai Batik — silk scarves" }, { pageText: "Kuih Mak Teh — family bakery" }],
 	"sitegen.site-plan": composedSamples("You generate a website as JSON."),
 	"sitegen.page-blocks": composedSamples("You generate one page of a website as JSON."),

@@ -352,3 +352,72 @@ describe('merchant locale guard [TC-AIWB-88]', () => {
         expect(res.status).toBe(200)
     })
 })
+
+describe('a long list is read in chunks [TC-AIWB-123]', () => {
+    const item = (n: number) => `cotton shirt number ${n}, white and black, size S M L, price RM${20 + n}`
+    const longList = Array.from({ length: 12 }, (_, i) => item(i + 1)).join(', ')
+    const taskOf = (url: unknown) => String(url).match(/\/v1\/tasks\/([^/]+)\/run$/)?.[1]
+    const answer = (taskId: string, output: unknown) => Response.json({
+        taskId, promptVersion: `${taskId}@1`, requestId: 'req_1', output,
+        usage: { provider: 'anthropic', model: 'claude-haiku-5-5', costUsdMicros: 1, latencyMs: 10, fallbacks: [] },
+    })
+    /** split → one piece per shirt; each parse call → one product per line of its chunk (SKU repeated across chunks) */
+    function platform(failChunkWith?: (text: string) => Response | null) {
+        fetchMock.mockImplementation(async (url, init) => {
+            const input = JSON.parse(String(init?.body)).input as { promptText: string }
+            if (taskOf(url) === 'catalog.split-products') {
+                return answer('catalog.split-products', { items: input.promptText.split(/, (?=cotton shirt)/).map((text) => ({ text })) })
+            }
+            const failed = failChunkWith?.(input.promptText)
+            if (failed) return failed
+            return answer('catalog.bulk-parse-products', {
+                products: input.promptText.split('\n').map((line) => ({ name: `Cotton Shirt ${line.match(/number (\d+)/)?.[1]}`, sku: 'CTN-SHT', price: 20 })),
+            })
+        })
+    }
+
+    it('splits, parses 3 chunks of 4 and returns all 12 products with unique SKUs', async () => {
+        // Arrange
+        platform()
+
+        // Act
+        const res = await run({ promptText: longList, locale: 'en' })
+
+        // Assert
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        const calls = fetchMock.mock.calls.map(([url]) => taskOf(url))
+        expect(calls).toEqual(['catalog.split-products', 'catalog.bulk-parse-products', 'catalog.bulk-parse-products', 'catalog.bulk-parse-products'])
+        expect(body.products).toHaveLength(12)
+        expect(body.products.map((p: { name: string }) => p.name)).toEqual(Array.from({ length: 12 }, (_, i) => `Cotton Shirt ${i + 1}`))
+        expect(new Set(body.products.map((p: { sku: string }) => p.sku)).size).toBe(12)
+        expect(body.unparsed).toBeUndefined()
+    })
+
+    it('returns the parsed products and the words of a chunk the platform could not read', async () => {
+        // Arrange
+        platform((text) => (text.includes('number 5,') ? Response.json({ error: 'The AI could not complete this task.' }, { status: 503 }) : null))
+
+        // Act
+        const res = await run({ promptText: longList, locale: 'en' })
+
+        // Assert
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        expect(body.products).toHaveLength(8)
+        expect(body.unparsed).toHaveLength(4)
+        expect(body.unparsed[0]).toContain('number 5,')
+    })
+
+    it('answers with the platform error code when every chunk fails', async () => {
+        // Arrange
+        platform(() => Response.json({ error: 'Your workspace reached today\'s AI limit.' }, { status: 429 }))
+
+        // Act
+        const res = await run({ promptText: longList, locale: 'en' })
+
+        // Assert
+        expect(res.status).toBe(429)
+        expect(await res.json()).toEqual({ error: 'aiQuotaExceeded' })
+    })
+})

@@ -21,8 +21,11 @@ export interface ResolvedImageModel {
 }
 
 export interface ModelRegistry {
-	/** Ordered fallback chain for an alias — only providers configured here. */
-	resolveChain(alias: ModelAlias): ResolvedModel[];
+	/**
+	 * Ordered fallback chain for an alias — only providers configured here. `effort` replaces the tier's
+	 * effort for this call (a task whose long JSON answer must fit its token limit runs without thinking).
+	 */
+	resolveChain(alias: ModelAlias, options?: { effort?: ReasoningEffort }): ResolvedModel[];
 	/** Picture models (`AI_MODEL_IMAGE`), configured providers only; empty = generation off. */
 	resolveImageChain?(): ResolvedImageModel[];
 }
@@ -112,7 +115,7 @@ export function createModelRegistry(
 		const wanted = [studio.length > 0 ? studio.join(", ") : undefined, config?.models()[alias], envChains[alias]];
 		return wanted.filter((value, index): value is string => Boolean(value) && wanted.indexOf(value) === index).map(parseChain);
 	};
-	const resolveLanguage = (alias: ModelAlias, chain: { provider: string; modelId: string }[]) => {
+	const resolveLanguage = (alias: ModelAlias, chain: { provider: string; modelId: string }[], effortOverride?: ReasoningEffort) => {
 		const resolved: ResolvedModel[] = [];
 		for (const { provider, modelId } of chain) {
 			if (provider === "mock") {
@@ -121,7 +124,7 @@ export function createModelRegistry(
 			}
 			const factory = factoryFor(provider);
 			if (!factory) continue;
-			const effort = effortFor(alias, provider);
+			const effort = effortOverride ?? effortFor(alias, provider);
 			const model = factory(modelId);
 			const applyEffort = effort != null && acceptsReasoningEffort(provider, modelId, state().vars);
 			resolved.push({ model: applyEffort ? withReasoningEffort(model, provider, effort) : model, provider, modelId });
@@ -130,9 +133,9 @@ export function createModelRegistry(
 	};
 
 	return {
-		resolveChain(alias) {
+		resolveChain(alias, options) {
 			for (const chain of chainsFor(alias)) {
-				const resolved = resolveLanguage(alias, chain);
+				const resolved = resolveLanguage(alias, chain, options?.effort);
 				if (resolved.length > 0) return resolved;
 			}
 			throw new ModelUnavailableError(`No configured provider for model alias "${alias}".`);

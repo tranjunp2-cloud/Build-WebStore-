@@ -2087,6 +2087,7 @@
         "parsing": "Reading list...",
         "parseSuccess": "Found {count} products",
         "parseInvalidData": "We couldn't read that list. Try rewriting it more simply.",
+        "partialParse": "We couldn't read {n} of the products: {items}. Add them again in a new list.",
         "parseError": "Something went wrong. Please try again.",
         "aiQuotaExceeded": "The AI is busy right now. Please try again in a few minutes.",
         "aiTimeout": "The AI took too long to respond. Please try again with a shorter list.",

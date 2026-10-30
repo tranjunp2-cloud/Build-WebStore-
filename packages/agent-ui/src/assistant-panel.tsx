@@ -453,7 +453,7 @@ export function AgentAssistantPanel({
 		if (queue.length < 2) return undefined;
 		const text = { ...DEFAULT_CAMPAIGN_LABELS, ...labels?.chat?.campaign };
 		return {
-			tag: text.tag.replace("{label}", group.label),
+			tag: (group.kind === "set" ? text.setTag : text.tag).replace("{label}", group.label),
 			approveAll: text.approveAll.replace("{n}", String(queue.length)),
 			onApproveAll: async () => {
 				const stopped = stoppedLine(await approveCampaign(cards, (card) => decide(card, "approve")), labels?.chat?.campaign);

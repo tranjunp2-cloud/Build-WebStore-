@@ -31,6 +31,7 @@ import { MODEL_REGISTRY } from "../models/models.module";
 import { ImageService } from "../images/image.service";
 import { cacheableInstructions } from "../models/prompt-cache";
 import { SHOP_TOOLS, type ShopTools } from "../shop/shop-tools";
+import { TaskEngine } from "../tasks/task-engine.service";
 import { AgentError } from "./agent-errors";
 import { AGENT_STORE, type AgentStore, type AttachmentRecord, type ReservedStart, type RunStartWindows } from "./agent-store";
 import { AgentThreadService } from "./agent-thread.service";
@@ -47,6 +48,8 @@ import { type CapabilitySet, effectiveCapabilities } from "./merchant-capabiliti
 import { merchantInstructions } from "./merchant-instructions";
 import {
 	askUserOptions,
+	type BlogPostsWriteInput,
+	type BlogPostWritten,
 	createMerchantTools,
 	type FindImagesInput,
 	type GenerateImageInput,
@@ -361,6 +364,8 @@ export class AgentRunService {
 		@Optional() @Inject(SHOP_CAPS) private readonly shopCaps?: ShopCaps,
 		// Prime Studio's runtime knobs and timeouts (Studio -> env -> default); absent = env only
 		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
+		// platform tasks the copilot runs itself (the articles of propose_blog_posts)
+		@Optional() private readonly tasks?: TaskEngine,
 	) {}
 
 	/** The runtime knobs as Studio sets them, else env. */
@@ -891,6 +896,7 @@ export class AgentRunService {
 			currentPage: () =>
 				this.readTool(run.id, push, "page.current", "Checked the page you're on", async () => currentPage(run, state), "page.current"),
 			images: () => state.images,
+			...(this.tasks ? { writeBlogPosts: (input: BlogPostsWriteInput) => this.writeBlogPosts(ctx, run.id, input, push) } : {}),
 			findImages: (input) => this.findImages(ctx, run.id, state, input, push),
 			generateImages: (input) => this.generateImages(ctx, run.id, state, input, push),
 			seenProducts: () => state.products ?? [],
@@ -1637,6 +1643,53 @@ export class AgentRunService {
 			this.logger.warn(`family schema unavailable while drafting: ${String(error)}`);
 		}
 		return knowledge;
+	}
+
+	/**
+	 * The articles of propose_blog_posts: one copy.blog-post-draft task per post, all at once. Each runs under the
+	 * shop's own limits (battery, daily cap) and is counted with this run; a post that fails says why, the rest stay.
+	 */
+	private async writeBlogPosts(
+		ctx: AiRequestContext,
+		runId: string,
+		input: BlogPostsWriteInput,
+		push: (event: RunEvent) => void,
+	): Promise<BlogPostWritten[]> {
+		const tasks = this.tasks;
+		if (!tasks) return input.posts.map(() => ({ ok: false, reason: "Writing posts is not available here." }));
+		const t0 = Date.now();
+		const written = await Promise.all(
+			input.posts.map(async (post): Promise<BlogPostWritten> => {
+				try {
+					const { output } = await tasks.run(
+						ctx,
+						"copy.blog-post-draft",
+						{ title: post.title, outline: post.outline, notes: post.notes ?? "", language: input.locale },
+						undefined,
+						{ runId },
+					);
+					return { ok: true, ...(output as { contentHtml: string; seoTitle: string; seoDescription: string }) };
+				} catch (error) {
+					this.logger.warn(`blog post "${post.title.slice(0, 60)}" not written: ${error instanceof Error ? error.message : String(error)}`);
+					return { ok: false, reason: error instanceof AgentError ? error.message : "The AI could not write this post." };
+				}
+			}),
+		);
+		const n = written.filter((post) => post.ok).length;
+		push({
+			type: "run.receipt",
+			runId,
+			receipt: {
+				id: newId("rcpt"),
+				tool: "blog.write_posts",
+				summary: `Wrote ${n} of ${input.posts.length} blog posts`,
+				phrase: { key: "blog.write_posts", values: { n } },
+				durationMs: Date.now() - t0,
+				status: n === input.posts.length ? "ok" : "error",
+				entityIds: [],
+			},
+		});
+		return written;
 	}
 
 	private async findImages(

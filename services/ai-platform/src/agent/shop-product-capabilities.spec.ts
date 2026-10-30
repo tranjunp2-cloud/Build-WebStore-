@@ -73,7 +73,7 @@ describe("tools per set with shop_products [TC-AIREL-52]", () => {
 	it("offers the staging set the site and blog tools, the item reads and the shop product tools, in a stable order", () => {
 		const staging = names(set(...STAGING));
 		expect(staging).toEqual([
-			"ask_user", "find_images", "read_item", "search_items", "current_page", "propose_update", "propose_status_change", "propose_blog_post",
+			"ask_user", "find_images", "read_item", "search_items", "current_page", "propose_update", "propose_status_change", "propose_blog_post", "propose_blog_posts",
 			"site_read", "propose_page_patch", "propose_site_patch", "propose_new_page", "propose_page_seo", "propose_page_translation", "propose_theme_change", "propose_navigation", "propose_site_languages", "propose_publish",
 			...SHOP_TOOLS,
 		]);

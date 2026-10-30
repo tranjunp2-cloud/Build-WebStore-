@@ -26,6 +26,7 @@ export const TOOL_CAPABILITIES = {
 	propose_inventory: ["inventory"],
 	propose_store_products: ["store_products"],
 	propose_blog_post: ["blog"],
+	propose_blog_posts: ["blog"],
 	site_read: ["site"],
 	propose_page_patch: ["site"],
 	propose_site_patch: ["site"],

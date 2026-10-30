@@ -112,5 +112,18 @@ export async function createMediaRow(
 		created = (await create()) as { id: number | string };
 	}
 	// read back: the storage plugin fills in the public url after the row is saved
-	return (await cms.findByID({ collection: "media", id: created.id, depth: 0 })) as MediaDoc;
+	const readBack = (id: number | string) => cms.findByID({ collection: "media", id, depth: 0 }) as Promise<MediaDoc>;
+	try {
+		return await readBack(created.id);
+	} catch (error) {
+		// the create raced another Payload write of this process (Approve all applies cards while the page refreshes):
+		// it resolved with an id, the storage hook failed and the row was rolled back (GH-1185). Create it once more.
+		if (!isNotFound(error)) throw error;
+		console.warn("[ai-agent] media row lost after create, creating it again:", created.id);
+		created = (await create()) as { id: number | string };
+		return await readBack(created.id);
+	}
 }
+
+const isNotFound = (error: unknown) =>
+	(error as { status?: unknown } | null)?.status === 404 || (error instanceof Error && error.name === "NotFound");

@@ -127,6 +127,34 @@ export const BlogDraftInputSchema = z.object({
 });
 export type BlogDraftInput = z.infer<typeof BlogDraftInputSchema>;
 
+export const MAX_BLOG_POSTS_PER_SET = 5;
+
+/** Several posts from one request: the copilot plans them, the platform writes each article (copy.blog-post-draft). */
+export const BlogPostsInputSchema = z.object({
+	locale: z.enum(BLOG_LOCALES).describe("Language of the posts."),
+	label: z
+		.string()
+		.min(1)
+		.max(40)
+		.describe('Short name of the set in the merchant\'s words, shown on its cards (e.g. "Rainy season tips")'),
+	posts: z
+		.array(
+			z.object({
+				title: z.string().min(5).max(160),
+				outline: z.array(z.string().min(2).max(200)).min(2).max(8).describe("The post's <h2> sections, in order"),
+				notes: z
+					.string()
+					.max(1_500)
+					.nullable()
+					.describe("Facts this post must use: what the merchant said, their products, prices, place, offers. null = none"),
+				coverImageId: z.string().min(1).max(120).nullable().describe("Cover photo: an id from find_images or an attached image; null = none"),
+			}),
+		)
+		.min(2)
+		.max(MAX_BLOG_POSTS_PER_SET),
+});
+export type BlogPostsInput = z.infer<typeof BlogPostsInputSchema>;
+
 export interface BuildContext {
 	id: string;
 	runId: string;

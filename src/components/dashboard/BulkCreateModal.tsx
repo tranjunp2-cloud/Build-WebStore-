@@ -390,6 +390,14 @@ export function BulkCreateModal({
                 setGenerationId(responseGenerationId)
                 setSaveFailures({})
                 setProducts(initProducts)
+                // a long list is read in chunks: the merchant's words of a chunk no call could read
+                const unparsed: string[] = Array.isArray(data.unparsed) ? data.unparsed.filter((piece: unknown): piece is string => typeof piece === 'string') : []
+                if (unparsed.length > 0) {
+                    const items = unparsed.join('; ')
+                    const tmpl = t.dashboard?.products?.bulkCreate?.partialParse
+                        || "We couldn't read {n} of the products: {items}. Add them again in a new list."
+                    toast.warning(tmpl.replace('{n}', String(unparsed.length)).replace('{items}', items.length > 200 ? `${items.slice(0, 200)}…` : items))
+                }
             } else {
                 toast.error(t.dashboard?.products?.bulkCreate?.parseInvalidData || 'Invalid products format received from AI')
             }

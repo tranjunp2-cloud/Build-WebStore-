@@ -3,6 +3,7 @@ import type { ModelMessage } from "ai";
 import type { AiRequestContext } from "../auth/context-token";
 import type { ZodType } from "zod";
 import type { ModelAlias } from "../models/model-registry";
+import type { ReasoningEffort } from "../models/providers";
 
 /**
  * Server-side half of a task: which model tier answers it and the versioned
@@ -47,6 +48,11 @@ export interface TaskDefinition<T extends AiTaskId = AiTaskId> {
 	 * left, no fallback starts without room to finish, and running out → 504.
 	 */
 	deadlineMs?: number;
+	/**
+	 * Thinking effort for this task on every tier, over Studio / AI_EFFORT_* (models that take one). For a task
+	 * whose long JSON answer must fit `maxOutputTokens`: thinking tokens count toward that limit and cut the answer.
+	 */
+	effort?: ReasoningEffort;
 	/** Sampling settings carried over from the call site's original prompt. */
 	temperature?: number;
 	maxOutputTokens?: number;

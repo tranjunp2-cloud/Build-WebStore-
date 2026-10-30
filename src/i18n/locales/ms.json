@@ -2087,6 +2087,7 @@
         "parsing": "Membaca senarai...",
         "parseSuccess": "Ditemui sejumlah {count} produk",
         "parseInvalidData": "Senarai yang diberikan tidak jelas. Sila isi semula dengan lebih ringkas",
+        "partialParse": "Kami tidak dapat membaca {n} produk: {items}. Tambah semula dalam senarai baharu.",
         "parseError": "Terdapat masalah, Sila cuba lagi",
         "aiQuotaExceeded": "AI sedang sibuk sekarang. Sila cuba lagi dalam beberapa minit.",
         "aiTimeout": "AI mengambil masa terlalu lama untuk membalas. Sila cuba lagi dengan senarai yang lebih pendek.",

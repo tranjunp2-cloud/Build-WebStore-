@@ -56,7 +56,8 @@ export class TaskEngine {
 		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
 	) {}
 
-	async run(ctx: AiRequestContext, taskId: string, rawInput: unknown, requestId?: string): Promise<RunTaskResponse> {
+	/** `runId`: the copilot run the call works for (its usage rows are counted with that chat). */
+	async run(ctx: AiRequestContext, taskId: string, rawInput: unknown, requestId?: string, options: { runId?: string } = {}): Promise<RunTaskResponse> {
 		if (!isAiTaskId(taskId)) throw new AgentError(`Unknown AI task "${taskId}".`, 404);
 		const contract = AI_TASKS[taskId];
 		const parsed = contract.input.safeParse(rawInput);
@@ -69,7 +70,7 @@ export class TaskEngine {
 		const input = parsed.data as never;
 		// the tier a Studio override moved the task to, else the catalog's
 		const alias = this.settings?.taskTier(taskId, definition.alias) ?? definition.alias;
-		const chain = this.models.resolveChain(alias);
+		const chain = this.models.resolveChain(alias, definition.effort ? { effort: definition.effort } : undefined);
 		const schema = (definition.modelOutput?.(input) ?? contract.output) as ZodType;
 		const jsonMode = definition.outputMode === "json";
 		const textMode = definition.outputMode === "text";
@@ -86,6 +87,7 @@ export class TaskEngine {
 				userId: ctx.userId,
 				surface: "system",
 				task: taskId,
+				...(options.runId ? { runId: options.runId } : {}),
 				provider: m.provider,
 				model: m.modelId,
 				latencyMs,

@@ -1,3 +1,4 @@
+import { generateText } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AiRequestContext } from "../auth/context-token";
 import { parseEnv } from "../config/env";
@@ -16,7 +17,15 @@ const vars = {
 	AI_MODEL_BALANCED: "anthropic:claude-haiku-5-5",
 };
 
-type Body = { max_tokens?: number; thinking?: { type?: string }; output_config?: { effort?: string } };
+type Body = {
+	max_tokens?: number;
+	max_completion_tokens?: number;
+	thinking?: { type?: string };
+	output_config?: { effort?: string };
+	reasoning_effort?: string;
+	messages?: Array<{ role: string; content: unknown }>;
+	system?: unknown;
+};
 
 /** Runs `taskId` through the real registry and engine; returns the body sent to Anthropic (the fake server answers 500). */
 async function anthropicBodyFor(taskId: string, input: unknown, extraEnv: Record<string, string> = {}): Promise<Body> {
@@ -55,5 +64,60 @@ describe("task calls carry the tier's effort only [TC-AIEFF-14]", () => {
 		// Assert
 		expect(body.output_config?.effort).toBe("medium");
 		expect(body.thinking?.type).not.toBe("disabled");
+	});
+});
+
+// TC-AIWB-125 — bulk add: the long JSON product list runs without thinking on every tier, with room for ~20 products.
+describe("catalog.bulk-parse-products runs without thinking [TC-AIWB-125]", () => {
+	const bulk = { promptText: "batik scarf RM50, rattan basket RM30", locale: "en", categoryCandidates: [] };
+
+	it("is sent with thinking disabled and 8000 output tokens, even when Studio / env sets a balanced effort", async () => {
+		// Act
+		const body = await anthropicBodyFor("catalog.bulk-parse-products", bulk, { AI_EFFORT_BALANCED: "high" });
+
+		// Assert
+		expect(body.max_tokens).toBe(8000);
+		expect(body.thinking).toEqual({ type: "disabled" });
+		expect(body.output_config?.effort).toBeUndefined();
+	});
+
+	it("changes only that call: the tier's effort still reaches every other call", async () => {
+		// Arrange
+		const bodies: string[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (_url: string, init?: { body?: string }) => {
+				bodies.push(String(init?.body ?? "{}"));
+				return new Response("{}", { status: 500 });
+			}),
+		);
+		const extra = { AI_EFFORT_BALANCED: "high" };
+		const registry = createModelRegistry(parseEnv({ ...vars, ...extra }), { ...vars, ...extra });
+
+		// Act
+		await generateText({ model: registry.resolveChain("balanced")[0]!.model, prompt: "hi", maxRetries: 0 }).catch(() => undefined);
+		await generateText({ model: registry.resolveChain("balanced", { effort: "none" })[0]!.model, prompt: "hi", maxRetries: 0 }).catch(() => undefined);
+		const [tier, task] = bodies.map((body) => JSON.parse(body) as Body);
+
+		// Assert
+		expect(tier!.output_config?.effort).toBe("high");
+		expect(task!.thinking).toEqual({ type: "disabled" });
+	});
+});
+
+// TC-AIWB-126 — the list splitter: fast tier, no thinking, the merchant's text as the prompt, unchanged.
+describe("catalog.split-products [TC-AIWB-126]", () => {
+	it("sends the merchant's text verbatim with thinking disabled and room for a 6000-character copy", async () => {
+		// Arrange
+		const text = "2 brown capybara keychains RM15, 1 red slippers size M RM5";
+
+		// Act
+		const body = await anthropicBodyFor("catalog.split-products", { promptText: text });
+
+		// Assert
+		expect(body.max_tokens).toBe(4000);
+		expect(body.thinking).toEqual({ type: "disabled" });
+		expect(JSON.stringify(body.messages)).toContain(text);
+		expect(JSON.stringify(body.system)).toMatch(/exactly as the merchant wrote them/);
 	});
 });

@@ -17,7 +17,10 @@ import { type AskUserOptions, askUserToolFor } from "./ask/ask-tool";
 import {
 	type BlogDraftInput,
 	BlogDraftInputSchema,
+	type BlogPostsInput,
+	BlogPostsInputSchema,
 	buildBlogDraftChangeSet,
+	MAX_BLOG_POSTS_PER_SET,
 	buildProductDraftsChangeSet,
 	type KnownImage,
 	type ProductDraftsInput,
@@ -50,6 +53,13 @@ import { type StoreDiscountsReadInput, StoreDiscountsReadInputSchema, type Store
 import { type StoreOrdersReadInput, StoreOrdersReadInputSchema, type StoreOrdersToolInput, StoreOrdersToolInputSchema } from "./store-order-schemas";
 import { type StoreReportsInput, StoreReportsInputSchema, type StoreTodosInput, StoreTodosInputSchema } from "./store-report-schemas";
 import { LIMIT, STAGED_NOTE } from "./tool-notes";
+
+/** What the platform writes for propose_blog_posts: the planned posts of one set. */
+export interface BlogPostsWriteInput {
+	locale: BlogPostsInput["locale"];
+	posts: ReadonlyArray<{ title: string; outline: string[]; notes: string | null }>;
+}
+export type BlogPostWritten = { ok: true; contentHtml: string; seoTitle: string; seoDescription: string } | { ok: false; reason: string };
 
 export interface MerchantToolDeps {
 	runId: string;
@@ -108,6 +118,11 @@ export interface MerchantToolDeps {
 	storeTodos?: (input: StoreTodosInput) => Promise<unknown>;
 	/** Links the cards of one promo campaign (group). Without it start_campaign still answers, but nothing is linked. */
 	campaign?: CampaignRun;
+	/**
+	 * Writes the article of each planned post (one platform task per post, in parallel). Absent where tasks
+	 * do not run: propose_blog_posts then answers that it is unavailable.
+	 */
+	writeBlogPosts?: (input: BlogPostsWriteInput) => Promise<BlogPostWritten[]>;
 	/** The merchant's latest message and the language of the editor canvas: page text edits keep the page's language. */
 	siteText?: () => { request: string; editingLanguage?: string };
 }
@@ -749,6 +764,54 @@ function buildMerchantTools(deps: MerchantToolDeps, capabilities: CapabilitySet)
 				await deps.stage(changeSet);
 				const skipped = changeSet.guardrails.filter((g) => !g.ok).map((g) => g.detail);
 				return { changeSetId: changeSet.id, title: input.title, note: STAGED_NOTE, ...(skipped.length > 0 ? { skipped } : {}) };
+			},
+		}),
+		propose_blog_posts: tool({
+			description: `Stage SEVERAL new blog post drafts (2–${MAX_BLOG_POSTS_PER_SET}) from one request ("write 3 posts about…"). You plan each post: title, its <h2> sections and the facts it must use; the platform writes the articles in parallel and stages one card per post, linked so the merchant can approve them all at once. For ONE post use propose_blog_post.`,
+			inputSchema: BlogPostsInputSchema,
+			execute: async (input: BlogPostsInput) => {
+				if (!deps.writeBlogPosts) return { error: { code: "unavailable", message: "Writing several posts at once is not available here. Draft them one by one with propose_blog_post." } };
+				const repeated = input.posts.filter((post) => alreadyCreated(deps, "blog_post", post.title).length > 0);
+				const posts = input.posts.filter((post) => !repeated.includes(post));
+				if (posts.length === 0) return alreadyCreated(deps, "blog_post", input.posts[0]!.title)[0];
+				const written = await deps.writeBlogPosts({
+					locale: input.locale,
+					posts: posts.map((post) => ({ title: post.title, outline: post.outline, notes: post.notes })),
+				});
+				// a running campaign links them itself (start_campaign); otherwise they are one set of their own
+				const group = deps.campaign?.active() ? undefined : { id: `set_${deps.newChangeSetId()}`.slice(0, 120), label: input.label.trim(), kind: "set" as const };
+				const changeSetIds: string[] = [];
+				const failed: Array<{ title: string; reason: string }> = [];
+				let step = 0;
+				for (const [index, post] of posts.entries()) {
+					const article = written[index];
+					if (!article?.ok) {
+						failed.push({ title: post.title, reason: article?.reason ?? "The article could not be written." });
+						continue;
+					}
+					const draft = buildBlogDraftChangeSet(
+						{
+							locale: input.locale,
+							title: post.title,
+							contentHtml: article.contentHtml,
+							seoTitle: article.seoTitle,
+							seoDescription: article.seoDescription,
+							coverImageId: post.coverImageId,
+						},
+						{ id: deps.newChangeSetId(), runId: deps.runId, now: deps.now() },
+						deps.images(),
+					);
+					step += 1;
+					await deps.stage(group ? { ...draft, group: { ...group, step } } : draft);
+					changeSetIds.push(draft.id);
+				}
+				return {
+					changeSetIds,
+					posts: changeSetIds.length,
+					...(changeSetIds.length > 0 ? { note: STAGED_NOTE } : {}),
+					...(failed.length > 0 ? { failed } : {}),
+					...(repeated.length > 0 ? { alreadyCreated: repeated.map((post) => post.title) } : {}),
+				};
 			},
 		}),
 		site_read: tool({

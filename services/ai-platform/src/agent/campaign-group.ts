@@ -19,6 +19,8 @@ export interface CampaignRun {
 	begin: (label: string) => ChangeSetGroup;
 	/** the change set with its group when it belongs in the campaign; otherwise unchanged */
 	stamp: (changeSet: ChangeSet) => ChangeSet;
+	/** a campaign was started in this run: its cards join it rather than a group of their own */
+	active: () => boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export function createCampaignRun(runId: string, holder: { campaign?: CampaignSt
 			holder.campaign = { seq, id: `cmp_${runId}_${seq}`.slice(0, 120), label: clean, steps: 0 };
 			return { id: holder.campaign.id, label: holder.campaign.label };
 		},
+		active: () => holder.campaign !== undefined,
 		stamp(changeSet) {
 			const campaign = holder.campaign;
 			if (!campaign || changeSet.group) return changeSet;

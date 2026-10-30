@@ -67,7 +67,7 @@ describe("copilot runs under a capability set", () => {
 
 		// Assert: only the allowed tools, with the matching instructions
 		expect(toolNames(callA)).toEqual([
-			"ask_user", "find_images", "read_item", "search_items", "current_page", "propose_update", "propose_status_change", "propose_blog_post",
+			"ask_user", "find_images", "read_item", "search_items", "current_page", "propose_update", "propose_status_change", "propose_blog_post", "propose_blog_posts",
 			"site_read", "propose_page_patch", "propose_site_patch", "propose_new_page", "propose_page_seo", "propose_page_translation", "propose_theme_change", "propose_navigation", "propose_site_languages", "propose_publish",
 		]);
 		expect(system(callA)).toEqual([{ role: "system", content: merchantInstructions(capabilitySet(["site", "blog", "stock_photos"])) }]);
@@ -89,7 +89,7 @@ describe("copilot runs under a capability set", () => {
 		await widened.service.start({ ...ctx, capabilities: ["site", "blog", "inventory", "product_master"] }, { prompt: "hi" }, () => undefined);
 
 		// Assert
-		expect(toolNames(narrowed.model.doGenerateCalls[0] as CallOptions)).toEqual(["ask_user", "read_item", "search_items", "current_page", "propose_update", "propose_status_change", "propose_blog_post"]);
+		expect(toolNames(narrowed.model.doGenerateCalls[0] as CallOptions)).toEqual(["ask_user", "read_item", "search_items", "current_page", "propose_update", "propose_status_change", "propose_blog_post", "propose_blog_posts"]);
 		const widenedTools = toolNames(widened.model.doGenerateCalls[0] as CallOptions);
 		expect(widenedTools).not.toContain("inventory_read");
 		expect(widenedTools).not.toContain("propose_product_drafts");

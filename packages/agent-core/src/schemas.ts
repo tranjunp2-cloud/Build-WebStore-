@@ -456,6 +456,8 @@ export const ChangeSetGroupSchema = z.object({
 	id: z.string().min(1).max(120),
 	label: z.string().min(1).max(60),
 	step: z.number().int().positive().optional(),
+	/** `campaign` (default): a promotion's linked cards; `set`: several drafts of one request (e.g. 3 blog posts) */
+	kind: z.enum(["campaign", "set"]).optional(),
 });
 export type ChangeSetGroup = z.infer<typeof ChangeSetGroupSchema>;
 
