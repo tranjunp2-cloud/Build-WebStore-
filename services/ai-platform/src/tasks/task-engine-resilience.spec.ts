@@ -138,3 +138,51 @@ describe("whole-chain deadline [TC-AIWB-91]", () => {
 		expect(unbounded.every((id) => id.startsWith("migration."))).toBe(true);
 	});
 });
+
+// seo.generate-meta declares maxRetries 0, so the SDK does not sleep between attempts.
+const runMeta = (engine: TaskEngine) => engine.run(ctx, "seo.generate-meta", { type: "page", itemName: "About", siteName: "Kedai Batik" });
+
+describe("TaskEngine provider rate limit [TC-AIRATE-01]", () => {
+	it("[TC-AIRATE-01] answers 429 provider_rate_limited when every provider answered 429, and ledgers the code", async () => {
+		const { engine, recorded } = setup([
+			{ provider: "anthropic", modelId: "claude-haiku-5-5", model: failing(apiError(429, "Rate limit reached for requests per minute")) },
+			{ provider: "openai", modelId: "gpt-5.4-nano", model: failing(apiError(429, "Too many requests")) },
+		]);
+
+		await expect(runMeta(engine)).rejects.toMatchObject({
+			status: 429,
+			code: "provider_rate_limited",
+			message: "The AI is busy right now. Try again in a minute.",
+		});
+		expect(recorded.map((e) => e.errorCode)).toEqual(["provider_rate_limited", "provider_rate_limited"]);
+	});
+
+	it("[TC-AIRATE-02] a rate limit wrapped by the SDK retry error is still a rate limit", async () => {
+		const wrapped = new RetryError({ message: "failed after retries", reason: "maxRetriesExceeded", errors: [apiError(429, "slow down")] });
+		const { engine } = setup([{ provider: "anthropic", modelId: "claude-haiku-5-5", model: failing(wrapped) }]);
+
+		await expect(runMeta(engine)).rejects.toMatchObject({ status: 429, code: "provider_rate_limited" });
+	});
+
+	it("[TC-AIRATE-03] billing exhaustion stays 402, also when it arrives as a 429", async () => {
+		const { engine } = setup([
+			{ provider: "anthropic", modelId: "claude-haiku-5-5", model: failing(apiError(429, "You exceeded your current quota")) },
+		]);
+
+		await expect(runMeta(engine)).rejects.toMatchObject({ status: 402, code: "provider_insufficient_quota" });
+	});
+
+	it("[TC-AIRATE-04] a 429 mixed with an outage or billing failure keeps the generic 503", async () => {
+		const outage = setup([
+			{ provider: "anthropic", modelId: "claude-haiku-5-5", model: failing(apiError(429, "slow down")) },
+			{ provider: "openai", modelId: "gpt-5.4-nano", model: failing(apiError(503, "down")) },
+		]);
+		const billing = setup([
+			{ provider: "anthropic", modelId: "claude-haiku-5-5", model: failing(apiError(429, "slow down")) },
+			{ provider: "openai", modelId: "gpt-5.4-nano", model: failing(apiError(429, "You exceeded your current quota")) },
+		]);
+
+		await expect(runMeta(outage.engine)).rejects.toMatchObject({ status: 503, code: undefined });
+		await expect(runMeta(billing.engine)).rejects.toMatchObject({ status: 503, code: undefined });
+	});
+});

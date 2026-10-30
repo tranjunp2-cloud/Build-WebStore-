@@ -85,7 +85,7 @@ const EnvSchema = z.object({
 	/**
 	 * Reasoning effort per tier, for every provider of that tier's chain (AI SDK `reasoning`: Anthropic
 	 * effort, OpenAI/compat reasoning_effort, Gemini thinking level/budget, DeepSeek thinking). Lets one
-	 * cheap model serve every tier. Unset = fast low, balanced medium, quality high (the default chains run
+	 * cheap model serve every tier. Unset = fast none (thinking off), balanced medium, quality high (the default chains run
 	 * claude-haiku-5-5 on all three); DeepSeek stays non-thinking unless the tier effort is set explicitly.
 	 * `default` = send no effort, each model uses its own.
 	 */

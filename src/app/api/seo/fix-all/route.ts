@@ -8,9 +8,8 @@ import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { z } from 'zod'
 import { parseRequest } from '@/lib/validations/helpers'
-import { generateAutoSEOMeta } from '@/lib/ai/generate-meta'
+import { runFixAllGeneration } from '@/lib/seo/fix-all-generation'
 import {
-    classifyFixFailure,
     FIX_ALL_KEEPALIVE_FRAME,
     FIX_ALL_KEEPALIVE_MS,
     fixAllStreamBudgetMs,
@@ -29,7 +28,6 @@ import {
 } from '@/lib/seo/local-seo-evaluation'
 
 const MAX_AI_FIX_BATCH = 100
-const AI_FIX_CONCURRENCY = 4
 const REVISION_TOKEN_PATTERN = /^[a-f0-9]{64}$/
 
 type TenantRef = string | number | { id: string | number } | null | undefined
@@ -52,25 +50,6 @@ function activeTenantIds(user: unknown): Set<string> {
             const id = tenantId(membership.tenant)
             return membership.status === 'active' && id ? [id] : []
         }),
-    )
-}
-
-async function mapWithConcurrency<T>(
-    items: readonly T[],
-    concurrency: number,
-    signal: AbortSignal,
-    worker: (item: T) => Promise<void>,
-): Promise<void> {
-    let nextIndex = 0
-    const run = async () => {
-        while (nextIndex < items.length && !signal.aborted) {
-            const item = items[nextIndex]
-            nextIndex += 1
-            await worker(item)
-        }
-    }
-    await Promise.all(
-        Array.from({ length: Math.min(concurrency, items.length) }, run),
     )
 }
 
@@ -337,7 +316,8 @@ export const POST = withFeatureGuard('content_management')(
                     )
 
                     // Counted from the request start: setup (cold start, evaluation) shares maxDuration.
-                    const streamBudgetMs = fixAllStreamBudgetMs(Date.now() - requestStartedAt)
+                    const streamStartedAt = Date.now()
+                    const streamBudgetMs = fixAllStreamBudgetMs(streamStartedAt - requestStartedAt)
                     timeout = setTimeout(() => {
                         const event: FixAllTimeoutEvent = {
                             error: 'timeout',
@@ -358,80 +338,48 @@ export const POST = withFeatureGuard('content_management')(
                         cleanup()
                     }, streamBudgetMs)
 
-                    await mapWithConcurrency(
-                        requestedItems,
-                        AI_FIX_CONCURRENCY,
-                        generationController.signal,
-                        async (item) => {
-                            if (generationController.signal.aborted || !item) return
-                            try {
-                                const { title, description } =
-                                    await generateAutoSEOMeta(
-                                        item.collection === 'products'
-                                            ? 'product'
-                                            : 'page',
-                                        item.title,
-                                        siteName,
-                                        item.context,
-                                        trackedKeywords,
-                                        generationController.signal,
-                                        actor,
-                                    )
-
-                                if (generationController.signal.aborted) return
-
-                                const result = {
-                                    id: item.id,
-                                    targetId: item.id,
-                                    collection: item.collection,
-                                    name: item.title,
-                                    proposedTitle: item.missingFields.includes(
-                                        'title',
-                                    )
-                                        ? title
+                    await runFixAllGeneration({
+                        items: requestedItems.flatMap((item) => (item ? [item] : [])),
+                        siteName,
+                        keywords: trackedKeywords,
+                        actor,
+                        signal: generationController.signal,
+                        deadlineAt: streamStartedAt + streamBudgetMs,
+                        onResult: (item, { title, description }) => {
+                            if (stopped) return
+                            const result = {
+                                id: item.id,
+                                targetId: item.id,
+                                collection: item.collection,
+                                name: item.title,
+                                proposedTitle: item.missingFields.includes('title')
+                                    ? title
+                                    : undefined,
+                                proposedDescription:
+                                    item.missingFields.includes('description')
+                                        ? description
                                         : undefined,
-                                    proposedDescription:
-                                        item.missingFields.includes(
-                                            'description',
-                                        )
-                                            ? description
-                                            : undefined,
-                                    currentTitle: item.currentTitle,
-                                    currentDescription: item.currentDescription,
-                                }
-
-                                settled.add(itemKey(item))
-                                succeeded += 1
-                                enqueue(
-                                    `data: ${JSON.stringify(result)}\n\n`,
-                                )
-                            } catch (error: unknown) {
-                                if (generationController.signal.aborted) return
-                                const { reason, status } =
-                                    classifyFixFailure(error)
-                                // No message/prompt text: only the error class, reason and HTTP status.
-                                console.error('[AI Fix All Partial Error]', {
-                                    name:
-                                        error instanceof Error
-                                            ? error.name
-                                            : 'UnknownError',
-                                    reason,
-                                    status,
-                                    collection: item.collection,
-                                })
-                                settled.add(itemKey(item))
-                                failed += 1
-                                const event: FixAllItemFailedEvent = {
-                                    error: 'item_failed',
-                                    targetId: item.id,
-                                    collection: item.collection,
-                                    name: item.title,
-                                    reason,
-                                }
-                                enqueue(`data: ${JSON.stringify(event)}\n\n`)
+                                currentTitle: item.currentTitle,
+                                currentDescription: item.currentDescription,
                             }
+                            settled.add(itemKey(item))
+                            succeeded += 1
+                            enqueue(`data: ${JSON.stringify(result)}\n\n`)
                         },
-                    )
+                        onFailure: (item, { reason }) => {
+                            if (stopped) return
+                            settled.add(itemKey(item))
+                            failed += 1
+                            const event: FixAllItemFailedEvent = {
+                                error: 'item_failed',
+                                targetId: item.id,
+                                collection: item.collection,
+                                name: item.title,
+                                reason,
+                            }
+                            enqueue(`data: ${JSON.stringify(event)}\n\n`)
+                        },
+                    })
                     const done: FixAllDoneEvent = {
                         done: true,
                         succeeded,

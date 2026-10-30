@@ -220,6 +220,7 @@ export function AIFixModal({
         ({
             timeout: aifix.reasonTimeout,
             quota: aifix.reasonQuota,
+            busy: aifix.reasonBusy,
             unavailable: aifix.reasonUnavailable,
             failed: aifix.reasonFailed,
         })[reason]
@@ -227,6 +228,7 @@ export function AIFixModal({
         ({
             timeout: aifix.errorTimeout,
             quota: aifix.errorQuota,
+            busy: aifix.errorBusy,
             unavailable: aifix.errorUnavailable,
             failed: aifix.errorFailed,
         })[reason]

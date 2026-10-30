@@ -42,6 +42,15 @@ export function isProviderBillingError(error: unknown): boolean {
 	return BILLING_EXHAUSTED.test(`${error.message} ${error.responseBody ?? ""}`);
 }
 
+/** Stable `AgentError.code` / ledger error code for "every provider answered 429 (rate limit, not billing)". */
+export const PROVIDER_RATE_LIMITED = "provider_rate_limited";
+
+/** A plain provider rate limit (HTTP 429). Check `isProviderBillingError` first: exhausted credit can also be a 429. */
+export function isProviderRateLimitError(error: unknown): boolean {
+	if (RetryError.isInstance(error)) return isProviderRateLimitError(error.lastError);
+	return APICallError.isInstance(error) && error.statusCode === 429;
+}
+
 const logger = new Logger("ModelFallback");
 
 /** Provider error summary for logs — status and message only, never the prompt. */

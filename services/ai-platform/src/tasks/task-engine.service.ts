@@ -10,7 +10,7 @@ import type { Env } from "../config/env";
 import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { estimateCostMicros } from "../ledger/price-book";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
-import { isProviderBillingError, runWithFallback } from "../models/fallback";
+import { isProviderBillingError, isProviderRateLimitError, PROVIDER_RATE_LIMITED, runWithFallback } from "../models/fallback";
 import type { ModelRegistry } from "../models/model-registry";
 import { MODEL_REGISTRY } from "../models/models.module";
 import { cacheableInstructions } from "../models/prompt-cache";
@@ -91,6 +91,7 @@ export class TaskEngine {
 		};
 		let failures = 0;
 		let billingFailures = 0;
+		let rateLimitFailures = 0;
 		const { value, model, latencyMs, fallbacks } = await runWithFallback(
 			chain,
 			async (candidate) => {
@@ -116,8 +117,16 @@ export class TaskEngine {
 					failures++;
 					const billing = isProviderBillingError(error);
 					if (billing) billingFailures++;
+					const rateLimited = !billing && isProviderRateLimitError(error);
+					if (rateLimited) rateLimitFailures++;
 					return record("error", candidate, ms, {
-						errorCode: billing ? "provider_insufficient_quota" : error instanceof Error ? error.name : "unknown",
+						errorCode: billing
+							? "provider_insufficient_quota"
+							: rateLimited
+								? PROVIDER_RATE_LIMITED
+								: error instanceof Error
+									? error.name
+									: "unknown",
 					});
 				},
 				canFallback: () => !deadline || deadline - Date.now() > MIN_ATTEMPT_MS,
@@ -127,6 +136,11 @@ export class TaskEngine {
 			// Every provider refused for billing: say so, so callers stop spending time on more steps.
 			if (failures > 0 && billingFailures === failures) {
 				throw new AgentError("The AI provider has no credit left.", 402, "provider_insufficient_quota");
+			}
+			// Every provider answered 429 (not billing): a busy moment, not an outage. The org's own daily limit is a
+			// different 429 (thrown before any provider call, without this code).
+			if (failures > 0 && rateLimitFailures === failures) {
+				throw new AgentError("The AI is busy right now. Try again in a minute.", 429, PROVIDER_RATE_LIMITED);
 			}
 			if (deadline && Date.now() >= deadline - MIN_ATTEMPT_MS) {
 				throw new AgentError("The AI took too long to answer. Try again with less input.", 504);

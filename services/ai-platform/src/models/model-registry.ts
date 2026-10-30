@@ -26,8 +26,11 @@ export interface ModelRegistry {
 	resolveImageChain?(): ResolvedImageModel[];
 }
 
-/** Tier efforts when AI_EFFORT_* is unset: cheap and quick for small tasks, deeper for the copilot and site generation. */
-export const DEFAULT_TIER_EFFORT: Record<ModelAlias, ReasoningEffort> = { fast: "low", balanced: "medium", quality: "high" };
+/**
+ * Tier efforts when AI_EFFORT_* is unset: no thinking for the small fast tasks (a tiny JSON answer gains nothing from
+ * adaptive thinking, and Claude's thinking made it slow and sometimes unparsable), deeper for the copilot and site generation.
+ */
+export const DEFAULT_TIER_EFFORT: Record<ModelAlias, ReasoningEffort> = { fast: "none", balanced: "medium", quality: "high" };
 
 export class ModelUnavailableError extends Error {}
 
