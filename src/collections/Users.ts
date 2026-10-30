@@ -434,8 +434,9 @@ export const Users: CollectionConfig = {
                         tempPassword = randomBytes(8).toString('base64url').slice(0, 12)
 
                         // Add to tenant + reset password.
-                        // Do not pass `req` here: without it req.user is null, so the temp password
+                        // Do not pass `req` or `user` here: without them req.user is null, so the temp password
                         // is not copied into keyString (syncKeyStringOnPasswordUpdate) and SSO calls keep working.
+                        // Guarded by invite-staff-keystring-guard.test.ts (TC-F02.66).
                         const normalizedExisting = normalizeTenants(targetUser.tenants || [])
                         await req.payload.update({
                             collection: 'users',

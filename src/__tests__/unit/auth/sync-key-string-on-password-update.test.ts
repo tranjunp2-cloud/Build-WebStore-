@@ -2,7 +2,7 @@
 /**
  * A super-admin password change in the admin panel also refreshes keyString (encrypted SSO password),
  * so outbound SSO calls use the new password.
- * TC-F02.59 – TC-F02.62 (docs/qa/F02-auth.md).
+ * TC-F02.59 – TC-F02.62, TC-F02.64 – TC-F02.65 (docs/qa/F02-auth.md).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { CollectionBeforeChangeHook } from 'payload'
@@ -60,7 +60,7 @@ describe('syncKeyStringOnPasswordUpdate (beforeChange)', () => {
         expect(decryptPassword(out.keyString as string)).toBe('NewPass1!')
     })
 
-    it('[TC-F02.60] leaves data alone without a password or on create', () => {
+    it('[TC-F02.64] leaves data alone without a password or on create', () => {
         // Arrange
         const noPassword = { firstName: 'Ann' }
         const emptyPassword = { password: '' }
@@ -72,7 +72,7 @@ describe('syncKeyStringOnPasswordUpdate (beforeChange)', () => {
         expect(run(created, 'create').out).not.toHaveProperty('keyString')
     })
 
-    it('[TC-F02.60] leaves keyString alone when the caller is not a super-admin', () => {
+    it('[TC-F02.65] leaves keyString alone when the caller is not a super-admin', () => {
         // Arrange
         const data = { password: 'TempPass1!' }
         const owner = { id: 2, roles: ['tenant-owner'] }
