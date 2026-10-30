@@ -129,6 +129,14 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 | **TC-F02.56** | `Func` | Bị khóa → super-admin reset qua SSO → đăng nhập được ngay (GH-2053) | 1. Khóa tài khoản (sai 5 lần).<br>2. `PUT /api/v1/sso/reset-password` (super-admin).<br>3. Đăng nhập bằng mật khẩu mới. | - Đăng nhập thành công ngay. | High |
 | **TC-F02.57** | `Sec` | Link reset sai/hết hạn không gỡ khóa (GH-2053) | 1. Khóa tài khoản.<br>2. Đặt lại mật khẩu bằng token sai hoặc hết hạn. | - Báo link hết hạn; tài khoản vẫn bị khóa (`lock_until` không đổi). | High |
 | **TC-F02.58** | `Reg` | Không đổi mật khẩu thì vẫn khóa đủ 15 phút (GH-2053) | 1. Khóa tài khoản.<br>2. Đăng nhập lại trong 15 phút (không reset). | - Vẫn `423` + câu khóa cho tới khi hết 15 phút. | Medium |
+| **TC-F02.59** | `Func` | Unit: super-admin đổi mật khẩu cũng cập nhật `keyString` (GH-2045) | Unit `sync-key-string-on-password-update.test.ts`: beforeChange `update` có `password`, không có `keyString`, `req.user` là super-admin. | - `keyString` giải mã ra đúng mật khẩu mới; các field khác giữ nguyên. | High |
+| **TC-F02.60** | `Sec` | Unit: bỏ `keyString` client gửi kèm (GH-2045) | Unit `sync-key-string-on-password-update.test.ts`: super-admin `update` có `password` + `keyString: "forged"`. | - `keyString` dựng lại từ mật khẩu mới; giá trị client gửi bị bỏ. | High |
+| **TC-F02.61** | `Func` | Unit: lỗi mã hóa không chặn đổi mật khẩu (GH-2045) | Unit: thiếu `SSO_ENCRYPTION_KEY`. | - Ghi `logger.error`; data trả về giữ `password`, không có `keyString`. | High |
+| **TC-F02.62** | `Reg` | Unit: Users collection đăng ký hook `syncKeyStringOnPasswordUpdate` (GH-2045) | Unit: đọc `Users.hooks.beforeChange`. | - Chứa `syncKeyStringOnPasswordUpdate`. | High |
+| **TC-F02.63** | `Func` | Super-admin đổi mật khẩu owner trong `/admin` → `keyString` khớp mật khẩu mới (GH-2045) | 1. `/admin/collections/users/<id>` → Change password → lưu.<br>2. Owner đăng nhập bằng mật khẩu mới.<br>3. Gọi chức năng cần SSO token của owner. | - Đăng nhập được; `psql`: `key_string` đã đổi; chức năng SSO không lỗi xác thực. | High |
+| **TC-F02.64** | `Reg` | Unit: không có mật khẩu hoặc `create` thì không ghi `keyString` (GH-2045) | Unit: `update` không có/rỗng `password`; `create` có `password`. | - Không thêm `keyString`. | Medium |
+| **TC-F02.65** | `Sec` | Unit: người gọi không phải super-admin thì không ghi `keyString` (GH-2045) | Unit: owner tự `update` mật khẩu; `req.user = null` (server ghi, như mời lại staff). | - Không thêm `keyString`. | High |
+| **TC-F02.66** | `Reg` | Unit: mời lại staff không truyền `req`/`user` khi đặt mật khẩu tạm (GH-2045) | Unit `invite-staff-keystring-guard.test.ts`: super-admin là owner tenant, `POST /invite-staff` với user đã tồn tại. | - `payload.update` đặt mật khẩu tạm không có `req`, `user`, `keyString`; chạy hook với tham số đó không sinh `keyString` → `keyString` cũ giữ nguyên. | High |
 
 ---
 

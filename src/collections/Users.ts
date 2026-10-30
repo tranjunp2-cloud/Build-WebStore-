@@ -19,6 +19,7 @@ import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
 import { normalizeTenants } from '@/lib/normalize-tenants'
 import { canUpdateAvatarField } from '@/lib/profile/avatar-field-access'
 import { clearLoginLockAfterPasswordReset, clearLoginLockOnPasswordUpdate } from '@/lib/auth/clear-login-lock-on-password-change'
+import { syncKeyStringOnPasswordUpdate } from '@/lib/auth/sync-key-string-on-password-update'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
 import type { getTemplateConfig as GetTemplateConfig } from '@/lib/email/get-template-config'
@@ -255,7 +256,7 @@ export const Users: CollectionConfig = {
     },
     hooks: {
         beforeOperation: [rejectInvalidRoleFilter],
-        beforeChange: [setAuditFields, clearLoginLockOnPasswordUpdate],
+        beforeChange: [setAuditFields, clearLoginLockOnPasswordUpdate, syncKeyStringOnPasswordUpdate],
         afterChange: [sendWelcomeEmailHook],
         afterOperation: [clearLoginLockAfterPasswordReset],
     },
@@ -432,7 +433,10 @@ export const Users: CollectionConfig = {
                         // So they can login even if they forgot the old password
                         tempPassword = randomBytes(8).toString('base64url').slice(0, 12)
 
-                        // Add to tenant + reset password
+                        // Add to tenant + reset password.
+                        // Do not pass `req` or `user` here: without them req.user is null, so the temp password
+                        // is not copied into keyString (syncKeyStringOnPasswordUpdate) and SSO calls keep working.
+                        // Guarded by invite-staff-keystring-guard.test.ts (TC-F02.66).
                         const normalizedExisting = normalizeTenants(targetUser.tenants || [])
                         await req.payload.update({
                             collection: 'users',
@@ -1399,6 +1403,7 @@ export const Users: CollectionConfig = {
             type: 'text',
             // Server-managed only — never expose or allow direct writes via REST/GraphQL.
             // Internal writes use overrideAccess:true (provision, reset-password, me/password routes).
+            // Admin-panel password changes fill it via the syncKeyStringOnPasswordUpdate hook.
             // Same pattern as Orders.magicLinkSecret and Tenants.xenditSecretKey.
             access: { read: () => false, update: () => false },
             admin: { hidden: true, description: 'Encrypted SSO password for outbound SSO API calls' },

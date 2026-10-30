@@ -83,3 +83,26 @@ rm -rf .migration/delta-runs/<tên-lần-chạy>/{old,new,source-old,source-new}
 ```
 
 Lần chạy sau cũng in cảnh báo kèm lệnh `rm -rf` nếu còn bản sao sót trong cùng thư mục `delta-runs/`. Nếu lần chạy bị ngắt khi đang ghi, `pw1_delta_runs.state` còn `APPLYING`; các store đã commit vẫn giữ, chạy lại để hoàn tất phần còn lại.
+
+## 7. Đổi tay mật khẩu owner trong `/admin` (GH-2045)
+
+Dùng khi owner đã đổi mật khẩu trên SSO nhưng mật khẩu mới chưa sang PW2 (ví dụ lần chạy delta không có `--old`).
+
+Khi super-admin đổi mật khẩu trong `/admin`, hệ thống ghi luôn `keyString` (mật khẩu SSO mã hoá, dùng cho các lệnh gọi SSO từ PW2). **Mật khẩu nhập phải đúng là mật khẩu SSO hiện tại của owner.** Đặt mật khẩu tạm hoặc gõ nhầm thì các lệnh gọi SSO của owner sẽ lỗi, và chỉ có log báo.
+
+Nếu được, ưu tiên nhờ owner reset trên SSO (xem ghi chú cuối mục) để admin không phải cầm mật khẩu của owner.
+
+1. Nhận mật khẩu SSO hiện tại từ owner qua kênh bảo mật. Không dán mật khẩu vào ticket, Lark hay GitHub. Nếu mật khẩu đã lộ ở đâu đó, nhờ owner đổi trên SSO rồi dùng mật khẩu mới.
+2. Ghi lại giá trị trước khi đổi:
+   ```sql
+   SELECT id, email, updated_at, left(key_string, 12) AS key_prefix FROM users WHERE id = <id>;
+   ```
+3. `/admin/collections/users/<id>` → **Change Password** → nhập đúng mật khẩu đó → Save.
+4. Chạy lại câu SQL ở bước 2: `key_prefix` và `updated_at` phải khác trước. Bước này chỉ cho biết `key_string` đã được ghi lại (mỗi lần mã hoá ra giá trị khác), không chứng minh mật khẩu đúng.
+5. Đăng nhập bằng mật khẩu mới, rồi gọi thử một chức năng cần SSO token của owner. Không được lỗi xác thực. **Đây là bước kiểm tra mật khẩu đúng.**
+6. Nếu bước 5 lỗi: lặp lại bước 3 với đúng mật khẩu SSO. Nếu log có `[auth] keyString encryption failed on password update`, kiểm tra env `SSO_ENCRYPTION_KEY`.
+
+Ghi chú:
+- Không dùng cách này để cấp mật khẩu tạm cho owner dùng SSO. Muốn reset thì reset trên SSO; SSO tự gọi `PUT /api/v1/sso/reset-password` để đồng bộ mật khẩu và `keyString` sang PW2.
+- Delta sync không ghi đè mật khẩu admin đã đặt. Nếu ở lần chạy sau mật khẩu PW1 của user này cũng đổi, user hiện trong báo cáo là conflict mật khẩu (`PW2_PASSWORD_CHANGED`, `PW2_EDITED_CONFLICT` hoặc `PROJECTION_MISSING`) và không được cập nhật. Đây là kết quả mong muốn, bỏ qua khi đọc §4.
+- Lưu trong `/admin` làm đổi `updated_at` của user. Nếu sau đó PW1 sửa field khác của user này, delta cũng báo `PW2_EDITED_CONFLICT` cho user đó. Mọi lần admin sửa user đều như vậy, không riêng việc đổi mật khẩu.
