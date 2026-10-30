@@ -8,6 +8,7 @@ import type { PlanCode } from '@/collections/PlanSubscriptions';
 import { deauthorizeStripeAccount } from '@/lib/payment/stripe';
 import { xenditFetch, XenditError } from '@/lib/payment/xendit-client'
 import { setCallbackUrl } from '@/lib/payment/xendit';
+import { XENDIT_ENABLED } from '@/lib/payment/xendit-visibility';
 import { withTenantRowLock } from '@/lib/payload/tenant-row-lock';
 
 export type PaymentUpdates = {
@@ -279,6 +280,9 @@ export async function uploadQrMedia(formData: FormData) {
 
 // Model C: save merchant's own Xendit API keys
 export async function saveXenditKeys(secretKey: string, callbackToken: string) {
+    // GH-2132: UI is hidden; block direct server-action calls too. disconnectXendit stays allowed (only removes keys).
+    if (!XENDIT_ENABLED) return { success: false, error: 'Xendit is not available.' };
+
     try {
         const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();

@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { CheckoutClient } from './CheckoutClient'
 import { StripeBackRedirectScript } from '@/components/storefront/stripe-back-redirect'
+import { XENDIT_ENABLED } from '@/lib/payment/xendit-visibility'
 
 // Force dynamic — reads request headers (custom domain) and DB at runtime
 export const dynamic = 'force-dynamic'
@@ -137,14 +138,14 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
                     fpxEnabled: tenantFpxEnabled && siteFpxEnabled,
                     stripeConnected: !!((tenantFull as any)?.stripeAccountId),
                     stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled),
-                    xenditConnected: !!((tenantFull as any)?.xenditSecretKey),
+                    xenditConnected: XENDIT_ENABLED && !!((tenantFull as any)?.xenditSecretKey),
                     hasPaymentMethods: !!(
                         codEnabled ||
                         qrEnabled ||
                         // Only count Stripe if it can actually accept payments
                         ((tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled)) ||
                         // Xendit Invoice — connected = ready to accept payments
-                        !!(((tenantFull as any)?.xenditSecretKey))
+                        (XENDIT_ENABLED && !!((tenantFull as any)?.xenditSecretKey))
                     ),
                 }
             }

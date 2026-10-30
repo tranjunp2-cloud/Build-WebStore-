@@ -15,6 +15,13 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F34 — Tạm ẩn Xendit ở Settings > Payments và checkout (GH-2132)
+
+- Section Xendit biến mất khỏi `/settings/payments` cho mọi tenant (đã/chưa kết nối); checkout storefront không còn "Pay with Xendit" và Xendit không tính vào `hasPaymentMethods`.
+- `POST /api/orders/xendit-checkout` trả 422 `PAYMENT_METHOD_DISABLED`. Đơn Xendit đang dở (retry, webhook, reconcile, cancel, refund) không đổi.
+- Công tắc duy nhất `XENDIT_ENABLED` ở `src/lib/payment/xendit-visibility.ts` (tạm thời — đặt `true` để bật lại). Không đổi schema/env. Tenant chỉ bật mỗi Xendit sẽ không đặt hàng được cho tới khi bật lại.
+- Server action `saveXenditKeys` cũng bị chặn khi cờ tắt (`disconnectXendit` vẫn dùng được). Test TC-F34X-24-01..07, 09..11 (08 manual).
+
 ### F01 — AI gen dùng thông tin liên hệ của user thay vì dữ liệu mẫu (GH-2048)
 
 - Block Contact không còn phone/email/address mẫu theo category (vd `grow@dannytandigital.my`) trên site gen thật, gồm cả trang Home (gap-fill ở `content-injection.ts`). Gallery/preview không có override vẫn giữ dữ liệu mẫu.

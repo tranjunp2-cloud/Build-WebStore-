@@ -752,3 +752,21 @@ Liệt kê các `[NEED]` từ PRD §11 mà test phải clarify trước khi code
 | **TC-F34X-23-14** | `C-6, F1` | `UI` `[Edge]` | GET /balance fail → fallback UI | 1. Mock Xendit /balance trả 500.<br>2. Load settings. | - Balance card hiển thị "Không lấy được balance" + nút retry.<br>- KHÔNG crash settings page. | Khẩn | [x] |
 | **TC-F34X-23-15** | `C-8` | `UI` `[Positive]` | Payout history table read-only | 1. Load settings. | - Table list payouts từ Xendit (date, amount, status, bank).<br>- KHÔNG nút edit/delete.<br>- Pagination nếu nhiều. | Medium | [x] |
 | **TC-F34X-23-16** | `R11` | `UI` `[Positive]` | KYB lead time banner countdown | 1. Pre: tenant INVITED đã 3 ngày.<br>2. Load settings. | - Banner "Đã 3 ngày, KYB thường mất 1-5 ngày. Liên hệ Xendit support nếu chờ lâu hơn."<br>- CTA "Liên hệ support". | High | [ ] |
+
+---
+
+### NHÓM 24 — Tạm ẩn Xendit (GH-2132) (11 TCs) — flag `XENDIT_ENABLED=false`
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F34X-24-01** | `GH-2132 AC-01` | `UI` `[Positive]` | Settings không hiện Xendit (tenant chưa kết nối) | 1. Vào settings/payments (EN + MY). | - Không có section Xendit.<br>- Stripe + COD + Bank/QR giữ nguyên. | Khẩn | [x] |
+| **TC-F34X-24-02** | `GH-2132 AC-01` | `UI` `[Positive]` | Settings không hiện Xendit (tenant đã có key) | 1. Tenant có `xenditSecretKey`.<br>2. Vào settings/payments. | - Không có Connected bar / nút disconnect. | Khẩn | [x] |
+| **TC-F34X-24-03** | `GH-2132 AC-03` | `API` `[Negative]` | `POST /api/orders/xendit-checkout` bị chặn | 1. Tenant có key.<br>2. POST payload hợp lệ. | - 422 `PAYMENT_METHOD_DISABLED`.<br>- Không tạo order, không gọi Xendit. | Blocker | [x] |
+| **TC-F34X-24-04** | `GH-2132 AC-05` | `UI` `[Positive]` | Bật flag → section Xendit trở lại | 1. `XENDIT_ENABLED=true`.<br>2. Render settings. | - Section Xendit hiển thị. | High | [x] |
+| **TC-F34X-24-05** | `GH-2132 AC-02` | `UI` `[Positive]` | Checkout: tenant đã kết nối không còn option Xendit | 1. Tenant có key, render checkout SSR. | - `xenditConnected=false`.<br>- Xendit không tính vào `hasPaymentMethods`. | Khẩn | [x] |
+| **TC-F34X-24-06** | `GH-2132 AC-02` | `UI` `[Positive]` | Checkout: phương thức khác không bị ảnh hưởng | 1. Tenant có key + COD bật. | - COD vẫn bật, `hasPaymentMethods=true`. | High | [x] |
+| **TC-F34X-24-07** | `GH-2132 AC-05` | `UI` `[Positive]` | Checkout: bật flag → option Xendit trở lại | 1. `XENDIT_ENABLED=true`. | - `xenditConnected=true`. | High | [x] |
+| **TC-F34X-24-08** | `GH-2132 AC-04` | `E2E` `[Regression]` | Đơn Xendit đang dở vẫn xử lý được khi flag tắt | 1. Có đơn Xendit `awaiting_payment` tạo trước đó.<br>2. Retry payment, trả tiền, nhận webhook, cancel/refund. | - Tất cả hoạt động bình thường (không bị chặn bởi flag). | Blocker | [ ] |
+| **TC-F34X-24-09** | `GH-2132 AC-05` | `Unit` `[Guard]` | Flag mặc định tắt khi ship | 1. Import `XENDIT_ENABLED`. | - Giá trị `false` (đổi test này khi chủ động bật lại). | High | [x] |
+| **TC-F34X-24-10** | `GH-2132 AC-01` | `API` `[Negative]` | Server action `saveXenditKeys` bị chặn khi flag tắt | 1. Gọi `saveXenditKeys('xnd_…','token')` trực tiếp. | - `{success:false}`; không đọc DB, không gọi Xendit, không ghi key. | Khẩn | [x] |
+| **TC-F34X-24-11** | `GH-2132` | `API` `[Positive]` | `disconnectXendit` vẫn dùng được khi flag tắt | 1. Tenant có key.<br>2. Gọi `disconnectXendit()`. | - Key bị xoá (`null`), `success:true`. | High | [x] |
