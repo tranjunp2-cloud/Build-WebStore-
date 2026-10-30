@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseEnv } from "../config/env";
-import { createModelRegistry, ModelUnavailableError } from "../models/model-registry";
+import { createModelRegistry, ModelUnavailableError, DEFAULT_TIER_EFFORT } from "../models/model-registry";
 import { ACTOR, makeSettings } from "./settings.spec-helper";
 import { SettingsService } from "./settings.service";
 
@@ -148,7 +148,7 @@ describe("effective values and sources [TC-AIPROV-06]", () => {
 	it("TC-AIPROV-06: chain, effort and timeout report studio, env or default per field", async () => {
 		const { admin } = await makeSettings({ vars: { AI_MODEL_BALANCED: "openai:gpt-4.1-mini", AI_EFFORT_BALANCED: "low", AI_MODEL_TIMEOUT_MS: "45000" } });
 		const before = (await admin.view()).routing.tiers;
-		expect(before.fast).toMatchObject({ chainSource: "default", effort: "low", effortSource: "default", timeoutMs: 45_000, timeoutSource: "env" });
+		expect(before.fast).toMatchObject({ chainSource: "default", effort: DEFAULT_TIER_EFFORT.fast, effortSource: "default", timeoutMs: 45_000, timeoutSource: "env" });
 		expect(before.balanced).toMatchObject({ chain: ["openai:gpt-4.1-mini"], chainSource: "env", effort: "low", effortSource: "env" });
 
 		const after = (await admin.setRouting({ tiers: { balanced: { chain: ["openai:gpt-4.1-nano"], effort: null, timeoutMs: 20_000 } } }, ACTOR)).routing.tiers;
