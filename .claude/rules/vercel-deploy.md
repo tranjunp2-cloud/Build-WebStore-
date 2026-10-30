@@ -48,7 +48,13 @@ the file; not changed by the AI release.)
 ### AI platform (separate Vercel project)
 
 `services/ai-platform` deploys as its own Vercel project (`VERCEL_AI_PLATFORM_PROJECT_ID`, same
-`VERCEL_TOKEN` / `VERCEL_ORG_ID`), in parallel with prime-web (no `needs` either way):
+`VERCEL_TOKEN` / `VERCEL_ORG_ID`). prime-web's deploy waits for it and stops if it failed.
+
+`deploy-scope` diffs the push (`before..sha`) and deploys only the side that changed:
+`services/ai-platform/**` → ai-platform only; `packages/agent-core|ai-contracts/**` or `ci.yml` →
+both; `docs/`, `plans/`, `.claude/`, top-level `*.md` → neither; anything else → prime-web. When it
+cannot tell (manual run, new branch, missing commit) it deploys both. To redeploy both by hand
+(e.g. after an env change) use Actions → CI → Run workflow on `staging` / `main`, not `vercel deploy`.
 
 ```
 Push to staging → deploy-ai-platform            (Node 24, --environment=staging / --target=staging)
