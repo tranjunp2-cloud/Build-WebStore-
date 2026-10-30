@@ -3,6 +3,8 @@ export type GenerationErrorCode =
     | 'FEATURE_LOCKED'
     | 'SUBSCRIPTION_EXPIRED'
     | 'RATE_LIMIT'
+    | 'GENERATION_IN_PROGRESS'
+    | 'SITE_ALREADY_EXISTS'
     | 'CONTENT_UNSAFE'
     | 'VALIDATION_ERROR'
     | 'UNAUTHORIZED'
@@ -50,6 +52,22 @@ const ERROR_MAP: Record<string, GenerationError> = {
         action: { label: 'Upgrade to Pro', type: 'upgrade' },
         retryable: false,
         uiType: 'fullscreen',
+    },
+    '409': {
+        code: 'GENERATION_IN_PROGRESS',
+        messageEN: 'Your website is already being generated. Please wait for it to finish.',
+        messageMS: 'Laman web anda sedang dijana. Sila tunggu sehingga selesai.',
+        action: { label: 'Go to dashboard', type: 'dashboard' },
+        retryable: false,
+        uiType: 'banner',
+    },
+    '409_SITE_ALREADY_EXISTS': {
+        code: 'SITE_ALREADY_EXISTS',
+        messageEN: 'You already have a website. Open it from your dashboard instead of generating a new one.',
+        messageMS: 'Anda sudah mempunyai laman web. Buka dari papan pemuka dan bukannya menjana yang baharu.',
+        action: { label: 'Go to dashboard', type: 'dashboard' },
+        retryable: false,
+        uiType: 'banner',
     },
     '429': {
         code: 'RATE_LIMIT',
@@ -164,6 +182,15 @@ export function getGenerationError(status: number, errorBody?: unknown): Generat
         if (code === 'CONTENT_UNSAFE' || code === 'content_unsafe') {
             return ERROR_MAP['400_CONTENT_UNSAFE']
         }
+    }
+
+    // For 409, the body code tells "already generating" from "already has a website"
+    if (status === 409 && typeof errorBody === 'object' && errorBody !== null) {
+        const body = errorBody as Record<string, unknown>
+        const code = typeof body.error === 'object' && body.error !== null
+            ? (body.error as Record<string, unknown>).code
+            : body.code
+        if (code === 'SITE_ALREADY_EXISTS') return ERROR_MAP['409_SITE_ALREADY_EXISTS']
     }
 
     // For 403, check body to distinguish subscription-expired from feature-locked

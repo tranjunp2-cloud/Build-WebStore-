@@ -250,6 +250,8 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.95 | PRD §17 | Sec | **[Security]** Truy cập /builder/new không xác thực (Unauthenticated) | **1.** Mở trình duyệt ẩn danh (không đăng nhập).<br>**2.** Truy cập trực tiếp `/builder/new`. | Server trả HTTP 401. Chuyển hướng tự động về `/login`. Không hiển thị form nhập liệu. | Blocker | [x] |
 | TC-F01.96 | AC-2 (07) | Sec | **[Security]** JWT hết hạn khi redirect vào CMS Admin | **1.** Nhấn "Go to Admin Dashboard".<br>**2.** Simulate JWT token đã expired. | Hệ thống yêu cầu đăng nhập lại. Redirect về `/login` với return URL về `/admin`. Không hiển thị trang trắng hoặc lỗi 500. | High | [ ] |
 | TC-F01.97 | FR-15 | Concu | **[Race]** Mở 2 Tab cùng /builder/new đồng thời | **1.** Mở Tab A và Tab B cùng truy cập `/builder/new`.<br>**2.** Điền form và nhấn Generate ở cả 2 Tab. | Chỉ 1 request được xử lý. Tab thứ 2 nhận thông báo conflict hoặc tải lại draft từ Tab 1. Không tạo 2 site trùng lặp. | Blocker | [ ] |
+| TC-F01.112 | FR-15 | API | **[Negative]** Account đã có website completed gọi lại `POST /api/ai/generate-site` (GH-2153) | **1.** Tenant có 1 site `generationStatus=completed`.<br>**2.** Gọi `POST /api/ai/generate-site`. | HTTP 409 `SITE_ALREADY_EXISTS`. Không gọi AI, không xóa/ghi đè page của site cũ, không tạo site thứ 2. Site `failed` vẫn cho thử lại. | Blocker | [ ] |
+| TC-F01.113 | FR-15 | UI | **[Negative]** Account đã có website vào `/builder/new` (GH-2153) | **1.** Tenant có site `completed` (hoặc đang `generating`).<br>**2.** Truy cập `/builder/new` trực tiếp. | Redirect về `/dashboard` (đang generate: `/dashboard?ai_status=generating`). Site `failed`/chưa có site vẫn thấy form. | Blocker | [ ] |
 
 ---
 

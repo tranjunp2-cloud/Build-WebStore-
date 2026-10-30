@@ -219,6 +219,9 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const [showPaywall, setShowPaywall] = useState(false)
     // F26: pre-generation locale confirm modal state
     const [preGenModal, setPreGenModal] = useState<{ detectedLocale: string } | null>(null)
+    // GH-2153: synchronous guard. `status` only flips after React re-renders, so two clicks dispatched
+    // in the same task (automation, fast touch) both still saw an enabled button and sent 2 requests.
+    const generationLockRef = useRef(false)
     const pendingGenRef = useRef<{ info: BusinessInfo; briefSnapshot: Record<string, unknown> | null } | null>(null)
 
     const {
@@ -721,10 +724,13 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         } finally {
             clearGenerationTimers()
             abortControllerRef.current = null
+            generationLockRef.current = false
         }
     }, [clearGenerationTimers, handleSSEEvent, locale, setError, setStep, contentBrief, router])
 
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
+        if (generationLockRef.current) return
+        generationLockRef.current = true
         const briefSnapshot = useBuilderStore.getState().contentBrief
 
         const decision = resolveGenerationLanguageDecision(
@@ -757,6 +763,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         if (action === 'dismiss') {
             setPreGenModal(null)
             pendingGenRef.current = null
+            generationLockRef.current = false
             return
         }
         setPreGenModal(null)

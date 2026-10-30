@@ -5,7 +5,7 @@ import type { z } from 'zod'
 import { importPw1BlockMedia } from '@/lib/migration/pw1-media'
 import type { GenerateSiteOptions } from '@/lib/ai/openai-generator'
 const NextResponse = Response
-import { getPayload } from 'payload'
+import { getPayload, type Where } from 'payload'
 import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import {
     generateSiteWithAI,
@@ -44,6 +44,8 @@ import {
 } from '@/lib/language-detection'
 import { parseProductsString, parseProducts } from '@/lib/ai/business-info-mapper'
 import { buildGenerationFacts, collectPlaceholders, type GenerationPlaceholder } from '@/lib/ai/generation-facts'
+import { GenerationBlockedError, generationBlockReason, type GenerationBlockCode } from '@/lib/ai/generation-in-progress'
+import { withTenantRowLock } from '@/lib/payload/tenant-row-lock'
 import { applyProductPricesToMenus, isEmptyRequiredListBlock } from '@/lib/ai/grounded-blocks'
 import { ensureHomeCommerceBlock, ensureProductsPage, productsCopy, shopContentLocale, type ShopContentLocale, type ShopPageShape } from '@/lib/ai/ensure-products-page'
 import { applyGenerationContact, buildSiteContactInfo } from '@/lib/ai/user-contact-defaults'
@@ -234,6 +236,21 @@ export interface GenerateSiteServiceContext {
         beforeWrite?: () => Promise<void>
         onFailure?: (error: unknown) => void
     }
+}
+
+function generationBlockedResponse(code: GenerationBlockCode): Response {
+    return NextResponse.json(
+        {
+            success: false,
+            error: {
+                code,
+                message: code === 'GENERATION_IN_PROGRESS'
+                    ? 'A website generation is already running for this account.'
+                    : 'This account already has a website. Open it from the dashboard instead of generating a new one.',
+            },
+        },
+        { status: 409 },
+    )
 }
 
 export async function generateSiteService(context: GenerateSiteServiceContext): Promise<Response> {
@@ -444,6 +461,19 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
             }
         }
 
+        // GH-2153: turn a repeat or overwriting request away before any AI work. The
+        // authoritative check runs again under the tenant lock at the site write below.
+        if (!migration) {
+            const running = await payload.find({
+                collection: 'sites',
+                where: { tenant: { equals: resolvedTenantId } },
+                limit: 1,
+                depth: 0,
+            })
+            const blocked = generationBlockReason(running.docs[0])
+            if (blocked) return generationBlockedResponse(new GenerationBlockedError(blocked).code)
+        }
+
         const safetyCheck = checkBusinessInfoSafety(businessInfo)
         if (!safetyCheck.safe) {
             return NextResponse.json(
@@ -536,9 +566,12 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         // Shared by blog preparation and the persistence phase. Starting this
         // read before the AI calls hides its latency and guarantees both paths
         // reason about the same current site.
+        const existingSiteWhere: Where = migration
+            ? { and: [{ tenant: { equals: resolvedTenantId } }, { id: { equals: migration.targetSiteId } }] }
+            : { tenant: { equals: resolvedTenantId } }
         const existingSitesPromise = payload.find({
             collection: 'sites',
-            where: migration ? { and: [{ tenant: { equals: resolvedTenantId } }, { id: { equals: migration.targetSiteId } }] } : { tenant: { equals: resolvedTenantId } },
+            where: existingSiteWhere,
             limit: 1,
         })
 
@@ -1451,75 +1484,77 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
         // pages and the AI blog posts together). Migration keeps its own contract-driven behaviour.
         const pageStatus: 'draft' | 'published' = migration ? (keepMigrationDraft ? 'draft' : 'published') : 'draft'
         if (migration?.beforeWrite) await migration.beforeWrite()
-        if (existingSites.docs.length > 0) {
-            const previousSite = existingSites.docs[0] as Record<string, unknown>
-            _site = previousSite
-            site = await trackPhase('site_write', () =>
-                withPayloadRetry(
-                    () => payload.update({
+        // GH-2153: the "find the tenant's site, then create or update it" step must be atomic per
+        // tenant. The lookup above ran minutes ago (before the AI calls), so two concurrent requests
+        // both saw "no site" and both created one. Re-read under the tenant row lock instead; the
+        // second request then finds the first one's site and is turned away while it is generating.
+        // The retry wraps the whole transaction: a failed statement aborts a Postgres transaction,
+        // so individual statements cannot be retried from inside it.
+        site = await trackPhase('site_write', () =>
+            withPayloadRetry(
+                () => withTenantRowLock(payload, resolvedTenantId, async (req) => {
+                    const current = await payload.find({
                         collection: 'sites',
-                        id: previousSite.id as string | number,
-                        data: {
-                            ...siteGenerationData,
-                            generationStatus: 'generating',
-                        },
-                    }),
-                    {
-                        maxRetries: 4,
-                        baseDelayMs: 150,
-                        onRetry: (attempt, kind) => {
-                            console.warn(`[generate-site] Retry site update attempt=${attempt} kind=${kind}`)
-                        },
-                    },
-                ),
-            )
-            _site = site
+                        where: existingSiteWhere,
+                        limit: 1,
+                        depth: 0,
+                        req,
+                    })
+                    const previousSite = current.docs[0] as Record<string, unknown> | undefined
+                    if (migration && !previousSite) throw new Error('Migration target site no longer exists')
+                    const blocked = migration ? null : generationBlockReason(previousSite)
+                    if (blocked) throw new GenerationBlockedError(blocked)
 
-            // Regeneration replaces page content immediately, matching the
-            // original direct-write flow used before PR #1658.
-            const oldPages = await payload.find({
-                collection: 'pages',
-                where: { site: { equals: site.id } },
-                limit: 100,
-                depth: 0,
-                pagination: false,
-                select: { id: true },
-            })
-            for (const oldPage of oldPages.docs) {
-                await withPayloadRetry(
-                    () => payload.delete({ collection: 'pages', id: oldPage.id }),
-                    {
-                        onRetry: (attempt, kind) => {
-                            console.warn(
-                                `[generate-site] Retry old page delete attempt=${attempt} kind=${kind} page_id=${oldPage.id}`,
-                            )
-                        },
-                    },
-                )
-            }
-        } else {
-            // CREATE new site (first time)
-            site = await trackPhase('site_write', () =>
-                withPayloadRetry(
-                    () => payload.create({
+                    if (previousSite) {
+                        _site = previousSite
+                        const updated = await payload.update({
+                            collection: 'sites',
+                            id: previousSite.id as string | number,
+                            data: {
+                                ...siteGenerationData,
+                                generationStatus: 'generating',
+                            },
+                            req,
+                        }) as unknown as Record<string, unknown>
+
+                        // Regeneration replaces page content immediately, matching the
+                        // original direct-write flow used before PR #1658.
+                        const oldPages = await payload.find({
+                            collection: 'pages',
+                            where: { site: { equals: updated.id } },
+                            limit: 100,
+                            depth: 0,
+                            pagination: false,
+                            select: { id: true },
+                            req,
+                        })
+                        for (const oldPage of oldPages.docs) {
+                            await payload.delete({ collection: 'pages', id: oldPage.id, req })
+                        }
+                        return updated
+                    }
+
+                    // CREATE new site (first time)
+                    return await payload.create({
                         collection: 'sites',
                         data: {
                             tenant: resolvedTenantId,
                             ...siteGenerationData,
                             generationStatus: 'generating',
                         },
-                    }),
-                    {
-                        maxRetries: 4,
-                        baseDelayMs: 150,
-                        onRetry: (attempt, kind) => {
-                            console.warn(`[generate-site] Retry site create attempt=${attempt} kind=${kind}`)
-                        },
+                        req,
+                    }) as unknown as Record<string, unknown>
+                }),
+                {
+                    maxRetries: 4,
+                    baseDelayMs: 150,
+                    onRetry: (attempt, kind) => {
+                        console.warn(`[generate-site] Retry site write attempt=${attempt} kind=${kind}`)
                     },
-                ),
-            )
-            _site = site
-        }
+                },
+            ),
+        )
+        _site = site
 
         // Derive nav links from AI multi-page output so menu reflects actual generated pages
         const aiPageLinks = extractPageLinks(
@@ -2539,7 +2574,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                                 _encoder.encode(
                                     `event: error\ndata: ${JSON.stringify({
                                         message: "We couldn't finish your website. Your details are saved — please try again.",
-                                        code: 'GENERATION_FAILED',
+                                        code: streamErr instanceof GenerationBlockedError ? streamErr.code : 'GENERATION_FAILED',
                                         debugId,
                                         phase: failedPhase,
                                         failedPhases,
@@ -2700,6 +2735,7 @@ export async function generateSiteService(context: GenerateSiteServiceContext): 
                 siteId: _siteForCatch?.id as string | number | null,
             })
         }
+        if (error instanceof GenerationBlockedError) return generationBlockedResponse(error.code)
         const errStack = error instanceof Error ? error.stack : ''
 
         // Drizzle wraps the real Postgres error (e.g. `column "variant" does not

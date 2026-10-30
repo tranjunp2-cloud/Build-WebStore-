@@ -16,6 +16,12 @@ import { getBlockStrings, injectBlockStrings } from '@/lib/ai/block-i18n'
 import { currentAiActor } from '@/lib/ai-platform/actor-scope'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
+// GH-2153: the site write runs inside withTenantRowLock; the payload mock has no Postgres, so run the callback directly.
+vi.mock('@/lib/payload/tenant-row-lock', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/payload/tenant-row-lock')>()),
+    withTenantRowLock: async (_payload: unknown, _tenantId: unknown, operation: (req: { transactionID: string }) => Promise<unknown>) =>
+        operation({ transactionID: 'test-tx' }),
+}))
 vi.mock('@/lib/auth', () => ({
     withAuth: vi.fn().mockImplementation((handler: any) => {
         return async (req: any, ctx: any) => {
@@ -1226,7 +1232,7 @@ describe('AI Streaming APIs', () => {
                  id: 'site-existing',
                  tenant: 'tenant-1',
                  name: 'Existing Bakery',
-                 generationStatus: 'completed',
+                 generationStatus: 'failed',
              }]
              mockPageDB = [
                  { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
@@ -1268,13 +1274,93 @@ describe('AI Streaming APIs', () => {
              expect(mockPageDB.some(page => String(page.slug).startsWith('generation-'))).toBe(false)
         })
 
+        describe('[TC-F01.97, TC-F01.112] one site, one generation at a time per account (GH-2153)', () => {
+            const generate = () => GenerateSitePOST(new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Kopi Ipoh', industry: 'Food', products: 'Coffee', shortDescription: 'Ipoh white coffee' },
+                }),
+            }))
+            const siteRow = (updatedAt: Date) => ({
+                id: 'site-running', tenant: 'tenant-1', generationStatus: 'generating', updatedAt: updatedAt.toISOString(),
+            })
+
+            it('turns a repeat request away with 409 while the site is still generating', async () => {
+                const payload = await getPayload({ config: {} as never })
+                mockSiteDB = [siteRow(new Date())]
+                vi.mocked(generateSiteWithAI).mockClear()
+
+                const res = await generate()
+
+                expect(res.status).toBe(409)
+                expect((await res.json()).error.code).toBe('GENERATION_IN_PROGRESS')
+                expect(generateSiteWithAI).not.toHaveBeenCalled()
+                expect(mockSiteDB).toHaveLength(1)
+                expect(payload.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'sites' }))
+                expect(payload.delete).not.toHaveBeenCalled()
+            })
+
+            it('a request that raced past the early check is stopped under the tenant lock: 409 and no second site', async () => {
+                const payload = await getPayload({ config: {} as never })
+                mockSiteDB = [siteRow(new Date())]
+                vi.mocked(generateSiteWithAI).mockClear()
+                // Both pre-AI reads (early check + shared lookup) ran before the other request wrote its site.
+                vi.mocked(payload.find)
+                    .mockImplementationOnce(async () => ({ docs: [] }) as never)
+                    .mockImplementationOnce(async () => ({ docs: [] }) as never)
+
+                const res = await generate()
+
+                expect(generateSiteWithAI).toHaveBeenCalled() // got past the early check, so 409 comes from the lock
+                expect(res.status).toBe(409)
+                expect(mockSiteDB).toHaveLength(1)
+                expect(payload.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'sites' }))
+            })
+
+            it('[TC-F01.112] refuses to regenerate over a completed site: 409 SITE_ALREADY_EXISTS, old pages untouched', async () => {
+                const payload = await getPayload({ config: {} as never })
+                mockSiteDB = [{ id: 'site-live', tenant: 'tenant-1', generationStatus: 'completed', updatedAt: new Date().toISOString() }]
+                mockPageDB = [{ id: 'live-home', site: 'site-live', title: 'Home', slug: '/', isHomepage: true, layout: [] }]
+                vi.mocked(generateSiteWithAI).mockClear()
+
+                const res = await generate()
+
+                expect(res.status).toBe(409)
+                expect((await res.json()).error.code).toBe('SITE_ALREADY_EXISTS')
+                expect(generateSiteWithAI).not.toHaveBeenCalled()
+                expect(payload.delete).not.toHaveBeenCalled()
+                expect(mockPageDB.map((page) => page.id)).toEqual(['live-home'])
+                expect(mockSiteDB).toHaveLength(1)
+            })
+
+            it('[TC-F01.112] a failed site can still be retried with AI', async () => {
+                mockSiteDB = [{ id: 'site-failed', tenant: 'tenant-1', generationStatus: 'failed', updatedAt: new Date().toISOString() }]
+
+                const res = await generate()
+
+                expect(res.status).toBe(200)
+                expect(mockSiteDB).toHaveLength(1)
+                expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+            })
+
+            it('does not block on a generating site left behind by a crashed run (older than the window)', async () => {
+                mockSiteDB = [siteRow(new Date(Date.now() - 30 * 60_000))]
+
+                const res = await generate()
+
+                expect(res.status).toBe(200)
+                expect(mockSiteDB).toHaveLength(1)
+                expect(mockSiteDB[0]?.generationStatus).toBe('completed')
+            })
+        })
+
         it('[TC-GENPERF-W3-26] regeneration replaces old pages directly with canonical pages', async () => {
              const payload = await getPayload({ config: {} as never })
              mockSiteDB = [{
                  id: 'site-existing',
                  tenant: 'tenant-1',
                  name: 'Existing Bakery',
-                 generationStatus: 'completed',
+                 generationStatus: 'failed',
              }]
              mockPageDB = [
                  { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
@@ -1315,7 +1401,7 @@ describe('AI Streaming APIs', () => {
                  id: 'site-existing',
                  tenant: 'tenant-1',
                  name: 'Existing Bakery',
-                 generationStatus: 'completed',
+                 generationStatus: 'failed',
              }]
              mockPageDB = [
                  { id: 'old-home', site: 'site-existing', title: 'Old Home', slug: '/', isHomepage: true, layout: [] },
@@ -1352,7 +1438,7 @@ describe('AI Streaming APIs', () => {
                  id: 'site-existing',
                  tenant: 'tenant-1',
                  name: 'Existing Bakery',
-                 generationStatus: 'completed',
+                 generationStatus: 'failed',
              }]
              vi.mocked(payload.find).mockImplementation(async (args) => {
                  if (args.collection === 'pages') throw new Error('old page read failed')
@@ -1595,7 +1681,7 @@ describe('AI Streaming APIs', () => {
 
             it('regenerate: keeps contactInfo the owner edited, account only fills empty fields', async () => {
                 mockAuthContact = { email: 'owner@login.my', phone: '60123456789' }
-                mockSiteDB = [{ id: 'site-existing', tenant: 'tenant-1', name: 'Bakery', generationStatus: 'completed', contactInfo: { email: 'shop@mybiz.my' } }]
+                mockSiteDB = [{ id: 'site-existing', tenant: 'tenant-1', name: 'Bakery', generationStatus: 'failed', contactInfo: { email: 'shop@mybiz.my' } }]
                 const p = await generate()
                 expect(siteWrite(p.update.mock.calls as never)?.contactInfo)
                     .toEqual({ email: 'shop@mybiz.my', phone: '60123456789' })
