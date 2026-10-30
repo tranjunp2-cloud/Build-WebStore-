@@ -1,4 +1,4 @@
-/** TC-F40-MIG-LIVE-16: real PostgreSQL regression; all fixtures are temporary. */
+/** TC-F40-MIG-LIVE-16, TC-F42-DELTA-10: real PostgreSQL regression; all fixtures are temporary. */
 import assert from 'node:assert/strict';
 import { Client } from 'pg';
 import { sql, type SQL } from 'drizzle-orm';
@@ -39,12 +39,12 @@ async function main() {
         ('batch-b','pw1-json-v3','{"sourceInstance":"fixture-source","targetHash":"fixture-target"}','["2","3"]');
     `);
 
-    async function scenario(name: string, body: () => Promise<void>) {
+    async function scenario(name: string, body: () => Promise<void>, tc = 'TC-F40-MIG-LIVE-16') {
       await client.query('SAVEPOINT fixture_case');
       try {
         await body();
         passed += 1;
-        process.stdout.write(`PASS TC-F40-MIG-LIVE-16 ${name}\n`);
+        process.stdout.write(`PASS ${tc} ${name}\n`);
       } finally {
         await client.query('ROLLBACK TO SAVEPOINT fixture_case');
         await client.query('RELEASE SAVEPOINT fixture_case');
@@ -63,6 +63,22 @@ async function main() {
           ('run-a','pw1','fixture-source','sites','1','sites','101',true,'VERIFIED'),
           ('run-a','pw1','fixture-source','stores','1','tenants','201',true,'VERIFIED');
       `);
+    }
+    // Store 1 created by the PW1 delta migration: no migration_entity_map claim, only the delta ledger.
+    // legacySite: the site is proven by the import ledger instead, only the tenant by the delta ledger.
+    async function deltaCreated(rows: { site?: string; tenant?: string; snapshot?: string; legacySite?: boolean } = {}) {
+      await legacy(Boolean(rows.legacySite));
+      if (rows.legacySite) await client.query("DELETE FROM pg_temp.migration_entity_map WHERE target_collection='tenants'");
+      await client.query(`
+        ALTER TABLE pg_temp.migration_runs ADD COLUMN source_snapshot_id text;
+        INSERT INTO pg_temp.migration_runs VALUES('run-b','batch-a','pw1','fixture-source','2','fixture-target','snap-import');
+        INSERT INTO pg_temp.migration_import_stores VALUES('run-b','batch-a','2');
+        CREATE TEMP TABLE pw1_delta_runs(run_id text, snapshot_id text) ON COMMIT DROP;
+        CREATE TEMP TABLE pw1_delta_map(source_entity text, source_id text, store_id text, target_collection text, target_id text, run_id text) ON COMMIT DROP;
+      `);
+      await client.query('INSERT INTO pg_temp.pw1_delta_runs VALUES($1,$2)', ['delta-1', rows.snapshot ?? 'snap-import']);
+      if (rows.site !== '' && !rows.legacySite) await client.query("INSERT INTO pg_temp.pw1_delta_map VALUES('sites','1','1','sites',$1,'delta-1')", [rows.site ?? '101']);
+      if (rows.tenant !== '') await client.query("INSERT INTO pg_temp.pw1_delta_map VALUES('stores','1','1','tenants',$1,'delta-1')", [rows.tenant ?? '201']);
     }
     async function rejected(reason: F42CatalogScopeError['reason']) {
       // Act / Assert: inspect the production error, not a replicated classifier.
@@ -137,6 +153,33 @@ async function main() {
       process.stdout.write(`Canonical ID outcomes (zero, leading zero): ${results.join(', ')}\n`);
       assert.deepEqual(results, ['rejected', 'rejected']);
     });
+    const delta = 'TC-F42-DELTA-10';
+    await scenario('store created by the delta migration is proven by the delta ledger', async () => {
+      await deltaCreated(); // Arrange
+      const scope = await readWebsiteCatalogScope(payload); // Act
+      assert.deepEqual(scope, { sourceInstance: 'fixture-source', targetInstance: 'fixture-target' }); // Assert
+    }, delta);
+    await scenario('delta ledger pointing to another site does not prove the store', async () => {
+      await deltaCreated({ site: '999' }); // Arrange
+      await rejected('UNPROVEN_LEGACY_IDENTITY');
+    }, delta);
+    await scenario('delta ledger needs the tenant in addition to the site', async () => {
+      await deltaCreated({ tenant: '' }); // Arrange
+      await rejected('UNPROVEN_LEGACY_IDENTITY');
+    }, delta);
+    await scenario('delta ledger needs the site in addition to the tenant', async () => {
+      await deltaCreated({ site: '' }); // Arrange
+      await rejected('UNPROVEN_LEGACY_IDENTITY');
+    }, delta);
+    await scenario('site proven by the import ledger and tenant by the delta ledger', async () => {
+      await deltaCreated({ legacySite: true }); // Arrange
+      const scope = await readWebsiteCatalogScope(payload); // Act
+      assert.deepEqual(scope, { sourceInstance: 'fixture-source', targetInstance: 'fixture-target' }); // Assert
+    }, delta);
+    await scenario('delta run of another import snapshot does not prove the store', async () => {
+      await deltaCreated({ snapshot: 'snap-other' }); // Arrange
+      await rejected('UNPROVEN_LEGACY_IDENTITY');
+    }, delta);
     process.stdout.write(`${passed} PostgreSQL catalog scenarios passed; temporary fixtures rolled back.\n`);
   } finally {
     try { await client.query('ROLLBACK'); } finally { await client.end(); }
