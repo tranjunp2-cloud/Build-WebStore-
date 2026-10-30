@@ -52,7 +52,7 @@ jobs:
           echo "completion=$COMPLETION" >> "$GITHUB_OUTPUT"
 
       - name: Upload metrics artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: weekly-metrics-${{ github.run_number }}
           path: metrics.json
