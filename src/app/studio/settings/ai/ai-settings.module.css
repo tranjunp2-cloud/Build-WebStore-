@@ -42,3 +42,4 @@
 .off { opacity: 0.55; }
 .offNote { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--warn); }
 .planTools { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: flex-end; }
+.head { margin-bottom: 16px; }

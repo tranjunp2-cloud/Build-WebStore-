@@ -1,0 +1,53 @@
+/* Providers page: cards, key rows, endpoints, gateway, dialogs. */
+.pm-provs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pm-prov[data-off] { opacity: .85; }
+.pm-prov-head { display: flex; align-items: center; gap: 8px 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.pm-prov-name { min-width: 0; flex: 1 1 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.pm-prov-name b { font-size: 14px; font-weight: 600; }
+.pm-dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px 12px; margin: 0; padding: 12px 16px; font-size: 13px; }
+.pm-dl > dt { padding-top: 6px; color: var(--text-2); font-size: 12px; font-weight: 500; }
+.pm-dl > dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-height: 30px; }
+.pm-grow { min-width: 0; flex: 1 1 200px; }
+.pm-key { font-family: var(--mono); font-size: 12px; letter-spacing: .02em; }
+.pm-keymeta { color: var(--text-2); font-size: 12px; }
+.pm-reentry { color: var(--danger); font-size: 12px; font-weight: 500; }
+.pm-test { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.pm-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.pm-chip { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-sunk); color: var(--text); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+.pm-chip[data-unpriced] { border-style: dashed; }
+.pm-chip i { color: var(--warn); font-style: normal; font-family: var(--font); font-weight: 600; }
+.studio-shell .input.pm-in { height: 30px; font-size: 12px; }
+.studio-shell .input.pm-in.pm-mono { font-family: var(--mono); }
+.pm-ep-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.pm-ep-flags { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; }
+.pm-ep-act { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.pm-adv > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 10px 16px; cursor: pointer; list-style: none; }
+.pm-adv > summary::-webkit-details-marker { display: none; }
+.pm-adv > summary .pm-ic { transition: rotate .15s; }
+.pm-adv[open] > summary .pm-ic { rotate: 90deg; }
+.pm-adv > summary div { min-width: 0; flex: 1; }
+.pm-adv > summary b { display: block; font-size: 13px; font-weight: 600; }
+.pm-adv > summary span { display: block; color: var(--text-2); font-size: 12px; }
+.pm-adv-body { border-top: 1px solid var(--border); }
+.pm-paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px 16px; }
+.pm-paths label { display: grid; gap: 4px; color: var(--text-2); font-size: 12px; }
+
+/* Dialog extras (on top of .acl-dialog) */
+.pm-dlg-field { display: grid; gap: 4px; }
+.pm-dlg-field > label { color: var(--text-2); font-size: 12px; font-weight: 600; }
+.pm-pass { position: relative; }
+.pm-pass .input { padding-right: 40px; font-family: var(--mono); }
+.pm-pass .pm-icbtn { position: absolute; top: 2px; right: 2px; }
+.pm-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 13px; }
+.pm-check input { flex: none; width: 15px; height: 15px; margin-top: 2px; appearance: auto; accent-color: var(--accent); }
+.pm-check small { display: block; color: var(--text-2); font-size: 12px; }
+.pm-kv { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px 12px; margin: 0; font-size: 13px; }
+.pm-kv dt { color: var(--text-2); font-size: 12px; padding-top: 1px; }
+.pm-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.pm-diff { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.acl-dialog .pm-diff { padding: 0; }
+.pm-diff li { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-sunk); }
+.pm-diff li span { color: var(--text-2); font-size: 12px; }
+
+@media (max-width: 1180px) { .pm-provs { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .pm-dl { grid-template-columns: minmax(0, 1fr); gap: 4px; } .pm-kv { grid-template-columns: minmax(0, 1fr); gap: 2px; } .pm-ep-act { margin-left: 40px; } }

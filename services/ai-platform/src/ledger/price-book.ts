@@ -125,6 +125,11 @@ export function setPriceOverrides(overrides: { prices?: Record<string, Price>; i
 	overrideImagePrices = overrides.images ?? {};
 }
 
+/** Every `provider:model` with a price (built-in table, Payload prices, picture prices): the models Studio offers. */
+export function knownPricedModels(): string[] {
+	return [...new Set([...Object.keys(BUILTIN_PRICES), ...Object.keys(overridePrices), ...Object.keys(BUILTIN_IMAGE_PRICES), ...Object.keys(overrideImagePrices)])];
+}
+
 /** `provider:model`, else the same without a trailing `-20251001` / `@20251001` / `-latest` snapshot suffix. */
 function lookup<T>(provider: string, modelId: string, ...tables: Record<string, T>[]): T | undefined {
 	const base = modelId.replace(/(?:[-@]\d{8}|-latest)$/, "");

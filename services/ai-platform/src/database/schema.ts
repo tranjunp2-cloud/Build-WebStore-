@@ -145,3 +145,74 @@ export const aiWorkState = pgTable(
 	},
 	(table) => [primaryKey({ columns: [table.organizationId, table.userId, table.key] })],
 );
+
+/** Prime Studio "Providers & models": one row per provider / custom endpoint. Secrets are AES-256-GCM sealed (settings/secret-box.ts). */
+export const aiProviderSettings = pgTable("ai_provider_settings", {
+	id: text("id").primaryKey(),
+	kind: text("kind").notNull(),
+	/** null = inherit (on) */
+	enabled: boolean("enabled"),
+	baseUrl: text("base_url"),
+	options: jsonb("options").notNull().default({}),
+	secretCiphertext: text("secret_ciphertext"),
+	secretIv: text("secret_iv"),
+	secretTag: text("secret_tag"),
+	secretLast4: text("secret_last4"),
+	secretKeyVersion: text("secret_key_version"),
+	secretSetBy: text("secret_set_by"),
+	secretSetAt: timestamp("secret_set_at", { withTimezone: true }),
+	lastTest: jsonb("last_test"),
+	updatedBy: text("updated_by"),
+	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Single row (id "gateway"): Cloudflare AI Gateway address, per-provider paths and the sealed token. */
+export const aiGatewaySettings = pgTable("ai_gateway_settings", {
+	id: text("id").primaryKey().default("gateway"),
+	baseUrl: text("base_url"),
+	paths: jsonb("paths").notNull().default({}),
+	tokenCiphertext: text("token_ciphertext"),
+	tokenIv: text("token_iv"),
+	tokenTag: text("token_tag"),
+	tokenLast4: text("token_last4"),
+	tokenKeyVersion: text("token_key_version"),
+	tokenSetBy: text("token_set_by"),
+	tokenSetAt: timestamp("token_set_at", { withTimezone: true }),
+	updatedBy: text("updated_by"),
+	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Single row (id "routing"): tier chains, effort, timeouts and the picture chain set in Studio. */
+export const aiRoutingSettings = pgTable("ai_routing_settings", {
+	id: text("id").primaryKey().default("routing"),
+	value: jsonb("value").notNull().default({}),
+	updatedBy: text("updated_by"),
+	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Task -> tier overrides (absent row = the task's catalog tier). */
+export const aiTaskRouting = pgTable("ai_task_routing", {
+	taskId: text("task_id").primaryKey(),
+	tier: text("tier").notNull(),
+	updatedBy: text("updated_by"),
+	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Runtime knobs set in Studio (absent row = env / default). */
+export const aiRuntimeSettings = pgTable("ai_runtime_settings", {
+	key: text("key").primaryKey(),
+	value: jsonb("value").notNull(),
+	updatedBy: text("updated_by"),
+	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Every settings change; `snapshot` is the NON-secret state after it (never a key). */
+export const aiSettingsHistory = pgTable("ai_settings_history", {
+	id: text("id").primaryKey(),
+	at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+	actor: jsonb("actor").notNull(),
+	area: text("area").notNull(),
+	summary: text("summary").notNull(),
+	snapshot: jsonb("snapshot").notNull(),
+	restorable: boolean("restorable").notNull().default(true),
+});

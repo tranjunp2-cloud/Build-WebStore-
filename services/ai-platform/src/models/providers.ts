@@ -20,7 +20,7 @@ export interface ProviderEnv {
  * provider's default base URL). Override with AI_GATEWAY_PATH_<PROVIDER>.
  * To verify in the Cloudflare spike before production.
  */
-const GATEWAY_PATHS: Record<string, string> = {
+export const GATEWAY_PATHS: Record<string, string> = {
 	openai: "openai",
 	anthropic: "anthropic/v1",
 	google: "google-ai-studio/v1beta",
@@ -81,7 +81,7 @@ export function withReasoningEffort(model: LanguageModel, provider: string, effo
 
 const KEY_HEADERS = ["authorization", "x-api-key", "x-goog-api-key"];
 
-function envKey(provider: string): string {
+export function envKey(provider: string): string {
 	return provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
 }
 
@@ -91,6 +91,8 @@ function envKey(provider: string): string {
  * stored key (BYOK) is used and no key header is forwarded.
  */
 function connection(env: ProviderEnv, provider: string, apiKey: string | undefined, directBaseUrl?: string) {
+	// a direct base URL override (AI_BASE_URL_<PROVIDER>: env, or Prime Studio mapped onto the same name)
+	directBaseUrl = env.vars[`AI_BASE_URL_${envKey(provider)}`] || directBaseUrl;
 	const gateway = env.gatewayBaseUrl?.replace(/\/+$/, "");
 	const path = env.vars[`AI_GATEWAY_PATH_${envKey(provider)}`] ?? GATEWAY_PATHS[provider];
 	const viaGateway = Boolean(gateway && path);

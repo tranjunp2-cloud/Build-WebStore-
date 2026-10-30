@@ -11,10 +11,11 @@ import type { ShopOverrideListItem } from '@/lib/admin/ai-caps/shop-overrides'
 import type { AlertRow } from '@/lib/admin/ai-caps/status'
 import { capsBody, capsDraftFromView, capsProblems, describeCapsChanges, type CapsDraft } from '@/lib/admin/ai-usage/caps-form'
 import styles from '../ai-settings.module.css'
+import { AiSettingsTabs } from '../../_components/ai-settings-tabs'
 import { AlertsSection } from './alerts-section'
 import { CapsSection } from './caps-section'
-import { ChainsSection } from './chains-section'
 import { LimitsSection } from './limits-section'
+import { ModelsLinkSection } from './models-link-section'
 import { PricesSection } from './prices-section'
 import { SaveBar } from './save-bar'
 import { SaveConfirm } from './save-confirm'
@@ -30,11 +31,14 @@ interface Props {
 }
 
 const Head = () => (
-    <div className="page-head">
-        <div>
-            <h1 className="page-title">AI limits &amp; prices</h1>
-            <p className="page-sub">Platform caps, limits per plan and per shop, model chains and prices for every AI call.</p>
+    <div className={styles.head}>
+        <div className="page-head" style={{ marginBottom: 12 }}>
+            <div>
+                <h1 className="page-title">AI settings</h1>
+                <p className="page-sub">Platform caps, limits per plan and per shop, and prices for every AI call. Providers and models have their own tab.</p>
+            </div>
         </div>
+        <AiSettingsTabs active="limits" />
     </div>
 )
 
@@ -109,7 +113,7 @@ export function AiSettingsClient({ initial, failure, overrides = null, overrides
                 <LimitsSection limits={draft.limits} stats={data.stats} errors={errorMap} onSet={setLimit} />
                 <ShopOverridesSection initial={overrides} failure={overridesFailure} limits={data.limits} />
                 <AlertsSection alerts={alerts} failure={alertsFailure} />
-                <ChainsSection draft={draft} errors={errorMap} updatedAt={data.configUpdatedAt} onChange={(key, models) => update({ chains: { ...draft.chains, [key]: models } })} />
+                <ModelsLinkSection />
                 <PricesSection draft={draft} unpriced={data.unpriced} errors={errorMap} updatedAt={data.configUpdatedAt} onChange={(next) => update(next)} />
             </div>
             {(lines.length > 0 || saveFailure) && (

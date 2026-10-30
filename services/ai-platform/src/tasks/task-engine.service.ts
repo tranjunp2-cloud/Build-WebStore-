@@ -19,6 +19,7 @@ import { isProviderBillingError, runWithFallback } from "../models/fallback";
 import type { ModelRegistry } from "../models/model-registry";
 import { MODEL_REGISTRY } from "../models/models.module";
 import { cacheableInstructions } from "../models/prompt-cache";
+import { SettingsService } from "../settings/settings.service";
 import { TASK_DEFINITIONS } from "./catalog";
 import type { TaskDefinition } from "./task-definition";
 
@@ -52,6 +53,8 @@ export class TaskEngine {
 		@Optional() @Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
 		@Optional() @Inject(ORG_BATTERY) private readonly battery?: OrgBattery,
 		@Optional() @Inject(SHOP_CAPS) private readonly shopCaps?: ShopCaps,
+		// Prime Studio: task -> tier overrides, tier timeouts, runtime knobs; absent = catalog tiers and env
+		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
 	) {}
 
 	async run(ctx: AiRequestContext, taskId: string, rawInput: unknown, requestId?: string): Promise<RunTaskResponse> {
@@ -65,7 +68,9 @@ export class TaskEngine {
 
 		const definition = TASK_DEFINITIONS[taskId as AiTaskId] as (typeof TASK_DEFINITIONS)[AiTaskId];
 		const input = parsed.data as never;
-		const chain = this.models.resolveChain(definition.alias);
+		// the tier a Studio override moved the task to, else the catalog's
+		const alias = this.settings?.taskTier(taskId, definition.alias) ?? definition.alias;
+		const chain = this.models.resolveChain(alias);
 		const schema = (definition.modelOutput?.(input) ?? contract.output) as ZodType;
 		const jsonMode = definition.outputMode === "json";
 		const textMode = definition.outputMode === "text";
@@ -93,7 +98,7 @@ export class TaskEngine {
 		const chainBudgetMs = chainBudgetFor(definition);
 		const deadline = chainBudgetMs ? Date.now() + chainBudgetMs : null;
 		const attemptTimeout = () => {
-			const perAttempt = definition.timeoutMs ?? this.env.AI_MODEL_TIMEOUT_MS;
+			const perAttempt = definition.timeoutMs ?? this.settings?.tierTimeoutMs(alias) ?? this.env.AI_MODEL_TIMEOUT_MS;
 			return deadline ? Math.max(1, Math.min(perAttempt, deadline - Date.now())) : perAttempt;
 		};
 		let failures = 0;
@@ -110,7 +115,7 @@ export class TaskEngine {
 					maxOutputTokens: sampling.maxOutputTokens ?? definition.maxOutputTokens,
 					timeout: attemptTimeout(),
 					maxRetries: definition.maxRetries ?? 1,
-					...anthropicEffortOptions(candidate, definition.alias),
+					...anthropicEffortOptions(candidate, alias),
 				});
 				const answer = textMode
 					? validateTextOutput(schema, result)
@@ -174,7 +179,7 @@ export class TaskEngine {
 		const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 		// only task calls (surface 'system'): copilot steps, decisions, suggestions and pictures have their own limits
 		const used = await this.ledger.countSince(ctx.organizationId, since, { surface: "system" });
-		if (used >= this.env.AI_DAILY_TASK_LIMIT_PER_ORG) {
+		if (used >= (this.settings?.runtimeEnv() ?? this.env).AI_DAILY_TASK_LIMIT_PER_ORG) {
 			throw new AgentError("Your workspace reached today's AI limit. Try again tomorrow.", 429);
 		}
 	}

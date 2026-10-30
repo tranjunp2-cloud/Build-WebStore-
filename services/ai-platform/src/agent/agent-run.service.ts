@@ -74,6 +74,8 @@ import { createResultMemory, type ResultMemory, shapeToolResult } from "./tool-r
 import { groupPurposes, type RoutingState, routedModel, routeGroups, routingEnabled, ToolRouter, USE_TOOLS, useToolsTool } from "./tool-routing";
 import { editingLanguageOf, prepareWithLanguage, readWithLanguage } from "./site-editing-language";
 import { draftTitle, productTitle, threadPreview } from "./thread-memory";
+import type { RuntimeEnv } from "../settings/runtime-keys";
+import { SettingsService } from "../settings/settings.service";
 import { stripInternalMarkers } from "./internal-markers";
 import { itemRecord } from "./receipt-records";
 import { type BudgetStop, budgetLine, RunBudget } from "./run-budget";
@@ -358,7 +360,14 @@ export class AgentRunService {
 		@Optional() @Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
 		@Optional() @Inject(ORG_BATTERY) private readonly battery?: OrgBattery,
 		@Optional() @Inject(SHOP_CAPS) private readonly shopCaps?: ShopCaps,
+		// Prime Studio's runtime knobs and timeouts (Studio -> env -> default); absent = env only
+		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
 	) {}
+
+	/** The runtime knobs as Studio sets them, else env. */
+	private get rt(): RuntimeEnv {
+		return this.settings?.runtimeEnv() ?? this.env;
+	}
 
 	/** What each driving run already fed the model (repeated parts of reads become pointers). */
 	private readonly memories = new Map<string, () => ResultMemory>();
@@ -404,7 +413,7 @@ export class AgentRunService {
 		// the shop's calendar-month allowance: 429
 		await this.shopCaps?.assertAvailable(ctx);
 		const runId = newId("run");
-		const caps = queueCaps(this.env);
+		const caps = queueCaps(this.rt);
 		const reserved = await this.store.reserveRunStart(
 			ctx,
 			runId,
@@ -412,10 +421,10 @@ export class AgentRunService {
 			(counts) => {
 				// one active run per chat: a second message while it works would race the first one's history
 				if (counts.threadActive > 0) throw new AgentError(THREAD_BUSY, 409);
-				if (counts.orgDay >= this.env.AI_DAILY_RUN_LIMIT_PER_ORG) {
+				if (counts.orgDay >= this.rt.AI_DAILY_RUN_LIMIT_PER_ORG) {
 					throw new AgentError("Your workspace reached today's AI request limit. Try again tomorrow.", 429);
 				}
-				if (counts.userMinute >= this.env.AI_RUNS_PER_MINUTE_PER_USER) {
+				if (counts.userMinute >= this.rt.AI_RUNS_PER_MINUTE_PER_USER) {
 					throw new AgentError("Too many AI requests in a minute. Please wait a moment.", 429);
 				}
 				// too many working (the shop's or this person's): wait in the queue instead of a refusal
@@ -539,7 +548,7 @@ export class AgentRunService {
 			// a document's text was written by someone else (a supplier, a customer): its cards need a click
 			...(documents.length > 0 ? { tainted: true } : {}),
 			// only the tool groups this message needs are sent (page, record, words of the message and the last turn)
-			...(routingEnabled(this.env.AI_TOOL_ROUTING)
+			...(routingEnabled(this.rt.AI_TOOL_ROUTING)
 				? {
 						routing: {
 							groups: routeGroups({
@@ -568,8 +577,8 @@ export class AgentRunService {
 		emit: (frame: RunFrame) => void,
 		since: number,
 	): Promise<{ admitted: true; at: Date } | { admitted: false; run: AgentRun }> {
-		const deadline = since + maxQueueWaitMs(this.env);
-		const caps = queueCaps(this.env);
+		const deadline = since + maxQueueWaitMs(this.rt);
+		const caps = queueCaps(this.rt);
 		const abort = new AbortController();
 		this.active.set(run.id, abort);
 		const end = async (event: Extract<RunEvent, { type: "run.status" }>, save: boolean) => {
@@ -619,7 +628,7 @@ export class AgentRunService {
 
 	/** This request's model budget: the deadline counts from the request's start. */
 	private budget(startedAt: number): RunBudget {
-		return new RunBudget(startedAt, this.env.AI_RUN_BUDGET_MS, this.env.AI_RUN_TOKEN_BUDGET);
+		return new RunBudget(startedAt, this.rt.AI_RUN_BUDGET_MS, this.env.AI_RUN_TOKEN_BUDGET);
 	}
 
 	/** The platform's daily spend cap (AI_DAILY_BUDGET_USD): 503 before anything calls a model. */
@@ -829,7 +838,7 @@ export class AgentRunService {
 		// what this deployment (and this request's signed token) lets the copilot do
 		const capabilities = effectiveCapabilities(this.env.AI_AGENT_CAPABILITIES, ctx.capabilities);
 		// tool routing: the groups this run loaded; a run that has them all is sent exactly as unrouted
-		const router = routingEnabled(this.env.AI_TOOL_ROUTING) && state.routing ? new ToolRouter(capabilities, state.routing) : null;
+		const router = routingEnabled(this.rt.AI_TOOL_ROUTING) && state.routing ? new ToolRouter(capabilities, state.routing) : null;
 		const routed = router !== null && !router.complete;
 		const instructionsNow = () => (router && routed ? merchantInstructions(router.capabilities, capabilities) : merchantInstructions(capabilities));
 		// reads of this run, for the rule-made suggestions
@@ -1139,7 +1148,7 @@ export class AgentRunService {
 							maxOutputTokens: this.env.AI_MAX_OUTPUT_TOKENS,
 							// each attempt (a fallback too) gets its own limit, cut to what is left of the run's time. The limit
 							// covers up to 6 tool steps (and a picture), so it stays model + picture time even without pictures.
-							timeout: { totalMs: budget.callTimeoutMs(this.env.AI_MODEL_TIMEOUT_MS + this.env.AI_IMAGE_TIMEOUT_MS) },
+							timeout: { totalMs: budget.callTimeoutMs((this.settings?.tierTimeoutMs("balanced") ?? this.env.AI_MODEL_TIMEOUT_MS) + (this.settings?.imageTimeoutMs() ?? this.env.AI_IMAGE_TIMEOUT_MS)) },
 							maxRetries: 1,
 							abortSignal: abort.signal,
 							// steps finished before a failure were billed: the error row carries them
@@ -1282,7 +1291,7 @@ export class AgentRunService {
 		}
 		await releaseEnd();
 		// suggestions only while the request still has the time for them
-		const mode = suggestMode(this.env.AI_SUGGEST_MODE);
+		const mode = suggestMode(this.rt.AI_SUGGEST_MODE);
 		const roomForSuggestions = budget.remainingMs() > SUGGEST_NEXT_TIMEOUT_MS && budget.stop(state.tokens ?? 0) === null;
 		if (mode !== "off" && roomForSuggestions && !abort.signal.aborted && (run.status === "applied" || run.status === "awaiting_approval")) {
 			const facts: RunFacts = {

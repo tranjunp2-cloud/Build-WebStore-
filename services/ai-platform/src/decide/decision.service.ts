@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { AGENT_STORE, type AgentStore } from "../agent/agent-store";
 import { ENV } from "../config/config.module";
 import type { Env } from "../config/env";
+import { SettingsService } from "../settings/settings.service";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import type { Decider, Decision, DecisionRequest } from "./decision-types";
 import { DECISION_NONE } from "./decision-types";
@@ -29,7 +30,8 @@ const L1_MAX_ENTRIES = 5_000;
 @Injectable()
 export class DecisionService {
 	private readonly logger = new Logger(DecisionService.name);
-	private readonly primary: Decider;
+	private readonly injected: Decider | undefined;
+	private built: { version: number; decider: Decider } | null = null;
 	private readonly fallback = new LexicalDecider();
 	private readonly l1 = new Map<string, { decision: Decision; expiresAt: number }>();
 
@@ -38,15 +40,31 @@ export class DecisionService {
 		@Inject(USAGE_LEDGER) private readonly ledger: UsageLedger,
 		@Inject(ENV) private readonly env: Env,
 		@Optional() @Inject(DECIDER) decider?: Decider,
+		// Prime Studio: the System One key / address / on-off switch; absent = env only
+		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
 	) {
-		this.primary =
-			decider ??
-			new TypeSafeDecider({
-				apiKey: env.TYPESAFE_API_KEY,
-				endpoint: env.TYPESAFE_API_URL,
-				model: env.TYPESAFE_MODEL,
-				timeoutMs: env.TYPESAFE_TIMEOUT_MS,
-			});
+		this.injected = decider;
+	}
+
+	/** The System One decider, rebuilt when Studio's settings change (key, address, switched off). */
+	private get primary(): Decider {
+		if (this.injected) return this.injected;
+		this.settings?.data(); // a stale copy starts its background refresh
+		const version = this.settings?.version() ?? 0;
+		if (!this.built || this.built.version !== version) {
+			const vars = this.settings?.overlayVars() ?? {};
+			const on = this.settings?.isProviderEnabled("typesafe") ?? true;
+			this.built = {
+				version,
+				decider: new TypeSafeDecider({
+					apiKey: on ? vars.TYPESAFE_API_KEY || this.env.TYPESAFE_API_KEY : undefined,
+					endpoint: vars.TYPESAFE_API_URL || this.env.TYPESAFE_API_URL,
+					model: this.env.TYPESAFE_MODEL,
+					timeoutMs: this.env.TYPESAFE_TIMEOUT_MS,
+				}),
+			};
+		}
+		return this.built.decider;
 	}
 
 	/** A choice at or above this confidence is applied without asking (visible and changeable). */

@@ -69,6 +69,11 @@ const EnvSchema = z.object({
 			return parsed.capabilities;
 		}),
 	AI_PLATFORM_CONTEXT_SECRET: z.string().min(32, "AI_PLATFORM_CONTEXT_SECRET must be at least 32 characters"),
+	/**
+	 * Encrypts the provider keys saved in Prime Studio (AES-256-GCM, HKDF-derived). Unset = derived from
+	 * AI_PLATFORM_CONTEXT_SECRET. Changing either one makes the saved keys unreadable until they are entered again.
+	 */
+	AI_PROVIDER_SECRETS_KEY: z.string().min(32, "AI_PROVIDER_SECRETS_KEY must be at least 32 characters").optional(),
 	OPENAI_API_KEY: z.string().optional(),
 	OPENROUTER_API_KEY: z.string().optional(),
 	ANTHROPIC_API_KEY: z.string().optional(),

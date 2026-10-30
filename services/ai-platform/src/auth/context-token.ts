@@ -121,3 +121,28 @@ export async function verifyUsageSyncToken(token: string, secret: string): Promi
 		throw new ContextTokenError(error instanceof Error ? error.message : "invalid usage sync token");
 	}
 }
+
+export const SETTINGS_ADMIN_TOKEN_SUBJECT = "settings-admin";
+const ActorSchema = z.object({ id: z.string().min(1).max(200), email: z.string().min(1).max(320) });
+
+/**
+ * prime-web's super-admin calls on /internal/settings: the usage-sync issuer, secret and audience with their own
+ * subject, 2 min old at most, and an `actor` claim ({ id, email }) naming the verified super-admin.
+ */
+export async function verifySettingsAdminToken(token: string, secret: string): Promise<z.infer<typeof ActorSchema>> {
+	let payload: Record<string, unknown>;
+	try {
+		({ payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
+			issuer: CONTEXT_TOKEN_ISSUER,
+			audience: USAGE_SYNC_TOKEN_AUDIENCE,
+			subject: SETTINGS_ADMIN_TOKEN_SUBJECT,
+			algorithms: ["HS256"],
+			maxTokenAge: "2m",
+		}));
+	} catch (error) {
+		throw new ContextTokenError(error instanceof Error ? error.message : "invalid settings admin token");
+	}
+	const actor = ActorSchema.safeParse(payload.actor);
+	if (!actor.success) throw new ContextTokenError("settings admin token has no actor");
+	return actor.data;
+}

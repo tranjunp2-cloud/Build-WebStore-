@@ -207,6 +207,69 @@ export const MIGRATIONS: readonly { name: string; sql: string }[] = [
 		CREATE INDEX IF NOT EXISTS ai_runs_working_org_idx ON ai_runs (organization_id, updated_at) WHERE status IN ('planning', 'running', 'applying');
 		CREATE INDEX IF NOT EXISTS ai_runs_queued_idx ON ai_runs (organization_id, updated_at) WHERE status = 'queued';`,
 	},
+	{
+		// Prime Studio "Providers & models": keys (AES-256-GCM ciphertext), routing, task overrides, runtime knobs, history.
+		name: "015_ai_provider_settings",
+		sql: `CREATE TABLE IF NOT EXISTS ai_provider_settings (
+			id text PRIMARY KEY,
+			kind text NOT NULL,
+			enabled boolean,
+			base_url text,
+			options jsonb NOT NULL DEFAULT '{}'::jsonb,
+			secret_ciphertext text,
+			secret_iv text,
+			secret_tag text,
+			secret_last4 text,
+			secret_key_version text,
+			secret_set_by text,
+			secret_set_at timestamptz,
+			last_test jsonb,
+			updated_by text,
+			updated_at timestamptz NOT NULL DEFAULT now()
+		);
+		CREATE TABLE IF NOT EXISTS ai_gateway_settings (
+			id text PRIMARY KEY DEFAULT 'gateway',
+			base_url text,
+			paths jsonb NOT NULL DEFAULT '{}'::jsonb,
+			token_ciphertext text,
+			token_iv text,
+			token_tag text,
+			token_last4 text,
+			token_key_version text,
+			token_set_by text,
+			token_set_at timestamptz,
+			updated_by text,
+			updated_at timestamptz NOT NULL DEFAULT now()
+		);
+		CREATE TABLE IF NOT EXISTS ai_routing_settings (
+			id text PRIMARY KEY DEFAULT 'routing',
+			value jsonb NOT NULL DEFAULT '{}'::jsonb,
+			updated_by text,
+			updated_at timestamptz NOT NULL DEFAULT now()
+		);
+		CREATE TABLE IF NOT EXISTS ai_task_routing (
+			task_id text PRIMARY KEY,
+			tier text NOT NULL,
+			updated_by text,
+			updated_at timestamptz NOT NULL DEFAULT now()
+		);
+		CREATE TABLE IF NOT EXISTS ai_runtime_settings (
+			key text PRIMARY KEY,
+			value jsonb NOT NULL,
+			updated_by text,
+			updated_at timestamptz NOT NULL DEFAULT now()
+		);
+		CREATE TABLE IF NOT EXISTS ai_settings_history (
+			id text PRIMARY KEY,
+			at timestamptz NOT NULL DEFAULT now(),
+			actor jsonb NOT NULL,
+			area text NOT NULL,
+			summary text NOT NULL,
+			snapshot jsonb NOT NULL,
+			restorable boolean NOT NULL DEFAULT true
+		);
+		CREATE INDEX IF NOT EXISTS ai_settings_history_at_idx ON ai_settings_history (at DESC);`,
+	},
 ];
 
 /** Session lock taken around every migration run: two builds / deploys migrating at once take turns. */

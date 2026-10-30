@@ -1,5 +1,5 @@
 import { picturesPerDay } from "../cost/shop-limits";
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { generateImage } from "ai";
 import { z } from "zod";
 import { AgentError } from "../agent/agent-errors";
@@ -12,6 +12,7 @@ import { SPEND_GUARD, type SpendGuard } from "../cost/spend-guard";
 import { USAGE_LEDGER, type UsageLedger } from "../ledger/usage-ledger";
 import { MODEL_REGISTRY } from "../models/models.module";
 import type { ModelRegistry } from "../models/model-registry";
+import { SettingsService } from "../settings/settings.service";
 import { IMAGE_TASK, PICTURE_QUOTA, type PictureQuota } from "./picture-quota";
 
 export { IMAGE_TASK };
@@ -65,6 +66,8 @@ export class ImageService {
 		@Inject(PICTURE_QUOTA) private readonly quota: PictureQuota,
 		// the platform's daily spend cap (AI_DAILY_BUDGET_USD), like runs and tasks; LedgerModule provides it
 		@Inject(SPEND_GUARD) private readonly spend?: SpendGuard,
+		// Prime Studio: picture timeout and format; absent = env
+		@Optional() @Inject(SettingsService) private readonly settings?: SettingsService,
 	) {}
 
 	get available(): boolean {
@@ -97,7 +100,7 @@ export class ImageService {
 			);
 		});
 
-		const format = imageOutputFormat(this.env);
+		const format = this.settings ? this.settings.imageFormat() : imageOutputFormat(this.env);
 		let lastError: unknown;
 		let reached = false;
 		for (const candidate of chain) {
@@ -108,7 +111,7 @@ export class ImageService {
 					prompt: input.prompt,
 					n: input.count,
 					size: SIZES[input.aspect],
-					abortSignal: AbortSignal.timeout(this.env.AI_IMAGE_TIMEOUT_MS),
+					abortSignal: AbortSignal.timeout(this.settings?.imageTimeoutMs() ?? this.env.AI_IMAGE_TIMEOUT_MS),
 					maxRetries: 0,
 					providerOptions: { openai: { quality: "medium", ...(format ? { outputFormat: format, ...(format === "png" ? {} : { outputCompression: 85 }) } : {}) } },
 				});
