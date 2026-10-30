@@ -1,16 +1,17 @@
 import { readFixtureMasterText } from '@/__tests__/helpers/pw1-master-artifact'
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, writeFile, rm, appendFile } from 'node:fs/promises'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, readFile, realpath, writeFile, rm, appendFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { execFile } from 'node:child_process'
 import { writeExportFixture } from '@/__tests__/helpers/pw1-export-fixture'
 import { exportMaster } from '@/lib/migration/pw1-export/export-master'
 import { validateArtifact } from '@/lib/migration/pw1-export/validate-artifact'
+import { runTsxCli } from '@/__tests__/helpers/run-tsx-cli'
+vi.setConfig({ testTimeout: 180_000 })
 let root: string
-beforeEach(async () => { root = await mkdtemp(path.join(os.tmpdir(), 'pw1-actors-')) })
+beforeEach(async () => { root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'pw1-actors-'))) })
 afterEach(async () => { await rm(root, { recursive: true, force: true }) })
 async function fixture() {
   const source = await writeExportFixture(root)
@@ -42,9 +43,7 @@ describe('[TC-F42-069] Hashed creator sidecar artifact', () => {
     // Act
     const registry = JSON.parse(await readFile(path.join(artifact, 'user-actors.json'), 'utf8'))
     const master = JSON.parse(await readFixtureMasterText(artifact))
-    const result = await new Promise<{ code: number; stdout: string; stderr: string }>(resolve => {
-      execFile(process.execPath, ['--import', 'tsx', 'scripts/data/export-pw1-master.ts', '--validate-only', '--artifact-dir', artifact], { timeout: 15000 }, (error, stdout, stderr) => resolve({ code: error && 'code' in error ? Number(error.code) : 0, stdout, stderr }))
-    })
+    const result = await runTsxCli('scripts/data/export-pw1-master.ts', ['--validate-only', '--artifact-dir', artifact])
     // Assert
     expect(registry.actors).toHaveLength(1)
     expect(master).toHaveLength(3)

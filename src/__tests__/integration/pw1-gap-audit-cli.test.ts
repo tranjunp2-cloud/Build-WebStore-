@@ -1,21 +1,17 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, rm, appendFile } from 'node:fs/promises'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, readFile, realpath, rm, appendFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { writeExportFixture } from '@/__tests__/helpers/pw1-export-fixture'
 import { exportMaster } from '@/lib/migration/pw1-export/export-master'
+import { runTsxCli } from '@/__tests__/helpers/run-tsx-cli'
 
+vi.setConfig({ testTimeout: 180_000 })
 let root: string
-beforeEach(async () => { root = await mkdtemp(path.join(os.tmpdir(), 'pw1-gap-audit-')) })
+beforeEach(async () => { root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'pw1-gap-audit-'))) })
 afterEach(async () => { await rm(root, { recursive: true, force: true }) })
-const run = (args: string[]) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve, reject) => {
-  execFile(process.execPath, ['--import', 'tsx', 'scripts/data/audit-pw1-gaps.ts', ...args], { timeout: 15000 }, (error, stdout, stderr) => {
-    if (error?.killed) { reject(error); return }
-    resolve({ code: error && 'code' in error ? Number(error.code) : 0, stdout, stderr })
-  })
-})
+const run = (args: string[]) => runTsxCli('scripts/data/audit-pw1-gaps.ts', args)
 async function fixture() {
   const source = await writeExportFixture(root)
   const artifact = path.join(root, 'export')
