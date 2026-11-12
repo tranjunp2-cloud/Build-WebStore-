@@ -76,7 +76,7 @@ describe('POST /api/blog-categories [TC-F17]', () => {
     })
 
     it('returns 409 for duplicate slug', async () => {
-        mockFind.mockResolvedValue({ docs: [{ id: 1 }] }) // existing slug
+        mockFind.mockResolvedValue({ docs: [{ id: 1, name: 'Existing', slug: 'existing' }] }) // existing category
 
         const req = { json: () => Promise.resolve({ name: 'Existing' }) } as unknown as Request
         const res = await POST(req, {} as any)
@@ -91,5 +91,23 @@ describe('POST /api/blog-categories [TC-F17]', () => {
         const res = await POST(req, {} as any)
 
         expect(res.status).toBe(400)
+    })
+})
+
+describe('blog categories keep the tenant an id [TC-PERF-129]', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    it('GET and POST read at depth 0, so no tenant row (Xendit / EasyParcel secrets) reaches the browser', async () => {
+        // Arrange
+        mockFind.mockResolvedValue({ docs: [] })
+        mockCreate.mockResolvedValue({ id: 1, name: 'Tips', slug: 'tips', tenant: 'tenant-1' })
+
+        // Act
+        await GET(new Request('http://localhost'), {} as any)
+        await POST({ json: () => Promise.resolve({ name: 'Tips' }) } as unknown as Request, {} as any)
+
+        // Assert
+        expect(mockFind.mock.calls[0][0]).toMatchObject({ collection: 'blog_categories', depth: 0 })
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blog_categories', depth: 0 }))
     })
 })

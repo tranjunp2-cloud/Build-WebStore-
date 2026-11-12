@@ -34,11 +34,13 @@ setup('authenticate', async ({ page }, testInfo) => {
     // Submit login form
     await page.click('button[type="submit"]')
 
-    // Wait for navigation — either OTP page or dashboard
+    // Wait for navigation — either OTP page or dashboard. Login + send-otp run
+    // back to back before the redirect and take 10-20 s on a busy staging
+    // runner; the login page itself only gives up after 45 s, so wait past that.
     await page.waitForURL(url => {
         const p = url.pathname
-        return p.includes('/verify-otp') || p.includes('/dashboard') || p.includes('/builder')
-    }, { timeout: 15_000 })
+        return p.includes('/verify-otp') || p.includes('/dashboard') || p.includes('/builder') || p.includes('/onboarding')
+    }, { timeout: 50_000, waitUntil: 'domcontentloaded' })
 
     // Handle OTP verification
     const currentUrl = page.url()

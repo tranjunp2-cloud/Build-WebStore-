@@ -1,0 +1,68 @@
+import { describe, expect, it, vi } from 'vitest'
+import { PLACEHOLDER_MEDIA_WHERE, placeholderCandidates, placeholderMediaPattern, pw1MediaFilename, pw1PlaceholderFilename, sourceUrls, isPlaceholderMedia } from '@/lib/migration/pw1-placeholder-image-repair'
+import { isMediaReferenced, repointMedia } from '@/lib/migration/pw1-media-repoint'
+
+const URL_A = 'https://pw1.test/a.jpg'
+const URL_B = 'https://pw1.test/b.jpg'
+
+// TC-F35.M72: placeholder image repair finds placeholders by source URL and repoints every reference
+describe('pw1 placeholder image repair', () => {
+    it('collects every absolute http(s) string in the contract', () => {
+        const urls = sourceUrls({ a: [{ image: { url: URL_A } }], b: 'text', c: { logo: URL_B, d: '/relative.jpg' } })
+        expect([...urls].sort()).toEqual([URL_A, URL_B])
+    })
+    it('names the placeholder after the stored copy the migration would have made', () => {
+        expect(pw1PlaceholderFilename(7, URL_A)).toBe(pw1MediaFilename(7, URL_A).replace('.jpg', '-placeholder.jpg'))
+        expect(pw1MediaFilename(7, URL_A)).toMatch(/^pw1-7-[0-9a-f]{20}\.jpg$/)
+    })
+    it('matches only URLs whose placeholder file exists for that tenant', () => {
+        const placeholders = [{ id: 11, filename: pw1PlaceholderFilename(7, URL_A) }, { id: 12, filename: pw1PlaceholderFilename(8, URL_B) }]
+        expect(placeholderCandidates([URL_A, URL_B], 7, placeholders)).toEqual([{ url: URL_A, placeholder: placeholders[0] }])
+    })
+    it('selects the plain-named media only by the neutral image size, for the tenant pattern', () => {
+        expect(placeholderMediaPattern(7)).toBe('pw1-7-%')
+        expect(PLACEHOLDER_MEDIA_WHERE).toContain("filename LIKE '%-placeholder.jpg'")
+        expect(PLACEHOLDER_MEDIA_WHERE).toMatch(/width = 960 AND height = 640 AND filesize = 9447/)
+    })
+    it('recognises the placeholder restorePw1Media falls back to, so the repair counts it as broken', () => {
+        expect(isPlaceholderMedia({ filename: 'pw1-187-b6c7e249791324010419-placeholder.jpg', width: 960, height: 640, filesize: 9447 })).toBe(true)
+        expect(isPlaceholderMedia({ filename: 'pw1-3023-685391f1304448447ad9.jpg', width: '960', height: '640', filesize: '9447' })).toBe(true)
+        expect(isPlaceholderMedia({ filename: 'pw1-3023-b06ef7942b85744053a9.jpg', width: 668, height: 290, filesize: 395518 })).toBe(false)
+        expect(isPlaceholderMedia({ filename: 'pw1-7-aaaaaaaaaaaaaaaaaaaa.jpg', width: 960, height: 640, filesize: 38533 })).toBe(false)
+    })
+    it('also matches a placeholder an older build stored under the plain media name', () => {
+        const placeholders = [{ id: 21, filename: pw1MediaFilename(7, URL_A) }]
+        expect(placeholderCandidates([URL_A, URL_B], 7, placeholders)).toEqual([{ url: URL_A, placeholder: placeholders[0] }])
+    })
+    it('repoints foreign keys and copied URLs', async () => {
+        const query = vi.fn(async (text: string) => {
+            if (text.includes('pg_constraint')) return { rows: [{ tbl: 'pages_blocks_hero', col: 'image_id' }], rowCount: 1 }
+            if (text.includes('information_schema')) return { rows: [{ table_name: 'pages_blocks_hero', column_name: 'slides', data_type: 'jsonb' }], rowCount: 1 }
+            return { rows: [], rowCount: 2 }
+        })
+        const updated = await repointMedia(query as never, { id: 1, url: '/m/old.png' }, { id: 2, url: '/m/new.jpg' })
+        expect(updated).toBe(4)
+        expect(query).toHaveBeenCalledWith('UPDATE pages_blocks_hero SET "image_id" = $1 WHERE "image_id" = $2', [2, 1])
+        expect(query).toHaveBeenCalledWith(expect.stringContaining('replace("slides"::text'), ['/m/old.png', '/m/new.jpg'])
+    })
+    it('skips the url rewrite when the URL did not change', async () => {
+        const query = vi.fn(async () => ({ rows: [], rowCount: 0 }))
+        await repointMedia(query as never, { id: 1, url: '/m/a.jpg' }, { id: 2, url: '/m/a.jpg' })
+        expect(query).toHaveBeenCalledTimes(1)
+    })
+    it('reports a placeholder still used through a foreign key or a copied URL, and not one already repointed', async () => {
+        const schema = (text: string) => {
+            if (text.includes('pg_constraint')) return { rows: [{ tbl: 'pages_blocks_hero', col: 'image_id' }], rowCount: 1 }
+            if (text.includes('information_schema')) return { rows: [{ table_name: 'pages_blocks_hero', column_name: 'slides', data_type: 'jsonb' }], rowCount: 1 }
+            return undefined
+        }
+        const byKey = vi.fn(async (text: string) => schema(text) ?? (text.includes('"image_id" = $1') ? { rows: [{}], rowCount: 1 } : { rows: [], rowCount: 0 }))
+        expect(await isMediaReferenced(byKey as never, { id: 1, url: '/m/old.png' })).toBe(true)
+        expect(byKey).toHaveBeenCalledWith('SELECT 1 FROM pages_blocks_hero WHERE "image_id" = $1 LIMIT 1', [1])
+        const byUrl = vi.fn(async (text: string) => schema(text) ?? (text.includes('"slides"::text LIKE') ? { rows: [{}], rowCount: 1 } : { rows: [], rowCount: 0 }))
+        expect(await isMediaReferenced(byUrl as never, { id: 1, url: '/m/old.png' })).toBe(true)
+        const unused = vi.fn(async (text: string) => schema(text) ?? { rows: [], rowCount: 0 })
+        expect(await isMediaReferenced(unused as never, { id: 1, url: '/m/old.png' })).toBe(false)
+        expect(await isMediaReferenced(unused as never, { id: 1, url: null })).toBe(false)
+    })
+})

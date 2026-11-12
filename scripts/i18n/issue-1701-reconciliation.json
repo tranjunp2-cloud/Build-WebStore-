@@ -27,6 +27,30 @@
     ],
     "contextChangedHold": [
       {
+        "key": "onboarding.form.industryOptions.restaurant",
+        "reason": "GH-2103 A6: the approved label overlapped the F&B option; it now names dine-in restaurants only."
+      },
+      {
+        "key": "onboarding.form.industryOptions.fnb",
+        "reason": "GH-2103 A6: the approved label overlapped the restaurant option; it now names cafe, bakery and dessert shops."
+      },
+      {
+        "key": "onboarding.form.tabUrl",
+        "reason": "GH-2103 A1: the link import tab is back and reads websites plus public Instagram/Facebook pages, not only an existing website."
+      },
+      {
+        "key": "onboarding.form.urlLabel",
+        "reason": "GH-2103 A1: the link import tab is back and reads websites plus public Instagram/Facebook pages, not only an existing website."
+      },
+      {
+        "key": "onboarding.form.urlHint",
+        "reason": "GH-2103 A1: the link import tab is back and reads websites plus public Instagram/Facebook pages, not only an existing website."
+      },
+      {
+        "key": "dashboard.shopCustomers.detail.autoLinkBody",
+        "reason": "GH-2279: the approved copy exposed the internal autoLinkCustomer hook name to shop owners; it now says orders are added automatically."
+      },
+      {
         "key": "dashboard.products.bulkCreate.saveEmptyError",
         "reason": "The redesigned drawer has no selected-product flow; it saves all remaining drafts."
       },
@@ -85,6 +109,82 @@
       {
         "key": "help.qna.categories.aDashboardSeo",
         "reason": "The live help answer must match the staging CTA label AI Fix Issues; the CSV still references the removed AI Fix All Issues label."
+      },
+      {
+        "key": "editor.pageManager.deleteSuccess",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "editor.pageManager.pageNamePlaceholder",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "editor.pageManager.pageCreated",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "editor.pageManager.pageHidden",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "editor.pageManager.restored",
+        "reason": "Pages panel redesign (GH-1984): toasts and placeholder now interpolate the page name / use design copy."
+      },
+      {
+        "key": "auth.errors.accountLocked",
+        "reason": "Lockout copy revised after user feedback (GH-2053): states the 15-minute wait and the reset-password option; password reset now unlocks the account."
+      },
+      {
+        "key": "auth.errors.passwordMinLength",
+        "reason": "Password minimum length lowered from 8 to 6 characters (GH-2269): login, reset-password and Profile change-password accept 6+ characters."
+      },
+      {
+        "key": "auth.register.reqLength",
+        "reason": "Password minimum length lowered from 8 to 6 characters (GH-2269): login, reset-password and Profile change-password accept 6+ characters."
+      },
+      {
+        "key": "auth.reset.newPasswordPlaceholder",
+        "reason": "Password minimum length lowered from 8 to 6 characters (GH-2269): login, reset-password and Profile change-password accept 6+ characters."
+      },
+      {
+        "key": "auth.reset.reqLength",
+        "reason": "Password minimum length lowered from 8 to 6 characters (GH-2269): login, reset-password and Profile change-password accept 6+ characters."
+      },
+      {
+        "key": "auth.reset.passwordMin",
+        "reason": "Password minimum length lowered from 8 to 6 characters (GH-2269): login, reset-password and Profile change-password accept 6+ characters."
+      },
+      {
+        "key": "accountSettings.password.placeholder",
+        "reason": "Password minimum length lowered from 8 to 6 characters (GH-2269): login, reset-password and Profile change-password accept 6+ characters."
+      },
+      {
+        "key": "accountSettings.password.tooShort",
+        "reason": "Password minimum length lowered from 8 to 6 characters (GH-2269): login, reset-password and Profile change-password accept 6+ characters."
+      },
+      {
+        "key": "profile.security.ruleMinLength",
+        "reason": "Password minimum length lowered from 8 to 6 characters (GH-2269): login, reset-password and Profile change-password accept 6+ characters."
+      },
+      {
+        "key": "profile.errors.passwordMinLength",
+        "reason": "Password minimum length lowered from 8 to 6 characters (GH-2269): login, reset-password and Profile change-password accept 6+ characters."
+      },
+      {
+        "key": "dashboard.blog.actions.deleteConfirmDetails",
+        "reason": "The blog delete dialog renders deleteConfirmDetails followed by deleteConfirmWarn, so the approved 'can't be undone' sentence appeared twice (GH-2264). The details line now only asks the question; deleteConfirmWarn keeps the warning."
+      },
+      {
+        "key": "dashboard.products.form.deleteWarning",
+        "reason": "Product delete is a soft delete with an undo toast (GH-2096), so the approved 'permanently deletes ... can't be undone' copy was wrong. The warning now says the product is removed and can be undone for a few seconds."
+      },
+      {
+        "key": "help.qna.categories.aSettingsDomain",
+        "reason": "Help Center domain guide: approved copy pointed to the retired Cloudflare IP 162.159.140.98 and the staging host web-v2.dev.ecommercehub.my; it now shows the live values (A @ 76.76.21.21, CNAME www cname.vercel-dns.com) and the delete-old-records step."
+      },
+      {
+        "key": "help.qna.categories.aSettingsDns",
+        "reason": "Help Center domain guide: approved copy pointed to the retired Cloudflare IP 162.159.140.98 and the staging host web-v2.dev.ecommercehub.my; it now shows the live values (A @ 76.76.21.21, CNAME www cname.vercel-dns.com) and the delete-old-records step."
       }
     ],
     "sourceContentConflictHold": [
@@ -107,6 +207,7 @@
       "reason": "The approved CSV restores PrimeWeb after the product was explicitly rebranded to Web Store.",
       "keys": [
         "dashboard.overview.welcomeTitle",
+        "help.overview.welcomeTitle",
         "dashboard.settings.payments.stripeConnectDesc",
         "dashboard.settings.payments.xenditConnectDesc",
         "dashboard.settings.payments.xenditModalSubtitle",
@@ -133,6 +234,20 @@
     }
   },
   "missingPathGroups": [
+    {
+      "classification": "superseded_context",
+      "evidenceCommit": "6416421f",
+      "replacementPaths": [
+        "help.overview.intro.desc",
+        "help.overview.intro.points"
+      ],
+      "reason": "The help center overview now opens with a replayable intro video; its long description and the need-help footer were removed.",
+      "keys": [
+        "help.overview.welcomeDesc",
+        "help.overview.needHelpTitle",
+        "help.overview.needHelpDesc"
+      ]
+    },
     {
       "classification": "obsolete_removed_ui",
       "evidenceCommit": "e5082ce0",
@@ -272,6 +387,27 @@
       "keys": [
         "dashboard.blog.editor.blog",
         "dashboard.blog.editor.home"
+      ]
+    },
+    {
+      "classification": "superseded_context",
+      "evidenceCommit": "efee2d8e8",
+      "replacementPaths": [
+        "editor.pageManager.createPage",
+        "editor.pageManager.deleteInlineConfirm",
+        "editor.pageManager.hiddenBadge",
+        "editor.pageManager.pageShown",
+        "editor.pageManager.urlPreview"
+      ],
+      "reason": "Pages panel redesign (GH-1984) replaced the visible/hidden labels, slug preview, Create button, and delete confirm dialog with icon actions, status badges, a URL preview line, and an inline delete confirm.",
+      "keys": [
+        "editor.pageManager.create",
+        "editor.pageManager.deleteConfirmDesc",
+        "editor.pageManager.deleteConfirmMsg",
+        "editor.pageManager.deleteConfirmTitle",
+        "editor.pageManager.hidden",
+        "editor.pageManager.slugPreview",
+        "editor.pageManager.visible"
       ]
     },
     {
@@ -691,6 +827,14 @@
   "retainedOutputHashes": {
     "algorithm": "sha256-json",
     "values": {
+      "help.qna.categories.aSettingsDomain": { "valueType": "scalar", "en": "eb642e37a0e0020b7972628c492c30f3e811fd137df41c863983730544f35044", "ms": "76e11f9e30c0f36ef7c11b96f386502df1a8abe295e219959bceb45a8be64515" },
+      "help.qna.categories.aSettingsDns": { "valueType": "scalar", "en": "98620a5372114646833b6dc706b31a19daa7d0c802358ba93b6d798cfc6c0a46", "ms": "0333f80a1a49ce53fbc5e3156c06290375274122b8927bbde4757abcf1c65890" },
+      "onboarding.form.industryOptions.restaurant": { "valueType": "scalar", "en": "6e5e27226c17f422dd222ed85a36a2e5a73547529a09b669cb38f0124a83b0bc", "ms": "45b2801f12332662d5d907491671b21c29e7cceec8f38635b5fc668d341c878b" },
+      "onboarding.form.tabUrl": { "valueType": "scalar", "en": "811622973db0a952db430f8a089d9616ef3f5806585775e2548825136fb7e965", "ms": "fdaae7f95152198f1e3a743f46388a4671b4393f4819114d95c3709693aac4d2" },
+      "onboarding.form.urlLabel": { "valueType": "scalar", "en": "8a2214d7cdb81e589ff80a4b69ca02ddbdc5c84abd83f79fea05fcb18dbe1857", "ms": "1298415afcefb44259810a311e873a5d291c03d00d96726edc2f73e8f48fafb1" },
+      "onboarding.form.urlHint": { "valueType": "scalar", "en": "67179d9265751527b8419ed1c95cf1da112bbc3d5c58f1598a4e2e33c397ea72", "ms": "8d84fdf5c0108a2acd399f6b0d8153510c26d724fa58399a00798e3fe283c7cb" },
+      "onboarding.form.industryOptions.fnb": { "valueType": "scalar", "en": "44457fd37b1228a480ba8579a4a35302e23f4876d6f9d880f2b223457634c36d", "ms": "1aca4f1ba2a47dd886255e54187e0bdcb895160194d895713cce861fd1dc3e24" },
+      "dashboard.shopCustomers.detail.autoLinkBody": { "valueType": "scalar", "en": "a8ba68bfca32f75a31d8086c4816f04598bad47275b584e30496c47b627c6942", "ms": "580e80b963ffb64a61c96b39e0329ba37a158b2ecd66ff0b76069e0f84d57570" },
       "dashboard.products.bulkCreate.saveEmptyError": { "valueType": "scalar", "en": "c1772101981b8ddf34d9d98b178379bd43ba1f625d7444601c6c340e11dee175", "ms": "052b0ba8b48a8b7ffc45bd709a3b579e66e46a13342a856b6eaff52b417b3e00" },
       "dashboard.products.bulkCreate.title": { "valueType": "scalar", "en": "8d0246dc6e1cdde728975b246928c156f76f963292465eafd6b788dbc23ffe40", "ms": "5f140ef5569fbab9095fb63beb3c3b1113e3c4279dab6e051b24648507360533" },
       "dashboard.products.categories.deleteModal.subCategoryWarning": { "valueType": "scalar", "en": "77b48eaf0de2c4917a93e15998735273dc6aad193fb049ecf0244cb3b753947c", "ms": "dbfddece008b2a3062915da49d725d40d45728be6de40697480aabf8e8c37468" },
@@ -707,6 +851,7 @@
       "dashboard.seo.fixAllButton": { "valueType": "scalar", "en": "f4f2ac08fb99ef6b8d1b7929b9daa14714eaf16ab9071ec5064d45a4c77149c9", "ms": "9b27da3d8bc68d9d65abd3bbe5115b17a74f9ed47579ac6776dbc3cbcba1b1ce" },
       "help.qna.categories.aDashboardSeo": { "valueType": "scalar", "en": "1306f173febbdb38a153332f3b0ebb5d9dc35999131ca4acd446444c2d8f2e42", "ms": "09dbb566cf04807971835c3639bbcb168f74e9a7a21e2c42cc84756ba7c8fdb0" },
       "dashboard.overview.welcomeTitle": { "valueType": "scalar", "en": "9fff4213d60be881b6e621500c13dd19e28a733f790054173a8f784780e007c5", "ms": "0e7fe46ab7d1961fb7b89867128f141bdb229f66a8f03bee72db7028355a9dcf" },
+      "help.overview.welcomeTitle": { "valueType": "scalar", "en": "9a799ef001db7e4278e6afe3a80359deb593a0738c72b730192b0365b22af46d", "ms": "6f3caeaabe4eabe5020e4082bb32ae20138fcb690d6fe7c62dac7a513076a9d6" },
       "dashboard.settings.payments.stripeConnectDesc": { "valueType": "scalar", "en": "783a3cc887eecbe23e0c7c8155468a97d9614b8ea6f261f1aa1d2ac0ca95a80c", "ms": "ffa226698a438613a5f4bf587ffb1235557e377f85b3fe954a80c85a61a5b383" },
       "dashboard.settings.payments.xenditConnectDesc": { "valueType": "scalar", "en": "783a3cc887eecbe23e0c7c8155468a97d9614b8ea6f261f1aa1d2ac0ca95a80c", "ms": "24100e6be9941c7a5906103bc1a244463ab31907950c0ef1d0ae88263caceb2e" },
       "dashboard.settings.payments.xenditModalSubtitle": { "valueType": "scalar", "en": "5b663438fdefd7036eb8c5c86d02e20518a5a9d5f707ae1c1319a0ab48ea2cbc", "ms": "028b4dde98b5aa82fb9a4f575ad634bf0f60b6446daacc5212ef1c4fdcf89004" },
@@ -734,7 +879,24 @@
       "help.modules.data.blog.steps": { "valueType": "array", "en": "52a3243650f99b36a68dcaa9375be20865d94811147f5e61df454046b73ef983", "ms": "dc8c101526e2ca215628ec9e18b0667ca2b4435cdf038c8a6bf1797ba9ed116f" },
       "help.modules.data.builder.steps": { "valueType": "array", "en": "fb2d3b81fc6d7d1bd51b4460d32da8291fb459fc9ce736bfb8339e69094e4213", "ms": "80f492d9efdab47eac0e0b5f1cfbe02f0438a7b7c7e48977901a58c5bff76ad5" },
       "help.modules.data.dashboard.steps": { "valueType": "array", "en": "7e719c312b51582eb0132d8557abf3fddbc57190e92f80d286113176a5e2763a", "ms": "e43bb2ae9a380c7c997fe2d43f2d8e0b98a94b78e4434ae0eec54be6de0ba4a3" },
-      "help.modules.data.settings.steps": { "valueType": "array", "en": "7318bb2e9ba20d1beacbb48e49e4bbf83ce21e92e7c5381fda8a6fec1cff8172", "ms": "f586be55c2da900edb31a3eebca609c8ecacc9fd8199c9e864cca9090393dc72" }
+      "help.modules.data.settings.steps": { "valueType": "array", "en": "cee508609cb266ce67dd51728eb1be4a1d208e0fcfa38557ff204ebbf8b86a6c", "ms": "39792859945e97cc52dc4564b08c8efff7773721041d5f30feeb2285f15da165" },
+      "editor.pageManager.deleteSuccess": { "valueType": "scalar", "en": "83d48c3fe3ec9728e76e345e2ce123b01aac9dbc2be3cc805edb7bf04f373f12", "ms": "a64fbfee2cd38b78d7b029cbf93afcd2add6d8a41c01eb2e5e940d3bfffa620e" },
+      "editor.pageManager.pageNamePlaceholder": { "valueType": "scalar", "en": "51cc0a6fafce4327577059afabe1abb1f3617601bcec4458443bd7742ab2c356", "ms": "3869c9c2e4688e87c36968636b1b27b33ea3d1ba4d6b2bfdc659257b4c8d1202" },
+      "editor.pageManager.pageCreated": { "valueType": "scalar", "en": "f8a7e1c23f6c71097d22d1eaf97ca83e5b13a5a2fe83d3aef271d2f8c39e2d21", "ms": "41ea8e606e2b37415a313b279025e6f6ee0031fc52ff919ade64dc5a0676e16a" },
+      "editor.pageManager.pageHidden": { "valueType": "scalar", "en": "02758b3e22bbf4d00bfd3a37aa9861f3beec136c31a2f2c91e3c98bed6b7f0b1", "ms": "963217fb1e99d5e6b156e9134b9e1f9ac619269265d720bc5ff3596433028bc6" },
+      "editor.pageManager.restored": { "valueType": "scalar", "en": "208fd4f2a2257e334044150d0999e6a57586c65dab1a1faaf93469dea437df98", "ms": "db4d2ac577f73742c220aa036c89ecad5cae3026e4fb721463869d0a1281b32d" },
+      "auth.errors.accountLocked": { "valueType": "scalar", "en": "efbb3db4b93b5ccdb6efc14f9bc6dadb3399365c4e0e8fc7066f1e7d2b91fab9", "ms": "5d74426e1e5a3381cbaa67547f7443916e0c35442c81672c7661f83a333a0d7c" },
+      "auth.errors.passwordMinLength": { "valueType": "scalar", "en": "7c6ed50df9b58238728913c0ad3d0accb195c53cf0f510e93fd19cc3bdb13ecf", "ms": "0c6141efbb8b6b5b57dd43f76068aa6a96bd49c51b88743b9a773c813e441e86" },
+      "auth.register.reqLength": { "valueType": "scalar", "en": "0a787246b1df17f8fc8793542f6ac3a811a41292583c22d328f909ecbd3058d7", "ms": "0ca6f2be5f2471cf9986cd0ce74a6f844ba906c0db89401516983a20520f7038" },
+      "auth.reset.newPasswordPlaceholder": { "valueType": "scalar", "en": "cc664828f45b0e3edb3127714b6f3c444bfec2943602b999be8924c573960200", "ms": "c9c6e43cf1da4a48178bbd9d6a1f8c0f0134d52e71c0c33bff87d3dc0d72559f" },
+      "auth.reset.reqLength": { "valueType": "scalar", "en": "0a787246b1df17f8fc8793542f6ac3a811a41292583c22d328f909ecbd3058d7", "ms": "0ca6f2be5f2471cf9986cd0ce74a6f844ba906c0db89401516983a20520f7038" },
+      "auth.reset.passwordMin": { "valueType": "scalar", "en": "7c6ed50df9b58238728913c0ad3d0accb195c53cf0f510e93fd19cc3bdb13ecf", "ms": "27b2fb3e6b4b59dc9c6db677b125c4c8b528939f7d83532dc8819b2049f1b886" },
+      "accountSettings.password.placeholder": { "valueType": "scalar", "en": "c8f8c0116a00f797ada76613de7047e9f95547f0bbe8439e45a7574de0097fbd", "ms": "27b2fb3e6b4b59dc9c6db677b125c4c8b528939f7d83532dc8819b2049f1b886" },
+      "accountSettings.password.tooShort": { "valueType": "scalar", "en": "7c6ed50df9b58238728913c0ad3d0accb195c53cf0f510e93fd19cc3bdb13ecf", "ms": "0c6141efbb8b6b5b57dd43f76068aa6a96bd49c51b88743b9a773c813e441e86" },
+      "profile.security.ruleMinLength": { "valueType": "scalar", "en": "0a787246b1df17f8fc8793542f6ac3a811a41292583c22d328f909ecbd3058d7", "ms": "0ca6f2be5f2471cf9986cd0ce74a6f844ba906c0db89401516983a20520f7038" },
+      "profile.errors.passwordMinLength": { "valueType": "scalar", "en": "7c6ed50df9b58238728913c0ad3d0accb195c53cf0f510e93fd19cc3bdb13ecf", "ms": "963e788eacee3ec4e3a0681dcc00aa4ef0e19cf72530453e076dc345a845b7e3" },
+      "dashboard.blog.actions.deleteConfirmDetails": { "valueType": "scalar", "en": "f7b0b83075ebf2faa0b6a7a50eb3363568511d7bc39bb84ba7cdbbc13d95190d", "ms": "bc5227062b555a55930c4970eac60e88fb91b3850291fb95590804d4ef0ff2f1" },
+      "dashboard.products.form.deleteWarning": { "valueType": "scalar", "en": "64b7fd617e8fbd5b9598bee5f7ee434d98dc0d68f6c5e52e0eae16bb3aa891e0", "ms": "1f0177a7aac9cbf2fafe40db71447e1200c88f58a0c624f388c14cd0fe075aeb" }
     }
   },
   "contractOverrides": [

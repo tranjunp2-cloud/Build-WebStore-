@@ -47,7 +47,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ---
 
-### US-02: Auto-link Hook — Order → Customer Upsert (9 Cases)
+### US-02: Auto-link Hook — Order → Customer Upsert (11 Cases)
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
@@ -55,21 +55,27 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F25-02-02** | `BR-08` / `AC-2` | `Logic` | Idempotency — 5 orders cùng phone → 1 customer | 1. Tạo lần lượt 5 order với cùng `customerPhone='+60111222333'` cùng tenant A.<br>2. Mỗi order trigger auto-link hook. | - Chỉ 1 Customer row C1 trong DB.<br>- Cả 5 orders đều link tới C1.id.<br>- DB UNIQUE INDEX bảo vệ safety net. | Blocker | [x] |
 | **TC-F25-02-03** | `BR-04` | `Edge` | Empty phone + email → no customer, no error | 1. Tạo order với `customerPhone=''`, `customerEmail=''`.<br>2. Hook validate. | - Order save thành công (không throw).<br>- `order.customer_id = null`.<br>- Không tạo Customer.<br>- Không log error (silent skip). | Blocker | [x] |
 | **TC-F25-02-04** | `BR-04` | `Edge` | Whitespace-only phone → treated as absent | 1. Tạo order với `customerPhone='   '` (spaces).<br>2. Hook normalize. | - Normalized = null.<br>- `customer_id = null` (no email fallback).<br>- No DB call, no error. | High | [x] |
-| **TC-F25-02-05** | `BR-03` / `BR-04` | `Recov` | Fault tolerance — DB throw → null FK + log | 1. Mock `req.payload.find` throw `Error('db down')`.<br>2. Tạo order với valid phone + tenant. | - Order save thành công (no re-throw).<br>- `customer_id = null` (safe fallback).<br>- Log error với prefix `[Orders.autoLinkCustomer]`.<br>- KHÔNG log PII (email/name/phone). | Blocker | [x] |
+| **TC-F25-02-05** | `BR-03` / `BR-04`, TC-PERF-185 | `Recov` | Fault tolerance — customer lookup throws → hook rethrows, order rolls back (unit: `TC-F25-005`) | 1. Mock `req.payload.find` throw `Error('db down')`.<br>2. Tạo order với valid phone + tenant. | - Hook rethrow đúng lỗi đó (lookup chạy trên transaction của đơn, Payload đã rollback) → order KHÔNG được lưu, checkout báo lỗi.<br>- KHÔNG gọi `payload.create`, KHÔNG set `customer = null`.<br>- Xem TC-PERF-185 (`docs/qa/F-security-perf-upgrade.md`). | Blocker | [x] |
+| **TC-F25-02-05b** | `BR-03`, TC-PERF-185 | `Recov` | Fault tolerance — customer create throws (unit: `TC-F25-006`, `TC-F25-006b`) | 1. Lookup trả `[]`, `req.payload.create('customers')` throw.<br>2. Tạo order với valid phone + tenant. | - Lỗi dữ liệu (vd. `value too long…`, `TC-F25-006b`): order vẫn lưu với `customer = null`, log `[Orders.autoLinkCustomer]` (không PII), không retry find.<br>- Lỗi unique (`TC-F25-006`): retry find; không có bản thắng → `customer = null` + log.<br>- Lỗi kết nối / pool (pg-pool "timeout exceeded when trying to connect", 08xxx / 57P0x / 53300, raw hoặc drizzle-wrapped): hook throw → order rollback, checkout báo lỗi, KHÔNG lưu với `customer = null` (TC-PERF-185). | Blocker | [x] |
 | **TC-F25-02-06** | `FR-10` / `BR-09` | `Logic` | firstOrderAt set-once — không update trên subsequent orders | 1. Customer C1 với `firstOrderAt='2026-04-01'`.<br>2. Tạo order mới (order 5) → auto-link → C1 existing path. | - C1.firstOrderAt UNCHANGED (vẫn 2026-04-01).<br>- Hook KHÔNG update field này khi tìm thấy existing customer.<br>- Read-only constraint preserved. | High | [ ] |
 | **TC-F25-02-07** | `FR-02` (perf) | `Perf` | Skip DB lookup khi phone unchanged trên order update | 1. Order O1 có `customerPhone='+60111'`.<br>2. Update O1 với same phone (originalDoc.customerPhone giống). | - `req.payload.find` KHÔNG được gọi (early return).<br>- `data.customer` KHÔNG bị mutate.<br>- Perf optimization preserved (chỉ check phone, không check email). | Medium | [ ] |
 | **TC-F25-02-16** | `FR-02` | `Logic` | Phone absent + valid email → customer=null (no fallback) | 1. Tạo order với `customerPhone=''`, `customerEmail='existing@x.com'`.<br>2. Hook validate. | - Phone absent → immediate null return.<br>- `req.payload.find` KHÔNG được gọi (no email fallback).<br>- `customer_id = null`, no error. | High | [x] |
 | **TC-F25-02-17** | `FR-02` | `Logic` | Same phone, diff email → same customer (phone-first) | 1. Tạo order với `customerPhone='+60111'`, `customerEmail='new@x.com'`.<br>2. Existing customer C1 với `phone='+60111'`, `email='old@x.com'`. | - Hook phone-first lookup finds C1.<br>- Order link tới C1.id.<br>- Email fallback NOT called.<br>- `payload.find` called once (phone only). | High | [x] |
 | **TC-F25-02-20** | `FR-02` / `BE-1` | `Regression` | Unnormalized order phone links to admin-normalized customer (BE-1 regression guard) | 1. Admin saves customer với phone `'+60 12-345 6789'` → Customers.beforeChange stores `'+60123456789'`.<br>2. Order arrives với `customerPhone='+60 12-345 6789'` (raw).<br>3. autoLinkCustomer chạy. | - Hook normalizes phone → lookup key `'+60123456789'`.<br>- Matches admin customer → `customer_id` trỏ tới cust-1.<br>- `payload.create` KHÔNG được gọi (no duplicate).<br>- `payload.find` được gọi với `{ phone: { equals: '+60123456789' } }`. | Blocker | [x] |
+| **TC-F25-02-21** | `FR-02`, #1996 bulk order update hang | `Logic` | Existing customer: link set, customer write không chặn transaction của đơn | 1. Bulk update nhiều order cùng tenant sang SĐT của customer C có sẵn (Payload update `where`).<br>2. Order đầu đã ghi `customer_id=C` (khóa FK `KEY SHARE` trên C); autoLinkCustomer của order sau chạy. | - Hook trả về ngay với `data.customer = C`, không await ghi customer.<br>- Ghi name/email chạy sau response qua `runAfterResponse`, không dùng `req`/transaction.<br>- Bulk update trả về, không treo. | Critical | ✅ |
+| **TC-F25-02-22** | `FR-02` / `BR-08`, Payload 3.91 | `Recov` | Unique phone violation dạng Payload ValidationError → retry find | 1. Hai order cùng SĐT mới trong một bulk update (song song).<br>2. `payload.create('customers')` thứ hai lỗi unique, Payload trả `ValidationError` (không có pg code, message "The following field is invalid"). | - Nhận ra lỗi unique (field error `tableName` / "Value must be unique").<br>- Retry find → link customer thắng; không set `customer=null`, không log error. | High | ✅ |
+| **TC-F25-02-23** | `FR-02, #2086` | `Logic` | Existing customer thiếu email / name `(unknown)` → chỉ điền trường trống | 1. C1 `name='Keep Me'`, email null; C2 `name='(unknown)'`, có email.<br>2. Order mới cùng SĐT với tên + email mới. | - C1: chỉ set email (lowercase), giữ name.<br>- C2: chỉ set name, giữ email. | High | [x] |
 
 ---
 
-### US-03: Sync Snapshot Hook — Latest-Wins Name/Phone (2 Cases)
+### US-03: Sync Snapshot Hook — Phone/latestOrderAt (không ghi đè name/email) (4 Cases)
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | **TC-F25-03-01** | `FR-02` (sync) | `Logic` | Sync hook update Customer.name/phone trên order create | 1. Order mới với `customerEmail='new@x.com'`, `customerName='Alice'`, `customerPhone='+60111'`.<br>2. auto-link tạo Customer với name='Alice'.<br>3. afterChange syncCustomerSnapshot chạy. | - Customer.name = 'Alice'.<br>- Customer.phone = '+60111'.<br>- Hook chạy idempotent dù create-path đã set fields. | High | [ ] |
-| **TC-F25-03-02** | `FR-02` (latest-wins) | `Data` | Sync hook latest-wins trên order update | 1. Customer C1 (name='Alice', phone='+60111') linked order O1.<br>2. Update O1 với `customerName='Alice Renamed'`, `customerPhone='+60999'`. | - C1.name = 'Alice Renamed' (latest order wins).<br>- C1.phone = '+60999'.<br>- Hook chỉ trigger khi field khác previousDoc (no-op nếu unchanged). | High | [ ] |
+| **TC-F25-03-02** | `FR-02`, #2086 | `Data` | Sync hook không ghi name/email lên customer khi sửa đơn | 1. Customer C1 (name='Alice') linked order O1.<br>2. Update O1 chỉ đổi `customerName='Alice Renamed'`. | - `payload.update` KHÔNG được gọi; C1.name giữ 'Alice'. | High | [x] |
+| **TC-F25-03-03** | `FR-02` (sync), checkout hang #2180 | `Logic` | Sync hook không chặn transaction tạo đơn | 1. Checkout bank transfer với SĐT mới (`POST /api/orders/checkout`).<br>2. Order INSERT giữ khóa FK `KEY SHARE` trên dòng customer; afterChange syncCustomerSnapshot chạy. | - Hook trả về ngay, không await ghi customer (không deadlock giữa 2 connection).<br>- Ghi customer (name/phone/email/latestOrderAt) chạy sau response qua `runAfterResponse`, không dùng `req`/transaction của đơn.<br>- Checkout trả 201, đơn + customer đúng. | Critical | ✅ |
+| **TC-F25-03-04** | `FR-02, #2086` | `Logic` | Update đơn đổi SĐT → chỉ sync phone, không name/email | 1. Update O1 đổi `customerPhone`, `customerName`, `customerEmail`. | - `data.phone` mới.<br>- Không có `name`, `email` trong data. | High | [x] |
 
 ---
 
@@ -124,7 +130,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F25-02-08** | `BR-01` | `Sec` | Cross-tenant — cùng email khác tenant → 2 records riêng biệt | 1. Tenant A: order với `email='x@y.com'`.<br>2. Tenant B: order với `email='x@y.com'`.<br>3. Inspect 2 find calls. | - 2 lookups riêng biệt `tenant: A` vs `tenant: B`.<br>- 2 Customer records riêng biệt.<br>- KHÔNG merge cross-tenant (BR-01 tenant-scoped identity). | High | [x] |
 | **TC-F25-02-09** | `BR-04` | `Edge` | NULL email handled như empty (legacy data path) | 1. Order với `customerEmail=null`.<br>2. Order với `customerEmail` field missing entirely. | - `customer=null`, no DB call, no error.<br>- Cover legacy migration data. | High | [x] |
 | **TC-F25-02-10** | `FR-02` | `Logic` | tenant relationship object → extract id correctly | 1. data.tenant = `{ id: 'tenant-99', name: 'X' }`.<br>2. Auto-link execute. | - find query dùng `tenant: { equals: 'tenant-99' }`.<br>- Support both populated object + raw id. | Medium | [x] |
-| **TC-F25-02-11** | `BR-01` | `Edge` | Missing tenant ID → customer=null | 1. `tenant=undefined` hoặc `tenant=null`.<br>2. Auto-link execute. | - `customer=null`, no DB call, no error.<br>- Defensive check trước query. | High | [x] |
+| **TC-F25-02-11** | `FR-02`, #2086 | `Logic` | Existing customer đã có name+email → không ghi đè (thay latest-wins cũ) | 1. Customer C1 `name='Siti Old'`, `email='old@x.com'`.<br>2. Tạo order cùng SĐT, `customerName='Siti'`, `customerEmail='siti@new.com'`. | - Order link tới C1.<br>- `payload.update` KHÔNG được gọi. | High | [x] |
 | **TC-F25-06-08** | `FR-07` (boundary) | `Bound` | Row cap boundary — 10000 OK, 10001 → 413 | 1. Mock count = 10000 → export.<br>2. Mock count = 10001 → export.<br>3. Mock count = 0 → export. | - 10000 → 200 OK stream.<br>- 10001 → 413 export_too_large.<br>- 0 → 200 header-only CSV. | Critical | [x] |
 | **TC-F25-01-06** | `FR-01` | `UI` | Schema field types — phone optional, notes textarea, timestamps | 1. Inspect `Customers.fields`. | - phone type text + not required.<br>- notes type textarea + admin description.<br>- `timestamps: true` enabled. | Medium | [x] |
 | **TC-F25-01-07** | `FR-08` | `Val` | Rank enum values all lowercase (case-sensitive) | 1. Inspect rank options. | - All values lowercase: bronze/silver/gold/vip.<br>- Labels có thể uppercase (VIP) nhưng value lowercase.<br>- Payload select case-sensitive. | Medium | [x] |
@@ -152,6 +158,10 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F25-22** | `FR-04` rate formula | `Logic` | rate formula — 2-decimal rounding + zero fallback | 1. Mock orders: 1 completed + 1 cancelled + 1 pending (count=3).<br>2. Call `getShopCustomersAction`.<br>3. Also call with 0 orders. | - `completedRate === 33.33` (not 33).<br>- `failedRate === 33.33` (not 33).<br>- Zero orders → `completedRate === 0`, `failedRate === 0`. | High | [x] |
 | **TC-F25-23** | `FR-04` (sort) | `Logic` | getShopCustomersAction — orderCount sort uses SQL JOIN, skips fetchOrderStats | 1. Mock `getCurrentTenantId` → '1'.<br>2. Mock `drizzle.execute` → 2 rows with inline order stats.<br>3. Call action with `{ sortBy: 'orderCount', sortDir: 'desc' }`. | - Returns 2 customers in correct order.<br>- `completedRate === 80` (4/5 completed).<br>- `payload.find` NOT called (stats computed inline via SQL JOIN). | High | [x] |
 | **TC-F25-24** | `FR-04` (sec) | `Sec` | SQL paths — reject non-integer tenantId before issuing any SQL | 1. Mock `getCurrentTenantId` → `'not-an-integer'`.<br>2. Call `getShopCustomersAction({})` (default sort → SQL path). | - Action throws `Invalid tenantId`.<br>- `drizzle.execute` NOT called (guard fires before SQL). | High | [x] |
+| **TC-F25-25** | `FR-04, #2086` | `Logic` | Spend/failed theo định nghĩa mới | 1. 5 đơn: completed 100, paid chưa giao 50, cancelled 214.20, payment_failed 40, pending 30.<br>2. `fetchCustomerOrderStats`. | - count 5, spend 150, completed 20%, failed 40%. | High | [x] |
+| **TC-F25-26** | `FR-04, #2086` | `Logic` | COD: completed tính vào spend dù paymentStatus chưa paid | 1. Đơn completed (paymentStatus pending) 80 + đơn shipped chưa thanh toán 60. | - spend = 80. | High | [x] |
+| **TC-F25-27** | `FR-04, #2086` | `Logic` | Refunded: tính vào Total orders, không vào spend/completed/failed | 1. Đơn refunded 70 + completed 20. | - count 2, spend 20, completed 1, failed 0. | High | [x] |
+| **TC-F25-28** | `FR-04, #2086` | `Logic` | Công thức dùng chung cho SQL sort, detail, CSV, ECH Agent | 1. Render SQL fragment `LIFETIME_SQL`/`FAILED_COUNT_SQL`.<br>2. Sort `spend` của ECH Agent. | - SQL loại cancelled/refunded, yêu cầu paid hoặc completed; failed = cancelled + payment_failed. | High | [x] |
 
 ---
 
@@ -168,6 +178,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F25-08-07** | `FR-07` | `Func` | CSV export endpoint trả CSV với headers đúng | 1. GET `/api/v1/customers/export` (auth cookies từ browser).<br>2. Inspect response. | - Status < 500.<br>- Nếu 200: `Content-Type: text/csv`, `Content-Disposition: attachment`, `Cache-Control: private`.<br>- Body line 1 = `email,name,phone,rank,createdAt,addressCount,orderCount`. | Blocker | [x] |
 | **TC-F25-08-08** | `FR-09` | `Sec` | CSV export no auth → 401/403 | 1. GET `/api/v1/customers/export` với empty `Cookie` header. | - Status ∈ {401, 403}.<br>- Cache-Control private.<br>- Không leak data. | Blocker | [x] |
 | **TC-F25-08-09** | `BR-07` | `Sec` | Hard-delete DELETE `/api/customers/:id` → 403 | 1. Lấy customer ID từ list.<br>2. DELETE `/api/customers/:id`. | - Status ∈ {403, 401, 405}.<br>- Customer record vẫn còn trong DB.<br>- No data loss. | Blocker | [x] |
+| **TC-F25-08-10** | `FR-03` | `UI` | Hộp Auto-link không lộ tên hook kỹ thuật (GH-2279) | 1. Mở customer detail.<br>2. Đọc hộp "Auto-link on". | - Nội dung EN/MS không chứa "hook" / `autoLinkCustomer`.<br>- Không còn thẻ `<code>` kỹ thuật. | Low | [x] AUTO |
 
 ---
 
@@ -177,14 +188,18 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 | Test File | Location | TC Coverage | Test Count |
 |:---|:---|:---|:---:|
-| `auto-link-customer.test.ts` | `src/__tests__/unit/customers/` | TC-F25-02-01..07, 02-15..20, TC-F25-006b | ✅ 21 PASS |
-| `sync-customer-snapshot.test.ts` | `src/__tests__/unit/customers/` | TC-F25-03-01..02, TC-F25-09-01..07 | ✅ 9 PASS |
+| `auto-link-customer.test.ts` | `src/__tests__/unit/customers/` | TC-F25-02-01..07, 02-15..20, TC-F25-005, TC-F25-006, TC-F25-006b | ✅ 21 PASS |
+| `auto-link-customer-pool.test.ts` | `src/__tests__/unit/customers/` | TC-F25-02-05, 02-05b (TC-PERF-185: connection / pool error rethrows) | ✅ 5 PASS |
+| `auto-link-customer-transaction.test.ts` | `src/__tests__/unit/customers/` | TC-F25-02-21..22 | ✅ 2 PASS |
+| `sync-customer-snapshot.test.ts` | `src/__tests__/unit/customers/` | TC-F25-03-01..04, TC-F25-09-01..09 | ✅ 13 PASS |
+| `customer-spend-rules.test.ts`, `crm-services.test.ts` | `src/__tests__/unit/customers/` | TC-F25-25..28 | ✅ PASS |
 | `customers-access.test.ts` | `src/__tests__/unit/customers/` | TC-F25-05-01..02 | ✅ 8 PASS |
 | `customers-field-validation.test.ts` | `src/__tests__/unit/customers/` | TC-F25-01-01..03, 04-01 | ✅ 15 PASS |
 | `customers-orders-tab.test.tsx` | `src/__tests__/unit/customers/` | TC-F25-05-03, 07-01..04 | ✅ 16 PASS |
 | `customers-export.test.ts` | `src/__tests__/integration/` | TC-F25-06-01, 05..07 | ✅ 9 PASS |
 | `shop-customer-record.test.ts` | `src/__tests__/unit/customers/` | TC-F25-11..14 | ✅ 5 PASS |
 | `shop-customer-actions.test.ts` | `src/__tests__/unit/customers/` | TC-F25-15..24 | ✅ 14 PASS |
+| `customer-autolink-copy.test.ts` | `src/__tests__/unit/customers/` | TC-F25-08-10 | ✅ 2 PASS |
 | `f25-customers.spec.ts` (E2E) | `e2e/` | TC-F25-08-01..09 | 🟡 9 specs compile (needs staging server) |
 | **TOTAL** | — | **TC-F25-01..09-XX, 11..24** | **81 PASS + 7 todo + 9 E2E specs** |
 
@@ -222,12 +237,16 @@ Post-merge, user QA team thực hiện 3 manual scenarios:
 | TC-F25-02-02 | §8 BR-08 | §2.1 hook flow | auto-link-customer.test.ts | ✅ |
 | TC-F25-02-03 | §8 BR-04 | §2.1 edge case | auto-link-customer.test.ts | ✅ |
 | TC-F25-02-04 | §8 BR-04 | §2.1 email validation | auto-link-customer.test.ts | ✅ |
-| TC-F25-02-05 | §8 BR-03 (non-throwing) | §5.2 try/catch | auto-link-customer.test.ts | ✅ |
+| TC-F25-02-05 | §8 BR-03, TC-PERF-185 (lookup error rethrows) | §5.2 try/catch | auto-link-customer.test.ts, auto-link-customer-pool.test.ts | ✅ |
+| TC-F25-02-05b | §8 BR-03, TC-PERF-185 (create: data error → null, connection error → rethrow) | §5.2 try/catch | auto-link-customer.test.ts, auto-link-customer-pool.test.ts | ✅ |
 | TC-F25-02-06 | §7 FR-10, §8 BR-09 | §2.1 firstOrderAt | customers-hooks-and-behavior.test.ts | ✅ |
 | TC-F25-02-07 | §7 FR-02 (perf) | §2.1 update path | auto-link-customer.test.ts | ✅ |
 | TC-F25-02-20 | §7 FR-02 / BE-1 | §5.1 phone normalization regression | auto-link-customer.test.ts | ✅ |
+| TC-F25-02-21 | §7 FR-02, bulk update hang (#1996) | §5.1 found path after response | auto-link-customer-transaction.test.ts | ✅ |
+| TC-F25-02-22 | §8 BR-08, Payload 3.91 unique error | §5.1 race retry | auto-link-customer-transaction.test.ts | ✅ |
 | TC-F25-03-01 | §7 FR-02, §9.2 flow | §2.2 syncCustomerSnapshot | sync-customer-snapshot.test.ts | ✅ |
-| TC-F25-03-02 | §7 FR-02 (latest-wins) | §2.2 sync hook | sync-customer-snapshot.test.ts | ✅ |
+| TC-F25-03-02 | §7 FR-02 (#2086, không ghi đè) | §2.2 sync hook | sync-customer-snapshot.test.ts | ✅ |
+| TC-F25-03-03 | §7 FR-02, checkout hang (#2180) | §2.2 sync hook after response | sync-customer-snapshot.test.ts | ✅ |
 | TC-F25-04-01 | §7 FR-03, design §3.1 | §3.1 country default | customers-hooks-and-behavior.test.ts | ✅ |
 | TC-F25-04-02 | design §3.2 (KISS) | — | customers-hooks-and-behavior.test.ts | ✅ |
 | TC-F25-05-01 | §7 FR-09, §8 BR-01 | §6 access control | customers-access.test.ts | ✅ |

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { getStripeOAuthUrl } from '@/lib/payment/stripe'
+import { guardPayoutConnect } from '@/lib/payment/payout-connect-guard'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 
 /**
@@ -31,6 +32,9 @@ export const POST = withFeatureGuard('payment_integration')(withAuth(async (user
                 { status: 403 },
             )
         }
+
+        const blocked = guardPayoutConnect(request, user, tenantId)
+        if (blocked) return blocked
 
         const oauthUrl = getStripeOAuthUrl(String(tenantId))
 

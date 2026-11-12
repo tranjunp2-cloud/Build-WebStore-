@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/templates/[id]/save-sections
  * Updates templatePages[0].layout + creates a TemplateVersion row.
- * Super-admin only. Rate-limited to 30/min/user.
+ * Needs template.edit and a draft or review template. Rate-limited to 30/min/user.
  *
  * Phase 04: After saving, increments fields_edited on any ai_generation_records
  * row linked to a site derived from this template. Best-effort — errors swallowed.
@@ -12,7 +12,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
-import { withSuperAdmin, checkRateLimit } from '@/lib/admin/api-utils'
+import { studioForbidden, withStudioPermission, checkRateLimit } from '@/lib/admin/api-utils'
+import { canEditTemplateContent } from '@/lib/admin/studio-permissions'
 import { countChangedFields } from '@/lib/admin/section-field-diff'
 import type { PlatformUser } from '@/types/user'
 
@@ -74,7 +75,7 @@ async function incrementFieldsEdited(
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
-    return withSuperAdmin(async (_req, adminCtx) => {
+    return withStudioPermission('template.edit', async (_req, adminCtx) => {
         const user = adminCtx.user as PlatformUser
         const userId = user.id
 
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
         if (!template) {
             return NextResponse.json({ error: 'Template not found' }, { status: 404 })
         }
+        if (!canEditTemplateContent(adminCtx.user.roles, template.status)) return studioForbidden()
 
         // Update templatePages[0].layout — preserve pageId + metadata, replace layout array
         const existingPages: unknown[] = Array.isArray(template.templatePages)

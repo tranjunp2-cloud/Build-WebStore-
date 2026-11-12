@@ -19,6 +19,13 @@
 const { spawn } = require('child_process');
 const { bootstrapSeed } = require('./bootstrap-seed');
 const { seedMalaysiaGeo } = require('./seed-malaysia-geo-boot');
+const { runPw1MigrationSchema } = require('./pw1-migration-schema');
+const { runPw1JsonMigrationSchema } = require('./pw1-json-migration-schema');
+const { runPw1DeltaMigrationSchema } = require('./pw1-delta-migration-schema');
+const { runPw1EvidenceSchema } = require('./pw1-evidence-schema');
+const { runContentSlugTenantMigration } = require('./pw1-content-schema');
+// Matching collection DDL (atomic helper): ALTER TABLE products ALTER COLUMN short_description TYPE varchar;
+// ALTER TABLE orders_items ALTER COLUMN product_id DROP NOT NULL;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -51,6 +58,15 @@ function createPool() {
   });
 }
 
+// Production deploys must never bootstrap an empty DB: --migrate-only skips every migration
+// when there are no tables, and the following `templates:seed` then crashes. Staging/local/qc-test
+// legitimately start from an empty DB, so only production is guarded.
+// APP_ENV / NEXT_PUBLIC_APP_ENV win when set (staging may run as a Vercel "production" target).
+function isProductionDeploy(env = process.env) {
+  const appEnv = env.APP_ENV || env.NEXT_PUBLIC_APP_ENV;
+  return (appEnv || env.VERCEL_ENV) === 'production';
+}
+
 async function getTableCount(pool) {
   const result = await pool.query(
     "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
@@ -62,7 +78,44 @@ async function getTableCount(pool) {
 // Standalone server can't run Payload's pushDevSchema (missing Drizzle files).
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
+// Platform-wide AI config seeded into plan-features (feature ai_platform_config, once, under FREEMIUM). USD per 1M tokens;
+// keys are "provider:model". Insert-only: after the first run an admin owns it in Payload.
+const p = (input, output, cachedInput, cacheWrite, extra = {}) => ({ input, output, ...(cachedInput === undefined ? {} : { cachedInput }), ...(cacheWrite === undefined ? {} : { cacheWrite }), ...extra })
+const AI_PLATFORM_CONFIG_SEED = {
+  prices: {
+    'anthropic:claude-haiku-5-5': p(0.1, 0.5, 0.01, 0.125, { longContext: { aboveInputTokens: 100000, input: 0.5, output: 2.5, cachedInput: 0.05, cacheWrite: 0.625 } }),
+    'anthropic:claude-haiku-4-5': p(1, 5, 0.1, 1.25),
+    'anthropic:claude-sonnet-5-5': p(2, 10, 0.1, 2.5),
+    'anthropic:claude-sonnet-5': p(2, 10, 0.2, 2.5),
+    'anthropic:claude-sonnet-4-6': p(3, 15, 0.3, 3.75),
+    'anthropic:claude-opus-5-5': p(4, 20, 0.2, 5),
+    'anthropic:claude-opus-5': p(5, 25, 0.5, 6.25),
+    'anthropic:claude-opus-4-8': p(5, 25, 0.5, 6.25),
+    'anthropic:claude-opus-4-7': p(5, 25, 0.5, 6.25),
+    'anthropic:claude-opus-4-6': p(5, 25, 0.5, 6.25),
+    'anthropic:claude-fable-5-1': p(10, 50, 0.25, 12.5),
+    'anthropic:claude-fable-5': p(10, 50, 1, 12.5),
+    'openai:gpt-5.4-nano': p(0.2, 1.25, 0.02),
+    'openai:gpt-5.4-mini': p(0.75, 4.5, 0.075),
+    'openai:gpt-4.1-mini': p(0.4, 1.6, 0.1),
+    'openai:gpt-4.1-nano': p(0.1, 0.4, 0.025),
+    'openai:gpt-4o-mini': p(0.15, 0.6, 0.075),
+    'deepseek:deepseek-flash': p(0.3, 1.2, 0.006, undefined, { offPeakFactor: 0.5 }),
+    'deepseek:deepseek-v4-flash': p(0.3, 1.2, 0.006, undefined, { offPeakFactor: 0.5 }),
+    'deepseek:deepseek-v4-pro': p(1.32, 3.96, 0.044, undefined, { offPeakFactor: 0.5 }),
+    'typesafe:jev-latest': p(0.042, 0, 0.042),
+  },
+  images: { 'openai:gpt-image-1': 0.042, 'openai:gpt-image-1-mini': 0.011 },
+  // no model chains: the environment's AI_MODEL_* (and AI_EFFORT_*) stay in charge until an admin sets one in Studio
+  models: {},
+}
+
 const MIGRATIONS = [
+  { name: 'pw1_migration.batch_ledger', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-batch.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_audits', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-qa.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_reviews', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-qa-reviews.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_image_reviews', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-image-reviews.sql'), 'utf8') },
+  { name: 'pw1_migration.qa_image_checks', sql: require('fs').readFileSync(require('path').join(__dirname, 'sql/pw1-migration-image-checks.sql'), 'utf8') },
   // ── Users: Auth tables (Payload Drizzle schema) ──
   // Payload 3.14 uses VARCHAR id (UUID), mixed column naming:
   //   roles: parent_id, order (no underscore)
@@ -328,6 +381,10 @@ const MIGRATIONS = [
   {
     name: 'orders.cancel_reason',
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancel_reason varchar;`,
+  },
+  {
+    name: 'orders.refund_reason',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_reason varchar;`,
   },
   // ── Blog Categories table ──
   {
@@ -644,6 +701,13 @@ const MIGRATIONS = [
   // Prevents two tenants adding the same domain concurrently (TOCTOU race on payload.find check).
   // Vercel 409 is the second line of defense; this is the DB-level guarantee.
   { name: 'tenants_custom_domains.domain_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS tenants_custom_domains_domain_uniq ON tenants_custom_domains (domain) WHERE domain IS NOT NULL;` },
+  // The table was created without an FK to tenants, so deleting a tenant left its domain rows
+  // behind. Payload never sees those rows (no parent doc), so the cross-tenant check passes and
+  // the insert then hits the unique index above — any domain of a deleted store became unusable.
+  // 1. Remove rows whose tenant no longer exists.
+  { name: 'tenants_custom_domains.cleanup_orphans', sql: `DELETE FROM tenants_custom_domains WHERE _parent_id NOT IN (SELECT id FROM tenants);` },
+  // 2. Add FK → tenants so future tenant deletes cascade. DO block keeps it idempotent.
+  { name: 'tenants_custom_domains.add_fk_parent', sql: `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tenants_custom_domains_parent_fk') THEN ALTER TABLE tenants_custom_domains ADD CONSTRAINT tenants_custom_domains_parent_fk FOREIGN KEY (_parent_id) REFERENCES tenants(id) ON DELETE CASCADE; END IF; END $$;` },
   { name: 'tenants.vercel_domain_id', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS vercel_domain_id varchar;` },
   { name: 'tenants.vercel_verification', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS vercel_verification jsonb;` },
   // sites_seo_tracked_keywords
@@ -842,6 +906,20 @@ const MIGRATIONS = [
     );`,
   },
   // Hero CTA buttons
+  {
+    name: 'pw1_reconstruction.native_blocks',
+    sql: `ALTER TABLE pages_blocks_hero ADD COLUMN IF NOT EXISTS source_layout jsonb;
+ALTER TABLE IF EXISTS _pages_v_blocks_hero ADD COLUMN IF NOT EXISTS source_layout jsonb;
+CREATE TABLE IF NOT EXISTS pages_blocks_rich_text (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, html text, source_component_id varchar, padding_y numeric DEFAULT 64);
+CREATE TABLE IF NOT EXISTS _pages_v_blocks_rich_text (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, html text, source_component_id varchar, padding_y numeric DEFAULT 64);
+CREATE TABLE IF NOT EXISTS pages_blocks_content_cards (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, variant varchar, headline varchar, source_component_id varchar, source_content jsonb);
+CREATE TABLE IF NOT EXISTS _pages_v_blocks_content_cards (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _path text NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar, block_spacing jsonb, variant varchar, headline varchar, source_component_id varchar, source_content jsonb);`,
+  },
+  {
+    name: 'pages_blocks_hero.slides',
+    sql: `ALTER TABLE "pages_blocks_hero" ADD COLUMN IF NOT EXISTS "slides" jsonb;
+      ALTER TABLE IF EXISTS "_pages_v_blocks_hero" ADD COLUMN IF NOT EXISTS "slides" jsonb;`,
+  },
   {
     name: 'pages_blocks_hero_cta_buttons.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_hero_cta_buttons" (
@@ -1378,10 +1456,6 @@ const MIGRATIONS = [
   {
     name: 'users.has_seen_ai_wizard',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_ai_wizard boolean DEFAULT false;`,
-  },
-  {
-    name: 'users.has_seen_ai_wizard.backfill_legacy',
-    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id FROM users_tenants WHERE _parent_id IS NOT NULL);`,
   },
   // ── Payload locked documents rels: FK columns for new collections ──
   {
@@ -2254,6 +2328,12 @@ const MIGRATIONS = [
     );`,
   },
   {
+    name: 'carousel.source_image_layout',
+    sql: `ALTER TABLE IF EXISTS pages_blocks_carousel ADD COLUMN IF NOT EXISTS aspect_ratio numeric, ADD COLUMN IF NOT EXISTS image_fit varchar, ADD COLUMN IF NOT EXISTS max_image_width numeric, ADD COLUMN IF NOT EXISTS slides_per_view numeric;
+    ALTER TABLE IF EXISTS _pages_v_blocks_carousel ADD COLUMN IF NOT EXISTS aspect_ratio numeric, ADD COLUMN IF NOT EXISTS image_fit varchar, ADD COLUMN IF NOT EXISTS max_image_width numeric, ADD COLUMN IF NOT EXISTS slides_per_view numeric;`,
+  },
+
+  {
     name: '_pages_v_blocks_carousel_items.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_carousel_items" (
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
@@ -2445,29 +2525,13 @@ const MIGRATIONS = [
     name: 'notifications.updated_at',
     sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();`,
   },
-  // pg LISTEN/NOTIFY trigger — SSE realtime bridge
+  // pg LISTEN/NOTIFY trigger removed (#1972): nothing LISTENs on Neon + Vercel serverless.
+  // Realtime now goes through the Firebase RTDB signal (src/lib/notifications/signal-notification.ts).
+  // Trigger first, then the function it depends on. IF EXISTS keeps fresh DBs a no-op.
   {
-    name: 'notifications.notify_fn',
-    sql: `CREATE OR REPLACE FUNCTION notify_new_notification()
-      RETURNS trigger AS $$
-      BEGIN
-        PERFORM pg_notify(
-          'notification_channel',
-          json_build_object(
-            'userId', NEW.user_id,
-            'tenantId', NEW.tenant_id,
-            'id', NEW.id
-          )::text
-        );
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;`,
-  },
-  {
-    name: 'notifications.notify_trigger',
-    sql: `CREATE OR REPLACE TRIGGER after_notification_insert
-      AFTER INSERT ON notifications
-      FOR EACH ROW EXECUTE FUNCTION notify_new_notification();`,
+    name: 'notifications.drop_pg_notify_trigger',
+    sql: `DROP TRIGGER IF EXISTS after_notification_insert ON notifications;
+      DROP FUNCTION IF EXISTS notify_new_notification();`,
   },
   // ── F16-07: Push Subscriptions table ──────────────────────────────────────
   {
@@ -2654,6 +2718,58 @@ const MIGRATIONS = [
   {
     name: 'ai_usage_logs.user_idx',
     sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_user_idx ON ai_usage_logs (user_id) WHERE user_id IS NOT NULL;`,
+  },
+  // ── AI Usage Logs: copy of the ai-platform usage ledger (cron /api/cron/ai-usage-sync) ──
+  { name: 'ai_usage_logs.endpoint_nullable', sql: `ALTER TABLE IF EXISTS ai_usage_logs ALTER COLUMN endpoint DROP NOT NULL;` },
+  { name: 'ai_usage_logs.cost_usd_nullable', sql: `ALTER TABLE IF EXISTS ai_usage_logs ALTER COLUMN cost_usd DROP NOT NULL;` },
+  { name: 'ai_usage_logs.alter_source', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS source varchar NOT NULL DEFAULT 'prime-web';` },
+  { name: 'ai_usage_logs.alter_feature', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS feature varchar;` },
+  { name: 'ai_usage_logs.alter_task', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS task varchar;` },
+  { name: 'ai_usage_logs.alter_provider', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS provider varchar;` },
+  { name: 'ai_usage_logs.alter_outcome', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS outcome varchar;` },
+  { name: 'ai_usage_logs.alter_cached_tokens_in', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS cached_tokens_in numeric;` },
+  { name: 'ai_usage_logs.alter_run_id', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS run_id varchar;` },
+  { name: 'ai_usage_logs.alter_organization_id', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS organization_id varchar;` },
+  { name: 'ai_usage_logs.alter_platform_event_id', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS platform_event_id numeric;` },
+  { name: 'ai_usage_logs.platform_event_id_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS ai_usage_logs_platform_event_id_idx ON ai_usage_logs (platform_event_id);` },
+  { name: 'ai_usage_logs.tenant_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_tenant_idx ON ai_usage_logs (tenant_id);` },
+  { name: 'ai_usage_logs.source_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_source_idx ON ai_usage_logs (source);` },
+  { name: 'ai_usage_logs.feature_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_feature_idx ON ai_usage_logs (feature);` },
+  { name: 'ai_usage_logs.task_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_task_idx ON ai_usage_logs (task);` },
+  { name: 'ai_usage_logs.outcome_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_outcome_idx ON ai_usage_logs (outcome);` },
+  { name: 'payload_locked_documents_rels.ai_usage_logs_id', sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS ai_usage_logs_id integer;` },
+  // readable detail derived at copy time (lib/ai-platform/usage-sync-map); re-copy with /api/cron/ai-usage-sync?from=0
+  { name: 'ai_usage_logs.alter_summary', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS summary varchar;` },
+  { name: 'ai_usage_logs.alter_area', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS area varchar;` },
+  { name: 'ai_usage_logs.alter_task_label', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS task_label varchar;` },
+  { name: 'ai_usage_logs.alter_page_title', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS page_title varchar;` },
+  { name: 'ai_usage_logs.alter_page_path', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS page_path varchar;` },
+  { name: 'ai_usage_logs.alter_thread_id', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS thread_id varchar;` },
+  { name: 'ai_usage_logs.alter_total_tokens', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS total_tokens numeric;` },
+  { name: 'ai_usage_logs.alter_cache_hit_percent', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS cache_hit_percent numeric;` },
+  { name: 'ai_usage_logs.alter_battery_cost_usd', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS battery_cost_usd numeric;` },
+  { name: 'ai_usage_logs.alter_priced', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS priced boolean;` },
+  { name: 'ai_usage_logs.alter_error_label', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS error_label varchar;` },
+  // why a call failed: status + the provider's message (ai-platform ledger/error-detail.ts), shown in Studio / Payload
+  { name: 'ai_usage_logs.alter_error_detail', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS error_detail varchar;` },
+  // plan code the shop was on when the call was copied (lib/ai-platform/usage-sync-plan); older rows stay NULL
+  { name: 'ai_usage_logs.alter_plan', sql: `ALTER TABLE IF EXISTS ai_usage_logs ADD COLUMN IF NOT EXISTS plan varchar;` },
+  { name: 'ai_usage_logs.plan_created_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_plan_created_idx ON ai_usage_logs (plan, created_at);` },
+  { name: 'ai_usage_logs.area_idx', sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_area_idx ON ai_usage_logs (area);` },
+  {
+    // legacy prime-web rows: give them a readable title and totals (their cost was always priced)
+    name: 'ai_usage_logs.backfill_legacy_summary',
+    sql: `UPDATE ai_usage_logs SET
+      summary = COALESCE(summary, 'Legacy · ' || CASE endpoint::text
+        WHEN 'site-generation' THEN 'Site generation' WHEN 'chat-edit' THEN 'Chat edit (block)'
+        WHEN 'inline-edit' THEN 'Inline edit' WHEN 'seo-generation' THEN 'SEO generation'
+        WHEN 'content-rewrite' THEN 'Content rewrite' WHEN 'product-description' THEN 'Product description'
+        WHEN 'url-extraction' THEN 'URL extraction' WHEN 'bulk-parse' THEN 'Bulk parse'
+        WHEN 'brand-analysis' THEN 'Brand analysis' ELSE COALESCE(endpoint::text, 'AI call') END),
+      task_label = COALESCE(task_label, endpoint::text),
+      total_tokens = COALESCE(total_tokens, tokens_in + tokens_out),
+      priced = COALESCE(priced, cost_usd IS NOT NULL)
+      WHERE source = 'prime-web';`,
   },
   // ── Sites: AI generation status tracking ──
   {
@@ -3392,6 +3508,14 @@ const MIGRATIONS = [
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS related_id varchar;`,
   },
   {
+    name: 'template_issues.alter_dedupe_key',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS dedupe_key varchar;`,
+  },
+  {
+    name: 'template_issues.create_dedupe_key_uniq',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS template_issues_dedupe_key_uniq ON template_issues (dedupe_key) WHERE dedupe_key IS NOT NULL;`,
+  },
+  {
     name: 'template_issues.alter_reported_by_id',
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS reported_by_id integer REFERENCES users(id) ON DELETE SET NULL;`,
   },
@@ -3402,6 +3526,76 @@ const MIGRATIONS = [
   {
     name: 'template_issues.alter_resolved_at',
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS resolved_at timestamp;`,
+  },
+  {
+    name: 'enum_template_issues_status.add_f41_workflow_values',
+    sql: `DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_template_issues_status') THEN
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'in_progress';
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'dev_fixed';
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'testing';
+              ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'done';
+            END IF;
+          END $$;`,
+  },
+  {
+    name: 'template_issues.normalize_f41_workflow_statuses',
+    sql: `UPDATE template_issues
+          SET status = CASE status
+            WHEN 'in-review' THEN 'in_progress'
+            WHEN 'fixed' THEN 'done'
+            WHEN 'wont-fix' THEN 'done'
+            ELSE status
+          END
+          WHERE status IN ('in-review', 'fixed', 'wont-fix');`,
+  },
+  {
+    name: 'enum_template_issues_status.add_f41_board_values',
+    sql: `DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_template_issues_status') THEN
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'backlog';
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'review';
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'reopen';
+          ALTER TYPE enum_template_issues_status ADD VALUE IF NOT EXISTS 'code_review';
+        END IF;
+      END $$;`,
+  },
+  {
+    name: 'template_issues.normalize_f41_board_statuses',
+    sql: `UPDATE template_issues
+          SET status = CASE status
+            WHEN 'open' THEN 'backlog'
+            WHEN 'dev_fixed' THEN 'code_review'
+            ELSE status
+          END
+          WHERE status IN ('open', 'dev_fixed');`,
+  },
+  {
+    name: 'template_issues.default_f41_board_status',
+    sql: `ALTER TABLE IF EXISTS template_issues ALTER COLUMN status SET DEFAULT 'backlog';`,
+  },
+  {
+    name: 'template_issues.remove_f41_review_code_review_statuses',
+    sql: `UPDATE template_issues
+          SET status = CASE status
+            WHEN 'review' THEN 'backlog'
+            WHEN 'code_review' THEN 'dev_fixed'
+            ELSE status
+          END
+          WHERE status IN ('review', 'code_review');`,
+  },
+  {
+    name: 'enum_template_issues_related_type.add_manual',
+    sql: `DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_template_issues_related_type') THEN
+              ALTER TYPE enum_template_issues_related_type ADD VALUE IF NOT EXISTS 'manual';
+            END IF;
+          END $$;`,
+  },
+  {
+    name: 'template_issues.assignment_target',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS assignment_target varchar NOT NULL DEFAULT 'unassigned';`,
   },
 
   // ── F40: QA run / result / immutable deploy-impact snapshot ──────────────
@@ -3859,6 +4053,144 @@ const MIGRATIONS = [
       ADD COLUMN IF NOT EXISTS fields_filled integer,
       ADD COLUMN IF NOT EXISTS fields_edited integer DEFAULT 0;`,
   },
+  // ── F41: durable website generation outcome (additive/idempotent) ────────
+  { name: 'ai_generation_records.f41_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records
+    ADD COLUMN IF NOT EXISTS trace_id varchar, ADD COLUMN IF NOT EXISTS input_snapshot jsonb,
+    ADD COLUMN IF NOT EXISTS input_schema_version varchar, ADD COLUMN IF NOT EXISTS input_hash varchar,
+    ADD COLUMN IF NOT EXISTS lifecycle varchar, ADD COLUMN IF NOT EXISTS outcome varchar,
+    ADD COLUMN IF NOT EXISTS recovery_status varchar, ADD COLUMN IF NOT EXISTS page_summary_expected integer,
+    ADD COLUMN IF NOT EXISTS page_summary_persisted integer, ADD COLUMN IF NOT EXISTS page_summary_failed integer,
+    ADD COLUMN IF NOT EXISTS user_safe_message varchar, ADD COLUMN IF NOT EXISTS started_at timestamp,
+    ADD COLUMN IF NOT EXISTS terminal_at timestamp, ADD COLUMN IF NOT EXISTS last_heartbeat_at timestamp;` },
+  { name: 'ai_generation_records.f41_indexes', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_trace_id_idx ON ai_generation_records (trace_id);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_lifecycle_idx ON ai_generation_records (lifecycle);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_outcome_idx ON ai_generation_records (outcome);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_recovery_status_idx ON ai_generation_records (recovery_status);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_terminal_at_idx ON ai_generation_records (terminal_at);` },
+  { name: 'ai_generation_records_page_outcomes.create_table', sql: `CREATE TABLE IF NOT EXISTS ai_generation_records_page_outcomes (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0,
+    _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
+    _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, page_key varchar, title varchar, slug varchar,
+    page_id varchar, status varchar, block_count integer, error_code varchar, error_summary text);` },
+  { name: 'ai_generation_records_page_outcomes.parent_idx', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_page_outcomes_parent_idx ON ai_generation_records_page_outcomes (_parent_id);` },
+  { name: 'ai_generation_records_generation_errors.create_table', sql: `CREATE TABLE IF NOT EXISTS ai_generation_records_generation_errors (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0,
+    _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
+    _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, phase varchar, location_type varchar, location_key varchar,
+    location_label varchar, validation_rule varchar, observed_state varchar,
+    code varchar, category varchar, retryability_reason varchar, operator_message text, user_safe_message text,
+    sanitized_technical_message text, signature varchar);` },
+  { name: 'ai_generation_records_generation_errors.parent_idx', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_generation_errors_parent_idx ON ai_generation_records_generation_errors (_parent_id);` },
+  // F41-07: CREATE TABLE does not update an existing Payload array table.
+  { name: 'ai_generation_records_generation_errors.structured_incident_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records_generation_errors
+    ADD COLUMN IF NOT EXISTS location_label varchar,
+    ADD COLUMN IF NOT EXISTS validation_rule varchar,
+    ADD COLUMN IF NOT EXISTS observed_state varchar;` },
+
+  // ── F41-03: durable, isolated website recovery queue ────────────────────
+  { name: 'ai_generation_records.f41_retry_lineage_columns', sql: `ALTER TABLE IF EXISTS ai_generation_records
+    ADD COLUMN IF NOT EXISTS source varchar DEFAULT 'user_submit',
+    ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS parent_generation_id integer REFERENCES ai_generation_records(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS retry_root_generation_id integer REFERENCES ai_generation_records(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS retry_attempt integer,
+    ADD COLUMN IF NOT EXISTS recovered_site_id integer REFERENCES sites(id) ON DELETE SET NULL;` },
+  { name: 'ai_generation_records.f41_retry_lineage_indexes', sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_source_idx ON ai_generation_records (source);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_tenant_id_idx ON ai_generation_records (tenant_id);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_parent_generation_id_idx ON ai_generation_records (parent_generation_id);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_retry_root_generation_id_idx ON ai_generation_records (retry_root_generation_id);
+    CREATE INDEX IF NOT EXISTS ai_generation_records_recovered_site_id_idx ON ai_generation_records (recovered_site_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS ai_generation_records_one_active_retry_child_idx
+      ON ai_generation_records (parent_generation_id)
+      WHERE parent_generation_id IS NOT NULL AND lifecycle IN ('queued', 'running');` },
+  { name: 'generation_recovery_jobs.create_table', sql: `CREATE TABLE IF NOT EXISTS generation_recovery_jobs (
+    id serial PRIMARY KEY,
+    tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+    source_generation_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE RESTRICT,
+    child_generation_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE RESTRICT,
+    requested_by_id integer NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    idempotency_key varchar NOT NULL,
+    retry_attempt integer NOT NULL,
+    status varchar NOT NULL DEFAULT 'queued',
+    queued_at timestamp NOT NULL DEFAULT now(),
+    started_at timestamp,
+    finished_at timestamp,
+    lease_token varchar,
+    lease_expires_at timestamp,
+    last_heartbeat_at timestamp,
+    attempt_count integer NOT NULL DEFAULT 0,
+    failure_code varchar,
+    user_safe_message varchar,
+    updated_at timestamp DEFAULT now(),
+    created_at timestamp DEFAULT now()
+  );` },
+  { name: 'generation_recovery_jobs.add_columns', sql: `ALTER TABLE IF EXISTS generation_recovery_jobs
+    ADD COLUMN IF NOT EXISTS tenant_id integer,
+    ADD COLUMN IF NOT EXISTS source_generation_id integer,
+    ADD COLUMN IF NOT EXISTS child_generation_id integer,
+    ADD COLUMN IF NOT EXISTS requested_by_id integer,
+    ADD COLUMN IF NOT EXISTS idempotency_key varchar,
+    ADD COLUMN IF NOT EXISTS retry_attempt integer,
+    ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'queued',
+    ADD COLUMN IF NOT EXISTS queued_at timestamp NOT NULL DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS started_at timestamp,
+    ADD COLUMN IF NOT EXISTS finished_at timestamp,
+    ADD COLUMN IF NOT EXISTS lease_token varchar,
+    ADD COLUMN IF NOT EXISTS lease_expires_at timestamp,
+    ADD COLUMN IF NOT EXISTS last_heartbeat_at timestamp,
+    ADD COLUMN IF NOT EXISTS attempt_count integer NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS failure_code varchar,
+    ADD COLUMN IF NOT EXISTS user_safe_message varchar,
+    ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now();` },
+  { name: 'generation_recovery_jobs.indexes', sql: `CREATE INDEX IF NOT EXISTS generation_recovery_jobs_status_queued_at_idx ON generation_recovery_jobs (status, queued_at, id);
+    CREATE INDEX IF NOT EXISTS generation_recovery_jobs_lease_expires_at_idx ON generation_recovery_jobs (lease_expires_at);
+    CREATE INDEX IF NOT EXISTS generation_recovery_jobs_tenant_id_idx ON generation_recovery_jobs (tenant_id);
+    CREATE INDEX IF NOT EXISTS generation_recovery_jobs_source_generation_id_idx ON generation_recovery_jobs (source_generation_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS generation_recovery_jobs_child_generation_id_uniq ON generation_recovery_jobs (child_generation_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS generation_recovery_jobs_source_retry_idempotency_uniq ON generation_recovery_jobs (source_generation_id, retry_attempt, idempotency_key);
+    CREATE UNIQUE INDEX IF NOT EXISTS generation_recovery_jobs_one_active_source_idx
+      ON generation_recovery_jobs (source_generation_id)
+      WHERE status IN ('queued', 'running');` },
+  // ── F41-03: JSONB-safe frozen-input hashes ──────────────────────────────
+  // PostgreSQL JSONB canonicalizes object key order. Recompute existing F41
+  // records with the same recursive canonical form used by application code so
+  // a persisted, unchanged form remains eligible for recovery after deploy.
+  { name: 'system_migration_state.create_table', sql: `CREATE TABLE IF NOT EXISTS system_migration_state (
+    migration_key varchar PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now()
+  );` },
+  { name: 'ai_generation_records.f41_snapshot_hash_pgcrypto', critical: true, sql: `CREATE EXTENSION IF NOT EXISTS pgcrypto;` },
+  { name: 'ai_generation_records.f41_snapshot_hash_function', critical: true, sql: `CREATE OR REPLACE FUNCTION f41_canonical_jsonb(value jsonb)
+    RETURNS text LANGUAGE plpgsql IMMUTABLE AS $fn$
+    DECLARE result text;
+    BEGIN
+      CASE jsonb_typeof(value)
+        WHEN 'object' THEN
+          SELECT '{' || COALESCE(string_agg(to_json(entry.key)::text || ':' || f41_canonical_jsonb(entry.value), ',' ORDER BY convert_to(entry.key, 'UTF8')), '') || '}'
+            INTO result FROM jsonb_each(value) AS entry(key, value);
+        WHEN 'array' THEN
+          SELECT '[' || COALESCE(string_agg(f41_canonical_jsonb(entry.value), ',' ORDER BY entry.ordinality), '') || ']'
+            INTO result FROM jsonb_array_elements(value) WITH ORDINALITY AS entry(value, ordinality);
+        ELSE
+          result := value::text;
+      END CASE;
+      RETURN result;
+    END;
+    $fn$;` },
+  { name: 'ai_generation_records.f41_snapshot_hash_backfill', critical: true, sql: `WITH claim AS (
+      INSERT INTO system_migration_state (migration_key) VALUES ('f41_snapshot_hash_v1')
+      ON CONFLICT (migration_key) DO NOTHING
+      RETURNING migration_key
+    ), hashes AS (
+      SELECT records.id, encode(digest(f41_canonical_jsonb(records.input_snapshot), 'sha256'), 'hex') AS canonical_hash
+      FROM ai_generation_records AS records CROSS JOIN claim
+      WHERE records.input_schema_version = 'f41.v1' AND records.input_snapshot IS NOT NULL
+    )
+    UPDATE ai_generation_records AS records SET input_hash = hashes.canonical_hash
+    FROM hashes WHERE records.id = hashes.id;` },
+  // Keep this immutable helper installed. Concurrent Vercel builds can run
+  // migrations simultaneously; removing it after one build backfills would
+  // make another build fail while planning its guarded backfill query.
 
   // ── Pages: Data cleanup for F05 Footer variants ──
   // Migrate legacy variant values to the new supported values cleanly in the database
@@ -3949,6 +4281,22 @@ const MIGRATIONS = [
   { name: 'pages_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "pages_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  // PW1 listing selection: apply to live pages and draft/version snapshots.
+  ...['pages_blocks_products_grid', '_pages_v_blocks_products_grid'].map(table => ({
+    name: `${table}.product_selection`,
+    sql: `DO $$ BEGIN
+      CREATE TYPE "enum_${table}_selection_mode" AS ENUM ('all', 'fixed', 'random');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS selection_mode "enum_${table}_selection_mode" DEFAULT 'all';
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS selected_product_ids jsonb DEFAULT '[]'::jsonb;
+    ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS include_out_of_stock boolean DEFAULT true;`,
+  })),
+  // PW1 page-wide filter controls, live and versioned blocks.
+  { name: 'pages_blocks_products_grid.filter_controls', sql: `ALTER TABLE pages_blocks_products_grid ADD COLUMN IF NOT EXISTS filter_controls jsonb;` },
+  { name: '_pages_v_blocks_products_grid.filter_controls', sql: `ALTER TABLE _pages_v_blocks_products_grid ADD COLUMN IF NOT EXISTS filter_controls jsonb;` },
+  { name: 'pages_blocks_blog_list.category_filter', sql: `ALTER TABLE pages_blocks_blog_list ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
+  { name: '_pages_v_blocks_blog_list.category_filter', sql: `ALTER TABLE _pages_v_blocks_blog_list ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
   // GH-1588: showCategoryFilter opt-in toggle (F08 storefront category filter)
   { name: 'pages_blocks_products_grid.show_category_filter', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS show_category_filter boolean DEFAULT false;` },
   { name: 'pages_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
@@ -4198,6 +4546,14 @@ const MIGRATIONS = [
   { name: 'enum_sites_site_type.add_fitness',     sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'fitness';` },
   { name: 'enum_sites_site_type.add_creative',    sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'creative';` },
   { name: 'enum_sites_site_type.add_beauty',      sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'beauty';` },
+  // GH-2419 — template fonts: widen sites.theme font enums (guarded: skip if the column is not a PG enum)
+  ...['heading', 'body'].flatMap((role) => [
+    'Outfit', 'Inter', 'Lato', 'Open Sans', 'Nunito', 'Poppins', 'Raleway', 'DM Sans', 'Playfair Display',
+    'Archivo Black', 'Cormorant Garamond', 'DM Mono', 'Exo 2', 'Hind', 'Josefin Sans', 'Karla', 'Lora', 'Manrope', 'Merriweather', 'Montserrat', 'Nunito Sans', 'Oswald', 'Proza Libre', 'Quicksand', 'Rajdhani', 'Sora', 'Source Sans 3', 'Source Serif 4', 'Space Grotesk', 'Varela Round', 'Work Sans',
+  ].map((font) => ({
+    name: `enum_sites_theme_font_${role}.add_${font.toLowerCase().replace(/ /g, '_')}`,
+    sql: `DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_sites_theme_font_${role}') THEN ALTER TYPE enum_sites_theme_font_${role} ADD VALUE IF NOT EXISTS '${font}'; END IF; END $$;`,
+  }))),
   { name: 'pages_blocks_whatsapp_button.add_country_code', sql: `ALTER TABLE "pages_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS country_code varchar;` },
   { name: '_pages_v_blocks_whatsapp_button.add_country_code', sql: `ALTER TABLE "_pages_v_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS country_code varchar;` },
   // GH-881 — FAQBlock fields subheadline + allowMultiple were missing from Payload schema
@@ -5025,6 +5381,162 @@ const MIGRATIONS = [
       END $$;
     `,
   },
+  // ── AI limits per plan (read by lib/ai-platform/plan-limits → `lim` claim in the ai-platform context token) ──
+  // Insert-only: a row an admin already edited in Payload is never overwritten. "0" = AI off for that plan.
+  // Seeded UNLIMITED: shops use AI freely while real usage is collected in ai-usage-logs; per-plan numbers are set
+  // later in Payload (the platform-wide AI_DAILY_BUDGET_USD guard on ai-platform still applies).
+  // Works on both table shapes: the one created above (plan_id + varchar plan_code + UNIQUE) and the one Payload
+  // created (no plan_id, enum plan_code, no unique index) — one literal INSERT per row (a literal coerces to the enum),
+  // guarded by NOT EXISTS instead of ON CONFLICT.
+  {
+    name: 'f-subscription-plan-features-ai-limits-seed',
+    sql: `
+      DO $$
+      DECLARE r record;
+      BEGIN
+        FOR r IN SELECT * FROM (VALUES
+          ('FREEMIUM','ai_budget_usd_daily','UNLIMITED'),
+          ('FREEMIUM','ai_pictures_daily','UNLIMITED'),
+          ('STARTER_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('STARTER_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('STARTER_NON_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('STARTER_NON_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('STANDARD_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('STANDARD_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('STANDARD_NON_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('STANDARD_NON_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('PROFESSIONAL_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('PROFESSIONAL_TM_USER','ai_pictures_daily','UNLIMITED'),
+          ('PROFESSIONAL_NON_TM_USER','ai_budget_usd_daily','UNLIMITED'),
+          ('PROFESSIONAL_NON_TM_USER','ai_pictures_daily','UNLIMITED')
+        ) AS v(plan_code, feature_code, value) LOOP
+          IF NOT EXISTS (SELECT 1 FROM plan_features WHERE plan_code::text = r.plan_code AND feature_code = r.feature_code) THEN
+            EXECUTE format('INSERT INTO plan_features (plan_code, feature_code, value, created_at, updated_at) VALUES (%L, %L, %L, now(), now())',
+              r.plan_code, r.feature_code, r.value);
+          END IF;
+        END LOOP;
+      END $$;
+    `,
+  },
+  // ── AI caps in layers (plan 261029-1830): per plan on/off, monthly budget, website-setup budget ──
+  // Insert-only, same two-table-shape handling as the ai-limits seed above. Missing rows already mean "on / unlimited".
+  {
+    name: 'f-subscription-plan-features-ai-caps-seed',
+    sql: `
+      DO $$
+      DECLARE r record;
+      BEGIN
+        FOR r IN SELECT * FROM (VALUES
+          ('FREEMIUM','ai_enabled','YES'),
+          ('FREEMIUM','ai_budget_usd_monthly','UNLIMITED'),
+          ('FREEMIUM','ai_site_budget_usd_daily','UNLIMITED'),
+          ('STARTER_TM_USER','ai_enabled','YES'),
+          ('STARTER_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('STARTER_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('STARTER_NON_TM_USER','ai_enabled','YES'),
+          ('STARTER_NON_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('STARTER_NON_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('STANDARD_TM_USER','ai_enabled','YES'),
+          ('STANDARD_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('STANDARD_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('STANDARD_NON_TM_USER','ai_enabled','YES'),
+          ('STANDARD_NON_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('STANDARD_NON_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('PROFESSIONAL_TM_USER','ai_enabled','YES'),
+          ('PROFESSIONAL_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('PROFESSIONAL_TM_USER','ai_site_budget_usd_daily','UNLIMITED'),
+          ('PROFESSIONAL_NON_TM_USER','ai_enabled','YES'),
+          ('PROFESSIONAL_NON_TM_USER','ai_budget_usd_monthly','UNLIMITED'),
+          ('PROFESSIONAL_NON_TM_USER','ai_site_budget_usd_daily','UNLIMITED')
+        ) AS v(plan_code, feature_code, value) LOOP
+          IF NOT EXISTS (SELECT 1 FROM plan_features WHERE plan_code::text = r.plan_code AND feature_code = r.feature_code) THEN
+            EXECUTE format('INSERT INTO plan_features (plan_code, feature_code, value, created_at, updated_at) VALUES (%L, %L, %L, now(), now())',
+              r.plan_code, r.feature_code, r.value);
+          END IF;
+        END LOOP;
+      END $$;
+    `,
+  },
+  // Per-shop override of the plan's AI limits (collection ai-shop-limits). One row per shop; expired rows are ignored by the reader.
+  {
+    name: 'ai_shop_limits.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_shop_limits (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      mode varchar NOT NULL DEFAULT 'custom',
+      ai_budget_usd numeric,
+      pictures_per_day numeric,
+      ai_budget_usd_monthly numeric,
+      site_budget_usd numeric,
+      reason varchar NOT NULL,
+      expires_at timestamp(3) with time zone,
+      set_by_id integer,
+      updated_at timestamp(3) with time zone DEFAULT now() NOT NULL,
+      created_at timestamp(3) with time zone DEFAULT now() NOT NULL
+    );`,
+  },
+  { name: 'ai_shop_limits.alter_tenant_id', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS tenant_id integer;` },
+  { name: 'ai_shop_limits.alter_mode', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS mode varchar NOT NULL DEFAULT 'custom';` },
+  { name: 'ai_shop_limits.alter_ai_budget_usd', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS ai_budget_usd numeric;` },
+  { name: 'ai_shop_limits.alter_pictures_per_day', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS pictures_per_day numeric;` },
+  { name: 'ai_shop_limits.alter_ai_budget_usd_monthly', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS ai_budget_usd_monthly numeric;` },
+  { name: 'ai_shop_limits.alter_site_budget_usd', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS site_budget_usd numeric;` },
+  { name: 'ai_shop_limits.alter_reason', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS reason varchar;` },
+  { name: 'ai_shop_limits.alter_expires_at', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS expires_at timestamp(3) with time zone;` },
+  { name: 'ai_shop_limits.alter_set_by_id', sql: `ALTER TABLE IF EXISTS ai_shop_limits ADD COLUMN IF NOT EXISTS set_by_id integer;` },
+  { name: 'ai_shop_limits.tenant_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS ai_shop_limits_tenant_idx ON ai_shop_limits (tenant_id);` },
+  { name: 'ai_shop_limits.set_by_idx', sql: `CREATE INDEX IF NOT EXISTS ai_shop_limits_set_by_idx ON ai_shop_limits (set_by_id);` },
+  { name: 'ai_shop_limits.updated_at_idx', sql: `CREATE INDEX IF NOT EXISTS ai_shop_limits_updated_at_idx ON ai_shop_limits (updated_at);` },
+  { name: 'ai_shop_limits.created_at_idx', sql: `CREATE INDEX IF NOT EXISTS ai_shop_limits_created_at_idx ON ai_shop_limits (created_at);` },
+  // Alerts when spend crosses a threshold (collection ai-cap-alerts), written by /api/cron/ai-usage-sync.
+  {
+    name: 'ai_cap_alerts.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_cap_alerts (
+      id serial PRIMARY KEY,
+      scope varchar NOT NULL,
+      period_key varchar NOT NULL,
+      threshold numeric NOT NULL,
+      spent_usd numeric NOT NULL,
+      cap_usd numeric NOT NULL,
+      tenant_id integer,
+      notified_lark boolean DEFAULT false,
+      updated_at timestamp(3) with time zone DEFAULT now() NOT NULL,
+      created_at timestamp(3) with time zone DEFAULT now() NOT NULL
+    );`,
+  },
+  { name: 'ai_cap_alerts.alter_scope', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS scope varchar;` },
+  { name: 'ai_cap_alerts.alter_period_key', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS period_key varchar;` },
+  { name: 'ai_cap_alerts.alter_threshold', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS threshold numeric;` },
+  { name: 'ai_cap_alerts.alter_spent_usd', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS spent_usd numeric;` },
+  { name: 'ai_cap_alerts.alter_cap_usd', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS cap_usd numeric;` },
+  { name: 'ai_cap_alerts.alter_tenant_id', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS tenant_id integer;` },
+  { name: 'ai_cap_alerts.alter_notified_lark', sql: `ALTER TABLE IF EXISTS ai_cap_alerts ADD COLUMN IF NOT EXISTS notified_lark boolean DEFAULT false;` },
+  { name: 'ai_cap_alerts.scope_idx', sql: `CREATE INDEX IF NOT EXISTS ai_cap_alerts_scope_idx ON ai_cap_alerts (scope);` },
+  { name: 'ai_cap_alerts.tenant_idx', sql: `CREATE INDEX IF NOT EXISTS ai_cap_alerts_tenant_idx ON ai_cap_alerts (tenant_id);` },
+  { name: 'ai_cap_alerts.updated_at_idx', sql: `CREATE INDEX IF NOT EXISTS ai_cap_alerts_updated_at_idx ON ai_cap_alerts (updated_at);` },
+  { name: 'ai_cap_alerts.created_at_idx', sql: `CREATE INDEX IF NOT EXISTS ai_cap_alerts_created_at_idx ON ai_cap_alerts (created_at);` },
+  // one alert per (scope, period, threshold, shop); platform alerts have no shop, so NULL is folded to 0 (NULLs never collide in a plain unique index)
+  {
+    name: 'ai_cap_alerts.dedupe_unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS ai_cap_alerts_dedupe_idx ON ai_cap_alerts (scope, period_key, threshold, (COALESCE(tenant_id, 0)));`,
+  },
+  { name: 'payload_locked_documents_rels.ai_shop_limits_id', sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "ai_shop_limits_id" integer REFERENCES "public"."ai_shop_limits"("id") ON DELETE CASCADE ON UPDATE CASCADE;` },
+  { name: 'payload_locked_documents_rels.ai_shop_limits_id_idx', sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_ai_shop_limits_id_idx" ON "payload_locked_documents_rels" ("ai_shop_limits_id");` },
+  { name: 'payload_locked_documents_rels.ai_cap_alerts_id', sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "ai_cap_alerts_id" integer REFERENCES "public"."ai_cap_alerts"("id") ON DELETE CASCADE ON UPDATE CASCADE;` },
+  { name: 'payload_locked_documents_rels.ai_cap_alerts_id_idx', sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_ai_cap_alerts_id_idx" ON "payload_locked_documents_rels" ("ai_cap_alerts_id");` },
+  {
+    // planCode is a required enum, so the platform-wide row lives under FREEMIUM; /api/internal/ai-config reads it by feature code only
+    name: 'f-subscription-plan-features-ai-platform-config-seed',
+    sql: `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM plan_features WHERE feature_code = 'ai_platform_config') THEN
+          EXECUTE format('INSERT INTO plan_features (plan_code, feature_code, value, settings, created_at, updated_at) VALUES (%L, %L, %L, %L::jsonb, now(), now())',
+            'FREEMIUM', 'ai_platform_config', 'YES', '${JSON.stringify(AI_PLATFORM_CONFIG_SEED).replace(/'/g, "''")}');
+        END IF;
+      END $$;
+    `,
+  },
   // ── F34: payload_locked_documents_rels FK columns for plan collections ──
   {
     name: 'payload_locked_documents_rels.plan_subscriptions_id',
@@ -5340,19 +5852,512 @@ const MIGRATIONS = [
     name: 'categories.drop_image_id',
     sql: `ALTER TABLE categories DROP COLUMN IF EXISTS image_id;`,
   },
+  // ── F41 US-F41-05: safe enum values for operator resolution workflow ──
+  {
+    name: 'enum_ai_generation_records_recovery_status.operator_verifying',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ai_generation_records_recovery_status') THEN
+        ALTER TYPE enum_ai_generation_records_recovery_status ADD VALUE IF NOT EXISTS 'operator_verifying';
+      END IF;
+    END $$;`,
+  },
+  {
+    name: 'enum_ai_generation_records_recovery_status.operator_resolved',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ai_generation_records_recovery_status') THEN
+        ALTER TYPE enum_ai_generation_records_recovery_status ADD VALUE IF NOT EXISTS 'operator_resolved';
+      END IF;
+    END $$;`,
+  },
+  // ── F23 GH-1723: SSO Owner avatar sync (immutable SSO identity + idempotency/ordering) ──
+  {
+    name: 'users.sso_user_id',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_user_id integer;`,
+  },
+  {
+    name: 'users.sso_user_id_unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS users_sso_user_id_uniq ON users (sso_user_id) WHERE sso_user_id IS NOT NULL;`,
+  },
+  {
+    name: 'users.sso_avatar_key',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_avatar_key varchar;`,
+  },
+  {
+    name: 'users.sso_avatar_synced_at',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_avatar_synced_at timestamp(3) with time zone;`,
+  },
+  // ── AI release (#1978): copilot, website languages, automations, apply receipts ──
+  // ── Contact Submissions: replies the shop sent (copilot "reply to a lead") — array table ──
+  {
+    name: 'contact_submissions_replies.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS contact_submissions_replies (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      subject varchar,
+      body varchar,
+      sent_at timestamp(3) with time zone,
+      sent_by varchar
+    );`,
+  },
+  {
+    name: 'contact_submissions_replies.alter_columns',
+    sql: `ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS subject varchar;
+      ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS body varchar;
+      ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS sent_at timestamp(3) with time zone;
+      ALTER TABLE contact_submissions_replies ADD COLUMN IF NOT EXISTS sent_by varchar;`,
+  },
+  {
+    name: 'contact_submissions_replies.indexes',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_replies_order_idx ON contact_submissions_replies (_order);
+      CREATE INDEX IF NOT EXISTS contact_submissions_replies_parent_id_idx ON contact_submissions_replies (_parent_id);`,
+  },
+  // Payload trash on blogs: a trashed post keeps its row with deleted_at set (restorable; AI copilot undo)
+  {
+    name: 'blogs.deleted_at',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS deleted_at timestamp(3) with time zone;`,
+  },
+  {
+    name: 'blogs.deleted_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_deleted_at_idx ON blogs(deleted_at);`,
+  },
+  // Copilot blog drafts: the change set that created the post (replay key of appliers/blog-draft.ts)
+  {
+    name: 'blogs.ai_change_set_id',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS ai_change_set_id varchar;`,
+  },
+  {
+    name: 'blogs.ai_change_set_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_ai_change_set_id_idx ON blogs(ai_change_set_id);`,
+  },
+  // Site-generator seed marker: the site's first publish promotes these drafts and clears it
+  {
+    name: 'blogs.ai_seeded',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS ai_seeded boolean DEFAULT false;`,
+  },
+  {
+    name: 'blogs.ai_seeded_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_ai_seeded_idx ON blogs(ai_seeded);`,
+  },
+  // ── Scheduled shop automations (cron /api/cron/shop-automations) ──
+  // Per-workspace switches + the cron's day markers: tenants.settings.automations (json).
+  {
+    name: 'tenants.settings_automations',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_automations jsonb;`,
+  },
+  // New notification type. The column is an enum when Payload created it (pushDevSchema) and a varchar when
+  // the table came from notifications.create_table above, so only extend the enum if it exists.
+  {
+    name: 'notifications.type_automation_reminder',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_notifications_type') THEN
+        ALTER TYPE enum_notifications_type ADD VALUE IF NOT EXISTS 'AUTOMATION_REMINDER';
+      END IF;
+    END $$;`,
+  },
+  // GH-2157: contact-form lead bell for the shop owner (same enum/varchar caveat as above).
+  {
+    name: 'notifications.type_lead_new',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_notifications_type') THEN
+        ALTER TYPE enum_notifications_type ADD VALUE IF NOT EXISTS 'LEAD_NEW';
+      END IF;
+    END $$;`,
+  },
+  // ── F26: the translations as published — locale_content is the editor's draft copy; the live
+  //    site reads this one, set on publish (empty until the next publish: the site shows as before) ──
+  {
+    name: 'pages.published_locale_content',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS published_locale_content jsonb DEFAULT '{}';`,
+  },
+  // Media owner workspace (AI copilot library + `media:<id>` ownership). Nullable: legacy rows keep NULL
+  // and are reachable only as pictures their workspace's sites, pages, products or blogs already use.
+  {
+    name: 'media.tenant_id',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'media.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS media_tenant_idx ON media (tenant_id);`,
+  },
+  // ── Editor draft revision: every content write (editor save, approved AI change, template)
+  // bumps it; a save made from an older revision is refused instead of overwriting (raw column,
+  // not a Payload field — read/written by src/lib/sites/editor-revision.ts) ──
+  {
+    name: 'sites.editor_revision',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS editor_revision integer NOT NULL DEFAULT 0;`,
+  },
+  {
+    name: 'pages.editor_revision',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS editor_revision integer NOT NULL DEFAULT 0;`,
+  },
+  // the editor save that made the last bump (NULL = an AI change / other writer): a save retried after
+  // its response was lost carries the same id and is let through instead of refused as stale
+  {
+    name: 'sites.editor_last_save_id',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS editor_last_save_id varchar(64);`,
+  },
+  {
+    name: 'pages.editor_last_save_id',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS editor_last_save_id varchar(64);`,
+  },
+  // ── Featured Products: the section's own pictures (shown while no product is on sale, and
+  // for a product without a photo) instead of the industry sample pictures — same rows as a gallery ──
+  {
+    name: 'pages_blocks_products_featured_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_products_featured_images" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      image_id integer, caption varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_products_featured_images.indexes',
+    sql: `CREATE INDEX IF NOT EXISTS pages_blocks_products_featured_images_order_idx ON "pages_blocks_products_featured_images" (_order);
+      CREATE INDEX IF NOT EXISTS pages_blocks_products_featured_images_parent_id_idx ON "pages_blocks_products_featured_images" (_parent_id);
+      CREATE INDEX IF NOT EXISTS pages_blocks_products_featured_images_image_idx ON "pages_blocks_products_featured_images" (image_id);`,
+  },
+  {
+    name: '_pages_v_blocks_products_featured_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_products_featured_images" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      image_id integer, caption varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_products_featured_images.indexes',
+    sql: `CREATE INDEX IF NOT EXISTS _pages_v_blocks_products_featured_images_order_idx ON "_pages_v_blocks_products_featured_images" (_order);
+      CREATE INDEX IF NOT EXISTS _pages_v_blocks_products_featured_images_parent_id_idx ON "_pages_v_blocks_products_featured_images" (_parent_id);
+      CREATE INDEX IF NOT EXISTS _pages_v_blocks_products_featured_images_image_idx ON "_pages_v_blocks_products_featured_images" (image_id);`,
+  },
+  // ── AI copilot apply receipts (raw table, not a Payload collection — read/written by
+  // src/lib/ai-platform/apply-receipts.ts). prime-web's own note that an approved change (or its
+  // undo) ran here, with the result: a retry re-sends it instead of applying twice, and the
+  // /api/cron/ai-receipts sweep records on ai-platform what it never heard about (recorded_at NULL) ──
+  {
+    name: 'ai_change_set_applies.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_change_set_applies (
+      change_set_id varchar PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      user_id varchar,
+      state varchar NOT NULL DEFAULT 'applying' CHECK (state IN ('applying', 'applied', 'reverted')),
+      result jsonb,
+      note text,
+      request_id varchar,
+      recorded_at timestamp(3) with time zone,
+      created_at timestamp(3) with time zone NOT NULL DEFAULT now(),
+      updated_at timestamp(3) with time zone NOT NULL DEFAULT now()
+    );`,
+  },
+  {
+    name: 'ai_change_set_applies.unrecorded_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_change_set_applies_unrecorded_idx ON ai_change_set_applies (updated_at) WHERE recorded_at IS NULL AND state IN ('applied', 'reverted');`,
+  },
+  // ── Payload 3.90+ base fields (not declared in src/collections — added by Payload itself) ──
+  // auth.forgotPassword.minRequestInterval (default 15s) stores the last reset request per user;
+  // without the column every users query fails.
+  {
+    name: 'users.reset_password_requested_at',
+    required: true,
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_requested_at timestamp(3) with time zone;`,
+  },
+  // plugin-cloud-storage (storage-s3) keeps a unique object key per upload (hidden `_objectKey` field).
+  {
+    name: 'media._objectkey',
+    required: true,
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS _objectkey varchar;`,
+  },
+  // ── Scale audit (plans/261022-ai-security-reliability-600-users/reports/nplus1-query-audit-261024.md) ──
+  // Built CONCURRENTLY (no write lock on busy tables during a deploy); `concurrentIndex` names the index so the
+  // runner drops an INVALID leftover of an interrupted build first (IF NOT EXISTS would keep it forever).
+  // Dashboard At-a-glance + traffic read one shop's events in a date range: index-only scan on
+  // (tenant, created_at) carrying the event (was BitmapAnd of tenant_idx + created_at_idx, ~12× the buffers).
+  {
+    name: 'analytics.tenant_created_idx',
+    concurrentIndex: 'analytics_tenant_created_idx',
+    sql: `CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_tenant_created_idx ON analytics (tenant_id, created_at) INCLUDE (event);`,
+  },
+  // Orders list / pending orders: newest first per shop. Without it the planner walks orders_created_at_idx
+  // backwards across every shop's orders filtering on tenant (1 536 buffers → 19 for a shop with older orders).
+  {
+    name: 'orders.tenant_created_idx',
+    concurrentIndex: 'orders_tenant_created_idx',
+    sql: `CREATE INDEX CONCURRENTLY IF NOT EXISTS orders_tenant_created_idx ON orders (tenant_id, created_at DESC);`,
+  },
+  // Page drafts of a site (editor): only the latest version row of each page, not the up to
+  // 100 autosave versions per page the site index walks and filters.
+  {
+    name: '_pages_v.site_latest_idx',
+    concurrentIndex: '_pages_v_site_latest_idx',
+    sql: `CREATE INDEX CONCURRENTLY IF NOT EXISTS _pages_v_site_latest_idx ON _pages_v (version_site_id) WHERE latest = true;`,
+  },
+  // ── Security round 2 (PR #1996): media ownership + private payment receipts (TC-PERF-144..146) ──
+  // Media.tenant: staging's `media.tenant_id` (column + inline FK) and `media.tenant_idx` own the column and its
+  // index. When the column already existed before that ran (pw1 migration schema, Payload push) the inline
+  // REFERENCES never applied, so add the FK only if NO foreign key exists on media.tenant_id under any name,
+  // clearing ids of tenants that no longer exist first (no owner is assigned: legacy rows stay NULL).
+  {
+    name: 'media.tenant_id_fk_if_missing',
+    sql: `DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint c
+          JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+          WHERE c.conrelid = 'media'::regclass AND c.contype = 'f' AND a.attname = 'tenant_id'
+        ) THEN
+          UPDATE media SET tenant_id = NULL
+            WHERE tenant_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tenants t WHERE t.id = media.tenant_id);
+          ALTER TABLE media ADD CONSTRAINT media_tenant_id_tenants_id_fk
+            FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE SET NULL;
+        END IF;
+      END $$;`,
+  },
+  // Media.private (checkbox): payment receipts, readable only by the media's tenant.
+  {
+    name: 'media.private',
+    required: true,
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS private boolean DEFAULT false;
+      UPDATE media SET private = false WHERE private IS NULL;`,
+  },
+  // Bank-transfer receipts already stored: private to their shop.
+  {
+    name: 'media.private_payment_proofs',
+    sql: `UPDATE media m SET private = true FROM orders o
+        WHERE o.payment_proof_image_id = m.id AND m.private IS DISTINCT FROM true;
+      UPDATE media SET private = true WHERE alt LIKE 'Payment proof — order %' AND private IS DISTINCT FROM true;`,
+  },
+  // A private receipt is opened through /api/media/private/{id} by members of its media tenant only. Receipts stored
+  // before media had an owner get the shop of the order that holds them (and nothing else: no other row is touched).
+  {
+    name: 'media.payment_proof_tenant_from_order',
+    sql: `UPDATE media m SET tenant_id = o.tenant_id FROM orders o
+        WHERE o.payment_proof_image_id = m.id AND m.tenant_id IS NULL AND o.tenant_id IS NOT NULL;`,
+  },
+  // ── One-off: client JSON stored verbatim (pages.locale_content / published_locale_content) held populated
+  // tenant / user rows (Xendit, EasyParcel, ECH keys; otpHash). Same rules as stripPrivateSnapshots
+  // (src/lib/payload/safe-populate.ts, TC-PERF-139 / TC-PERF-152): relation rows under tenant / createdBy /
+  // updatedBy become their id, private keys are dropped at any depth. Only rows that match are rewritten.
+  {
+    name: 'pages.strip_private_snapshots',
+    sql: `CREATE OR REPLACE FUNCTION pw_strip_private_snapshots(v jsonb, depth integer DEFAULT 0) RETURNS jsonb AS $$
+      DECLARE k text; c jsonb; out jsonb;
+      BEGIN
+        IF v IS NULL OR depth > 40 THEN RETURN v; END IF;
+        IF jsonb_typeof(v) = 'array' THEN
+          SELECT COALESCE(jsonb_agg(pw_strip_private_snapshots(e, depth + 1) ORDER BY o), '[]'::jsonb)
+            INTO out FROM jsonb_array_elements(v) WITH ORDINALITY AS t(e, o);
+          RETURN out;
+        END IF;
+        IF jsonb_typeof(v) <> 'object' THEN RETURN v; END IF;
+        out := '{}'::jsonb;
+        FOR k, c IN SELECT * FROM jsonb_each(v) LOOP
+          IF k IN ('xenditSecretKey', 'xenditCallbackToken', 'easyParcelIntegration', 'echIntegration',
+                   'otpHash', 'otpExpiresAt', 'keyString', 'resetPasswordToken', 'magicLinkSecret') THEN
+            CONTINUE;
+          END IF;
+          IF k IN ('tenant', 'createdBy', 'updatedBy') AND jsonb_typeof(c) = 'object' AND c ? 'id' THEN
+            out := out || jsonb_build_object(k, c -> 'id');
+            CONTINUE;
+          END IF;
+          out := out || jsonb_build_object(k, pw_strip_private_snapshots(c, depth + 1));
+        END LOOP;
+        RETURN out;
+      END $$ LANGUAGE plpgsql IMMUTABLE;
+      DO $$
+      DECLARE col text;
+      BEGIN
+        FOREACH col IN ARRAY ARRAY['locale_content', 'published_locale_content'] LOOP
+          IF EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'pages' AND column_name = col) THEN
+            EXECUTE format('UPDATE pages SET %1$I = pw_strip_private_snapshots(%1$I::jsonb) WHERE %1$I::text ~ %2$L', col,
+              '"(xenditSecretKey|xenditCallbackToken|easyParcelIntegration|echIntegration|otpHash|otpExpiresAt|keyString|resetPasswordToken|magicLinkSecret)"|"(tenant|createdBy|updatedBy)": *\\{');
+          END IF;
+        END LOOP;
+      END $$;`,
+  },
+  // Studio read-only seat for the Prime team: new users.roles value (Users.ts USER_ROLE_OPTIONS).
+  {
+    name: 'users_roles.add_studio_viewer',
+    // Reads the enum behind users_roles.value instead of assuming its name; a varchar column needs nothing.
+    sql: `DO $$ DECLARE enum_name text; BEGIN
+      SELECT c.udt_name INTO enum_name FROM information_schema.columns c JOIN pg_type t ON t.typname = c.udt_name AND t.typtype = 'e'
+        WHERE c.table_schema = current_schema() AND c.table_name = 'users_roles' AND c.column_name = 'value';
+      IF enum_name IS NOT NULL THEN EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', enum_name, 'studio-viewer'); END IF;
+    END $$;`,
+  },  // Audit trail of storefront Publish/Unpublish (src/lib/sites/site-status-events.ts): answers
+  // "who took this store offline, and when" after request logs expire. Append-only, raw SQL writes.
+  {
+    name: 'site_status_events.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS site_status_events (
+      id serial PRIMARY KEY,
+      site_id integer NOT NULL,
+      tenant_id integer,
+      user_id integer,
+      user_email varchar,
+      action varchar NOT NULL CHECK (action IN ('publish', 'unpublish')),
+      source varchar NOT NULL,
+      previous_status varchar,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );`,
+  },
+  {
+    name: 'site_status_events.idx_site_created',
+    sql: `CREATE INDEX IF NOT EXISTS site_status_events_site_created ON site_status_events (site_id, created_at DESC);`,
+  },
+  {
+    name: 'site_status_events.idx_tenant_created',
+    sql: `CREATE INDEX IF NOT EXISTS site_status_events_tenant_created ON site_status_events (tenant_id, created_at DESC);`,
+  },
+  // Support seat that may open a merchant's CMS (Users.ts USER_ROLE_OPTIONS, /support/merchant-access).
+  {
+    name: 'users_roles.add_support',
+    sql: `DO $$ DECLARE enum_name text; BEGIN
+      SELECT c.udt_name INTO enum_name FROM information_schema.columns c JOIN pg_type t ON t.typname = c.udt_name AND t.typtype = 'e'
+        WHERE c.table_schema = current_schema() AND c.table_name = 'users_roles' AND c.column_name = 'value';
+      IF enum_name IS NOT NULL THEN EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', enum_name, 'support'); END IF;
+    END $$;`,
+  },
+  // Studio team work seats (Users.ts USER_ROLE_OPTIONS, src/lib/admin/studio-permissions.ts).
+  {
+    name: 'users_roles.add_studio_content',
+    sql: `DO $$ DECLARE enum_name text; BEGIN
+      SELECT c.udt_name INTO enum_name FROM information_schema.columns c JOIN pg_type t ON t.typname = c.udt_name AND t.typtype = 'e'
+        WHERE c.table_schema = current_schema() AND c.table_name = 'users_roles' AND c.column_name = 'value';
+      IF enum_name IS NOT NULL THEN EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', enum_name, 'studio-content'); END IF;
+    END $$;`,
+  },
+  {
+    name: 'users_roles.add_studio_reviewer',
+    sql: `DO $$ DECLARE enum_name text; BEGIN
+      SELECT c.udt_name INTO enum_name FROM information_schema.columns c JOIN pg_type t ON t.typname = c.udt_name AND t.typtype = 'e'
+        WHERE c.table_schema = current_schema() AND c.table_name = 'users_roles' AND c.column_name = 'value';
+      IF enum_name IS NOT NULL THEN EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', enum_name, 'studio-reviewer'); END IF;
+    END $$;`,
+  },
+  {
+    name: 'users_roles.add_studio_qa',
+    sql: `DO $$ DECLARE enum_name text; BEGIN
+      SELECT c.udt_name INTO enum_name FROM information_schema.columns c JOIN pg_type t ON t.typname = c.udt_name AND t.typtype = 'e'
+        WHERE c.table_schema = current_schema() AND c.table_name = 'users_roles' AND c.column_name = 'value';
+      IF enum_name IS NOT NULL THEN EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', enum_name, 'studio-qa'); END IF;
+    END $$;`,
+  },
+  {
+    name: 'users_roles.add_studio_ops',
+    sql: `DO $$ DECLARE enum_name text; BEGIN
+      SELECT c.udt_name INTO enum_name FROM information_schema.columns c JOIN pg_type t ON t.typname = c.udt_name AND t.typtype = 'e'
+        WHERE c.table_schema = current_schema() AND c.table_name = 'users_roles' AND c.column_name = 'value';
+      IF enum_name IS NOT NULL THEN EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', enum_name, 'studio-ops'); END IF;
+    END $$;`,
+  },
+  // One row per merchant CMS access link: who opened whose account, and when the one-time link was used.
+  {
+    name: 'merchant_access_events.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS merchant_access_events (
+      id serial PRIMARY KEY,
+      jti varchar(64) NOT NULL UNIQUE,
+      actor_user_id integer NOT NULL,
+      actor_email varchar,
+      target_user_id integer NOT NULL,
+      target_email varchar,
+      expires_at timestamptz NOT NULL,
+      used_at timestamptz,
+      used_ip varchar,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  },
+  {
+    name: 'merchant_access_events.index_target_created',
+    sql: `CREATE INDEX IF NOT EXISTS merchant_access_events_target_created ON merchant_access_events (target_user_id, created_at DESC)`,
+  },
 ];
 
+// PERF: cache applied migration names in a state table so subsequent builds
+// skip the ~1125 idempotent SQL round-trips. Cut staging deploy migration
+// phase from ~5m33s to ~10s (see plans/260921-1629-GH-15-deploy-cold-build-perf).
+// Migrations flagged `critical: true` bypass the cache and always re-run —
+// use only for CREATE OR REPLACE FUNCTION bodies or safety-net idempotent
+// statements that must apply on every deploy.
+// `required: true` aborts the build when the entry fails (columns Payload selects on every query: without them
+// auth or storefront would break after a green deploy) but is cached like any other entry.
+// Every entry runs with a 5 s lock_timeout: an ALTER queued behind a long transaction (pw1 import, cron) would
+// otherwise block every read of that table until it got its lock. A timed-out entry retries on the next build.
+/** An interrupted CREATE INDEX CONCURRENTLY leaves an INVALID index that `IF NOT EXISTS` would keep forever. */
+async function dropInvalidIndex(client, indexName) {
+  const { rows } = await client.query(
+    `SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relname = $1 AND NOT i.indisvalid`,
+    [indexName],
+  );
+  if (rows.length) await client.query(`DROP INDEX CONCURRENTLY IF EXISTS "${indexName.replace(/"/g, '""')}"`);
+}
+
 async function runMigrations(pool) {
-  console.log(`[db-setup] Running ${MIGRATIONS.length} migrations...`);
-  for (const m of MIGRATIONS) {
-    try {
-      await pool.query(m.sql);
-      console.log(`[db-setup] ✅ ${m.name}`);
-    } catch (e) {
-      // Log but don't fail — column might already exist with different type etc.
-      console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS _db_setup_state (
+    name varchar PRIMARY KEY,
+    applied_at timestamptz NOT NULL DEFAULT NOW()
+  );`);
+
+  const { rows } = await pool.query('SELECT name FROM _db_setup_state;');
+  const applied = new Set(rows.map((r) => r.name));
+
+  let skipped = 0;
+  let ran = 0;
+  let alwaysRan = 0;
+  let failed = 0;
+
+  console.log(
+    `[db-setup] Running ${MIGRATIONS.length} migrations (${applied.size} previously applied)...`,
+  );
+
+  const client = await pool.connect();
+  await client.query(`SET lock_timeout = '5s'`);
+  try {
+    for (const m of MIGRATIONS) {
+      const alwaysRun = m.critical === true;
+      if (!alwaysRun && applied.has(m.name)) {
+        skipped++;
+        continue;
+      }
+      try {
+        if (m.concurrentIndex) await dropInvalidIndex(client, m.concurrentIndex);
+        await client.query(m.sql);
+        if (alwaysRun) {
+          alwaysRan++;
+        } else {
+          await client.query(
+            'INSERT INTO _db_setup_state (name) VALUES ($1) ON CONFLICT (name) DO NOTHING;',
+            [m.name],
+          );
+          ran++;
+        }
+        console.log(`[db-setup] ✅ ${m.name}`);
+      } catch (e) {
+        failed++;
+        if (m.critical || m.required) throw e;
+        // Log but don't fail — column might already exist with different type etc.
+        // Not inserted into state → will retry on next build.
+        console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
+      }
     }
+  } finally {
+    await client.query('RESET lock_timeout').catch(() => {});
+    client.release();
   }
+  // Import ledger failures must abort setup: claims and fencing are safety boundaries.
+  await runPw1MigrationSchema(pool);
+  await runPw1JsonMigrationSchema(pool);
+  await runPw1EvidenceSchema(pool);
+  await runPw1DeltaMigrationSchema(pool);
+
+  console.log(
+    `[db-setup] Migration summary: skipped=${skipped}, applied=${ran}, always-run=${alwaysRan}, failed=${failed}, total=${MIGRATIONS.length}`,
+  );
 }
 
 // PERF-04: only audited pairs may be removed. Unknown duplicate pairs fail the
@@ -5894,12 +6899,15 @@ const COLLECTION_SLUGS = [
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
   'seo_meta_jobs', 'notifications', 'subscribers',
-  'contact_submissions',
+  'contact_submissions', 'push-subscriptions',
   'ai_usage_logs',
+  'ai-shop-limits',
+  'ai-cap-alerts',
   'template_quality_scores',
   'block_catalog_entries',
   'block_variants',
   'ai_generation_records',
+  'generation_recovery_jobs',
   'template_issues',
   'content_packs',
   'template_versions',
@@ -6020,6 +7028,7 @@ async function checkDB() {
       await runMigrations(pool);
       await cleanupApprovedDuplicateIndexes(pool);
       await runCategorySlugTenantMigration(pool);
+      await runContentSlugTenantMigration(pool);
       await ensureRuntimeIssueUniqueIndex(pool);
       await syncPayloadRelsTables(pool);
       await runBootstrapSeed(pool);
@@ -6230,10 +7239,17 @@ async function main() {
       const tableCount = await getTableCount(pool);
       console.log(`[db-setup] Tables in public schema: ${tableCount}`);
 
+      if (tableCount === 0 && isProductionDeploy()) {
+        console.error('::error::[db-setup] production DB is empty — restore the staging dump first');
+        await pool.end().catch(() => {});
+        process.exit(1);
+      }
+
       if (tableCount > 0) {
         await runMigrations(pool);
         await cleanupApprovedDuplicateIndexes(pool);
         await runCategorySlugTenantMigration(pool);
+        await runContentSlugTenantMigration(pool);
         await ensureRuntimeIssueUniqueIndex(pool);
         await verifyCriticalIndexes(pool);
         await syncPayloadRelsTables(pool);
@@ -6417,6 +7433,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  isProductionDeploy,
+  runContentSlugTenantMigration,
   MIGRATIONS,
   APPROVED_DUPLICATE_INDEX_PAIRS,
   buildDuplicateIndexCleanupPlan,

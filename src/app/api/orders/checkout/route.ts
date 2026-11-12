@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
+import { generateOrderNumber } from '@/lib/orders/generate-order-number'
 import crypto from 'crypto'
 import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
+import { isTenantUnavailable } from '@/lib/storefront/store-availability'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
@@ -84,8 +86,17 @@ export async function POST(request: Request) {
         const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
         const tenantPayments = (tenantForSlug as any)?.payments ?? {}
 
+        // TC-F09.274: suspended tenant cannot accept COD/QR orders (parity with TC-F13.88 Stripe, Xendit)
+        // #2179: nor can a store whose main subscription has lapsed
+        if (tenantForSlug && await isTenantUnavailable(payload, tenantForSlug as { id: string | number; status?: unknown })) {
+            return NextResponse.json(
+                { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
+                { status: 403 }
+            )
+        }
+
         // Enforce payment method availability: tenant master flag (dashboard toggle) AND site-level guard
-        // site.paymentConfig.enableCod/enableQrBanking is a site-level opt-out (default true)
+        // site.paymentConfig.enableCod is a site-level opt-out (default true); bank transfer has no site gate (GH-2477)
         // tenant.payments.payment_cod/payment_qr is the seller's explicit enable in Payment Settings (default false)
         const pc = (site as any).paymentConfig
         if (paymentMethod === 'cod' && (tenantPayments.payment_cod !== true || pc?.enableCod === false)) {
@@ -94,7 +105,7 @@ export async function POST(request: Request) {
                 { status: 422 }
             )
         }
-        if (paymentMethod === 'bank_transfer' && (tenantPayments.payment_qr !== true || pc?.enableQrBanking === false)) {
+        if (paymentMethod === 'bank_transfer' && tenantPayments.payment_qr !== true) {
             return NextResponse.json(
                 { success: false, error: { code: 'PAYMENT_METHOD_DISABLED', message: 'Bank Transfer is not available for this store' } },
                 { status: 422 }
@@ -218,7 +229,7 @@ export async function POST(request: Request) {
         }
 
         // Generate order number
-        const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
+        const orderNumber = generateOrderNumber()
 
         // PR note: subtotal is RM-float (p.price * qty); shippingConfig rates are in sen (800 = RM 8)
         const subtotalSen = Math.round(subtotal * 100)
@@ -653,7 +664,7 @@ export async function POST(request: Request) {
             if (sellerCmsConfig?.enabled === false) {
                 console.log('[Email] suppressed (disabled): new-order-seller (COD)')
             } else {
-                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl, items: orderItems.map((i) => ({ name: i.productName, variant: i.variant || undefined, quantity: i.quantity, lineTotal: i.unitPrice * i.quantity })), orderTotal: order.total, shippingFee, currency: order.currency ?? 'MYR', locale: siteLocale }, sellerCmsConfig ?? undefined)
+                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl, items: orderItems.map((i) => ({ name: i.productName, variant: i.variant || undefined, quantity: i.quantity, lineTotal: i.unitPrice * i.quantity })), orderTotal: order.total, shippingFee, discountAmount: discountRM || null, discountCode: discountRow?.code ?? null, currency: order.currency ?? 'MYR', locale: siteLocale }, sellerCmsConfig ?? undefined)
                 ownerEmails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
                     .catch((err: unknown) => console.error('[Email seller notify COD]', err)))
             }
@@ -724,7 +735,7 @@ export async function POST(request: Request) {
             if (btSellerCmsConfig?.enabled === false) {
                 console.log('[Email] suppressed (disabled): new-order-seller (BT)')
             } else {
-                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl, items: orderItems.map((i) => ({ name: i.productName, variant: i.variant || undefined, quantity: i.quantity, lineTotal: i.unitPrice * i.quantity })), orderTotal: order.total, shippingFee, currency: order.currency ?? 'MYR', locale: siteLocale }, btSellerCmsConfig ?? undefined)
+                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl, items: orderItems.map((i) => ({ name: i.productName, variant: i.variant || undefined, quantity: i.quantity, lineTotal: i.unitPrice * i.quantity })), orderTotal: order.total, shippingFee, discountAmount: discountRM || null, discountCode: discountRow?.code ?? null, currency: order.currency ?? 'MYR', locale: siteLocale }, btSellerCmsConfig ?? undefined)
                 ownerEmails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
                     .catch((err: unknown) => console.error('[Email seller notify BT]', err)))
             }

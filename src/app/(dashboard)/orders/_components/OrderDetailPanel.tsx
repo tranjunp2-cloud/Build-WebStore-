@@ -645,7 +645,7 @@ export function PaymentInformation({ order }: { order: OrderDetail }) {
                 >
                     {proofUrl ? (
                         <>
-                            <Image src={proofUrl} alt="Payment Receipt" fill className="object-cover" />
+                            <Image src={proofUrl} alt="Payment Receipt" fill className="object-cover" unoptimized />
                             <div style={{ position: 'absolute', inset: 0, background: proofHovered ? 'rgba(0,0,0,0.35)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}>
                                 <ZoomIn size={24} color="#fff" style={{ opacity: proofHovered ? 1 : 0, transition: 'opacity 0.15s', pointerEvents: 'none' }} />
                             </div>

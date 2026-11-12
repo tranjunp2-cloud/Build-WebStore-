@@ -12,7 +12,7 @@ Trigger: `pull_request` to `main`
 - **Step 1: Code Checkout & Cache Setup** (Node.js/npm cache)
 - **Step 2: Lint & Typecheck**
   - Run `npm run typecheck` (TypeScript)
-  - Run `npm run lint` (ESLint/Prettier)
+  - Run `npm run lint` (ESLint; `npm run lint:fast` = oxlint for local hooks)
 - **Step 3: Security Checks (DevSecOps)**
   - **SAST:** Run SonarQube for static analysis (connected to `https://sonarqube.primecommerce.asia`).
   - **Dependency Scan:** Run `npm audit` or Dependabot/Snyk to find vulnerable packages.

@@ -46,7 +46,7 @@ export type SupportedAddSectionType =
     | 'blog-list'
     | 'products-grid'
     | 'logo-cloud'
-    // | 'custom-html' // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    | 'custom-html'
     | 'products-featured'
     // v2.0 industry blocks
     // | 'booking-widget' // hidden: BLOCKS_TEMP_HIDDEN GH-1145
@@ -162,7 +162,7 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'blog-list': 'blog list',
     'products-grid': 'products grid',
     'logo-cloud': 'logo cloud',
-    // 'custom-html': 'custom HTML', // hidden: BLOCKS_TEMP_HIDDEN GH-1145
+    'custom-html': 'rich text',
     'products-featured': 'featured products',
     // v2.0 industry blocks
     // 'booking-widget': 'booking widget', // hidden: BLOCKS_TEMP_HIDDEN GH-1145
@@ -716,14 +716,8 @@ export function createAddSectionBlock({
                 ],
             }
 
-        // case 'custom-html': // hidden: BLOCKS_TEMP_HIDDEN GH-1145
-        //     return {
-        //         blockType: 'custom-html',
-        //         html: `<div style="padding: 2rem; text-align: center; background: #f8f8f8; border-radius: 8px;">
-        //   <h3 style="margin-bottom: 0.5rem;">Custom HTML Block</h3>
-        //   <p style="color: #666;">Edit this HTML to add any custom content, embeds, or widgets.</p>
-        // </div>`,
-        //     }
+        case 'custom-html':
+            return { blockType: 'custom-html', html: '<p>Add your text here.</p>' }
 
         case 'products-featured':
             return {
@@ -843,6 +837,14 @@ export function createAddSectionBlock({
 
 import { blockRegistry } from '@/blocks/registry'
 
+/**
+ * Blocks the library lets the user drop although the AI add-section flow hides them (BLOCKS_TEMP_HIDDEN),
+ * so they reach the registry path, where a required field without a schema default would stay missing.
+ */
+const LIBRARY_DROP_DEFAULTS: Record<string, Record<string, unknown>> = {
+    'custom-html': { html: '<p>Add your text here.</p>' },
+}
+
 /** Generate minimal default content for any block type using its Zod schema defaults */
 function createDefaultBlockFromRegistry(blockType: string, brandName: string): BlockData | null {
     try {
@@ -887,7 +889,13 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
             brandName,
         )
         if (registryBlock) {
-            const rb = { ...registryBlock, ...(block || {}) } as BlockData
+            const dropDefaults = LIBRARY_DROP_DEFAULTS[String(registryBlock.blockType)] || {}
+            const rb = { ...registryBlock, ...dropDefaults, ...(block || {}) } as BlockData
+            const rbFields = rb as Record<string, unknown>
+            // An explicit empty/null value from the caller must not erase the starter content
+            for (const [key, value] of Object.entries(dropDefaults)) {
+                if (rbFields[key] == null || rbFields[key] === '') rbFields[key] = value
+            }
             const rbKey = String(rb.blockType || '')
             // Attach locale init slots for registry-backed blocks (AC: 1d coverage)
             // {n} tokens in testimonials are the caller's responsibility, not resolver's.

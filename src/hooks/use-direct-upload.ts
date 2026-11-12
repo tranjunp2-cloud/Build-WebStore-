@@ -37,6 +37,28 @@ function logS3UploadFailure(xhr: XMLHttpRequest) {
     })
 }
 
+/** Host + bucket (first path segment, path-style URLs) of the storage URL — never
+ *  the rest of the path, the query, or any presign fields. */
+function readStorageTarget(url: string) {
+    try {
+        const parsed = new URL(url)
+        return { storageHost: parsed.host, bucket: parsed.pathname.split('/').filter(Boolean)[0] }
+    } catch {
+        return { storageHost: 'invalid-url', bucket: undefined }
+    }
+}
+
+// A network-level XHR failure before any response is almost always the browser
+// blocking the preflight (bucket CORS missing for this origin) or no connectivity.
+function logS3NetworkFailure(url: string) {
+    console.error('[media:direct-upload] Could not reach storage (CORS blocked or network error)', {
+        origin: typeof window === 'undefined' ? undefined : window.location.origin,
+        ...readStorageTarget(url),
+    })
+}
+
+export const DIRECT_UPLOAD_NETWORK_ERROR_MESSAGE = 'Could not reach storage (check CORS/network)'
+
 export class DirectUploadUnavailableError extends Error {
     constructor(message = 'Direct upload unavailable') {
         super(message)
@@ -48,7 +70,7 @@ export class DirectUploadUnavailableError extends Error {
 //   1. POST /api/media/presign  → presigned POST (url + fields) + minted key
 //   2. POST the file STRAIGHT to S3 (XHR, real progress) — never touches Vercel
 //   3. POST /api/media/register → create the Payload media row, returns { id, url }
-// Requires S3 bucket CORS to allow POST from the app origin (see plan phase 04).
+// Requires S3 bucket CORS to allow POST from the app origin (see docs/runbooks/s3-spaces-cors.md).
 export function useDirectUpload() {
     const [progress, setProgress] = useState(0)
     const [isUploading, setIsUploading] = useState(false)
@@ -122,7 +144,10 @@ function putToS3(url: string, form: FormData, onProgress: (n: number) => void): 
             if (/EntityTooLarge/i.test(xhr.responseText)) return reject(new Error('File exceeds the size limit'))
             reject(new Error(`Upload failed (${xhr.status})`))
         })
-        xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
+        xhr.addEventListener('error', () => {
+            logS3NetworkFailure(url)
+            reject(new Error(DIRECT_UPLOAD_NETWORK_ERROR_MESSAGE))
+        })
         xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
         xhr.addEventListener('timeout', () => reject(new Error('Upload timed out')))
         xhr.timeout = 300_000 // 100MB on a slow line can exceed 2 min; S3 has no function maxDuration

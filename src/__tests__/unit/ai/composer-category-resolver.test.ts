@@ -77,3 +77,23 @@ describe('TC-GH1611-13 — siteType alias is no longer defeated upstream', () =>
         expect(resolveSiteType(normalizeComposerCategory('fnb'))).toBe('restaurant')
     })
 })
+
+describe('TC-GH1611-33 — Vietnamese free text no longer sinks to business', () => {
+    it.each([
+        ['tiệm hoa tươi', 'ecommerce'],
+        ['cửa hàng hoa', 'ecommerce'],
+        ['bánh kẹo', 'fnb'],
+        ['bánh ngọt', 'fnb'],
+        ['bánh mì', 'fnb'],
+    ])('resolveComposerCategory(%s) → %s', (text, expected) => {
+        expect(resolveComposerCategory(text)).toBe(expected)
+    })
+
+    it('leaves a category with no matching composer key on the business sink', () => {
+        expect(resolveComposerCategory('sửa xe máy')).toBe('business')
+    })
+
+    it('does not change the form-key-wins rule', () => {
+        expect(normalizeComposerCategory('fnb')).toBe('fnb')
+    })
+})

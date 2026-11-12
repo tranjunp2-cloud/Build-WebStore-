@@ -51,10 +51,12 @@ describe('Products collection config [TC-F08-01-01]', () => {
         expect(seoField?.type).toBe('group')
     })
 
-    it('has shortDescription with maxLength 300', () => {
-        const field = Products.fields.find((f: any) => f.name === 'shortDescription') as any
-        expect(field).toBeDefined()
-        expect(field?.maxLength).toBe(300)
+    it('preserves historical shortDescription without a 300-character limit', () => {
+        // Arrange / Act
+        const field = Products.fields.find(field => 'name' in field && field.name === 'shortDescription')
+        // Assert
+        expect(field).toMatchObject({ name: 'shortDescription', type: 'textarea' })
+        expect(field).not.toHaveProperty('maxLength')
     })
 
     it('price field has min 0', () => {
@@ -71,14 +73,14 @@ describe('Products collection config [TC-F08-01-01]', () => {
         expect(options).toContain('draft')
     })
 
-    it('delete access returns false (soft delete only)', () => {
-        // Products should not be hard-deleted
-        const deleteAccess = Products.access?.delete
-        if (typeof deleteAccess === 'function') {
-            const result = deleteAccess({ req: { user: { roles: ['super-admin'] } } } as any)
-            // Either returns false or a where clause (tenant-scoped)
-            expect(result).toBeDefined()
-        }
+    it('TC-09.54: hard delete via REST is super-admin only (GH-1520)', async () => {
+        // Arrange
+        const deleteAccess = Products.access!.delete as (a: unknown) => unknown
+        const owner = { user: { roles: ['tenant-owner'], tenants: [{ tenant: 't1' }] } }
+        // Act / Assert
+        expect(await deleteAccess({ req: owner })).toBe(false)
+        expect(await deleteAccess({ req: { user: null } })).toBe(false)
+        expect(await deleteAccess({ req: { user: { roles: ['super-admin'] } } })).toBe(true)
     })
 })
 

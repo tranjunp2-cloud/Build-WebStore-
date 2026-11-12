@@ -145,6 +145,7 @@ export function StaffDirectoryClient({
                     debouncedSearch ? (
                         <TableEmptyState
                             icon={<SearchX />}
+                            scene="searchEmpty"
                             title={t?.Staff?.emptyState?.noMatch || 'No staff members match your search.'}
                         />
                     ) : (

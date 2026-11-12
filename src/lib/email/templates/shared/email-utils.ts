@@ -5,6 +5,7 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { SHOP_TIME_ZONE } from '@/lib/reports/shop-time'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,11 +48,13 @@ export function formatPrice(amount: number, currency: string, locale: EmailLocal
     return `${currency} ${amount.toFixed(2)}`
 }
 
+/** Date + time in shop time (Malaysia): the server runs in UTC, so the zone must be explicit (GH-2158). */
 export function formatDate(iso: string, locale: EmailLocale): string {
     try {
         return new Date(iso).toLocaleString(locale === 'ms' ? 'en-MY' : 'en-GB', {
             weekday: 'long', year: 'numeric', month: 'long',
             day: 'numeric', hour: '2-digit', minute: '2-digit',
+            timeZone: SHOP_TIME_ZONE,
         })
     } catch {
         return iso

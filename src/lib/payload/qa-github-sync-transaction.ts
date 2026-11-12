@@ -1,6 +1,6 @@
-import crypto from "crypto";
 import { sql } from "drizzle-orm";
 import type { Payload, PayloadRequest } from "payload";
+import { registerTransactionSession } from "./transaction-session";
 
 type TransactionRequest = Pick<PayloadRequest, "transactionID">;
 type TransactionSessionDb = { execute: (query: unknown) => Promise<{ rows?: Array<{ locked?: boolean }> }> };
@@ -17,12 +17,13 @@ export async function withQaGithubSyncLock<T>(payload: Payload, operation: (req:
   return db.drizzle.transaction(async (transaction) => {
     const lock = await transaction.execute(sql`SELECT pg_try_advisory_xact_lock(hashtext('qa-github-issue-sync')) AS locked`);
     if (lock.rows?.[0]?.locked !== true) throw new Error("GitHub issue synchronization is already running");
-    const transactionID = crypto.randomUUID();
-    db.sessions[transactionID] = { db: transaction };
+    const session = registerTransactionSession(db, transaction);
     try {
-      return await operation({ transactionID });
+      const result = await operation(session.req);
+      session.assertActive();
+      return result;
     } finally {
-      delete db.sessions[transactionID];
+      session.release();
     }
   }, db.transactionOptions);
 }

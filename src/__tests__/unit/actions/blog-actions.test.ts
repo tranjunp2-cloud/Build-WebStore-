@@ -159,6 +159,7 @@ describe('updateBlogCategoryAction [TC-F17.03]', () => {
     it('updates category when tenant matches', async () => {
         vi.mocked(getCurrentUser).mockResolvedValue(mockUser as any)
         mockFindByID.mockResolvedValue({ id: 'cat-1', tenant: { id: 'tenant-1' } })
+        mockFind.mockResolvedValue({ docs: [{ id: 'cat-1', name: 'Old', slug: 'old' }] }) // only itself: no name clash
         mockUpdate.mockResolvedValue({ id: 'cat-1', name: 'Updated', slug: 'updated' })
 
         const result = await updateBlogCategoryAction('cat-1', { name: 'Updated' })
@@ -311,5 +312,56 @@ describe('getBlogByIdAction [TC-F17.08]', () => {
 
         const result = await getBlogByIdAction('blog-1')
         expect(result).toHaveProperty('title', 'My Post')
+    })
+})
+
+// ─── TC-PERF-073: populated relations never carry a whole user or tenant row ─────────────
+describe('blog reads populate only what the blog screens show [TC-PERF-073]', () => {
+    const expectTrimmedPopulate = (populate: Record<string, Record<string, boolean>>) => {
+        expect(populate.users).toEqual({ firstName: true, lastName: true, email: true })
+        expect(populate.tenants).toEqual({ name: true, slug: true })
+        expect(JSON.stringify(populate)).not.toMatch(/otp|keyString|sessions|xendit|token/i)
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(getCurrentUser).mockResolvedValue(mockUser as any)
+    })
+
+    it('lists posts at depth 1 with trimmed author / tenant / site relations', async () => {
+        // Arrange
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0, totalPages: 0, page: 1, limit: 10 })
+
+        // Act
+        await listBlogsAction({})
+
+        // Assert
+        const args = mockFind.mock.calls[0][0]
+        expect(args).toMatchObject({ collection: 'blogs', depth: 1 })
+        expectTrimmedPopulate(args.populate)
+    })
+
+    it('opens one post at depth 2 with the same trimmed relations', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue({ id: 'blog-1', tenant: { id: 'tenant-1' } })
+
+        // Act
+        await getBlogByIdAction('blog-1')
+
+        // Assert
+        const args = mockFindByID.mock.calls[0][0]
+        expect(args).toMatchObject({ collection: 'blogs', id: 'blog-1', depth: 2 })
+        expectTrimmedPopulate(args.populate)
+    })
+
+    it('reads blog categories as one statement (no COUNT)', async () => {
+        // Arrange
+        mockFind.mockResolvedValue({ docs: [] })
+
+        // Act
+        await getBlogCategoriesAction()
+
+        // Assert
+        expect(mockFind.mock.calls[0][0]).toMatchObject({ collection: 'blog_categories', limit: 100, pagination: false, depth: 1 })
     })
 })

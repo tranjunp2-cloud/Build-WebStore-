@@ -1,4 +1,9 @@
 import { expect, test, type Browser } from "@playwright/test";
+import {
+  createSuperAdminContext,
+  readSuperAdminCredentials,
+  type SuperAdminCredentials,
+} from "../e2e/helpers/super-admin-session";
 
 async function createUnauthenticatedBrowserContext(browser: Browser) {
   return browser.newContext({
@@ -80,22 +85,29 @@ test.describe("F40 QA Control Center security boundary", () => {
 
 test.describe("F40 Project Health Inventory & Unknown Target State", () => {
   test("[TC-F40-01-E2E-02] super-admin views full CMS inventory and Unknown targets", async ({
-    page,
+    browser,
   }) => {
-    // Arrange: the project depends on auth.setup.ts, which persists the
-    // super-admin Studio session verified through the app's OTP flow.
+    // Arrange: a super-admin session of its own. The project storageState is the
+    // TEST_EMAIL tenant-owner (the E2E OTP bypass never applies to super-admins).
+    const credentials = readSuperAdminCredentials();
+    test.skip(!credentials, "ADMIN_EMAIL / ADMIN_PASSWORD (super-admin) not set");
+    const context = await createSuperAdminContext(
+      browser,
+      credentials as SuperAdminCredentials,
+    );
 
-    // Act 1: Fetch protected control-center data as the authenticated user.
-    const healthResponse = await page.request.get(
+    // Act: Fetch protected control-center data as the super-admin.
+    const healthResponse = await context.request.get(
       "/api/admin/qa/control-center",
     );
-    expect(healthResponse.ok()).toBe(true);
+    const healthText = await healthResponse.text();
+    await context.close();
 
-    const json = (await healthResponse.json()) as ProjectHealthResponse;
+    // Assert API response: 67 active CMS targets present
+    expect(healthResponse.ok(), healthText).toBe(true);
+    const json = JSON.parse(healthText) as ProjectHealthResponse;
     const targets = json.data?.targets;
     const summary = json.data?.summary;
-
-    // Assert API response: 67 active CMS targets present, all default to deterministic Unknown when no runs exist
     expect(summary?.totalTargets).toBe(67);
     expect(targets).toHaveLength(67);
 
@@ -106,8 +118,24 @@ test.describe("F40 Project Health Inventory & Unknown Target State", () => {
     expect(unmappedTarget).toBeDefined();
     expect(unmappedTarget?.state).toBe("Unknown");
     expect(unmappedTarget?.reasonCode).toBeTruthy();
+  });
 
-    // Act 2: Navigate to /studio/qa UI and use the real health inventory.
+  test("[TC-F40-01-E2E-02] QA Control Center UI renders the seeded inbox (local only)", async ({
+    page,
+  }, testInfo) => {
+    // The fixture route answers only under `next dev` and only for TEST_EMAIL as a
+    // super-admin, so a deployed target cannot seed this state. A skip here is not
+    // a staging PASS; run it against localhost.
+    const baseURL = testInfo.project.use.baseURL ?? "";
+    const isLocalTarget = ["localhost", "127.0.0.1"].includes(
+      new URL(baseURL || "http://localhost").hostname,
+    );
+    test.skip(
+      !isLocalTarget,
+      "QA Control Center fixture is local-only (NODE_ENV=development)",
+    );
+
+    // Arrange: seed the deterministic inbox, then open /studio/qa.
     const fixtureResponse = await page.request.post(
       "/api/e2e/qa-control-center-fixture",
     );

@@ -137,6 +137,8 @@ Tài liệu Test Case này đảm bảo chất lượng toàn diện cho **Templ
 |:---|:---|:---|:---|:---|:---:|:---:|
 | **TC_F07_045** | `Mob` | **[Positive]** Bottom Sheet thay vì Modal trên Mobile | 1. Bật viewport < 768px.<br>2. Nhấn mở Gallery Preview. | - Modal chuyển thành Bottom Sheet trượt lên (chiều cao 90vh).<br>- Nút "Preview/Apply" có Touch target ≥ 44×44px. | High | Yes |
 | **TC_F07_046** | `UI` | **[Positive]** Grid 2 cột trên Mobile | 1. Xem danh sách templates trên thiết bị Mobile. | - CSS hiển thị `grid-template-columns: repeat(2, 1fr)`.<br>- 2 thumbnail card kề nhau trên 1 hàng, tối ưu không gian lướt. | Med | No |
+| **TC_F07_047** | `Logic` | **[Positive]** Apply template giữ font heading/body của template | 1. Template B dùng font ngoài bộ mặc định (Lora, Josefin Sans, Oswald, Karla, Quicksand...).<br>2. Apply template B lên site có sẵn. | - `fontHeading`/`fontBody` của site bằng font của template B.<br>- Không bị đổi về `Outfit`/`Inter` khi font hợp lệ. | High | Yes |
+| **TC_F07_048** | `Bound` | **[Negative]** Font không hợp lệ rơi về mặc định | 1. Template có font không nằm trong danh sách font hỗ trợ (vd `Helvetica`).<br>2. Apply template. | - Heading rơi về `Outfit`, body về `Inter`.<br>- Giá trị font lưu vào site luôn nằm trong enum của Sites. | Med | Yes |
 
 ---
 

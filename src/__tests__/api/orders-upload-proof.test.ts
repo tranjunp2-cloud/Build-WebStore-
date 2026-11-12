@@ -25,6 +25,7 @@ const mockVerifyOrderToken = vi.mocked(verifyOrderToken)
 // getPayload resolves to a fresh mock object per test — capture via beforeEach
 let mockFind: ReturnType<typeof vi.fn>
 let mockUpdate: ReturnType<typeof vi.fn>
+let mockFindByID: ReturnType<typeof vi.fn>
 
 // ─── TC-F10: Upload proof API ─────────────────────────────────────────────────
 
@@ -51,9 +52,67 @@ const baseOrder = {
 describe('POST /api/orders/[id]/upload-proof [TC-F10]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-        mockFind = vi.fn()
+        // first find = the order (set per test); later finds = "is this receipt on another order?" -> no
+        mockFind = vi.fn().mockResolvedValue({ docs: [] })
         mockUpdate = vi.fn().mockResolvedValue({})
-        vi.mocked(getPayload).mockResolvedValue({ find: mockFind, update: mockUpdate } as any)
+        // The attached id is this order's private receipt (what upload-proof-direct creates) unless a test says otherwise
+        mockFindByID = vi.fn().mockResolvedValue({ id: 42, tenant: 'tenant-1', private: true, alt: 'Payment proof — order ORD-001' })
+        vi.mocked(getPayload).mockResolvedValue({ find: mockFind, update: mockUpdate, findByID: mockFindByID } as any)
+    })
+
+    it.each([
+        ["another shop's receipt", { id: 42, tenant: 'tenant-2', private: true, alt: 'Payment proof — order ORD-001' }],
+        ["the shop's logo / a product picture (public media)", { id: 42, tenant: 'tenant-1', private: false, alt: 'Shop logo' }],
+        ['a public media renamed like the receipt', { id: 42, tenant: 'tenant-1', private: false, alt: 'Payment proof — order ORD-001' }],
+        ["another order's receipt in the same shop", { id: 42, tenant: 'tenant-1', private: true, alt: 'Payment proof — order ORD-002' }],
+        ['a legacy media without a shop', { id: 42, tenant: null, private: true, alt: 'Payment proof — order ORD-001' }],
+        ['an unknown id', null],
+    ])('[TC-PERF-166] refuses to attach %s (400, nothing written)', async (_label, media) => {
+        // Arrange
+        mockFind.mockResolvedValueOnce({ docs: [{ ...baseOrder }] })
+        mockVerifyOrderToken.mockResolvedValueOnce({ ok: true, orderId: '1' })
+        mockFindByID.mockResolvedValueOnce(media)
+
+        // Act
+        const res = await POST(mockReq({ token: 'valid-jwt', paymentProofImage: 42 }), mockParams('1'))
+
+        // Assert — neither the order nor the media is touched (a public picture is never made private)
+        expect(res.status).toBe(400)
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-PERF-166] refuses a receipt already attached to another order', async () => {
+        // Arrange
+        mockFind
+            .mockResolvedValueOnce({ docs: [{ ...baseOrder }] })
+            .mockResolvedValueOnce({ docs: [{ id: 2 }] })
+        mockVerifyOrderToken.mockResolvedValueOnce({ ok: true, orderId: '1' })
+
+        // Act
+        const res = await POST(mockReq({ token: 'valid-jwt', paymentProofImage: 42 }), mockParams('1'))
+
+        // Assert
+        expect(res.status).toBe(400)
+        expect(mockUpdate).not.toHaveBeenCalled()
+        expect(mockFind).toHaveBeenLastCalledWith(expect.objectContaining({
+            collection: 'orders',
+            where: { and: [{ paymentProofImage: { equals: 42 } }, { id: { not_equals: 1 } }] },
+        }))
+    })
+
+    it("[TC-PERF-166] attaches this order's own receipt without writing to the media row", async () => {
+        // Arrange
+        mockFind.mockResolvedValueOnce({ docs: [{ ...baseOrder }] })
+        mockVerifyOrderToken.mockResolvedValueOnce({ ok: true, orderId: '1' })
+
+        // Act
+        const res = await POST(mockReq({ token: 'valid-jwt', paymentProofImage: 42 }), mockParams('1'))
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ collection: 'orders', data: expect.objectContaining({ paymentProofImage: 42 }) }))
+        expect(mockUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'media' }))
     })
 
     it('[TC-F10-04-01] valid token + awaiting_payment → 200 + paymentStatus=pending_verification', async () => {
@@ -86,6 +145,7 @@ describe('POST /api/orders/[id]/upload-proof [TC-F10]', () => {
         mockVerifyOrderToken.mockResolvedValueOnce({ ok: true, orderId: '1' })
 
         // Act
+        mockFindByID.mockResolvedValueOnce({ id: 99, tenant: 'tenant-1', private: true, alt: 'Payment proof — order ORD-001' })
         const res = await POST(mockReq({ token: 'valid-jwt', paymentProofImage: 99 }), mockParams('1'))
         const body = await res.json()
 

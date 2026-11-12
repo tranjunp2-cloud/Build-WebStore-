@@ -124,6 +124,38 @@ describe('addProjectDomain', () => {
         expect(headers['Content-Type']).toBe('application/json')
     })
 
+    it('omits gitBranch in production even when the commit ref is main [TC-F19.85]', async () => {
+        process.env.VERCEL_ENV = 'production'
+        process.env.VERCEL_GIT_COMMIT_REF = 'main'
+        try {
+            const fetchMock = mockFetchOnce({ body: makeDomain({ verified: true }) })
+
+            await addProjectDomain('example.com')
+
+            const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+            expect(init.body).toBe(JSON.stringify({ name: 'example.com' }))
+        } finally {
+            delete process.env.VERCEL_ENV
+            delete process.env.VERCEL_GIT_COMMIT_REF
+        }
+    })
+
+    it('sends gitBranch outside production so staging domains hit the staging deploy [TC-F19.86]', async () => {
+        process.env.VERCEL_ENV = 'preview'
+        process.env.VERCEL_GIT_COMMIT_REF = 'staging'
+        try {
+            const fetchMock = mockFetchOnce({ body: makeDomain({ verified: true }) })
+
+            await addProjectDomain('example.com')
+
+            const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+            expect(init.body).toBe(JSON.stringify({ name: 'example.com', gitBranch: 'staging' }))
+        } finally {
+            delete process.env.VERCEL_ENV
+            delete process.env.VERCEL_GIT_COMMIT_REF
+        }
+    })
+
     it('returns verification[] when verified=false (TXT challenge)', async () => {
         const fetchMock = mockFetchOnce({
             body: makeDomain({

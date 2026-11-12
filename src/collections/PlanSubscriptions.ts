@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { revalidatePlanSubscriptionAfterChange, revalidatePlanSubscriptionAfterDelete } from '@/lib/cache/revalidate-storefront'
 
 // Plan codes matching PW1 DB + SSO subscription codes
 export const PLAN_CODES = [
@@ -25,6 +26,10 @@ export const PlanSubscriptions: CollectionConfig = {
     create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
     update: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
     delete: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+  },
+  hooks: {
+    afterChange: [revalidatePlanSubscriptionAfterChange],
+    afterDelete: [revalidatePlanSubscriptionAfterDelete],
   },
   fields: [
     {

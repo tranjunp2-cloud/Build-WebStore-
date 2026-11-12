@@ -46,7 +46,7 @@ A first-class **`contact-submissions`** collection + a public POST intake endpoi
 - Public endpoint `POST /api/contact-submit` — rate-limited, validated, spam-guarded
 - Persists each submission keyed to a `site` (relationship → `sites`)
 - Status workflow for triage: `new → read → replied → archived`
-- Fire-and-forget email notification to the site owner (plain-text, ⚠️ to be templatized in F32)
+- Fire-and-forget email (F32 `contact-from-seller` template) + in-app bell (`LEAD_NEW`) to the tenant's active owners
 - Admin list view filterable by site + status to triage leads
 - Spam protection: per-IP rate limit (5/5min) + honeypot field
 
@@ -73,7 +73,7 @@ A first-class **`contact-submissions`** collection + a public POST intake endpoi
 ### Out of Scope
 
 - Buyer auto-reply / confirmation email (planned in F32 as `contact-buyer-confirmation`)
-- HTML email template for owner notification — currently inline plain-text (F32 `contact-seller-notification`)
+- Lead `subject` row in the owner email template (F32 `contact-from-seller` has no subject row yet)
 - CSV / bulk export of leads
 - ⚠️ Tenant-scoped read access (currently super-admin only — see BR-07)
 - Wiring `footer` and `popup` as live `source` values (schema supports, API hardcodes `contact-block`)
@@ -120,7 +120,8 @@ Full stories: [`docs/stories/F25-contact-submissions-stories.md`](../stories/F25
 | FR-CS-03 | Per-IP rate limit 5 / 5 min; exceed → 429 | P0 | `checkRateLimit('contact-submit:<ip>', 5, 300000)` |
 | FR-CS-04 | Honeypot `website` field non-empty → silent success, no persistence | P0 | anti-bot; returns `{ success: true }` |
 | FR-CS-05 | Validate `siteId` exists before create; unknown → 400 | P0 | `payload.findByID('sites', siteId)` |
-| FR-CS-06 | Fire-and-forget owner email notify (does not block / fail response) | P1 | `payload.sendEmail` to `site.ownerEmail` ⟶ fallback `site.tenant.email` |
+| FR-CS-06 | Fire-and-forget owner email notify (does not block / fail response) | P1 | GH-2157: F32 `contact-from-seller` template via `payload.sendEmail` to every user with tenant role `owner` + status `active` (`getTenantOwnerEmails(payload, tenantId, ['owner'])`); skipped when the tenant disabled the template. `site.ownerEmail` / `tenant.email` never existed in the schema |
+| FR-CS-11 | In-app bell for the owner(s) per lead | P1 | GH-2157: `notifyTenantOwners` type `LEAD_NEW` → `/contact-leads`, dedupe `LEAD_NEW:<submissionId>`, metadata has no visitor email/phone/message |
 | FR-CS-07 | Status workflow `new/read/replied/archived`, default `new`, indexed | P1 | merchant triage |
 | FR-CS-08 | Capture `ipAddress` (read-only) from `x-forwarded-for` | P1 | spam/abuse review |
 | FR-CS-09 | Admin list: title=email, columns name/email/site/status/createdAt; filter site+status | P1 | Payload list view |
@@ -138,7 +139,7 @@ Full stories: [`docs/stories/F25-contact-submissions-stories.md`](../stories/F25
 - **BR-CS-06:** Email notification is **best-effort** — sent without `await` on the response path; a send failure is swallowed and never turns a successful create into an error.
 - **BR-CS-07:** ⚠️ **Read/update/delete restricted to `super-admin`.** Unlike F25 Customers (tenant-scoped), site owners cannot currently view their own leads in the admin — they rely solely on the email notification. Tenant-scoping is deferred (§15).
 - **BR-CS-08:** `source` defaults to `contact-block`. API hardcodes this value today; `footer`/`popup` exist in schema for forward-compat but are not yet emitted.
-- **BR-CS-09:** Owner email resolution order: `site.ownerEmail` → `site.tenant.email` → skip (no notify if neither present).
+- **BR-CS-09:** Email recipients = every user with tenant role `owner` and status `active` (`getTenantOwnerEmails(payload, tenantId, ['owner'])` in `src/lib/contact/notify-contact-lead.ts`); one mail each. No active owner → warn + skip email. Skipped too when the tenant disabled the `contact-from-seller` template. The in-app `LEAD_NEW` bell goes to the same tenant owners (dedupe `LEAD_NEW:<submissionId>`). `site.ownerEmail` / `tenant.email` do not exist in the schema.
 - **BR-CS-10:** Hard-delete is **allowed** for super-admin (differs from Customers/Orders which forbid delete) — leads are transient triage data, not financial records.
 
 ---
@@ -158,7 +159,7 @@ POST /api/contact-submit { name, email, phone, message, siteId, website:'' }
   ├── honeypot website empty? ───────────── filled → 200 silent (bot), nothing saved
   ├── site exists? ──────────────────────── no → 400 "Invalid site"
   ├── payload.create('contact-submissions') status=new, source=contact-block, ipAddress
-  └── fire-and-forget: payload.sendEmail(ownerEmail, ...)  (not awaited)
+  └── runAfterResponse: notifyContactLead → email owners (contact-from-seller) + bell LEAD_NEW
   ↓
 200 { success: true } → form shows success state, resets
 ```
@@ -246,11 +247,13 @@ THEN the endpoint returns 429 and no row is created
 ### AC-4: Owner notification (US-F25-CS-04, FR-CS-06, BR-CS-06/09)
 
 ```gherkin
-GIVEN a valid submission for a site with an ownerEmail (or tenant.email)
+GIVEN a valid submission for a site whose tenant has an active owner
 WHEN the submission is created
-THEN payload.sendEmail is invoked to the resolved owner address (fire-and-forget)
-  AND if the email send fails the HTTP response is still 200 { success: true }
-  AND if neither ownerEmail nor tenant.email exists no email is attempted
+THEN each active owner is emailed with the contact-from-seller template linking to /contact-leads (after the response)
+  AND each active owner gets a LEAD_NEW bell notification
+  AND if the email or the bell fails the HTTP response is still 200 { success: true }
+  AND if the tenant disabled the template no email is sent (bell still is)
+  AND if the tenant has no active owner nothing is sent (warning logged)
 ```
 
 ### AC-5: Triage workflow + access (US-F25-CS-05, FR-CS-07/09/10, BR-CS-07/10)
@@ -330,8 +333,8 @@ THEN the list shows name/email/site/status/createdAt filterable by site + status
 
 | Item | Priority | Reason |
 |------|----------|--------|
-| ⚠️ Site owners cannot view own leads (super-admin only) | High | Read access not tenant-scoped; owners rely on email only. Align with F25 Customers tenant pattern. |
-| Plain-text owner email (no HTML template) | Med (F32) | Inline `text` at `route.ts`; F32 `contact-seller-notification` to templatize |
+| Payload admin collection is super-admin only | Low | Owners triage leads in the dashboard `/contact-leads` (tenant-scoped), not the Payload admin |
+| Lead `subject` missing from owner email | Low | `contact-from-seller` template has no subject row |
 | No buyer auto-reply / confirmation | Med (F32) | F32 `contact-buyer-confirmation` planned |
 | `footer` / `popup` sources not wired | Low | Schema-ready; API hardcodes `contact-block` |
 | No CSV export of leads | Low | Mirror F25 Customers export when needed |
@@ -362,4 +365,4 @@ THEN the list shows name/email/site/status/createdAt filterable by site + status
 - [x] Block UI wired to endpoint (`useContactForm`)
 - [ ] ⚠️ Tenant-scoped read access (deferred — see §15)
 - [ ] QA matrix authored (`docs/qa/F25-contact-submissions.md`, TC-F25-CS-NN)
-- [ ] Owner email templatized (F32)
+- [x] Owner email uses the F32 `contact-from-seller` template (GH-2157)

@@ -16,9 +16,19 @@ export async function uploadImageUrl(
     payload: BasePayload,
 ): Promise<number | undefined> {
     const { buffer, mimetype } = await downloadPhotoBuffer(imageUrl)
+    const id = await uploadImageBuffer(buffer, mimetype, filename, alt, tenantId, payload)
+    if (id != null) registerPixabayMediaSource(id, imageUrl)
+    return id
+}
+
+/** Shared persistence boundary for already validated legacy/source image bytes. */
+export async function uploadImageBuffer(
+    buffer: Buffer, mimetype: string, filename: string, alt: string,
+    tenantId: number | string, payload: BasePayload, aiGenerated = true,
+): Promise<number | undefined> {
     const createArgs = {
         collection: 'media' as const,
-        data: { alt, tenant: tenantId, aiGenerated: true },
+        data: { alt, tenant: tenantId, aiGenerated },
         file: { data: buffer, mimetype, name: filename, size: buffer.length },
     }
     // GH-1185: DB create serialized — concurrent media creates silently lose
@@ -36,6 +46,5 @@ export async function uploadImageUrl(
     }
     const numId = typeof doc.id === 'number' ? doc.id : parseInt(String(doc.id), 10)
     if (!Number.isFinite(numId)) return undefined
-    registerPixabayMediaSource(numId, imageUrl)
     return numId
 }

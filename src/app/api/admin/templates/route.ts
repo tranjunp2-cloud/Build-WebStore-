@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
-import { withSuperAdmin, CreateTemplateSchema } from '@/lib/admin/api-utils'
+import { withStudioPermission, withSuperAdmin, CreateTemplateSchema } from '@/lib/admin/api-utils'
+import { hasStudioPermission } from '@/lib/admin/studio-permissions'
 
 export const GET = withSuperAdmin(async (req: NextRequest) => {
     const sp = req.nextUrl.searchParams
@@ -66,7 +67,7 @@ export const GET = withSuperAdmin(async (req: NextRequest) => {
     })
 })
 
-export const POST = withSuperAdmin(async (req: NextRequest) => {
+export const POST = withStudioPermission('template.create', async (req: NextRequest, { user }) => {
     const body = await req.json().catch(() => null)
 
     if (!body) {
@@ -78,6 +79,8 @@ export const POST = withSuperAdmin(async (req: NextRequest) => {
         return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 422 })
     }
 
+    // Someone who cannot publish still creates: the template just starts as a draft.
+    const canPublish = hasStudioPermission(user.roles, 'template.review')
     const payload = await getPayload({ config })
 
     const template = await payload.create({
@@ -86,12 +89,12 @@ export const POST = withSuperAdmin(async (req: NextRequest) => {
             name: parsed.data.name,
             description: parsed.data.description,
             category: parsed.data.category,
-            status: parsed.data.status ?? 'draft',
+            status: canPublish ? (parsed.data.status ?? 'draft') : 'draft',
             personality: parsed.data.personality,
             isPremium: parsed.data.isPremium ?? false,
             isFeatured: parsed.data.isFeatured ?? false,
             previewUrl: parsed.data.previewUrl,
-            scheduledFor: parsed.data.scheduledFor,
+            scheduledFor: canPublish ? parsed.data.scheduledFor : undefined,
             tags: parsed.data.tags ?? [],
         },
     })

@@ -33,6 +33,8 @@ vi.mock('payload', () => ({
 }))
 
 vi.mock('@payload-config', () => ({ default: {} }))
+// the route reads the cached, per-domain-tagged lookup (src/lib/cache/tenant.ts): no Next cache in unit tests
+vi.mock('next/cache', () => ({ unstable_cache: (fn: (...args: unknown[]) => unknown) => fn, revalidateTag: vi.fn() }))
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const makeGetReq = (host?: string) => {

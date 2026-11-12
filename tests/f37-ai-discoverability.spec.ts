@@ -5,6 +5,8 @@ import { BlockList, isIP } from 'node:net'
 const AUTH_STATE_PATH = './e2e/.auth/user.json'
 const EXPECTED_TEST_EMAIL = process.env.TEST_EMAIL
 const PLATFORM_BASE_URL = process.env.BASE_URL
+/** Workspace /api/e2e/ensure-test-user provisions when no tenantSlug is sent. */
+const DEFAULT_E2E_TENANT_SLUG = 'e2e-test'
 
 const NON_PUBLIC_ADDRESSES = new BlockList()
 for (const [network, prefix] of [
@@ -291,11 +293,17 @@ async function discoverFixtures(
         throw new Error('TEST_EMAIL must have at least one active tenant membership')
     }
 
-    if (activeMemberships.length !== 1) {
-        throw new Error('The F37 test account must have exactly one active tenant membership')
+    // TEST_EMAIL is shared: targeted-smoke.yml adds it to `e2e-targeted-smoke`, people
+    // invite it to other workspaces by hand, and /api/e2e/ensure-test-user keeps
+    // earlier memberships. Use the default
+    // E2E workspace the staging suites provision, not "the only membership".
+    const memberships = activeMemberships.map(membership => hydratedTenant(membership.tenant))
+    const tenant = memberships.length === 1
+        ? memberships[0]
+        : memberships.find(candidate => candidate?.slug === DEFAULT_E2E_TENANT_SLUG) ?? null
+    if (memberships.length > 1 && !tenant) {
+        throw new Error(`TEST_EMAIL has several active workspaces and none is "${DEFAULT_E2E_TENANT_SLUG}"`)
     }
-
-    const tenant = hydratedTenant(activeMemberships[0].tenant)
     if (!tenant) {
         throw new Error('/api/users/me must hydrate active tenant relationships for F37 fixture discovery')
     }

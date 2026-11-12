@@ -28,9 +28,10 @@ import { SectionCard } from './section-card'
 
 // ── Sortable wrapper keeps dnd-kit logic outside SectionCard ─────────────────
 
-function SortableSectionCard({ section, isSelected }: { section: Section; isSelected: boolean }) {
+function SortableSectionCard({ section, isSelected, canEdit }: { section: Section; isSelected: boolean; canEdit: boolean }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: section.id,
+        disabled: !canEdit,
     })
 
     const style: React.CSSProperties = {
@@ -46,6 +47,7 @@ function SortableSectionCard({ section, isSelected }: { section: Section; isSele
             <SectionCard
                 section={section}
                 isSelected={isSelected}
+                canEdit={canEdit}
                 dragHandleProps={{ ...attributes, ...listeners } as React.HTMLAttributes<HTMLButtonElement>}
             />
         </div>
@@ -54,7 +56,7 @@ function SortableSectionCard({ section, isSelected }: { section: Section; isSele
 
 // ── Main pane ────────────────────────────────────────────────────────────────
 
-export function BuilderCanvasPane() {
+export function BuilderCanvasPane({ canEdit = true }: { canEdit?: boolean } = {}) {
     const { sections, selectedId, reorder, addBlock } = useBuilderStore()
     const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
 
@@ -117,13 +119,15 @@ export function BuilderCanvasPane() {
                         <div className="b-empty-canvas">
                             <h3>Start with an empty template</h3>
                             <p>Drag blocks from the library on the left, or click to add quickly.</p>
-                            <button
-                                type="button"
-                                className="b-btn"
-                                onClick={() => addBlock('hero')}
-                            >
-                                + Add hero block
-                            </button>
+                            {canEdit && (
+                                <button
+                                    type="button"
+                                    className="b-btn"
+                                    onClick={() => addBlock('hero')}
+                                >
+                                    + Add hero block
+                                </button>
+                            )}
                         </div>
                     </div>
                 ) : (
@@ -142,6 +146,7 @@ export function BuilderCanvasPane() {
                                         key={section.id}
                                         section={section}
                                         isSelected={selectedId === section.id}
+                                        canEdit={canEdit}
                                     />
                                 ))}
                             </div>
@@ -150,13 +155,13 @@ export function BuilderCanvasPane() {
                 )}
 
                 {/* End drop zone hint */}
-                <div className="b-end-zone">
+                {canEdit && <div className="b-end-zone">
                     <div style={{ fontSize: 14, marginBottom: 4 }}>＋</div>
                     <div>Drag a block here to add at the end</div>
                     <div style={{ fontSize: 11, marginTop: 2, color: 'var(--text-4)' }}>
                         or click a block in the Library
                     </div>
-                </div>
+                </div>}
             </div>
         </div>
     )

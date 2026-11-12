@@ -3,11 +3,15 @@
  *
  * Usage:
  *   E2E_SETUP_SECRET=... npm run measure:generation -- --runs=20 --language=vi --label=staging
+ *
+ * Each run signs a fresh account in through verify-otp (scripts/perf/otp-session.ts): that needs a server that
+ * accepts its code for any account, i.e. a local `next dev`; deployed envs only bypass OTP for TEST_EMAIL.
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { percentile } from '../src/lib/ai/generation-timings'
+import { createOtpSession, type OtpSession } from './perf/otp-session'
 
 const BASE = process.env.NEXT_PUBLIC_SERVER_URL ?? `http://localhost:${process.env.PORT ?? 3000}`
 const BEARER = process.env.E2E_SETUP_SECRET ?? ''
@@ -51,13 +55,7 @@ function parseArgs() {
     }
 }
 
-function cookieHeader(headers: Headers): string {
-    const values = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.()
-        ?? [headers.get('set-cookie') ?? '']
-    return values.filter(Boolean).map((value) => value.split(';', 1)[0]).join('; ')
-}
-
-async function createBenchmarkSession(runIndex: number, label: string): Promise<string> {
+async function createBenchmarkSession(runIndex: number, label: string): Promise<OtpSession> {
     if (!BEARER) throw new Error('E2E_SETUP_SECRET is required')
     if (!TEST_PASSWORD) throw new Error('TEST_PASSWORD is required')
     const suffix = `${label}-${runIndex}-${crypto.randomUUID().slice(0, 8)}`
@@ -71,18 +69,11 @@ async function createBenchmarkSession(runIndex: number, label: string): Promise<
         body: JSON.stringify({ email, password: TEST_PASSWORD, tenantSlug, tenantName: `Generation Benchmark ${runIndex + 1}` }),
     })
     if (!response.ok) throw new Error(`ensure-test-user failed: ${response.status} ${await response.text()}`)
-    const login = await fetch(`${BASE}/api/users/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: TEST_PASSWORD }),
-    })
-    if (!login.ok) throw new Error(`login failed: ${login.status} ${await login.text()}`)
-    const cookie = cookieHeader(login.headers)
-    if (!cookie) throw new Error('login succeeded without a session cookie')
-    return cookie
+    // The password step alone opens no app route (TC-PERF-142): finish the sign-in with the OTP step.
+    return createOtpSession(BASE, email)
 }
 
-async function runGeneration(cookie: string, fixture: typeof FIXTURES[number], language: string): Promise<RunResult> {
+async function runGeneration(session: OtpSession, fixture: typeof FIXTURES[number], language: string): Promise<RunResult> {
     const requestId = crypto.randomUUID()
     const startedAt = performance.now()
     const result: RunResult = { requestId, language, industry: fixture.industry, status: 'failed' }
@@ -93,7 +84,8 @@ async function runGeneration(cookie: string, fixture: typeof FIXTURES[number], l
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Cookie: cookie,
+                Cookie: session.cookie,
+                Origin: session.origin,
                 'X-Generation-Request-Id': requestId,
             },
             body: JSON.stringify({
@@ -186,8 +178,8 @@ async function main() {
     const results: RunResult[] = []
     for (let index = 0; index < args.runs; index++) {
         const fixture = FIXTURES[index % FIXTURES.length]!
-        const cookie = await createBenchmarkSession(index, args.label)
-        const result = await runGeneration(cookie, fixture, args.language)
+        const session = await createBenchmarkSession(index, args.label)
+        const result = await runGeneration(session, fixture, args.language)
         results.push(result)
         console.info(`[measure-generation] ${index + 1}/${args.runs} ${fixture.industry} ${result.status} done=${result.doneMs ?? '-'}ms`)
     }

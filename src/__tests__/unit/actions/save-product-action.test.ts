@@ -122,19 +122,34 @@ describe('getProductsAction [TC-GH1432-PERF-01]', () => {
         mockFind.mockResolvedValue({ docs: [{ id: 42, name: 'Test Product' }] })
     })
 
-    it('loads only list/quick-view fields without a pagination count query', async () => {
+    it('[TC-PERF-053] loads list/quick-view fields of every authorized product in one read', async () => {
+        // Arrange: the legacy array caller must receive records beyond the first 100.
+        const products = Array.from({ length: 101 }, (_, index) => ({ id: index + 1, name: `Product ${index + 1}` }))
+        mockFind.mockResolvedValueOnce({ docs: products, totalPages: 1 })
+
+        // Act
         const result = await getProductsAction()
 
-        expect(result).toEqual([{ id: 42, name: 'Test Product' }])
-        expect(mockFind).toHaveBeenCalledOnce()
+        // Assert
+        expect(result).toEqual(products)
+        expect(mockFind).toHaveBeenCalledTimes(1)
+        expect(mockFind.mock.calls[0][0]).toMatchObject({
+            user: { id: 'u1', email: 'test@example.com' },
+            overrideAccess: false,
+            pagination: false,
+            limit: 0,
+            sort: ['-createdAt', '-id'],
+            where: { and: [{ deletedAt: { exists: false } }, { tenant: { equals: 68 } }] },
+        })
+        expect(mockFind.mock.calls[0][0]).not.toHaveProperty('page')
 
         const query = mockFind.mock.calls[0][0]
         expect(query).toMatchObject({
             collection: 'products',
             overrideAccess: false,
-            limit: 100,
+            limit: 0,
             pagination: false,
-            sort: '-createdAt',
+            sort: ['-createdAt', '-id'],
             depth: 1,
             where: {
                 and: [
@@ -352,14 +367,11 @@ describe('saveProductAction', () => {
             mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ sku: 'sku-001' }] })
 
             // Act
-            let thrown: Error | null = null
-            try {
-                await saveProductAction({ name: 'New Product', sku: 'SKU-001' })
-            } catch (e) { thrown = e as Error }
+            // GH-2079: returned (not thrown) — Next.js production hides a thrown server-action message
+            const parsed = await saveProductAction({ name: 'New Product', sku: 'SKU-001' })
 
             // Assert — structured JSON error
-            expect(thrown).not.toBeNull()
-            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.ok).toBe(false)
             expect(parsed.code).toBe('FIELD_ERRORS')
             expect(parsed.fieldErrors).toHaveProperty('baseSku')
             expect(parsed.fieldErrors.baseSku.code).toBe('SKU_ALREADY_IN_USE')
@@ -374,14 +386,11 @@ describe('saveProductAction', () => {
             mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ sku: 'var-001' }] })
 
             // Act
-            let thrown: Error | null = null
-            try {
-                await saveProductAction({ name: 'New Product', variants: [{ sku: 'VAR-001' }] })
-            } catch (e) { thrown = e as Error }
+            // GH-2079: returned (not thrown) — Next.js production hides a thrown server-action message
+            const parsed = await saveProductAction({ name: 'New Product', variants: [{ sku: 'VAR-001' }] })
 
             // Assert
-            expect(thrown).not.toBeNull()
-            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.ok).toBe(false)
             expect(parsed.code).toBe('FIELD_ERRORS')
             expect(parsed.fieldErrors).toHaveProperty('variants.0.skuCode')
             expect(parsed.fieldErrors['variants.0.skuCode'].code).toBe('SKU_ALREADY_IN_USE')
@@ -390,21 +399,17 @@ describe('saveProductAction', () => {
         })
 
         it('[TC-F08-04-77] duplicate base/variant SKUs in one request → returns structured variant field error', async () => {
-            let thrown: Error | null = null
-            try {
-                await saveProductAction({
-                    name: 'Wool Coat',
-                    sku: 'COAT-001',
-                    variants: [
-                        { sku: 'COAT-RED-M' },
-                        { sku: 'coat-red-m' },
-                        { sku: 'COAT-001' },
-                    ],
-                })
-            } catch (error) { thrown = error as Error }
-
-            expect(thrown).not.toBeNull()
-            const parsed = JSON.parse(thrown!.message)
+            // GH-2079: returned (not thrown) — Next.js production hides a thrown server-action message
+            const parsed = await saveProductAction({
+                name: 'Wool Coat',
+                sku: 'COAT-001',
+                variants: [
+                    { sku: 'COAT-RED-M' },
+                    { sku: 'coat-red-m' },
+                    { sku: 'COAT-001' },
+                ],
+            })
+            expect(parsed.ok).toBe(false)
             expect(parsed.code).toBe('FIELD_ERRORS')
             expect(parsed.fieldErrors).toHaveProperty('variants.1.skuCode')
             expect(parsed.fieldErrors).toHaveProperty('variants.2.skuCode')
@@ -464,18 +469,15 @@ describe('saveProductAction', () => {
             mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ sku: 'b-001' }, { sku: 'v-001' }] })
 
             // Act
-            let thrown: Error | null = null
-            try {
-                await saveProductAction({
-                    name: 'New Product',
-                    sku: 'B-001',
-                    variants: [{ sku: 'V-001' }],
-                })
-            } catch (e) { thrown = e as Error }
+            // GH-2079: returned (not thrown) — Next.js production hides a thrown server-action message
+            const parsed = await saveProductAction({
+                name: 'New Product',
+                sku: 'B-001',
+                variants: [{ sku: 'V-001' }],
+            })
 
             // Assert — both field paths populated
-            expect(thrown).not.toBeNull()
-            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.ok).toBe(false)
             expect(parsed.code).toBe('FIELD_ERRORS')
             expect(parsed.fieldErrors).toHaveProperty('baseSku')
             expect(parsed.fieldErrors).toHaveProperty('variants.0.skuCode')
@@ -487,14 +489,11 @@ describe('saveProductAction', () => {
             mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ sku: 'sku-001' }] })
 
             // Act
-            let thrown: Error | null = null
-            try {
-                await saveProductAction({ name: 'New Product', sku: 'sku-001' })
-            } catch (e) { thrown = e as Error }
+            // GH-2079: returned (not thrown) — Next.js production hides a thrown server-action message
+            const parsed = await saveProductAction({ name: 'New Product', sku: 'sku-001' })
 
             // Assert — baseSku field error present despite case difference
-            expect(thrown).not.toBeNull()
-            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.ok).toBe(false)
             expect(parsed.code).toBe('FIELD_ERRORS')
             expect(parsed.fieldErrors).toHaveProperty('baseSku')
             expect(mockCreate).not.toHaveBeenCalled()
@@ -733,13 +732,9 @@ describe('saveProductAction', () => {
         it('[TC-F08-04-48] create path: unresolved unique-violation (our raw-SQL sku index) → translated into FIELD_ERRORS/baseSku shape', async () => {
             mockCreate.mockRejectedValueOnce(makeUnresolvedUniqueViolation())
 
-            let thrown: Error | null = null
-            try {
-                await saveProductAction({ name: 'New Product', sku: 'DUP-001' })
-            } catch (e) { thrown = e as Error }
-
-            expect(thrown).not.toBeNull()
-            const parsed = JSON.parse(thrown!.message)
+            // GH-2079: returned (not thrown) — Next.js production hides a thrown server-action message
+            const parsed = await saveProductAction({ name: 'New Product', sku: 'DUP-001' })
+            expect(parsed.ok).toBe(false)
             expect(parsed.code).toBe('FIELD_ERRORS')
             expect(parsed.fieldErrors.baseSku.code).toBe('SKU_ALREADY_IN_USE')
             expect(parsed.fieldErrors.baseSku.values).toEqual(['DUP-001'])
@@ -748,13 +743,9 @@ describe('saveProductAction', () => {
         it('[TC-F08-04-49] update path: same violation is translated identically', async () => {
             mockUpdate.mockRejectedValueOnce(makeUnresolvedUniqueViolation())
 
-            let thrown: Error | null = null
-            try {
-                await saveProductAction({ name: 'Existing Product', sku: 'DUP-002' }, 42)
-            } catch (e) { thrown = e as Error }
-
-            expect(thrown).not.toBeNull()
-            const parsed = JSON.parse(thrown!.message)
+            // GH-2079: returned (not thrown) — Next.js production hides a thrown server-action message
+            const parsed = await saveProductAction({ name: 'Existing Product', sku: 'DUP-002' }, 42)
+            expect(parsed.ok).toBe(false)
             expect(parsed.code).toBe('FIELD_ERRORS')
             expect(parsed.fieldErrors.baseSku.values).toEqual(['DUP-002'])
         })
@@ -779,13 +770,9 @@ describe('saveProductAction', () => {
             // (see actions.ts translateDbSkuConflict comment) rather than asserting ideal behavior.
             mockCreate.mockRejectedValueOnce(makeUnresolvedUniqueViolation())
 
-            let thrown: Error | null = null
-            try {
-                await saveProductAction({ name: 'New Product', sku: 'BASE-1', variants: [{ sku: 'DUP-VAR' }] })
-            } catch (e) { thrown = e as Error }
-
-            expect(thrown).not.toBeNull()
-            const parsed = JSON.parse(thrown!.message)
+            // GH-2079: returned (not thrown) — Next.js production hides a thrown server-action message
+            const parsed = await saveProductAction({ name: 'New Product', sku: 'BASE-1', variants: [{ sku: 'DUP-VAR' }] })
+            expect(parsed.ok).toBe(false)
             expect(parsed.code).toBe('FIELD_ERRORS')
             expect(parsed.fieldErrors).toHaveProperty('baseSku') // not a variants.N.skuCode key — the limitation
         })
@@ -794,6 +781,23 @@ describe('saveProductAction', () => {
             mockCreate.mockRejectedValueOnce(new Error('Network timeout'))
 
             await expect(saveProductAction({ name: 'New Product' })).rejects.toThrow('Network timeout')
+        })
+
+        it('[TC-F08-04-154] a duplicate SKU is RETURNED as FIELD_ERRORS (never thrown); other errors still throw (VERSION_CONFLICT: save-version-products.test.ts)', async () => {
+            // Arrange — duplicate base SKU
+            mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ sku: 'bea-002' }] })
+
+            // Act + Assert — result, not rejection
+            await expect(saveProductAction({ name: 'New Product', sku: 'BEA-002' })).resolves.toMatchObject({
+                ok: false,
+                code: 'FIELD_ERRORS',
+                fieldErrors: { baseSku: { code: 'SKU_ALREADY_IN_USE', values: ['BEA-002'] } },
+            })
+
+            // Other errors are not swallowed
+            mockCreate.mockRejectedValueOnce(new Error('Network timeout'))
+            await expect(saveProductAction({ name: 'New Product' })).rejects.toThrow('Network timeout')
+
         })
     })
 })
@@ -1528,5 +1532,54 @@ describe('getProductAction', () => {
         expect(result.name).toBe('Test Product')
         // Write failed, so we don't claim it succeeded — flag stays as fetched (true).
         expect(result.aiReviewPending).toBe(true)
+    })
+
+    // ── GH-2079: read scoped by Products.access.read ─────────────────────────────────
+
+    it('[TC-F08-04-151] reads with overrideAccess:false + disableErrors:true so another tenant\'s product is filtered out', async () => {
+        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', aiReviewPending: false })
+
+        await getProductAction(42)
+
+        expect(mockFindByID.mock.calls[0][0]).toMatchObject({ collection: 'products', id: 42, overrideAccess: false, disableErrors: true })
+        expect(mockFindByID.mock.calls[0][0].user).toMatchObject({ id: 'u1' })
+    })
+
+    it('[TC-F08-04-152] findByID returns null (missing / other tenant) → resolves null and writes nothing', async () => {
+        mockFindByID.mockResolvedValue(null)
+
+        const result = await getProductAction(42)
+
+        expect(result).toBeNull()
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-04-153] own product with aiReviewPending → flag still cleared and shape unchanged', async () => {
+        mockFindByID.mockResolvedValue({ id: 42, name: 'Mine', sku: 'S-1', aiReviewPending: true })
+        mockUpdate.mockResolvedValue({ id: 42, updatedAt: '2026-11-10T00:00:00.000Z' })
+
+        const result = await getProductAction(42)
+
+        expect(result).toEqual({ id: 42, name: 'Mine', sku: 'S-1', aiReviewPending: false, updatedAt: '2026-11-10T00:00:00.000Z' })
+        expect(mockUpdate.mock.calls[0][0]).toMatchObject({ overrideAccess: false })
+    })
+
+    it('[TC-PERF-076] trims the populated tenant / site to public fields and reads back only the new version stamp', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', aiReviewPending: true })
+        mockUpdate.mockResolvedValue({ id: 42, updatedAt: '2026-10-24T00:00:00.000Z' })
+
+        // Act
+        const result = await getProductAction(42)
+
+        // Assert
+        expect(mockFindByID.mock.calls[0][0]).toMatchObject({
+            collection: 'products',
+            id: 42,
+            depth: 1,
+            populate: { tenants: { name: true, slug: true }, sites: { name: true, domain: true } },
+        })
+        expect(mockUpdate.mock.calls[0][0]).toMatchObject({ depth: 0, select: { updatedAt: true }, overrideAccess: false })
+        expect(result.updatedAt).toBe('2026-10-24T00:00:00.000Z')
     })
 })

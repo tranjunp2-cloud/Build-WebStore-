@@ -1,11 +1,16 @@
 'use client'
 
+import { mergeFooterSocialsWithSite, mergeContactInfoWithSite, mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
+
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { AlertTriangle, Building2, ChevronDown, Compass, Globe, Globe2, ListTree, Loader2, Palette, Search, Settings, Sparkles, UploadCloud, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { SETTINGS_ADD_BUTTON_COLORS } from './settings-add-button-class'
 import { blockRegistry } from '@/blocks/registry'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { ProductListingSettings } from './ProductListingSettings'
+import { VideoUrlField } from './video-url-field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
@@ -17,14 +22,23 @@ import { BlockImageEditor } from './BlockImageEditor'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
+import HeroSlidesSettings from './HeroSlidesSettings'
+import type { HeroConfig } from '@/blocks/hero/config'
 import FaqSettings from './FaqSettings'
 import TeamSettings from './TeamSettings'
 import LogoCloudSettings from './LogoCloudSettings'
+import PortfolioGridSettings from './PortfolioGridSettings'
 import PricingSettings from './PricingSettings'
 import FeatureComparisonSettings from './FeatureComparisonSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
 import { FontSelect } from './FontSelect'
+import { BlockSpacingControls, type BlockSpacingField } from './settings-block-spacing-controls'
+import { VariantChip } from './settings-variant-chip'
+import { BLOCK_ICONS, FALLBACK_BLOCK_ICON } from './block-library-icons'
+import { useEditorAgentEnabled } from './agent/editor-agent-context'
+import { useAiAllowanceOut } from '@/components/ai-quota/use-ai-usage'
+import { ElementAskLayer, type ViewportRect } from './agent/ElementAskLayer'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { StepItem } from '@/blocks/step-process/config'
 import type { FeatureComparisonConfig } from '@/blocks/feature-comparison/config'
@@ -32,6 +46,7 @@ import type { MenuCategory, MenuItem } from '@/blocks/menu-food/config'
 import type { FAQConfig } from '@/blocks/faq/config'
 import type { TeamConfig } from '@/blocks/team/config'
 import type { LogoCloudConfig } from '@/blocks/logo-cloud/config'
+import type { PortfolioGridConfig } from '@/blocks/portfolio-grid/config'
 import type { PricingConfig } from '@/blocks/pricing/config'
 import { SETTINGS_PANEL_WIDTH } from './layout-constants'
 import type { PageData } from '@/store/editorStore'
@@ -58,10 +73,8 @@ import { MapsEmbedPreview } from './local-business/maps-embed-preview'
 import { CompletionChecklist } from './local-business/completion-checklist'
 import type { LocalBusinessData } from './local-business/types'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-    SeoOverwriteConfirmDialog,
-    type SeoMetadataPreview,
-} from './SeoOverwriteConfirmDialog'
+import type { BreadcrumbConfig } from '@/lib/site-renderer/breadcrumb-config'
+import { isBreadcrumbEnabled, buildBreadcrumbConfig } from '@/lib/site-renderer/breadcrumb-config'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
 function stripHtmlForDisplay(value: unknown): string {
@@ -120,32 +133,22 @@ const FOOTER_SOCIAL_PLATFORMS = [
     { key: 'instagram', label: 'Instagram URL' },
     { key: 'linkedin',  label: 'LinkedIn URL' },
     { key: 'youtube',   label: 'YouTube URL' },
+    { key: 'tiktok', label: 'TikTok URL' },
+    { key: 'whatsapp', label: 'WhatsApp URL' },
 ] as const
 
 // ─── Constants ──────────────────────────────────────────────────────────
 const HEADING_FONT_OPTIONS = [...THEME_ENUMS.fontHeading]
 const BODY_FONT_OPTIONS = [...THEME_ENUMS.fontBody]
-const labelCls = "text-[11px] font-medium text-slate-400"
+const labelCls = "text-[11px] font-medium text-[var(--editor-text-muted)]"
 
 const PHONE_COUNTRIES = [
     { code: '+60', flag: '🇲🇾', name: 'Malaysia', iso: 'my', placeholder: '+60 12 345 6789' },
     { code: '+84', flag: '🇻🇳', name: 'Vietnam', iso: 'vn', placeholder: '+84 93 123 4567' },
 ] as const
-const sectionCls = "border-t border-white/10 pt-4"
+const sectionCls = "border-t border-[var(--editor-border)] pt-4"
 // Hide newsletter variants from footer UI — feature not ready for users
 const FOOTER_HIDDEN_VARIANTS = new Set(['expanded', 'mega-footer'])
-
-type SeoProposal = SeoMetadataPreview & {
-    slug?: string | null
-}
-
-type PendingSeoOverwrite = {
-    pageId: string
-    isHomepage: boolean
-    existing: SeoMetadataPreview
-    proposed: SeoProposal
-    warning?: string
-}
 
 /** Ensure phone number is displayed with country code prefix (e.g. "+60123456789"). */
 function preparePhoneForDisplay(phone: string, countryCode: string): string {
@@ -184,10 +187,13 @@ function PhoneCountryPicker({ value, onChange }: { value: string; onChange: (cod
                         <button
                             key={c.code}
                             type="button"
+                            aria-current={c.code === value ? 'true' : undefined}
                             onClick={() => { onChange(c.code); setOpen(false) }}
                             className={cn(
-                                'flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-white/5',
-                                c.code === value ? 'text-blue-400' : 'text-slate-200',
+                                'flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors',
+                                c.code === value
+                                    ? 'bg-[hsl(var(--primary)/0.1)] font-medium text-[var(--editor-text)] hover:bg-[hsl(var(--primary)/0.15)] dark:text-[hsl(var(--primary))]'
+                                    : 'text-slate-200 hover:bg-white/5',
                             )}
                         >
                             <img src={`https://flagcdn.com/w40/${c.iso}.png`} alt={c.name} className="h-5 w-5 rounded object-cover" />
@@ -206,7 +212,8 @@ export type SettingsTab = 'global' | 'seo' | 'menu' | 'block'
 
 function getBlockInfo(blockType: string) {
     const meta = blockRegistry.getBlockMeta(blockType)
-    return { label: meta?.name || blockType, icon: meta?.icon || '🧩', variants: meta?.variants || [] }
+    // GH-2107: same lucide icon as the Components panel (BlockLibraryPanel), not the registry emoji
+    return { label: meta?.name || blockType, Icon: BLOCK_ICONS[blockType] ?? FALLBACK_BLOCK_ICON, variants: meta?.variants || [] }
 }
 
 function normalizePagePath(slug?: string | null) {
@@ -373,14 +380,20 @@ function SettingsPanelInner({
     const footerShowSocials = footerVariant !== 'minimal'
     const footerShowTagline = footerVariant === 'centered-stack' || footerVariant === 'dark-gradient'
 
-    const _spacingDefault = () => block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY || 12) : 32
-    const [localPaddingTop, setLocalPaddingTop] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? _spacingDefault()))
-    const [localPaddingBottom, setLocalPaddingBottom] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? _spacingDefault()))
+    // Spacing used when the block has no blockSpacing yet: announcement bar falls back to its paddingY
+    const spacingDefault = block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY || 12) : 32
+    // Value stored on the block (or the default) — slider initial/sync value and the "no-op save" reference
+    const savedSpacing = (field: BlockSpacingField) =>
+        Number((block?.blockSpacing as Record<string, unknown>)?.[field] ?? spacingDefault)
+    const savedTop = savedSpacing('paddingTop')
+    const savedBottom = savedSpacing('paddingBottom')
+    const [localPaddingTop, setLocalPaddingTop] = useState(savedTop)
+    const [localPaddingBottom, setLocalPaddingBottom] = useState(savedBottom)
+    // Re-sync the sliders when the stored value changes (other block selected, undo, paddingY edited)
     useEffect(() => {
-        const def = block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY || 12) : 32
-        setLocalPaddingTop(Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? def))
-        setLocalPaddingBottom(Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? def))
-    }, [block?.blockSpacing, block?.blockType])
+        setLocalPaddingTop(savedTop)
+        setLocalPaddingBottom(savedBottom)
+    }, [savedTop, savedBottom])
 
     // Resolve navigation links: prefer headerBlock.links, fallback to layout nav block
     const storeBlocks = useEditorStore(state => state.blocks)
@@ -399,7 +412,7 @@ function SettingsPanelInner({
     const isTranslatedNavView = activeLocale !== baseLocale
     // Breadcrumb config stored globally in headerBlock.breadcrumbConfig
     const breadcrumbCfg = (headerBlock as Record<string, unknown> | null | undefined)?.breadcrumbConfig as
-        { homeLabel?: string; separator?: string; showOnAllPages?: boolean } | undefined
+        BreadcrumbConfig | undefined
     const resolvedNavLinks = useMemo(() => {
         // Display-merge so labels reflect activeLocale (base view → base labels, returned as-is).
         const displayHeader = headerBlock ? getDisplayBlock(headerBlock as BlockData) as Record<string, unknown> : null
@@ -441,10 +454,11 @@ function SettingsPanelInner({
         setAnnShowLink(sl === true || (sl === undefined && !!(b?.linkText || b?.linkUrl)))
     }, [blockIndex, block?.showLink, block?.linkText, block?.linkUrl])
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
-    const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
-    const [pendingSeoOverwrite, setPendingSeoOverwrite] = useState<PendingSeoOverwrite | null>(null)
-    const [isApplyingSeoOverwrite, setIsApplyingSeoOverwrite] = useState(false)
-    const currentPageIdRef = useRef(currentPageId)
+    // the SEO tab's AI button asks the copilot chat (Ask AI); no button without the assistant
+    // no SEO Ask AI while the shop's AI allowance is used up
+    const aiOut = useAiAllowanceOut()
+    const agentOn = useEditorAgentEnabled() && !aiOut
+    const [seoAsk, setSeoAsk] = useState<ViewportRect | null>(null)
     const [seoSlugInput, setSeoSlugInput] = useState('')
     const [seoTitleInput, setSeoTitleInput] = useState('')
     const [seoDescriptionInput, setSeoDescriptionInput] = useState('')
@@ -472,12 +486,8 @@ function SettingsPanelInner({
     const settingsFocusFallbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
 
-    useEffect(() => {
-        currentPageIdRef.current = currentPageId
-        setPendingSeoOverwrite((pending) => (
-            pending && pending.pageId !== currentPageId ? null : pending
-        ))
-    }, [currentPageId])
+    // an Ask AI box opened for one page never stays over another
+    useEffect(() => setSeoAsk(null), [currentPageId])
 
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
@@ -686,7 +696,7 @@ function SettingsPanelInner({
                         className="h-7 w-7 rounded border-0 cursor-pointer bg-transparent" />
                     <input value={(theme.primaryColor as string) || '#0ea5e9'}
                         onChange={e => onThemeChange('primaryColor', e.target.value)}
-                        className="flex-1 rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500/50" />
+                        className="flex-1 rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-1.5 text-xs text-white outline-none focus:border-[hsl(var(--primary)/0.5)]" />
                 </div>
             </div>
             <div>
@@ -713,11 +723,9 @@ function SettingsPanelInner({
                 <label className="text-xs text-gray-400">{s.colorMode}</label>
                 <div className="mt-1 flex gap-2">
                     {(['dark', 'light'] as const).map(mode => (
-                        <button key={mode} onClick={() => onThemeChange('colorMode', mode)}
-                            className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors',
-                                theme.colorMode === mode ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
+                        <VariantChip key={mode} className="flex-1" active={theme.colorMode === mode} onClick={() => onThemeChange('colorMode', mode)}>
                             {mode === 'dark' ? s.dark : s.light}
-                        </button>
+                        </VariantChip>
                     ))}
                 </div>
             </div>
@@ -1165,21 +1173,22 @@ function SettingsPanelInner({
         }
 
         setSeoSlugInput(activePage.isHomepage ? '/' : (activePage.slug || ''))
-        setSeoTitleInput(activePage.seoTitle || activePage.title || '')
+        setSeoTitleInput(activePage.seoTitle || '')
         setSeoDescriptionInput(activePage.seoDescription || '')
         setSeoFieldError(activePage.error || null)
     }, [activePage])
 
     const handleSeoUpdate = async (field: keyof PageData, value: string) => {
         if (!activePage || !currentPageId) return
-        if (activePage[field] === value) return
+        // Untouched empty field (null/undefined in DB vs '' in input) is not a change.
+        if ((activePage[field] ?? '') === value) return
 
         const updatedPage = await onPageUpdate?.(currentPageId, { [field]: value })
         if (!updatedPage) {
             if (field === 'slug') {
                 setSeoSlugInput(activePage.isHomepage ? '/' : (activePage.slug || ''))
             } else if (field === 'seoTitle') {
-                setSeoTitleInput(activePage.seoTitle || activePage.title || '')
+                setSeoTitleInput(activePage.seoTitle || '')
             } else if (field === 'seoDescription') {
                 setSeoDescriptionInput(activePage.seoDescription || '')
             }
@@ -1188,70 +1197,8 @@ function SettingsPanelInner({
 
         setSeoFieldError(null)
         setSeoSlugInput(updatedPage.isHomepage ? '/' : (updatedPage.slug || ''))
-        setSeoTitleInput(updatedPage.seoTitle || updatedPage.title || '')
+        setSeoTitleInput(updatedPage.seoTitle || '')
         setSeoDescriptionInput(updatedPage.seoDescription || '')
-    }
-
-    const applySeoProposal = async (
-        proposed: SeoProposal,
-        targetPageId: string,
-        targetIsHomepage: boolean,
-    ): Promise<boolean> => {
-        if (currentPageIdRef.current !== targetPageId) return false
-
-        if (proposed.title) setSeoTitleInput(proposed.title)
-        if (proposed.description) setSeoDescriptionInput(proposed.description)
-        if (proposed.slug && !targetIsHomepage) setSeoSlugInput(proposed.slug)
-
-        if (proposed.title) {
-            await handleSeoUpdate('seoTitle', proposed.title)
-            if (currentPageIdRef.current !== targetPageId) return false
-        }
-        if (proposed.description) {
-            await handleSeoUpdate('seoDescription', proposed.description)
-            if (currentPageIdRef.current !== targetPageId) return false
-        }
-        if (proposed.slug && !targetIsHomepage) {
-            await handleSeoUpdate('slug', proposed.slug)
-            if (currentPageIdRef.current !== targetPageId) return false
-        }
-        return true
-    }
-
-    const cancelSeoOverwrite = () => {
-        if (isApplyingSeoOverwrite) return
-        setPendingSeoOverwrite(null)
-        toast.info(s.seoCancelled)
-    }
-
-    const confirmSeoOverwrite = async () => {
-        if (!pendingSeoOverwrite || isApplyingSeoOverwrite) return
-        if (pendingSeoOverwrite.pageId !== currentPageIdRef.current) {
-            setPendingSeoOverwrite(null)
-            toast.info(s.seoCancelled)
-            return
-        }
-
-        const pending = pendingSeoOverwrite
-        setIsApplyingSeoOverwrite(true)
-        try {
-            const applied = await applySeoProposal(
-                pending.proposed,
-                pending.pageId,
-                pending.isHomepage,
-            )
-            if (!applied) {
-                toast.info(s.seoCancelled)
-                return
-            }
-            toast.success(s.seoGenerated)
-            if (pending.warning) toast.warning(pending.warning)
-            setPendingSeoOverwrite(null)
-        } catch {
-            toast.error(s.seoError)
-        } finally {
-            setIsApplyingSeoOverwrite(false)
-        }
     }
 
     const seoTitleValue = seoTitleInput
@@ -1336,9 +1283,11 @@ function SettingsPanelInner({
                 <div>
                     <label className={labelCls}>{s.metaTitle}</label>
                     <Input
+                        data-settings-focus="seoTitle"
                         value={seoTitleValue}
                         onChange={(e) => setSeoTitleInput(e.target.value)}
                         onBlur={(e: FieldBlurEvent) => void handleSeoUpdate('seoTitle', e.target.value)}
+                        placeholder={activePage?.title || undefined}
                         variant="editor"
                         className={cn(editorInputClassName, metaTitleWarning && 'border-amber-500/40 focus-visible:border-amber-400')}
                     />
@@ -1352,6 +1301,7 @@ function SettingsPanelInner({
                 <div>
                     <label className={labelCls}>{s.metaDescription}</label>
                     <Textarea
+                        data-settings-focus="seoDescription"
                         rows={4}
                         value={seoDescriptionValue}
                         onChange={(e) => setSeoDescriptionInput(e.target.value)}
@@ -1382,7 +1332,7 @@ function SettingsPanelInner({
                             https://{previewDomain}/{normalizedPreviewPath}
                         </div>
                         <div className="text-[18px] text-[#1a0dab] font-normal mt-1 truncate hover:underline cursor-pointer leading-[1.2]" style={{ fontFamily: 'arial,sans-serif' }}>{/* Google SERP mimic — intentional */}
-                            {seoTitleValue || 'Page Title'}
+                            {seoTitleValue || activePage?.title || 'Page Title'}
                         </div>
                         <div className="text-[13px] text-[#4d5156] mt-1 line-clamp-2 leading-[1.4]" style={{ fontFamily: 'arial,sans-serif' }}>{/* Google SERP mimic — intentional */}
                             {seoDescriptionValue || 'Provide a meta description to help users know what this page is about before they click on the search result.'}
@@ -1403,69 +1353,40 @@ function SettingsPanelInner({
                     />
                 </div>
 
+                {agentOn ? (
                 <div className="pt-2">
                     <button
                         type="button"
-                        disabled={isGeneratingSEO}
-                        onClick={async () => {
-                            if (!currentPageId || !site?.id) return
-                            const requestPageId = currentPageId
-                            const requestIsHomepage = isHomepage
-                            setIsGeneratingSEO(true)
-                            const loadingToastId = toast.loading(s.generatingSeo)
-                            try {
-                                const res = await fetch(`/api/sites/${site.id}/pages/${requestPageId}/generate-seo`, {
-                                    method: 'POST'
-                                })
-                                if (res.ok) {
-                                    const data = await res.json()
-                                    const proposed = (data.proposed || data) as SeoProposal
-                                    if (currentPageIdRef.current !== requestPageId) {
-                                        toast.info(s.seoCancelled, { id: loadingToastId })
-                                        return
-                                    }
-                                    // AC-16, BR-06: confirm before overwriting existing meta
-                                    if (data.hasExisting) {
-                                        toast.dismiss(loadingToastId)
-                                        setPendingSeoOverwrite({
-                                            pageId: requestPageId,
-                                            isHomepage: requestIsHomepage,
-                                            existing: data.existing || {},
-                                            proposed,
-                                            warning: data.warning,
-                                        })
-                                        return
-                                    }
-                                    const applied = await applySeoProposal(
-                                        proposed,
-                                        requestPageId,
-                                        requestIsHomepage,
-                                    )
-                                    if (!applied) {
-                                        toast.info(s.seoCancelled, { id: loadingToastId })
-                                        return
-                                    }
-                                    toast.success(s.seoGenerated, { id: loadingToastId })
-                                    if (data.warning) toast.warning(data.warning)
-                                } else {
-                                    toast.error(s.seoFailed, { id: loadingToastId })
-                                }
-                            } catch (error) {
-                                toast.error(s.seoError, { id: loadingToastId })
-                            } finally {
-                                setIsGeneratingSEO(false)
-                            }
+                        disabled={!currentPageId}
+                        onClick={(event) => {
+                            const box = event.currentTarget.getBoundingClientRect()
+                            setSeoAsk({ top: box.top, left: box.left, width: box.width, height: box.height })
                         }}
                         className="flex w-full items-center justify-center gap-2 rounded-lg bg-[linear-gradient(90deg,hsl(var(--info))_0%,hsl(var(--primary))_100%)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-50"
                     >
-                        {isGeneratingSEO ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        ) : (
-                            <Sparkles className="h-4 w-4" aria-hidden />
-                        )}
-                        {isGeneratingSEO ? s.generating : s.autoSeo}
+                        <Sparkles className="h-4 w-4" aria-hidden />
+                        {t.editor.elementAsk.title}
                     </button>
+                    {seoAsk && currentPageId && (() => {
+                        const panel = panelScrollRef.current?.getBoundingClientRect()
+                        return (
+                            <ElementAskLayer
+                                element={{
+                                    kind: 'seo',
+                                    label: activePage?.title || s.metaTitle,
+                                    pageId: String(currentPageId),
+                                    path: 'seoTitle',
+                                    ...(seoTitleValue ? { value: seoTitleValue.slice(0, 300) } : {}),
+                                }}
+                                anchor={seoAsk}
+                                bounds={{ left: panel?.left ?? 0, right: panel?.right ?? window.innerWidth }}
+                                currentValue={seoTitleValue || undefined}
+                                onClose={() => setSeoAsk(null)}
+                            />
+                        )
+                    })()}
                 </div>
+                ) : null}
             </div>
         )
     }
@@ -1488,6 +1409,10 @@ function SettingsPanelInner({
     }
 
     const renderMenuContent = () => {
+        const resolvedFooter = mergeFooterSocialsWithSite({
+            logo: footerBlock?.logo,
+            socials: footerBlock?.socials as Array<{ platform: string; url: string }> | undefined,
+        }, site)
         return (
             <div className="space-y-5">
                 {/* 1. Navigation Style */}
@@ -1504,19 +1429,9 @@ function SettingsPanelInner({
                             const current = (headerBlock as Record<string, unknown>)?.variant as string | undefined
                             const active = current === key || (!current && key === 'default')
                             return (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    onClick={() => onHeaderUpdate?.({ variant: key })}
-                                    className={cn(
-                                        'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                        active
-                                            ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                            : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                                    )}
-                                >
+                                <VariantChip key={key} active={active} onClick={() => onHeaderUpdate?.({ variant: key })}>
                                     {label}
-                                </button>
+                                </VariantChip>
                             )
                         })}
                     </div>
@@ -1631,10 +1546,10 @@ function SettingsPanelInner({
                     <BreadcrumbEditor
                         homeLabel={String(breadcrumbCfg?.homeLabel || 'Home')}
                         separator={String(breadcrumbCfg?.separator || '/')}
-                        showOnAllPages={Boolean(breadcrumbCfg?.showOnAllPages ?? true)}
+                        showOnAllPages={isBreadcrumbEnabled(breadcrumbCfg)}
                         pageSlug={activePage?.slug ?? undefined}
                         onChange={(changes) => {
-                            onHeaderUpdate?.({ breadcrumbConfig: { ...breadcrumbCfg, ...changes } })
+                            onHeaderUpdate?.({ breadcrumbConfig: buildBreadcrumbConfig(breadcrumbCfg, changes) })
                         }}
                     />
                 </div>
@@ -1657,19 +1572,13 @@ function SettingsPanelInner({
                                     { key: 'centered-stack', label: s.footerStyleCentered },
                                     { key: 'dark-gradient', label: s.dark },
                                 ] as { key: string; label: string }[]).map(({ key, label }) => (
-                                    <button
+                                    <VariantChip
                                         key={key}
-                                        type="button"
+                                        active={(footerBlock.variant as string) === key || (!footerBlock.variant && key === 'simple')}
                                         onClick={() => onFooterUpdate?.({ variant: key })}
-                                        className={cn(
-                                            'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                            (footerBlock.variant as string) === key || (!footerBlock.variant && key === 'simple')
-                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                                        )}
                                     >
                                         {label}
-                                    </button>
+                                    </VariantChip>
                                 ))}
                             </div>
                         </div>
@@ -1685,7 +1594,7 @@ function SettingsPanelInner({
                                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterBrandOpen && 'rotate-180')} />
                             </button>
                             {isFooterBrandOpen && (() => {
-                                const currentLogoUrl = (footerBlock?.logo as { url?: string } | undefined)?.url || ''
+                                const currentLogoUrl = (resolvedFooter.logo as { url?: string } | undefined)?.url || ''
                                 return (
                                 <div className="mt-1 space-y-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 pb-3 pt-2.5">
                                     {/* Upload Logo */}
@@ -1695,7 +1604,7 @@ function SettingsPanelInner({
                                             type="button"
                                             onClick={() => footerLogoRef.current?.click()}
                                             disabled={isUploadingFooterLogo}
-                                            className="mt-1 flex h-24 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 border-dashed border-blue-500/20 bg-[var(--editor-bg)] text-slate-400 transition-colors hover:border-blue-500/40 disabled:opacity-50"
+                                            className="mt-1 flex h-24 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 border-dashed border-[hsl(var(--primary)/0.2)] bg-[var(--editor-bg)] text-slate-400 transition-colors hover:border-[hsl(var(--primary)/0.4)] disabled:opacity-50"
                                         >
                                             {isUploadingFooterLogo ? (
                                                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -1781,7 +1690,7 @@ function SettingsPanelInner({
                                 <div className="mt-1 space-y-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 pb-3 pt-2.5">
                                     {FOOTER_SOCIAL_PLATFORMS.map(({ key, label }) => {
                                         const PlatformIcon = SOCIAL_ICONS[key]
-                                        const currentUrl = ((footerBlock?.socials as { platform: string; url: string }[] | undefined) || [])
+                                        const currentUrl = resolvedFooter.socials
                                             .find(s => s.platform === key)?.url || ''
                                         return (
                                             <div key={key} className="flex flex-col gap-1.5">
@@ -1790,7 +1699,7 @@ function SettingsPanelInner({
                                                     {label}
                                                 </label>
                                                 <Input
-                                                    key={`footer-social-${key}-${fbk}`}
+                                                    key={`footer-social-${key}-${fbk}-${currentUrl}`}
                                                     defaultValue={currentUrl}
                                                     placeholder={`https://${key}.com/yourcompany`}
                                                     onBlur={(e: FieldBlurEvent) => {
@@ -1800,9 +1709,10 @@ function SettingsPanelInner({
                                                             e.target.value = currentUrl
                                                             return
                                                         }
-                                                        const existing = ((footerBlock?.socials as { platform: string; url: string }[] | undefined) || [])
+                                                        const existing = resolvedFooter.socials
                                                             .filter(s => s.platform !== key)
-                                                        const updated = val ? [...existing, { platform: key, url: val }] : existing
+                                                        if (val === currentUrl) return
+                                                        const updated = [...existing, { platform: key, url: val }]
                                                         onFooterUpdate?.({ socials: updated })
                                                     }}
                                                     variant="editor"
@@ -1845,7 +1755,7 @@ function SettingsPanelInner({
                                     value={(footerBlock?.backgroundColor as string) || '#0f172a'}
                                     onChange={(e) => onFooterUpdate?.({ backgroundColor: e.target.value })}
                                     aria-label={s.pickBgColor}
-                                    className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5"
+                                    className="h-8 w-12 shrink-0 cursor-pointer rounded border border-[hsl(var(--primary)/0.3)] bg-transparent p-0.5"
                                 />
                             </div>
                         </div>
@@ -1876,6 +1786,27 @@ function SettingsPanelInner({
     const bt = block?.blockType
     const currentBlockIndex = blockIndex ?? 0
 
+    // GH-2107: one "Layout & Spacing" UI for every block type (generic, announcement-bar, feature-comparison, pricing)
+    const commitBlockSpacing = (field: BlockSpacingField, value: number) => {
+        const prevSpacing = ((block?.blockSpacing as Record<string, unknown>) || {})
+        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, [field]: value } })
+    }
+    const renderBlockSpacing = (className: string) => (
+        <BlockSpacingControls
+            className={className}
+            title={s.layoutSpacing}
+            topLabel={s.topSpacing}
+            bottomLabel={s.bottomSpacing}
+            top={localPaddingTop}
+            bottom={localPaddingBottom}
+            savedTop={savedTop}
+            savedBottom={savedBottom}
+            onTopChange={setLocalPaddingTop}
+            onBottomChange={setLocalPaddingBottom}
+            onCommit={commitBlockSpacing}
+        />
+    )
+
     const focusedBlockIndexRef = useRef<number>(currentBlockIndex)
 
     // Global block routing — floating blocks use negative __editorBlockIndex
@@ -1886,6 +1817,7 @@ function SettingsPanelInner({
 
     const isGlobal = block?.__editorBlockIndex !== undefined && (block.__editorBlockIndex as number) < 0
     const globalKey = bt ? BLOCK_TYPE_TO_KEY[bt] : undefined
+    const resolvedContact = mergeContactInfoWithSite({ email: block?.email as string | undefined, phone: block?.phone as string | undefined, address: block?.address as string | undefined }, site?.contactInfo)
     const effectiveBlock = (isGlobal && globalKey
         ? (storeGlobalBlocks?.[globalKey] ?? block)
         : block) as BlockData | null
@@ -2033,7 +1965,7 @@ function SettingsPanelInner({
                             </div>
                             {activeTab === 'block' && block ? (
                                 <div className="mt-1 pl-7 flex items-center gap-2">
-                                    <p className="text-[11px] text-slate-500">[{block.blockType}]</p>
+                                    <p className="text-[11px] text-slate-500">{block.blockType === 'custom-html' ? 'Rich text' : `[${block.blockType}]`}</p>
                                     {isGlobal && (
                                         <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none" style={{ background: 'hsl(var(--info)/0.12)', color: 'hsl(var(--info))' }}>
                                             <Globe className="h-3 w-3" aria-hidden /> Global
@@ -2060,83 +1992,36 @@ function SettingsPanelInner({
                         <>
                             <div className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 py-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-white">{info?.icon} {info?.label}</span>
+                                    <span className="flex min-w-0 items-center gap-2.5 text-sm font-medium text-[var(--editor-text)]">
+                                        {info && (
+                                            <span data-testid="block-settings-icon" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--editor-overlay-bg)] text-[hsl(var(--primary))]">
+                                                <info.Icon className="h-4 w-4" aria-hidden />
+                                            </span>
+                                        )}
+                                        <span className="truncate">{info?.label}</span>
+                                    </span>
                                     <span className="text-xs text-gray-500">#{currentBlockIndex + 1}</span>
                                 </div>
                             </div>
+                            {bt === 'products-grid' && <ProductListingSettings key={`${site?.id}-${currentBlockIndex}`} siteId={site?.id} block={block} locale={siteLocale} onChange={(field, value) => onBlockUpdate(currentBlockIndex, { [field]: value })} />}
                             {/* Variant Switcher */}
-                            {bt === 'products-grid' && block.showCategoryFilter !== undefined ? (
-                                <div className={sectionCls}>
-                                    <label className="group flex cursor-pointer items-center gap-3 rounded-xl border border-solid border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 py-2 text-sm text-[var(--editor-text)] transition-colors hover:border-[hsl(var(--primary)/0.45)] focus-within:border-[hsl(var(--ring)/0.65)]">
-                                        <Checkbox
-                                            checked={Boolean(block.showCategoryFilter)}
-                                            onCheckedChange={(checked) => onBlockFieldChange(currentBlockIndex, 'showCategoryFilter', checked === true)}
-                                            className="h-5 w-5 rounded-md border-solid border-[hsl(var(--input-border))] bg-[var(--editor-surface-deep)] text-[hsl(var(--primary-foreground))] transition-colors focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--editor-surface-elevated)] data-[state=checked]:border-[hsl(var(--primary))] data-[state=checked]:bg-[hsl(var(--primary))] data-[state=checked]:text-[hsl(var(--primary-foreground))]"
-                                        />
-                                        <span>{s.showCategoryFilter}</span>
-                                    </label>
-                                </div>
-                            ) : (info?.variants?.length || 0) > 1 && (
+                            {bt !== 'products-grid' && (info?.variants?.length || 0) > 1 && (
                                 <div>
                                     <label className="text-xs font-medium uppercase text-gray-500">{s.variant}</label>
                                     <div className="mt-2 flex flex-wrap gap-1.5">
                                         {info?.variants.filter(v => bt !== 'footer' || !FOOTER_HIDDEN_VARIANTS.has(v)).map(v => (
-                                            <button key={v}
-                                                onClick={() => onBlockFieldChange(currentBlockIndex, 'variant', v)}
-                                                className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                                                    block.variant === v ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
+                                            <VariantChip key={v} active={block.variant === v} onClick={() => onBlockFieldChange(currentBlockIndex, 'variant', v)}>
                                                 {v.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                            </button>
+                                            </VariantChip>
                                         ))}
                                     </div>
                                 </div>
                             )}
 
                             {/* Layout & Spacing */}
-                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && block.blockType !== 'announcement-bar' && block.blockType !== 'pricing' && block.blockType !== 'feature-comparison' && (
-                                <div className={sectionCls}>
-                                    <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
-                                    <div className="mt-3 space-y-3">
-                                        <div>
-                                            <div className="flex items-center justify-between">
-                                                <span className={labelCls}>Top Spacing</span>
-                                                <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
-                                            </div>
-                                            <input
-                                                type="range"
-                                                min={0} max={120} step={4}
-                                                value={localPaddingTop}
-                                                onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
-                                                onPointerUp={(e) => {
-                                                    const val = Number((e.target as HTMLInputElement).value)
-                                                    const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                    onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
-                                                }}
-                                                className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                            />
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center justify-between">
-                                                <span className={labelCls}>Bottom Spacing</span>
-                                                <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
-                                            </div>
-                                            <input
-                                                type="range"
-                                                min={0} max={120} step={4}
-                                                value={localPaddingBottom}
-                                                onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
-                                                onPointerUp={(e) => {
-                                                    const val = Number((e.target as HTMLInputElement).value)
-                                                    const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                    onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
-                                                }}
-                                                className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && block.blockType !== 'announcement-bar' && block.blockType !== 'pricing' && block.blockType !== 'feature-comparison' && renderBlockSpacing(sectionCls)}
 
+                            {bt === 'custom-html' && <p className="text-sm text-slate-400">Click the Rich text content on the page to edit text, images, links and tables inline.</p>}
                             {/* ─── Common Text Fields ──────────────────────── */}
                             {block.logoText !== undefined && (
                                 <div>
@@ -2148,7 +2033,7 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {block.headline !== undefined && (
+                            {block.headline !== undefined && !(bt === 'hero' && block.variant === 'slideshow') && (
                                 <div>
                                     <label className={labelCls}>{s.headline}</label>
                                     <Input defaultValue={stripHtmlForDisplay(block.headline)} key={`hl-${bk}`}
@@ -2158,7 +2043,7 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {block.subheadline !== undefined && (
+                            {block.subheadline !== undefined && !(bt === 'hero' && block.variant === 'slideshow') && (
                                 <div>
                                     <label className={labelCls}>{s.subheadline}</label>
                                     <Textarea defaultValue={stripHtmlForDisplay(block.subheadline)} rows={2} key={`sub-${bk}`}
@@ -2168,7 +2053,20 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {bt !== 'products-grid' && block.showCategoryFilter !== undefined && (
+                            {bt === 'video' && (
+                                <VideoUrlField
+                                    key={`video-url-${bk}`}
+                                    value={typeof block.videoUrl === 'string' ? block.videoUrl : undefined}
+                                    label={s.videoUrl}
+                                    placeholder={s.videoUrlPlaceholder}
+                                    invalidMessage={s.videoUrlInvalid}
+                                    onChange={(url) => onBlockFieldChange(currentBlockIndex, 'videoUrl', url)}
+                                    labelClassName={labelCls}
+                                    className={editorInputClassName}
+                                />
+                            )}
+
+                            {bt !== 'products-grid' && (bt === 'blog-list' || block.showCategoryFilter !== undefined) && (
                                 <div className={sectionCls}>
                                     <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-slate-500">
                                         <Checkbox
@@ -2228,7 +2126,7 @@ function SettingsPanelInner({
                                     <div className="mt-3 space-y-3">
                                         <div>
                                             <label className={labelCls}>{s.email}</label>
-                                            <Input type="email" defaultValue={(block.email as string) || ''} key={`email-${bk}`}
+                                            <Input type="email" defaultValue={resolvedContact.email} key={`email-${bk}-${resolvedContact.email}`}
                                                 onBlur={(e: FieldBlurEvent) => {
                                                     if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
                                                         onBlockFieldChange(currentBlockIndex, 'email', e.target.value)
@@ -2241,14 +2139,14 @@ function SettingsPanelInner({
                                         </div>
                                         <div>
                                             <label className={labelCls}>{s.phone}</label>
-                                            <Input defaultValue={(block.phone as string) || ''} key={`phone-${bk}`}
+                                            <Input defaultValue={resolvedContact.phone} key={`phone-${bk}-${resolvedContact.phone}`}
                                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'phone', e.target.value)}
                                                 variant="editor"
                                                 className={editorInputClassName} placeholder={s.phonePlaceholder} />
                                         </div>
                                         <div>
                                             <label className={labelCls}>{s.address}</label>
-                                            <Textarea defaultValue={(block.address as string) || ''} rows={2} key={`addr-${bk}`}
+                                            <Textarea defaultValue={resolvedContact.address} rows={2} key={`address-${bk}-${resolvedContact.address}`}
                                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'address', e.target.value)}
                                                 variant="editor"
                                                 className={editorTextareaClassName} placeholder={s.addressPlaceholder} />
@@ -2329,9 +2227,9 @@ function SettingsPanelInner({
                                                             setAnnShowLink(next)
                                                             onBlockUpdate(currentBlockIndex, { showLink: next })
                                                         }}
-                                                        className={cn('relative h-6 w-11 rounded-full transition-colors', annShowLink ? 'bg-blue-500' : 'bg-slate-700')}
+                                                        className={cn('relative h-6 w-11 rounded-full transition-colors', annShowLink ? 'bg-[hsl(var(--primary))]' : 'bg-slate-700')}
                                                     >
-                                                        <span className={cn('absolute top-1 h-4 w-4 rounded-full bg-white transition-all', annShowLink ? 'left-6' : 'left-1')} />
+                                                        <span className={cn('absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-all', annShowLink ? 'left-6' : 'left-1')} />
                                                     </button>
                                                 </div>
                                                 {annShowLink && (
@@ -2351,7 +2249,7 @@ function SettingsPanelInner({
                                                             <select
                                                                 value={(block.linkIsInternal as boolean) ? 'internal' : 'external'}
                                                                 onChange={(e) => onBlockUpdate(currentBlockIndex, { linkIsInternal: e.target.value === 'internal' })}
-                                                                className="mt-1.5 w-full rounded-lg bg-[var(--editor-bg)] border border-[hsl(var(--primary)/0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                                                                className="mt-1.5 w-full rounded-lg bg-[var(--editor-bg)] border border-[hsl(var(--primary)/0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-[hsl(var(--primary)/0.5)]"
                                                             >
                                                                 <option value="external">Style: External</option>
                                                                 <option value="internal">Style: Internal Page</option>
@@ -2361,7 +2259,7 @@ function SettingsPanelInner({
                                                             <select
                                                                 value={(block.linkUrl as string) || ''}
                                                                 onChange={(e) => onBlockFieldChange(currentBlockIndex, 'linkUrl', e.target.value)}
-                                                                className="w-full rounded-lg bg-[var(--editor-bg)] border border-[hsl(var(--primary)/0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                                                                className="w-full rounded-lg bg-[var(--editor-bg)] border border-[hsl(var(--primary)/0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-[hsl(var(--primary)/0.5)]"
                                                             >
                                                                 <option value="">— select page —</option>
                                                                 {pages?.map(p => (
@@ -2455,43 +2353,7 @@ function SettingsPanelInner({
                                     </div>
 
                                     {/* Layout & Spacing */}
-                                    <div className="mt-4">
-                                        <label className="text-xs font-medium uppercase text-gray-500 tracking-[0.6px]">Layout &amp; Spacing</label>
-                                        <div className="mt-3 space-y-3">
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Top Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
-                                                </div>
-                                                <input type="range" min={0} max={120} step={4}
-                                                    value={localPaddingTop}
-                                                    onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Bottom Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
-                                                </div>
-                                                <input type="range" min={0} max={120} step={4}
-                                                    value={localPaddingBottom}
-                                                    onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {renderBlockSpacing('mt-4')}
                                 </div>
                             )}
 
@@ -2522,7 +2384,7 @@ function SettingsPanelInner({
                                         <button
                                             type="button"
                                             onClick={() => onBlockUpdate(currentBlockIndex, { secondaryCtaLabel: 'Learn More', secondaryCtaUrl: '#' })}
-                                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors"
+                                            className={cn('mt-2 w-full rounded-lg py-1.5 text-xs transition-colors', SETTINGS_ADD_BUTTON_COLORS)}
                                         >{s.addButton}</button>
                                     )}
                                 </div>
@@ -2539,7 +2401,8 @@ function SettingsPanelInner({
                             )}
 
                             {/* ─── Hero CTA Buttons ───────────────────────── */}
-                            {bt === 'hero' && (
+                            {bt === 'hero' && block.variant === 'slideshow' && <HeroSlidesSettings key={currentBlockIndex} block={block as unknown as HeroConfig} blockIndex={currentBlockIndex} onBlockUpdate={onBlockUpdate} />}
+                            {bt === 'hero' && block.variant !== 'slideshow' && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">{s.ctaButtons}</label>
                                     {((block.ctaButtons || []) as CtaButton[]).length === 0 && (
@@ -2552,6 +2415,7 @@ function SettingsPanelInner({
                                                 <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300"><X className="h-4 w-4" aria-hidden /></button>
                                             </div>
                                             <Input defaultValue={stripHtmlForDisplay(btn.label)} placeholder={s.label}
+                                                data-settings-focus={`ctaButtons.${i}.label`}
                                                 onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'label', e.target.value)}
                                                 variant="editor"
                                                 className={editorInputClassName} />
@@ -2560,6 +2424,7 @@ function SettingsPanelInner({
                                                 return (
                                                     <>
                                                         <Input defaultValue={btn.url || ''} placeholder={s.url}
+                                                            data-settings-focus={`ctaButtons.${i}.url`}
                                                             onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'url', e.target.value)}
                                                             variant="editor"
                                                             className={hiddenBtn ? `${editorInputClassName} ring-2 ring-red-500/70` : editorInputClassName} />
@@ -2578,7 +2443,7 @@ function SettingsPanelInner({
                                         type="button"
                                         onClick={() => addArrayItem('ctaButtons', { label: 'New Button', url: '#', style: 'primary' })}
                                         disabled={((block.ctaButtons || []) as CtaButton[]).length >= 2}
-                                        className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className={cn('mt-2 w-full rounded-lg py-1.5 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed', SETTINGS_ADD_BUTTON_COLORS)}
                                     >{s.addButton}</button>
                                 </div>
                             )}
@@ -2647,7 +2512,7 @@ function SettingsPanelInner({
                                         </div>
                                     ))}
                                     <button onClick={() => addArrayItem('features', { title: 'New Feature', description: '', icon: '✦' })}
-                                        className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addFeature}</button>
+                                        className={cn('mt-2 w-full rounded-lg py-1.5 text-xs transition-colors', SETTINGS_ADD_BUTTON_COLORS)}>{s.addFeature}</button>
                                 </div>
                             )}
 
@@ -2676,7 +2541,7 @@ function SettingsPanelInner({
                                         </div>
                                     ))}
                                     <button onClick={() => addArrayItem('testimonials', { name: s.defaultCustomerName, title: '', quote: s.defaultReviewQuote, rating: 5 })}
-                                        className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addTestimonial}</button>
+                                        className={cn('mt-2 w-full rounded-lg py-1.5 text-xs transition-colors', SETTINGS_ADD_BUTTON_COLORS)}>{s.addTestimonial}</button>
                                 </div>
                             )}
 
@@ -2690,47 +2555,7 @@ function SettingsPanelInner({
                                         onBlockUpdate={onBlockUpdate}
                                     />
                                     {/* Layout & Spacing — after comparison content, mirrors pricing pattern */}
-                                    <div className={sectionCls}>
-                                        <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
-                                        <div className="mt-3 space-y-3">
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Top Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={0} max={120} step={4}
-                                                    value={localPaddingTop}
-                                                    onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Bottom Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={0} max={120} step={4}
-                                                    value={localPaddingBottom}
-                                                    onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {renderBlockSpacing(sectionCls)}
                                 </>
                             )}
 
@@ -2806,11 +2631,11 @@ function SettingsPanelInner({
                                                     </div>
                                                 ))}
                                                 <button type="button" onClick={() => addNestedItem('categories', ci, { name: 'New Item', description: '', price: '', currency: 'RM', tag: '', image: null })}
-                                                    className="mt-1 w-full rounded bg-blue-500/10 py-1 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addMenuItem}</button>
+                                                    className={cn('mt-1 w-full rounded py-1 text-xs transition-colors', SETTINGS_ADD_BUTTON_COLORS)}>{s.addMenuItem}</button>
                                             </div>
                                         ))}
                                         <button type="button" onClick={() => addArrayItem('categories', { name: 'New Category', items: [] })}
-                                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addCategory}</button>
+                                            className={cn('mt-2 w-full rounded-lg py-1.5 text-xs transition-colors', SETTINGS_ADD_BUTTON_COLORS)}>{s.addCategory}</button>
                                     </div>
                                 )
                             })()}
@@ -2880,47 +2705,7 @@ function SettingsPanelInner({
                                         pages={pages}
                                     />
                                     {/* Layout & Spacing — pricing-specific position (after Plans Management) */}
-                                    <div className={sectionCls}>
-                                        <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
-                                        <div className="mt-3 space-y-3">
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Top Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={0} max={120} step={4}
-                                                    value={localPaddingTop}
-                                                    onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Bottom Spacing</span>
-                                                    <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min={0} max={120} step={4}
-                                                    value={localPaddingBottom}
-                                                    onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
-                                                    onPointerUp={(e) => {
-                                                        const val = Number((e.target as HTMLInputElement).value)
-                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
-                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
-                                                    }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-slider-track)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-slider-track)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {renderBlockSpacing(sectionCls)}
                                 </>
                             )}
 
@@ -2949,10 +2734,18 @@ function SettingsPanelInner({
                                 />
                             )}
 
+                            {bt === 'portfolio-grid' && block && (
+                                <PortfolioGridSettings
+                                    block={block as unknown as PortfolioGridConfig}
+                                    blockIndex={currentBlockIndex}
+                                    onBlockUpdate={onBlockUpdate}
+                                />
+                            )}
+
                             {bt === 'socialWidget' && (
                                 <div className={sectionCls}>
                                     {(() => {
-                                        const normalizedSocialBlock = normalizeSocialWidgetConfig((effectiveBlock ?? block) as Record<string, unknown>)
+                                        const normalizedSocialBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite((effectiveBlock ?? block) as Record<string, unknown> & { links?: Array<{ platform: string; url: string; enabled?: boolean }> }, site?.socialLinks))
 
                                         return (
                                             <>
@@ -3058,7 +2851,7 @@ function SettingsPanelInner({
                                                     className={cn(
                                                         'rounded-full px-3 py-2 text-xs font-medium transition-colors',
                                                         effectiveBlock?.showLabel
-                                                            ? 'bg-blue-500/15 text-blue-300'
+                                                            ? 'bg-[hsl(var(--primary)/0.15)] text-[var(--editor-text)] dark:text-[hsl(var(--primary))]'
                                                             : 'bg-white/5 text-slate-400 hover:bg-white/10',
                                                     )}
                                                 >
@@ -3124,19 +2917,13 @@ function SettingsPanelInner({
                                             <label className={labelCls}>{s.whatsappPosition}</label>
                                             <div className="mt-2 grid grid-cols-2 gap-2">
                                                 {(['bottom-right', 'bottom-left'] as const).map(pos => (
-                                                    <button
+                                                    <VariantChip
                                                         key={pos}
-                                                        type="button"
+                                                        active={((effectiveBlock?.position ?? block?.position) || 'bottom-right') === pos}
                                                         onClick={() => handleBlockUpdate({ position: pos })}
-                                                        className={cn(
-                                                            'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                                            ((effectiveBlock?.position ?? block?.position) || 'bottom-right') === pos
-                                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                        )}
                                                     >
-                                                        {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
-                                                    </button>
+                                                        {pos === 'bottom-right' ? `↘ ${s.positionRight}` : `↙ ${s.positionLeft}`}
+                                                    </VariantChip>
                                                 ))}
                                             </div>
                                         </div>
@@ -3145,7 +2932,7 @@ function SettingsPanelInner({
                             )}
 
                             {/* Image Editor — for blocks with image/backgroundImage fields */}
-                            {block && (block.image || block.backgroundImage || block.heroImage) && (
+                            {block && !(bt === 'hero' && block.variant === 'slideshow') && (block.image || block.backgroundImage || block.heroImage) && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">Image</label>
                                     <div className="mt-2">
@@ -3173,15 +2960,6 @@ function SettingsPanelInner({
                     ) : null}
                 </div>
             </div>
-            <SeoOverwriteConfirmDialog
-                open={Boolean(pendingSeoOverwrite)}
-                current={pendingSeoOverwrite?.existing || {}}
-                proposed={pendingSeoOverwrite?.proposed || {}}
-                copy={s.seoOverwriteDialog}
-                isApplying={isApplyingSeoOverwrite}
-                onCancel={cancelSeoOverwrite}
-                onConfirm={() => void confirmSeoOverwrite()}
-            />
         </div>
     )
 }

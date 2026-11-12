@@ -43,11 +43,12 @@ Unified view of the ech-prime-web-v2 stack: client, server, data, external servi
 ## Deploy architecture
 
 ```
-Developer pushes to staging
+Developer merges a PR into staging (the PR already ran changes → quality ∥ affected tests)
          │
          ▼
 GitHub Actions (.github/workflows/ci.yml)
-         │  quality-check → test → deploy-staging
+         │  deploy-scope → deploy-ai-platform (if touched) → deploy-staging
+         │  (separate workflows on the same push: staging-full-tests.yml, e2e-staging.yml)
          ▼
 vercel pull --environment=staging --token=$VERCEL_TOKEN
          │
@@ -94,6 +95,7 @@ All feature-specific architecture lives in `docs/architecture/F*.md`:
 | F09 | Storefront Commerce | [F09-storefront-commerce.md](architecture/F09-storefront-commerce.md) |
 | F10 | Orders Management | [F10-orders-management.md](architecture/F10-orders-management.md) |
 | F11 | SEO Dashboard | [F11-seo-dashboard.md](architecture/F11-seo-dashboard.md) |
+| F15 | Support — mở CMS merchant không cần OTP | [F15-support-merchant-access.md](architecture/F15-support-merchant-access.md) |
 | F16 | Notification Center | [F16-notification-center.md](architecture/F16-notification-center.md) |
 | F17 | Blog Management | [F17-blog-management.md](architecture/F17-blog-management.md) |
 | F18 | CMS Layout | [F18-cms-layout.md](architecture/F18-cms-layout.md) |
@@ -101,6 +103,7 @@ All feature-specific architecture lives in `docs/architecture/F*.md`:
 | F22 | Tracking Analytics | [F22-tracking-analytics.md](architecture/F22-tracking-analytics.md) |
 | F32 | Email Template CMS | [F32-email-template-cms-settings.md](architecture/F32-email-template-cms-settings.md) |
 | F37 | Local SEO & Search Performance | In development (first phase US-F37-03 shipped) |
+| F48 | Media Management | [F48-media-management.md](architecture/F48-media-management.md) |
 | F99 | CI/CD Monitoring | [F99-cicd-monitoring.md](architecture/F99-cicd-monitoring.md) |
 
 ## Cross-cutting concerns

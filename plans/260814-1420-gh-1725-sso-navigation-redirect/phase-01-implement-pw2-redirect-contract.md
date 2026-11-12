@@ -73,9 +73,9 @@ Runtime staging verification remains in Phase 3; no token value was accessed or 
 
 | Action | File | Change |
 |---|---|---|
-| Modify | `/home/liam/data/ech-prime-web-v2/src/app/sso/authorization/page.tsx` | Read and pass optional intent |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/app/sso/authorization/_components/SsoAuthorizationClient.tsx` | Include optional intent in session POST |
-| Modify | `/home/liam/data/ech-prime-web-v2/src/app/api/auth/sso-session/route.ts` | Default generic entry to Dashboard; route only known legacy intents |
+| Modify | `./src/app/sso/authorization/page.tsx` | Read and pass optional intent |
+| Modify | `./src/app/sso/authorization/_components/SsoAuthorizationClient.tsx` | Include optional intent in session POST |
+| Modify | `./src/app/api/auth/sso-session/route.ts` | Default generic entry to Dashboard; route only known legacy intents |
 
 No source files are created or deleted. No schema, environment, or dependency changes.
 

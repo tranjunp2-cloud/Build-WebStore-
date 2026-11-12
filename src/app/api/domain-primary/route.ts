@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import configPromise from '@payload-config'
+import { getCachedTenantByDomain } from '@/lib/cache/tenant'
+import { storeUnavailableResponse } from '@/lib/storefront/cached-store-availability'
 
 /**
  * REQ-F19-06: Primary domain check API
@@ -20,21 +20,12 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const payload = await getPayload({ config: configPromise })
+        // Find the tenant that has this custom domain: the cached, per-domain-tagged lookup the storefront page
+        // reads too. The middleware calls this on every custom-domain page view; it ran ~5 uncached statements
+        // (array join + COUNT + depth-2 relations) each time (TC-PERF-066).
+        const tenant = await getCachedTenantByDomain(host)
 
-        // Find the tenant that has this custom domain
-        const result = await payload.find({
-            collection: 'tenants',
-            where: {
-                'customDomains.domain': {
-                    equals: host
-                }
-            },
-            limit: 1,
-        })
-
-        if (result.docs.length > 0) {
-            const tenant = result.docs[0]
+        if (tenant) {
             const domains = (tenant.customDomains as Array<{ domain: string; status: string; isPrimary?: boolean }>) || []
             const match = domains.find(d => d.domain === host && d.status === 'active')
             
@@ -42,8 +33,10 @@ export async function GET(req: NextRequest) {
                 const isPrimary = match.isPrimary === true
                 const primaryEntry = domains.find(d => d.status === 'active' && d.isPrimary)
                 const primaryDomain = primaryEntry?.domain ?? null
-                
-                return NextResponse.json({ isPrimary, primaryDomain })
+                // #2179: a banned or expired store gets the 503 unavailable page (middleware checks it before redirecting).
+                const unavailable = await storeUnavailableResponse(tenant as { id: string | number; status?: unknown })
+
+                return NextResponse.json({ isPrimary, primaryDomain, ...unavailable })
             }
         }
 

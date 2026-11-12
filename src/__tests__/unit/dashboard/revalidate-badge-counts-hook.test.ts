@@ -31,7 +31,7 @@ describe('revalidateBadgeCounts hooks (TC-F18-SB-REVALIDATE-01)', () => {
         const result = revalidateBadgeCountsAfterChange(changeArg(42))
 
         expect(mockRevalidateTag).toHaveBeenCalledTimes(1)
-        expect(mockRevalidateTag).toHaveBeenCalledWith('sidebar-badge-counts:42')
+        expect(mockRevalidateTag).toHaveBeenCalledWith('sidebar-badge-counts:42', { expire: 0 })
         // Hook must return the doc unchanged (afterChange contract)
         expect(result).toEqual(doc)
     })
@@ -39,13 +39,13 @@ describe('revalidateBadgeCounts hooks (TC-F18-SB-REVALIDATE-01)', () => {
     it('afterChange resolves tenant from a populated relation object {id}', () => {
         revalidateBadgeCountsAfterChange(changeArg({ id: 7 }))
 
-        expect(mockRevalidateTag).toHaveBeenCalledWith('sidebar-badge-counts:7')
+        expect(mockRevalidateTag).toHaveBeenCalledWith('sidebar-badge-counts:7', { expire: 0 })
     })
 
     it('afterDelete busts the per-tenant tag and returns the doc', () => {
         const result = revalidateBadgeCountsAfterDelete(deleteArg('t99'))
 
-        expect(mockRevalidateTag).toHaveBeenCalledWith('sidebar-badge-counts:t99')
+        expect(mockRevalidateTag).toHaveBeenCalledWith('sidebar-badge-counts:t99', { expire: 0 })
         expect(result).toEqual({ tenant: 't99' })
     })
 

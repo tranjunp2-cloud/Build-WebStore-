@@ -167,6 +167,8 @@ describe('[TC-F37-04-19] Local SEO evaluator scale/query budget', () => {
         const calls = find.mock.calls.map(([args]) => args)
         const scoredCalls = calls.filter((args) => args.collection !== 'sites')
         expect(scoredCalls.every((args) => args.limit === PAGE_SIZE)).toBe(true)
+        // TC-PERF-069: 100-row pages without Payload's COUNT per page (a short page ends the walk)
+        expect(calls.every((args) => args.pagination === false)).toBe(true)
         for (const args of calls) {
             if (args.collection === 'sites') {
                 expect(args).toMatchObject({

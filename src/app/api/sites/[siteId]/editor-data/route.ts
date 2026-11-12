@@ -7,6 +7,8 @@ import { withAuth } from '@/lib/auth'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 import { getCachedSidebarBadgeCounts } from '@/lib/dashboard/sidebar-badge-counts-cached'
 import type { SidebarBadgeKey } from '@/config/sidebar-nav'
+import { stripPrivateSnapshots } from '@/lib/payload/safe-populate'
+import { formatDraftVersion, poolExec, readEditorRevision, type EditorRevision } from '@/lib/sites/editor-revision'
 
 function normalizeEditorLayout(layout: unknown) {
     if (!Array.isArray(layout)) return []
@@ -36,16 +38,25 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
         const pageId = new URL(req.url).searchParams.get('pageId')
 
         // Fetch site (depth: 1 to populate tenant for siteUrl computation)
+        // The tenant comes trimmed to what is read below (slug, domains): the whole ~70-column row rode along (TC-PERF-070)
         const site = await payload.findByID({
             collection: 'sites',
             id: siteId,
             depth: 1,
             disableErrors: true,
+            populate: { tenants: { name: true, slug: true, customDomains: true } },
         })
 
         if (!site) {
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
+
+        // The draft revision is read BEFORE the content: a write landing in between leaves the editor
+        // with an older revision than its content (its next save is refused), never the reverse.
+        const revisionExec = poolExec(payload)
+        const revisionBefore: EditorRevision | null = Number.isSafeInteger(numericSiteId) && numericSiteId > 0
+            ? await readEditorRevision(revisionExec, numericSiteId, pageId && /^\d+$/.test(pageId) ? Number(pageId) : null).catch(() => null)
+            : null
 
         type TenantRef = string | number | { id: string | number } | null | undefined
         const resolveTenantId = (t: TenantRef): string | null =>
@@ -69,12 +80,13 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
 
         // Sidebar badge counts (orders/products/...) — scoped to the site's tenant, cached 60s per-tenant
         // (same cost the dashboard pays). Non-fatal: a failure shows no badges, never blanks the editor.
-        let badgeCounts: Partial<Record<SidebarBadgeKey, number>> = {}
-        try {
-            badgeCounts = await getCachedSidebarBadgeCounts(siteTenantId)
-        } catch (err) {
-            console.warn('[editor-data] sidebar badge counts failed:', err)
-        }
+        // Started now, awaited at the end: it does not depend on the page reads below (TC-PERF-070).
+        const badgeCountsPromise: Promise<Partial<Record<SidebarBadgeKey, number>>> = Promise.resolve()
+            .then(() => getCachedSidebarBadgeCounts(siteTenantId))
+            .catch((err) => {
+                console.warn('[editor-data] sidebar badge counts failed:', err)
+                return {}
+            })
 
         const isSuperAdmin = Boolean((user as { roles?: string[] }).roles?.includes('super-admin'))
         // Env gate for any future dev-only nav item — mirror the dashboard layout (server-side; not NEXT_PUBLIC).
@@ -113,6 +125,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                     isHomepage: { equals: true },
                 },
                 limit: 1,
+                pagination: false, // no COUNT over the versions table (TC-PERF-070)
                 draft: true, // From staging: include drafts
             })
 
@@ -121,11 +134,23 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                     collection: 'pages',
                     where: { site: { equals: numericSiteId } },
                     limit: 1,
+                    pagination: false,
                     draft: true, // From staging: include drafts
                 })
             }
 
             page = pagesResult.docs[0] || null
+        }
+
+        // the homepage fallback (no or unknown pageId): its revision is read now
+        let draftVersion: string | undefined
+        if (revisionBefore) {
+            const pagePart = !page
+                ? null
+                : String(page.id) === pageId
+                    ? revisionBefore.page
+                    : (await readEditorRevision(revisionExec, numericSiteId, Number(page.id)).catch(() => null))?.page ?? null
+            draftVersion = formatDraftVersion({ site: revisionBefore.site, page: pagePart })
         }
 
         // F-26: Fetch locale_content from pages table (raw SQL — not a Payload field)
@@ -138,12 +163,14 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 `)
                 const row = result.rows?.[0]
                 if (row?.locale_content && typeof row.locale_content === 'object') {
-                    localeContent = row.locale_content as Record<string, unknown>
+                    localeContent = stripPrivateSnapshots(row.locale_content as Record<string, unknown>)
                 }
             } catch {
                 // Non-fatal — locale_content is additive
             }
         }
+
+        const badgeCounts = await badgeCountsPromise
 
         return NextResponse.json({
             site: {
@@ -190,6 +217,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                     return null
                 })(),
             },
+            /** The editor draft revision — sent back as `base` with each save (lib/sites/editor-revision) */
+            ...(draftVersion ? { draftVersion } : {}),
             page: page ? {
                 id: page.id,
                 title: page.title || 'Homepage',
@@ -198,6 +227,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 updatedAt: page.updatedAt,
                 /** F-26: Per-block locale content map for multilingual editor */
                 localeContent,
+                /** The page draft's SEO (the copilot's SEO proposals land here) */
+                seo: { title: (page.seo as { title?: string | null } | undefined)?.title ?? null, description: (page.seo as { description?: string | null } | undefined)?.description ?? null },
             } : null,
             user: {
                 firstName: (user as Record<string, unknown>).firstName as string || null,

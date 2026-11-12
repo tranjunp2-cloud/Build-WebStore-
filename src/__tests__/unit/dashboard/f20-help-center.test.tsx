@@ -52,7 +52,7 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
 
         // Assert
         expect(
-            screen.getByRole('heading', { level: 2, name: /Welcome to EchPrime/i })
+            screen.getByRole('heading', { level: 2, name: /Welcome to Web Store/i })
         ).toBeInTheDocument()
     })
 
@@ -94,17 +94,11 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
         }
     })
 
-    it('renders Need more help section with support email link', () => {
+    it('no longer renders the Need more help section (removed in US-F20-05 #2065)', () => {
         renderPage()
 
-        // Assert heading
-        expect(
-            screen.getByRole('heading', { level: 3, name: /Need more help/i })
-        ).toBeInTheDocument()
-
-        // Assert email link
-        const emailLink = screen.getByRole('link', { name: /support@echprime\.com/i })
-        expect(emailLink).toHaveAttribute('href', 'mailto:support@echprime.com')
+        expect(screen.queryByRole('heading', { name: /Need more help/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: /support@echprime\.com/i })).not.toBeInTheDocument()
     })
 })
 

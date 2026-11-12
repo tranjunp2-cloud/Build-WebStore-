@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { useI18n } from '@/i18n'
 import { passwordBaseSchema } from '@/lib/profile/schemas'
+import { PASSWORD_MIN_LENGTH } from '@/lib/auth/password-rules'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -65,7 +66,7 @@ export function PasswordChangeForm({ onDone, onCancel }: Props) {
         })
 
     const newPassword = watch('newPassword') ?? ''
-    const hasMinLength  = newPassword.length >= 8
+    const hasMinLength  = newPassword.length >= PASSWORD_MIN_LENGTH
     const hasUppercase  = /[A-Z]/.test(newPassword)
     const hasNumber     = /\d/.test(newPassword)
 

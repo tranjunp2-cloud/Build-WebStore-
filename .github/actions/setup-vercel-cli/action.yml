@@ -1,0 +1,36 @@
+name: Setup Vercel CLI
+description: >
+  Vercel CLI from a cached prefix (key = OS + major + ISO week) instead of `npm install --global`
+  on every deploy (~50 s on the shared runners). The weekly key picks up new minor releases.
+
+inputs:
+  major:
+    description: Vercel CLI major version
+    default: '50'
+
+runs:
+  using: composite
+  steps:
+    - name: Week stamp
+      id: stamp
+      shell: bash
+      run: echo "week=$(date -u +%G-w%V)" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Vercel CLI
+      id: cli
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.temp }}/vercel-cli
+        key: vercel-cli-${{ runner.os }}-${{ inputs.major }}-${{ steps.stamp.outputs.week }}
+
+    - name: Install Vercel CLI (cache miss only)
+      if: steps.cli.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm install --prefix "$RUNNER_TEMP/vercel-cli" --no-audit --no-fund "vercel@${{ inputs.major }}"
+
+    - name: Add Vercel CLI to PATH
+      shell: bash
+      run: |
+        # RUNNER_TEMP is per job, so concurrent deploys never share or overwrite the install.
+        echo "$RUNNER_TEMP/vercel-cli/node_modules/.bin" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/vercel-cli/node_modules/.bin/vercel" --version

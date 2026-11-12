@@ -6,6 +6,7 @@
  * Phase P3: added blockPromptOverrides map for per-template AI prompt overrides.
  */
 import { create } from 'zustand'
+import { uuid } from '@/lib/uuid'
 
 export interface Section {
     /** Unique ID — crypto.randomUUID() */
@@ -44,7 +45,7 @@ interface BuilderState {
 
 function makeId(): string {
     return typeof crypto !== 'undefined'
-        ? crypto.randomUUID()
+        ? uuid()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 

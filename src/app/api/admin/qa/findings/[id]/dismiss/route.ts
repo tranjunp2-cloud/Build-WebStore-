@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
 import config from "@payload-config";
-import { withSuperAdmin } from "@/lib/admin/api-utils";
+import { withStudioPermission } from "@/lib/admin/api-utils";
 import { withQaFindingRowLock } from "@/lib/payload/qa-finding-row-lock";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /** Internal QC decision only. It never calls GitHub or alters evidence. */
-export const POST = withSuperAdmin(
+export const POST = withStudioPermission('qa.triage', 
   async (_req: NextRequest, { params, user }) => {
     const id = params?.id;
     if (!id || !/^\d+$/.test(id))

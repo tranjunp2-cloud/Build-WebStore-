@@ -19,9 +19,18 @@ Canonical reference for linting, TypeScript strictness, imports, naming, modular
 
 ## Linting
 
-- Run `npm run lint` (Next.js ESLint).
+- Run `npm run lint` — ESLint with `eslint.config.mjs` (~60 s). **This is the CI gate.**
+- Run `npm run lint:fast` — oxlint with `.oxlintrc.json` (~1–2 s), used by the git hooks and
+  `npm run verify`. It mirrors `eslint-config-next/core-web-vitals` plus the `no-restricted-imports` rule
+  (model SDKs `openai`, `ai`, `@ai-sdk/*` stay out of `src/`, tests exempt), but oxlint 1.66 has no
+  equivalent for 5 ESLint error rules (`react/no-deprecated`, `react-hooks/set-state-in-render`,
+  `react-hooks/globals`, `react-hooks/config`, `react-hooks/gating`) nor the React Compiler warnings —
+  so a clean `lint:fast` can still fail `npm run lint` in CI. ESLint stays the gate for that reason
+  (an ESLint run limited to those 5 rules measured 63 s, the same as the full run).
 - Run `npm run typecheck` (tsc --noEmit).
-- ESLint warnings target: eventually hard-fail. Current baseline: warnings permitted; new code should be warning-free.
+- Lint warnings target: eventually hard-fail. Current baseline: warnings permitted; new code should be warning-free.
+- oxlint is pinned to `1.66.0`: every later release declares an optional `vite-plus` peer that npm cannot
+  resolve against the repo's vitest 3 (ERESOLVE). Bump it together with vitest.
 
 ## Naming Conventions
 

@@ -10,16 +10,16 @@ on:
 jobs:
   check-security:
     name: 'Security: Weekly Check'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       security-events: read
       contents: read
     steps:
       - name: Checkout (for composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check Dependabot alerts
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: alerts
         with:
           script: |

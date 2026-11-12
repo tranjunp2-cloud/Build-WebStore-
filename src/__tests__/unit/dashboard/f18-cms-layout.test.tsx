@@ -30,12 +30,25 @@ vi.mock('next/navigation', () => ({
 
 // ── Mock next/link ─────────────────────────────────────────────────────────────
 vi.mock('next/link', () => ({
-    default: ({ href, children, className, onClick }: { href: string; children: React.ReactNode; className?: string; onClick?: () => void }) =>
-        React.createElement('a', { href, className, onClick }, children),
+    // Pass every prop through (aria-label, focus handlers, ref) like the real Link, so tooltip triggers work
+    default: ({ href, children, prefetch: _prefetch, ...rest }: { href: string; children: React.ReactNode; prefetch?: unknown } & Record<string, unknown>) =>
+        React.createElement('a', { href, ...rest }, children),
+}))
+
+// Radix tooltips only open on real pointer/focus in a browser; render content inline so mini-rail copy is assertable
+vi.mock('@/components/ui/tooltip', () => ({
+    TooltipProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    TooltipContent: ({ children }: { children: React.ReactNode }) => <div role="tooltip">{children}</div>,
 }))
 
 vi.mock('@/components/dashboard/NotificationBell', () => ({
     NotificationBell: () => <div data-testid="notification-bell">Bell</div>,
+}))
+
+vi.mock('@/components/dashboard/feedback/feedback-button', () => ({
+    FeedbackButton: () => <div data-testid="feedback-button">Feedback</div>,
 }))
 
 vi.mock('@/app/(dashboard)/actions', () => ({
@@ -126,6 +139,45 @@ describe('F18 CMS Core Layout', () => {
             rerender(<DashboardSidebar {...defaultProps} badgeCounts={{ orders: 1500 }} />)
             expect(screen.getAllByText('1.5K').length).toBeGreaterThan(0)
             expect(screen.queryByText('1500')).toBeNull()
+        })
+
+        it('[TC-GH2170-02] Orders badge explains it counts pending orders (en + ms)', () => {
+            // Arrange + Act — expanded sidebar, EN
+            const { unmount } = render(<DashboardSidebar {...defaultProps} badgeCounts={{ orders: 175, products: 3 }} />)
+
+            // Assert — the Orders pill carries a hover hint + screen-reader text with the count
+            const ordersPill = screen.getAllByTitle('Pending orders')[0]
+            expect(ordersPill).toHaveTextContent('175 Pending orders')
+            // Badges without a hint stay as before
+            expect(screen.getAllByText('3')[0]).not.toHaveAttribute('title')
+            unmount()
+
+            // Collapsed rail (EN): the tooltip carries the hidden number
+            const { unmount: unmountMini } = render(<DashboardSidebar {...defaultProps} collapsed badgeCounts={{ orders: 175 }} />)
+            expect(screen.getAllByRole('tooltip').map(t => t.textContent)).toContain('Orders · 175 Pending orders')
+            unmountMini()
+
+            // Malay locale uses the ms copy
+            const localeSpy = vi.spyOn(i18n, 'useI18n').mockReturnValue({
+                locale: 'ms',
+                setLocale: vi.fn(),
+                toggleLocale: vi.fn(),
+                t: { cms: { profile: 'Profile', logout: 'Logout', appSwitcher: { switchApp: 'Switch app', ssoRedirect: 'Secure SSO redirect' } }, dashboard: { overview: { greeting: 'Good' } } } as any,
+                tp: vi.fn(),
+                ti: vi.fn(),
+            })
+            try {
+                const { unmount: unmountMs } = render(<DashboardSidebar {...defaultProps} badgeCounts={{ orders: 175 }} />)
+                expect(screen.getAllByTitle('Pesanan belum diproses')[0]).toHaveTextContent('175 Pesanan belum diproses')
+                unmountMs()
+
+                // Collapsed rail (MY): the tooltip carries the count in Malay too, not English
+                render(<DashboardSidebar {...defaultProps} collapsed badgeCounts={{ orders: 175 }} />)
+                expect(screen.getAllByRole('tooltip').map(t => t.textContent)).toContain('Pesanan · 175 Pesanan belum diproses')
+                expect(screen.queryByText(/Pending orders/)).toBeNull()
+            } finally {
+                localeSpy.mockRestore()
+            }
         })
 
         it('[TC-F18.01c] Relabels: Email Templates keeps the email-templates route; Team & Account points to staff (#1138)', () => {

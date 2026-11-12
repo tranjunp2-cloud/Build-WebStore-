@@ -19,7 +19,11 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { ORDER_STATUS_LABEL_KEY, type OrderStatus } from '@/lib/orders/status-groups'
-import { getBrowserViewerTimeZone } from '@/lib/viewer-timezone'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/hooks/queries/query-keys'
+import { useKeptData } from '@/hooks/queries/use-kept-data'
+import { useQueryScope } from '@/providers/query-provider'
+import { useOrdersPageQuery } from './orders-queries'
 
 // ───────── TYPES ─────────
 export type { OrderStatus }
@@ -279,7 +283,6 @@ function OrdersTableInner({ orders, loading, selectedRows, onSelectionChange, ne
 }
 
 export function OrdersTable({
-    refreshCounter = 0,
     silentRefreshTrigger = 0,
     selectedRows = new Set(),
     onSelectionChange,
@@ -290,7 +293,6 @@ export function OrdersTable({
     paymentMethodFilter = '',
     sortOrder = '-createdAt',
 }: {
-    refreshCounter?: number
     silentRefreshTrigger?: number
     selectedRows?: Set<string>
     onSelectionChange?: (selectedIds: Set<string>) => void
@@ -301,136 +303,68 @@ export function OrdersTable({
     paymentMethodFilter?: string
     sortOrder?: string
 }) {
-    const [orders, setOrders] = useState<Order[]>([])
-    const [loading, setLoading] = useState(true)
     const [page, setPage] = useState(1)
-    const [total, setTotal] = useState(0)
     const [limit, setLimit] = useState(10)
     const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set())
     const { t } = useI18n()
+    const scope = useQueryScope()
+    const queryClient = useQueryClient()
+
+    // A filter change starts on page 1 in the same render: no request for the old page number.
+    const filtersKey = JSON.stringify([searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder])
+    const [pageFilters, setPageFilters] = useState(filtersKey)
+    if (pageFilters !== filtersKey) {
+        setPageFilters(filtersKey)
+        if (page !== 1) setPage(1)
+    }
+
+    const query = useOrdersPageQuery({ page, limit, sort: sortOrder, search: searchQuery, status: statusFilter, date: dateFilter, paymentMethod: paymentMethodFilter })
+    // a failed page read keeps the rows last shown (the old screen logged it and kept them too)
+    const shown = useKeptData(query.data)
+    const orders = shown?.docs ?? []
+    const total = shown?.totalDocs ?? 0
+    // spinner rows while the rows on screen are not this page / these filters yet; a background refetch keeps them
+    const loading = query.isPending || query.isPlaceholderData
+    useEffect(() => {
+        if (query.error) console.error('Failed to load orders:', query.error)
+    }, [query.error])
 
     // GH-1579: bulk status changes with an active status filter shrink the dataset —
     // snap back when the refetched total strands page past the last valid page.
     useTablePageClamp(page, total, limit, setPage, !loading)
 
-    // Refs keep latest filter values accessible inside the silentFetch effect without
-    // adding them as deps (which would turn silent-refresh into a full reload on every filter change)
-    const searchQueryRef = useRef(searchQuery)
-    const statusFilterRef = useRef(statusFilter)
-    const dateFilterRef = useRef(dateFilter)
-    const paymentMethodFilterRef = useRef(paymentMethodFilter)
-    const sortOrderRef = useRef(sortOrder)
+    // the parent keeps the loaded rows (bulk confirm reads their status)
     const onOrdersLoadedRef = useRef(onOrdersLoaded)
-    useEffect(() => { searchQueryRef.current = searchQuery }, [searchQuery])
-    useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
-    useEffect(() => { dateFilterRef.current = dateFilter }, [dateFilter])
-    useEffect(() => { paymentMethodFilterRef.current = paymentMethodFilter }, [paymentMethodFilter])
-    useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
-    useEffect(() => { onOrdersLoadedRef.current = onOrdersLoaded }, [onOrdersLoaded])
-
-    // Track previous filter values to detect changes and compute effectivePage in one effect,
-    // avoiding the double-fetch race condition that arises from a separate page-reset effect.
-    const prevFiltersRef = useRef({ searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder })
-
+    onOrdersLoadedRef.current = onOrdersLoaded
+    const loadedDocs = query.isPlaceholderData ? undefined : query.data?.docs
     useEffect(() => {
-        const prev = prevFiltersRef.current
-        const filtersChanged =
-            prev.searchQuery !== searchQuery ||
-            prev.statusFilter !== statusFilter ||
-            prev.dateFilter !== dateFilter ||
-            prev.paymentMethodFilter !== paymentMethodFilter ||
-            prev.sortOrder !== sortOrder
-        prevFiltersRef.current = { searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder }
+        if (loadedDocs) onOrdersLoadedRef.current?.(loadedDocs)
+    }, [loadedDocs])
 
-        // When filters change, fetch page 1 immediately — don't wait for setPage(1) re-render.
-        // Also sync the page state for pagination display.
-        const effectivePage = filtersChanged ? 1 : page
-        if (filtersChanged && page !== 1) setPage(1)
-
-        async function fetchOrders() {
-            try {
-                setLoading(true)
-                let url = `/api/orders?page=${effectivePage}&limit=${limit}&sort=${encodeURIComponent(sortOrder)}`
-                if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
-                if (statusFilter && statusFilter !== 'all') url += `&status=${encodeURIComponent(statusFilter)}`
-                if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
-                if (paymentMethodFilter) url += `&paymentMethod=${encodeURIComponent(paymentMethodFilter)}`
-
-                const res = await fetch(url, {
-                    headers: {
-                        'X-Viewer-Time-Zone': getBrowserViewerTimeZone(),
-                    },
-                })
-                if (!res.ok) throw new Error('Failed to fetch')
-                const data = await res.json()
-
-                if (data.success && data.docs) {
-                    setOrders(data.docs)
-                    setTotal(data.totalDocs ?? data.total ?? data.docs.length)
-                    if (onOrdersLoaded) onOrdersLoaded(data.docs)
-                }
-            } catch (err) {
-                console.error("Failed to load orders:", err)
-            } finally {
-                setLoading(false)
-            }
-        }
-        fetchOrders()
-    }, [page, limit, refreshCounter, searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder])
-
-    // Silent background merge — only on page 1, no loading spinner, preserves scroll/selection
+    // A new order arrived (notification): read page 1 again in the background and highlight the rows that are new.
+    const highlightAfter = useRef<Set<string> | null>(null)
     useEffect(() => {
         if (silentRefreshTrigger === 0) return
-        if (page !== 1) return
-
-        async function silentFetch() {
-            try {
-                let url = `/api/orders?page=1&limit=${limit}&sort=${encodeURIComponent(sortOrderRef.current)}`
-                // Use refs to read latest filter values — avoids stale closure without triggering full reload on filter change
-                if (searchQueryRef.current) url += `&search=${encodeURIComponent(searchQueryRef.current)}`
-                if (statusFilterRef.current && statusFilterRef.current !== 'all') url += `&status=${encodeURIComponent(statusFilterRef.current)}`
-                if (dateFilterRef.current && dateFilterRef.current !== 'all') url += `&date=${encodeURIComponent(dateFilterRef.current)}`
-                if (paymentMethodFilterRef.current) url += `&paymentMethod=${encodeURIComponent(paymentMethodFilterRef.current)}`
-
-                const res = await fetch(url, {
-                    headers: {
-                        'X-Viewer-Time-Zone': getBrowserViewerTimeZone(),
-                    },
-                })
-                if (!res.ok) return
-                const data = await res.json()
-                if (!data.success || !data.docs) return
-
-                const incoming: Order[] = data.docs
-                // Use a captured variable to read computed fresh IDs after the updater runs.
-                // This avoids both stale closure (functional form reads fresh prev) and
-                // side-effect-in-updater (setNewOrderIds called outside, once, not in updater).
-                let capturedFreshIds: Set<string> | null = null
-                setOrders((prev) => {
-                    const existingIds = new Set(prev.map((ord) => ord.id))
-                    const fresh = incoming.filter((ord) => !existingIds.has(ord.id))
-                    if (fresh.length === 0) return prev
-                    capturedFreshIds = new Set(fresh.map((ord) => ord.id))
-                    return [...fresh, ...prev]
-                })
-                if (capturedFreshIds) {
-                    const freshIds = capturedFreshIds as Set<string>
-                    setNewOrderIds((cur) => new Set([...cur, ...freshIds]))
-                    setTimeout(() => {
-                        setNewOrderIds((cur) => {
-                            const next = new Set(cur)
-                            freshIds.forEach((id) => next.delete(id))
-                            return next
-                        })
-                    }, 4000)
-                }
-                if (onOrdersLoadedRef.current) onOrdersLoadedRef.current(incoming)
-            } catch (err) {
-                console.error('[Orders] Silent refresh failed:', err)
-            }
-        }
-        silentFetch()
+        if (page === 1) highlightAfter.current = new Set(orders.map((ord) => ord.id))
+        void queryClient.invalidateQueries({ queryKey: queryKeys.orders.lists(scope) })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [silentRefreshTrigger])
+    useEffect(() => {
+        const before = highlightAfter.current
+        if (!before || !loadedDocs || page !== 1) return
+        highlightAfter.current = null
+        const freshIds = new Set(loadedDocs.filter((ord) => !before.has(ord.id)).map((ord) => ord.id))
+        if (freshIds.size === 0) return
+        setNewOrderIds((cur) => new Set([...cur, ...freshIds]))
+        const timer = setTimeout(() => {
+            setNewOrderIds((cur) => {
+                const next = new Set(cur)
+                freshIds.forEach((id) => next.delete(id))
+                return next
+            })
+        }, 4000)
+        return () => clearTimeout(timer)
+    }, [loadedDocs, page])
 
     return (
         // No outer card here — the base Table provides the single card; the pager is

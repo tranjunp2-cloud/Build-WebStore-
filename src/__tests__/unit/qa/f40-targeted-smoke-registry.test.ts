@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parseCoverageMap } from "@/lib/admin/qa/change-impact";
 import {
   TARGETED_SMOKE_PACKS,
   resolveTargetedSmokePacks,
@@ -64,5 +67,14 @@ describe("[TC-F40-03-01] Targeted critical-flow Smoke registry", () => {
   it("TC-F40-03-01: validates the checked-in registry against known targets", () => {
     // Arrange / Act / Assert
     expect(() => validateTargetedSmokePacks(TARGETED_SMOKE_PACKS, knownTargetIds)).not.toThrow();
+  });
+
+  it("TC-F40-03-01: maps every registry target in qa/coverage-map.yml (targeted-dispatch fails closed otherwise)", () => {
+    // Arrange
+    const coverageMap = parseCoverageMap(readFileSync(join(process.cwd(), "qa", "coverage-map.yml"), "utf8"));
+    const mappedTargetIds = new Set(coverageMap.rules.flatMap((rule) => rule.targets));
+
+    // Act / Assert
+    expect(() => validateTargetedSmokePacks(TARGETED_SMOKE_PACKS, mappedTargetIds)).not.toThrow();
   });
 });

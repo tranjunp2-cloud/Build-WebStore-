@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { cartSignature, useCartStore, type CartItem } from '@/store/cartStore'
 
@@ -67,6 +68,30 @@ describe('CartStore', () => {
             const stored = JSON.parse(localStorageMock.getItem('primeweb-cart:1') || '[]')
             expect(stored).toHaveLength(1)
             expect(stored[0].productId).toBe('prod-1')
+        })
+    })
+
+    describe('[TC-F09.290] addItem with quantity (GH-2100)', () => {
+        it('adds the requested quantity, default stays +1', () => {
+            useCartStore.getState().addItem(mockItem, 3)
+            expect(useCartStore.getState().items[0].quantity).toBe(3)
+            useCartStore.getState().addItem(mockItem)
+            expect(useCartStore.getState().items[0].quantity).toBe(4)
+        })
+
+        it('clamps to inventory for new and existing lines', () => {
+            useCartStore.getState().addItem({ ...mockItem, inventory: 5 }, 9)
+            expect(useCartStore.getState().items[0].quantity).toBe(5)
+            useCartStore.getState().clearCart()
+            useCartStore.getState().addItem({ ...mockItem, inventory: 5 }, 3)
+            useCartStore.getState().addItem({ ...mockItem, inventory: 5 }, 4)
+            expect(useCartStore.getState().items[0].quantity).toBe(5)
+        })
+
+        it('falls back to 1 for invalid quantity', () => {
+            useCartStore.getState().addItem(mockItem, 0)
+            useCartStore.getState().addItem(mockItem2, Number.NaN)
+            expect(useCartStore.getState().items.map(i => i.quantity)).toEqual([1, 1])
         })
     })
 

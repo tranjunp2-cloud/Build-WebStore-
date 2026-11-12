@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission, withSuperAdmin } from '@/lib/admin/api-utils'
 
 const CreatePackSchema = z.object({
     name: z.string().min(1).max(200),
@@ -44,7 +44,7 @@ export const GET = withSuperAdmin(async (req: NextRequest) => {
     })
 })
 
-export const POST = withSuperAdmin(async (req: NextRequest) => {
+export const POST = withStudioPermission('pack.edit', async (req: NextRequest) => {
     let body: unknown
     try {
         body = await req.json()

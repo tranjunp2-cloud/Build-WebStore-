@@ -4,7 +4,13 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Payload } from 'payload'
 import { verifyXenditCallbackToken, handleAccountEvent } from './handlers/account-updated'
-import { handlePaymentEvent, handleInvoiceEvent } from './handlers/payment-updated'
+import {
+    findWebhookOrder,
+    handleInvoiceEvent,
+    handlePaymentEvent,
+    webhookOrderRefs,
+    type WebhookOrder,
+} from './handlers/payment-updated'
 
 const ACCOUNT_EVENTS = ['account.created', 'account.updated', 'account.activated'] as const
 // v2 legacy events (XenPlatform Model B)
@@ -12,13 +18,6 @@ const PAYMENT_EVENTS_V2 = ['payment.capture', 'payment.authorization', 'payment.
 // v3 events (Model C — merchant's own Xendit account via payment_requests API)
 const PAYMENT_EVENTS_V3 = ['payment_request.succeeded', 'payment_request.expiry'] as const
 
-/**
- * Verify the X-CALLBACK-TOKEN header.
- *
- * Model C (payment events): look up order via reference_id → find tenant →
- *   verify against tenant.xenditCallbackToken (per-merchant).
- * Model B (account events) + fallback: verify against master XENDIT_WEBHOOK_TOKEN env var.
- */
 function safeTimingSafeEqual(a: string, b: string): boolean {
     const bufA = Buffer.from(a)
     const bufB = Buffer.from(b)
@@ -26,58 +25,32 @@ function safeTimingSafeEqual(a: string, b: string): boolean {
     return timingSafeEqual(bufA, bufB)
 }
 
-async function resolveCallbackToken(
+/**
+ * Verify the X-CALLBACK-TOKEN header against the shop of the order the event will update (TC-PERF-147).
+ * - Account events: ECH platform level → master XENDIT_WEBHOOK_TOKEN.
+ * - Payment / invoice events naming one of our orders: that order's tenant.xenditCallbackToken, nothing else
+ *   (no fallback to the master token: that would bypass per-tenant security).
+ * - Payment / invoice events naming no order of ours (Xendit Dashboard test pings): master token only; the
+ *   handlers do nothing without an order.
+ */
+async function verifyCallbackToken(
     payload: Payload,
     incomingToken: string,
     event: string,
-    data: Record<string, any>,
-    body: Record<string, any>,
+    order: WebhookOrder | null,
 ): Promise<boolean> {
     if (!incomingToken) return false
-
-    // Account events are ECH-platform-level → verify against master token
-    if ((ACCOUNT_EVENTS as readonly string[]).includes(event)) {
-        return verifyXenditCallbackToken(incomingToken)
+    if ((ACCOUNT_EVENTS as readonly string[]).includes(event) || !order) return verifyXenditCallbackToken(incomingToken)
+    if (order.tenantId == null) return false
+    const tenant = await payload
+        .findByID({ collection: 'tenants', id: order.tenantId, depth: 0, overrideAccess: true, select: { xenditCallbackToken: true } } as any)
+        .catch(() => null) as { xenditCallbackToken?: string | null } | null
+    const tenantToken = tenant?.xenditCallbackToken
+    if (!tenantToken) {
+        console.error('[Xendit Webhook] Tenant has no xenditCallbackToken configured — rejecting')
+        return false
     }
-
-    // Invoice webhooks use external_id at root; payment_request webhooks use data.reference_id
-    // Payment events → try per-tenant token (Model C)
-    // Path 1: order id is numeric (real payment)
-    const referenceId: string | undefined = data.reference_id ?? body.external_id
-    if (referenceId && !isNaN(Number(referenceId))) {
-        try {
-            const order = await payload
-                .findByID({ collection: 'orders', id: Number(referenceId), depth: 1, overrideAccess: true })
-                .catch(() => null)
-            if (order) {
-                const tenantId =
-                    typeof (order as any).tenant === 'object'
-                        ? (order as any).tenant?.id
-                        : (order as any).tenant
-                if (tenantId) {
-                    const tenant = await payload
-                        .findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
-                        .catch(() => null)
-                    const tenantToken: string | undefined = (tenant as any)?.xenditCallbackToken
-                    if (tenantToken) {
-                        return safeTimingSafeEqual(incomingToken, tenantToken)
-                    }
-                    // Tenant found but has no webhook token configured — reject immediately.
-                    // Do NOT fall through to master token; that would bypass per-tenant security.
-                    console.error('[Xendit Webhook] Tenant has no xenditCallbackToken configured — rejecting')
-                    return false
-                }
-            }
-        } catch {
-            // fall through
-        }
-    }
-
-    // Real invoice events always have a numeric external_id (String(order.id)).
-    // Non-numeric ids are Xendit Dashboard test pings — only accept via master platform token.
-    // Path 2 (tenant token scan for non-numeric ids) is removed: it allowed any tenant to validate
-    // events for other tenants' orders by supplying their own token with a non-numeric external_id.
-    return verifyXenditCallbackToken(incomingToken)
+    return safeTimingSafeEqual(incomingToken, tenantToken)
 }
 
 /**
@@ -108,9 +81,21 @@ export async function POST(request: Request) {
     const data: Record<string, any> = body.data ?? {}
     const token = request.headers.get('x-callback-token') ?? ''
 
-    // 2. Verify callback token
+    const isAccountEvent = (ACCOUNT_EVENTS as readonly string[]).includes(event)
+    const isPaymentEvent =
+        (PAYMENT_EVENTS_V2 as readonly string[]).includes(event) ||
+        (PAYMENT_EVENTS_V3 as readonly string[]).includes(event)
+    // Invoice webhook: no event field, has external_id at root level (invoice.paid / invoice.expired)
+    const isInvoiceEvent = !event && typeof body.external_id === 'string'
+
+    // 2. Resolve the one order this event is about, then verify the token against that order's shop
     const payload = await getPayload({ config })
-    const verified = await resolveCallbackToken(payload, token, event, data, body)
+    let order: WebhookOrder | null = null
+    if (isPaymentEvent || isInvoiceEvent) {
+        const { referenceId, paymentRequestId } = webhookOrderRefs(event, body)
+        order = await findWebhookOrder(payload, referenceId, paymentRequestId)
+    }
+    const verified = await verifyCallbackToken(payload, token, event, order)
     if (!verified) {
         return NextResponse.json(
             { success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid callback token' } },
@@ -118,21 +103,16 @@ export async function POST(request: Request) {
         )
     }
 
-    // 3. Dispatch
+    // 3. Dispatch — the handlers update only the verified order
     try {
-        const isAccountEvent = (ACCOUNT_EVENTS as readonly string[]).includes(event)
-        const isPaymentEvent =
-            (PAYMENT_EVENTS_V2 as readonly string[]).includes(event) ||
-            (PAYMENT_EVENTS_V3 as readonly string[]).includes(event)
-        // Invoice webhook: no event field, has external_id at root level (invoice.paid / invoice.expired)
-        const isInvoiceEvent = !event && typeof body.external_id === 'string'
-
         if (isAccountEvent) {
             await handleAccountEvent(payload, event, data)
-        } else if (isInvoiceEvent) {
-            await handleInvoiceEvent(payload, body)
-        } else if (isPaymentEvent) {
-            await handlePaymentEvent(payload, event, data)
+        } else if ((isInvoiceEvent || isPaymentEvent) && !order) {
+            console.warn('[Xendit Webhook] No order for event', { event: event || 'invoice' })
+        } else if (isInvoiceEvent && order) {
+            await handleInvoiceEvent(payload, body, order)
+        } else if (isPaymentEvent && order) {
+            await handlePaymentEvent(payload, event, data, order)
         } else {
             console.log('[Xendit Webhook] Ignoring event:', event || '(no event field)')
         }

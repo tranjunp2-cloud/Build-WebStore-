@@ -1,7 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import {
-    createOpenAIWikimediaRater,
     createWikimediaAdapter,
     type PlannedReservoir,
 } from '@/lib/ai/image-sourcing'
@@ -46,7 +45,7 @@ function wikiResponse(licenseName = 'CC BY-SA 4.0') {
     } as unknown as Response
 }
 
-describe('[TC-F38-WIKI-01–08] Wikimedia adapter and OpenAI rating', () => {
+describe('[TC-F38-WIKI-01–08] Wikimedia adapter (AI rating moved out of prime-web with the OpenAI rater)', () => {
     it('uses namespace 6, max 20, user agent and maps complete reusable provenance', async () => {
         // Arrange
         const fetchMock = vi.fn().mockResolvedValue(wikiResponse())
@@ -134,66 +133,5 @@ describe('[TC-F38-WIKI-01–08] Wikimedia adapter and OpenAI rating', () => {
 
         // Assert
         expect(result).toEqual({ ok: true, candidates: [] })
-    })
-
-    it('sends at most five inline validated previews and accepts only an input winner ID', async () => {
-        // Arrange
-        const candidates = Array.from({ length: 7 }, (_, index) => ({
-            ...(wikiResponse() as unknown as object),
-            provider: 'wikimedia' as const,
-            providerImageId: String(index),
-            previewUrl: 'https://upload.wikimedia.org/preview.jpg',
-            downloadUrl: 'https://upload.wikimedia.org/original.jpg',
-            sourceUrl: 'https://commons.wikimedia.org/wiki/File:X.jpg',
-            creator: 'Jane',
-            licenseName: 'CC BY 4.0',
-            licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-            attribution: 'Jane',
-            tags: ['bakery'],
-            category: 'fnb',
-            width: 1600,
-            height: 900,
-            aspect: 16 / 9,
-            active: true,
-        }))
-        const loadPreview = vi.fn().mockResolvedValue({
-            data: new Uint8Array([0xff, 0xd8, 0xff]),
-            mimeType: 'image/jpeg',
-        })
-        const fetchMock = vi.fn().mockResolvedValue({
-            ok: true,
-            json: vi.fn().mockResolvedValue({
-                choices: [{ message: { content: JSON.stringify({
-                    winnerId: '2',
-                    relevant: true,
-                    alt: 'Bakery',
-                    reason: 'Relevant',
-                }) } }],
-            }),
-        })
-        const rater = createOpenAIWikimediaRater({
-            apiKey: 'secret-key',
-            loadPreview,
-            fetch: fetchMock,
-        })
-
-        // Act
-        const result = await rater.rate(candidates, demand)
-
-        // Assert
-        expect(result?.winnerId).toBe('2')
-        expect(loadPreview).toHaveBeenCalledTimes(5)
-        const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string)
-        expect(body.model).toBe('gpt-5.4-mini')
-        expect(body.response_format.json_schema.schema.required).toEqual([
-            'winnerId',
-            'relevant',
-            'alt',
-            'reason',
-        ])
-        expect(fetchMock.mock.calls[0]![0]).toBe('https://api.openai.com/v1/chat/completions')
-        expect((fetchMock.mock.calls[0]![1] as RequestInit).headers).toEqual(
-            expect.objectContaining({ Authorization: 'Bearer secret-key' }),
-        )
     })
 })

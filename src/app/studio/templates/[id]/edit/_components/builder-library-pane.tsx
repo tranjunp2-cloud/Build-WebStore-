@@ -30,7 +30,7 @@ const BLOCK_CATEGORIES = [
     { id: 'other',      name: 'Other',      Icon: Package },
 ]
 
-export function BuilderLibraryPane() {
+export function BuilderLibraryPane({ canEdit = true }: { canEdit?: boolean } = {}) {
     const [query, setQuery]     = useState('')
     const [cat, setCat]         = useState('all')
     const [collapsed, setCollapsed] = useState(false)
@@ -141,9 +141,9 @@ export function BuilderLibraryPane() {
                         role="button"
                         tabIndex={0}
                         className="b-block-card"
-                        onClick={() => addBlock(block.slug)}
-                        onKeyDown={(e) => e.key === 'Enter' && addBlock(block.slug)}
-                        title="Click to add to canvas"
+                        onClick={canEdit ? () => addBlock(block.slug) : undefined}
+                        onKeyDown={canEdit ? (e) => e.key === 'Enter' && addBlock(block.slug) : undefined}
+                        title={canEdit ? 'Click to add to canvas' : undefined}
                     >
                         <div className="b-bc-head">
                             <div className="b-bc-icon">{block.icon}</div>

@@ -1013,7 +1013,7 @@ Thread user-supplied `phone`, `email`, `address`, `products`, `shortDescription`
 | TC ID | Test File | Mô tả | Status |
 |-------|-----------|-------|--------|
 | **TC-F01-W.01** | `business-info-mapper.test.ts` | Mapper parse + dedupe products string, normalize phone/email, derive tagline | ✅ |
-| **TC-F01-W.02** | `contact-override.test.ts` | Contact block dùng user phone/email/address verbatim khi provided; fallback canned khi empty; bizOverride deep-clone không pollute cache | ✅ |
+| **TC-F01-W.02** | `contact-override.test.ts` | Contact block dùng user phone/email/address verbatim khi provided; KHÔNG fallback canned khi empty (contact rỗng trên mọi page, kể cả Home padding); bizOverride deep-clone không pollute cache | ✅ |
 | **TC-F01-W.03** | `features-from-products.test.ts` | Features block emit cards từ user products khi ≥2; icons rotate từ `PRODUCT_FEATURE_ICONS[category]`; description dùng `FEATURE_BODY_TEMPLATES[category]`; fallback canned khi <2 | ✅ |
 | **TC-F01-W.04** | `service-cards-from-products.test.ts` | Service-cards emit user products khi provided; fallback canned khi empty | ✅ |
 | **TC-F01-W.05** | `service-cards-from-products.test.ts` | Product-quick-view emit user products, pad từ canned khi <3 | ✅ |
@@ -1021,6 +1021,7 @@ Thread user-supplied `phone`, `email`, `address`, `products`, `shortDescription`
 | **TC-F01-W.06b** | `product-translator.test.ts` + `image-keywords-products.test.ts` | `nasi lemak` → `malaysian coconut rice`; `phở` → `vietnamese pho noodle soup`; unknown vi/ms pass-through | ✅ |
 | **TC-F01-W.07** | `build-user-prompt.test.ts` | `buildUserPrompt` serialize phone/email/address/tagline khi provided; omit khi empty | ✅ |
 | **TC-F01-W.08** | `user-data-e2e-fixture.test.ts` | End-to-end: ramen shop + nasi lemak shop fixtures — composer + keywords + prompt đồng bộ | ✅ |
+| **TC-F01-W.09** | `user-contact-defaults.test.ts` + `api/ai.test.ts` | Contact điền theo ưu tiên form > `sites.contactInfo` hiện có > account; regenerate không ghi đè contact đã sửa; migration không dùng account owner; bỏ email `@primeweb.local`; không bịa phone; service ghi `contactInfo` (tạo mới + regenerate) | ✅ |
 
 ### Files Modified
 
@@ -1421,3 +1422,31 @@ enforcer-padded hero subheadline.
 | TC-1252-03 | backend | `team` `grid` variant, 2 members → `enforceMinContent` | downgrades to `list` | unit | `src/__tests__/unit/ai/gh-1252-variant-min-content.test.ts` |
 | TC-1252-04 | backend | `team` `grid` variant, 3 members → `enforceMinContent` | keeps `grid` | unit | `src/__tests__/unit/ai/gh-1252-variant-min-content.test.ts` |
   - `src/__tests__/unit/blocks/gh-1266-split-video-render.test.tsx` (27 tests)
+
+---
+
+## GH-1611 — Ảnh AI gen sai ngành hàng (gallery trộn bánh + quần áo)
+
+Các TC-GH1611-* dưới đây đã có trong test nhưng trước đây chưa được ghi vào docs/qa. Số TC được đánh theo từng file test (một số số trùng giữa các file: 10–13, 30–31) nên bảng ghi rõ file.
+
+| TC ID | Layer | Scenario | Expected | Type | File |
+|-------|-------|----------|----------|------|------|
+| TC-GH1611-01..17 | backend | Pool ảnh: relevance gate cho mọi ngôn ngữ/tier, tier-2 dùng cụm từ tìm được (không dùng key nội bộ), bucket chưa "đủ" cho tới khi gallery=6, gate chỉ tin sản phẩm user nhập | Không ảnh ngành khác lọt vào pool; bucket rỗng còn hơn ảnh sai ngành | unit | `src/__tests__/unit/ai/image-pool.test.ts` |
+| TC-GH1611-10..13 | backend | Form key (`fnb`, `realestate`…) thắng khi resolve category; siteType alias không bị phá | Không trôi về `business` | unit | `src/__tests__/unit/ai/composer-category-resolver.test.ts` |
+| TC-GH1611-18..19 | backend | Pool provenance + curated fallback cùng ngành khi pool thiếu | Gallery lấp từ ảnh curated đúng ngành | unit | `src/__tests__/unit/lib/ai/media-injector.test.ts` |
+| TC-GH1611-20..31 | backend | `photoMatchesTerms`: term nhiều từ, số nhiều, token nguyên, không gate theo mood | Ảnh cross-industry bị loại | unit | `src/__tests__/unit/lib/ai/pixabay-client.test.ts` |
+| TC-GH1611-30..32 | backend | Gallery bánh 6 ảnh đều đúng ngành; không vá thiếu bằng search ngoài pool | 0 ảnh quần áo | unit | `src/__tests__/unit/ai/gh1611-bakery-gallery.test.ts` |
+| TC-GH1611-33 | backend | `resolveComposerCategory` với "tiệm hoa tươi", "cửa hàng hoa", "bánh kẹo", "bánh ngọt", "bánh mì"; "sửa xe máy" vẫn `business` (chưa có category riêng) | Đúng category, không trôi `business` (trừ ngành không có key) | unit | `src/__tests__/unit/ai/composer-category-resolver.test.ts` |
+| TC-GH1611-34 | backend | Pixabay TIMEOUT → recovery vẫn gate theo sản phẩm merchant (category `food` chỉ là lọc thô) | Ảnh "dress, clothing" bị loại | unit | `src/__tests__/unit/ai/image-pool.test.ts` |
+| TC-GH1611-35 | backend | Timeout recovery không có product → giữ ảnh đã lọc theo category | Ảnh category được giữ | unit | `src/__tests__/unit/ai/image-pool.test.ts` |
+| TC-GH1611-36 | backend | `ecommerce`/`business` + merchant thật: hero/about/contact/footer/cta không chứa Nurul/FreshBox/Baju Kurung/Earbuds/Organic Honey/Batik… | Không lộ nhận diện ngành mẫu | unit | `src/__tests__/unit/ai/gh1611-no-cross-industry-sample-leak.test.ts` |
+| TC-GH1611-37 | backend | `isBakeryContext`: "bánh", "bánh kem", "cupcake", "kek" là bakery; "cà phê, bánh", "trà sữa", "bánh mì", rỗng thì không | Chỉ tiệm bánh thật mới đổi cụm tìm kiếm | unit | `src/__tests__/unit/ai/gh1611-bakery-subject.test.ts` |
+| TC-GH1611-38 | backend | `categorySearchPhrase`/pool tier-3: `fnb` + sản phẩm bánh dùng "bakery pastry"/"tiệm bánh"; quán cà phê giữ "coffee shop"/"quán cà phê" | Không search ảnh cà phê cho tiệm bánh | unit | `src/__tests__/unit/ai/gh1611-bakery-subject.test.ts` |
+| TC-GH1611-39 | backend | `getMediaForBlock` gate thêm term đã dịch (`gateTerms`) bên cạnh term thô | Giữ ảnh bánh, loại ảnh "coffee cup" | unit | `src/__tests__/unit/ai/gh1611-bakery-subject.test.ts` |
+| TC-GH1611-40 | backend | Từ điển `translateKnownProductTerms` có "bánh", "bánh kem", "kẹo"…; "bánh mì" vẫn ra dish riêng | Dịch lỗi không còn rơi về gate "coffee shop" | unit | `src/__tests__/unit/ai/gh1611-bakery-subject.test.ts` |
+| TC-GH1611-41 | backend | `productTypeWords`: "bánh"/"bánh kem"/"bánh ngọt"/"bánh quy"/"kẹo" → tag EN; "bánh mì" → bread (không cake); "bánh canh" không bị ép về cake; tên EN không đổi | Sản phẩm VN có type hợp lệ | unit | `src/__tests__/unit/lib/ai/product-photo-matching.test.ts` |
+| TC-GH1611-42 | backend | `matchPoolPhotosToProducts` với sản phẩm "bánh" (có/không `imageKeyword`) chọn ảnh muffin/cupcake, không chọn ảnh áo | Sản phẩm "bánh" có ảnh bánh, không rơi về ảnh steak mẫu | unit | `src/__tests__/unit/lib/ai/product-photo-matching.test.ts` |
+| TC-GH1611-43 | backend | Sản phẩm VN không nhận diện + pool không khớp → không ảnh (placeholder) | Không gán ảnh sai | unit | `src/__tests__/unit/lib/ai/product-photo-matching.test.ts` |
+| TC-GH1611-44 | backend | "Khuôn bánh kem" / "Bánh kem stand" / "Đế bánh kem" không nhận ảnh bánh khi pool chỉ có bánh; "Bánh Kem Dâu" vẫn có ảnh | Phụ kiện/dụng cụ giữ đúng loại (TC-AIAUD-168..169) | unit | `src/__tests__/unit/lib/ai/product-photo-matching.test.ts` |
+| TC-GH1611-45 | backend | Matcher nhận tên không dấu ("banh ngot", "keo") và "bánh quy"/"kẹo" → ảnh pastry/cookie/candy, không ảnh áo | Tên không dấu vẫn có ảnh đúng loại | unit | `src/__tests__/unit/lib/ai/product-photo-matching.test.ts` |
+| TC-GH1611-MANUAL | e2e | QC gen web trên staging cho ≥4 ngành (bánh kẹo, hoa, xe máy, sửa chữa), duyệt mọi block | 100% ảnh/nội dung đúng ngành | manual | (phụ thuộc Pixabay + LLM thật, không đưa vào CI) |

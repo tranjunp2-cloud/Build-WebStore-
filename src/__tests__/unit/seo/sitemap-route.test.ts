@@ -8,6 +8,14 @@ vi.mock('payload', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 
 import { GET as getSitemap } from '@/app/sites/[slug]/sitemap.xml/route'
+// #2179: store availability has its own tests (store-unavailable.test.ts); every store is available here.
+vi.mock('@/lib/storefront/cached-store-availability', () => ({
+    isCachedStoreUnavailable: vi.fn(async () => false),
+    storeUnavailableLocaleOf: vi.fn(async () => 'en'),
+    storeUnavailableResponse: vi.fn(async () => null),
+    storefrontUnavailableFor: vi.fn(async () => null),
+}))
+import { storefrontUnavailableFor } from '@/lib/storefront/cached-store-availability'
 
 function request(hostname = ''): NextRequest {
     return {
@@ -22,6 +30,19 @@ function publishedSite() {
 describe('[TC-F37-03] sitemap public route contract', () => {
     beforeEach(() => {
         mockFind.mockReset()
+    })
+
+    it('TC-F09.282: unavailable store answers 503 noindex without reading content', async () => {
+        // Arrange
+        vi.mocked(storefrontUnavailableFor).mockResolvedValueOnce({ unavailable: true, locale: 'en' })
+
+        // Act
+        const response = await getSitemap(request(), { params: Promise.resolve({ slug: 'mycafe' }) })
+
+        // Assert
+        expect(response.status).toBe(503)
+        expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
+        expect(mockFind).not.toHaveBeenCalled()
     })
 
     it('TC-F37-03-38: returns XML for current public content on a published site', async () => {

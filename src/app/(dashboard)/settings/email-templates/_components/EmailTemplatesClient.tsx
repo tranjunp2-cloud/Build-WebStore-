@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useCallback } from 'react'
+import { useState, useEffect, useTransition, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
@@ -9,9 +9,13 @@ import type { ContentFields } from '@/lib/email/template-default-fields'
 import {
     saveEmailTemplateConfig,
     resetEmailTemplateConfig,
+    getEmailTemplateSettings,
 } from '../actions'
 import { EmailTemplateListView } from './email-template-list-view'
 import { EmailTemplateEditView } from './email-template-edit-view'
+import { AgentChangedNotice, SaveConflictNotice } from '@/components/agent/agent-changed-notice'
+import { useSaveVersion } from '@/lib/save-version/use-save-version'
+import { isVersionConflict } from '@/lib/save-version/save-version'
 
 export interface TemplateRow {
     id: string | number
@@ -62,6 +66,23 @@ function withDefaults(rowContent: ContentFields | undefined, defaults: ContentFi
     }
 }
 
+type Draft = { contentEn: ContentFields; contentMs: ContentFields; enabled: boolean }
+
+/** The editor's starting values for a template: its saved row over the defaults (or the defaults alone). */
+function draftFromRow(row: TemplateRow | undefined, defaults: { contentEn: ContentFields; contentMs: ContentFields }): Draft {
+    return {
+        contentEn: withDefaults(row?.contentEn, defaults.contentEn),
+        contentMs: withDefaults(row?.contentMs, defaults.contentMs),
+        enabled: row ? row.enabled : true,
+    }
+}
+
+/** Did what the editor is built on (not the timestamp) change between two reads of the same template? */
+function rowChanged(a: TemplateRow | undefined, b: TemplateRow | undefined): boolean {
+    const key = (r: TemplateRow | undefined) => JSON.stringify(r && [r.enabled, r.contentEn, r.contentMs])
+    return key(a) !== key(b)
+}
+
 export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTemplatesClientProps) {
     const { t, ti } = useI18n()
     const et = t.dashboard.settings.emailTemplates
@@ -80,23 +101,45 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
     const [saveError, setSaveError] = useState<string | null>(null)
     const [isSaving, startSaving] = useTransition()
     const [isSendingTest, setIsSendingTest] = useState(false)
+    // the assistant changed the open template while it has unsaved edits: nothing is overwritten until the merchant picks
+    const [stale, setStale] = useState(false)
+    useEffect(() => { if (!isDirty) setStale(false) }, [isDirty])
+    // The open template's row version, sent with each save: its updatedAt, or null when the editor started from the
+    // built-in default (a row created meanwhile is then a conflict, too).
+    const version = useSaveVersion()
+
+    // The page was rendered again on the server (the assistant changed a template): take the new rows. An open
+    // editor for a changed template reloads silently, or, with unsaved edits, asks first.
+    const [seenRows, setSeenRows] = useState(initialRows)
+    if (initialRows !== seenRows) {
+        setSeenRows(initialRows)
+        const next = normalizeRows(initialRows)
+        setRows(next)
+        if (selectedTemplateId && selectedRecipient) {
+            const sameRow = (r: TemplateRow) => r.templateType === selectedTemplateId && r.recipient === selectedRecipient
+            const fresh = next.find(sameRow)
+            if (rowChanged(rows.find(sameRow), fresh)) {
+                if (isDirty) setStale(true)
+                else {
+                    setDraft(draftFromRow(fresh, defaultsByType[selectedTemplateId]))
+                    version.set(fresh ? fresh.updatedAt : null)
+                }
+            } else version.set(fresh ? fresh.updatedAt : null)
+        }
+    }
 
     const findRow = (type: EmailTemplateType, recipient: EmailRecipient): TemplateRow | undefined =>
         rows.find((r) => r.templateType === type && r.recipient === recipient)
 
     function handleSelectTemplate(templateType: EmailTemplateType, recipient: EmailRecipient) {
         const row = findRow(templateType, recipient)
-        const typeDefaults = defaultsByType[templateType]
         setSelectedTemplateId(templateType)
         setSelectedRecipient(recipient)
         setLocale('en')
-        setDraft({
-            contentEn: withDefaults(row?.contentEn, typeDefaults.contentEn),
-            contentMs: withDefaults(row?.contentMs, typeDefaults.contentMs),
-            enabled: row ? row.enabled : true,
-        })
+        setDraft(draftFromRow(row, defaultsByType[templateType]))
         setIsDirty(false)
         setSaveError(null)
+        version.set(row ? row.updatedAt : null)
     }
 
     function handleBack() {
@@ -122,13 +165,7 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
 
     function handleRevert() {
         if (!selectedTemplateId || !selectedRecipient) return
-        const row = findRow(selectedTemplateId, selectedRecipient)
-        const typeDefaults = defaultsByType[selectedTemplateId]
-        setDraft({
-            contentEn: withDefaults(row?.contentEn, typeDefaults.contentEn),
-            contentMs: withDefaults(row?.contentMs, typeDefaults.contentMs),
-            enabled: row ? row.enabled : true,
-        })
+        setDraft(draftFromRow(findRow(selectedTemplateId, selectedRecipient), defaultsByType[selectedTemplateId]))
         setIsDirty(false)
         setSaveError(null)
     }
@@ -142,10 +179,12 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
                 enabled: draft.enabled,
                 contentEn: draft.contentEn,
                 contentMs: draft.contentMs,
+                expectedUpdatedAt: version.current(),
             })
+            if (version.refused(result)) return
             if (result.success) {
-                const now = new Date().toISOString()
                 setSaveError(null)
+                version.set(result.updatedAt)
                 setRows((prev) => {
                     const existing = prev.find(
                         (r) => r.templateType === selectedTemplateId && r.recipient === selectedRecipient
@@ -157,7 +196,7 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
                         enabled: draft.enabled,
                         contentEn: { ...draft.contentEn },
                         contentMs: { ...draft.contentMs },
-                        updatedAt: now,
+                        updatedAt: result.updatedAt,
                     }
                     if (existing) {
                         return prev.map((r) =>
@@ -179,6 +218,23 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
         })
     }
 
+    // Load the latest: the editor's template as it is saved now; the edits are dropped.
+    async function handleLoadLatest() {
+        if (!selectedTemplateId || !selectedRecipient) return
+        const res = await getEmailTemplateSettings()
+        if (!res.success || !res.rows) {
+            console.error('[EmailTemplatesClient] load latest failed:', res.error)
+            return
+        }
+        const next = normalizeRows(res.rows)
+        const row = next.find((r) => r.templateType === selectedTemplateId && r.recipient === selectedRecipient)
+        setRows(next)
+        setDraft(draftFromRow(row, defaultsByType[selectedTemplateId]))
+        setIsDirty(false)
+        setSaveError(null)
+        version.set(row ? row.updatedAt : null)
+    }
+
     function handleReset() {
         if (!selectedTemplateId || !selectedRecipient) return
         // Capture before async so closure sees the correct template id
@@ -198,6 +254,7 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
                     enabled: true,
                 })
                 setIsDirty(false)
+                version.set(null)
                 toast.success(et.toast.reset)
             } else {
                 toast.error(et.toast.resetFailed)
@@ -298,7 +355,6 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
                     enabled,
                     contentEn: { ...EMPTY_CONTENT },
                     contentMs: { ...EMPTY_CONTENT },
-                    updatedAt: new Date().toISOString(),
                 },
             ]
         })
@@ -310,8 +366,11 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
             enabled,
             contentEn: row?.contentEn ?? EMPTY_CONTENT,
             contentMs: row?.contentMs,
-        }).then((result) => {
+            expectedUpdatedAt: row ? row.updatedAt : null,
+        }).then(async (result) => {
             if (result.success) {
+                const same = (r: TemplateRow) => r.templateType === templateType && r.recipient === recipient
+                setRows((prev) => prev.map((r) => (same(r) ? { ...r, updatedAt: result.updatedAt } : r)))
                 toast.success(enabled ? et.toast.enabled : et.toast.disabled)
             } else {
                 // Revert to pre-click value (not !r.enabled which races under rapid toggles)
@@ -322,6 +381,13 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
                             : r
                     )
                 )
+                if (isVersionConflict(result)) {
+                    // changed elsewhere since the list was read: nothing was written; show the rows as they are now
+                    toast.error(t.dashboard.agentChanged.changedElsewhere)
+                    const fresh = await getEmailTemplateSettings()
+                    if (fresh.success && fresh.rows) setRows(normalizeRows(fresh.rows))
+                    return
+                }
                 toast.error(result.error ?? et.toast.updateFailed)
                 console.error('[EmailTemplatesClient] toggle failed:', result.error)
             }
@@ -352,6 +418,9 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
                 onReset={handleReset}
                 onSendTest={handleSendTest}
                 onOpenInNewTab={handleOpenInNewTab}
+                notice={version.conflicted
+                    ? <SaveConflictNotice record="template" onLoadLatest={handleLoadLatest} onSaveAnyway={() => { version.overwrite(); handleSave() }} />
+                    : stale ? <AgentChangedNotice record="template" onReload={handleRevert} onKeep={() => setStale(false)} /> : undefined}
             />
         )
     }

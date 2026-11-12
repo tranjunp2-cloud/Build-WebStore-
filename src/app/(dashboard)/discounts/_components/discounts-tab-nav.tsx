@@ -9,13 +9,15 @@
  *
  * Each tab shows its own total count (codes vs usage-history). The sidebar Discounts
  * badge reflects tab 1 (codes) only; the per-tab totals live here. Counts are fetched
- * once with limit=1 (we only read totalDocs), independent of the active tab.
+ * with limit=1 (we only read totalDocs), independent of the active tab, and cached.
  */
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Ticket, History } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { queryKeys } from '@/hooks/queries/query-keys'
+import { useQueryScope } from '@/providers/query-provider'
 import { Tabs, TabsList, TabsTrigger, TabsCount } from '@/components/ui/tabs'
 
 const TABS = [
@@ -30,29 +32,25 @@ export function DiscountsTabNav() {
     const router = useRouter()
     const { t } = useI18n()
     const tabLabels = t.dashboard.discounts.tabs
-    const [counts, setCounts] = useState<{ codes: number | null; history: number | null }>({
-        codes: null,
-        history: null,
+    // Read once per workspace and cached (both tabs share it); a discount change from this screen
+    // invalidates it with the rest of the discounts data.
+    const scope = useQueryScope()
+    const countsQuery = useQuery({
+        queryKey: queryKeys.discounts.counts(scope),
+        queryFn: async ({ signal }) => {
+            const readTotal = (url: string) =>
+                fetch(url, { credentials: 'include', signal })
+                    .then((r) => (r.ok ? r.json() : null))
+                    .then((j) => (typeof j?.totalDocs === 'number' ? (j.totalDocs as number) : null))
+                    .catch(() => null)
+            const [codes, history] = await Promise.all([
+                readTotal('/api/v1/discounts?limit=1'),
+                readTotal('/api/v1/discounts/usage-history?limit=1'),
+            ])
+            return { codes, history }
+        },
     })
-
-    useEffect(() => {
-        let alive = true
-        const readTotal = (url: string) =>
-            fetch(url, { credentials: 'include' })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((j) => (typeof j?.totalDocs === 'number' ? j.totalDocs : null))
-                .catch(() => null)
-
-        Promise.all([
-            readTotal('/api/v1/discounts?limit=1'),
-            readTotal('/api/v1/discounts/usage-history?limit=1'),
-        ]).then(([codes, history]) => {
-            if (alive) setCounts({ codes, history })
-        })
-        return () => {
-            alive = false
-        }
-    }, [])
+    const counts = countsQuery.data ?? { codes: null, history: null }
 
     // Usage History owns its subtree; Codes is the exact /discounts root only
     // (so /discounts/new and /discounts/[id] don't light up either tab).

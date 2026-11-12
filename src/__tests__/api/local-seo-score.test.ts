@@ -112,14 +112,16 @@ function installCollectionResults(overrides?: {
         products: overrides?.products ?? [completeProduct],
         blogs: overrides?.blogs ?? [completeBlog],
     }
+    // pages like Payload: `page` / `limit` slice the rows (also with `pagination: false`, which only skips the count)
     mocks.find.mockImplementation(
-        async ({ collection }: { collection: string }) => ({
-            docs:
+        async ({ collection, page = 1, limit = 10 }: { collection: string; page?: number; limit?: number }) => {
+            const rows =
                 collection === 'sites'
                     ? (overrides?.publicRouteSites ?? [{ id: ownedSite.id }])
-                    : records[collection as keyof typeof records],
-            hasNextPage: false,
-        }),
+                    : records[collection as keyof typeof records]
+            const docs = limit > 0 ? rows.slice((page - 1) * limit, page * limit) : rows
+            return { docs, hasNextPage: limit > 0 && page * limit < rows.length }
+        },
     )
 }
 

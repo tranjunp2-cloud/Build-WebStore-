@@ -371,6 +371,7 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
         // Arrange
         mockFindByID.mockResolvedValue({
             id: 'site-1',
+            tenant: 'tenant-1',
             domain: 'mycafe.com',
             slug: 'mycafe',
         })
@@ -397,7 +398,7 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
 
     it('home page gets priority 1.0, others get 0.8', async () => {
         // Arrange
-        mockFindByID.mockResolvedValue({ id: 'site-1', domain: 'test.com' })
+        mockFindByID.mockResolvedValue({ id: 'site-1', tenant: 'tenant-1', domain: 'test.com' })
         mockFind.mockResolvedValue({
             docs: [
                 { slug: 'home', updatedAt: '2026-03-01T00:00:00Z' },
@@ -419,7 +420,7 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
 
     it('normalizes home slug to empty path', async () => {
         // Arrange
-        mockFindByID.mockResolvedValue({ id: 'site-1', domain: 'test.com' })
+        mockFindByID.mockResolvedValue({ id: 'site-1', tenant: 'tenant-1', domain: 'test.com' })
         mockFind.mockResolvedValue({
             docs: [{ slug: 'home', updatedAt: '2026-03-01T00:00:00Z' }],
         })
@@ -452,7 +453,7 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
 
     it('falls back to server URL when no custom domain', async () => {
         // Arrange
-        mockFindByID.mockResolvedValue({ id: 'site-1', slug: 'mysite' })
+        mockFindByID.mockResolvedValue({ id: 'site-1', tenant: 'tenant-1', slug: 'mysite' })
         mockFind.mockResolvedValue({ docs: [] })
         process.env.NEXT_PUBLIC_SERVER_URL = 'https://app.primeweb.com'
 
@@ -465,5 +466,25 @@ describe('POST /api/seo/sitemap [TC-F03.30]', () => {
 
         // Assert
         expect(body.data.sitemapUrl).toContain('app.primeweb.com/sites/mysite')
+    })
+})
+
+describe('POST /api/seo/sitemap — another tenant\'s site [TC-PERF-138]', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    it('403s without listing the other shop\'s pages', async () => {
+        // Arrange
+        mockUser.roles = []
+        mockFindByID.mockResolvedValue({ id: 'site-9', tenant: 'tenant-9', slug: 'other' })
+        const req = new Request('http://localhost/api/seo/sitemap', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ siteId: 'site-9' }),
+        })
+
+        // Act
+        const res = await sitemapPOST(req, {} as never)
+
+        // Assert
+        expect(res.status).toBe(403)
+        expect(mockFind).not.toHaveBeenCalled()
     })
 })

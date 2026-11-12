@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { isNotFoundError } from '@/lib/api/is-not-found-error'
+import { jsonWithEtag } from '@/lib/api/json-etag'
 import type { NotificationsResponse } from '@/types/notification'
 
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,11 @@ export const dynamic = 'force-dynamic'
  * Returns paginated notifications for the authenticated user within their tenant.
  * Optional `since` param filters to notifications created after the given timestamp.
  * Always scoped to the current user (user_id + tenant_id) for data isolation.
+ *
+ * Read by every open dashboard (NotificationProvider: on the Firebase signal, else a 60 s fallback), so it stays
+ * cheap: two indexed queries run together (latest `limit` rows without a total count, and the unread count), the
+ * body carries a weak ETag and `Cache-Control: private, max-age=0`, and a request whose `If-None-Match` matches the
+ * new body gets `304` with no body.
  */
 export const GET = withAuth(async (user, request) => {
     try {
@@ -65,39 +71,42 @@ export const GET = withAuth(async (user, request) => {
             sinceFilter = { createdAt: { greater_than: effectiveSince.toISOString() } }
         }
 
-        // Fetch notifications (Payload access control enforces user scoping)
-        const result = await payload.find({
-            collection: 'notifications',
-            where: {
-                and: [
-                    { user: { equals: user.id } },
-                    { tenant: { equals: tenantId } },
-                    ...(sinceFilter ? [sinceFilter] : []),
-                ],
-            },
-            sort: '-createdAt',
-            limit,
-            page: Math.floor(offset / limit) + 1,
-            depth: 0,
-            user,
-            overrideAccess: false,
-        })
-
-        // Count unread separately (minimal query)
-        const unreadResult = await payload.find({
-            collection: 'notifications',
-            where: {
-                and: [
-                    { user: { equals: user.id } },
-                    { tenant: { equals: tenantId } },
-                    { isRead: { equals: false } },
-                ],
-            },
-            limit: 1,
-            depth: 0,
-            user,
-            overrideAccess: false,
-        })
+        // Latest rows + unread count, together. `pagination: false` (offset 0 only; see below) skips the total count Payload
+        // would run for the list (the response has no total); the count is a plain COUNT on (tenant_id, user_id) + is_read.
+        // Payload access control enforces user scoping.
+        const [result, unread] = await Promise.all([
+            payload.find({
+                collection: 'notifications',
+                where: {
+                    and: [
+                        { user: { equals: user.id } },
+                        { tenant: { equals: tenantId } },
+                        ...(sinceFilter ? [sinceFilter] : []),
+                    ],
+                },
+                sort: '-createdAt',
+                limit,
+                page: Math.floor(offset / limit) + 1,
+                // offset 0 = poll path: skip the total count. offset > 0 = "load more" page: pagination must be on,
+                // otherwise Payload ignores `page` and returns the first rows again (GH #2331).
+                pagination: offset > 0,
+                depth: 0,
+                user,
+                overrideAccess: false,
+            }),
+            payload.count({
+                collection: 'notifications',
+                where: {
+                    and: [
+                        { user: { equals: user.id } },
+                        { tenant: { equals: tenantId } },
+                        { isRead: { equals: false } },
+                    ],
+                },
+                user,
+                overrideAccess: false,
+            }),
+        ])
 
         const items = result.docs.map((doc) => ({
             id: String(doc.id),
@@ -110,10 +119,11 @@ export const GET = withAuth(async (user, request) => {
             createdAt: doc.createdAt as string,
         }))
 
-        return NextResponse.json<NotificationsResponse>({
-            unreadCount: unreadResult.totalDocs,
-            items,
-        })
+        const body: NotificationsResponse = { unreadCount: unread.totalDocs, items }
+        // `hasMore` only when the page was fetched with pagination (offset > 0); first page lets the client infer it.
+        if (offset > 0) body.hasMore = Boolean(result.hasNextPage)
+
+        return jsonWithEtag(body, request)
     } catch (error) {
         console.error('[Notifications GET Error]', error)
         // A NotFound thrown from Payload is a client-side (bad reference) error,

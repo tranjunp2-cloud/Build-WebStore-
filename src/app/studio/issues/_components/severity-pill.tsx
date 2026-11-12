@@ -8,10 +8,10 @@
 export type IssueSeverity = 'critical' | 'high' | 'medium' | 'low'
 
 const SEVERITY_STYLES: Record<IssueSeverity, { bg: string; text: string; label: string }> = {
-    critical: { bg: '#fef2f2', text: '#dc2626', label: 'Critical' },
-    high:     { bg: '#fff7ed', text: '#ea580c', label: 'High' },
-    medium:   { bg: '#fffbeb', text: '#d97706', label: 'Medium' },
-    low:      { bg: '#f8fafc', text: '#64748b', label: 'Low' },
+    critical: { bg: '#fef2f2', text: '#dc2626', label: 'Khẩn cấp' },
+    high:     { bg: '#fff7ed', text: '#ea580c', label: 'Cao' },
+    medium:   { bg: '#fffbeb', text: '#d97706', label: 'Trung bình' },
+    low:      { bg: '#f8fafc', text: '#64748b', label: 'Thấp' },
 }
 
 export function SeverityPill({ severity }: { severity: IssueSeverity }) {

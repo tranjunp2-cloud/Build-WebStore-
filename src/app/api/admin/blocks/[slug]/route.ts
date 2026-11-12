@@ -1,11 +1,11 @@
 /**
  * GET  /api/admin/blocks/[slug] — single block merged with override + variants
  * PATCH /api/admin/blocks/[slug] — upsert BlockCatalogEntry for this slug
- * Super-admin only. PATCH rejects unknown slugs (registry whitelist).
+ * Reads for any Studio seat; PATCH needs block.edit and rejects unknown slugs (registry whitelist).
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission, withSuperAdmin } from '@/lib/admin/api-utils'
 import { getBlockBySlug, getRegistrySlugs } from '@/lib/admin/block-registry-reader'
 import { getBlockUsageCounts } from '@/lib/admin/block-usage-counter'
 import { getPayload } from 'payload'
@@ -68,7 +68,7 @@ export const GET = async (req: NextRequest, ctx: RouteContext) => {
 }
 
 export const PATCH = async (req: NextRequest, ctx: RouteContext) => {
-    return withSuperAdmin(async () => {
+    return withStudioPermission('block.edit', async () => {
         const { slug } = await ctx.params
 
         // Registry whitelist — reject unknown slugs

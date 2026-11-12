@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionAfterChangeHook } from 'payload'
+import type { CollectionConfig, CollectionBeforeChangeHook } from 'payload'
 import { checkCompliance } from '@/lib/admin/dna-compliance'
 
 export const TEMPLATE_CATEGORY_OPTIONS = [
@@ -19,15 +19,21 @@ export const TEMPLATE_CATEGORY_OPTIONS = [
 ]
 
 /**
- * afterChange hook: recompute DNA compliance cache when template is saved.
- * Guard: skip when context.skipComplianceHook to prevent infinite loop.
+ * beforeChange hook: recompute the DNA compliance cache into the row being saved.
+ * Skipped when context.skipComplianceHook is set (save-sections writes layout only).
+ *
+ * Computed before the write instead of a second `payload.update` in afterChange: that nested
+ * update ran on another connection while this save's transaction still held the template row
+ * lock, so every save of a template with a DNA category hung (Postgres cannot see the wait).
  */
-const recomputeComplianceHook: CollectionAfterChangeHook = async ({ doc, req, context }) => {
-    if (context?.skipComplianceHook) return doc
+export const recomputeComplianceHook: CollectionBeforeChangeHook = async ({ data, originalDoc, req, context }) => {
+    if (context?.skipComplianceHook) return data
 
-    const categories = Array.isArray(doc.category) ? doc.category : [doc.category].filter(Boolean)
-    if (categories.length === 0) return doc
+    const merged = { ...(originalDoc ?? {}), ...data }
+    const categories = Array.isArray(merged.category) ? merged.category : [merged.category].filter(Boolean)
+    if (categories.length === 0) return data
 
+    const hadTransaction = Boolean(req.transactionID)
     try {
         // Fetch first matching category's DNA. `slug` is per-tenant unique (not global) since
         // GH-1587 Phase 01, so any tenant can now create a category with a slug matching one of
@@ -35,6 +41,8 @@ const recomputeComplianceHook: CollectionAfterChangeHook = async ({ doc, req, co
         // only ever set via the super-admin-only PATCH /api/admin/categories/[id]/dna route, so it
         // reliably identifies the curated taxonomy category rather than an unrelated tenant's category
         // that happens to share the slug. `sort` breaks ties deterministically if it ever matches >1.
+        // `req`: run on the save's own transaction connection. Without it the read needed a second
+        // pool connection while the save held one, and waited the connect timeout under load.
         const categorySlug = categories[0]
         const catResult = await req.payload.find({
             collection: 'categories',
@@ -42,25 +50,23 @@ const recomputeComplianceHook: CollectionAfterChangeHook = async ({ doc, req, co
             sort: '-updatedAt',
             limit: 1,
             depth: 0,
+            overrideAccess: true,
+            req,
         })
 
         const dna = catResult.docs[0]?.dna ?? null
-        if (!dna) return doc
+        if (!dna) return data
 
-        const compliance = checkCompliance(doc, dna as Record<string, unknown>)
-
-        await req.payload.update({
-            collection: 'templates',
-            id: doc.id,
-            data: { dnaComplianceCache: compliance },
-            context: { skipComplianceHook: true },
-        })
+        data.dnaComplianceCache = checkCompliance(merged, dna as Record<string, unknown>)
     } catch (err) {
+        // A failed read on `req` made Payload roll the save's transaction back: going on would
+        // write the template outside it, so fail the save.
+        if (hadTransaction && !req.transactionID) throw err
         // Non-fatal: compliance cache is best-effort
         console.warn('[Templates] compliance recompute failed:', err)
     }
 
-    return doc
+    return data
 }
 
 export const Templates: CollectionConfig = {
@@ -76,7 +82,7 @@ export const Templates: CollectionConfig = {
         delete: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
     },
     hooks: {
-        afterChange: [recomputeComplianceHook],
+        beforeChange: [recomputeComplianceHook],
     },
     fields: [
         { name: 'name', type: 'text', required: true },

@@ -1,23 +1,15 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
+import { useAwaitingVerificationCount } from './orders-queries'
 
 export function AwaitingVerificationChip() {
-    const [count, setCount] = useState<number | null>(null)
-
+    // checking or rejecting a payment moves it (orders list invalidation); a failed read shows nothing
+    const query = useAwaitingVerificationCount()
+    const count = query.data ?? (query.isError ? 0 : null)
     useEffect(() => {
-        let cancelled = false
-        fetch('/api/orders?paymentStatus=pending_verification&paymentMethod=bank_transfer&limit=0')
-            .then(r => r.json())
-            .then(data => {
-                if (!cancelled) setCount(data?.totalDocs ?? 0)
-            })
-            .catch(err => {
-                console.error('[AwaitingVerificationChip] fetch failed', err)
-                if (!cancelled) setCount(0)
-            })
-        return () => { cancelled = true }
-    }, [])
+        if (query.error) console.error('[AwaitingVerificationChip] fetch failed', query.error)
+    }, [query.error])
 
     if (count === null || count === 0) return null
 

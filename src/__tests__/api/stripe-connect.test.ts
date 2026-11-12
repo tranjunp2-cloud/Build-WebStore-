@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ─── Mocks ────────────────────────────────────────────────────────────
 
-const mockUser = { id: 1, email: 'owner@test.com', tenants: [{ tenant: 'tenant-1' }] }
+const mockUser = { id: 1, email: 'owner@test.com', tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }] }
 vi.mock('@/lib/auth', () => ({
     withAuth: vi.fn((handler: any) => async (req: any, ctx?: any) => handler(mockUser, req, ctx)),
 }))
@@ -54,7 +54,7 @@ describe('POST /api/stripe/connect/onboard [TC-F13.24]', () => {
     it('[TC-F13.24] returns oauthUrl for authenticated tenant owner', async () => {
         mockGetStripeOAuthUrl.mockReturnValue('https://connect.stripe.com/oauth/authorize?client_id=ca_test&state=tenant-1')
 
-        const req = { json: () => Promise.resolve({ tenantId: 'tenant-1' }) } as unknown as Request
+        const req = { headers: new Headers(), json: () => Promise.resolve({ tenantId: 'tenant-1' }) } as unknown as Request
         const res = await onboardPOST(req, {} as any)
         const body = await res.json()
 

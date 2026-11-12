@@ -1,42 +1,48 @@
 import { test, expect } from '@playwright/test'
 import { expectNoServerError, expectPageLoaded } from './helpers/assertions'
+import { provisionDashboardFixture } from './helpers/dashboard-fixture'
 
 /**
- * AI Builder E2E Tests — Verify builder loads and generation works.
+ * AI Builder E2E Tests — Verify the builder entry and generation.
  *
- * Split into 2 tests per validation decision:
- * - Fast test: UI loads (CI-friendly, always runs)
+ * - Fast test: an account that already has a website cannot open the builder again (CI-friendly)
  * - Slow test: Full generation (manual, marked test.slow())
  *
- * TC-F01.01: Builder page loads
+ * TC-F01.113: Account with a website is sent from /builder/new to the dashboard (GH-2153, GH-2154)
  * TC-F01.02: AI site generation
+ *
+ * The e2e user (ensure-test-user) already owns a site, so /builder/new redirects to /dashboard (FR-15).
+ * Seeing the builder form needs an account without a site; no such fixture exists yet.
  */
 
 test.describe('AI Builder', () => {
-    test('[TC-F01.01] builder page loads with chat UI', async ({ page }) => {
+    test('[TC-F01.113] account with a website is redirected from /builder/new to the dashboard', async ({ page }) => {
+        // Arrange — the shared E2E workspace always owns a completed website
+        // (same fixture the dashboard suite uses), so the GH-2153 guard applies.
+        await provisionDashboardFixture(page.request)
+
+        // Act
         await page.goto('/builder/new')
         await page.waitForLoadState('networkidle')
 
+        // Assert — /dashboard, or /dashboard?ai_status=generating while a site is generating
         await expectNoServerError(page)
-
-        // Chat interface or form should be visible
-        const chatUI = page.locator(
-            'textarea, input[placeholder*="business" i], input[placeholder*="name" i], ' +
-            '[data-testid*="builder"], [data-testid*="chat"], form'
-        )
-        await expect(chatUI.first()).toBeVisible({ timeout: 15_000 })
+        await expect(page).toHaveURL(url => url.pathname === '/dashboard', { timeout: 15_000 })
     })
 
     test('[TC-F01.02] AI builder generates site (slow, opt-in)', async ({ page }) => {
         // Skip by default — enable manually via RUN_BUILDER_GEN=1
         // This test triggers real AI generation (slow + consumes OpenAI credits + pollutes staging)
         test.skip(!process.env.RUN_BUILDER_GEN, 'Set RUN_BUILDER_GEN=1 to run full AI generation test')
-
         test.slow() // Mark as slow — 120s timeout
         test.setTimeout(180_000) // 3 min total timeout for AI generation
 
         await page.goto('/builder/new')
         await page.waitForLoadState('networkidle')
+        // GH-2154: an account that already owns a site is redirected away from the builder.
+        if (new URL(page.url()).pathname.startsWith('/dashboard')) {
+            test.skip(true, 'GH-2154: account already owns a site; needs a no-site e2e account')
+        }
         await expectNoServerError(page)
 
         // Find input field — chat input or business name field

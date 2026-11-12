@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
 import config from "@payload-config";
 import { z } from "zod";
-import { withSuperAdmin } from "@/lib/admin/api-utils";
+import { withStudioPermission } from "@/lib/admin/api-utils";
 import { getTargetById } from "@/lib/admin/qa/target-registry";
 import { withQaIngestTransaction } from "@/lib/payload/qa-ingest-transaction";
 
@@ -14,7 +14,7 @@ const MappingSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("dismiss"), reason: z.string().trim().min(3).max(500) }).strict(),
 ]);
 
-export const POST = withSuperAdmin(async (req: NextRequest, { user, params }) => {
+export const POST = withStudioPermission('qa.triage', async (req: NextRequest, { user, params }) => {
   const issueId = params?.id;
   if (!issueId || !/^\d+$/.test(issueId)) return NextResponse.json({ error: "Invalid issue ID" }, { status: 422 });
   const body = await req.json().catch(() => null);

@@ -1,19 +1,28 @@
+import { ScrollToTop } from '@/components/storefront/scroll-to-top'
+import { localizedSiteAndPage, siteBrand } from '@/lib/i18n/locale-display'
+import { getCachedPublishedTranslations, readPageTranslations } from '@/lib/i18n/page-translations'
+import { siteLanguagesOf, VISITOR_LANGUAGE_COOKIE, visitorLanguage } from '@/lib/site-languages'
+import { LiveLanguageProvider } from '@/components/site-renderer/live-language'
 import Link from 'next/link'
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { getPayload } from 'payload'
 import { getCurrentUser } from '@/lib/auth'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRenderer'
 import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
+import { isCachedStoreUnavailable, storeUnavailableLocaleOf } from '@/lib/storefront/cached-store-availability'
+import { STORE_UNAVAILABLE_COPY } from '@/lib/storefront/store-unavailable'
 import type { SiteData } from '@/blocks/types'
+import { publicAuthorName, toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 import type { PageData } from '@/store/editorStore'
 import { StorefrontBlogList } from '@/components/site-renderer/StorefrontBlogList'
 import DOMPurify from 'isomorphic-dompurify'
 import { getServerI18n } from '@/i18n/server'
 import { getSiteBasePath } from '@/lib/site-base-path'
-import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
+import { resolveImageLibraryS3Map, resolveImageLibraryS3MapCached } from '@/lib/images/image-library-resolver'
 import { resolveStorefrontOrigin, type TenantLike } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
 import { resolveMetadataImageUrl } from '@/lib/seo/metadata-image'
@@ -24,6 +33,9 @@ import {
     getCachedVisitorPage,
     getCachedVisitorHomepage,
     getCachedNavigationPages,
+    STOREFRONT_POPULATE,
+    withPublicSiteTenant,
+    withPublicSiteTenants,
 } from '@/lib/cache/tenant'
 import { proseThemeVars } from '@/lib/theme/prose-theme'
 
@@ -38,7 +50,11 @@ type Props = {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-async function getTenantAndPage(slug: string, pagePath: string) {
+/**
+ * One resolution per request: `generateMetadata` and the page both call this, and React `cache()` makes the second
+ * call reuse the first (owner previews and blog posts are uncached reads, so they ran twice per view) (TC-PERF-062).
+ */
+const getTenantAndPage = cache(async (slug: string, pagePath: string) => {
     const reqHeaders = await headers()
     const payload = await getPayload({ config })
     const user = await getCurrentUser()
@@ -57,6 +73,12 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     }
 
     if (!tenant) return null
+
+    // #2179: banned or expired store → unavailable page for everyone, owner included (the middleware serves the
+    // real 503; this is the fallback when its lookup failed or the site is opened at /sites/<slug> directly).
+    if (await isCachedStoreUnavailable(tenant as { id: string | number; status?: unknown })) {
+        return { unavailable: true as const, locale: await storeUnavailableLocaleOf(tenant.id) }
+    }
 
     // Check ownership (used for draft gate + tracking skip + cache gating).
     // Computed before the site/page reads so the owner-preview path can opt out
@@ -77,6 +99,8 @@ async function getTenantAndPage(slug: string, pagePath: string) {
             collection: 'sites',
             where: { tenant: { equals: tenant.id } },
             limit: 1,
+            pagination: false,
+            populate: STOREFRONT_POPULATE,
         })).docs[0]
         : await getCachedSiteByTenant(String(tenant.id))
 
@@ -109,22 +133,26 @@ async function getTenantAndPage(slug: string, pagePath: string) {
         const ownerDraft = site.status !== 'published'
         const pagesResult = await payload.find({
             collection: 'pages',
-            where: { and: [{ site: { equals: site.id } }, { slug: { equals: pageSlug } }, ...deletedFilter] },
+            where: { and: [{ site: { equals: site.id } }, { slug: { in: [pageSlug, pageSlug.replace(/^\//, '')] } }, ...deletedFilter] },
             limit: 1,
+            pagination: false,
             depth: 3,
             draft: ownerDraft,
+            populate: STOREFRONT_POPULATE,
         })
-        page = pagesResult.docs[0]
+        page = withPublicSiteTenant(pagesResult.docs[0])
         // Fallback: homepage may have slug 'home' (legacy) — match by isHomepage flag
         if (!page && pagePath === '') {
             const homepageFallback = await payload.find({
                 collection: 'pages',
                 where: { and: [{ site: { equals: site.id } }, { isHomepage: { equals: true } }, ...deletedFilter] },
                 limit: 1,
+                pagination: false,
                 depth: 3,
                 draft: ownerDraft,
+                populate: STOREFRONT_POPULATE,
             })
-            page = homepageFallback.docs[0]
+            page = withPublicSiteTenant(homepageFallback.docs[0])
         }
     } else {
         // Visitor path: cached, published + visible + non-deleted (filters mirrored
@@ -143,8 +171,10 @@ async function getTenantAndPage(slug: string, pagePath: string) {
             collection: 'pages',
             where: { and: [{ site: { equals: site.id } }] },
             limit: 100,
+            pagination: false,
             sort: 'createdAt',
-        })
+            populate: STOREFRONT_POPULATE,
+        }).then((result) => ({ docs: withPublicSiteTenants(result.docs) }))
         : { docs: await getCachedNavigationPages(String(site.id)) }
 
     // Blog listing page: /blogs or /blogs?category=X&page=N
@@ -166,7 +196,9 @@ async function getTenantAndPage(slug: string, pagePath: string) {
                     ],
                 },
                 limit: 1,
+                pagination: false,
                 depth: 2,
+                populate: STOREFRONT_POPULATE,
             })
             const blogPost = blogResult.docs[0]
             if (blogPost) {
@@ -178,7 +210,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     }
 
     return { tenant, site, page, pages: navigationPages.docs, isOwner }
-}
+})
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug, path } = await params
@@ -186,6 +218,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const data = await getTenantAndPage(slug, pagePath)
 
     if (!data) return { title: 'Not Found', robots: { index: false, follow: false } }
+    if ('unavailable' in data && data.unavailable) {
+        return { title: STORE_UNAVAILABLE_COPY[data.locale ?? 'en'].title, robots: { index: false, follow: false } }
+    }
     if ('maintenance' in data && data.maintenance) {
         return { title: 'Maintenance', robots: { index: false, follow: false } }
     }
@@ -251,6 +286,10 @@ export default async function TenantSitePage({ params }: Props) {
         notFound()
     }
 
+    if ('unavailable' in data && data.unavailable) {
+        return <MaintenancePage variant="unavailable" locale={data.locale ?? 'en'} />
+    }
+
     const { t } = await getServerI18n()
     const base = await getSiteBasePath(slug)
 
@@ -287,9 +326,7 @@ export default async function TenantSitePage({ params }: Props) {
         const post = blogPost as BlogPost
         const thumbUrl = typeof post.thumbnail === 'object' ? post.thumbnail?.url : null
         const catName = typeof post.category === 'object' ? post.category?.name : null
-        const authorName = typeof post.author === 'object'
-            ? [post.author?.firstName, post.author?.lastName].filter(Boolean).join(' ') || post.author?.email
-            : null
+        const authorName = publicAuthorName(post.author)
         const publishDate = post.publishedAt || post.createdAt
 
         const jsonLd = {
@@ -348,22 +385,41 @@ export default async function TenantSitePage({ params }: Props) {
         notFound()
     }
 
-    const { site, page, pages, isOwner } = data
+    const { pages, isOwner } = data
+    // visitors get the site's primary language (Menu → Quick language): the pages as written plus
+    // that language's published copy — an owner looking at a site not yet live reads the draft one
+    // (release: Payload documents are untyped here, so the site's fields are named for the language helpers)
+    const siteDoc = data.site as unknown as Parameters<typeof siteLanguagesOf>[0] & Parameters<typeof localizedSiteAndPage>[0] & { id: string | number; status?: unknown; name?: unknown }
+    const draft = isOwner && siteDoc.status !== 'published'
+    const slots = draft
+        ? await readPageTranslations(data.page.id, 'draft')
+        : await getCachedPublishedTranslations(String(siteDoc.id), data.page.id)
+    // ...or the language the visitor chose in the menu's language switcher, when the site has it
+    const languages = siteLanguagesOf(siteDoc, draft ? 'edited' : 'live')
+    const language = visitorLanguage(languages, (await cookies()).get(VISITOR_LANGUAGE_COOKIE)?.value)
+    const { site, page } = localizedSiteAndPage(siteDoc, data.page as unknown as { layout?: unknown }, language, slots, siteBrand(siteDoc))
 
     // GH-727 Phase 03: resolve seeded IMAGE_LIBRARY → S3 mappings (best-effort, never throws).
     const payload = await getPayload({ config })
-    const imageLibraryS3 = await resolveImageLibraryS3Map(payload, site.id)
+    const imageLibraryS3 = isOwner
+        ? await resolveImageLibraryS3Map(payload, site.id)
+        : await resolveImageLibraryS3MapCached(payload, site.id)
 
     const tenantHostname = (await headers()).get('x-tenant-hostname')
     const origin = resolveStorefrontOrigin(data.tenant as unknown as TenantLike, { fallbackHostname: tenantHostname, slug })
 
     return (
-        <SiteRenderer
-            site={{ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
-            page={page as unknown as PageData}
-            pages={pages as unknown as NavPage[]}
-            siteId={String(site.id)}
-            isOwner={isOwner}
-        />
+        <>
+        <ScrollToTop />
+        <LiveLanguageProvider languages={languages} active={language}>
+            <SiteRenderer
+                site={toPublicSite({ ...site, domain: origin, tenantSlug: slug, siteBasePath: base, imageLibraryS3 }) as unknown as SiteData}
+                page={toPublicDoc(page) as unknown as PageData}
+                pages={toPublicDoc(pages) as unknown as NavPage[]}
+                siteId={String(site.id)}
+                isOwner={isOwner}
+            />
+        </LiveLanguageProvider>
+        </>
     )
 }

@@ -13,6 +13,8 @@ Payload quản lý:
 - Password hashing (bcrypt)
 - Quản lý 2FA (mã OTP) và Email Verification.
 - Các endpoint built-in: `/api/users/login`, `/api/users/logout`, `/api/users/me` (có thể kết hợp custom hooks).
+- Khóa đăng nhập: `maxLoginAttempts: 5`, `lockTime: 15 phút` (login trả `423 ACCOUNT_LOCKED`). Payload không gỡ khóa khi đổi mật khẩu, nên `src/lib/auth/clear-login-lock-on-password-change.ts` gỡ khóa khi password đổi (`beforeChange`) và sau khi reset qua email thành công (`afterOperation` `resetPassword`) — GH-2053.
+- Độ dài password tối thiểu 6 ký tự (`PASSWORD_MIN_LENGTH` trong `src/lib/auth/password-rules.ts`), dùng chung cho form Login, Reset password và Đổi mật khẩu Profile (`passwordBaseSchema`, cả server `/api/users/me/password`). Server `/api/users/reset-password` chặn password ngắn qua `beforeOperation` `enforceResetPasswordMinLength` (Payload mặc định chỉ chặn < 3). Không chặn ở `create`/`update` vì SSO, PW1 và admin panel ghi password qua đó — GH-2269.
 
 Frontend Pages = **Client Components** (forms có state, validation Zod).  
 Auth guard = **Server-side middleware** + `getPayload()` session check.

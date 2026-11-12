@@ -1,13 +1,20 @@
 # CI Pipeline — quality + test on PRs, CI-driven Vercel deploy on push
 #
-# PR            → quality-check + test + metrics comment
-# Push staging  → deploy-staging                    (via VERCEL_TOKEN)
-# Push main     → deploy-production                 (via VERCEL_TOKEN)
+# PR → staging   → changes + quality + test (affected tests only) + ai-platform-check, by path
+# PR → main      → same jobs, full test suite + coverage (release gate)
+# Push staging   → deploy-staging                    (via VERCEL_TOKEN)
+# Push main      → deploy-production                 (via VERCEL_TOKEN)
 #
-# Quality/test DO NOT run on push — merge commits on staging/main are
-# already validated by the PR's own CI run. Branch protection blocks
-# direct push, so every commit passes through CI on its PR exactly once.
-# This removes the 5+ min duplicate-CI tax from deploy time.
+# Quality/test DO NOT run in this workflow on push — merge commits on staging/main are already
+# validated by the PR's own CI run, and this run holds the per-branch concurrency group that keeps
+# deploys in push order. Outside this run, after a merge into staging:
+#   staging-full-tests.yml — full unit suite (does not block the deploy)
+#   e2e-staging.yml        — Playwright on the live deploy (own `push: staging` trigger, unchanged)
+#
+# Why affected tests on feature PRs: the full suite is 1242 files / ~18k tests and takes ~22 min
+# on a 2-CPU runner. unit-tests.yml (mode affected) runs only the specs that import a file the PR
+# changed. Everything a feature PR skips still runs after the merge (staging-full-tests.yml) and on
+# the staging → main release PR.
 #
 # Why CI-driven deploy instead of Vercel git webhook:
 #   Vercel Pro blocks commits from non-team-members with
@@ -16,12 +23,22 @@
 #   See plans/260413-1126-vercel-deploy-blocked/ for full diagnosis.
 #
 # Architecture:
-#   quality-check (1.5m, PR only): lint + typecheck + migrations
-#   test (3.5m, PR only, needs: quality-check)
-#   metrics (PR only, needs: test)
-#   deploy-staging    (push staging, no needs — CI already ran on PR)
+#   changes (PR only): which areas the PR touched → web / ai / full
+#   quality-check (PR, web): migrations + env manifests + Payload cycles + ESLint + typecheck
+#   test (PR, web): unit-tests.yml, affected or full — parallel with quality-check
+#   metrics (full runs on PRs only, needs: test): coverage comment
+#   ai-platform-check (PR, ai): services/ai-platform install + typecheck + test + build (Node 24)
+#   deploy-staging    (push staging, no needs on test — CI already ran on PR)
 #   deploy-production (push main,    no needs — CI already ran on PR)
+#   deploy-ai-platform            (push staging) — separate Vercel project, same 3-stage flow
+#   deploy-ai-platform-production (push main)    — separate Vercel project, same 3-stage flow
+#   deploy-scope (push / manual run on staging, main): picks which of the two projects the
+#     push changed; the four deploy jobs above run only for their side (manual run = both)
 #   notify-fail (PR only, if failure)
+#
+# Runners: CI_HEAVY_RUNNER (PR checks), CI_DEPLOY_RUNNER (deploy jobs; falls back to
+# CI_HEAVY_RUNNER), CI_RUNNER (small jobs). Pointing CI_DEPLOY_RUNNER at a label that only a
+# reserved runner carries keeps deploys from queueing behind PR test jobs.
 name: CI
 
 on:
@@ -35,8 +52,16 @@ on:
       - '.github/pull_request_template.md'
       - '*.md'
       - 'LICENSE'
+      - 'plans/**'
+      - '.claude/**'
+      - '.opencode/**'
+      - '.cursor/**'
+      - '.gemini/**'
   pull_request:
     branches: [main, staging]
+    # ready_for_review re-runs CI when a draft is marked ready; drafts
+    # themselves are skipped at job level below to save Actions minutes.
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore:
       - 'docs/**'
       - '.github/ISSUE_TEMPLATE/**'
@@ -45,6 +70,11 @@ on:
       - '.github/pull_request_template.md'
       - '*.md'
       - 'LICENSE'
+      - 'plans/**'
+      - '.claude/**'
+      - '.opencode/**'
+      - '.cursor/**'
+      - '.gemini/**'
   # Manual dispatch lets sync-staging-to-qc-test.yml re-trigger the
   # deploy-qc-test job after it pushes to qc-test with GITHUB_TOKEN.
   # GITHUB_TOKEN pushes do not fire push events, but workflow_dispatch
@@ -53,31 +83,98 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # PR runs are superseded by newer pushes; pushes to staging/main are never cancelled
+  # because their deploy jobs run DB migrations and a mid-flight cancel can leave them half-applied.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ──────────────────────────────────────
-  # Job 1: Quality Check — Lint + Typecheck + Migrations (1.5 min)
+  # Job 0: Changes — which areas a PR touched (seconds, light runner)
+  # ──────────────────────────────────────
+  # The PR merge commit's first parent (HEAD^1) is the base branch tip, so a depth-2 checkout is
+  # enough to diff exactly what the PR adds on top of the current base.
+  #   web  — anything outside services/ai-platform, docs, plans, AI-tool folders, top-level *.md
+  #          and .github/ISSUE_TEMPLATE
+  #   ai   — services/ai-platform, packages/agent-core|ai-contracts (linked via file:), core CI files
+  #   full — affected mode = `vitest --changed` (import graph) + every spec that reads files or
+  #          spawns processes (unit-tests.yml; covers scripts/db-setup.js, vercel.json, locale JSON,
+  #          CSS, workflows…). It cannot see what changes every spec at once or what vi.mock()s a
+  #          path that no longer exists, so full=true for: a release PR into main; package.json,
+  #          lockfile, tsconfig, vitest config, .nvmrc, node-polyfill.js, shared test helpers/mocks;
+  #          the CI definition itself (ci.yml, unit-tests.yml, staging-full-tests.yml, setup actions);
+  #          any deleted or renamed .ts/.tsx/.js/.mjs/.cjs file.
+  # When the diff cannot be read every flag is true, so a check is never silently dropped.
+  # No branch protection requires these checks, so a skipped job never blocks a merge.
+  changes:
+    name: "Changes"
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      web: ${{ steps.scope.outputs.web }}
+      ai: ${{ steps.scope.outputs.ai }}
+      full: ${{ steps.scope.outputs.full }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Classify changed files
+        id: scope
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          all() { printf 'web=true\nai=true\nfull=true\n' >> "$GITHUB_OUTPUT"; echo "Run everything: $1"; exit 0; }
+          # quotePath=false: non-ASCII paths come out unquoted so the patterns below still match.
+          status=$(git -c core.quotePath=false diff --name-status HEAD^1 HEAD) || all "diff failed"
+          [ -n "$status" ] || all "empty diff"
+          web=false; ai=false; full=false
+          [ "$BASE_REF" = main ] && full=true
+          # Deleted / renamed code files: specs that vi.mock() the old path are not picked by --changed.
+          # Collected first, matched with a herestring: no pipeline, so the result does not depend on
+          # pipefail / SIGPIPE if the step's shell options ever change.
+          moved=$(grep -E '^(D|R)' <<< "$status" | cut -f2- | tr '\t' '\n' || true)
+          if grep -qE '\.(ts|tsx|js|mjs|cjs)$' <<< "$moved"; then
+            full=true
+          fi
+          files=$(cut -f2- <<< "$status" | tr '\t' '\n')
+          while IFS= read -r f; do
+            case "$f" in
+              .github/ISSUE_TEMPLATE/*) ;;
+              .github/workflows/ci.yml|.github/workflows/unit-tests.yml|.github/workflows/staging-full-tests.yml|.github/actions/setup-deps/*|.github/actions/setup-vercel-cli/*)
+                web=true; ai=true; full=true ;;
+              # Other workflows/actions: specs that assert workflow content read them as files.
+              .github/*) web=true ;;
+              packages/agent-core/*|packages/ai-contracts/*) web=true; ai=true ;;
+              services/ai-platform/*) ai=true ;;
+              docs/*|plans/*|.claude/*|.opencode/*|.cursor/*|.gemini/*) ;;
+              package.json|package-lock.json|tsconfig*.json|vitest.config.*|.nvmrc|node-polyfill.js|src/__tests__/helpers/*|src/__tests__/mocks/*)
+                web=true; full=true ;;
+              *) if [[ "$f" == */* || "$f" != *.md ]]; then web=true; fi ;;
+            esac
+          done <<< "$files"
+          printf 'web=%s\nai=%s\nfull=%s\n' "$web" "$ai" "$full" >> "$GITHUB_OUTPUT"
+          echo "Changed files: $(wc -l <<< "$files") → web=$web ai-platform=$ai full=$full"
+
+  # ──────────────────────────────────────
+  # Job 1: Quality Check — Migrations + Env manifests + Lint + Typecheck
   # ──────────────────────────────────────
   quality-check:
     name: "Quality: Lint + Typecheck"
     # pull_request only — merge commits on staging/main are already
-    # validated by the PR's own CI run. GitHub branch protection blocks
-    # direct push, so every code change passes through this job at
-    # least once before it can land.
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    # validated by the PR's own CI run. Lint and typecheck always cover the
+    # whole web app (a type error can surface far from the changed file).
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+        uses: actions/checkout@v7
 
       - name: Guard against stray lockfiles
         # Repo uses npm only. A stray pnpm-lock.yaml / yarn.lock makes
@@ -98,11 +195,10 @@ jobs:
           fi
           echo "✓ no stray lockfiles"
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Setup Node + dependencies
+        uses: ./.github/actions/setup-deps
 
       - name: Check DB migrations
-        if: github.event_name == 'pull_request'
         run: |
           git fetch origin staging --depth=1
           node scripts/check-migrations.js origin/staging
@@ -110,65 +206,89 @@ jobs:
       - name: Check environment variable manifests
         run: node scripts/check-env-vars.js origin/staging
 
+      # A static import of @payload-config from anything the config imports breaks
+      # server actions in production builds only (audit C5). Lazy-import it instead.
+      - name: Check Payload import cycles
+        run: node scripts/check-payload-cycles.mjs
+
       - name: Lint
         run: npm run lint
 
+      - name: Restore TypeScript build info
+        # tsconfig has incremental: true; reusing tsconfig.tsbuildinfo from the
+        # previous run of this PR lets tsc skip unchanged files.
+        uses: actions/cache@v6
+        with:
+          path: tsconfig.tsbuildinfo
+          key: tsbuildinfo-${{ github.head_ref }}-${{ github.sha }}
+          restore-keys: |
+            tsbuildinfo-${{ github.head_ref }}-
+
       - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run typecheck
 
   # ──────────────────────────────────────
-  # Job 2: Test (parallel with build, 3.5 min)
+  # Job 2: Test — affected specs on feature PRs, full suite on release PRs and staging pushes
   # ──────────────────────────────────────
   test:
     name: "Test"
-    # pull_request only — see quality-check rationale above.
-    needs: quality-check
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    # Parallel with quality-check (the called workflow installs its own dependencies).
+    # Feature PRs run the affected specs + the file-reading specs; PRs into main and diffs that
+    # touch global config / CI definition / delete code (see `changes`) run the full suite + coverage. The post-merge full run on
+    # staging is .github/workflows/staging-full-tests.yml (outside this run, so it never delays
+    # the next deploy).
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     permissions:
       contents: read
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      mode: ${{ needs.changes.outputs.full == 'true' && 'full' || 'affected' }}
+      upload-coverage: ${{ needs.changes.outputs.full == 'true' }}
+
+  # ──────────────────────────────────────
+  # Job 2b: ai-platform check — standalone install (Node 24)
+  # ──────────────────────────────────────
+  # services/ai-platform is a copy synced from the monorepo (AI_LAYER_SOURCE) with its
+  # own package-lock.json; it links ../../packages/{agent-core,ai-contracts} via file:.
+  # Runs only when the PR touches ai-platform or the packages it links.
+  ai-platform-check:
+    name: "AI Platform: Typecheck + Test + Build"
+    needs: changes
+    if: needs.changes.outputs.ai == 'true'
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: services/ai-platform
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
+          check-latest: true
           cache: 'npm'
+          cache-dependency-path: services/ai-platform/package-lock.json
 
       - name: Install dependencies
-        run: npm ci --include=optional
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
 
       - name: Test
-        id: test
-        run: |
-          set -o pipefail
-          npm run test -- --coverage 2>&1 | tee test-output.log
-          PASSED=$(grep 'Tests' test-output.log | grep -oE '[0-9]+ passed' | grep -oE '^[0-9]+' | head -1 || echo "0")
-          FAILED=$(grep 'Tests' test-output.log | grep -oE '[0-9]+ failed' | grep -oE '^[0-9]+' | head -1 || echo "0")
-          TOTAL=$((${PASSED:-0} + ${FAILED:-0}))
-          echo "test_total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "test_passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
-          echo "test_failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
+        run: npm test
 
-      - name: Drift check (block registry ↔ templates)
-        # Plan 260419-2022 Phase 03 — fail PR if block variant/schema drift
-        # grows beyond baseline. Source-only scan (no DB), <30s.
-        run: npm run drift:check
-
-      - name: Harness quick gen
-        # Plan 260419-2022 Phase 03 — smoke test composer on 3 fixtures.
-        # Fails fast if composer blows up on real schemas.
-        run: npm run harness:quick
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage/
-          retention-days: 3
+      - name: Build
+        # tsup bundle only (no DB): `build:vercel` also runs migrations, which belong to the deploy job.
+        run: npm run build
 
   # ──────────────────────────────────────
   # Build skipped in CI — Vercel handles build + deploy.
@@ -177,19 +297,23 @@ jobs:
   # ──────────────────────────────────────
 
   # ──────────────────────────────────────
-  # Job 3: Quality Metrics (PR only, after test)
+  # Job 3: Quality Metrics (PR full runs only, after test — affected runs measure no coverage)
   # ──────────────────────────────────────
   metrics:
     name: "PR Metrics"
-    needs: [test]
-    if: success() && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    needs: [changes, test]
+    # Dependabot PRs get a read-only token, so the comment step would 403 and turn the run red.
+    if: success() && github.event_name == 'pull_request' && needs.changes.outputs.full == 'true' && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
       contents: read
     steps:
       - name: Download coverage
-        uses: actions/download-artifact@v4
+        # Missing when the upload hit the artifact quota; the parse step below
+        # already handles a missing coverage-summary.json.
+        continue-on-error: true
+        uses: actions/download-artifact@v8
         with:
           name: coverage-report
           path: coverage/
@@ -211,7 +335,7 @@ jobs:
           echo "statements=$STATEMENTS" >> "$GITHUB_OUTPUT"
 
       - name: Comment quality metrics on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const coverage = {
@@ -270,16 +394,16 @@ jobs:
   # ──────────────────────────────────────
   notify-fail:
     name: "Notify: CI Failed"
-    # pull_request only — deploy jobs have their own dedicated
-    # deploy_fail notification; this job catches quality/test failures.
-    needs: [quality-check, test]
+    # pull_request only — deploy jobs have their own dedicated deploy_fail notification and the
+    # post-merge full test run (staging-full-tests.yml) has its own; this job catches PR failures.
+    needs: [changes, quality-check, test, ai-platform-check]
     if: failure() && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Prepare failure info
         id: fail_info
@@ -300,17 +424,66 @@ jobs:
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
+  # Job 5b: Deploy scope — which project(s) this push changed (staging / main)
+  # ──────────────────────────────────────
+  # services/ai-platform/** → ai-platform only; packages/agent-core|ai-contracts/** (ai-platform links
+  # them via file:), ci.yml and the setup actions it uses → both; docs/, plans/, .claude/, top-level
+  # *.md → neither; anything else → web. Do not add more "neither" paths: the diff is against the
+  # previous push, not the last deployed commit, so a skipped deploy can drop an earlier push whose
+  # pending run was replaced (its code and migrations would never reach the environment). Every case it cannot read (manual run, new branch, missing commit) deploys both,
+  # so a deploy is never silently dropped. A manual run (Actions → CI → Run workflow) redeploys both.
+  deploy-scope:
+    name: "Deploy: Scope"
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      web: ${{ steps.scope.outputs.web }}
+      ai: ${{ steps.scope.outputs.ai }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pick projects
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          both() { printf 'web=true\nai=true\n' >> "$GITHUB_OUTPUT"; echo "Deploy both: $1"; exit 0; }
+          [ "$EVENT" = push ] || both "manual run"
+          case "$BEFORE" in ""|0000000000000000000000000000000000000000) both "no previous commit" ;; esac
+          git fetch --no-tags --depth=1 origin "$BEFORE" || both "previous commit $BEFORE not fetchable"
+          files=$(git -c core.quotePath=false diff --name-only "$BEFORE" "$SHA") || both "diff failed"
+          [ -n "$files" ] || both "empty diff"
+          web=false; ai=false
+          while IFS= read -r f; do
+            case "$f" in
+              .github/workflows/ci.yml|.github/actions/setup-deps/*|.github/actions/setup-vercel-cli/*) web=true; ai=true ;;
+              packages/agent-core/*|packages/ai-contracts/*) web=true; ai=true ;;
+              services/ai-platform/*) ai=true ;;
+              docs/*|plans/*|.claude/*) ;;
+              *) if [[ "$f" == */* || "$f" != *.md ]]; then web=true; fi ;;
+            esac
+          done <<< "$files"
+          printf 'web=%s\nai=%s\n' "$web" "$ai" >> "$GITHUB_OUTPUT"
+          echo "Changed files: $(wc -l <<< "$files") → web=$web ai-platform=$ai"
+
+  # ──────────────────────────────────────
   # Job 6: Deploy to Vercel (staging branch)
   # ──────────────────────────────────────
   deploy-staging:
     name: "Deploy: Vercel (staging)"
-    # No `needs` — quality-check and test only run on pull_request, and
-    # this job only runs on push, so a `needs` would make the job
-    # permanently skipped. GitHub branch protection guarantees every
-    # merge commit was already CI-validated on its source PR.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Waits for the ai-platform deploy: prime-web on staging calls AI_PLATFORM_URL, so it must
+    # not go live ahead of a failed ai-platform deploy. A skipped one (push did not touch
+    # ai-platform) is fine. quality-check/test run on the PR only.
+    needs: [deploy-scope, deploy-ai-platform]
+    if: "!cancelled() && github.ref == 'refs/heads/staging' && needs.deploy-scope.outputs.web == 'true' && needs.deploy-ai-platform.result != 'failure'"
+    runs-on: ${{ vars.CI_DEPLOY_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 45
     concurrency:
       group: vercel-deploy-staging
       cancel-in-progress: false
@@ -321,19 +494,21 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      # Each environment has its own Sentry project; uploading both builds' source maps
+      # to one project leaves the other's stack traces minified.
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_STAGING || secrets.SENTRY_PROJECT }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+      - name: Setup Node + dependencies
+        # node_modules from the lockfile-keyed cache: `vercel build` then finds dependencies in
+        # place and its own `npm install` is a no-op check instead of a ~1.5-2 min fresh install
+        # (this replaces setup-node's 1.9 GB ~/.npm cache restore).
+        uses: ./.github/actions/setup-deps
 
       - name: Get commit subject
         id: commit
@@ -343,24 +518,26 @@ jobs:
         run: |
           SUBJECT=$(git log -1 --format='%s' | head -c 80)
           echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
           echo "commit subject: $SUBJECT"
 
       - name: Cache Next.js build output
-        # Next.js incremental build reuses .next/cache between runs.
-        # First build after lockfile change is still cold (~5 min),
-        # subsequent builds drop to ~1-2 min.
-        uses: actions/cache@v4
+        # .next/cache holds Next 16's Turbopack build cache (turbopackFileSystemCacheForBuild is
+        # on by default), so unchanged modules are not recompiled. Always restored; saved once a
+        # day (first deploy of the day) — the old per-commit key uploaded ~715 MB after every
+        # deploy (~3.5 min of runner time) and evicted the dependency caches.
+        uses: actions/cache@v6
         with:
           path: |
             .next/cache
             node_modules/.cache
-          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ steps.commit.outputs.day }}
           restore-keys: |
             next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
             next-${{ github.job }}-
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@50
+      - name: Setup Vercel CLI
+        uses: ./.github/actions/setup-vercel-cli
 
       - name: Pull Vercel env (staging custom environment)
         # --environment=staging pulls the custom env directly, which stamps
@@ -369,6 +546,11 @@ jobs:
         # `vercel deploy --prebuilt --target=staging` below, otherwise the
         # CLI aborts with a "prebuilt environment mismatch" error.
         run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
+
+      - name: Preflight — AI platform env (staging, warn only)
+        # Same check as production (scripts/ci/ai-env-preflight.mjs) but never blocks staging:
+        # missing / bad AI_PLATFORM_URL or AI_PLATFORM_CONTEXT_SECRET → ::warning:: only.
+        run: node scripts/ci/ai-env-preflight.mjs .vercel/.env.staging.local --warn-only
 
       - name: Preflight — Postgres reachable
         run: |
@@ -487,10 +669,11 @@ jobs:
   # ──────────────────────────────────────
   deploy-production:
     name: "Deploy: Vercel (production)"
-    # No `needs` — see deploy-staging rationale above.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Waits for the ai-platform production deploy — see deploy-staging.
+    needs: [deploy-scope, deploy-ai-platform-production]
+    if: "!cancelled() && github.ref == 'refs/heads/main' && needs.deploy-scope.outputs.web == 'true' && needs.deploy-ai-platform-production.result != 'failure'"
+    runs-on: ${{ vars.CI_DEPLOY_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 45
     concurrency:
       group: vercel-deploy-production
       cancel-in-progress: false
@@ -501,19 +684,19 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_PRODUCTION || secrets.SENTRY_PROJECT }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+      - name: Setup Node + dependencies
+        # node_modules from the lockfile-keyed cache: `vercel build` then finds dependencies in
+        # place and its own `npm install` is a no-op check instead of a ~1.5-2 min fresh install
+        # (this replaces setup-node's 1.9 GB ~/.npm cache restore).
+        uses: ./.github/actions/setup-deps
 
       - name: Get commit subject
         id: commit
@@ -523,27 +706,40 @@ jobs:
         run: |
           SUBJECT=$(git log -1 --format='%s' | head -c 80)
           echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
           echo "commit subject: $SUBJECT"
 
       - name: Cache Next.js build output
-        # Next.js incremental build reuses .next/cache between runs.
-        # First build after lockfile change is still cold (~5 min),
-        # subsequent builds drop to ~1-2 min.
-        uses: actions/cache@v4
+        # .next/cache holds Next 16's Turbopack build cache (turbopackFileSystemCacheForBuild is
+        # on by default), so unchanged modules are not recompiled. Always restored; saved once a
+        # day (first deploy of the day) — the old per-commit key uploaded ~715 MB after every
+        # deploy (~3.5 min of runner time) and evicted the dependency caches.
+        uses: actions/cache@v6
         with:
           path: |
             .next/cache
             node_modules/.cache
-          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ steps.commit.outputs.day }}
           restore-keys: |
             next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
             next-${{ github.job }}-
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@50
+      - name: Setup Vercel CLI
+        uses: ./.github/actions/setup-vercel-cli
 
       - name: Pull Vercel env (production)
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Preflight — AI platform env (production)
+        # Without AI_PLATFORM_URL (https) + AI_PLATFORM_CONTEXT_SECRET (32+ chars) production still
+        # runs, but onboarding falls back to rule-based sites, auto SEO stops and /api/ai/* answers
+        # 503 — silently. Fail the deploy here (Notify deploy fail pings Lark). An empty secret only
+        # warns (a Vercel Sensitive variable is pulled empty). AI_AGENT_ENABLED is not checked: the
+        # copilot is off on production on purpose. To ship without AI deliberately, set repo
+        # variable ALLOW_PROD_WITHOUT_AI=true (problems become warnings).
+        env:
+          ALLOW_PROD_WITHOUT_AI: ${{ vars.ALLOW_PROD_WITHOUT_AI }}
+        run: node scripts/ci/ai-env-preflight.mjs .vercel/.env.production.local
 
       - name: Preflight — Postgres reachable
         run: |
@@ -585,9 +781,14 @@ jobs:
         # Plan 260419-2022 Phase 03 — mirror of staging seed step against prod
         # alias. SEED_TOKEN must be mirrored in Vercel production env.
         # NOTE: staging freshness gate deferred (see plan.md — nice-to-have).
+        # Target the deployment URL, not the production domain: on the first deploy
+        # (and during cutover) the domain still points at v1. /api/* skips host routing.
         env:
-          DEPLOY_URL: https://web-v2.ecommercehub.my
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
           SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+          # Production never force-reseeds: force deletes + recreates templates and cascades
+          # to template_versions / quality_scores / content packs.
+          SEED_FORCE: 'false'
         run: bash .github/scripts/seed-templates-post-deploy.sh
 
       - name: Notify deploy success
@@ -619,6 +820,316 @@ jobs:
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
+  # Job 6b: Deploy ai-platform to Vercel (staging branch) — separate project
+  # ──────────────────────────────────────
+  deploy-ai-platform:
+    name: "Deploy: AI Platform (staging)"
+    # Only deploy-scope: CI already ran on the PR.
+    needs: deploy-scope
+    if: github.ref == 'refs/heads/staging' && needs.deploy-scope.outputs.ai == 'true'
+    runs-on: ${{ vars.CI_DEPLOY_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    concurrency:
+      group: vercel-deploy-ai-platform-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      # Separate Vercel project (Root Directory left EMPTY — the CLI runs from services/ai-platform
+      # and builds on the runner, where the file: deps in ../../packages exist).
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_AI_PLATFORM_PROJECT_ID }}
+    defaults:
+      run:
+        working-directory: services/ai-platform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          check-latest: true
+          cache: 'npm'
+          cache-dependency-path: services/ai-platform/package-lock.json
+
+      - name: Get commit subject
+        id: commit
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 70)
+          echo "subject=[ai-platform] $SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Setup Vercel CLI
+        uses: ./.github/actions/setup-vercel-cli
+
+      - name: Pull Vercel env (staging)
+        # Same rules as deploy-staging: --environment=staging stamps
+        # .vercel/.env.staging.local with VERCEL_TARGET_ENV=staging, which must match
+        # `vercel build --target=staging` and `vercel deploy --prebuilt --target=staging`.
+        run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
+
+      - name: Preflight — ai-platform Postgres reachable
+        # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
+        # Fail here (not mid-build) when it is missing or unreachable from the runner.
+        # Reads only that key (never sourced, never printed). Path is from services/ai-platform.
+        run: node ../../scripts/ci/pg-tcp-check.mjs .vercel/.env.staging.local AI_PLATFORM_DATABASE_URL
+
+      - name: Build --target=staging
+        run: vercel build --target=staging --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt --target=staging
+        id: deploy
+        run: |
+          set -e
+          URL=$(vercel deploy --prebuilt --target=staging --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Notify deploy success
+        if: success()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_success'
+          environment: 'staging'
+          branch: staging
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ steps.deploy.outputs.url }}
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'staging'
+          branch: staging
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # ──────────────────────────────────────
+  # Job 7b: Deploy ai-platform to Vercel (main branch → production) — separate project
+  # ──────────────────────────────────────
+  deploy-ai-platform-production:
+    name: "Deploy: AI Platform (production)"
+    # Only deploy-scope: CI already ran on the PR.
+    needs: deploy-scope
+    if: github.ref == 'refs/heads/main' && needs.deploy-scope.outputs.ai == 'true'
+    runs-on: ${{ vars.CI_DEPLOY_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    concurrency:
+      group: vercel-deploy-ai-platform-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      # Separate Vercel project (Root Directory left EMPTY — the CLI runs from services/ai-platform
+      # and builds on the runner, where the file: deps in ../../packages exist).
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_AI_PLATFORM_PROJECT_ID }}
+    defaults:
+      run:
+        working-directory: services/ai-platform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          check-latest: true
+          cache: 'npm'
+          cache-dependency-path: services/ai-platform/package-lock.json
+
+      - name: Get commit subject
+        id: commit
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 70)
+          echo "subject=[ai-platform] $SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Setup Vercel CLI
+        uses: ./.github/actions/setup-vercel-cli
+
+      - name: Pull Vercel env (production)
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Preflight — ai-platform Postgres reachable
+        # `npm run build:vercel` applies migrations when AI_PLATFORM_DATABASE_URL is set.
+        # Fail here (not mid-build) when it is missing or unreachable from the runner.
+        # Reads only that key (never sourced, never printed). Path is from services/ai-platform.
+        run: node ../../scripts/ci/pg-tcp-check.mjs .vercel/.env.production.local AI_PLATFORM_DATABASE_URL
+
+      - name: Build --prod
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt --prod
+        id: deploy
+        run: |
+          set -e
+          URL=$(vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Notify deploy success
+        if: success()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_success'
+          environment: 'production'
+          branch: main
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ steps.deploy.outputs.url }}
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'production'
+          branch: main
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # ──────────────────────────────────────
+  # Job 7c: Deploy ai-platform to Vercel (qc-test branch → Preview scope)
+  # ──────────────────────────────────────
+  # qc-test needs its own ai-platform deploy: the platform calls back into one
+  # prime-web (PRIME_WEB_INTERNAL_URL), so sharing the staging deploy would let
+  # QC chat edit staging shops. Env vars live in the ech-ai-platform project
+  # under scope "Preview + branch qc-test" (own Neon DB, own daily budget).
+  deploy-ai-platform-qc-test:
+    name: "Deploy: AI Platform (qc-test)"
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
+    runs-on: ${{ vars.CI_DEPLOY_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    concurrency:
+      group: vercel-deploy-ai-platform-qc-test
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_AI_PLATFORM_PROJECT_ID }}
+    defaults:
+      run:
+        working-directory: services/ai-platform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          check-latest: true
+          cache: 'npm'
+          cache-dependency-path: services/ai-platform/package-lock.json
+
+      - name: Get commit subject
+        id: commit
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 70)
+          echo "subject=[ai-platform] $SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Setup Vercel CLI
+        uses: ./.github/actions/setup-vercel-cli
+
+      - name: Pull Vercel env (Preview scope + branch=qc-test overrides)
+        run: |
+          vercel pull --yes \
+            --environment=preview \
+            --git-branch=qc-test \
+            --token="$VERCEL_TOKEN"
+
+      - name: Preflight — ai-platform Postgres reachable
+        run: |
+          set -e
+          ENV_FILE=".vercel/.env.preview.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${AI_PLATFORM_DATABASE_URL:-}" ]; then
+            echo "::error::AI_PLATFORM_DATABASE_URL not present in $ENV_FILE"
+            echo "::error::Fix: ech-ai-platform → env vars → scope Preview + branch=qc-test"
+            exit 1
+          fi
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.AI_PLATFORM_DATABASE_URL);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
+
+      - name: Build (preview)
+        run: vercel build --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt (preview)
+        id: deploy
+        run: |
+          set -e
+          URL=$(vercel deploy --prebuilt --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Promote alias → ech-ai-platform-qc.vercel.app
+        # Stable URL for prime-web qc-test's AI_PLATFORM_URL (preview deploys
+        # get a new URL each time) — same reason as deploy-qc-test's alias step.
+        run: |
+          set -e
+          URL="${{ steps.deploy.outputs.url }}"
+          URL="${URL#https://}"
+          vercel alias set "$URL" ech-ai-platform-qc.vercel.app --token="$VERCEL_TOKEN"
+          echo "Alias rolled: ech-ai-platform-qc.vercel.app → $URL"
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'qc-test'
+          branch: qc-test
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # ──────────────────────────────────────
   # Job 8: Deploy to Vercel (qc-test branch → Preview scope with branch-filter)
   # ──────────────────────────────────────
   # Isolated QC environment for JMeter / load / E2E tests.
@@ -641,9 +1152,11 @@ jobs:
     name: "Deploy: Vercel (qc-test)"
     # Accepts both push (normal branch push) and workflow_dispatch (invoked
     # by sync-staging-to-qc-test.yml after auto-merging staging into qc-test).
+    # Waits for the qc-test ai-platform deploy — see deploy-staging.
+    needs: deploy-ai-platform-qc-test
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ${{ vars.CI_DEPLOY_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 45
     concurrency:
       group: vercel-deploy-qc-test
       cancel-in-progress: false
@@ -655,36 +1168,37 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+      - name: Setup Node + dependencies
+        # node_modules from the lockfile-keyed cache: `vercel build` then finds dependencies in
+        # place and its own `npm install` is a no-op check instead of a ~1.5-2 min fresh install
+        # (this replaces setup-node's 1.9 GB ~/.npm cache restore).
+        uses: ./.github/actions/setup-deps
 
       - name: Get commit subject
         id: commit
         run: |
           SUBJECT=$(git log -1 --format='%s' | head -c 80)
           echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
           echo "commit subject: $SUBJECT"
 
       - name: Cache Next.js build output
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .next/cache
             node_modules/.cache
-          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ steps.commit.outputs.day }}
           restore-keys: |
             next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
             next-${{ github.job }}-
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@50
+      - name: Setup Vercel CLI
+        uses: ./.github/actions/setup-vercel-cli
 
       - name: Pull Vercel env (Preview scope + branch=qc-test overrides)
         # `--environment=preview --git-branch=qc-test` pulls the branch-

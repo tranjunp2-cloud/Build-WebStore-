@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -20,17 +19,62 @@ import { getBlogCategoriesAction, getCurrentUserAction, saveBlogAction, getBlogB
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { validateImageMagicBytes, MAX_IMAGE_SIZE } from '@/lib/validate-image'
 import { useI18n } from '@/i18n'
+import { useInvalidateDomain } from '@/hooks/queries/use-invalidate-domain'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
+import { AgentChangedNotice, SaveConflictNotice } from '@/components/agent/agent-changed-notice'
+import { useSaveVersion } from '@/lib/save-version/use-save-version'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { CategoryModal } from '../_components/CategoryModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import type { ChangeSet } from '@ech/agent-core'
+// types only: the copilot (blog-agent → @ech/agent-react, the chat panel and its styles) is loaded
+// on demand, only when it is switched on (BlogAgentShell below)
+import type * as BlogAgentModule from '../_components/ai/blog-agent'
+import { appliedKey, blogAiPreview, createdPostId, isStaleChange, type BlogAiField } from '../_components/ai/blog-ai-draft'
+import { AiMark, BlogAiBar, type BlogAiLabels, type BlogAiPhase } from '../_components/ai/blog-ai-marks'
 
 const BlogRichEditor = dynamic(
     () => import('../_components/BlogRichEditor').then(mod => mod.BlogRichEditor),
     { ssr: false, loading: () => <div className="flex flex-col bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[16px] overflow-hidden min-h-[523px] animate-pulse" /> }
 )
+
+type BlogAgentValue = ReturnType<typeof BlogAgentModule.useBlogAgent>
+/** The copilot as the editor sees it, plus the key its chat is kept under (blog-agent's own). */
+type EditorAgentValue = BlogAgentValue & { threadKey?: (blogId: string) => string }
+
+/** The copilot switched off: the editor works without it (nothing of blog-agent is loaded). */
+const AGENT_OFF: EditorAgentValue = {
+    enabled: false,
+    draft: undefined,
+    busy: false,
+    decide: async (changeSet) => changeSet,
+    undo: undefined,
+    askAgainFor: () => undefined,
+    threadId: undefined,
+    setHandlers: () => undefined,
+    panel: null,
+}
+const EditorAgentContext = createContext<EditorAgentValue>(AGENT_OFF)
+const useEditorAgent = () => useContext(EditorAgentContext)
+
+/** The copilot, loaded on demand: blog-agent's provider, its value handed to the editor's context. */
+const BlogAgentShell = lazy(() => import('../_components/ai/blog-agent').then((mod) => {
+    function BlogAgentBridge({ children }: { children: ReactNode }) {
+        const agent = mod.useBlogAgent()
+        return <EditorAgentContext.Provider value={{ ...agent, threadKey: mod.blogThreadKey }}>{children}</EditorAgentContext.Provider>
+    }
+    function LoadedBlogAgentShell({ blogId, children }: { blogId: string; children: ReactNode }) {
+        return (
+            <mod.BlogAgentProvider blogId={blogId} enabled>
+                <BlogAgentBridge>{children}</BlogAgentBridge>
+            </mod.BlogAgentProvider>
+        )
+    }
+    return { default: LoadedBlogAgentShell }
+}))
 
 type BlogCategory = {
     id: string
@@ -75,9 +119,10 @@ function formatSlugInput(text: string) {
         .replace(/-+/g, '-')
 }
 
-export default function BlogEditorPage() {
+function BlogEditorInner() {
     const params = useParams()
     const router = useRouter()
+    const invalidateDomain = useInvalidateDomain()
     const { t, locale } = useI18n()
     const sub = t.common.subscriptionErrors
     const blogId = params?.id as string
@@ -86,7 +131,6 @@ export default function BlogEditorPage() {
     const [form, setForm] = useState<BlogForm>(initialForm)
     const [isLoading, setIsLoading] = useState(!isNew)
     const [isSaving, setIsSaving] = useState(false)
-    const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
     const [success, setSuccess] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [categories, setCategories] = useState<BlogCategory[]>([])
@@ -107,14 +151,6 @@ export default function BlogEditorPage() {
     // Editor key — increment to force CKEditor remount when AI inserts content
     const [editorKey, setEditorKey] = useState(0)
 
-    // AI Generator State
-    const [showAIGenerator, setShowAIGenerator] = useState(false)
-    const [aiPrompt, setAiPrompt] = useState('')
-    const [aiTone, setAiTone] = useState('Professional')
-    const [isGenerating, setIsGenerating] = useState(false)
-    const [generatedAiContent, setGeneratedAiContent] = useState('')
-    type GeneratedAIData = { title?: string; content?: string; seoTitle?: string; seoDescription?: string }
-    const [generatedAiData, setGeneratedAiData] = useState<GeneratedAIData | null>(null)
 
     // Load categories
     useEffect(() => {
@@ -139,6 +175,38 @@ export default function BlogEditorPage() {
         return currentUser.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : currentUser.email?.split('@')[0] || t.dashboard.blog.editor.authorFallback
     }
 
+    // The post as last loaded from the server: what "unsaved edits" is measured against.
+    const baselineRef = useRef<{ form: BlogForm; thumbnailId: string | null }>({ form: initialForm, thumbnailId: null })
+    // the post's updatedAt as loaded: sent with each save so a newer change is never written over
+    const version = useSaveVersion()
+    const s3Url = (url: string) => url.replace(/https?:\/\/minio:\d+/, process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000')
+
+    // Puts a whole post from the server into the form.
+    const applyPost = (data: Awaited<ReturnType<typeof getBlogByIdAction>>) => {
+        const next: BlogForm = {
+            title: data.title || '',
+            slug: data.slug || '',
+            content: data.content || '',
+            status: data.status || 'draft',
+            category: typeof data.category === 'object' ? String(data.category?.id ?? '') : String(data.category ?? ''),
+            seoTitle: data.seo?.metaTitle || '',
+            seoDescription: data.seo?.metaDescription || '',
+        }
+        const thumb = data.thumbnail && typeof data.thumbnail === 'object' ? data.thumbnail : null
+        const rawThumbId = thumb ? thumb.id : data.thumbnail
+        const nextThumbId = rawThumbId ? String(rawThumbId) : null
+        // Fix Docker-internal MinIO URL to browser-accessible URL
+        // On local: minio:9000 → localhost:9000 (port-mapped)
+        // On staging/prod: S3 URL is already correct, no replacement needed
+        setForm(next)
+        setThumbnailPreview(thumb?.url ? s3Url(thumb.url) : null)
+        setThumbnailId(nextThumbId)
+        setThumbnailFile(null)
+        setPublishDate(new Date(data.publishedAt || data.createdAt))
+        baselineRef.current = { form: next, thumbnailId: nextThumbId }
+        version.set(data.updatedAt)
+    }
+
     // Load existing blog post when editing
     useEffect(() => {
         if (isNew) return
@@ -146,29 +214,7 @@ export default function BlogEditorPage() {
             try {
                 const data = await getBlogByIdAction(blogId as string)
                 if (data) {
-                    setForm({
-                        title: data.title || '',
-                        slug: data.slug || '',
-                        content: data.content || '',
-                        status: data.status || 'draft',
-                        category: typeof data.category === 'object' ? String(data.category?.id ?? '') : String(data.category ?? ''),
-                        seoTitle: data.seo?.metaTitle || '',
-                        seoDescription: data.seo?.metaDescription || '',
-                    })
-                    if (data.thumbnail) {
-                        const thumb = typeof data.thumbnail === 'object' ? data.thumbnail : null
-                        if (thumb?.url) {
-                            // Fix Docker-internal MinIO URL to browser-accessible URL
-                            // On local: minio:9000 → localhost:9000 (port-mapped)
-                            // On staging/prod: S3 URL is already correct, no replacement needed
-                            const thumbUrl = thumb.url.replace(/https?:\/\/minio:\d+/, process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000')
-                            setThumbnailPreview(thumbUrl)
-                        }
-                        const existingThumbId = thumb?.id || (typeof data.thumbnail === 'number' ? String(data.thumbnail) : data.thumbnail)
-                        if (existingThumbId) setThumbnailId(String(existingThumbId))
-                    }
-
-                    setPublishDate(new Date(data.publishedAt || data.createdAt))
+                    applyPost(data)
                 } else {
                     toast.error(t.dashboard.blog.editor.loadFailed)
                     setError(t.dashboard.blog.editor.loadFailed)
@@ -240,6 +286,7 @@ export default function BlogEditorPage() {
     useEffect(() => {
         if (isLoading) return
         const timer = setInterval(() => {
+            if (aiRef.current?.phase === 'pending') return
             if (form.title || form.content) {
                 localStorage.setItem(DRAFT_KEY, JSON.stringify({
                     title: form.title,
@@ -265,6 +312,293 @@ export default function BlogEditorPage() {
         })
         setError(null)
     }, [isNew])
+
+    // ─── AI writer (ai-platform copilot) ─────────────────────────────────
+    // A waiting AI change is shown in the form (locked) until it is kept or
+    // discarded; keeping approves it server-side, so the post, its photos and
+    // Undo are the server's — the form then shows what was written.
+    const agent = useEditorAgent()
+    const E = t.dashboard.blog.editor
+    const aiLabels: BlogAiLabels = {
+        tag: E.aiMarkTag, undoPart: E.aiUndoPart, keepPart: E.aiKeepPart,
+        draftTitle: E.aiDraftTitle, editTitle: E.aiEditTitle, pendingNote: E.aiPendingNote,
+        appliedTitle: E.aiAppliedTitle, appliedNote: E.aiAppliedNote, savedTitle: E.aiSavedTitle, savedNote: E.aiSavedNote,
+        keepAll: E.aiKeepAll, discard: E.aiDiscard, askChanges: E.aiAskChanges, undoAll: E.aiUndoAll, done: E.aiDone,
+        parts: { title: E.aiPartTitle, content: E.aiPartContent, cover: E.aiPartCover, seo: E.aiPartSeo },
+    }
+    const [sideTab, setSideTab] = useState<'ai' | 'settings'>(agent.enabled && isNew ? 'ai' : 'settings')
+    type AiSnapshot = Pick<BlogForm, 'title' | 'slug' | 'content' | 'seoTitle' | 'seoDescription'> & { thumbnailPreview: string | null; thumbnailId: string | null }
+    type AiState = { phase: BlogAiPhase; kind: 'create' | 'update'; fields: BlogAiField[]; changeSetId: string; before: AiSnapshot; applied?: ChangeSet }
+    const [ai, setAi] = useState<AiState | null>(null)
+    const [aiBusy, setAiBusy] = useState(false)
+    const aiRef = useRef<AiState | null>(null)
+    useEffect(() => {
+        aiRef.current = ai
+    }, [ai])
+    const aiPending = ai?.phase === 'pending'
+    const phaseOf = (field: BlogAiField): BlogAiPhase | null => (ai && ai.fields.includes(field) ? ai.phase : null)
+
+    const snapshot = (): AiSnapshot => ({
+        title: form.title, slug: form.slug, content: form.content, seoTitle: form.seoTitle, seoDescription: form.seoDescription,
+        thumbnailPreview, thumbnailId,
+    })
+    const restore = (before: AiSnapshot, fields?: BlogAiField[]) => {
+        const all = !fields
+        setForm(prev => ({
+            ...prev,
+            ...(all || fields.includes('title') ? { title: before.title, slug: before.slug } : {}),
+            ...(all || fields.includes('content') ? { content: before.content } : {}),
+            ...(all || fields.includes('seo') ? { seoTitle: before.seoTitle, seoDescription: before.seoDescription } : {}),
+        }))
+        if (all || fields.includes('cover')) {
+            setThumbnailPreview(before.thumbnailPreview)
+            setThumbnailId(before.thumbnailId)
+            setThumbnailFile(null)
+        }
+        if (all || fields.includes('content')) setEditorKey(k => k + 1)
+    }
+
+    // The post as the server has it now (after an approved AI edit): the written values, real photo URLs, the new cover id.
+    const refreshFromServer = async (fields: BlogAiField[]) => {
+        if (isNew) return
+        const data = await getBlogByIdAction(blogId).catch(() => null)
+        if (!data) return
+        const base = baselineRef.current
+        const patch: Partial<BlogForm> = {
+            ...(fields.includes('title') ? { title: data.title || '', slug: data.slug || base.form.slug } : {}),
+            ...(fields.includes('content') ? { content: data.content || '' } : {}),
+            ...(fields.includes('seo') ? { seoTitle: data.seo?.metaTitle || '', seoDescription: data.seo?.metaDescription || '' } : {}),
+        }
+        setForm(prev => ({ ...prev, ...patch }))
+        let nextThumbId = base.thumbnailId
+        if (fields.includes('content')) setEditorKey(k => k + 1)
+        if (fields.includes('cover')) {
+            const thumb = data.thumbnail && typeof data.thumbnail === 'object' ? data.thumbnail : null
+            if (thumb?.url) setThumbnailPreview(s3Url(thumb.url))
+            const id = thumb?.id ?? (data.thumbnail && typeof data.thumbnail !== 'object' ? data.thumbnail : null)
+            if (id) {
+                setThumbnailId(String(id))
+                nextThumbId = String(id)
+            }
+        }
+        baselineRef.current = { form: { ...base.form, ...patch }, thumbnailId: nextThumbId }
+        version.set(data.updatedAt)
+    }
+
+    // A new AI change for this post → show it in the form; one that went away undecided here → put the post back.
+    useEffect(() => {
+        if (isLoading) return
+        const draft = agent.draft
+        const current = aiRef.current
+        if (draft && current?.changeSetId !== draft.id) {
+            const preview = blogAiPreview(draft)
+            if (!preview) return
+            const before = current?.phase === 'pending' ? current.before : snapshot()
+            setForm(prev => ({
+                ...prev,
+                ...(preview.title !== undefined ? { title: preview.title, slug: isNew ? (preview.slug ?? slugify(preview.title)) : prev.slug } : {}),
+                ...(preview.contentHtml !== undefined ? { content: preview.contentHtml } : {}),
+                ...(preview.seoTitle !== undefined ? { seoTitle: preview.seoTitle.slice(0, 60) } : {}),
+                ...(preview.seoDescription !== undefined ? { seoDescription: preview.seoDescription.slice(0, 160) } : {}),
+            }))
+            if (preview.coverUrl) setThumbnailPreview(preview.coverUrl)
+            if (preview.contentHtml !== undefined) setEditorKey(k => k + 1)
+            setAi({ phase: 'pending', kind: preview.kind, fields: preview.fields, changeSetId: draft.id, before })
+        } else if (!draft && current?.phase === 'pending' && !aiBusy) {
+            // approved from the chat card: the approval handler marks it applied in the same moment — only
+            // a change that is still "waiting" a beat later was rejected or expired, and the post goes back
+            const id = current.changeSetId
+            const timer = setTimeout(() => {
+                const latest = aiRef.current
+                if (latest?.phase !== 'pending' || latest.changeSetId !== id) return
+                restore(latest.before)
+                setAi(null)
+            }, 120)
+            return () => clearTimeout(timer)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [agent.draft?.id, isLoading])
+
+    // Changes this editor already applied to the form itself (its handlers below); the bus announces them too.
+    const handledRef = useRef(new Set<string>())
+    const unsaved = !isNew && !isLoading && (
+        thumbnailFile !== null ||
+        thumbnailId !== baselineRef.current.thumbnailId ||
+        (Object.keys(form) as (keyof BlogForm)[]).some(k => form[k] !== baselineRef.current.form[k])
+    )
+    const [stale, setStale] = useState(false)
+    const reloadSeq = useRef(0)
+    const unsavedRef = useRef(unsaved)
+    unsavedRef.current = unsaved
+    // The assistant changed this post from elsewhere (another tab, another chat). `force`: the merchant chose Reload.
+    const reloadFromServer = async (force = false) => {
+        const seq = ++reloadSeq.current
+        try {
+            const data = await getBlogByIdAction(blogId)
+            if (!data || seq !== reloadSeq.current) return
+            // typing started while the post was on its way: keep what is being typed
+            if (!force && unsavedRef.current) return setStale(true)
+            if (data.content !== baselineRef.current.form.content) setEditorKey(k => k + 1)
+            applyPost(data)
+        } catch (err) {
+            console.error('[Blog] Reload after assistant change failed:', err)
+        }
+    }
+    useAgentChanges({ kinds: ['blog_post'], ids: [blogId], enabled: !isNew }, (batch) => {
+        if (batch.changes.every(c => handledRef.current.has(`${c.action}:${c.changeSetId}`))) return
+        if (unsaved) setStale(true)
+        else void reloadFromServer()
+    })
+    // saved or reverted to the server's version: the notice no longer applies
+    useEffect(() => {
+        if (!unsaved) setStale(false)
+    }, [unsaved])
+
+    // Approvals (from the bar, the chat card or the review sheet) come back here.
+    useEffect(() => {
+        agent.setHandlers({
+            onCreated: (changeSet) => {
+                handledRef.current.add(`applied:${changeSet.id}`)
+                const id = createdPostId(changeSet)
+                if (!id) return
+                const fields = aiRef.current?.fields ?? blogAiPreview(changeSet)?.fields ?? []
+                try {
+                    sessionStorage.setItem(appliedKey(id), JSON.stringify({ fields }))
+                    if (agent.threadId && agent.threadKey) sessionStorage.setItem(agent.threadKey(id), agent.threadId)
+                    localStorage.removeItem(DRAFT_KEY)
+                } catch { /* storage off: the post still opens, without the marks */ }
+                router.replace(`/blog/${encodeURIComponent(id)}`)
+            },
+            onUpdated: (changeSet) => {
+                handledRef.current.add(`applied:${changeSet.id}`)
+                const current = aiRef.current
+                const fields = current?.changeSetId === changeSet.id ? current.fields : blogAiPreview(changeSet)?.fields ?? []
+                const before = current?.changeSetId === changeSet.id ? current.before : snapshot()
+                setAi({ phase: 'applied', kind: 'update', fields, changeSetId: changeSet.id, before, applied: changeSet })
+                void refreshFromServer(fields)
+            },
+            onReverted: (changeSet) => {
+                handledRef.current.add(`undone:${changeSet.id}`)
+                const current = aiRef.current
+                if (current?.changeSetId === changeSet.id) restore(current.before)
+                else void refreshFromServer(['title', 'content', 'seo', 'cover'])
+                setAi(null)
+            },
+        })
+    })
+
+    // The new post's editor, right after its AI draft was saved: mark what AI wrote.
+    useEffect(() => {
+        if (isNew || isLoading) return
+        try {
+            const raw = sessionStorage.getItem(appliedKey(blogId))
+            if (!raw) return
+            sessionStorage.removeItem(appliedKey(blogId))
+            const fields = (JSON.parse(raw) as { fields?: BlogAiField[] }).fields ?? []
+            if (fields.length === 0) return
+            const empty: AiSnapshot = { title: '', slug: form.slug, content: '', seoTitle: '', seoDescription: '', thumbnailPreview: null, thumbnailId: null }
+            setAi({ phase: 'saved', kind: 'create', fields, changeSetId: '', before: empty })
+            if (agent.enabled) setSideTab('ai')
+        } catch { /* nothing to mark */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoading, isNew, blogId])
+
+    const keepAll = async () => {
+        const draft = agent.draft
+        if (!draft) return
+        setAiBusy(true)
+        try {
+            await agent.decide(draft, 'approve')
+        } catch (err) {
+            if (isStaleChange(err)) {
+                // drafted from an older version of the post (it changed since): drop it, put the form back, offer a redo
+                const current = aiRef.current
+                if (current) restore(current.before)
+                setAi(null)
+                await agent.decide(draft, 'reject').catch(() => undefined)
+                toast.error(E.aiStale, {
+                    action: { label: E.aiAskAgain, onClick: () => { setSideTab('ai'); agent.askAgainFor(draft.id) } },
+                })
+            } else {
+                toast.error(err instanceof Error && err.message ? err.message : E.aiKeepFailed)
+            }
+        } finally {
+            setAiBusy(false)
+        }
+    }
+    const discard = async () => {
+        const current = aiRef.current
+        if (current) restore(current.before)
+        setAi(null)
+        if (agent.draft) await agent.decide(agent.draft, 'reject').catch(() => undefined)
+    }
+    const askChanges = () => {
+        setSideTab('ai')
+        setTimeout(() => document.querySelector<HTMLTextAreaElement>('.blog-ai-panel textarea')?.focus(), 60)
+    }
+    const undoAll = async () => {
+        const applied = aiRef.current?.applied
+        if (!applied || !agent.undo) return
+        setAiBusy(true)
+        try {
+            await agent.undo(applied)
+        } catch (err) {
+            toast.error(err instanceof Error && err.message ? err.message : E.aiKeepFailed)
+        } finally {
+            setAiBusy(false)
+        }
+    }
+    const dropMark = (field: BlogAiField) => setAi(prev => {
+        if (!prev) return prev
+        const fields = prev.fields.filter(f => f !== field)
+        return fields.length > 0 ? { ...prev, fields } : null
+    })
+    const undoPart = (field: BlogAiField) => {
+        const current = aiRef.current
+        if (!current) return
+        restore(current.before, [field])
+        dropMark(field)
+    }
+    const markProps = (field: BlogAiField) => ({
+        phase: phaseOf(field),
+        labels: aiLabels,
+        onKeep: () => dropMark(field),
+        onUndo: () => undoPart(field),
+    })
+
+    // ✦ in the SEO fields: meta title + description in the post's own language (task seo.blog-meta).
+    const [seoAi, setSeoAi] = useState<{ busy: boolean; before?: { seoTitle: string; seoDescription: string } }>({ busy: false })
+    const writeSeo = async () => {
+        if (!form.title.trim() && !form.content.replace(/<[^>]*>/g, '').trim()) {
+            toast.error(E.aiSeoNeedsText)
+            return
+        }
+        const before = { seoTitle: form.seoTitle, seoDescription: form.seoDescription }
+        setSeoAi({ busy: true })
+        try {
+            const res = await fetch('/api/ai/blog-seo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ title: form.title, content: form.content, fallbackLanguage: locale }),
+            })
+            const json = await res.json().catch(() => ({}))
+            if (!res.ok || !json.success) throw new Error(json.error || E.aiSeoFailed)
+            setForm(prev => ({
+                ...prev,
+                seoTitle: String(json.data?.metaTitle ?? prev.seoTitle).slice(0, 60),
+                seoDescription: String(json.data?.metaDescription ?? prev.seoDescription).slice(0, 160),
+            }))
+            setSeoAi({ busy: false, before })
+        } catch (err) {
+            setSeoAi({ busy: false })
+            toast.error(err instanceof Error && err.message ? err.message : E.aiSeoFailed)
+        }
+    }
+    const undoSeo = () => {
+        if (seoAi.before) setForm(prev => ({ ...prev, ...seoAi.before }))
+        setSeoAi({ busy: false })
+    }
 
     type RichTextNode = { text?: string; children?: RichTextNode[]; root?: RichTextNode }
     const getContentText = (content: string | RichTextNode | null): string => {
@@ -293,10 +627,13 @@ export default function BlogEditorPage() {
     }
 
     const isSubmittingRef = useRef(false)
+    // what "Save mine anyway" saves again
+    const lastSaveStatus = useRef<'draft' | 'published' | undefined>(undefined)
 
     const handleSave = async (overrideStatus?: 'draft' | 'published') => {
         if (isSubmittingRef.current) return
         isSubmittingRef.current = true
+        lastSaveStatus.current = overrideStatus
 
         const validationError = validate()
         if (validationError) {
@@ -355,11 +692,17 @@ export default function BlogEditorPage() {
                     metaTitle: form.seoTitle,
                     metaDescription: form.seoDescription,
                 },
+                expectedUpdatedAt: isNew ? undefined : version.current(),
             })
 
-            if (result && typeof result === 'object' && 'error' in result && result.error) {
+            if (version.refused(result)) {
+                // the edits stay in the form; the notice asks what to do
+            } else if (result && typeof result === 'object' && 'error' in result && result.error) {
                 toast.error(resolveApiError(result, t.dashboard.blog.editor.saveFailed, sub))
             } else if (result) {
+                version.set(result.updatedAt)
+                // the blog list is cached: its row is stale after this save
+                void invalidateDomain('blog')
                 setSuccess(true)
                 localStorage.removeItem(DRAFT_KEY)
                 toast.success(isNew ? t.dashboard.blog.editor.postCreated : t.dashboard.blog.editor.postSaved)
@@ -380,67 +723,6 @@ export default function BlogEditorPage() {
         }
     }
 
-
-    const handleGenerateSEO = async () => {
-        const contentText = getContentText(form.content)
-        if (!form.title.trim() && !contentText) {
-            toast.error(t.dashboard.blog.editor.enterTitleOrContent)
-            return
-        }
-        setIsGeneratingSEO(true)
-        setError(null)
-        try {
-            const res = await fetch('/api/ai/generate-blog', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    prompt: `Generate ONLY SEO metadata (seoTitle and seoDescription) for this blog post. Title: "${form.title}". Content snippet: "${contentText.substring(0, 500)}"`,
-                    language: 'en',
-                }),
-            })
-
-            if (res.ok) {
-                const json = await res.json()
-                const data = json.data || json
-                if (data.seoTitle || data.metaTitle) {
-                    setForm(prev => ({
-                        ...prev,
-                        seoTitle: data.seoTitle || data.metaTitle || prev.seoTitle,
-                        seoDescription: data.seoDescription || data.metaDescription || prev.seoDescription,
-                    }))
-                    setShowSEO(true)
-                    toast.success(t.dashboard.blog.editor.seoGenerated)
-                } else {
-                    setForm(prev => ({
-                        ...prev,
-                        seoTitle: prev.title.substring(0, 60),
-                        seoDescription: contentText.substring(0, 155),
-                    }))
-                    setShowSEO(true)
-                    toast.warning(t.dashboard.blog.editor.aiUnavailableFallback)
-                }
-            } else {
-                setForm(prev => ({
-                    ...prev,
-                    seoTitle: prev.title.substring(0, 60),
-                    seoDescription: contentText.substring(0, 155),
-                }))
-                setShowSEO(true)
-                toast.warning(t.dashboard.blog.editor.aiUnavailableFallback)
-            }
-        } catch {
-            setForm(prev => ({
-                ...prev,
-                seoTitle: prev.title.substring(0, 60),
-                seoDescription: contentText.substring(0, 155),
-            }))
-            setShowSEO(true)
-            toast.warning(t.dashboard.blog.editor.aiUnavailableFallback)
-        } finally {
-            setIsGeneratingSEO(false)
-        }
-    }
 
     if (isLoading) {
         return (
@@ -464,37 +746,6 @@ export default function BlogEditorPage() {
                 </div>
             </div>
         )
-    }
-
-    const handleGenerateWithAI = async () => {
-        if (!aiPrompt.trim()) return
-
-        try {
-            setIsGenerating(true)
-            setGeneratedAiContent('')
-            setGeneratedAiData(null)
-
-            const res = await fetch('/api/ai/generate-blog', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: aiPrompt, tone: aiTone, language: locale })
-            })
-
-            const json = await res.json()
-            if (!res.ok || !json.success) throw new Error(json.error || t.dashboard.blog.editor.generateFailed)
-
-            const { title, content, seoTitle, seoDescription } = json.data
-
-            setGeneratedAiData({ title, content, seoTitle, seoDescription })
-            setGeneratedAiContent(content || t.dashboard.blog.editor.noContentGenerated)
-
-            toast.success(t.dashboard.blog.editor.aiGenerated, { id: 'ai-blog' })
-        } catch (error: unknown) {
-            console.error('[Blog] AI generation failed:', error)
-            toast.error(t.dashboard.blog.editor.aiGenerationFailed, { id: 'ai-blog' })
-        } finally {
-            setIsGenerating(false)
-        }
     }
 
     return (
@@ -523,9 +774,12 @@ export default function BlogEditorPage() {
                 {/* Row 2: Action Buttons — below on mobile, right-aligned on desktop */}
                 <div className="flex flex-row items-center gap-[12px] shrink-0">
                     {/* AI Assistant Button — icon-only on mobile per Figma */}
-                    <Button
+                    {agent.enabled && <Button
                         type="button"
-                        onClick={() => setShowAIGenerator(true)}
+                        onClick={() => {
+                            setSideTab('ai')
+                            document.querySelector('.blog-ai-panel')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+                        }}
                         size="dash"
                         className="w-auto"
                     >
@@ -544,13 +798,14 @@ export default function BlogEditorPage() {
                             </defs>
                         </svg>
                         <span className="hidden sm:inline">{t.dashboard.blog.editor.aiAssistant}</span>
-                    </Button>
+                    </Button>}
 
                     {/* Save Draft Button — icon-only on mobile per Figma */}
                     <Button
                         type="button"
                         onClick={() => handleSave('draft')}
-                        disabled={isSaving || success}
+                        disabled={isSaving || success || aiPending}
+                        title={aiPending ? E.aiLocked : undefined}
                         variant="dashSecondary"
                         size="dash"
                         className="w-auto panel-outline"
@@ -567,7 +822,8 @@ export default function BlogEditorPage() {
                     <Button
                         type="button"
                         onClick={() => handleSave('published')}
-                        disabled={isSaving || success}
+                        disabled={isSaving || success || aiPending}
+                        title={aiPending ? E.aiLocked : undefined}
                         size="dash"
                     >
                         {isSaving ? (
@@ -593,6 +849,20 @@ export default function BlogEditorPage() {
             <div className="flex flex-col xl:flex-row items-start gap-[24px] w-full mt-6">
                 <div className="flex-1 flex flex-col gap-[24px] min-w-0 w-full">
 
+
+                    {version.conflicted ? (
+                        <SaveConflictNotice
+                            record="post"
+                            onLoadLatest={() => { setStale(false); void reloadFromServer(true) }}
+                            onSaveAnyway={() => { version.overwrite(); void handleSave(lastSaveStatus.current) }}
+                        />
+                    ) : stale && (
+                        <AgentChangedNotice
+                            record="post"
+                            onReload={() => { setStale(false); void reloadFromServer(true) }}
+                            onKeep={() => setStale(false)}
+                        />
+                    )}
 
                     {showDraftRecovery && (
                         <div className="flex items-center justify-between rounded-lg bg-warning/10 border border-warning/30 px-4 py-3">
@@ -628,6 +898,31 @@ export default function BlogEditorPage() {
                         }
                     `}</style>
 
+                    {ai && (
+                        <BlogAiBar
+                            phase={ai.phase}
+                            kind={ai.kind}
+                            fields={ai.fields}
+                            labels={aiLabels}
+                            busy={aiBusy}
+                            onKeepAll={keepAll}
+                            onDiscard={() => void discard()}
+                            onAskChanges={askChanges}
+                            onUndoAll={ai.phase === 'applied' && ai.applied && agent.undo ? () => void undoAll() : undefined}
+                            onDone={() => setAi(null)}
+                        />
+                    )}
+                    {!ai && agent.busy && isNew && !form.title && !getContentText(form.content).trim() && (
+                        <p className="m-0 inline-flex w-fit items-center gap-2 rounded-full bg-[hsl(var(--primary)/0.1)] px-3 py-1 text-[12px] font-semibold text-[hsl(var(--primary))]">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            {E.aiWriting}
+                        </p>
+                    )}
+
+                    {/* while an AI draft waits the post is locked: keep or discard it first */}
+                    <div className="relative flex flex-col gap-[24px]" aria-busy={aiPending || undefined}>
+                    {aiPending && <div className="absolute inset-0 z-[5] cursor-not-allowed rounded-[16px]" title={E.aiLocked} aria-hidden="true" />}
+                    <AiMark {...markProps('title')}>
                     <div className="flex flex-col p-[24px] bg-[hsl(var(--card))] panel-outline rounded-[16px]">
                         <div className="flex flex-col gap-[8px]">
                             <div className="flex flex-row justify-between items-center h-[20px]">
@@ -646,6 +941,8 @@ export default function BlogEditorPage() {
                             />
                         </div>
                     </div>
+
+                    </AiMark>
 
                     <div className="flex flex-col p-[25px] gap-[8px] min-h-[116px] bg-[hsl(var(--card))] panel-outline rounded-[16px] flex-shrink-0">
                         <div className="h-[20px]">
@@ -680,6 +977,7 @@ export default function BlogEditorPage() {
                         )}
                     </div>
 
+                    <AiMark {...markProps('cover')}>
                     {/* GH-1511 bug #44: preview matches the storefront blog-list grid ratio (aspect-[4/3],
                         blocks/blog-list/index.tsx) so merchants see the same crop the buyer gets — the old
                         fixed 256px height rendered ~1.8:1 and misled. Card height is now content-driven. */}
@@ -752,15 +1050,49 @@ export default function BlogEditorPage() {
                         )}
                     </div>
 
+                    </AiMark>
+
+                    <AiMark {...markProps('content')}>
                     <BlogRichEditor
                         key={editorKey}
                         content={form.content}
                         onChange={(html: string) => updateField('content', html)}
                         placeholder={t.dashboard.blog.editor.startWriting}
                     />
+                    </AiMark>
+                    </div>
                 </div>
 
-                <div className="w-full xl:w-[512px] xl:max-w-[512px] flex flex-col gap-[24px] flex-shrink-0">
+                {/* with the copilot open the whole rail (tabs + chat) stays in view while the post scrolls: sticky under the 56px header */}
+                <div className={cn("w-full flex flex-col gap-[24px] flex-shrink-0", agent.enabled && sideTab === 'ai' ? "xl:w-[440px] xl:max-w-[440px] gap-[12px] xl:sticky xl:top-[72px] xl:self-start" : "xl:w-[512px] xl:max-w-[512px]")}>
+                    {agent.enabled && (
+                        <div role="tablist" aria-label={E.aiTab} className="flex gap-1 rounded-xl p-1 bg-[hsl(var(--card))] panel-outline">
+                            {(['ai', 'settings'] as const).map(tab => (
+                                <button
+                                    key={tab}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={sideTab === tab}
+                                    onClick={() => setSideTab(tab)}
+                                    className={cn(
+                                        "flex-1 inline-flex h-9 items-center justify-center gap-2 rounded-lg border-0 text-[13px] font-medium transition-colors cursor-pointer",
+                                        sideTab === tab ? "bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))]" : "bg-transparent text-foreground/70 hover:text-foreground hover:bg-[hsl(var(--muted))]",
+                                    )}
+                                >
+                                    {tab === 'ai' ? <Sparkles className="h-[15px] w-[15px]" strokeWidth={1.75} /> : <Settings2 className="h-[15px] w-[15px]" strokeWidth={1.75} />}
+                                    {tab === 'ai' ? E.aiTab : E.settingsTab}
+                                    {tab === 'ai' && sideTab !== 'ai' && (agent.busy || aiPending) && <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))] animate-pulse" aria-hidden="true" />}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {/* the copilot stays mounted while Settings is open: the chat and its composer keep their state */}
+                    {agent.enabled && (
+                        <div className={cn("blog-ai-panel h-[calc(100vh-220px)] min-h-[560px] xl:h-[calc(100vh-148px)] xl:min-h-[480px] overflow-hidden rounded-[16px]", sideTab !== 'ai' && "hidden")}>
+                            {agent.panel}
+                        </div>
+                    )}
+                    <div className={cn("flex flex-col gap-[24px]", agent.enabled && sideTab !== 'settings' && "hidden")}>
                     <div className="flex flex-col p-[25px] gap-[20px] bg-[hsl(var(--card))] panel-outline rounded-[16px]">
                         <div className="flex flex-row items-center gap-[12px] h-[28px]">
                             <Tag className="w-[20px] h-[20px] text-[hsl(var(--primary))]" strokeWidth={1.5} />
@@ -864,38 +1196,41 @@ export default function BlogEditorPage() {
                         </div>
                     </div>
 
-                    <div className="flex flex-col p-[25px] gap-[20px] bg-[hsl(var(--card))] panel-outline rounded-[16px]">
+                    <AiMark {...markProps('seo')}>
+                    <div className="relative flex flex-col p-[25px] gap-[20px] bg-[hsl(var(--card))] panel-outline rounded-[16px]">
+                        {aiPending && <div className="absolute inset-0 z-[5] cursor-not-allowed rounded-[16px]" title={E.aiLocked} aria-hidden="true" />}
                         <div className="flex flex-row items-center justify-between w-full h-[32px]">
                             <div className="flex flex-row items-center gap-[12px] h-[28px]">
                                 <Sparkles className="w-[20px] h-[20px] text-[hsl(var(--primary))]" strokeWidth={1.5} />
                                 <span className="font-['Inter'] font-[700] text-[18px] leading-[1.5555555555555556em] text-foreground">{t.dashboard.blog.editor.seoTitle}</span>
                             </div>
-                            <Button
-                                type="button"
-                                onClick={(e) => {
-                                    e.preventDefault()
-                                    handleGenerateSEO()
-                                }}
-                                disabled={isGeneratingSEO || (!form.title.trim() && !getContentText(form.content).trim())}
-                                className="w-[151.23px] h-[32px] rounded-xl text-[12px]"
-                            >
-                                {isGeneratingSEO ? <Loader2 className="w-[16px] h-[16px] animate-spin" /> : <Sparkles className="w-[16px] h-[16px]" strokeWidth={1.5} />}
-                                {t.dashboard.blog.editor.generateSeo}
-                            </Button>
                         </div>
 
                         <div className="flex flex-col gap-[7px]">
                             <div className="h-[20px] w-full">
                                 <Label htmlFor="seo-title" className="text-muted-foreground">{t.dashboard.blog.editor.metaTitle}</Label>
                             </div>
-                            <Input
-                                id="seo-title"
-                                type="text"
-                                value={form.seoTitle}
-                                onChange={e => updateField('seoTitle', e.target.value)}
-                                maxLength={60}
-                                placeholder={t.dashboard.blog.editor.seoTitlePlaceholder}
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="seo-title"
+                                    type="text"
+                                    value={form.seoTitle}
+                                    onChange={e => updateField('seoTitle', e.target.value)}
+                                    maxLength={60}
+                                    placeholder={t.dashboard.blog.editor.seoTitlePlaceholder}
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => void writeSeo()}
+                                    disabled={seoAi.busy}
+                                    aria-label={E.aiSeoFill}
+                                    title={E.aiSeoFill}
+                                    className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.1)] cursor-pointer disabled:cursor-default"
+                                >
+                                    {seoAi.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" strokeWidth={1.75} />}
+                                </button>
+                            </div>
                             <div className="h-[16px] w-full flex items-center">
                                 <span className="text-[12px] text-muted-foreground">
                                     {form.seoTitle.length}/60 {t.dashboard.blog.editor.characters}
@@ -907,217 +1242,50 @@ export default function BlogEditorPage() {
                             <div className="h-[20px] w-full">
                                 <Label htmlFor="seo-desc" className="text-muted-foreground">{t.dashboard.blog.editor.metaDesc}</Label>
                             </div>
-                            <Textarea
-                                id="seo-desc"
-                                value={form.seoDescription}
-                                onChange={e => updateField('seoDescription', e.target.value)}
-                                maxLength={160}
-                                placeholder={t.dashboard.blog.editor.seoDescPlaceholder}
-                                className="h-[113px]"
-                            />
+                            <div className="relative">
+                                <Textarea
+                                    id="seo-desc"
+                                    value={form.seoDescription}
+                                    onChange={e => updateField('seoDescription', e.target.value)}
+                                    maxLength={160}
+                                    placeholder={t.dashboard.blog.editor.seoDescPlaceholder}
+                                    className="h-[113px] pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => void writeSeo()}
+                                    disabled={seoAi.busy}
+                                    aria-label={E.aiSeoFill}
+                                    title={E.aiSeoFill}
+                                    className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-md border-0 bg-transparent text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.1)] cursor-pointer disabled:cursor-default"
+                                >
+                                    {seoAi.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" strokeWidth={1.75} />}
+                                </button>
+                            </div>
                             <div className="h-[16px] w-full flex items-center">
                                 <span className="text-[12px] text-muted-foreground">
                                     {form.seoDescription.length}/160 {t.dashboard.blog.editor.characters}
                                 </span>
                             </div>
                         </div>
+                        {(seoAi.busy || seoAi.before) && (
+                            <p role="status" className="m-0 -mt-2 flex items-center gap-2 text-[12px] text-muted-foreground">
+                                {seoAi.busy ? (
+                                    <><Loader2 className="h-3.5 w-3.5 animate-spin text-[hsl(var(--primary))]" />{E.aiSeoWriting}</>
+                                ) : (
+                                    <>
+                                        <Check className="h-3.5 w-3.5 text-[hsl(var(--primary))]" />{E.aiSeoFilled} ·
+                                        <button type="button" onClick={undoSeo} className="inline-flex min-h-7 items-center rounded px-1 border-0 bg-transparent text-foreground/80 hover:text-foreground underline-offset-2 hover:underline cursor-pointer">{E.aiSeoUndo}</button>
+                                    </>
+                                )}
+                            </p>
+                        )}
+                    </div>
+                    </AiMark>
                     </div>
                 </div>
             </div>
 
-            {/* AI Generator Modal */}
-            {showAIGenerator && typeof document !== 'undefined' && createPortal(
-                <div
-                    className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-end xl:items-center justify-center backdrop-blur-[3px] xl:p-4 animate-in fade-in duration-200"
-                    style={{ backgroundColor: 'var(--dash-overlay)' }}
-                >
-                    <div className={`flex flex-col w-full xl:w-[768px] h-[85vh] xl:h-auto ${(!isGenerating && generatedAiContent) ? 'xl:h-[826px]' : isGenerating ? 'xl:h-[763px]' : 'xl:h-[417px]'} p-[1px] bg-[hsl(var(--secondary))] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] border-t border-[hsl(var(--border))] xl:border rounded-t-[24px] xl:rounded-[16px] transition-all duration-300 overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 xl:fade-in`}>
-                        {/* Mobile drag handle */}
-                        <div className="flex xl:hidden items-start justify-center pt-[12px] w-full shrink-0">
-                            <div className="bg-[hsl(var(--border))] h-[4px] rounded-[9999px] shrink-0 w-[48px]" />
-                        </div>
-                        {/* Header — mobile: compact 77px / desktop: 97px */}
-                        <div
-                            className="flex flex-row justify-between items-center w-full px-[24px] h-[77px] xl:h-[97px] flex-shrink-0"
-                            style={{ borderBottom: '1px solid var(--dash-border)' }}
-                        >
-                            <div className="flex flex-row items-center gap-[12px]">
-                                <div className="flex flex-row justify-center items-center w-[40px] h-[40px] rounded-[16px] shrink-0" style={{ background: 'linear-gradient(135deg,#3b82f6 0%,#2dd4bf 100%)' }}>
-                                    <Sparkles className="w-[20px] h-[20px] text-white" strokeWidth={1.67} />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="font-['Inter'] font-[700] text-[18px] xl:text-[20px] leading-[28px] text-foreground">{t.dashboard.blog.editor.aiModalTitle}</span>
-                                    <span className="font-['Inter'] font-[400] text-[12px] xl:text-[14px] leading-[16px] xl:leading-[20px] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.aiModalDesc}</span>
-                                </div>
-                            </div>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => { e.preventDefault(); setShowAIGenerator(false) }}
-                                className="shrink-0"
-                            >
-                                <X className="w-[20px] h-[20px]" strokeWidth={1.67} />
-                            </Button>
-                        </div>
-
-                        <div
-                            className={`flex flex-col items-start self-stretch flex-1 xl:flex-initial gap-[20px] ${(!isGenerating && generatedAiContent) ? 'xl:h-[628px]' : isGenerating ? 'xl:h-[664px]' : 'xl:h-[318px]'} transition-all duration-300 overflow-y-auto`}
-                            style={{ padding: '24px 24px 0 24px' }}
-                        >
-                            <div className="flex flex-col gap-[8px] w-full">
-                                <div className="flex items-center w-full h-[20px]">
-                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-foreground">{t.dashboard.blog.editor.aiTopicLabel}</span>
-                                </div>
-                                <Input
-                                    value={aiPrompt}
-                                    onChange={e => setAiPrompt(e.target.value)}
-                                    placeholder={t.dashboard.blog.editor.titlePlaceholder}
-                                    className="rounded-lg text-sm"
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-[12px] w-full">
-                                <div className="flex items-center h-[20px] w-full">
-                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-foreground">{t.dashboard.blog.editor.aiToneLabel}</span>
-                                </div>
-                                <div className="flex flex-col xl:flex-row justify-between gap-[8px] xl:gap-[12px] w-full">
-                                    {([
-                                        { key: 'Professional', emoji: '💼', label: t.dashboard.blog.editor.aiToneProfessional, desc: t.dashboard.blog.editor.aiToneProfessionalDesc },
-                                        { key: 'Friendly', emoji: '😊', label: t.dashboard.blog.editor.aiToneFriendly, desc: t.dashboard.blog.editor.aiToneFriendlyDesc },
-                                        { key: 'Persuasive', emoji: '🎯', label: t.dashboard.blog.editor.aiTonePersuasive, desc: t.dashboard.blog.editor.aiTonePersuasiveDesc },
-                                    ] as const).map((tone) => (
-                                        <Button
-                                            key={tone.key}
-                                            type="button"
-                                            onClick={(e) => { e.preventDefault(); setAiTone(tone.key) }}
-                                            variant="ghost"
-                                            className="flex flex-row items-center gap-[12px] shrink-0 xl:flex-1 h-[70px] xl:h-[56px] px-[17px] xl:px-0 xl:justify-center transition-all relative rounded-xl"
-                                            style={aiTone === tone.key ? {
-                                                border: '1px solid hsl(var(--primary))',
-                                                background: 'hsl(var(--primary)/0.1)',
-                                                boxShadow: '0 0 20px 0 hsl(var(--primary)/0.3)'
-                                            } : {
-                                                border: '1px solid var(--dash-border)',
-                                                background: 'var(--dash-surface)'
-                                            }}
-                                        >
-                                            <span className="text-[24px] xl:text-[18px] leading-[32px] shrink-0">{tone.emoji}</span>
-                                            <div className="flex flex-col items-start xl:items-center flex-1 xl:flex-initial">
-                                                <span className={`font-semibold xl:font-medium text-[14px] leading-[20px] ${aiTone === tone.key ? 'text-primary' : 'text-foreground'}`}>{tone.label}</span>
-                                                <span className="xl:hidden text-[12px] leading-[16px] text-muted-foreground">{tone.desc}</span>
-                                            </div>
-                                            {aiTone === tone.key && <Check className="xl:hidden w-[20px] h-[20px] text-primary shrink-0" strokeWidth={2} />}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {(!isGenerating && !generatedAiContent) && (
-                                <Button
-                                    type="button"
-                                    onClick={handleGenerateWithAI}
-                                    disabled={!aiPrompt.trim()}
-                                    className="w-full text-base"
-                                >
-                                    <Sparkles className="w-[20px] h-[20px]" strokeWidth={1.67} />
-                                    {t.dashboard.blog.editor.aiGenerateBtn}
-                                </Button>
-                            )}
-                            {isGenerating && (
-                                <div className="w-full flex">
-                                    <Button
-                                        type="button"
-                                        disabled
-                                        className="w-full text-base opacity-50"
-                                    >
-                                        <Loader2 className="w-[28px] h-[28px] animate-spin" />
-                                        {t.dashboard.blog.editor.aiGenerating}
-                                    </Button>
-                                </div>
-                            )}
-
-                            {(isGenerating || generatedAiContent) && (
-                                <div className="flex flex-col items-stretch self-stretch gap-[16px] w-full h-[366px] animate-in fade-in slide-in-from-top-4 duration-300">
-                                    <div className="h-[20px] flex items-center">
-                                        <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-foreground">{t.dashboard.blog.editor.aiGeneratedContent}</span>
-                                    </div>
-                                    <div className={`relative flex flex-col items-stretch w-full ${(!isGenerating && generatedAiContent) ? 'h-[330px]' : 'h-[300px]'} bg-[hsl(var(--background))] border-[1px] border-[hsl(var(--border))] rounded-[16px] px-[17px] pt-[17px] pb-[1px] overflow-hidden`}>
-                                        {isGenerating ? (
-                                            <div className="relative w-full h-[156px]">
-                                                <div className="absolute left-0 top-[0px] w-[522px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[28px] w-[620px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[56px] w-[556px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[84px] w-[646px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[112px] w-[546px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[140px] w-[657px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                            </div>
-                                        ) : (
-                                            <div className="w-full h-full overflow-y-auto pb-[16px] nice-scrollbar">
-                                                {generatedAiData?.title && (
-                                                    <div className="mb-4">
-                                                        <h3 className="text-lg font-bold text-foreground mb-1">{generatedAiData.title}</h3>
-                                                        <p className="text-xs text-muted-foreground mb-4">{t.dashboard.blog.editor.slugLabel} {slugify(generatedAiData.title)}</p>
-                                                    </div>
-                                                )}
-                                                <div className="w-full font-['Inter'] font-[400] text-[14px] leading-[1.625em] tracking-[-0.0107em] text-foreground whitespace-pre-wrap border-t border-[hsl(var(--border))] pt-4">
-                                                    {generatedAiContent}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {(!isGenerating && generatedAiContent) && (
-                            <div
-                                className="flex flex-col xl:flex-row justify-end items-stretch xl:items-center self-stretch gap-[12px] p-[24px] xl:h-[101px] xl:pr-[24px] rounded-b-[16px] animate-in fade-in slide-in-from-bottom-2 duration-300 flex-shrink-0"
-                                style={{ background: 'var(--dash-bg)', borderTop: '1px solid var(--dash-border)' }}
-                            >
-                                <Button
-                                    type="button"
-                                    onClick={handleGenerateWithAI}
-                                    disabled={isGenerating}
-                                    variant="dashSecondary"
-                                    size="dash"
-                                    className="px-[16px] w-full xl:w-auto panel-outline"
-                                >
-                                    <RefreshCw className="w-[16px] h-[16px]" />
-                                    {t.dashboard.blog.editor.aiRegenerate}
-                                </Button>
-
-                                <Button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        if (generatedAiData) {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                title: generatedAiData.title || prev.title,
-                                                slug: generatedAiData.title ? slugify(generatedAiData.title) : prev.slug,
-                                                content: generatedAiData.content || prev.content,
-                                                seoTitle: generatedAiData.seoTitle || generatedAiData.title || prev.seoTitle,
-                                                seoDescription: generatedAiData.seoDescription || prev.seoDescription
-                                            }))
-                                            if (generatedAiData.content) {
-                                                setEditorKey(k => k + 1)
-                                            }
-                                        }
-                                        setShowAIGenerator(false);
-                                    }}
-                                    size="dash"
-                                    className="w-full xl:w-[187px] rounded-[10px]"
-                                >
-                                    <Check className="w-[16px] h-[16px]" />
-                                    {t.dashboard.blog.editor.aiInsertBtn}
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                </div>,
-                document.body
-            )}
             {isCategoryModalOpen && (
                 <CategoryModal
                     onClose={() => setIsCategoryModalOpen(false)}
@@ -1129,5 +1297,29 @@ export default function BlogEditorPage() {
                 />
             )}
         </div >
+    )
+}
+
+/**
+ * The blog editor with its copilot: the AI writer lives in the side column
+ * (inline panel, one chat per post) and every AI change shows in the form.
+ * With the copilot off its code is never loaded.
+ */
+export default function BlogEditorPageClient({ agentEnabled = false }: { agentEnabled?: boolean }) {
+    const params = useParams()
+    const blogId = (params?.id as string) ?? 'new'
+    if (!agentEnabled) return <BlogEditorInner key={blogId} />
+    return (
+        <Suspense
+            fallback={
+                <div className="flex min-h-[400px] items-center justify-center" aria-busy="true">
+                    <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--muted-foreground))]" />
+                </div>
+            }
+        >
+            <BlogAgentShell key={blogId} blogId={blogId}>
+                <BlogEditorInner />
+            </BlogAgentShell>
+        </Suspense>
     )
 }

@@ -1,0 +1,122 @@
+# Unit tests (vitest) — one definition for every caller.
+#   ci.yml                  PR into staging (mode affected) / into main (mode full)
+#   staging-full-tests.yml  nightly on the staging branch (mode full)
+#
+# mode=affected: `vitest run --changed HEAD^1` — specs that import a file the PR changed (HEAD^1 of
+#   the PR merge commit is the base branch tip), plus every spec that reads files or spawns
+#   processes or checks file existence (~58 files, ~35 s): --changed follows imports only, and those specs check sources as
+#   text (payload.config.ts, collections, workflows, scripts/db-setup.js…). ci.yml `changes` picks
+#   mode=full for global config (package.json, lockfile, tsconfig, vitest config, shared test
+#   helpers), the CI definition itself, deleted/renamed code files, and PRs into main.
+# mode=full: whole suite with coverage (thresholds in vitest.config.ts are a gate).
+name: Unit tests
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: "full | affected"
+        type: string
+        required: true
+      upload-coverage:
+        description: "Upload coverage-summary.json for the PR Metrics job"
+        type: boolean
+        default: false
+      ref:
+        description: "Branch to test; empty = the ref that triggered the caller"
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: "Test"
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    env:
+      TEST_MODE: ${{ inputs.mode }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: primeweb
+          POSTGRES_PASSWORD: primeweb
+          POSTGRES_DB: primeweb
+        options: >-
+          --health-cmd "pg_isready -U primeweb -d primeweb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        # Random host port: several self-hosted runners share one machine
+        # (CI_HEAVY_RUNNER), so a fixed 5432:5432 makes concurrent Test jobs
+        # collide. Steps read the mapped port from job.services below.
+        ports:
+          - 5432/tcp
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          # HEAD^1 of the PR merge commit = base branch tip (vitest --changed baseline)
+          fetch-depth: 2
+
+      - name: Setup Node + dependencies
+        uses: ./.github/actions/setup-deps
+
+      - name: Verify F41 migrations are idempotent on an isolated schema
+        env:
+          DATABASE_URI: postgresql://primeweb:primeweb@localhost:${{ job.services.postgres.ports['5432'] }}/primeweb?sslmode=disable
+        run: npm run test:f41-migrations
+
+      - name: Test (${{ env.TEST_MODE }})
+        id: test
+        run: |
+          set -o pipefail
+          if [ "$TEST_MODE" = full ]; then
+            # PR Metrics only reads coverage-summary.json; skip the html/lcov/json
+            # reporters from vitest.config.ts so CI does not build and upload them.
+            npx vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=text-summary 2>&1 | tee test-output.log
+          else
+            # Specs that import a file changed since the base tip.
+            npx vitest run --changed HEAD^1 --passWithNoTests 2>&1 | tee test-output.log
+            # Specs that read files / spawn processes: not reachable through the import graph.
+            # One array element per file (never one newline-joined filter), and no --passWithNoTests:
+            # a non-empty list that matches no test must fail, not pass silently.
+            mapfile -t FS_SPECS < <(grep -rlE 'readFileSync|readdirSync|readFile\(|existsSync|statSync|execFile|spawn\(|spawnSync|execSync|run-tsx-cli' src/__tests__ \
+              --include='*.test.ts' --include='*.test.tsx' --include='*.spec.ts' --include='*.spec.tsx' | sort)
+            if [ "${#FS_SPECS[@]}" -gt 0 ]; then
+              echo "Also running ${#FS_SPECS[@]} file-reading / process-spawning specs"
+              npx vitest run "${FS_SPECS[@]}" 2>&1 | tee -a test-output.log
+            fi
+          fi
+          PASSED=$(grep 'Tests' test-output.log | grep -oE '[0-9]+ passed' | grep -oE '^[0-9]+' | head -1 || echo "0")
+          FAILED=$(grep 'Tests' test-output.log | grep -oE '[0-9]+ failed' | grep -oE '^[0-9]+' | head -1 || echo "0")
+          TOTAL=$((${PASSED:-0} + ${FAILED:-0}))
+          echo "test_total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "test_passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
+          echo "test_failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Drift check (block registry ↔ templates)
+        # Plan 260419-2022 Phase 03 — fail PR if block variant/schema drift
+        # grows beyond baseline. Source-only scan (no DB), <30s.
+        run: npm run drift:check
+
+      - name: Harness quick gen
+        # Plan 260419-2022 Phase 03 — smoke test composer on 3 fixtures.
+        # Fails fast if composer blows up on real schemas.
+        run: npm run harness:quick
+
+      - name: Upload coverage artifact
+        if: always() && inputs.upload-coverage
+        # The org-wide artifact storage quota can be full (it is shared by every
+        # repo and recalculated every 6-12 h). Coverage is a report, not a gate:
+        # a failed upload must not turn a green test run red.
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 3

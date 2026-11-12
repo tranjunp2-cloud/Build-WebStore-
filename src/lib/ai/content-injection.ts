@@ -12,11 +12,12 @@
  */
 
 import { getCategoryContent } from './content'
-import type { BusinessSample, TestimonialSample, FAQSample } from './content'
+import type { BusinessSample } from './content'
 import { getBlockStrings } from './block-i18n'
-import { pickLogosByCategory } from './content/client-logos-library'
+import { groundedLogoHeadline } from './grounded-blocks'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
 import { hashString, seededShuffle, seededShufflePick } from './seeded-random'
+import { withoutLibraryIdentity } from './library-identity'
 import type { ThemeMood } from './theme-moods'
 import { getCategoryCTA } from './theme-moods'
 import {
@@ -30,6 +31,9 @@ import {
 // fallback to legacy hardcoded blocks.
 import {
     buildFeatures as composerBuildFeatures,
+    buildTestimonials as composerBuildTestimonials,
+    buildFAQ as composerBuildFAQ,
+    buildClientLogos as composerBuildClientLogos,
     buildStats as composerBuildStats,
     buildPricing as composerBuildPricing,
     buildTeam as composerBuildTeam,
@@ -181,24 +185,6 @@ function rotateSlice<T>(pool: readonly T[], seed: number): T[] {
     return seededShuffle(pool, seed)
 }
 
-/** Normalized testimonial for Zod schema shape. Picks language-specific quote when available. */
-function mapTestimonial(t: TestimonialSample, language?: string): Block {
-    const quote = (language === 'ms' && t.quote_ms) ? t.quote_ms
-                : (language === 'vi' && t.quote_vi) ? t.quote_vi
-                : t.quote
-    return {
-        quote,
-        name: t.name,
-        title: t.title ?? 'Customer',
-        company: t.company ?? '',
-        rating: t.rating,
-    }
-}
-
-function mapFaq(f: FAQSample): Block {
-    return { question: f.question, answer: f.answer }
-}
-
 /**
  * Build a fully-formed block from the content library.
  * Returns null if no suitable content exists for (blockType, category).
@@ -233,10 +219,16 @@ export function buildBlockFromLibrary(
     // category inject different canned copy + tagline + description when the AI
     // underfills and structure-enforcer has to gap-fill.
     const bizSeed = ctx.seed ?? 0
-    const biz: BusinessSample | undefined =
+    const librarySample: BusinessSample | undefined =
         pickSeeded(content.businesses, bizSeed) ?? content.businesses[0]
     // Plan 07 — user-supplied fields override canned samples.
     const userBiz = ctx.userBiz
+    // #2103 A1: with a real merchant (userBiz) the library sample's identity and
+    // contact must never be read, so every `biz?.x` below sees them empty.
+    // Gallery/preview callers (no userBiz) keep the sample.
+    const biz: BusinessSample | undefined = librarySample && userBiz
+        ? withoutLibraryIdentity(librarySample, userBiz)
+        : librarySample
     const name = userBiz?.name
         ?? ctx.businessName
         ?? (isNonEnglish ? undefined : biz?.name)
@@ -351,27 +343,27 @@ export function buildBlockFromLibrary(
                     ? `${localized.sections.aboutHeadlinePrefix} ${name}`.trim()
                     : `${i18n.about.headlinePrefix} ${name}`,
                 // Plan 07 — prefer user description, fall back to canned pool.
+                // #2103 A1: with real user data never fall back to the library sample's
+                // description (it describes a different, fictional business).
                 body: userDescription
-                    ?? (isNonEnglish ? undefined : biz?.description)
+                    ?? (userBiz ? name : (isNonEnglish ? undefined : biz?.description))
                     ?? (isNonEnglish ? name : undefined)
                     ?? `${name} is dedicated to delivering exceptional experiences to every customer.`,
             }
 
-        case 'testimonials':
-            return {
-                blockType: 'testimonials',
-                variant: 'cards',
-                headline: i18n.testimonials.headline,
-                testimonials: testimonialSlice.slice(0, 4).map((t) => mapTestimonial(t, ctx.language)),
-            }
+        case 'testimonials': {
+            // #2103 A1: real quotes from FACTS, else one invitation card — never library people.
+            const block = composerBuildTestimonials(mergedBiz, ctx.language)
+            return { ...block, headline: i18n.testimonials.headline } as Block
+        }
 
-        case 'faq':
-            return {
-                blockType: 'faq',
-                variant: 'accordion',
-                headline: i18n.faq.headline,
-                faqs: faqSlice.slice(0, 5).map(mapFaq),
-            }
+        case 'faq': {
+            // #2103 A1: only questions answerable from FACTS. Nothing to say → don't inject an empty FAQ.
+            const block = composerBuildFAQ(mergedBiz, ctx.language) as Block
+            const items = (block.items as unknown[]) ?? []
+            if (items.length === 0) return null
+            return { blockType: 'faq', variant: 'accordion', headline: i18n.faq.headline, faqs: items } as Block
+        }
 
         case 'cta':
             return {
@@ -400,11 +392,13 @@ export function buildBlockFromLibrary(
                     ?? (isNonEnglish ? userDescription ?? name : i18n.contact.subheadline),
                 sectionLabel: localized?.sections.contact ?? navigation.contact,
                 // Plan 07 — user-supplied contact fields win over canned pool.
-                address: userAddress ?? biz?.address ?? '',
-                phone: userPhone ?? biz?.phone ?? '',
+                // Real generation (userBiz present) never falls back to canned sample
+                // contact data; gallery/preview callers (no userBiz) keep the sample.
+                address: userAddress ?? (userBiz ? '' : biz?.address ?? ''),
+                phone: userPhone ?? (userBiz ? '' : biz?.phone ?? ''),
                 // null not '' — Payload email-type field validates format even without required:true,
                 // so empty string causes ValidationError on publish.
-                email: userEmail ?? biz?.email ?? null,
+                email: userEmail ?? (userBiz ? null : biz?.email ?? null),
                 submitLabel: localized?.contact.submitLabel ?? i18n.contact.submitLabel,
                 phoneLabel: localized?.contact.phoneLabel ?? i18n.contact.phoneLabel,
                 addressLabel: localized?.contact.addressLabel ?? i18n.contact.addressLabel,
@@ -432,107 +426,19 @@ export function buildBlockFromLibrary(
                 ],
             }
 
-        case 'features': {
-            // Plan 2253 follow-up (260415-0900) — delegate to template-composer
-            // buildFeatures which has hand-curated Malaysia-specific features per
-            // 14 categories (JAKIM halal for restaurant, MBBS UM for health, etc).
-            // Composer also handles user product injection via featuresFromProducts
-            // so same-category businesses diverge. Fallback to legacy Phase 03
-            // shuffle pool on error (defensive).
-            try {
-                return composerBuildFeatures(mergedBiz, category, ctx.language)
-            } catch (err) {
-                console.warn('[content-injection] composerBuildFeatures failed, falling back:', err)
-            }
-
-            const pool = [
-                { icon: '⭐', title: 'Quality Service', description: 'Exceptional quality in every interaction.' },
-                { icon: '🚀', title: 'Fast Response', description: 'Quick turnaround on all requests.' },
-                { icon: '💎', title: 'Premium Experience', description: 'Carefully crafted for discerning customers.' },
-                { icon: '🛡️', title: 'Trusted & Reliable', description: 'Years of consistent service excellence.' },
-                { icon: '🎯', title: 'Results-Focused', description: 'Measurable outcomes you can count on.' },
-                { icon: '🤝', title: 'Personal Attention', description: 'Every client matters to us.' },
-                { icon: '✨', title: 'Craftsmanship', description: 'Details that make a lasting impression.' },
-                { icon: '📈', title: 'Proven Track Record', description: 'Trusted by hundreds of satisfied clients.' },
-            ]
-            const shuffled = seededShuffle(pool, bizSeed ^ hashString('features'))
-            let features = shuffled.slice(0, 4)
-            if (userProducts.length >= 2) {
-                const productCards = userProducts.slice(0, 4).map((product, idx) => {
-                    const base = shuffled[idx] ?? shuffled[0]!
-                    const capitalized = capitalizeFirstLetter(product)
-                    return {
-                        icon: base.icon,
-                        title: `${capitalized}`,
-                        description: `Our signature ${product} — a favourite with every ${name} guest.`,
-                    }
-                })
-                const needed = Math.max(0, 4 - productCards.length)
-                features = productCards.concat(shuffled.slice(4, 4 + needed))
-            }
-            return {
-                blockType: 'features',
-                variant: 'grid-3',
-                headline: i18n.features.headlineWhyChoose(name),
-                features,
-            }
-        }
+        case 'features':
+            // #2103 A1: product/description based only (see template-composer buildFeatures).
+            return composerBuildFeatures(mergedBiz, category, ctx.language)
 
         case 'stats': {
-            // Plan 2253 follow-up (260415-0900) — delegate to template-composer
-            // buildStats for category-curated stats (20+ Years / 15000+ Patients
-            // Treated for health; 50000+ Customers for restaurant; etc).
-            try {
-                return composerBuildStats(category, ctx.language)
-            } catch (err) {
-                console.warn('[content-injection] composerBuildStats failed, falling back:', err)
-            }
-
-            const pool = [
-                { value: '500+', label: 'Happy Customers' },
-                { value: '10+', label: 'Years Experience' },
-                { value: '4.9★', label: 'Average Rating' },
-                { value: '98%', label: 'Satisfaction Rate' },
-                { value: '24/7', label: 'Support Available' },
-                { value: '1M+', label: 'Projects Delivered' },
-            ]
-            const shuffled = seededShuffle(pool, bizSeed ^ hashString('stats'))
-            return {
-                blockType: 'stats',
-                variant: 'row',
-                headline: i18n.stats.headline,
-                stats: shuffled.slice(0, 3),
-            }
+            // #2103 A1: real numbers only; fewer than two → nothing to inject.
+            const block = composerBuildStats(mergedBiz, ctx.language)
+            return (block.stats as unknown[]).length > 0 ? block : null
         }
 
-        case 'team': {
-            // Plan 2253 follow-up (260415-0900) — delegate to template-composer
-            // buildTeam for category-curated team members (Dr. Tan Wei Ming MBBS
-            // for health, Ahmad Razif CTO for tech, Dato' Rahman for business).
-            // Note: Payload schema uses `image` field (not `avatar`) — composer
-            // bios don't set image, media pipeline fills via BLOCK_IMAGE_SPEC.team.
-            try {
-                return composerBuildTeam(category, ctx.language)
-            } catch (err) {
-                console.warn('[content-injection] composerBuildTeam failed, falling back:', err)
-            }
-
-            const pool = [
-                { name: 'Team Lead', role: 'Founder', bio: 'Passionate about delivering great experiences.' },
-                { name: 'Senior Specialist', role: 'Expert', bio: 'Years of experience in the field.' },
-                { name: 'Customer Success', role: 'Support Lead', bio: 'Dedicated to your satisfaction.' },
-                { name: 'Creative Director', role: 'Design Lead', bio: 'Obsessed with craft and detail.' },
-                { name: 'Operations Manager', role: 'Ops Lead', bio: 'Keeps every project on track.' },
-                { name: 'Client Partner', role: 'Account Lead', bio: 'Your trusted point of contact.' },
-            ]
-            const shuffled = seededShuffle(pool, bizSeed ^ hashString('team'))
-            return {
-                blockType: 'team',
-                variant: 'grid',
-                headline: i18n.team.headline,
-                members: shuffled.slice(0, 3),
-            }
-        }
+        case 'team':
+            // #2103 A1: owner/brand only — no invented names or credentials.
+            return composerBuildTeam(mergedBiz, ctx.language)
 
         case 'service-cards': {
             // Plan 2253 follow-up (260415-0900) — delegate to template-composer
@@ -563,6 +469,14 @@ export function buildBlockFromLibrary(
                 services: shuffled.slice(0, 4),
             }
         }
+
+        case 'products-featured':
+            // #2103 A3: the shop's own products, shown on the home page (rendered from the catalogue).
+            return {
+                blockType: 'products-featured',
+                variant: 'hero-product',
+                headline: isNonEnglish ? name : (language === 'ms' ? 'Produk Pilihan' : 'Featured Products'),
+            }
 
         case 'gallery': {
             return {
@@ -596,68 +510,19 @@ export function buildBlockFromLibrary(
         }
 
         case 'pricing': {
-            // Plan 2253 follow-up (260415-0900) — delegate to template-composer
-            // buildPricing for category-curated RM tiers ("Bridal Package RM 800"
-            // for beauty, "Executive Checkup RM 1200" for health, etc). Composer
-            // has 7 category-specific maps + RM default for other categories.
-            try {
-                return composerBuildPricing(category, ctx.language)
-            } catch (err) {
-                console.warn('[content-injection] composerBuildPricing failed, falling back:', err)
-            }
-
-            return {
-                blockType: 'pricing',
-                variant: 'cards',
-                headline: i18n.pricing.headline,
-                plans: [
-                    {
-                        name: 'Starter',
-                        price: 'RM 99',
-                        features: [
-                            { text: 'Core features', included: true },
-                            { text: 'Email support', included: true },
-                        ],
-                        ctaLabel: 'Get Started',
-                        ctaUrl: '/contact',
-                    },
-                    {
-                        name: 'Pro',
-                        price: 'RM 299',
-                        features: [
-                            { text: 'All Starter features', included: true },
-                            { text: 'Priority support', included: true },
-                            { text: 'Advanced tools', included: true },
-                        ],
-                        ctaLabel: 'Choose Pro',
-                        ctaUrl: '/contact',
-                    },
-                    {
-                        name: 'Enterprise',
-                        price: 'Custom',
-                        features: [
-                            { text: 'All Pro features', included: true },
-                            { text: 'Dedicated manager', included: true },
-                            { text: 'SLA guarantee', included: true },
-                        ],
-                        ctaLabel: 'Contact Sales',
-                        ctaUrl: '/contact',
-                    },
-                ],
-            }
+            // #2103 A1: plans are the merchant's own priced products — never invented tiers.
+            const block = composerBuildPricing(mergedBiz, ctx.language)
+            return (block.plans as unknown[]).length > 0 ? block : null
         }
 
         case 'logo-cloud':
         case 'client-logos': // backward compat alias for saved pages
-            return {
-                blockType: 'logo-cloud',
-                variant: 'row',
-                headline: localized?.sections.clientLogos
-                    ?? (isNonEnglish ? name : i18n.clientLogos.headline),
-                logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
-                    .slice(0, 6)
-                    .map((l) => ({ name: l.name, logo: { url: l.url ?? '', alt: l.name } })),
-            }
+            // #2103 A1: payment methods the tenant enabled; never third-party brands.
+        {
+            const block = composerBuildClientLogos(mergedBiz, ctx.language)
+            if ((block.logos as unknown[]).length === 0) return null
+            return { ...block, headline: localized?.sections.clientLogos ?? (isNonEnglish ? name : groundedLogoHeadline(ctx.language)) } as Block
+        }
 
         default: {
             // Try industry blocks for category-specific signatures
@@ -681,6 +546,16 @@ export function buildBlockFromLibrary(
  * for non-English sites. Library content is English-only — padding these blocks
  * with library items corrupts language consistency.
  */
+const NEVER_PAD_BLOCKS: ReadonlySet<string> = new Set([
+    'testimonials',
+    'faq',
+    'team',
+    'stats',
+    'pricing',
+    'logo-cloud',
+    'client-logos',
+])
+
 const CONTENT_BLOCKS_NO_ENGLISH_PAD = new Set([
     'testimonials',
     'faq',
@@ -762,6 +637,8 @@ export function padItems(
     ctx: InjectionContext = {},
 ): unknown[] {
     if (existing.length >= minCount) return [...existing]
+    // #2103 A1: these blocks only ever carry real facts — never pad them with invented items.
+    if (NEVER_PAD_BLOCKS.has(blockType)) return [...existing]
 
     // For non-English sites, skip library padding for content-heavy blocks.
     // GPT has already generated items in the target language; adding English
@@ -790,30 +667,9 @@ export function padItems(
     const result: unknown[] = [...existing]
     const baseSeed = ctx.seed ?? 0
 
-    if (blockType === 'testimonials' && content) {
-        const pool = rotateSlice(content.testimonials, baseSeed)
-        let i = 0
-        while (result.length < minCount && i < pool.length) {
-            const candidate = mapTestimonial(pool[i]!, ctx.language)
-            const isDupe = result.some(
-                (r) =>
-                    typeof r === 'object' && r !== null && (r as Block).name === candidate.name,
-            )
-            if (!isDupe) result.push(candidate)
-            i++
-        }
-    } else if (blockType === 'faq' && content) {
-        const pool = rotateSlice(content.faqItems, baseSeed ^ hashString('faq'))
-        let i = 0
-        while (result.length < minCount && i < pool.length) {
-            const candidate = mapFaq(pool[i]!)
-            const isDupe = result.some(
-                (r) =>
-                    typeof r === 'object' && r !== null && (r as Block).question === candidate.question,
-            )
-            if (!isDupe) result.push(candidate)
-            i++
-        }
+    if (blockType === 'testimonials' || blockType === 'faq') {
+        // #2103 A1: real items are never padded with library people/Q&A — fewer is honest.
+        return result
     } else {
         // Generic padding — inject from library block, dedup by `title` field
         // (features, service-cards have title). Avoids "Quality Service" appearing twice.

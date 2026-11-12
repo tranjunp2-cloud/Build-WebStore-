@@ -21,6 +21,8 @@ export type ContactFormValues = {
 
 export type ContactFormErrors = Partial<Record<keyof ContactFormValues | 'form', string>>
 
+const EMPTY_VALUES: ContactFormValues = { name: '', email: '', phone: '', subject: '', message: '' }
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /**
@@ -137,11 +139,32 @@ export function useContactForm({ siteId, requiredFieldNames = [] }: UseContactFo
         [siteId, requiredFields],
     )
 
+    // GH-2165: errors are only set on submit, so a field that was flagged stayed red after the visitor
+    // fixed it. Re-check just the flagged field on every change: clear it once valid, refresh the
+    // message while it is still invalid. Never raise a NEW error while the visitor is still typing.
+    const handleFieldChange = useCallback(
+        (e: FormEvent<HTMLFormElement>) => {
+            const target = e.target as HTMLInputElement | HTMLTextAreaElement
+            const field = target.name as keyof ContactFormValues
+            if (!field) return
+            setErrors((prev) => {
+                if (!prev[field]) return prev
+                const fieldError = validate({ ...EMPTY_VALUES, [field]: target.value }, requiredFields)[field]
+                if (fieldError === prev[field]) return prev
+                const next = { ...prev }
+                if (fieldError) next[field] = fieldError
+                else delete next[field]
+                return next
+            })
+        },
+        [requiredFields],
+    )
+
     const reset = useCallback(() => {
         setState('idle')
         setErrors({})
         setSubmitError('')
     }, [])
 
-    return { state, errors, submitError, handleSubmit, reset }
+    return { state, errors, submitError, handleSubmit, handleFieldChange, reset }
 }

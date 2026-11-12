@@ -9,6 +9,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Upload, Plus, Search, Eye, Copy, Edit, Link } from 'lucide-react'
 import type { PackContentStats } from '@/app/api/admin/packs/[id]/stats/route'
 import { PackDetailDrawer } from './pack-detail-drawer'
+import { useStudioCan } from '../../_components/studio-permissions-context'
 import { CreatePackModal } from '../../_components/modals/create-pack-modal'
 import type { PackDoc } from '../page'
 
@@ -51,6 +52,7 @@ function hueFromId(id: string): number {
 }
 
 export function PacksGrid({ initialPacks }: Props) {
+    const canEditPacks = useStudioCan()('pack.edit')
     const [packs, setPacks] = useState<PackDoc[]>(initialPacks)
     const [selectedId, setSelectedId] = useState<string>(packs[0]?.id ?? '')
     const [category, setCategory] = useState('all')
@@ -101,12 +103,16 @@ export function PacksGrid({ initialPacks }: Props) {
                     </p>
                 </div>
                 <div className="page-actions">
-                    <button className="btn btn-ghost">
-                        <Upload size={13} /> Import JSON
-                    </button>
-                    <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-                        <Plus size={13} /> Tạo pack mới
-                    </button>
+                    {canEditPacks && (
+                        <>
+                            <button className="btn btn-ghost">
+                                <Upload size={13} /> Import JSON
+                            </button>
+                            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                                <Plus size={13} /> Tạo pack mới
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -148,9 +154,11 @@ export function PacksGrid({ initialPacks }: Props) {
             {packs.length === 0 ? (
                 <div className="pk-empty">
                     <p>No packs yet — create your first content pack.</p>
-                    <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-                        <Plus size={13} /> New Pack
-                    </button>
+                    {canEditPacks && (
+                        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                            <Plus size={13} /> New Pack
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="pk-layout">
@@ -224,7 +232,7 @@ export function PacksGrid({ initialPacks }: Props) {
                     onDeleted={() => handleDeleted(selected.id)}
                 />
             )}
-            {showCreate && (
+            {showCreate && canEditPacks && (
                 <CreatePackModal
                     onClose={() => setShowCreate(false)}
                     onCreated={handleCreated}
@@ -243,6 +251,10 @@ function PackDetailPanel({
     pack: PackDoc
     onEdit: () => void
 }) {
+    const can = useStudioCan()
+    const canEditPacks = can('pack.edit')
+    // The drawer also hosts delete, so a seat that can only delete still needs a way in.
+    const canOpenDrawer = canEditPacks || can('pack.delete')
     const hue = hueFromId(pack.id)
     const industry = INDUSTRY_LABELS[pack.category ?? ''] ?? pack.category ?? '—'
     const tmplCount = pack.includedTemplates?.length ?? 0
@@ -301,12 +313,16 @@ function PackDetailPanel({
                         <button className="btn btn-sm">
                             <Eye size={12} /> Preview
                         </button>
-                        <button className="btn btn-sm">
-                            <Copy size={12} /> Clone
-                        </button>
-                        <button className="btn btn-sm btn-primary" onClick={onEdit}>
-                            <Edit size={12} /> Edit pack
-                        </button>
+                        {canEditPacks && (
+                            <button className="btn btn-sm">
+                                <Copy size={12} /> Clone
+                            </button>
+                        )}
+                        {canOpenDrawer && (
+                            <button className="btn btn-sm btn-primary" onClick={onEdit}>
+                                <Edit size={12} /> {canEditPacks ? 'Edit pack' : 'Manage pack'}
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -367,18 +383,22 @@ function PackDetailPanel({
                     <span className="card-title">Sample content</span>
                     <span className="card-sub">3 fields</span>
                     <div style={{ flex: 1 }} />
-                    <button className="btn btn-xs btn-ghost">
-                        <Edit size={11} /> Edit all
-                    </button>
+                    {canEditPacks && (
+                        <button className="btn btn-xs btn-ghost">
+                            <Edit size={11} /> Edit all
+                        </button>
+                    )}
                 </div>
                 <div style={{ padding: 0 }}>
                     {SAMPLE_PREVIEW.map((item, i) => (
                         <div key={i} className="pk-sample-row" style={{ borderBottom: i < SAMPLE_PREVIEW.length - 1 ? '1px dashed var(--border)' : 'none' }}>
                             <span className="mono muted pk-sample-field">{item.field}</span>
                             <span className="pk-sample-val">&ldquo;{item.value}&rdquo;</span>
-                            <div className="pk-sample-actions">
-                                <button className="btn btn-xs btn-ghost"><Edit size={11} /></button>
-                            </div>
+                            {canEditPacks && (
+                                <div className="pk-sample-actions">
+                                    <button className="btn btn-xs btn-ghost"><Edit size={11} /></button>
+                                </div>
+                            )}
                         </div>
                     ))}
                     <div style={{ padding: '10px 16px', textAlign: 'center' }}>
@@ -393,9 +413,11 @@ function PackDetailPanel({
                     <span className="card-title">Used by templates</span>
                     <span className="card-sub">{tmplCount}</span>
                     <div style={{ flex: 1 }} />
-                    <button className="btn btn-xs btn-ghost">
-                        <Link size={11} /> Link to template
-                    </button>
+                    {canEditPacks && (
+                        <button className="btn btn-xs btn-ghost">
+                            <Link size={11} /> Link to template
+                        </button>
+                    )}
                 </div>
                 {tmplCount === 0 ? (
                     <div style={{ padding: '16px', textAlign: 'center' }}>
@@ -442,7 +464,7 @@ function PackDetailPanel({
                                 <span className="mono pk-validation-field">{v.field}</span>
                                 <span className="muted pk-validation-note">{v.note}</span>
                                 <div style={{ textAlign: 'right' }}>
-                                    <button className="btn btn-xs">Fix</button>
+                                    {canEditPacks && <button className="btn btn-xs">Fix</button>}
                                 </div>
                             </div>
                         )

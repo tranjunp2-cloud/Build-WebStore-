@@ -71,12 +71,17 @@ export async function getTrafficData(
     // into Top Referrers (the only aggregation below not already event-gated) or
     // crowd out real pageviews within the 5000-doc cap.
     const internalEvents = ['local_business_data_saved']
-    const { docs } = await payload.find({
+    const { docs: eventDocs } = await payload.find({
         collection: 'analytics',
         where: { tenant: { equals: tenantId }, createdAt, event: { not_in: internalEvents } },
         limit: 5000,
         sort: '-createdAt',
+        // The four columns read below, one statement: no COUNT, no depth-2 tenant/site rows per event (TC-PERF-059).
+        pagination: false,
+        depth: 0,
+        select: { event: true, createdAt: true, pageUrl: true, referrer: true },
     })
+    const docs = eventDocs as unknown as Array<{ event: string; createdAt: string; pageUrl?: string | null; referrer?: string | null }>
 
     const dailyViews: Record<string, number> = {}
     const hourlyViews: number[] = Array(24).fill(0)

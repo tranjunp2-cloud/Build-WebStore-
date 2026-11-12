@@ -20,7 +20,8 @@ import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
 import { useBuilderStore, getDraftStatus, getDraftMeta, type BusinessInfo } from '@/store/builderStore'
-import { getGenerationError, formatErrorMessage } from '@/lib/generation-errors'
+import { createBuilderDraftBase, isAutosavePaused, saveBuilderDraft } from './builder-draft-save'
+import { getGenerationError, getStreamGenerationError, formatErrorMessage } from '@/lib/generation-errors'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { useI18n } from '@/i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
@@ -33,9 +34,6 @@ export interface AIBuilderPageClientProps {
 
 const BUILDER_SESSION_META_KEY = 'prime-builder-session-meta'
 const BUILDER_SESSION_TTL_MS = 24 * 60 * 60 * 1000
-
-/** Locale for generation error messages — defaults to 'en'. */
-const GENERATION_ERROR_LOCALE: 'en' | 'ms' = 'en'
 
 function formatSavedAt(timestamp: number | null) {
     if (!timestamp) return null
@@ -166,7 +164,7 @@ function LivePreview({
 }
 
 export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps) {
-    const { t } = useI18n()
+    const { t, locale } = useI18n()
     const router = useRouter()
     // Prevents SSR/hydration flash: server renders initial state (form), but Zustand
     // persist rehydrates synchronously only after client-side mount. Without this guard
@@ -187,6 +185,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     // otherwise it overwrites the properly-split page layouts with raw blocks.
     const hasUserEditsRef = useRef(false)
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    // #2103 A4: the draft revision the builder's saves are made against
+    const draftBaseRef = useRef(createBuilderDraftBase())
     const abortControllerRef = useRef<AbortController | null>(null)
     const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -197,6 +197,9 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const [showPaywall, setShowPaywall] = useState(false)
     // F26: pre-generation locale confirm modal state
     const [preGenModal, setPreGenModal] = useState<{ detectedLocale: string } | null>(null)
+    // GH-2153: synchronous guard. `status` only flips after React re-renders, so two clicks dispatched
+    // in the same task (automation, fast touch) both still saw an enabled button and sent 2 requests.
+    const generationLockRef = useRef(false)
     const pendingGenRef = useRef<{ info: BusinessInfo; briefSnapshot: Record<string, unknown> | null } | null>(null)
 
     const {
@@ -329,17 +332,15 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         }
 
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+        // the draft changed elsewhere (409): a timed save would overwrite it unasked — wait for an explicit save or a reload
+        if (isAutosavePaused(draftBaseRef.current)) return
 
         saveTimeoutRef.current = setTimeout(async () => {
             try {
                 setDraftSaveState('saving')
-                const response = await fetch(`/api/sites/${siteId}/save`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ blocks, theme }),
-                })
-                if (!response.ok) {
-                    throw new Error('Failed to save draft')
+                const result = await saveBuilderDraft(siteId, { blocks, theme }, draftBaseRef.current)
+                if (!result.ok) {
+                    throw new Error(result.conflict ? 'Draft changed elsewhere' : 'Failed to save draft')
                 }
                 setDraftSaveState('saved')
                 setLastSavedAt(Date.now())
@@ -369,14 +370,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
         try {
             setDraftSaveState('saving')
-            const response = await fetch(`/api/sites/${siteId}/save`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ blocks, theme }),
-            })
+            const result = await saveBuilderDraft(siteId, { blocks, theme }, draftBaseRef.current, { explicit: true })
 
-            if (!response.ok) {
-                throw new Error('Failed to save latest changes')
+            if (!result.ok) {
+                throw new Error(result.conflict ? 'Draft changed elsewhere' : 'Failed to save latest changes')
             }
 
             setDraftSaveState('saved')
@@ -477,9 +474,16 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 addBlock(block)
                 break
             }
-            case 'error':
-                setError(data)
+            case 'error': {
+                // The stream's message is server text; show the copy for the merchant's UI language.
+                const streamError = getStreamGenerationError(data.code)
+                setError({
+                    code: streamError.code,
+                    message: formatErrorMessage(streamError, locale),
+                    retryable: typeof data.retryable === 'boolean' ? data.retryable : streamError.retryable,
+                })
                 break
+            }
             case 'done':
                 setStatus('done')
                 setGenerationTimeMs(data.timeMs || 0)
@@ -507,7 +511,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             default:
                 break
         }
-    }, [addBlock, addMessage, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme, t])
+    }, [addBlock, addMessage, locale, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme, t])
 
     const clearGenerationTimers = useCallback(() => {
         if (elapsedIntervalRef.current) {
@@ -571,7 +575,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             controller.abort()
             clearGenerationTimers()
             const genError = getGenerationError(408)
-            const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
+            const message = formatErrorMessage(genError, locale)
             setError({ code: 'timeout', message, retryable: true })
             setStep('info')
             toast.error(message)
@@ -605,7 +609,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             if (!response.ok) {
                 const errorBody = await response.json().catch(() => null)
                 const genError = getGenerationError(response.status, errorBody)
-                const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
+                const message = formatErrorMessage(genError, locale)
 
                 // 402/403 → show PaywallCard (free limit exceeded or feature/subscription gated)
                 if (response.status === 402 || response.status === 403) {
@@ -694,10 +698,13 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         } finally {
             clearGenerationTimers()
             abortControllerRef.current = null
+            generationLockRef.current = false
         }
-    }, [clearGenerationTimers, handleSSEEvent, setError, setStep, contentBrief, router])
+    }, [clearGenerationTimers, handleSSEEvent, locale, setError, setStep, contentBrief, router])
 
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
+        if (generationLockRef.current) return
+        generationLockRef.current = true
         const briefSnapshot = useBuilderStore.getState().contentBrief
 
         const decision = resolveGenerationLanguageDecision(
@@ -730,6 +737,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         if (action === 'dismiss') {
             setPreGenModal(null)
             pendingGenRef.current = null
+            generationLockRef.current = false
             return
         }
         setPreGenModal(null)
@@ -879,7 +887,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                         : null
 
     const saveStatusBadge = saveStatusLabel ? (
-        <div className="fixed bottom-6 right-6 z-[70] rounded-2xl border border-white/10 bg-[#0b1120]/90 px-4 py-2 text-xs font-medium text-[#94a3b8] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+        <div className="fixed bottom-6 right-6 z-[70] rounded-full border border-white/10 bg-[#0b1120]/90 px-3 py-1 text-xs font-medium text-[#94a3b8] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.35)] backdrop-blur-xl">
             {saveStatusLabel}
         </div>
     ) : null
@@ -941,6 +949,9 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             <>
                 {saveStatusBadge}
                 <BuilderGenerationView
+                    blocks={blocks}
+                    businessInfo={businessInfo}
+                    theme={theme}
                     elapsedSeconds={elapsedSeconds}
                     message={generationMessage}
                     onCancel={cancelGeneration}

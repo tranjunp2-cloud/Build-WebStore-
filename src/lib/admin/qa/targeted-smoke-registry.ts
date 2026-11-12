@@ -7,6 +7,12 @@ import {
   isTargetQaPackContractCertified,
   validateTargetQaCoverage,
 } from "@/lib/admin/qa/targeted-qa-coverage";
+import {
+  TARGET_TEST_CASES_MAP,
+  TARGET_USER_FLOW_CASES_MAP,
+  TARGET_IMPACT_CASES_MAP,
+  TARGET_SECURITY_CASES_MAP,
+} from "./test-case-directory";
 
 export type TargetedSmokeTestCase = {
   id: string;
@@ -14,7 +20,7 @@ export type TargetedSmokeTestCase = {
 };
 
 /** Browser clients choose one of these labels, never a spec or command. */
-export type ManualQaProfile = "smoke" | "regression";
+export type ManualQaProfile = "smoke" | "regression" | "user_flow" | "impact" | "security";
 /**
  * A server-owned test runner classification. Deployment payloads and browser
  * clients never choose this value; it is part of the checked-in contract.
@@ -53,7 +59,7 @@ const TARGETED_SPEC_PREFIX = "tests/targeted-smoke/";
 const API_TEST_PREFIX = "src/__tests__/api/";
 const UNIT_TEST_PREFIX = "src/__tests__/unit/";
 
-export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = [
+const RAW_TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = [
   {
     targetId: "identity-login-otp",
     packId: "identity-login-otp-contract",
@@ -1631,6 +1637,68 @@ function isSafeSpecPath(value: string, runner: TargetedQaRunner): boolean {
   );
 }
 
+export const TARGETED_SMOKE_PACKS: readonly TargetedSmokePack[] = RAW_TARGETED_SMOKE_PACKS.map((pack) => {
+  const dirCases = TARGET_TEST_CASES_MAP[pack.targetId];
+  const regressionCases = dirCases && dirCases.length > 0 ? dirCases : pack.testCases;
+  const regressionDuration = Math.min(30, Math.max(3, regressionCases.length * 2));
+  const userFlowCases = TARGET_USER_FLOW_CASES_MAP[pack.targetId] ?? pack.testCases;
+  const impactCases = TARGET_IMPACT_CASES_MAP[pack.targetId] ?? pack.testCases;
+  const securityCases = TARGET_SECURITY_CASES_MAP[pack.targetId] ?? pack.testCases;
+
+  return {
+    ...pack,
+    manualProfiles: {
+      smoke: pack.manualProfiles?.smoke ?? {
+        testType: "unit",
+        estimatedDurationMinutes: 2,
+        prerequisites: ["Staging test suite ready"],
+        manualChecklistCount: 0,
+        testCases: pack.testCases,
+      },
+      regression: {
+        testType: pack.manualProfiles?.smoke?.testType ?? "unit",
+        estimatedDurationMinutes: regressionDuration,
+        prerequisites: [
+          ...(pack.manualProfiles?.smoke?.prerequisites ?? ["Staging test suite ready"]),
+          "Regression test contract ready",
+        ],
+        manualChecklistCount: 0,
+        testCases: regressionCases,
+      },
+      user_flow: {
+        testType: pack.manualProfiles?.smoke?.testType ?? "unit",
+        estimatedDurationMinutes: Math.min(30, Math.max(3, userFlowCases.length * 2)),
+        prerequisites: [
+          ...(pack.manualProfiles?.smoke?.prerequisites ?? ["Staging test suite ready"]),
+          "User flow & E2E contract ready",
+        ],
+        manualChecklistCount: 0,
+        testCases: userFlowCases,
+      },
+      impact: {
+        testType: pack.manualProfiles?.smoke?.testType ?? "unit",
+        estimatedDurationMinutes: Math.min(30, Math.max(3, impactCases.length * 2)),
+        prerequisites: [
+          ...(pack.manualProfiles?.smoke?.prerequisites ?? ["Staging test suite ready"]),
+          "Change impact contract ready",
+        ],
+        manualChecklistCount: 0,
+        testCases: impactCases,
+      },
+      security: {
+        testType: pack.manualProfiles?.smoke?.testType ?? "unit",
+        estimatedDurationMinutes: Math.min(30, Math.max(3, securityCases.length * 2)),
+        prerequisites: [
+          ...(pack.manualProfiles?.smoke?.prerequisites ?? ["Staging test suite ready"]),
+          "Security isolation contract ready",
+        ],
+        manualChecklistCount: 0,
+        testCases: securityCases,
+      },
+    },
+  };
+});
+
 /** Fails closed before a registry entry can become an executable CI input. */
 export function validateTargetedSmokePacks(
   packs: readonly TargetedSmokePack[],
@@ -1682,7 +1750,7 @@ export function validateTargetedSmokePacks(
     for (const [profile, contract] of Object.entries(
       pack.manualProfiles ?? {},
     )) {
-      if (profile !== "smoke" && profile !== "regression")
+      if (!["smoke", "regression", "user_flow", "impact", "security"].includes(profile))
         throw new Error(`Unknown manual profile for pack: ${pack.packId}`);
       if (
         !contract ||
@@ -1698,14 +1766,30 @@ export function validateTargetedSmokePacks(
       );
       // The workflow executes the static pack spec, not a profile-specific
       // subset. Keep the preview contract identical to what Actions runs.
-      if (
-        profileIds.size !== contract.testCases.length ||
-        profileIds.size !== testCaseIds.size ||
-        [...profileIds].some((id) => !testCaseIds.has(id))
-      )
-        throw new Error(
-          `Manual profile test cases must match pack contract: ${pack.packId}`,
-        );
+      if (profile === "smoke") {
+        if (
+          profileIds.size !== contract.testCases.length ||
+          profileIds.size !== testCaseIds.size ||
+          [...profileIds].some((id) => !testCaseIds.has(id))
+        )
+          throw new Error(
+            `Manual profile test cases must match pack contract: ${pack.packId}`,
+          );
+      } else {
+        // Regression profiles expand test cases using Test Case Directory entries (e.g. TC-VIS-*)
+        // which may use dedicated IDs distinct from the primary smoke pack sanity test.
+        if (
+          profileIds.size !== contract.testCases.length ||
+          contract.testCases.length === 0 ||
+          contract.testCases.some(
+            (testCase) =>
+              !TEST_CASE_ID.test(testCase.id) || !testCase.assertion.trim(),
+          )
+        )
+          throw new Error(
+            `Manual regression profile has invalid or duplicate test cases: ${pack.packId}`,
+          );
+      }
       if (
         contract.testCases.some(
           (testCase) =>
@@ -1713,7 +1797,7 @@ export function validateTargetedSmokePacks(
         )
       )
         throw new Error(`Invalid manual profile test case: ${pack.packId}`);
-      if (!isTargetQaPackContractCertified(pack, profile, contract))
+      if (!isTargetQaPackContractCertified(pack, profile as ManualQaProfile, contract))
         throw new Error(
           `Targeted Smoke pack is not certified in coverage matrix: ${pack.packId}`,
         );
@@ -1781,6 +1865,9 @@ export function getManualQaProfileAvailability(
   return {
     smoke: Boolean(resolveManualQaPack(targetId, "smoke", packs)),
     regression: Boolean(resolveManualQaPack(targetId, "regression", packs)),
+    user_flow: Boolean(resolveManualQaPack(targetId, "user_flow", packs)),
+    impact: Boolean(resolveManualQaPack(targetId, "impact", packs)),
+    security: Boolean(resolveManualQaPack(targetId, "security", packs)),
   };
 }
 

@@ -6,6 +6,8 @@ import {
     Megaphone,
     CircleAlert,
     FileText,
+    ClipboardCheck,
+    MessageSquare,
     Bell,
     X,
     type LucideIcon,
@@ -56,6 +58,12 @@ export function LiveToast({ id, title, type, message, onDismiss }: LiveToastProp
     } else if (type === 'BLOG_PUBLISHED') {
         Icon = FileText
         iconBgClass = 'bg-white/10 text-white'
+    } else if (type === 'AUTOMATION_REMINDER') {
+        Icon = ClipboardCheck
+        iconBgClass = 'bg-[#2DD4BF]/10 text-[#2DD4BF]'
+    } else if (type === 'LEAD_NEW') {
+        Icon = MessageSquare
+        iconBgClass = 'bg-[#A78BFA]/10 text-[#A78BFA]'
     }
 
     return (

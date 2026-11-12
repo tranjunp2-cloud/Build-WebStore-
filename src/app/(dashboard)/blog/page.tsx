@@ -1,9 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { CategoryModal } from './_components/CategoryModal'
 import { useI18n } from '@/i18n'
+import { queryKeys } from '@/hooks/queries/query-keys'
+import { refreshQueries } from '@/hooks/queries/refresh-queries'
+import { useKeptData } from '@/hooks/queries/use-kept-data'
+import { useQueryScope } from '@/providers/query-provider'
 import {
     Plus,
     Trash2,
@@ -86,62 +91,66 @@ export default function BlogListPage() {
     const { t } = useI18n()
     const sub = t.common.subscriptionErrors
     const router = useRouter()
-    const [posts, setPosts] = useState<BlogPost[]>([])
-    const [meta, setMeta] = useState<BlogMeta | null>(null)
-    const [loading, setLoading] = useState(true)
-    const hasLoaded = useRef(false)
-    const [error, setError] = useState<string | null>(null)
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<'' | 'draft' | 'published'>('')
     const [page, setPage] = useState(1)
     const [limit, setLimit] = useState(10)
-    // GH-1579: snap back when deletions strand page past the last page (meta null until first load → no-op)
-    useTablePageClamp(page, meta?.totalDocs ?? 0, limit, setPage, !loading)
     const [sortBy, setSortBy] = useState('-updatedAt')
     const [categoryFilter, setCategoryFilter] = useState('')
-    const [categories, setCategories] = useState<BlogCategory[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [bulkActionLoading, setBulkActionLoading] = useState(false)
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
-    const fetchPosts = useCallback(async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const res = await listBlogsAction({
-                search: search || undefined,
-                status: statusFilter || undefined,
-                category: categoryFilter || undefined,
-                page: page,
-                limit: limit,
-                sort: sortBy,
-            })
+    // A filter change starts on page 1 in the same render: no request for the old page number.
+    const filtersKey = JSON.stringify([search, statusFilter, categoryFilter, sortBy])
+    const [pageFilters, setPageFilters] = useState(filtersKey)
+    if (pageFilters !== filtersKey) {
+        setPageFilters(filtersKey)
+        if (page !== 1) setPage(1)
+    }
 
-            setPosts(res.data || [])
-            setMeta(res.meta || null)
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Something went wrong')
-        } finally {
-            setLoading(false)
-            hasLoaded.current = true
-        }
-    }, [search, statusFilter, categoryFilter, sortBy, page, limit])
-
+    // One cached query per filter/sort/page set; the previous rows stay while another one loads. A write
+    // elsewhere refetches this page in place (the dashboard's query invalidation): rows stay, no spinner, and a
+    // failed background refetch keeps them.
+    const scope = useQueryScope()
+    const queryClient = useQueryClient()
+    const listParams = { search, status: statusFilter, category: categoryFilter, page, limit, sort: sortBy }
+    const postsQuery = useQuery({
+        queryKey: queryKeys.blog.list(scope, listParams),
+        queryFn: () => listBlogsAction({
+            search: search || undefined,
+            status: statusFilter || undefined,
+            category: categoryFilter || undefined,
+            page,
+            limit,
+            sort: sortBy,
+        }),
+        placeholderData: keepPreviousData,
+    })
+    const shown = useKeptData(postsQuery.data)
+    const posts: BlogPost[] = shown?.data || []
+    const meta: BlogMeta | null = shown?.meta || null
+    const loading = postsQuery.isPending || postsQuery.isPlaceholderData
+    const loadError = postsQuery.isLoadingError ? postsQuery.error : null
+    const error = loadError ? (loadError instanceof Error ? loadError.message : 'Something went wrong') : null
+    const { isRefetchError, errorUpdatedAt } = postsQuery
     useEffect(() => {
-        fetchPosts()
-    }, [fetchPosts])
+        if (isRefetchError) console.error('[Blog] Background refresh failed:', postsQuery.error)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [errorUpdatedAt])
+    // GH-1579: snap back when deletions strand page past the last page (meta null until first load → no-op)
+    useTablePageClamp(page, meta?.totalDocs ?? 0, limit, setPage, !loading)
 
-    // Fetch categories for filter dropdown
-    useEffect(() => {
-        getBlogCategoriesAction()
-            .then(docs => setCategories(docs || []))
-            .catch(() => { })
-    }, [])
+    /** after a write: every cached page is stale, the one on view refetches in place */
+    const fetchPosts = () => { void refreshQueries(queryClient, queryKeys.blog.lists(scope)) }
 
-    // Reset page when filters change
-    useEffect(() => {
-        setPage(1)
-    }, [search, statusFilter, categoryFilter, sortBy])
+    // Categories for the filter dropdown (cached; the category modal invalidates them)
+    const categoriesQuery = useQuery({
+        queryKey: queryKeys.blog.categories(scope),
+        queryFn: async () => ((await getBlogCategoriesAction()) || []) as BlogCategory[],
+        staleTime: 5 * 60 * 1000,
+    })
+    const categories = categoriesQuery.data ?? []
 
     // Delete confirmation modal state
     const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string; status: string } | null>(null)
@@ -263,7 +272,7 @@ export default function BlogListPage() {
     // --- RENDER ---
 
     // Loading skeleton — only on first load, not during filter refetch
-    if (!hasLoaded.current && loading) {
+    if (shown === undefined && postsQuery.isPending) {
         return (
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -293,7 +302,7 @@ export default function BlogListPage() {
                     </div>
                     <h3 className="text-lg font-semibold text-foreground">{t.dashboard.blog.loadFailed}</h3>
                     <p className="text-sm text-muted-foreground">{error}</p>
-                    <Button onClick={fetchPosts} variant="dashPrimary" size="dash">
+                    <Button onClick={() => void postsQuery.refetch()} variant="dashPrimary" size="dash">
                         {t.dashboard.blog.tryAgain}
                     </Button>
                 </div>
@@ -441,6 +450,7 @@ export default function BlogListPage() {
                     <div className="md:col-span-2">
                         <TableEmptyState
                             icon={<SearchX />}
+                            scene="searchEmpty"
                             title={t.dashboard.blog.noMatches}
                         />
                     </div>
@@ -573,6 +583,7 @@ export default function BlogListPage() {
                 {posts.length === 0 ? (
                     <TableEmptyState
                         icon={<SearchX />}
+                        scene="searchEmpty"
                         title={t.dashboard.blog.noMatches}
                     />
                 ) : (
@@ -815,9 +826,7 @@ export default function BlogListPage() {
                 <CategoryModal
                     onClose={() => setIsCategoryModalOpen(false)}
                     onCategoryUpdated={() => {
-                        getBlogCategoriesAction()
-                            .then(docs => setCategories(docs || []))
-                            .catch(() => { })
+                        void queryClient.invalidateQueries({ queryKey: queryKeys.blog.categories(scope) })
                         fetchPosts()
                     }}
                 />

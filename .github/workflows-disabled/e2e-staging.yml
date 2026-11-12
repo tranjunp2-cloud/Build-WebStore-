@@ -15,7 +15,7 @@ on:
     inputs:
       base_url:
         description: "Staging URL to test"
-        default: "https://web-cms-v2.dev.ecommercehub.my"
+        default: "https://web-v2.dev.ecommercehub.my"
         required: false
 
 concurrency:
@@ -25,14 +25,16 @@ concurrency:
 jobs:
   e2e:
     name: "E2E: Playwright on Staging"
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Playwright run; follows CI_HEAVY_RUNNER like the heavy CI jobs.
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    # Covers the deploy wait below (up to 60 min) plus the ~35 min Playwright run.
+    timeout-minutes: 100
     permissions:
       contents: read
       pull-requests: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # The deploy-impact snapshot compares the deployed commit to its parent.
           fetch-depth: 2
@@ -40,7 +42,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '24'
+          check-latest: true
           cache: "npm"
 
       - name: Install dependencies
@@ -52,30 +55,31 @@ jobs:
       - name: Wait for NEW staging deploy to be ready
         id: staging_deploy
         run: |
-          URL="${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}"
+          URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
           echo "Waiting for Vercel deploy: $URL"
           # The staging alias can point to the prior deployment while Vercel builds.
           # Poll the deployed commit identity; route existence/status alone cannot
           # prove this exact SHA is live.
           #
-          # Vercel deploy typically takes 2-3 min for Next.js apps.
+          # The staging deploy job in CI waits for quality, test and AI Platform
+          # deploy jobs first, so the new SHA is often live only ~45 min after push.
           sleep 45
-          for i in {1..50}; do
+          for i in {1..120}; do
             HEALTH=$(curl -fsS "$URL/api/health" || true)
             DEPLOYED_SHA=$(printf '%s' "$HEALTH" | jq -r '.commitSha // empty' 2>/dev/null || true)
             if [ "$DEPLOYED_SHA" = "$GITHUB_SHA" ]; then
               echo "Expected staging deploy $DEPLOYED_SHA is live on attempt $i"
               exit 0
             fi
-            echo "Attempt $i/50: deployed SHA '${DEPLOYED_SHA:-unavailable}' is not '$GITHUB_SHA', retrying in 10s..."
-            sleep 10
+            echo "Attempt $i/120: deployed SHA '${DEPLOYED_SHA:-unavailable}' is not '$GITHUB_SHA', retrying in 30s..."
+            sleep 30
           done
-          echo "::error::New deploy didn't appear after 10 min — aborting"
+          echo "::error::New deploy didn't appear after 60 min — aborting"
           exit 1
 
       - name: Ensure E2E test user exists
         run: |
-          BASE_URL="${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}"
+          BASE_URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
           if [ -z "${{ secrets.E2E_SETUP_SECRET }}" ]; then
             echo "::warning::E2E_SETUP_SECRET not set — skipping user provisioning"
             exit 0
@@ -117,9 +121,11 @@ jobs:
             gh1573-easyparcel-oauth.spec.ts \
             tests/cart-drawer.spec.ts \
             tests/gh-1734-self-delivery-complete.spec.ts \
+            tests/gh-2284-checkout-email-length.spec.ts \
             tests/f40-qa-ingest.spec.ts \
             tests/f40-project-health.spec.ts \
-            --project=smoke --project=setup --project=chromium --project=storefront-regression --project=gh-1734-self-delivery --project=f40-qa-ingest --project=f40-project-health 2>&1 | tee e2e-output.log
+            tests/f07-template-search.spec.ts \
+            --project=smoke --project=setup --project=chromium --project=storefront-regression --project=gh-1734-self-delivery --project=gh-2284-checkout-email-length --project=f40-qa-ingest --project=f40-project-health --project=f07-template-search 2>&1 | tee e2e-output.log
           EXIT_CODE=${PIPESTATUS[0]}
           # Parse results. Playwright outputs: "53 passed", "4 failed", "5 skipped", "N did not run"
           PASSED=$(grep -oE '[0-9]+ passed' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
@@ -135,13 +141,27 @@ jobs:
           echo "=== Stats: $PASSED passed, $FAILED failed, $SKIPPED skipped, $DID_NOT_RUN did not run (total $TOTAL) ==="
           exit $EXIT_CODE
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
           ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
           QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
+
+      # Screenshots and page snapshots only. Traces, videos and the HTML report
+      # record request bodies, including the test-account and super-admin logins.
+      - name: Upload E2E failure evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-staging-failure-evidence
+          path: |
+            test-results/**/*.png
+            test-results/**/error-context.md
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Resolve source PR for staging deploy
         id: qa_context
@@ -172,7 +192,7 @@ jobs:
       - name: Dispatch allow-listed targeted Smoke packs
         if: always() && steps.staging_deploy.outcome == 'success' && steps.qa_context.outcome == 'success' && steps.qa_impact.outcome == 'success'
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
           QA_TARGETED_DISPATCH_SECRET: ${{ secrets.QA_TARGETED_DISPATCH_SECRET || secrets.QA_INGEST_SECRET }}
           F40_TARGETED_SMOKE_ENABLED: ${{ vars.F40_TARGETED_SMOKE_ENABLED || 'false' }}
           QA_PULL_REQUEST: ${{ steps.qa_context.outputs.pull_request }}
@@ -206,7 +226,7 @@ jobs:
 
       - name: Verify targeted Smoke API security boundaries
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
         run: npx playwright test tests/f40-targeted-smoke-api.spec.ts --project=f40-targeted-smoke-api
 
       - name: Prepare notification info

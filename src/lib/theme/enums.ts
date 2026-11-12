@@ -2,12 +2,24 @@
  * Single source of truth for theme enum values.
  * Consumed by:
  *  - `src/collections/Sites.ts`                (fontHeading/fontBody select options)
- *  - `src/app/api/sites/[siteId]/save/route.ts` (runtime validation via Set<string>)
- *  - `src/app/api/ai/edit-block/route.ts`      (AI system prompt constraints)
+ *  - `src/lib/theme/sanitize-theme.ts`          (runtime validation via Set<string>: editor save + copilot theme edits)
  */
+/**
+ * Fonts the renderer loads (`src/lib/fonts/variables.ts`) and the template
+ * presets use (`src/lib/fonts/pairings.ts`). Heading and body share one list so
+ * applying a template never falls back to Outfit/Inter (GH-2419).
+ * Keep in sync with the `enum_sites_theme_font_*` migrations in `scripts/db-setup.js`.
+ */
+export const THEME_FONTS = [
+    'Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway', 'Lato', 'Open Sans', 'Nunito',
+    'Archivo Black', 'Cormorant Garamond', 'DM Mono', 'Exo 2', 'Hind', 'Josefin Sans', 'Karla', 'Lora',
+    'Manrope', 'Merriweather', 'Montserrat', 'Nunito Sans', 'Oswald', 'Proza Libre', 'Quicksand',
+    'Rajdhani', 'Sora', 'Source Sans 3', 'Source Serif 4', 'Space Grotesk', 'Varela Round', 'Work Sans',
+] as const
+
 export const THEME_ENUMS = {
-    fontHeading: ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway'] as const,
-    fontBody: ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito'] as const,
+    fontHeading: THEME_FONTS,
+    fontBody: THEME_FONTS,
     colorMode: ['light', 'dark'] as const,
     borderRadius: ['sharp', 'subtle', 'rounded', 'soft', 'pill'] as const,
     spacingPreset: ['compact', 'default', 'relaxed'] as const,

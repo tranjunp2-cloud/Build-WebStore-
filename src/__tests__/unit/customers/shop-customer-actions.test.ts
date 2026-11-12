@@ -354,8 +354,8 @@ describe('Shop Customer Actions (TC-F25-015..021)', () => {
             mockedGetCurrentTenantId.mockResolvedValue(tenantId)
 
             const customerRows = [
-                { id: 2, email: 'top@test.com', name: 'Top Buyer', phone: null, rank: 'gold', notes: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', latest_order_at: '2026-05-01T00:00:00Z', first_order_at: null, order_count: 5, lifetime: 500, completed_count: 4, cancelled_count: 0 },
-                { id: 1, email: 'low@test.com', name: 'Low Buyer', phone: null, rank: null, notes: null, created_at: '2026-02-01T00:00:00Z', updated_at: '2026-02-01T00:00:00Z', latest_order_at: null, first_order_at: null, order_count: 1, lifetime: 100, completed_count: 1, cancelled_count: 0 },
+                { id: 2, email: 'top@test.com', name: 'Top Buyer', phone: null, rank: 'gold', notes: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', latest_order_at: '2026-05-01T00:00:00Z', first_order_at: null, order_count: 5, lifetime: 500, completed_count: 4, failed_count: 1 },
+                { id: 1, email: 'low@test.com', name: 'Low Buyer', phone: null, rank: null, notes: null, created_at: '2026-02-01T00:00:00Z', updated_at: '2026-02-01T00:00:00Z', latest_order_at: null, first_order_at: null, order_count: 1, lifetime: 100, completed_count: 1, failed_count: 0 },
             ]
 
             const mockPayload = {
@@ -377,8 +377,9 @@ describe('Shop Customer Actions (TC-F25-015..021)', () => {
             expect(result.data[0].email).toBe('top@test.com')
             expect(result.data[0].orderCount).toBe(5)
             expect(result.data[0].completedRate).toBe(80)   // 4/5
-            expect(result.data[0].failedRate).toBe(0)
+            expect(result.data[0].failedRate).toBe(20)      // 1/5, from failed_count (cancelled + payment_failed)
             expect(result.data[1].orderCount).toBe(1)
+            expect(result.data[1].failedRate).toBe(0)
             // Assert: payload.find NOT called — stats come from SQL JOIN, not fetchOrderStats
             expect(mockPayload.find).not.toHaveBeenCalled()
         })

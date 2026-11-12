@@ -9,6 +9,7 @@ const DASHBOARD_ORDER_TOTAL = 107.8
 
 export type DashboardFixtureTenant = {
     id: string | number
+    slug?: string
     settings?: unknown
 }
 

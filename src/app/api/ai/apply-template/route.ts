@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 // as generate-site 504s. Keeping parity to avoid another latency surprise.
 export const maxDuration = 300
 import { NextResponse, after } from 'next/server'
+import { revalidateSiteStorefront } from '@/lib/cache/revalidate-storefront'
 import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { getPayload } from 'payload'
 import { sql } from 'drizzle-orm'
@@ -16,18 +17,32 @@ import { getActivePlanSubscription, canUse, canUseWithinLimit, recordUsage } fro
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
+import { isReservedSlug, validateSlugFormat } from '@/lib/utils/reserved-slugs'
 import { mergeUserContent } from '@/lib/ai/merge-user-content'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
+import { buildTemplateTheme } from '@/lib/ai/template-theme'
 import { BLOCKS_TEMP_HIDDEN } from '@/lib/ai/unsupported-blocks'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
-import { ensureCartGlobalBlock, ensureCartGlobalBlockWithPending } from '@/lib/ai/ensure-cart-global-block'
+import { ensureCartGlobalBlock } from '@/lib/ai/ensure-cart-global-block'
+import { applyTemplateStructureToLayout, buildTemplateSystemBlocks } from '@/lib/editor/optimistic-template-swap'
+import {
+    executeTenantTransaction,
+    lockTenantSiteRows,
+    TenantSiteLockError,
+    withTenantRowLock,
+    type TenantTransactionRequest,
+} from '@/lib/payload/tenant-row-lock'
+import { GenerationBlockedError, firstGenerationBlock, generationBlockedResponse } from '@/lib/ai/generation-in-progress'
+import { bumpEditorRevision, formatDraftVersion, poolExec, readEditorRevision, txExec } from '@/lib/sites/editor-revision'
 
 /** Recursively strip Payload system fields so Payload creates fresh records.
  *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
  *  back to just the numeric ID, which Payload expects for upload/relationship fields. */
 const STRIP_KEYS = new Set(['id', '_order', '_parent_id', '_path', '_uuid', 'createdAt', 'updatedAt'])
+const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
+const VALID_NAV_VARIANTS = new Set(['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'])
 function stripSystemFields(obj: unknown): unknown {
     if (Array.isArray(obj)) return obj.map(stripSystemFields)
     if (obj && typeof obj === 'object') {
@@ -51,6 +66,78 @@ function stripSystemFields(obj: unknown): unknown {
     return obj
 }
 
+function isStableBlockId(value: unknown): value is string {
+    return typeof value === 'string' && (
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+        || /^[0-9a-f]{24}$/i.test(value)
+    )
+}
+
+function successResponse(data: Record<string, unknown>): NextResponse {
+    return NextResponse.json({
+        success: true,
+        data,
+        meta: { timestamp: new Date().toISOString() },
+    })
+}
+
+function errorResponse(
+    status: number,
+    code: string,
+    message: string,
+    details?: unknown,
+): NextResponse {
+    return NextResponse.json({
+        success: false,
+        error: {
+            code,
+            message,
+            details: details ?? null,
+            requestId: crypto.randomUUID(),
+        },
+    }, { status })
+}
+
+function prepareTemplateSwapLayout(layout: Record<string, unknown>[]): Record<string, unknown>[] {
+    const normalizedLayout = normalizeBlocksForPersistence(
+        layout.map(block => {
+            const clean = stripSystemFields(block) as Record<string, unknown>
+            return isStableBlockId(block.id) ? { ...clean, id: block.id } : clean
+        })
+            .filter(block => block.blockType !== 'google-maps')
+            .filter(block => !BLOCKS_TEMP_HIDDEN.has(block.blockType as string)),
+    )
+
+    for (const block of normalizedLayout) {
+        if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
+            block.formFields = (block.formFields as Record<string, unknown>[]).filter(field =>
+                typeof field.fieldName === 'string' && field.fieldName.trim().length > 0 &&
+                typeof field.label === 'string' && field.label.trim().length > 0 &&
+                typeof field.fieldType === 'string' && VALID_FIELD_TYPES.has(field.fieldType),
+            )
+            if ((block.formFields as unknown[]).length === 0) {
+                block.formFields = [
+                    { fieldName: 'name', fieldType: 'text', label: 'Your Name', required: true },
+                    { fieldName: 'email', fieldType: 'email', label: 'Email Address', required: true },
+                    { fieldName: 'message', fieldType: 'textarea', label: 'Message', required: true },
+                ]
+            }
+        }
+        if (block.blockType === 'navigation' && (!block.variant || !VALID_NAV_VARIANTS.has(block.variant as string))) {
+            block.variant = 'default'
+        }
+    }
+
+    return normalizedLayout
+}
+
+function isTemplateSwapLayoutUnchanged(
+    existingLayout: Record<string, unknown>[],
+    nextLayout: Record<string, unknown>[],
+): boolean {
+    return JSON.stringify(stripSystemFields(existingLayout)) === JSON.stringify(stripSystemFields(nextLayout))
+}
+
 /**
  * POST /api/ai/apply-template
  * Creates a new site from a template's default blocks and theme.
@@ -63,7 +150,7 @@ export const POST = withAuth(async (user, req) => {
 
     try {
         // Rate Limit: 20 template applications per hour
-        const rateLimit = await checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(`ai:apply-template:${user.id}`, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },
@@ -74,10 +161,10 @@ export const POST = withAuth(async (user, req) => {
         const payload = await getPayload({ config })
         _payload = payload
 
-        const { data, errorResponse } = await parseRequest(req, applyTemplateSchema)
-        if (errorResponse) return errorResponse
+        const { data, errorResponse: validationErrorResponse } = await parseRequest(req, applyTemplateSchema)
+        if (validationErrorResponse) return validationErrorResponse
         
-        const { templateId, siteId } = data!
+        const { templateId, siteId, pageId } = data!
 
         // Find template
         let template: Record<string, unknown>
@@ -152,7 +239,7 @@ export const POST = withAuth(async (user, req) => {
 
                 const newTenant = await payload.create({
                     collection: 'tenants',
-                    data: { name: tenantName, slug: tenantSlug },
+                    data: { name: tenantName, slug: tenantSlug, plan: 'free', status: 'active' },
                 })
                 // Provision FREEMIUM before linking user — fail-safe ordering.
                 await payload.create({
@@ -202,25 +289,46 @@ export const POST = withAuth(async (user, req) => {
             )
         }
 
-        // F23: Auto-upgrade legacy store-{id} slug to smart slug from template name
-        try {
-            const tenant = await payload.findByID({ collection: 'tenants', id: tenantId as string | number })
-            const currentSlug = tenant?.slug as string | undefined
-            const templateName = (template.name as string) || ''
-            if (currentSlug && /^store-\d+$/.test(currentSlug) && templateName) {
-                const baseSlug = slugify(templateName)
-                if (baseSlug && baseSlug !== currentSlug) {
-                    const newSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
-                    await payload.update({
-                        collection: 'tenants',
-                        id: tenantId as string | number,
-                        data: { slug: newSlug } as Record<string, unknown>,
-                    })
-                }
-            }
-        } catch {
-            // Non-critical — slug upgrade failure shouldn't block template apply
+        // GH-2154: creating a new site (no siteId) must not give an account a second website or race a
+        // running generation. The check under the tenant lock below is the authoritative one.
+        if (!siteId) {
+            const tenantSites = await payload.find({
+                collection: 'sites',
+                where: { tenant: { equals: tenantId } },
+                limit: 100,
+                pagination: false,
+                depth: 0,
+                select: { generationStatus: true, updatedAt: true },
+            })
+            const blocked = firstGenerationBlock(tenantSites.docs)
+            if (blocked) return generationBlockedResponse(new GenerationBlockedError(blocked).code)
         }
+
+        // F23: upgrade legacy slugs only after the authoritative guard for new sites.
+        async function upgradeLegacySlug(req?: TenantTransactionRequest) {
+            try {
+                const tenant = await payload.findByID({ collection: 'tenants', id: tenantId as string | number, req })
+                const currentSlug = tenant?.slug as string | undefined
+                const templateName = (template.name as string) || ''
+                if (currentSlug && /^store-\d+$/.test(currentSlug) && templateName) {
+                    const baseSlug = slugify(templateName)
+                    if (baseSlug && baseSlug !== currentSlug) {
+                        const newSlug = await ensureUniqueSlug(payload, baseSlug, user.id, 5, req)
+                        if (isReservedSlug(newSlug) || validateSlugFormat(newSlug)) return
+                        await payload.update({
+                            collection: 'tenants',
+                            req,
+                            id: tenantId as string | number,
+                            data: { slug: newSlug } as Record<string, unknown>,
+                        })
+                    }
+                }
+            } catch (error) {
+                if (req) throw error // Preserve rollback when the shared transaction fails.
+                // Editor slug upgrades remain best effort.
+            }
+        }
+        if (siteId) await upgradeLegacySlug()
 
         const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
 
@@ -254,59 +362,10 @@ export const POST = withAuth(async (user, req) => {
             }
         }
 
-        const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
-        // Pick only valid theme fields — Payload select fields reject unknown values
-        const VALID_HEADING_FONTS = new Set(['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway', 'Plus Jakarta Sans'])
-        const VALID_BODY_FONTS = new Set(['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito', 'Poppins', 'Plus Jakarta Sans'])
-        const VALID_COLOR_MODES = new Set(['light', 'dark'])
-        const VALID_BORDER_RADIUS = new Set(['sharp', 'subtle', 'rounded', 'soft', 'pill'])
-        const VALID_SPACING = new Set(['compact', 'default', 'relaxed'])
-        const VALID_SHADOW = new Set(['none', 'subtle', 'medium', 'dramatic'])
-        const rawHeading = String(rawTheme.fontHeading || '')
-        const rawBody = String(rawTheme.fontBody || '')
-        const rawColorMode = String(rawTheme.colorMode || '')
-        const templateTheme: Record<string, unknown> = {
-            primaryColor: String(rawTheme.primaryColor || '#0ea5e9'),
-            secondaryColor: String(rawTheme.secondaryColor || '#d946ef'),
-            fontHeading: VALID_HEADING_FONTS.has(rawHeading) ? rawHeading : 'Outfit',
-            fontBody: VALID_BODY_FONTS.has(rawBody) ? rawBody : 'Inter',
-            colorMode: VALID_COLOR_MODES.has(rawColorMode) ? rawColorMode : 'dark',
-        }
-        // Include optional theme fields if template defines them
-        if (rawTheme.backgroundColor) templateTheme.backgroundColor = String(rawTheme.backgroundColor)
-        if (rawTheme.accentColor) templateTheme.accentColor = String(rawTheme.accentColor)
-        if (rawTheme.surfaceColor) templateTheme.surfaceColor = String(rawTheme.surfaceColor)
-        if (rawTheme.textColor) templateTheme.textColor = String(rawTheme.textColor)
-        if (rawTheme.mutedColor) templateTheme.mutedColor = String(rawTheme.mutedColor)
-        const rawBorderRadius = String(rawTheme.borderRadius || '')
-        if (VALID_BORDER_RADIUS.has(rawBorderRadius)) templateTheme.borderRadius = rawBorderRadius
-        const rawSpacing = String(rawTheme.spacingPreset || '')
-        if (VALID_SPACING.has(rawSpacing)) templateTheme.spacingPreset = rawSpacing
-        const rawShadow = String(rawTheme.shadowPreset || '')
-        if (VALID_SHADOW.has(rawShadow)) templateTheme.shadowPreset = rawShadow
+        const templateTheme = buildTemplateTheme(template.defaultTheme as Record<string, unknown> | null | undefined)
 
         // === APPLY TO EXISTING SITE (multi-page + transaction) ===
         if (siteId) {
-            let existingSite: Record<string, unknown>
-            try {
-                existingSite = await payload.findByID({ collection: 'sites', id: Number(siteId) }) as Record<string, unknown>
-            } catch {
-                return NextResponse.json({ error: 'Site not found' }, { status: 404 })
-            }
-            if (!existingSite) {
-                return NextResponse.json({ error: 'Site not found' }, { status: 404 })
-            }
-
-            // Verify ownership: site must belong to user's tenant
-            const siteTenantId = typeof existingSite.tenant === 'object'
-                ? (existingSite.tenant as Record<string, unknown>).id
-                : existingSite.tenant
-            if (String(siteTenantId) !== String(tenantId)) {
-                return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-            }
-
-            _siteId = Number(siteId)
-
             // Build template variant map: blockType → variant/style/layout from template
             const templatePages = (template.templatePages as Array<{ layout: unknown }>)
             const templateBlockList = templatePages?.length
@@ -317,231 +376,188 @@ export const POST = withAuth(async (user, req) => {
             coerceVideoVariants(templateBlockList as Record<string, unknown>[])
             const sanitizedTemplateBlocks = sanitizeBlocks(templateBlockList)
 
-            // Extract structural + visual fields per blockType from template (first match wins)
-            // These fields define the template's look — user content (headlines, text, images) is preserved
-            const TEMPLATE_FIELDS = [
-                'variant', 'layout', 'style',           // structural
-                'badge',                                  // hero badge config
-                'showSocialLinks', 'showMap',             // toggle features
-            ]
-            const templateVariantMap: Record<string, Record<string, unknown>> = {}
-            for (const tb of sanitizedTemplateBlocks) {
-                const bt = tb.blockType as string
-                if (!bt || templateVariantMap[bt]) continue
-                const structural: Record<string, unknown> = {}
-                for (const field of TEMPLATE_FIELDS) {
-                    if (tb[field] !== undefined) structural[field] = tb[field]
-                }
-                templateVariantMap[bt] = structural
-            }
+            const templateHomepagePage =
+                templatePages?.find((page) => Boolean((page as { isHomepage?: boolean }).isHomepage))
+                ?? templatePages?.[0]
+            const templateHomepageLayout =
+                (templateHomepagePage?.layout as Record<string, unknown>[] | undefined) ?? []
+            const rawHomepageLayout = (templateHomepageLayout.length ? templateHomepageLayout : blocks) as Record<string, unknown>[]
+            coerceVideoVariants(rawHomepageLayout)
+            const templateBlocksClean = sanitizeBlocks(rawHomepageLayout)
 
-            // Track unmatched blocks across all pages for notification
+            let existingSite: Record<string, unknown> | null = null
+            let existingSiteName: unknown = null
             const allUnmatchedBlocks: Record<string, unknown>[] = []
-
-            // 2. Fetch existing pages + snapshot for rollback (BR-06)
-            // MUST use draft: true — editor saves blocks as drafts,
-            // reading published version would miss user's latest edits.
-            // payload.find() generates aggregate SQL expecting "data" column that
-            // doesn't exist in our pages_blocks_* tables — use SQL for IDs + findByID per page.
-            const db = payload.db.drizzle
-            const pageIdRows = await db.execute(sql`
-                SELECT id FROM pages WHERE site_id = ${Number(siteId)} AND deleted_at IS NULL LIMIT 100
-            `) as { rows: Array<{ id: number }> }
-            const pageDocs = await Promise.all(
-                pageIdRows.rows.map(row =>
-                    payload.findByID({ collection: 'pages', id: row.id, depth: 0, draft: true })
-                )
-            )
-            const existingPages = { docs: pageDocs }
-
-            const rollbackData = {
-                theme: existingSite.theme,
-                pages: existingPages.docs.map((page) => ({
-                    id: page.id,
-                    layout: (page as Record<string, unknown>).layout,
-                })),
-            }
-
-            // Mark as re-skinning
-            await payload.update({
-                collection: 'sites',
-                id: Number(siteId),
-                data: { generationStatus: 'generating' },
-            })
-
+            let appliedPage: { id: string | number; layout: Record<string, unknown>[] } | null = null
+            let appliedSiteState: {
+                theme: Record<string, unknown>
+                headerBlock: Record<string, unknown> | null
+                footerBlock: Record<string, unknown> | null
+                globalBlocks: Record<string, unknown> | null
+            } | null = null
             try {
-                // 1. Update site theme only
-                await payload.update({
-                    collection: 'sites',
-                    id: Number(siteId),
-                    data: { theme: templateTheme },
-                })
+                await withTenantRowLock(payload, tenantId as string | number, async (transactionReq) => {
+                    await lockTenantSiteRows(payload, tenantId as string | number, [Number(siteId)], transactionReq)
 
-                // Template has blocks for homepage only — sanitize them.
-                // Pick the template's homepage layout (NOT flatMap across all pages,
-                // which would duplicate navigation/footer that appear on every page
-                // for multi-page templates — Professional=3 pages, Premium=5 pages).
-                const templateHomepagePage =
-                    templatePages?.find((p) =>
-                        Boolean((p as { isHomepage?: boolean }).isHomepage),
-                    ) ?? templatePages?.[0]
-                const templateHomepageLayout =
-                    (templateHomepagePage?.layout as Record<string, unknown>[] | undefined) ?? []
-                // GH-1266: coerce before sanitize (same reasoning as path 1 above)
-                const rawHomepageLayout = (templateHomepageLayout.length ? templateHomepageLayout : blocks) as Record<string, unknown>[]
-                coerceVideoVariants(rawHomepageLayout)
-                const templateBlocksClean = sanitizeBlocks(rawHomepageLayout)
-
-                // Hoisted outside page loop — same values for every page
-                const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
-                const VALID_NAV_VARIANTS = new Set(['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'])
-
-                // Final layouts written back to pages — feeds the cart auto-add check below
-                const reskinnedLayouts: Array<{ layout?: unknown[] }> = []
-
-                // 2. Smart Mapping: replace layout with template blocks, map user content
-                //    PRD F07 US-F07-05: "mapping nội dung hiện tại sang block tương ứng của template mới"
-                for (const page of existingPages.docs) {
-                    const pageData = page as Record<string, unknown>
-                    const currentBlocks = (pageData.layout as Record<string, unknown>[]) || []
-                    if (currentBlocks.length === 0) continue
-
-                    const isHomepage = Boolean(pageData.isHomepage)
-
-                    let newLayout: Record<string, unknown>[]
-
-                    if (isHomepage && templateBlocksClean.length > 0) {
-                        // HOMEPAGE: Smart Mapping — replace layout with template blocks,
-                        // merge user content into matching blockTypes
-                        const { mergedBlocks: merged, unmatchedUserBlocks } = mergeUserContent(
-                            templateBlocksClean, currentBlocks, { returnDetails: true }
-                        )
-
-                        // Track unmatched blocks for notification (FR-05)
-                        if (unmatchedUserBlocks.length > 0) {
-                            allUnmatchedBlocks.push(...unmatchedUserBlocks)
-                        }
-
-                        // Insert unmatched blocks before footer (PRD AC-2: don't lose content)
-                        const footerIdx = merged.findIndex(b => b.blockType === 'footer')
-                        if (footerIdx !== -1 && unmatchedUserBlocks.length > 0) {
-                            merged.splice(footerIdx, 0, ...unmatchedUserBlocks)
-                        } else if (unmatchedUserBlocks.length > 0) {
-                            merged.push(...unmatchedUserBlocks)
-                        }
-
-                        newLayout = merged
-                    } else {
-                        // SUBPAGES: Re-skin only — keep all blocks, overlay template variant
-                        newLayout = currentBlocks.map(block => {
-                            const bt = block.blockType as string
-                            if (!bt) return block
-                            const templateVariant = templateVariantMap[bt]
-                            if (!templateVariant || Object.keys(templateVariant).length === 0) return block
-                            const cleanVariant = stripSystemFields(templateVariant) as Record<string, unknown>
-                            return { ...block, ...cleanVariant }
-                        })
-                    }
-
-                    // Ensure footer is always last
-                    const footerIdx = newLayout.findIndex(b => b.blockType === 'footer')
-                    if (footerIdx !== -1 && footerIdx < newLayout.length - 1) {
-                        const footer = newLayout.splice(footerIdx, 1)[0]
-                        newLayout.push(footer)
-                    }
-
-                    // Strip system fields — Payload rejects 'id' in layout block data
-                    // GH-820: also drop google-maps — embedUrl cannot be auto-generated
-                    // GH-1024: strip temp-hidden blocks (menu-display, property-card, pricing-table)
-                    //   so DB-seeded templates don't smuggle them back into user pages
-                    const cleanLayout = (stripSystemFields(newLayout) as Record<string, unknown>[])
-                        .filter(b => b.blockType !== 'google-maps')
-                        .filter(b => !BLOCKS_TEMP_HIDDEN.has(b.blockType as string))
-
-                    // Normalize required fields: coerces service-cards titles, upload fields,
-                    // contact email, footer variant aliases, etc. Covers data from currentBlocks
-                    // (user's existing DB content) which may predate AI gen sanitization fixes.
-                    const normalizedLayout = normalizeBlocksForPersistence(cleanLayout)
-
-                    // Additional block-specific sanitization not covered by normalizeBlocksForPersistence
-                    for (const block of normalizedLayout) {
-                        // Contact: formFields array items need fieldName + label + fieldType
-                        if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
-                            block.formFields = (block.formFields as Record<string, unknown>[]).filter(f =>
-                                typeof f.fieldName === 'string' && f.fieldName.trim().length > 0 &&
-                                typeof f.label === 'string' && f.label.trim().length > 0 &&
-                                typeof f.fieldType === 'string' && VALID_FIELD_TYPES.has(f.fieldType)
-                            )
-                            if ((block.formFields as unknown[]).length === 0) {
-                                block.formFields = [
-                                    { fieldName: 'name', fieldType: 'text', label: 'Your Name', required: true },
-                                    { fieldName: 'email', fieldType: 'email', label: 'Email Address', required: true },
-                                    { fieldName: 'message', fieldType: 'textarea', label: 'Message', required: true },
-                                ]
-                            }
-                        }
-                        // Navigation: variant must be one of the valid enum values
-                        if (block.blockType === 'navigation') {
-                            if (!block.variant || !VALID_NAV_VARIANTS.has(block.variant as string)) {
-                                block.variant = 'default'
-                            }
-                        }
-                    }
-
-                    await payload.update({
-                        collection: 'pages',
-                        id: page.id,
-                        data: { layout: normalizedLayout },
-                    })
-                    reskinnedLayouts.push({ layout: normalizedLayout })
-                    _createdPagesCount++
-                }
-
-                // 3. Mark completed (+ auto-add floating cart when the re-skinned
-                // layouts contain commerce blocks and no cart is configured yet).
-                // Pending-aware: a stale pendingGlobalBlocks draft (e.g. unpublished
-                // cart deletion) would shadow the live cart in the editor.
-                await payload.update({
-                    collection: 'sites',
-                    id: Number(siteId),
-                    data: {
-                        generationStatus: 'completed',
-                        ...ensureCartGlobalBlockWithPending(
-                            (existingSite as { globalBlocks?: Record<string, unknown> | null }).globalBlocks,
-                            (existingSite as { pendingGlobalBlocks?: Record<string, unknown> | null }).pendingGlobalBlocks,
-                            reskinnedLayouts,
-                            (existingSite as { headerBlock?: unknown }).headerBlock,
-                        ),
-                    },
-                })
-            } catch (applyError) {
-                // ROLLBACK (BR-06): restore previous theme + page layouts
-                console.error('[Apply Template] Mutation failed, rolling back:', applyError)
-                try {
-                    await payload.update({
+                    existingSite = await payload.findByID({
                         collection: 'sites',
                         id: Number(siteId),
-                        data: { theme: rollbackData.theme, generationStatus: 'completed' } as Record<string, unknown>,
-                    })
-                    for (const page of rollbackData.pages) {
+                        depth: 0,
+                        req: transactionReq,
+                    }) as Record<string, unknown> | null
+                    if (!existingSite) throw new TenantSiteLockError([Number(siteId)])
+                    existingSiteName = existingSite.name
+
+                    // Read the homepage as context for canonical header/footer fallbacks,
+                    // but update exactly the page the editor is showing. Implicitly changing
+                    // the homepage while another page is active makes the editor's single
+                    // undo snapshot incomplete. When no pageId is supplied, the homepage
+                    // remains the backwards-compatible target.
+                    const pageScope = pageId
+                        ? sql`AND (pages.id = ${Number(pageId)} OR pages.is_homepage IS TRUE)`
+                        : sql`AND pages.is_homepage IS TRUE`
+                    const pageIdRows = await executeTenantTransaction<{ rows: Array<{ id: number }> }>(
+                        payload,
+                        transactionReq,
+                        sql`SELECT pages.id
+                            FROM pages
+                            INNER JOIN sites ON sites.id = pages.site_id
+                            WHERE pages.site_id = ${Number(siteId)}
+                              AND sites.tenant_id = ${tenantId}
+                              AND pages.deleted_at IS NULL
+                              ${pageScope}
+                            ORDER BY pages.id
+                            FOR UPDATE OF pages`,
+                    )
+                    // The locked, tenant-scoped rows exclude deleted and foreign pages.
+                    // Reject a stale editor target before changing the site.
+                    if (pageId && !pageIdRows.rows.some(row => String(row.id) === pageId)) {
+                        throw Object.assign(new Error('Page not found'), { code: 'PAGE_NOT_FOUND' })
+                    }
+                    const pageDocs = await Promise.all(pageIdRows.rows.map(row => payload.findByID({
+                        collection: 'pages',
+                        id: row.id,
+                        depth: 0,
+                        draft: true,
+                        req: transactionReq,
+                    })))
+
+                    const reskinnedLayouts: Array<{ layout?: unknown[] }> = []
+                    const pageUpdates: Array<{ id: string | number; layout: Record<string, unknown>[] }> = []
+
+                    for (const page of pageDocs) {
+                        const pageData = page as Record<string, unknown>
+                        const isTargetPage = pageId
+                            ? String(page.id) === pageId
+                            : Boolean(pageData.isHomepage)
+                        if (!isTargetPage) continue
+                        const currentBlocks = (pageData.layout as Record<string, unknown>[]) || []
+                        let newLayout: Record<string, unknown>[]
+
+                        if (pageData.isHomepage && templateBlocksClean.length > 0) {
+                            const { mergedBlocks, unmatchedUserBlocks } = mergeUserContent(
+                                templateBlocksClean,
+                                currentBlocks,
+                                { returnDetails: true },
+                            )
+                            allUnmatchedBlocks.push(...unmatchedUserBlocks)
+                            // AC2: sections with no destination slot are reported but are not
+                            // injected into the new template. The previous draft remains in
+                            // Payload versions and the editor's single undo batch.
+                            newLayout = mergedBlocks
+                        } else if (currentBlocks.length > 0) {
+                            newLayout = applyTemplateStructureToLayout(sanitizedTemplateBlocks, currentBlocks)
+                        } else {
+                            continue
+                        }
+
+                        const footerIndex = newLayout.findIndex(block => block.blockType === 'footer')
+                        if (footerIndex !== -1 && footerIndex < newLayout.length - 1) {
+                            const [footer] = newLayout.splice(footerIndex, 1)
+                            newLayout.push(footer)
+                        }
+
+                        const normalizedLayout = prepareTemplateSwapLayout(newLayout)
+                        reskinnedLayouts.push({ layout: normalizedLayout })
+                        if (pageId && String(page.id) === pageId) {
+                            appliedPage = { id: page.id, layout: normalizedLayout }
+                        }
+                        if (!isTemplateSwapLayoutUnchanged(currentBlocks, normalizedLayout)) {
+                            pageUpdates.push({ id: page.id, layout: normalizedLayout })
+                        }
+                    }
+
+                    const homepage = pageDocs.find(page => Boolean((page as Record<string, unknown>).isHomepage)) as Record<string, unknown> | undefined
+                    const homepageBlocks = (homepage?.layout as Record<string, unknown>[] | undefined) ?? []
+                    const currentHeader = (existingSite.pendingHeaderBlock ?? existingSite.headerBlock
+                        ?? homepageBlocks.find(block => block.blockType === 'navigation')) as Record<string, unknown> | null | undefined
+                    const currentFooter = (existingSite.pendingFooterBlock ?? existingSite.footerBlock
+                        ?? homepageBlocks.find(block => block.blockType === 'footer')) as Record<string, unknown> | null | undefined
+                    const effectiveGlobalBlocks = (existingSite.pendingGlobalBlocks ?? existingSite.globalBlocks) as Record<string, unknown> | null | undefined
+                    const { headerBlock: nextHeader, footerBlock: nextFooter, globalBlocks: nextGlobalBlocks } = buildTemplateSystemBlocks(
+                        templateBlocksClean,
+                        { headerBlock: currentHeader, footerBlock: currentFooter, globalBlocks: effectiveGlobalBlocks },
+                        reskinnedLayouts.flatMap(page => page.layout ?? []) as Record<string, unknown>[],
+                    )
+                    appliedSiteState = {
+                        theme: templateTheme,
+                        headerBlock: nextHeader ?? null,
+                        footerBlock: nextFooter ?? null,
+                        globalBlocks: nextGlobalBlocks,
+                    }
+
+                    // Payload performs validation, hooks and version writes for every
+                    // page. One at a time on the transaction: run together, one failure
+                    // aborts the shared req and the others finish on other connections,
+                    // outside the rollback. Then update the canonical site draft.
+                    for (const page of pageUpdates) {
                         await payload.update({
                             collection: 'pages',
                             id: page.id,
-                            data: { layout: page.layout } as Record<string, unknown>,
+                            data: { layout: page.layout },
+                            draft: true,
+                            req: transactionReq,
                         })
                     }
-                } catch (rollbackError) {
-                    console.error('[Apply Template] Rollback also failed:', rollbackError)
+                    _createdPagesCount += pageUpdates.length
+
                     await payload.update({
                         collection: 'sites',
                         id: Number(siteId),
-                        data: { generationStatus: 'failed' },
-                    }).catch(() => {})
+                        data: {
+                            theme: templateTheme,
+                            generationStatus: 'completed',
+                            ...(nextHeader ? { pendingHeaderBlock: nextHeader } : {}),
+                            ...(nextFooter ? { pendingFooterBlock: nextFooter } : {}),
+                            ...(nextGlobalBlocks !== effectiveGlobalBlocks && nextGlobalBlocks !== null
+                                ? { pendingGlobalBlocks: nextGlobalBlocks } : {}),
+                        },
+                        req: transactionReq,
+                    })
+                    // the theme / menu / footer and the reskinned pages changed: another editor tab still holding the
+                    // old ones gets a 409 instead of saving them back over the template (see lib/sites/editor-revision)
+                    await bumpEditorRevision(txExec(payload, transactionReq), Number(siteId), { site: true, pageIds: pageUpdates.map(page => page.id) })
+                })
+            } catch (applyError) {
+                console.error('[Apply Template] Transaction failed:', applyError)
+                if (applyError instanceof TenantSiteLockError) {
+                    return errorResponse(404, 'SITE_NOT_FOUND', 'Site not found')
                 }
-                return NextResponse.json(
-                    { error: 'Failed to apply template. Your previous content has been restored.' },
-                    { status: 500 }
-                )
+                if (applyError instanceof Error && 'code' in applyError && applyError.code === 'PAGE_NOT_FOUND') {
+                    return errorResponse(404, 'PAGE_NOT_FOUND', applyError.message)
+                }
+                return errorResponse(500, 'TEMPLATE_SWAP_FAILED', 'Failed to apply template. Your previous content has been restored.')
+            }
+
+            _siteId = Number(siteId)
+
+            // Payload hooks run before an externally-owned transaction commits.
+            // Bust cache again after the callback transaction has committed.
+            try {
+                revalidateSiteStorefront(Number(siteId), tenantId)
+            } catch (cacheError) {
+                // Non-Next test/runtime context — cache invalidation is best effort.
+                console.warn('[Apply Template] Cache revalidation skipped:', cacheError)
             }
 
             // 5. Increment template usage count (non-critical — don't fail the whole apply)
@@ -561,17 +577,31 @@ export const POST = withAuth(async (user, req) => {
                 console.warn('[ApplyTemplate] Failed to record template_limit usage:', err)
             }
 
-            return NextResponse.json({
-                success: true,
+            // the revision the applying tab now holds (it renders the applied state), so its next save is not refused
+            // (assigned inside the transaction callback: TS can't see it, hence the widening)
+            const appliedPageId = (appliedPage as { id: string | number } | null)?.id
+            const draftPageId = appliedPageId != null ? Number(appliedPageId) : pageId != null && /^\d+$/.test(String(pageId)) ? Number(pageId) : null
+            const draftVersion = await readEditorRevision(poolExec(payload), Number(siteId), draftPageId)
+                .then(revision => (draftPageId === null ? null : formatDraftVersion(revision)))
+                .catch(() => null)
+
+            const response = successResponse({
                 siteId: Number(siteId),
-                siteName: existingSite.name,
+                siteName: existingSiteName,
+                ...(draftVersion ? { draftVersion } : {}),
                 templateName: template.name,
                 pagesUpdated: _createdPagesCount,
                 applied: true,
+                appliedState: appliedSiteState ? {
+                    site: appliedSiteState,
+                    page: appliedPage,
+                } : undefined,
                 unmatchedBlocks: allUnmatchedBlocks.length > 0
                     ? [...new Set(allUnmatchedBlocks.map(b => b.blockType as string))]
                     : undefined,
             })
+
+            return response
         }
 
         // === CREATE NEW SITE FROM TEMPLATE (multi-page) ===
@@ -588,18 +618,33 @@ export const POST = withAuth(async (user, req) => {
         }))
         injectNavLinks(pagesToCreate)
 
-        const site = await payload.create({
-            collection: 'sites',
-            data: {
-                name: String(template.name || 'Untitled'),
-                tenant: tenantId,
-                status: 'draft',
-                generationStatus: 'generating',
-                siteType: resolveSiteType(
-                    Array.isArray(template.category) ? template.category[0] : template.category,
-                ),
-                theme: templateTheme,
-            },
+        const site = await withTenantRowLock(payload, tenantId as string | number, async (transactionReq) => {
+            const current = await payload.find({
+                collection: 'sites',
+                where: { tenant: { equals: tenantId } },
+                limit: 100,
+                pagination: false,
+                depth: 0,
+                select: { generationStatus: true, updatedAt: true },
+                req: transactionReq,
+            })
+            const blocked = firstGenerationBlock(current.docs)
+            if (blocked) throw new GenerationBlockedError(blocked)
+            await upgradeLegacySlug(transactionReq)
+            return payload.create({
+                collection: 'sites',
+                data: {
+                    name: String(template.name || 'Untitled'),
+                    tenant: tenantId,
+                    status: 'draft',
+                    generationStatus: 'generating',
+                    siteType: resolveSiteType(
+                        Array.isArray(template.category) ? template.category[0] : template.category,
+                    ),
+                    theme: templateTheme,
+                },
+                req: transactionReq,
+            })
         })
         _siteId = site.id as string | number
 
@@ -691,6 +736,8 @@ export const POST = withAuth(async (user, req) => {
         })
 
     } catch (error: unknown) {
+        // GH-2154: refused under the tenant lock — no site was created, nothing to mark failed.
+        if (error instanceof GenerationBlockedError) return generationBlockedResponse(error.code)
         // Smart status: partial success (≥1 page created) = completed, 0 pages = failed
         if (_siteId && _payload) {
             const status = _createdPagesCount > 0 ? 'completed' : 'failed'
@@ -708,4 +755,4 @@ export const POST = withAuth(async (user, req) => {
             { status: 500 },
         )
     }
-})
+}, { csrf: true })

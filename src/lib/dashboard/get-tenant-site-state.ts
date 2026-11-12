@@ -14,22 +14,50 @@ export interface TenantSiteState {
     hasUsableSite: boolean
 }
 
+/** The columns the dashboard layout + page read off a tenant's sites (onboarding steps, usable / failed). */
+export interface DashboardSiteRow {
+    id: number | string
+    status?: string | null
+    generationStatus?: string | null
+    themeCustomized?: boolean | null
+    shippingConfig?: { shippingSetupConfirmed?: boolean | null } | null
+}
+
+/**
+ * A tenant's sites, newest first, as one statement: `depth: 0` + `select` + no COUNT. This read used Payload's
+ * defaults (depth 2: the whole tenant row and its media per site, plus a COUNT) for a yes/no answer (TC-PERF-055).
+ * Sites per workspace are bounded by the plan (1 expected); 100 is a safety cap.
+ */
+export async function findDashboardSites(payload: Payload, tenantId: string | number): Promise<DashboardSiteRow[]> {
+    const result = await payload.find({
+        collection: 'sites',
+        where: { tenant: { equals: tenantId } },
+        sort: '-createdAt',
+        limit: 100,
+        pagination: false,
+        depth: 0,
+        overrideAccess: true,
+        select: {
+            status: true,
+            generationStatus: true,
+            themeCustomized: true,
+            shippingConfig: { shippingSetupConfirmed: true },
+        },
+    })
+    return result.docs as unknown as DashboardSiteRow[]
+}
+
 /**
  * Resolve whether a tenant has at least one usable website. Takes an injected
  * `payload` (no @payload-config import) so it can be unit-tested with a mock and
- * piggyback on a caller's existing payload session.
+ * piggyback on a caller's existing payload session. `sites` = rows already read in this request.
  */
 export async function getTenantSiteState(
     payload: Payload,
     tenantId: string | null | undefined,
+    sites?: Promise<DashboardSiteRow[]>,
 ): Promise<TenantSiteState> {
     if (tenantId == null) return { hasUsableSite: false }
-
-    const result = await payload.find({
-        collection: 'sites',
-        where: { tenant: { equals: tenantId } },
-        limit: 5, // 1 site/tenant expected, extra for safety
-    })
-
-    return { hasUsableSite: result.docs.some(isUsableSite) }
+    const rows = await (sites ?? findDashboardSites(payload, tenantId))
+    return { hasUsableSite: rows.some(isUsableSite) }
 }

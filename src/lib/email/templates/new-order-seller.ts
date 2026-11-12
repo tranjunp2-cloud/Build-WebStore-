@@ -27,6 +27,9 @@ export interface NewOrderSellerData {
     items?: NewOrderSellerItem[]
     orderTotal?: number
     shippingFee?: number
+    /** Discount applied to the order, in RM (not sen) */
+    discountAmount?: number | null
+    discountCode?: string | null
     currency?: string
     locale?: EmailLocale
 }
@@ -78,6 +81,7 @@ export function newOrderSellerEmail(data: NewOrderSellerData, config?: EmailTemp
         colItem: locale === 'ms' ? 'Item' : 'Item',
         colQty: locale === 'ms' ? 'Kuantiti' : 'Qty',
         colSubtotal: locale === 'ms' ? 'Jumlah Kecil' : 'Subtotal',
+        rowDiscount: locale === 'ms' ? 'Diskaun' : 'Discount',
         rowShipping: locale === 'ms' ? 'Penghantaran' : 'Shipping',
         rowShippingFree: locale === 'ms' ? 'Percuma' : 'Free',
         rowTotal: locale === 'ms' ? 'Jumlah' : 'Total',
@@ -122,6 +126,13 @@ export function newOrderSellerEmail(data: NewOrderSellerData, config?: EmailTemp
         </tr>`).join('')}
       </tbody>
       <tfoot>
+        ${data.discountAmount && data.discountAmount > 0 ? `
+        <tr>
+          <td colspan="2" style="padding:9px 12px;border-top:1px solid #edeff2;font-family:${FONT};font-size:13px;color:#0F172A;">
+            ${defaults.rowDiscount}${data.discountCode ? ` <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#F1F5F9;color:#475569;font-size:12px;margin-left:6px;">${esc(data.discountCode)}</span>` : ''}
+          </td>
+          <td style="padding:9px 12px;border-top:1px solid #edeff2;font-family:${FONT};font-size:13px;color:#EF4444;text-align:right;">-${fp(data.discountAmount)}</td>
+        </tr>` : ''}
         <tr>
           <td colspan="2" style="padding:9px 12px;border-top:1px solid #edeff2;font-family:${FONT};font-size:13px;color:#0F172A;">${defaults.rowShipping}</td>
           <td style="padding:9px 12px;border-top:1px solid #edeff2;font-family:${FONT};font-size:13px;color:#0F172A;text-align:right;">

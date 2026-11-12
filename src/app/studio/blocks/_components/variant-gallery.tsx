@@ -13,6 +13,7 @@ import { useState } from 'react'
 import { Star, Eye, Pencil, Copy, Trash2 } from 'lucide-react'
 import { VariantZoomModal } from './variant-zoom-modal'
 import { VariantEditModal } from './variant-edit-modal'
+import { useStudioCan } from '../../_components/studio-permissions-context'
 
 type VariantOverride = {
     variantName: string
@@ -43,6 +44,7 @@ export function VariantGallery({
     curatedPreviewUrl,
     variantOverrides,
 }: Props) {
+    const canEdit = useStudioCan()('block.edit')
     const [cols, setCols] = useState<Cols>('2')
     const [activeVariant, setActiveVariant] = useState<string | null>(null)
     // local default override (client-only, does not persist — save button would call API in F07)
@@ -162,7 +164,7 @@ export function VariantGallery({
                                 <span className="name">{displayName}</span>
                                 {isDefault && <span className="default-pill">Default</span>}
                                 <div className="actions">
-                                    <button
+                                    {canEdit && <button
                                         title={isDefault ? 'Already default' : 'Set as default'}
                                         onClick={() => setLocalDefault(variant)}
                                         style={isDefault ? { color: 'var(--accent)' } : {}}
@@ -171,28 +173,32 @@ export function VariantGallery({
                                             size={13}
                                             fill={isDefault ? 'currentColor' : 'none'}
                                         />
-                                    </button>
+                                    </button>}
                                     <button
                                         title="Fullscreen preview"
                                         onClick={() => setActiveVariant(variant)}
                                     >
                                         <Eye size={13} />
                                     </button>
-                                    <button
-                                        title="Edit variant metadata"
-                                        onClick={() => setEditVariant(variant)}
-                                    >
-                                        <Pencil size={13} />
-                                    </button>
-                                    <button title="Duplicate variant">
-                                        <Copy size={13} />
-                                    </button>
-                                    <button
-                                        title="Delete variant"
-                                        style={{ color: 'var(--danger)' }}
-                                    >
-                                        <Trash2 size={13} />
-                                    </button>
+                                    {canEdit && (
+                                        <>
+                                            <button
+                                                title="Edit variant metadata"
+                                                onClick={() => setEditVariant(variant)}
+                                            >
+                                                <Pencil size={13} />
+                                            </button>
+                                            <button title="Duplicate variant">
+                                                <Copy size={13} />
+                                            </button>
+                                            <button
+                                                title="Delete variant"
+                                                style={{ color: 'var(--danger)' }}
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
@@ -225,30 +231,34 @@ export function VariantGallery({
                                     {isDefault ? 'Default variant' : 'Variant'}
                                 </span>
                                 <span className="sp" />
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                                    <span>Enabled</span>
-                                    <div
-                                        className={[
-                                            'b-switch',
-                                            !isDisabled ? 'on' : '',
-                                            pendingToggle.has(variant) ? 'pending' : '',
-                                        ].filter(Boolean).join(' ')}
-                                        onClick={() => toggleVariantEnabled(variant)}
-                                    />
-                                </div>
+                                {canEdit && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                                        <span>Enabled</span>
+                                        <div
+                                            className={[
+                                                'b-switch',
+                                                !isDisabled ? 'on' : '',
+                                                pendingToggle.has(variant) ? 'pending' : '',
+                                            ].filter(Boolean).join(' ')}
+                                            onClick={() => toggleVariantEnabled(variant)}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )
                 })}
 
                 {/* Add new variant card */}
-                <div className="b-var-add">
-                    <div style={{ textAlign: 'center' }}>
-                        <div className="plus">＋</div>
-                        <div className="t">Add new variant</div>
-                        <div className="s">Register a new layout for this block</div>
+                {canEdit && (
+                    <div className="b-var-add">
+                        <div style={{ textAlign: 'center' }}>
+                            <div className="plus">＋</div>
+                            <div className="t">Add new variant</div>
+                            <div className="s">Register a new layout for this block</div>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Zoom modal */}
@@ -266,7 +276,7 @@ export function VariantGallery({
             )}
 
             {/* Edit metadata modal */}
-            {editVariant && (
+            {editVariant && canEdit && (
                 <VariantEditModal
                     open={true}
                     onClose={() => setEditVariant(null)}

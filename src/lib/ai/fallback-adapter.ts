@@ -11,7 +11,7 @@
  */
 
 import { composeFromBlueprint, type TemplateSeed } from './template-composer'
-import { TEMPLATE_PRESETS, selectTemplatePreset } from './template-definitions'
+import { GENERATION_TEMPLATE_PRESETS, selectTemplatePreset } from './template-definitions'
 import type { TemplatePreset } from './template-definitions'
 import { resolveFontPairing } from './font-pairings'
 import {
@@ -27,6 +27,7 @@ import { enforceMinimumStructure, enforceSubpageStructure, enforceMinItems, enfo
 import { mapBusinessInfo } from './business-info-mapper'
 import type { BusinessInfoInput } from './system-prompt'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
+import { withoutLibraryIdentity } from './library-identity'
 
 type Language = 'en' | 'ms' | 'vi'
 
@@ -78,7 +79,7 @@ function findFirstImage(blocks: GeneratedBlock[]): string | undefined {
  * Throws if no presets exist for the category (should never happen — all 14 have 4 each).
  */
 function hasPresets(category: ComposerCategory): boolean {
-    return TEMPLATE_PRESETS.some((p) => p.category === category)
+    return GENERATION_TEMPLATE_PRESETS.some((p) => p.category === category)
 }
 
 function pickPreset(category: ComposerCategory, seed: number): TemplatePreset {
@@ -181,7 +182,7 @@ export function adaptTemplateSeedToGenerationResult(
         pages,
         seo: {
             title: biz.tagline ? `${biz.name} — ${biz.tagline}` : biz.name,
-            description: truncate(biz.description ?? templateSeed.description, 160),
+            description: truncate(biz.description || templateSeed.description, 160),
         },
         language: language === 'en' || language === 'ms' || language === 'vi' ? language : 'en',
         theme: {
@@ -275,7 +276,7 @@ export function composeTemplateResult(
     }
 
     const biz: BusinessSample = bizOverride
-        ? { ...baseBiz, ...bizOverride }
+        ? withoutLibraryIdentity(baseBiz, bizOverride)
         : baseBiz
 
     // Phase 06 — the consistency check runs ONE level up in

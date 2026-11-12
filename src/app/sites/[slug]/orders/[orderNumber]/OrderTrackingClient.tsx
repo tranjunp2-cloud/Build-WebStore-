@@ -11,6 +11,8 @@ import {
     RefreshCw, Store, Star, ChevronRight, XCircle, RotateCcw, ScanBarcode,
 } from 'lucide-react'
 import { formatTrackingEventDisplay } from '@/lib/shipping/tracking-event-display'
+import { useI18n } from '@/i18n'
+import { getPaymentChip } from './order-tracking-payment-chip'
 
 type TrackingStatus = 'processing' | 'in-transit' | 'delivered' | 'cancelled' | 'refunded' | 'payment_failed'
 
@@ -117,8 +119,6 @@ function getStageStates(trackingStatus: TrackingStatus) {
 
 function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
     const [copied, setCopied] = useState(false)
-    const isPaid = order.paymentStatus === 'paid'
-    const isPaymentFailed = order.paymentStatus === 'failed' || order.paymentStatus === 'payment_failed'
 
     const STATUS_META = {
         'processing': { cls: 'processing', Icon: Package, eyebrow: 'Current Status', title: 'Processing' },
@@ -130,15 +130,7 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
     }
     const s = STATUS_META[trackingStatus]
 
-    const paymentLabel = isPaid
-        ? 'Paid'
-        : isPaymentFailed
-            ? 'Payment Failed'
-            : (() => {
-                const m: Record<string, string> = { bank_transfer: 'Bank Transfer', card: 'Credit Card', fpx: 'FPX', cod: 'COD', ewallet: 'e-Wallet' }
-                return `Pending · ${m[order.paymentMethod ?? ''] ?? 'Pending'}`
-            })()
-    const chipClass = isPaid ? 'paid' : isPaymentFailed ? 'failed' : 'pending'
+    const paymentChip = getPaymentChip(order)
 
     const handleCopy = () => {
         navigator.clipboard?.writeText(order.orderNumber)
@@ -155,9 +147,9 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
                     <button className="ot-oh-copy" onClick={handleCopy} title="Copy order ID">
                         {copied ? <Check size={13} /> : <Copy size={13} />}
                     </button>
-                    <span className={`ot-payment-chip ${chipClass}`}>
+                    <span className={`ot-payment-chip ${paymentChip.cls}`}>
                         <span className="dot" />
-                        {paymentLabel}
+                        {paymentChip.label}
                     </span>
                 </div>
                 <div className="ot-oh-meta">
@@ -430,6 +422,7 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
 }
 
 function OtItems({ order }: { order: OrderData }) {
+    const { t } = useI18n()
     const [open, setOpen] = useState(true)
     return (
         <div className="ot-card">
@@ -471,7 +464,7 @@ function OtItems({ order }: { order: OrderData }) {
                     {(order.discountAmount ?? 0) > 0 && <div className="row"><span className="lbl">Discount{order.discountCode ? ` (${order.discountCode})` : ''}</span><span className="val">−{formatMoney((order.discountAmount ?? 0) / 100, order.currency)}</span></div>}
                     {order.tax > 0 && <div className="row"><span className="lbl">Tax</span><span className="val">{formatMoney(order.tax, order.currency)}</span></div>}
                     {order.shippingFee > 0 && <div className="row"><span className="lbl">Shipping</span><span className="val">{formatMoney(order.shippingFee, order.currency)}</span></div>}
-                    <div className="row total"><span className="lbl">Total Paid</span><span className="val">{formatMoney(order.total, order.currency)}</span></div>
+                    <div className="row total"><span className="lbl">{order.paymentStatus === 'paid' ? t.storefront.orderTracking.totalPaid : t.storefront.orderTracking.total}</span><span className="val">{formatMoney(order.total, order.currency)}</span></div>
                 </div>
             )}
         </div>
@@ -501,7 +494,6 @@ function OtSide({ order, slug }: { order: OrderData; slug: string }) {
                             {addr.postcode && <em>{addr.postcode} </em>}{addr.city}<br />
                             {addr.state}{addr.country && addr.country !== 'Malaysia' ? `, ${addr.country}` : ', Malaysia'}
                         </div>
-                        <span className="ot-addr-tag"><Check size={11} /> Address Verified</span>
                     </div>
                 </div>
             )}

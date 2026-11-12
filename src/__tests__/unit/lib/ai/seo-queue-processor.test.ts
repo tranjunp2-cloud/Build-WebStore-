@@ -1,6 +1,6 @@
 /**
  * Unit Tests: seo-queue — backgroundSeoProcessor via queueSEOAutoGeneration
- * TC-IDs: TC-F08-03-01
+ * TC-IDs: TC-F08-03-01, TC-AISEC-03
  * Convention: docs/TEST_CONVENTION.md
  *
  * Note: backgroundSeoProcessor is a private function called async (fire-and-forget).
@@ -27,24 +27,51 @@ vi.mock('next/cache', () => ({
     revalidatePath: vi.fn(),
 }))
 
+// Inside a request, after() runs the task once the response is sent; the test runs it at once.
+vi.mock('next/server', () => ({
+    after: vi.fn((task: () => unknown) => {
+        void task()
+    }),
+}))
+
 const mockGenerateAutoSEOMeta = vi.fn()
 
 vi.mock('@/lib/ai/generate-meta', () => ({
     generateAutoSEOMeta: (...args: unknown[]) => mockGenerateAutoSEOMeta(...args),
 }))
 
+// Platform gate + publisher membership, as seen by the processor (TC-AISEC-03).
+const mockIsAiTasksEnabled = vi.fn(() => true)
+const mockActorForUserInTenant = vi.fn()
+
+vi.mock('@/lib/ai-platform/config', () => ({
+    isAiTasksEnabled: () => mockIsAiTasksEnabled(),
+}))
+
+vi.mock('@/lib/ai-platform/context', () => ({
+    AgentAccessError: class AgentAccessError extends Error {},
+    actorForUserInTenant: (...args: unknown[]) => mockActorForUserInTenant(...args),
+    // publisherActor reads the tenant's platform-org pin first (TC-PERF-183); same actor otherwise
+    actorForSessionUserInTenant: async (...args: unknown[]) => mockActorForUserInTenant(...args),
+}))
+
 import { queueSEOAutoGeneration } from '@/lib/ai/seo-queue'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 
 // ─── Helper: flush microtasks/promises ───────────────────────────────────────
 
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 10))
+
+const PUBLISHER = { id: 7, email: 'owner@shop.my', tenants: [{ tenant: { id: 1 }, status: 'active' }] }
+const PUBLISHER_ACTOR = { user: PUBLISHER, tenantId: '1', organizationId: 'org_1', role: 'owner' }
 
 // ─── TC-F08-03-01: SEO queue background processor ────────────────────────────
 
 describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockIsAiTasksEnabled.mockReturnValue(true)
 
         // Default: payload resolves successfully
         mockGetPayload.mockResolvedValue({
@@ -69,7 +96,7 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
     it('resolves immediately without blocking caller [TC-F08-03-01]', async () => {
         // Arrange & Act — function should return quickly (fire-and-forget)
         const start = Date.now()
-        await queueSEOAutoGeneration('products', '123', 'site-1', 'Nasi Lemak')
+        await queueSEOAutoGeneration('pages', '123', 'site-1', 'Nasi Lemak')
         const elapsed = Date.now() - start
 
         // Assert — returns without waiting for background work
@@ -78,7 +105,7 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
 
     it('calls getPayload to access database [TC-F08-03-01]', async () => {
         // Arrange & Act
-        await queueSEOAutoGeneration('products', '99', 'site-5', 'Product Name')
+        await queueSEOAutoGeneration('pages', '99', 'site-5', 'Product Name')
         await flushPromises()
 
         // Assert
@@ -87,7 +114,7 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
 
     it('fetches site by ID to get business name [TC-F08-03-01]', async () => {
         // Arrange & Act
-        await queueSEOAutoGeneration('products', '99', 'site-5', 'Teh Tarik')
+        await queueSEOAutoGeneration('pages', '99', 'site-5', 'Teh Tarik')
         await flushPromises()
 
         // Assert
@@ -98,7 +125,7 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
 
     it('creates a pending SEO meta job record [TC-F08-03-01]', async () => {
         // Arrange & Act
-        await queueSEOAutoGeneration('products', '55', 'site-2', 'Roti Canai')
+        await queueSEOAutoGeneration('pages', '55', 'site-2', 'Roti Canai')
         await flushPromises()
 
         // Assert
@@ -106,7 +133,7 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
             expect.objectContaining({
                 collection: 'seo-meta-jobs',
                 data: expect.objectContaining({
-                    targetCollection: 'products',
+                    targetCollection: 'pages',
                     targetId: '55',
                     status: 'pending',
                 }),
@@ -114,27 +141,30 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
         )
     })
 
-    it('calls generateAutoSEOMeta with product type, name, and site name [TC-F08-03-01]', async () => {
-        // Arrange
-        mockFindByID.mockResolvedValue({ businessName: 'Restoran ABC', name: 'restoran-abc' })
+    it('calls generateAutoSEOMeta with page type, name, site name, and context [TC-F08-03-01]', async () => {
+        // Arrange — the processor names the site from `site.name` (stale expectation fixed: was businessName)
+        mockFindByID.mockResolvedValue({ name: 'Restoran ABC' })
 
         // Act
-        await queueSEOAutoGeneration('products', '10', 'site-3', 'Ayam Percik', 'Grilled chicken')
+        await queueSEOAutoGeneration('pages', '10', 'site-3', 'Ayam Percik', 'Grilled chicken')
         await flushPromises()
 
-        // Assert
+        // Assert — no publisher, so no actor: the meta falls back to the template
         expect(mockGenerateAutoSEOMeta).toHaveBeenCalledWith(
-            'product',
+            'page',
             'Ayam Percik',
             'Restoran ABC',
             'Grilled chicken',
-            []
+            [],
+            undefined,
+            null,
+            expect.anything()
         )
     })
 
     it('calls generateAutoSEOMeta with page type for pages collection [TC-F08-03-01]', async () => {
         // Arrange
-        mockFindByID.mockResolvedValue({ businessName: 'MyBiz', name: 'mybiz' })
+        mockFindByID.mockResolvedValue({ name: 'MyBiz' })
 
         // Act
         await queueSEOAutoGeneration('pages', '20', 'site-4', 'About Us')
@@ -146,19 +176,22 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
             'About Us',
             'MyBiz',
             undefined,
-            []
+            [],
+            undefined,
+            null,
+            expect.anything()
         )
     })
 
     it('updates the target collection with generated SEO fields [TC-F08-03-01]', async () => {
         // Arrange & Act
-        await queueSEOAutoGeneration('products', '77', 'site-6', 'Mee Goreng')
+        await queueSEOAutoGeneration('pages', '77', 'site-6', 'Mee Goreng')
         await flushPromises()
 
         // Assert
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
-                collection: 'products',
+                collection: 'pages',
                 id: '77',
                 data: expect.objectContaining({
                     seo: {
@@ -172,7 +205,7 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
 
     it('marks job as completed after successful update [TC-F08-03-01]', async () => {
         // Arrange & Act
-        await queueSEOAutoGeneration('products', '88', 'site-7', 'Laksa')
+        await queueSEOAutoGeneration('pages', '88', 'site-7', 'Laksa')
         await flushPromises()
 
         // Assert — second update call marks job completed
@@ -186,7 +219,7 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
 
     it('calls revalidatePath for sitemap after success [TC-F08-03-01]', async () => {
         // Arrange & Act
-        await queueSEOAutoGeneration('products', '90', 'site-8', 'Char Kway Teow')
+        await queueSEOAutoGeneration('pages', '90', 'site-8', 'Char Kway Teow')
         await flushPromises()
 
         // Assert
@@ -198,16 +231,19 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
         mockFindByID.mockResolvedValue({ name: 'plain-site' })
 
         // Act
-        await queueSEOAutoGeneration('products', '11', 'site-9', 'Product X')
+        await queueSEOAutoGeneration('pages', '11', 'site-9', 'Product X')
         await flushPromises()
 
         // Assert — site name passed to meta generator
         expect(mockGenerateAutoSEOMeta).toHaveBeenCalledWith(
-            'product',
+            'page',
             'Product X',
             'plain-site',
             undefined,
-            []
+            [],
+            undefined,
+            null,
+            expect.anything()
         )
     })
 
@@ -216,17 +252,107 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
         mockFindByID.mockResolvedValue({})
 
         // Act
-        await queueSEOAutoGeneration('products', '12', 'site-10', 'No-Name Product')
+        await queueSEOAutoGeneration('pages', '12', 'site-10', 'No-Name Product')
         await flushPromises()
 
         // Assert
         expect(mockGenerateAutoSEOMeta).toHaveBeenCalledWith(
-            'product',
+            'page',
             'No-Name Product',
             'Website',
             undefined,
-            []
+            [],
+            undefined,
+            null,
+            expect.anything()
         )
+    })
+})
+
+// ─── TC-AISEC-03: the publisher's identity decides whether AI runs ───────────
+
+describe('queueSEOAutoGeneration — publisher actor [TC-AISEC-03]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockIsAiTasksEnabled.mockReturnValue(true)
+        mockGetPayload.mockResolvedValue({ findByID: mockFindByID, create: mockCreate, update: mockUpdate })
+        mockFindByID.mockResolvedValue({ name: 'KL Cafe', tenant: { id: 1 } })
+        mockCreate.mockResolvedValue({ id: 'job-9' })
+        mockUpdate.mockResolvedValue({})
+        mockGenerateAutoSEOMeta.mockResolvedValue({ title: 'T', description: 'D' })
+        mockActorForUserInTenant.mockReturnValue(PUBLISHER_ACTOR)
+    })
+
+    it('generates as the publisher in the site workspace when the platform is configured', async () => {
+        await queueSEOAutoGeneration('products', '5', 'site-1', 'Teh Tarik', undefined, PUBLISHER)
+        await flushPromises()
+
+        expect(mockActorForUserInTenant).toHaveBeenCalledWith(PUBLISHER, '1')
+        expect(mockGenerateAutoSEOMeta).toHaveBeenCalledWith('product', 'Teh Tarik', 'KL Cafe', undefined, [], undefined, PUBLISHER_ACTOR, expect.anything())
+    })
+
+    it('runs without an actor (template meta) when the platform is not configured', async () => {
+        mockIsAiTasksEnabled.mockReturnValue(false)
+
+        await queueSEOAutoGeneration('pages', '6', 'site-1', 'Contact', undefined, PUBLISHER)
+        await flushPromises()
+
+        expect(mockActorForUserInTenant).not.toHaveBeenCalled()
+        expect(mockGenerateAutoSEOMeta).toHaveBeenCalledWith('page', 'Contact', 'KL Cafe', undefined, [], undefined, null, expect.anything())
+    })
+
+    it('runs without an actor when the publisher is not an active member of the site workspace', async () => {
+        // actorForUserInTenant throws AgentAccessError(403) for non-members; the processor treats any refusal as "no actor".
+        mockActorForUserInTenant.mockImplementation(() => {
+            throw new Error('You are not an active member of this workspace.')
+        })
+
+        await queueSEOAutoGeneration('pages', '7', 'site-1', 'Contact', undefined, PUBLISHER)
+        await flushPromises()
+
+        expect(mockGenerateAutoSEOMeta).toHaveBeenCalledWith('page', 'Contact', 'KL Cafe', undefined, [], undefined, null, expect.anything())
+    })
+
+    it('runs without an actor when there is no publisher (imports, scripts)', async () => {
+        await queueSEOAutoGeneration('pages', '8', 'site-1', 'Contact')
+        await flushPromises()
+
+        expect(mockActorForUserInTenant).not.toHaveBeenCalled()
+        expect(mockGenerateAutoSEOMeta).toHaveBeenCalledWith('page', 'Contact', 'KL Cafe', undefined, [], undefined, null, expect.anything())
+    })
+})
+
+// ─── Scheduling: after() inside a request, detached outside one ─────────────
+
+describe('queueSEOAutoGeneration — scheduling [TC-F08-03-01]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockIsAiTasksEnabled.mockReturnValue(true)
+        mockGetPayload.mockResolvedValue({ findByID: mockFindByID, create: mockCreate, update: mockUpdate })
+        mockFindByID.mockResolvedValue({ name: 'KL Cafe' })
+        mockCreate.mockResolvedValue({ id: 'job-3' })
+        mockUpdate.mockResolvedValue({})
+        mockGenerateAutoSEOMeta.mockResolvedValue({ title: 'T', description: 'D' })
+    })
+
+    it('hands the work to next/server after() so it survives the response', async () => {
+        await queueSEOAutoGeneration('pages', '1', 'site-1', 'Laksa')
+        await flushPromises()
+
+        expect(after).toHaveBeenCalledWith(expect.any(Function))
+        expect(mockGenerateAutoSEOMeta).toHaveBeenCalledOnce()
+    })
+
+    it('still runs the work detached when after() throws outside a request scope', async () => {
+        vi.mocked(after).mockImplementationOnce(() => {
+            throw new Error('`after` was called outside a request scope')
+        })
+
+        await expect(queueSEOAutoGeneration('pages', '2', 'site-1', 'Laksa')).resolves.toBeUndefined()
+        await flushPromises()
+
+        expect(mockGetPayload).toHaveBeenCalledOnce()
+        expect(mockGenerateAutoSEOMeta).toHaveBeenCalledOnce()
     })
 })
 
@@ -235,6 +361,7 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
 describe('queueSEOAutoGeneration — error handling [TC-F08-03-01]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockIsAiTasksEnabled.mockReturnValue(true)
 
         mockGetPayload.mockResolvedValue({
             findByID: mockFindByID,
@@ -252,7 +379,7 @@ describe('queueSEOAutoGeneration — error handling [TC-F08-03-01]', () => {
         mockGenerateAutoSEOMeta.mockRejectedValue(new Error('OpenAI timeout'))
 
         // Act
-        await queueSEOAutoGeneration('products', '50', 'site-x', 'Failed Product')
+        await queueSEOAutoGeneration('pages', '50', 'site-x', 'Failed Product')
         await flushPromises()
 
         // Assert — update called to mark job failed
@@ -272,7 +399,7 @@ describe('queueSEOAutoGeneration — error handling [TC-F08-03-01]', () => {
             .mockResolvedValueOnce({})
 
         // Act
-        await queueSEOAutoGeneration('products', '60', 'site-y', 'Error Product')
+        await queueSEOAutoGeneration('pages', '60', 'site-y', 'Error Product')
         await flushPromises()
 
         // Assert — job update called to log failure
@@ -289,9 +416,97 @@ describe('queueSEOAutoGeneration — error handling [TC-F08-03-01]', () => {
 
         // Act & Assert — caller must not see this error (fire-and-forget)
         await expect(
-            queueSEOAutoGeneration('products', '70', 'site-z', 'Ghost Product')
+            queueSEOAutoGeneration('pages', '70', 'site-z', 'Ghost Product')
         ).resolves.toBeUndefined()
 
         await flushPromises()
+    })
+})
+
+// ─── TC-F37-11: auto-SEO never overwrites merchant meta (#2083) ──────────────
+
+describe('queueSEOAutoGeneration — fills only empty fields [TC-F37-11]', () => {
+    const SITE = { businessName: 'KL Cafe' }
+    const GENERATED = { title: 'AI Title', description: 'AI Description' }
+    type Seo = { title?: string | null; description?: string | null; ogImage?: number; noIndex?: boolean }
+    // Each read of the page returns the next SEO snapshot (1st: skip check, 2nd: right before the write).
+    const pageReads = (...snapshots: Seo[]) => {
+        mockFindByID.mockImplementation(async ({ collection }: { collection: string }) => {
+            if (collection === 'sites') return SITE
+            return { id: 'p1', seo: snapshots.length > 1 ? snapshots.shift() : snapshots[0] }
+        })
+    }
+    const pageWrites = () => mockUpdate.mock.calls.filter((call) => call[0]?.collection === 'pages')
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockIsAiTasksEnabled.mockReturnValue(false)
+        mockGetPayload.mockResolvedValue({ findByID: mockFindByID, create: mockCreate, update: mockUpdate })
+        mockCreate.mockResolvedValue({ id: 'job-1' })
+        mockUpdate.mockResolvedValue({})
+        mockGenerateAutoSEOMeta.mockResolvedValue(GENERATED)
+    })
+
+    it('[TC-F37-11-01] keeps the merchant description and fills only the empty title', async () => {
+        // Arrange
+        pageReads({ title: '', description: 'Merchant description', ogImage: 12, noIndex: true })
+
+        // Act
+        await queueSEOAutoGeneration('pages', 'p1', 'site-1', 'About')
+        await flushPromises()
+
+        // Assert
+        expect(pageWrites()).toHaveLength(1)
+        expect(pageWrites()[0][0].data).toEqual({ seo: { title: 'AI Title', description: 'Merchant description', ogImage: 12, noIndex: true } })
+    })
+
+    it('[TC-F37-11-02] keeps the merchant title and fills only the empty description', async () => {
+        // Arrange
+        pageReads({ title: 'Merchant title', description: null })
+
+        // Act
+        await queueSEOAutoGeneration('pages', 'p1', 'site-1', 'About')
+        await flushPromises()
+
+        // Assert
+        expect(pageWrites()[0][0].data).toEqual({ seo: { title: 'Merchant title', description: 'AI Description' } })
+    })
+
+    it('[TC-F37-11-03] does nothing when the merchant filled both fields (no job, no write)', async () => {
+        // Arrange
+        pageReads({ title: 'Merchant title', description: 'Merchant description' })
+
+        // Act
+        await queueSEOAutoGeneration('pages', 'p1', 'site-1', 'About')
+        await flushPromises()
+
+        // Assert
+        expect(mockCreate).not.toHaveBeenCalled()
+        expect(mockGenerateAutoSEOMeta).not.toHaveBeenCalled()
+        expect(pageWrites()).toHaveLength(0)
+    })
+
+    it('[TC-F37-11-04] keeps a description the merchant saved while the meta was generating', async () => {
+        // Arrange — empty at enqueue, description saved before the write
+        pageReads({ title: '', description: '' }, { title: '', description: 'Saved meanwhile' })
+
+        // Act
+        await queueSEOAutoGeneration('pages', 'p1', 'site-1', 'About')
+        await flushPromises()
+
+        // Assert
+        expect(pageWrites()[0][0].data).toEqual({ seo: { title: 'AI Title', description: 'Saved meanwhile' } })
+    })
+
+    it('[TC-F37-11-05] treats whitespace-only values as empty', async () => {
+        // Arrange
+        pageReads({ title: '   ', description: 'Merchant description' })
+
+        // Act
+        await queueSEOAutoGeneration('pages', 'p1', 'site-1', 'About')
+        await flushPromises()
+
+        // Assert
+        expect(pageWrites()[0][0].data).toEqual({ seo: { title: 'AI Title', description: 'Merchant description' } })
     })
 })

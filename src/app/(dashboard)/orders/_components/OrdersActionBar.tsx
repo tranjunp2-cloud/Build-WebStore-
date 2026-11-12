@@ -35,6 +35,7 @@ const SORT_VALUES: Record<string, string> = {
 export function OrdersActionBar({
     search = '',
     onSearch,
+    statusFilter,
     onFilterStatus,
     onFilterDate,
     onFilterPaymentMethod,
@@ -45,6 +46,8 @@ export function OrdersActionBar({
     isConfirming?: boolean
     search?: string
     onSearch?: (val: string) => void
+    /** Controlled status value (keeps the chip in sync with the Stats Bar cards). */
+    statusFilter?: string
     onFilterStatus?: (val: string) => void
     onFilterDate?: (val: string) => void
     onFilterPaymentMethod?: (val: string) => void
@@ -135,7 +138,7 @@ export function OrdersActionBar({
                 <FilterChip<string>
                     icon={Clock}
                     label={o.filterLabels.status}
-                    value={statusVal}
+                    value={statusFilter ?? statusVal}
                     options={STATUS_OPTIONS}
                     onChange={(v) => { setStatusVal(v); onFilterStatus?.(v) }}
                 />

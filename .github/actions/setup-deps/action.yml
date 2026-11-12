@@ -1,0 +1,48 @@
+name: Setup Node + dependencies
+description: >
+  Node + node_modules (root and packages/*) restored from cache (key = OS + arch + Node + package.json files + lockfile + postinstall).
+  On a cache hit npm ci is skipped entirely. Replaces setup-node's `cache: npm`, which restored a
+  1.9 GB ~/.npm tarball and still ran a full npm ci (2-10 min on the shared runner host).
+  Only pushes (staging / main) save the cache: PR runs (Dependabot opens one lockfile per PR) only
+  restore, so they cannot evict the shared entries. PRs read the staging / main entries.
+
+inputs:
+  node-version:
+    description: Node version for actions/setup-node
+    default: '24'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        check-latest: true
+
+    - name: Restore node_modules
+      id: nm
+      uses: actions/cache/restore@v6
+      with:
+        # Workspace packages keep their own nested deps (packages/ai-contracts needs zod 4 while the
+        # root has zod 3), so their node_modules must be cached too or they silently resolve the root copy.
+        path: |
+          node_modules
+          packages/*/node_modules
+        # package.json is in the key on purpose: if it disagrees with the lockfile the key misses,
+        # `npm ci` runs and fails exactly as it did before this cache existed.
+        key: nm-v2-${{ runner.os }}-${{ runner.arch }}-node${{ inputs.node-version }}-${{ hashFiles('package.json', 'packages/*/package.json', 'package-lock.json', 'scripts/postinstall.js') }}
+
+    - name: Install dependencies (cache miss only)
+      if: steps.nm.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci --include=optional --no-audit --no-fund
+
+    - name: Save node_modules (push runs only)
+      if: steps.nm.outputs.cache-hit != 'true' && github.event_name == 'push'
+      uses: actions/cache/save@v6
+      with:
+        path: |
+          node_modules
+          packages/*/node_modules
+        key: ${{ steps.nm.outputs.cache-primary-key }}

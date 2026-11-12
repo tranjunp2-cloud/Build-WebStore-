@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { IMPERSONATION_FORBIDDEN, isMerchantAccessSession } from '@/lib/support/merchant-access-session'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,10 @@ export const dynamic = 'force-dynamic'
  * Body: { endpoint: string, keys: { p256dh: string, auth: string } }
  */
 export const POST = withAuth(async (user, request) => {
+  // A support session must not register its browser for the merchant's notifications (TC-F15.40)
+  if (isMerchantAccessSession(request)) {
+    return NextResponse.json({ error: IMPERSONATION_FORBIDDEN }, { status: 403 })
+  }
   try {
     const payload = await getPayload({ config })
     const body = await request.json()

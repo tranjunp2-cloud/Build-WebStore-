@@ -4,7 +4,7 @@ plan: plans/260416-1450-template-first-gen/plan.md
 prd: docs/prd/F01-ai-builder.md
 created: 2026-04-16
 scenarios: 32
-test-cases: 27
+test-cases: 31
 ---
 
 # QA Test Plan — F01 Template-First Gen
@@ -118,7 +118,7 @@ test-cases: 27
   1. POST with language="ms", industry="restaurant"
   2. Check hero headline language = Malay (GPT personalize)
   3. Check SEO description language = Malay
-- **Expected:** GPT outputs Malay headline/SEO. Template body content = English (known limitation until Phase 04).
+- **Expected:** GPT outputs Malay headline/SEO. Template body localized for gallery heading + `/gallery` page title, homepage newsletter, sample product `shortDescription` (TC-TF-028..031, #2160). Known remaining gaps: Blog page headings, SEO titles of other sub-pages.
 
 ### TC-TF-008: Multilingual — language=vi
 - **Priority:** P2
@@ -294,16 +294,50 @@ test-cases: 27
   3. Inspect the page persisted by the image-free retry.
 - **Expected:** The first create receives the numeric image reference; the retry removes it while preserving Malay headline/subheadline, `showCategoryFilter`, normalized `limit`, and removal of legacy `count`.
 
+### TC-TF-028: Malay sample products — shortDescription in Bahasa Melayu (#2160)
+- **Priority:** P2
+- **Type:** Unit (Vitest, AI platform transport mocked) — `src/__tests__/unit/lib/ai/sample-products-language-prompt.test.ts`
+- **AC Reference:** AC-5, FR-16
+- **Steps:**
+  1. `prepareSampleProducts` with issue input (Kek lapis, roti canai, kopi tarik) and language `ms` / `en` / `vi`.
+  2. Inspect the `sitegen.sample-products` prompt.
+- **Expected:** `ms` prompt requires `shortDescription` in Bahasa Melayu (shown on every storefront product surface), keeps `description` EN + `descriptionBM`. `en` has no Malay rule; `vi` keeps its generic target-language rule.
+
+### TC-TF-029: Malay gallery heading + `/gallery` page title (#2160)
+- **Priority:** P2
+- **Type:** Unit (Vitest, real composer) — `src/__tests__/unit/templates/template-composer-malay-locale.test.ts`
+- **AC Reference:** AC-5, FR-16
+- **Steps:**
+  1. `composeTemplateResult` with issue input, industry `fnb`, language `ms` (seeds 1-3) and `en`.
+- **Expected:** `ms`: no gallery headline contains "Gallery" (composer → `Galeri — {biz}`); `/gallery` page title `Galeri` (nav/footer/SEO labels derive from it); slug stays `/gallery`, no `/galeri` link. `en` unchanged (`Gallery — {biz}`, title `Gallery`). `vi` gets the same fix (`Thư Viện Ảnh`).
+
+### TC-TF-030: Malay homepage newsletter heading (#2160)
+- **Priority:** P2
+- **Type:** Unit (Vitest, real composer) — same file as TC-TF-029
+- **AC Reference:** AC-5, FR-16
+- **Steps:**
+  1. Same as TC-TF-029; inspect homepage `newsletter` blocks.
+- **Expected:** `ms`: headline `Ikuti Perkembangan Terbaru {biz}`, subheadline `Langgan untuk berita dan tawaran.` `en` unchanged.
+
+### TC-TF-031: Template-first composes in the resolved locale (#2160)
+- **Priority:** P2
+- **Type:** Unit (Vitest, real `generateSiteWithAI` template-first path; AI platform scripted) — `src/__tests__/unit/ai/template-first-resolved-locale.test.ts`
+- **AC Reference:** AC-5, FR-16
+- **Steps:**
+  1. Builder request shape: `language: 'auto'` + `targetLocale: 'ms'` (issue input, industry `fnb`).
+  2. Repeat with `language: 'en'`.
+- **Expected:** `ms`: gallery headlines `Galeri — {biz}`, `/gallery` title `Galeri` (composer receives the resolved locale, not raw `'auto'` → `'en'`). `en` unchanged (`Gallery — {biz}`).
+
 ## 5. Traceability Matrix
 
 | AC / FR | Test Cases | Coverage |
 |---------|-----------|----------|
 | AC-1 (Gen site < 60s, 4 pages) | TC-TF-001, TC-TF-002, TC-TF-003, TC-TF-004 | ✅ Full |
-| AC-5 (Multilingual output) | TC-TF-007, TC-TF-008 | ✅ Full |
+| AC-5 (Multilingual output) | TC-TF-007, TC-TF-008, TC-TF-028, TC-TF-029, TC-TF-030, TC-TF-031 | ✅ Full |
 | AC-6 (AI image) | TC-TF-012 (blocks populated for media) | ✅ Full |
 | FR-02 (< 60s) | TC-TF-001, TC-TF-009, TC-TF-010 | ✅ Full |
 | FR-15 (Rate limit) | TC-TF-014 | ✅ Full |
-| FR-16 (Language detection) | TC-TF-007, TC-TF-008 | ✅ Full |
+| FR-16 (Language detection) | TC-TF-007, TC-TF-008, TC-TF-028, TC-TF-029, TC-TF-030, TC-TF-031 | ✅ Full |
 | FR-17 (4 pages minimum) | TC-TF-001, TC-TF-011 | ✅ Full |
 | FR-18 (Layout per category) | TC-TF-001, TC-TF-004 | ✅ Full |
 | BR-03 (Rate limit before API) | TC-TF-014 | ✅ Full |

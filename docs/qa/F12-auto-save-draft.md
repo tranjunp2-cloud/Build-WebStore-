@@ -73,6 +73,19 @@ Trọng tâm kiểm thử đặc biệt nhắm đến các rủi ro hệ thống
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | **TC-F12.15** | `Flow`| `Flow` | **[Positive]** Auto-Save Đồng Biên Cùng Hành Động Undo F11 | 1. Khách Hàng chọn tính năng Lùi Nội Dung (Undo) trên một Card UI Hình ảnh.<br>2. Buông thao tác Chuột nằm đợi tĩnh 3 giây. | - Hành vi Lùi Về Undo bắt buộc Kích Hoạt Cờ thay đổi `isDirty=true`. Hệ Auto-Save phải Nhận và Push Dữ data Mốc Sau Undo này Ghi Vào Database để Không Trôi Quên Cấu trúc. | Blocker | [ ] |
 | **TC-F12.16** | `Sec` | `Edge` | **[Negative]** Chặn quyền ghi đè Dữ liệu Cũ khi Người Dùng xử lý nhiều Tab cùng Mở | 1. Tại Cửa Sổ Trình Duyệt Chrome mở Song Ngang 2 Tab A và Tab B vô chung Phòng Edit Page Cũ.<br>2. Dùng Tab A gõ Dày Chữ, Quá Trình Load Lưu Chốt Bảng Vàng Hoàn Tất.<br>3. Chuyển Qua Màn Tab B Tĩnh (Giao diện Version Cũ Lạc Hậu) gõ Nhè 1 Chữ. | - Trình Mạng Tự Động Push Của Tab B Chạm DB Backend Bị Cảnh báo (Version Mismatch). Phương Tiện Request Chặn Đứng Khóa Quyền Sửa Khống. Bật Thông Báo: "Trang Của Bạn Thiết Cập Thay Đổi Phiên Làm Khác, Tiến Hành Refresh". | Critical | [ ] |
+| **TC-F12.17** | `Flow` | `Edge` | **[Positive]** Undo xong sửa inline lại vẫn được lưu (GH-2084) | 1. Sửa inline tiêu đề Hero (A) → đợi Saved.<br>2. Bấm Undo (canvas reload).<br>3. Sửa inline lần nữa (B) → click ra ngoài → đợi Saved.<br>4. Reload editor. | - Payload lưu sau Undo luôn gửi `localeContent` (kể cả `{}`) để xoá bản ngôn ngữ cũ của A trong DB.<br>- Sau reload thấy B, không quay về A. | Blocker | [x] AUTO |
+| **TC-F12.18** | `Flow` | `Negative` | **[Negative]** Edit inline không khớp field nào → báo lỗi, không hiện Saved (GH-2084) | 1. Canvas hiển thị nội dung khác với store (lệch bản).<br>2. Sửa inline rồi click ra ngoài. | - Toast lỗi "Couldn't save your edit"; không gọi lưu; canvas reload lại từ DB; trạng thái không chuyển "Saved". | Critical | [x] AUTO |
+
+
+### Phân Quyền API Lưu / Xuất Bản (Role Check, #2092) (5 Cases)
+
+| TC-ID | Ref | Loại | Tình huống | Các bước | Kết quả mong đợi | Mức độ | AUTO |
+|---|---|---|---|---|---|---|---|
+| **TC-F12.17** | `Sec` | `Sec` | **[Negative]** `PATCH /api/sites/:id/save` bị 403 khi staff role `custom` thiếu quyền `builder` | 1. Staff `custom` chỉ có quyền Orders, membership `active`.<br>2. Gọi PATCH save. | - 403 `Forbidden`, không ghi DB (`payload.update` không được gọi). | Critical | [x] AUTO |
+| **TC-F12.18** | `Sec` | `Sec` | **[Negative]** `PATCH /api/sites/:id/publish` bị 403 khi thiếu quyền `builder` | 1. Như TC-F12.17.<br>2. Gọi PATCH publish. | - 403 `FORBIDDEN`, site không được publish. | Critical | [x] AUTO |
+| **TC-F12.19** | `Sec` | `Sec` | **[Negative]** `DELETE /api/sites/:id/publish` (unpublish) bị 403 khi thiếu quyền `builder` | 1. Như TC-F12.17.<br>2. Gọi DELETE publish. | - 403 `FORBIDDEN`, site vẫn `published`. | Critical | [x] AUTO |
+| **TC-F12.20** | `Sec` | `Sec` | **[Negative]** Membership `pending` / không thuộc tenant bị 403 ở cả 3 API | 1. Staff có membership `status: pending`.<br>2. Gọi save / publish / unpublish. | - 403, không ghi DB. | Critical | [x] AUTO |
+| **TC-F12.21** | `Sec` | `Flow` | **[Positive]** Regression: owner / admin / editor / viewer / `custom` + `builder` (active) vẫn lưu & xuất bản được | 1. Đăng nhập các role trên.<br>2. Gọi save / publish / unpublish. | - Hành vi cũ không đổi (không 403 do role). | Critical | [x] AUTO |
 
 ---
 

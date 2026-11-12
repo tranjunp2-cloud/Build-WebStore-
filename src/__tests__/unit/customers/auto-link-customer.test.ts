@@ -185,7 +185,7 @@ describe('autoLinkCustomer Hook (TC-F25-001..005)', () => {
     })
 
     describe('TC-F25-005: Fault tolerance (DB failure)', () => {
-        it('TC-F25-005: Should log error with prefix and set customer=null when find() throws', async () => {
+        it('TC-F25-005: find() throws → hook rethrows (the lookup runs on the order transaction, which Payload already rolled back; see TC-PERF-185)', async () => {
             // Arrange
             const data = {
                 customerPhone: '+60123456789',
@@ -201,34 +201,22 @@ describe('autoLinkCustomer Hook (TC-F25-001..005)', () => {
 
             const req = { payload: mockPayload } as any
 
-            // Act
-            const result = await autoLinkCustomer({
+            // Act + Assert: the order save fails instead of continuing outside its transaction
+            await expect(autoLinkCustomer({
                 data,
                 req,
                 operation: 'create',
                 originalDoc: undefined,
-            })
-
-            // Assert: hook returns data without throwing
-            expect(result).toBeDefined()
-            expect(result.customer).toBeNull()
-
-            // Assert: error logged with [Orders.autoLinkCustomer] prefix
-            expect(consoleErrorSpy).toHaveBeenCalledWith(
-                expect.stringContaining('[Orders.autoLinkCustomer]'),
-                dbError
-            )
-
-            // Assert: order creation continues (not aborted)
-            expect(result.customerName).toBe('Test')
+            } as any)).rejects.toBe(dbError)
+            expect(mockPayload.create).not.toHaveBeenCalled()
+            expect(data).not.toHaveProperty('customer')
         })
     })
 
     describe('TC-F25-006: Fault tolerance (create() throws)', () => {
-        it('TC-F25-006: unique create error → retry find finds no winner → rethrow → outer catch → customer=null', async () => {
+        it('TC-F25-006: unique create error → retry find finds no winner → customer=null', async () => {
             // Flow: create throws 'unique constraint violation' → inner catch detects 'unique' →
-            // retry find (both find calls return []) → no winner → throw createErr →
-            // outer catch → customer=null + console.error (non-throwing contract).
+            // retry find (both find calls return []) → no winner → customer=null + console.error.
             const data = {
                 customerPhone: '+60987654321',
                 customerName: 'New Customer',
@@ -263,16 +251,16 @@ describe('autoLinkCustomer Hook (TC-F25-001..005)', () => {
             )
         })
 
-        it('TC-F25-006b: non-unique create error → no retry → outer catch → customer=null', async () => {
-            // Flow: create throws non-unique error (e.g. network) → inner catch 'else' branch →
-            // throw createErr directly (no retry find) → outer catch → customer=null + console.error.
+        it('TC-F25-006b: non-unique create error → no retry → customer=null', async () => {
+            // Flow: create throws a non-unique data error → no retry find → customer=null + console.error.
+            // (A connection/pool-timeout error throws instead — TC-PERF-185.)
             const data = {
                 customerPhone: '+60987654321',
                 customerName: 'New Customer',
                 tenant: 'tenant-789',
             } as any
 
-            const createError = new Error('connection reset')
+            const createError = new Error('value too long for type character varying(255)')
             const mockPayload = {
                 find: vi.fn().mockResolvedValue({ docs: [] }), // initial lookup only
                 create: vi.fn().mockRejectedValue(createError),
@@ -410,26 +398,42 @@ describe('autoLinkCustomer — address sync (TC-F25-02-08..14)', () => {
         expect(updateCall.data).not.toHaveProperty('addresses')
     })
 
-    it('TC-F25-02-11: existing customer + new order → payload.update always called (latest-wins)', async () => {
+    it('TC-F25-02-11: existing customer with name + email → NO update (no latest-wins overwrite, #2086)', async () => {
         const data = {
             customerPhone: '+60444555666',
             customerName: 'Siti',
+            customerEmail: 'siti@new.com',
             tenant: 'tenant-1',
             shippingAddress: { line1: 'New Street 1' },
         } as any
 
         const mockPayload = {
-            find: vi.fn().mockResolvedValue({ docs: [{ id: 55, name: 'Siti Old', addresses: [{ line1: 'Old St', isDefault: true }] }] }),
+            find: vi.fn().mockResolvedValue({ docs: [{ id: 55, name: 'Siti Old', email: 'old@x.com', addresses: [{ line1: 'Old St', isDefault: true }] }] }),
             update: vi.fn().mockResolvedValue({ id: 55 }),
         }
 
-        await autoLinkCustomer({ data, req: { payload: mockPayload } as any, operation: 'create', originalDoc: undefined })
+        const result = await autoLinkCustomer({ data, req: { payload: mockPayload } as any, operation: 'create', originalDoc: undefined })
 
-        expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
-            collection: 'customers',
-            id: 55,
-            data: expect.objectContaining({ name: 'Siti' }),
-        }))
+        expect(result.customer).toBe(55)
+        expect(mockPayload.update).not.toHaveBeenCalled()
+    })
+
+    it('TC-F25-02-23: existing customer without email / with "(unknown)" name → fills only the empty fields', async () => {
+        const mockPayload = {
+            find: vi.fn()
+                .mockResolvedValueOnce({ docs: [{ id: 60, name: 'Keep Me', email: null }] })
+                .mockResolvedValueOnce({ docs: [{ id: 61, name: '(unknown)', email: 'has@x.com' }] }),
+            update: vi.fn().mockResolvedValue({}),
+        }
+        const base = { customerPhone: '+60123000111', customerName: 'Aina', customerEmail: 'Aina@X.com', tenant: 'tenant-1' }
+
+        await autoLinkCustomer({ data: { ...base } as any, req: { payload: mockPayload } as any, operation: 'create', originalDoc: undefined })
+        await autoLinkCustomer({ data: { ...base } as any, req: { payload: mockPayload } as any, operation: 'create', originalDoc: undefined })
+
+        expect(mockPayload.update.mock.calls[0][0]).toMatchObject({ id: 60, data: { email: 'aina@x.com' } })
+        expect(mockPayload.update.mock.calls[0][0].data).not.toHaveProperty('name')
+        expect(mockPayload.update.mock.calls[1][0]).toMatchObject({ id: 61, data: { name: 'Aina' } })
+        expect(mockPayload.update.mock.calls[1][0].data).not.toHaveProperty('email')
     })
 
     it('TC-F25-02-12: existing customer + empty line1 → payload.update called for name but without addresses', async () => {
@@ -455,12 +459,13 @@ describe('autoLinkCustomer — address sync (TC-F25-02-08..14)', () => {
     it('TC-F25-02-13: payload.update throws → no rethrow, data.customer still set to existing id', async () => {
         const data = {
             customerPhone: '+60100200300',
+            customerName: 'Fail Name',
             tenant: 'tenant-1',
             shippingAddress: { line1: 'Fail Street' },
         } as any
 
         const mockPayload = {
-            find: vi.fn().mockResolvedValue({ docs: [{ id: 99, addresses: [] }] }),
+            find: vi.fn().mockResolvedValue({ docs: [{ id: 99, name: '(unknown)', addresses: [] }] }),
             update: vi.fn().mockRejectedValue(new Error('update failed')),
         }
 

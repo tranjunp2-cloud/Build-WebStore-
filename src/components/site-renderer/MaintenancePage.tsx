@@ -1,11 +1,29 @@
 'use client'
 
+import { STORE_UNAVAILABLE_COPY, type StoreUnavailableLocale } from '@/lib/storefront/store-unavailable'
+
 /**
  * Maintenance mode page (AC-3: US-F05-10)
  * Shown to public visitors when site is unpublished (was previously published).
- * HTTP 503 status is set by middleware for SEO crawlers.
+ * `variant="unavailable"`: banned or expired store (#2179) — fixed copy, no store name, no reason.
+ * HTTP 503 status is set by middleware for SEO crawlers; this page is the fallback render.
  */
-export function MaintenancePage({ siteName }: { siteName?: string }) {
+export function MaintenancePage({ siteName, variant = 'maintenance', locale = 'en' }: {
+    siteName?: string
+    variant?: 'maintenance' | 'unavailable'
+    locale?: StoreUnavailableLocale
+}) {
+    if (variant === 'unavailable') {
+        const copy = STORE_UNAVAILABLE_COPY[locale] ?? STORE_UNAVAILABLE_COPY.en
+        return (
+            <div lang={locale} className="flex min-h-screen items-center justify-center bg-slate-50">
+                <div className="mx-4 max-w-md text-center">
+                    <h1 className="mb-3 text-2xl font-bold text-slate-900">{copy.title}</h1>
+                    <p className="text-base leading-relaxed text-slate-600">{copy.message}</p>
+                </div>
+            </div>
+        )
+    }
     return (
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
             <div className="mx-4 max-w-md text-center">

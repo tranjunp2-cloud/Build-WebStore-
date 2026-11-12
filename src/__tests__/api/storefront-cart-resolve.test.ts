@@ -11,6 +11,13 @@ vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('@/lib/rateLimit', () => ({ checkRateLimit: mockCheckRateLimit }))
 
 import { POST } from '@/app/api/storefront/cart/resolve/route'
+// #2179: store availability has its own tests (store-unavailable.test.ts); here a store is unavailable only when suspended.
+vi.mock('@/lib/storefront/store-availability', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/storefront/store-availability')>()),
+    isTenantUnavailable: vi.fn(async (_payload: unknown, tenant: { status?: unknown } | null) => tenant?.status === 'suspended'),
+    isTenantIdUnavailable: vi.fn(async () => false),
+}))
+import { isTenantIdUnavailable, isTenantUnavailable } from '@/lib/storefront/store-availability'
 
 const body = { siteId: 10, siteSlug: 'merchant', items: [{ productId: 20, quantity: 5, snapshot: { name: 'Old shirt', price: 50 } }] }
 const request = (value = body, host = 'merchant.primeweb.app') => new Request('http://localhost/api/storefront/cart/resolve', { method: 'POST', headers: { host, 'x-forwarded-for': '203.0.113.1' }, body: JSON.stringify(value) })
@@ -53,6 +60,19 @@ describe('POST /api/storefront/cart/resolve [TC-F09.57]', () => {
         expect(json.lines[0]).toEqual(expect.objectContaining({ productId: 20, available: true, changed: expect.arrayContaining(['name', 'price']), product: expect.objectContaining({ name: 'New shirt', price: 40, quantity: 3 }) }))
         expect(json.lines[0].product).not.toHaveProperty('tenant')
         expect(json.lines[0].product).not.toHaveProperty('images')
+    })
+
+    it('[TC-F09.283] unavailable store resolves no cart lines', async () => {
+        // Arrange
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 1, status: 'active' }] })
+        vi.mocked(isTenantUnavailable).mockResolvedValueOnce(true)
+
+        // Act
+        const response = await POST(request())
+
+        // Assert
+        expect(await response.json()).toEqual({ lines: [] })
+        expect(mockFind).toHaveBeenCalledTimes(1)
     })
 
     it('does not leak a cart when requested site is not published for the hostname tenant', async () => {

@@ -251,7 +251,7 @@ describe('[TC-F37-04-11 / TC-F37-04-12] Issue ownership and actions', () => {
             name: 'Fix: 2 items missing meta titles',
         })
         const descriptionFix = screen.getByRole('button', {
-            name: 'Fix: 2 pages missing meta descriptions',
+            name: 'Fix: 2 items missing meta descriptions',
         })
         expect(titleFix).not.toBe(descriptionFix)
     })
@@ -374,5 +374,47 @@ describe('[TC-F37-04-16] Conditional metadata AI Fix strip', () => {
         ).toBeInTheDocument()
         expect(screen.queryByText("All clear")).not.toBeInTheDocument()
         expect(screen.queryByRole("button")).not.toBeInTheDocument()
+    })
+})
+
+// ── GH-2257: meta-description count covers pages + products + blogs ─────────
+describe('[TC-F37-04-11] Meta description issue is labelled as items, not pages', () => {
+    const stateWithDescriptions = (count: number): SeoHealthCardLoadState => ({
+        ...partialState,
+        issues: [
+            {
+                id: 'meta-description',
+                code: 'meta-description',
+                count,
+                action: { kind: 'fix-meta-description' },
+            },
+        ],
+    })
+
+    const renderIn = (locale: 'en' | 'ms', count: number) =>
+        render(
+            <I18nProvider defaultLocale={locale}>
+                <SeoHealthCard
+                    data={stateWithDescriptions(count)}
+                    onIssueAction={vi.fn()}
+                    onFixAllMetadata={vi.fn()}
+                    onRetry={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+
+    it.each([
+        ['en', 1, 'Fix: 1 item missing a meta description'],
+        ['en', 26, 'Fix: 26 items missing meta descriptions'],
+        ['ms', 1, /^.+: 1 item tiada penerangan meta$/],
+        ['ms', 26, /^.+: 26 item tiada penerangan meta$/],
+    ] as const)('%s, count %i: row uses the item wording', (locale, count, name) => {
+        // Arrange + Act
+        renderIn(locale, count)
+
+        // Assert
+        const row = screen.getByRole('button', { name })
+        expect(row).toBeInTheDocument()
+        expect(row.getAttribute('aria-label') ?? row.textContent ?? '').not.toMatch(/page|halaman/i)
     })
 })

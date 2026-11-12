@@ -44,6 +44,21 @@ describe('getCategoriesAction — tenant-scoped access (TC-F08-05-13)', () => {
         vi.mocked(tenantIdForQuery).mockReturnValue('tenant-456')
     })
 
+    it('[TC-PERF-077] reads the categories as one statement with names-only tenant / site relations, next to the counts', async () => {
+        // Act
+        await getCategoriesAction()
+
+        // Assert
+        expect(mockFind).toHaveBeenCalledTimes(1)
+        expect(mockFind.mock.calls[0][0]).toMatchObject({
+            collection: 'categories',
+            pagination: false,
+            depth: 1,
+            populate: { tenants: { name: true, slug: true }, sites: { name: true } },
+        })
+        expect(mockExecute).toHaveBeenCalledTimes(1)
+    })
+
     it('TC-F08-05-13: passes overrideAccess:false so the tenant-scoped read access-control actually applies', async () => {
         // Regression guard: Payload's Local API defaults `overrideAccess` to `true` when omitted,
         // which silently bypasses Categories.ts's tenant-scoped `read` access control (`{tenant:

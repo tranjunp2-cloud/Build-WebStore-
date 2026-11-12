@@ -26,6 +26,13 @@ import { POST } from '@/app/api/orders/calculate-shipping/route'
 import { getPayload } from 'payload'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
+// #2179: store availability has its own tests (store-unavailable.test.ts); here a store is unavailable only when suspended.
+vi.mock('@/lib/storefront/store-availability', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/storefront/store-availability')>()),
+    isTenantUnavailable: vi.fn(async (_payload: unknown, tenant: { status?: unknown } | null) => tenant?.status === 'suspended'),
+    isTenantIdUnavailable: vi.fn(async () => false),
+    isSiteDocTenantUnavailable: vi.fn(async (_payload: unknown, site: { tenant?: { status?: unknown } | unknown }) => (site.tenant as { status?: unknown } | null)?.status === 'suspended'),
+}))
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 

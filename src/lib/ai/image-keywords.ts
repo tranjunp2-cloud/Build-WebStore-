@@ -45,6 +45,36 @@ export const CATEGORY_BASE_KEYWORDS: Record<string, string[]> = {
     ecommerce: ['product photography', 'retail shop', 'shopping bags', 'flatlay'],
 }
 
+// GH-1611: `fnb` covers cafés AND bakeries, but its category phrase is "coffee
+// shop". A bakery merchant therefore got coffee photos from every scaffolding /
+// relaxed / category-fallback query. These lexicons let callers pick a bakery
+// phrase when — and only when — the merchant's own products say so.
+const BAKERY_TOKENS = new Set([
+    'bánh', 'kẹo', 'bakery', 'cake', 'cakes', 'cupcake', 'cupcakes',
+    'pastry', 'pastries', 'candy', 'cookie', 'cookies', 'donut', 'donuts',
+    'macaron', 'macarons', 'kek', 'roti', 'dessert', 'desserts',
+])
+// A merchant selling both ("cà phê, bánh") is a real café: keep "coffee shop".
+// Markers match WHOLE tokens / phrases only — substring matching read "platter"
+// as latte and "steamed" as tea, flipping valid cake products back to coffee.
+// "bánh mì" is a sandwich shop, not a bakery.
+const COFFEE_TOKENS = new Set(['cafe', 'café', 'coffee', 'kopi', 'espresso', 'latte', 'trà', 'tea'])
+const NON_BAKERY_PHRASES = ['bánh mì', 'banh mi', 'cà phê', 'ca phe']
+
+export const BAKERY_PHRASE_EN = 'bakery pastry'
+export const BAKERY_PHRASE_VI = 'tiệm bánh'
+
+/** True when the merchant's product terms describe a bakery, not a coffee shop. */
+export function isBakeryContext(subjectTexts: ReadonlyArray<string | undefined>): boolean {
+    const text = subjectTexts.filter(Boolean).join(' ').normalize('NFC').toLowerCase()
+    if (!text) return false
+    const tokens = text.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+    const padded = ` ${tokens.join(' ')} `
+    if (NON_BAKERY_PHRASES.some((p) => padded.includes(` ${p} `))) return false
+    if (tokens.some((tok) => COFFEE_TOKENS.has(tok))) return false
+    return tokens.some((tok) => BAKERY_TOKENS.has(tok))
+}
+
 /** Block type → modifier keywords that refine the query for specific contexts. */
 export const BLOCK_MODIFIER_KEYWORDS: Record<string, string[]> = {
     hero: [],

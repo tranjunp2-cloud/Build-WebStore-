@@ -1,11 +1,12 @@
 /**
- * F02 Auth Flow — Unit Tests for Validation, Password Strength, Role Redirect
+ * F02 Auth Flow — Unit Tests for Validation, Role Redirect
+ *
+ * Login password length + strength moved to tests that import the source (GH-2269):
+ *   login-page-password-min-length.test.tsx, password-rules.test.ts
  *
  * QA Coverage Map (docs/qa/F02-auth.md):
  *   TC-F02.09: Empty input validation
  *   TC-F02.11: Email space trimming (registerSchema)
- *   TC-F02.12: Password min length (8 chars)
- *   TC-F02.13: Password complexity (uppercase, number, special char)
  *   TC-F02.34: Post-login redirect with returnUrl
  *   TC-F02.35: Role-based redirect (owner vs staff)
  */
@@ -26,29 +27,6 @@ const registerSchema = z
         message: "Passwords don't match",
         path: ['confirmPassword'],
     })
-
-const loginSchema = z.object({
-    email: z.string().min(1, 'Email is required').email('Please enter a valid email'),
-    password: z.string().min(8, 'Password must be at least 8 characters'),
-})
-
-// ── Re-create pure functions (mirroring register/login page.tsx) ──
-function getPasswordStrength(password: string): { score: number; label: string; color: string } {
-    let score = 0
-    if (password.length >= 8) score++
-    if (/[A-Z]/.test(password)) score++
-    if (/[0-9]/.test(password)) score++
-    if (/[^A-Za-z0-9]/.test(password)) score++
-
-    const levels: { label: string; color: string }[] = [
-        { label: 'Too weak', color: 'bg-red-500' },
-        { label: 'Weak', color: 'bg-orange-500' },
-        { label: 'Fair', color: 'bg-yellow-500' },
-        { label: 'Good', color: 'bg-emerald-400' },
-        { label: 'Strong', color: 'bg-emerald-500' },
-    ]
-    return { score, ...levels[score] }
-}
 
 function generateSlug(name: string): string {
     return name
@@ -116,77 +94,6 @@ describe('registerSchema (TC-F02.09: empty input validation)', () => {
             firstName: 'Ahmad', lastName: 'Ali', email: 'a@b.com', password: 'MyPass88!', confirmPassword: 'Different!',
         })
         expect(result.success).toBe(false)
-    })
-})
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TC-F02.12: Password Length Validation (min 8 chars)
-// ═══════════════════════════════════════════════════════════════════════════
-describe('loginSchema (TC-F02.12: password length)', () => {
-    it('rejects password shorter than 8 chars', () => {
-        const result = loginSchema.safeParse({ email: 'a@b.com', password: 'Admin1!' })
-        expect(result.success).toBe(false)
-        if (!result.success) {
-            expect(result.error.issues[0].message).toContain('8 characters')
-        }
-    })
-
-    it('accepts password exactly 8 chars', () => {
-        const result = loginSchema.safeParse({ email: 'a@b.com', password: 'Admin12!' })
-        expect(result.success).toBe(true)
-    })
-
-    it('rejects empty email in login', () => {
-        const result = loginSchema.safeParse({ email: '', password: 'ValidPass1!' })
-        expect(result.success).toBe(false)
-    })
-})
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TC-F02.13: Password Complexity / Strength
-// ═══════════════════════════════════════════════════════════════════════════
-describe('getPasswordStrength (TC-F02.13: password complexity)', () => {
-    it('scores 0 (Too weak) for empty string', () => {
-        const result = getPasswordStrength('')
-        expect(result.score).toBe(0)
-        expect(result.label).toBe('Too weak')
-    })
-
-    it('scores 0 for short password without complexity', () => {
-        const result = getPasswordStrength('abc')
-        expect(result.score).toBe(0)
-        expect(result.label).toBe('Too weak')
-    })
-
-    it('scores 1 (Weak) for >=8 chars lowercase only', () => {
-        const result = getPasswordStrength('abcdefgh')
-        expect(result.score).toBe(1)
-        expect(result.label).toBe('Weak')
-    })
-
-    it('scores 2 (Fair) for >=8 chars + uppercase', () => {
-        const result = getPasswordStrength('Abcdefgh')
-        expect(result.score).toBe(2)
-        expect(result.label).toBe('Fair')
-    })
-
-    it('scores 3 (Good) for >=8 chars + uppercase + number', () => {
-        const result = getPasswordStrength('Abcdefg1')
-        expect(result.score).toBe(3)
-        expect(result.label).toBe('Good')
-    })
-
-    it('scores 4 (Strong) for >=8 chars + uppercase + number + special', () => {
-        const result = getPasswordStrength('Abcdefg1!')
-        expect(result.score).toBe(4)
-        expect(result.label).toBe('Strong')
-    })
-
-    it('does not count length-only short passwords with complexity', () => {
-        // Short but has uppercase + number + special → 3 (no length bonus)
-        const result = getPasswordStrength('Ab1!')
-        expect(result.score).toBe(3)
-        expect(result.label).toBe('Good')
     })
 })
 

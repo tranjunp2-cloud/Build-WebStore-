@@ -25,6 +25,14 @@ vi.mock('@/lib/seo/canonical', async () => {
 })
 
 import { GET as getLlmsTxt } from '@/app/sites/[slug]/llms.txt/route'
+// #2179: store availability has its own tests (store-unavailable.test.ts); every store is available here.
+vi.mock('@/lib/storefront/cached-store-availability', () => ({
+    isCachedStoreUnavailable: vi.fn(async () => false),
+    storeUnavailableLocaleOf: vi.fn(async () => 'en'),
+    storeUnavailableResponse: vi.fn(async () => null),
+    storefrontUnavailableFor: vi.fn(async () => null),
+}))
+import { storefrontUnavailableFor } from '@/lib/storefront/cached-store-availability'
 
 // ─── Test Suite ────────────────────────────────────────────────────────
 
@@ -37,6 +45,19 @@ import { GET as getLlmsTxt } from '@/app/sites/[slug]/llms.txt/route'
 describe('[TC-F37-03] llms.txt content contract', () => {
     beforeEach(() => {
         mockFind.mockReset()
+    })
+
+    it('TC-F09.282: unavailable store answers 503 noindex without reading content', async () => {
+        // Arrange
+        vi.mocked(storefrontUnavailableFor).mockResolvedValueOnce({ unavailable: true, locale: 'en' })
+
+        // Act
+        const response = await getLlmsTxt({ headers: new Map([['x-tenant-hostname', '']]) as any } as any, { params: Promise.resolve({ slug: 'mycafe' }) })
+
+        // Assert
+        expect(response.status).toBe(503)
+        expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
+        expect(mockFind).not.toHaveBeenCalled()
     })
 
     // ────────────────────────────────────────────────────────────────

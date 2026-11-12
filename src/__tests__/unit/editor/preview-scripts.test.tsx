@@ -138,6 +138,44 @@ describe('PreviewScripts', () => {
         )
     })
 
+    it.each([
+        ['Ctrl+Z', { key: 'z', ctrlKey: true }, 'undo'],
+        ['Cmd+Z', { key: 'z', metaKey: true }, 'undo'],
+        ['Ctrl+Shift+Z', { key: 'z', ctrlKey: true, shiftKey: true }, 'redo'],
+        ['Ctrl+Y', { key: 'y', ctrlKey: true }, 'redo'],
+    ])('TC-F11.01: forwards %s from the iframe as a history step request', (_label, init, direction) => {
+        // Arrange
+        render(<PreviewScripts />)
+        const event = new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true })
+
+        // Act
+        document.dispatchEvent(event)
+
+        // Assert
+        expect(event.defaultPrevented).toBe(true)
+        expect(mockPostMessage).toHaveBeenCalledWith(
+            { type: 'HISTORY_STEP_REQUEST', direction, source: 'iframe' },
+            expect.any(String),
+        )
+    })
+
+    it('TC-F11.19: leaves Ctrl+Z to the browser while typing in a contenteditable', () => {
+        // Arrange
+        document.body.innerHTML = '<div id="typing" contenteditable="true">Hello</div>'
+        render(<PreviewScripts />)
+        const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })
+
+        // Act
+        document.getElementById('typing')!.dispatchEvent(event)
+
+        // Assert
+        expect(event.defaultPrevented).toBe(false)
+        expect(mockPostMessage).not.toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'HISTORY_STEP_REQUEST' }),
+            expect.anything(),
+        )
+    })
+
     // TC-F05-06-09: contentEditable must not activate on table-scroll wrapper divs
     it('should not set contenteditable on a div that directly wraps a <table> (overflow-x-auto fix)', () => {
         // Arrange — feature-comparison table variant DOM structure

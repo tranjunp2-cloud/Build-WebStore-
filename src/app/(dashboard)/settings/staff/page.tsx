@@ -1,5 +1,6 @@
 import React from 'react';
 import { getCurrentTenantId, getCurrentUser } from '@/lib/auth';
+import { SAFE_RELATION_POPULATE } from '@/lib/payload/safe-populate';
 import { getPayloadHMR } from '@payloadcms/next/utilities';
 import configPromise from '@payload-config';
 import { redirect } from 'next/navigation';
@@ -35,6 +36,8 @@ export default async function StaffPage() {
         collection: 'users',
         id: user.id,
         depth: 1,
+        // Local API skips field read access: keep the populated tenant to display fields (TC-PERF-126).
+        populate: SAFE_RELATION_POPULATE,
     });
     const u = full as unknown as Record<string, unknown>;
     const initialUser: PlatformUser = {

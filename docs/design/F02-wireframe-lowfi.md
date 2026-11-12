@@ -394,7 +394,7 @@ Cấu trúc: **Full Split Screen** — Brand Panel trái (50-60% width), Form Pa
 │     │                              │     ││     │  ┌──────────────────────┐    │     │
 │     │                              │     ││     │  │ ••••••••        [👁]  │    │     │
 │     │                              │     ││     │  └──────────────────────┘    │     │
-│     │                              │     ││     │  ✓ Ít nhất 8 ký tự          │     │
+│     │                              │     ││     │  ✓ Ít nhất 6 ký tự          │     │
 │     │                              │     ││     │  ✓ Chứa chữ HOA             │     │
 │     │                              │     ││     │  ✓ Chứa số                  │     │
 │     │                              │     ││     │  ✗ Chứa ký tự đặc biệt     │     │
@@ -558,7 +558,7 @@ Layout dọc (Stack column), ẩn Brand Panel bên trái. Form Card chiếm full
 │  ┌──────────────────────┐│
 │  │ ••••••••        [👁]  ││
 │  └──────────────────────┘│
-│  ✓ Ít nhất 8 ký tự      │
+│  ✓ Ít nhất 6 ký tự      │
 │  ✓ Chứa chữ HOA         │
 │  ✓ Chứa số              │
 │  ✗ Chứa ký tự đặc biệt  │
@@ -589,7 +589,7 @@ Layout dọc (Stack column), ẩn Brand Panel bên trái. Form Card chiếm full
 - **Inline Validation:** Hiển thị lỗi đỏ ngay dưới trường input khi thiếu hoặc sai format.
 - **Email auto-trim:** Tự động cắt khoảng trống thừa đầu/cuối trước khi submit.
 - **Password Visibility Toggle:** Icon 👁 bật/tắt hiển thị password.
-- **Password Strength:** Checklist realtime (≥8 ký tự, chữ HOA, số, ký tự đặc biệt).
+- **Password Strength:** Checklist realtime (≥6 ký tự, chữ HOA, số, ký tự đặc biệt).
 
 ### 3.3 Error Handling
 - **Alert Banner:** Hiển thị phía trên form khi Auth fail (nền đỏ/cam, text trắng).

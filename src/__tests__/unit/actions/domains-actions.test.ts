@@ -213,6 +213,23 @@ describe('addCustomDomain — error handling & rollback', () => {
         expect(rollbackCall.data.customDomains).toEqual([])
     })
 
+    it('maps a DB unique-index conflict on the optimistic write to the taken-domain message [TC-F19.88]', async () => {
+        const conflict = Object.assign(new Error('The following field is invalid: domain'), {
+            data: { errors: [{ path: 'customDomains.0.domain', message: 'Value must be unique' }] },
+        })
+        mockUpdate.mockRejectedValueOnce(conflict)
+        const res = await addCustomDomain('chinmuoi.shop')
+        expect(res).toEqual({ success: false, error: 'Domain already registered by another store.' })
+        expect(addProjectDomain).not.toHaveBeenCalled()
+    })
+
+    it('keeps the generic save error for other optimistic-write failures [TC-F19.88]', async () => {
+        mockUpdate.mockRejectedValueOnce(new Error('connection reset'))
+        const res = await addCustomDomain('domain.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('Unable to save domain')
+    })
+
     it('maps Vercel 409 domain_already_in_use to user-safe message', async () => {
         const err = new VercelDomainsError({ code: 'domain_already_in_use', status: 409, message: 'taken' })
         vi.mocked(addProjectDomain).mockRejectedValueOnce(err)

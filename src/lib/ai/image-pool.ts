@@ -14,7 +14,7 @@
  */
 
 import { searchPhotos, detectQueryLang, photoMatchesTerms, PIXABAY_CATEGORY_BY_COMPOSER, PixabayError, type PixabayPhoto } from './pixabay-client'
-import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
+import { BAKERY_PHRASE_EN, BAKERY_PHRASE_VI, CATEGORY_BASE_KEYWORDS, isBakeryContext } from './image-keywords'
 import type { ThemeMood } from './theme-moods'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -125,10 +125,32 @@ export const DEFAULT_SQUARE_SIZE = 6
  * the fnb→business drift produced retail/fashion photos instead of no photos.
  * Always search with the category's natural-language phrase instead.
  */
-function categoryPhrase(category: string): string {
-  return Object.hasOwn(CATEGORY_BASE_KEYWORDS, category)
-    ? CATEGORY_BASE_KEYWORDS[category]?.[0] ?? category
-    : category
+function categoryPhrase(category: string, subjects: ReadonlyArray<string | undefined> = []): string {
+  return categorySearchPhrase(category, subjects, false) ?? category
+}
+
+/**
+ * GH-1611: the SEARCH phrase for a category, aware of what the merchant sells.
+ * `fnb` = café + bakery, but its default phrase is "coffee shop" — for a bakery
+ * every scaffolding/relaxed/category-fallback query then returned coffee photos.
+ * When the merchant's products are bakery terms (and not coffee), use a bakery
+ * phrase. Other categories — and cafés — keep the curated default.
+ */
+export function categorySearchPhrase(
+  category: string,
+  subjects: ReadonlyArray<string | undefined>,
+  vietnamese: boolean,
+): string | undefined {
+  if (category === 'fnb' && isBakeryContext(subjects)) {
+    return vietnamese ? BAKERY_PHRASE_VI : BAKERY_PHRASE_EN
+  }
+  if (vietnamese) return Object.hasOwn(VN_CATEGORY_QUERIES, category) ? VN_CATEGORY_QUERIES[category] : undefined
+  return Object.hasOwn(CATEGORY_BASE_KEYWORDS, category) ? CATEGORY_BASE_KEYWORDS[category]?.[0] : undefined
+}
+
+/** Merchant-typed subject texts for phrase selection (gateProducts = user-typed only). */
+function subjectTextsOf(ctx: BuildPoolCtx): Array<string | undefined> {
+  return ctx.gateProducts ?? ctx.products ?? [ctx.topProduct]
 }
 
 /**
@@ -191,7 +213,7 @@ export function buildPoolTerms(ctx: BuildPoolCtx, relaxed: boolean = false): str
       if (productTerms.length > 1) {
         push(first)
       } else {
-        push(categoryPhrase(ctx.category))
+        push(categoryPhrase(ctx.category, subjectTextsOf(ctx)))
         if (terms.length === 0) push(first)
       }
     } else {
@@ -204,7 +226,7 @@ export function buildPoolTerms(ctx: BuildPoolCtx, relaxed: boolean = false): str
     }
   } else {
     // Scaffolding path — no user keyword to protect, English terms are fine.
-    push(categoryPhrase(ctx.category))
+    push(categoryPhrase(ctx.category, subjectTextsOf(ctx)))
     if (!relaxed && ctx.mood) {
       push(ctx.mood.imageryKeywords[0])
     }
@@ -412,21 +434,24 @@ async function searchBucket(
   // while leaving every bucket empty. Use Pixabay's own category keyword (or
   // our category phrase when no provider category exists), then reuse the
   // recovered photos across all roles. The category filter + short query keeps
-  // this on-industry without depending on product tags being present.
+  // this on-industry; when the merchant typed products the relevance gate below
+  // also applies, so a coarse category can't admit another industry's photos.
   if (primaryTimedOut) {
     usedFallback = true
     if (ctx.exactSlotMode) {
       return { photos: [], usedFallback }
     }
-    const recoveryQuery = category ?? categoryPhrase(ctx.category)
+    const recoveryQuery = category ?? categoryPhrase(ctx.category, subjectTextsOf(ctx))
     try {
       const recovered = (await searchPhotos(recoveryQuery, requestCount, {
         ...searchOptions,
         timeoutMs: Math.max(ctx.timeoutMs ?? 20_000, 25_000),
       })) ?? []
-      const safeRecovered = categoryMapped
-        ? recovered
-        : gate(recovered, gateTerms, recoveryQuery)
+      // GH-1611: gate recovery too. A Pixabay category (e.g. `health` shared by
+      // beauty + health) is only a coarse filter; with product terms present the
+      // photo must still name the merchant's subject. No terms + mapped category
+      // → gate() passes the category-filtered photos through unchanged.
+      const safeRecovered = gate(recovered, gateTerms, recoveryQuery)
       merge(safeRecovered)
       if (photos.length > 0) {
         console.info(
@@ -485,8 +510,8 @@ async function searchBucket(
   // (lang=vi). Non-VN inputs whose bucket is still under minCount (zero or thin hits
   // — e.g. "pen dan pensel" has no Pixabay tag coverage) top up with the English
   // category base keyword. Results still pass the product relevance gate.
-  const vnQuery = isVietnamese ? VN_CATEGORY_QUERIES[ctx.category] : undefined
-  const catQuery = vnQuery ?? CATEGORY_BASE_KEYWORDS[ctx.category]?.[0]
+  const vnQuery = isVietnamese ? categorySearchPhrase(ctx.category, subjectTextsOf(ctx), true) : undefined
+  const catQuery = vnQuery ?? categorySearchPhrase(ctx.category, subjectTextsOf(ctx), false)
   // `!== relaxedQuery` guard: on the scaffolding path the tier-2 query can
   // already equal the category base keyword — re-issuing the byte-identical
   // just-failed search wastes a rate-limited Pixabay call. Unless tier-2 ERRORED

@@ -94,7 +94,7 @@ expect(sqlText).toContain('parent_id') // or 'tenant_id'
 
 ### 4. New Regression Tests (category-field-access.test.ts — NEW) — 12 Added
 
-**File:** `/home/liam/data/ech-prime-web-v2/src/__tests__/unit/dashboard/category-field-access.test.ts`  
+**File:** `./src/__tests__/unit/dashboard/category-field-access.test.ts`
 **Coverage:** 12 test cases covering all GH-1587 security findings
 
 #### 4.1 Field Access & Allowlist (TC-F08-05-05) — 5 Tests

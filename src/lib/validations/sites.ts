@@ -161,6 +161,10 @@ export const saveSiteSchema = z.object({
     localeContent: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
     /** F26-01: Clear pendingLocaleConfirm flag after user confirms/dismisses dialog */
     pendingLocaleConfirm: z.boolean().optional(),
+    /** The editor draft revision this save was made from ("<site>.<page>", see lib/sites/editor-revision) */
+    base: z.string().max(40).optional(),
+    /** One editor save (kept across its retries): a retry whose first try was committed is not stale */
+    saveId: z.string().max(64).optional(),
 }).superRefine((value, ctx) => {
     const localBusiness = value.localBusiness
     if (!localBusiness || localBusiness.schemaSubtype === undefined || localBusiness.businessCategory === undefined) return

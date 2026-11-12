@@ -675,7 +675,7 @@ describe('TC-F38-RAW-25 — provider outage short-circuits the pool fallback lad
   it('tier-1 TIMEOUT uses a short category query as the final generation-budget retry', async () => {
     mockSearchPhotos
       .mockRejectedValueOnce(new PixabayError('TIMEOUT', 0, true))
-      .mockResolvedValueOnce([fakePhoto('L1', 1920, 1080, 'restaurant interior')])
+      .mockResolvedValueOnce([fakePhoto('L1', 1920, 1080, 'ramen, restaurant interior')])
 
     const pool = await buildImagePool(baseCtx({ squareSize: 0 }))
 
@@ -687,6 +687,31 @@ describe('TC-F38-RAW-25 — provider outage short-circuits the pool fallback lad
     })
     expect(pool.landscape.map((photo) => photo.id)).toEqual(['L1'])
     expect(pool.underfill).toBe(true)
+  })
+
+  it('[TC-GH1611-34] timeout recovery still gates by merchant products (mapped category is only a coarse filter)', async () => {
+    mockSearchPhotos
+      .mockRejectedValueOnce(new PixabayError('TIMEOUT', 0, true))
+      .mockResolvedValueOnce([
+        fakePhoto('ok', 1920, 1080, 'ramen, noodle soup'),
+        fakePhoto('bad', 1920, 1080, 'dress, clothing, fashion'),
+      ])
+
+    const pool = await buildImagePool(baseCtx({ squareSize: 0 }))
+
+    expect(pool.landscape.map((photo) => photo.id)).toEqual(['ok'])
+  })
+
+  it('[TC-GH1611-35] timeout recovery with no product terms keeps the category-filtered photos', async () => {
+    mockSearchPhotos
+      .mockRejectedValueOnce(new PixabayError('TIMEOUT', 0, true))
+      .mockResolvedValueOnce([fakePhoto('f1', 1920, 1080, 'food, plate')])
+
+    const pool = await buildImagePool(
+      baseCtx({ squareSize: 0, topProduct: undefined, products: [], gateProducts: [] }),
+    )
+
+    expect(pool.landscape.map((photo) => photo.id)).toEqual(['f1'])
   })
 
   it('tier-1 RATE_LIMITED → no tier-2/tier-3 calls, underfill=true', async () => {

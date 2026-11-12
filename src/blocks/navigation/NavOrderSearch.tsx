@@ -4,13 +4,18 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Package, ArrowRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { normalizeOrderNumber } from '@/lib/orders/normalize-order-number'
 
 interface NavOrderSearchProps {
     slug: string
     className?: string
+    /** `dropdown` (default) = desktop popup; `inline` = form rendered in place (mobile drawer). */
+    variant?: 'dropdown' | 'inline'
+    /** Called after a successful submit (e.g. to close the mobile drawer). */
+    onNavigate?: () => void
 }
 
-export function NavOrderSearch({ slug, className = '' }: NavOrderSearchProps) {
+export function NavOrderSearch({ slug, className = '', variant = 'dropdown', onNavigate }: NavOrderSearchProps) {
     const { t } = useI18n()
     const ol = t.storefront.orderLookup
     const router = useRouter()
@@ -43,13 +48,62 @@ export function NavOrderSearch({ slug, className = '' }: NavOrderSearchProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        const trimmed = value.trim()
+        const trimmed = normalizeOrderNumber(value)
         if (!trimmed) { setError(ol.required); return }
         const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
         router.push(`${shopBase}/orders/${encodeURIComponent(trimmed)}`)
         setOpen(false)
         setValue('')
         setError('')
+        onNavigate?.()
+    }
+
+    if (variant === 'inline') {
+        return (
+            <form
+                onSubmit={handleSubmit}
+                className={`px-4 py-3 flex flex-col gap-2 ${className}`.trim()}
+                data-testid="nav-order-search-inline"
+            >
+                <label
+                    htmlFor="nav-order-search-inline-input"
+                    className="flex items-center gap-1.5 text-sm font-medium opacity-80"
+                >
+                    <Package size={15} strokeWidth={1.8} />
+                    {ol.navLabel}
+                </label>
+                <div className="flex gap-2">
+                    <input
+                        id="nav-order-search-inline-input"
+                        type="text"
+                        value={value}
+                        onChange={e => { setValue(e.target.value); setError('') }}
+                        placeholder={ol.placeholder}
+                        autoComplete="off"
+                        className="min-w-0 flex-1 rounded-lg px-3 py-2 text-sm bg-transparent outline-none"
+                        style={{
+                            color: 'inherit',
+                            border: `1px solid ${error
+                                ? 'var(--brand-primary)'
+                                : 'color-mix(in srgb, currentColor 25%, transparent)'}`,
+                        }}
+                    />
+                    <button
+                        type="submit"
+                        aria-label={ol.submit}
+                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-3 text-sm font-bold"
+                        style={{ background: 'var(--brand-primary)', color: '#fff' }}
+                    >
+                        <ArrowRight size={16} />
+                    </button>
+                </div>
+                {error && (
+                    <p role="alert" className="text-xs" style={{ color: 'var(--brand-primary)' }}>
+                        {error}
+                    </p>
+                )}
+            </form>
+        )
     }
 
     return (

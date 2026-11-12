@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
 import { z } from "zod";
 import config from "@payload-config";
-import { withSuperAdmin } from "@/lib/admin/api-utils";
+import { withStudioPermission } from "@/lib/admin/api-utils";
 import { hasApprovedArtifactUrl } from "@/lib/admin/qa/contracts";
 import { withQaResultRowLock } from "@/lib/payload/qa-result-row-lock";
 
@@ -14,7 +14,7 @@ const VisualReviewSchema = z.object({
 });
 
 /** Records a human visual decision only. GitHub issue creation remains F40-05. */
-export const POST = withSuperAdmin(
+export const POST = withStudioPermission('qa.visual', 
   async (req: NextRequest, { user, params }) => {
     const id = params?.id;
     if (!id || !/^\d+$/.test(id))

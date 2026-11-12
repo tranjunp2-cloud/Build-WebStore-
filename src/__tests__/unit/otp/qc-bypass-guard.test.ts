@@ -166,13 +166,23 @@ describe('qc-bypass guard', () => {
     })
   })
 
-  // ─── Extra: NEXT_PUBLIC_APP_ENV also allowed (edge routing) ─────────
-  it('accepts NEXT_PUBLIC_APP_ENV=qc-test as scope stamp', () => {
+  // ─── TC-PERF-158: only the server APP_ENV stamps the QC lane ─────────
+  it('[TC-PERF-158] refuses NEXT_PUBLIC_APP_ENV=qc-test alone (public build value, not a lane stamp)', () => {
     process.env.NEXT_PUBLIC_APP_ENV = 'qc-test'
     process.env.QC_OTP_BYPASS_ENABLED = 'true'
     process.env.QC_OTP_BYPASS_DOMAIN = '@primeweb.local'
     process.env.QC_OTP_BYPASS_CODE = '123456'
-    expect(isQcBypassEnabled()).toBe(true)
-    expect(canBypassOtpForEmail('qc-owner-1@primeweb.local')).toBe(true)
+    expect(isQcBypassEnabled()).toBe(false)
+    expect(canBypassOtpForEmail('qc-owner-1@primeweb.local')).toBe(false)
+  })
+
+  it('[TC-PERF-158] matches the exact mailbox domain, even when configured without "@"', () => {
+    process.env.APP_ENV = 'qc-test'
+    process.env.QC_OTP_BYPASS_ENABLED = 'true'
+    process.env.QC_OTP_BYPASS_DOMAIN = 'example.com'
+    expect(canBypassOtpForEmail('qc-owner-1@example.com')).toBe(true)
+    expect(canBypassOtpForEmail('QC-Owner-1@EXAMPLE.com')).toBe(true)
+    expect(canBypassOtpForEmail('victim@evilexample.com')).toBe(false)
+    expect(canBypassOtpForEmail('victim@example.com.evil.my')).toBe(false)
   })
 })

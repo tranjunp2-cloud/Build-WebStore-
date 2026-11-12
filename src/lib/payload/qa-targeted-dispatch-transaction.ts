@@ -1,6 +1,6 @@
-import crypto from "crypto";
 import { sql } from "drizzle-orm";
 import type { Payload, PayloadRequest } from "payload";
+import { registerTransactionSession } from "./transaction-session";
 
 type TransactionRequest = Pick<PayloadRequest, "transactionID">;
 type TransactionSessionDb = { execute: (query: unknown) => Promise<unknown> };
@@ -32,8 +32,7 @@ export async function withQaTargetedDispatchTransaction<T>(
     throw new Error("Database transactions are unavailable");
 
   return db.drizzle.transaction(async (transaction) => {
-    const transactionID = crypto.randomUUID();
-    db.sessions[transactionID] = { db: transaction };
+    const session = registerTransactionSession(db, transaction);
     try {
       if (quotaProfile)
         await transaction.execute(
@@ -42,9 +41,11 @@ export async function withQaTargetedDispatchTransaction<T>(
       await transaction.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`${environment}:${fixtureKey}`}))`,
       );
-      return await operation({ transactionID });
+      const result = await operation(session.req);
+      session.assertActive();
+      return result;
     } finally {
-      delete db.sessions[transactionID];
+      session.release();
     }
   }, db.transactionOptions);
 }

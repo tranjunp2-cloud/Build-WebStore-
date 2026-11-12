@@ -65,6 +65,9 @@ test.describe('[GH-1725] Generic SSO navigation', () => {
                 onboardingCompleted: true,
             })
 
+            // The SSO portal hands over Payload's own password-step token as v2_token; sso-session checks it
+            // with payload.auth() and mints the OTP-equivalent session. An OTP token would not be one, so this
+            // stays a password login (it opens no protected route by itself, TC-PERF-142).
             const loginResponse = await api.post('/api/users/login', {
                 data: { email: ssoEmail, password },
             })

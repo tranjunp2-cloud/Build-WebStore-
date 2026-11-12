@@ -1,8 +1,8 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { useI18n } from '@/i18n'
+import { Mascot } from '@/mascot'
 
 export function DashboardEmptyState() {
     const { t } = useI18n()
@@ -15,16 +15,8 @@ export function DashboardEmptyState() {
                     {/* Background Glow */}
                     <div className="absolute inset-0 bg-[hsl(var(--primary)/0.2)] blur-[60px] rounded-xl" />
 
-                    {/* Rocket Image */}
-                    <div className="relative h-[200px] w-[200px] sm:h-[237px] sm:w-[256px]">
-                        <Image
-                            src="/images/dashboard/rocket-empty-state.png"
-                            alt="Rocket launch illustration"
-                            fill
-                            className="object-contain"
-                            priority
-                        />
-                    </div>
+                    {/* The mascot greets a brand-new store */}
+                    <Mascot scene="welcome" size={240} className="relative" />
                 </div>
 
                 {/* Typography Content */}

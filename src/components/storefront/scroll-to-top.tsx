@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 export function ScrollToTop() {
     const pathname = usePathname()
     useEffect(() => {
+        if (window.location.hash) return
         window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
     }, [pathname])
     return null

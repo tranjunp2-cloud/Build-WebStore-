@@ -7,6 +7,9 @@ import type { Where } from 'payload'
 import { sql } from 'drizzle-orm'
 import { mapCustomer, toCsv } from './_lib/shop-customer-record'
 import type { ShopCustomerFilters, SortKey, UpdateCustomerData } from './_lib/shop-customer-record'
+import { isVersionConflict, withVersionGuard } from '@/lib/save-version/save-version'
+import { FAILED_COUNT_SQL, LIFETIME_SQL } from '@/lib/customers/customer-spend-rules'
+import { assertCustomerTenant, fetchCustomerOrderStats, rate, updateCustomerAs } from '@/lib/customers/customer-service'
 
 async function requireTenantId(): Promise<string> {
     const tenantId = await getCurrentTenantId()
@@ -14,13 +17,7 @@ async function requireTenantId(): Promise<string> {
     return tenantId
 }
 
-function assertTenantOwnership(doc: Record<string, unknown>, tenantId: string): void {
-    const docTenantId =
-        typeof doc.tenant === 'object' && doc.tenant !== null
-            ? String((doc.tenant as Record<string, unknown>).id)
-            : String(doc.tenant)
-    if (docTenantId !== tenantId) throw new Error('Unauthorized')
-}
+const assertTenantOwnership = assertCustomerTenant
 
 function buildCustomerWhere(tenantId: string, filters: ShopCustomerFilters): Where {
     const conditions: Where[] = [{ tenant: { equals: tenantId } }]
@@ -108,65 +105,6 @@ function rowToCustomerDoc(row: Record<string, unknown>): Record<string, unknown>
     }
 }
 
-type OrderStats = { count: number; total: number; completed: number; cancelled: number }
-
-// 2-decimal rounding (prime-web-api parity); 0 when no orders
-function rate(numerator: number, count: number): number {
-    if (count <= 0) return 0
-    return Math.round((numerator / count) * 10000) / 100
-}
-
-async function fetchOrderStats(
-    payload: Awaited<ReturnType<typeof getPayload>>,
-    customerIds: number[],
-    tenantId: string,
-    orderLimit?: number,
-): Promise<Map<number, OrderStats>> {
-    const map = new Map<number, OrderStats>()
-    if (customerIds.length === 0) return map
-
-    // Single-customer detail: 5 000 cap (handles high-volume buyers).
-    // List page (25–100 customers): 200×N cap, max 10 000 (fast, accurate for typical stores).
-    // Export (up to 1 000 customers): caller passes explicit limit — default to 200×N, max 100 000.
-    const defaultLimit = customerIds.length === 1
-        ? 5_000
-        : Math.min(customerIds.length * 200, 10_000)
-
-    const res = await payload.find({
-        collection: 'orders',
-        where: {
-            and: [
-                { customer: { in: customerIds } },
-                { tenant: { equals: tenantId } },
-            ],
-        },
-        limit: orderLimit ?? defaultLimit,
-        depth: 0,
-        overrideAccess: true,
-    })
-
-    if (res.totalDocs > res.docs.length) {
-        console.warn(
-            `[fetchOrderStats] truncated: ${res.docs.length}/${res.totalDocs} orders for ${customerIds.length} customers (limit=${customerIds.length === 1 ? 5_000 : Math.min(customerIds.length * 200, 10_000)})`,
-        )
-    }
-
-    for (const doc of res.docs) {
-        const raw = doc.customer as number | { id: number } | null
-        const custId = typeof raw === 'object' && raw !== null ? raw.id : (raw as number)
-        if (!custId) continue
-
-        const s = map.get(custId) ?? { count: 0, total: 0, completed: 0, cancelled: 0 }
-        s.count++
-        s.total += (doc.total as number) ?? 0
-        if (doc.status === 'completed') s.completed++
-        if (doc.status === 'cancelled') s.cancelled++
-        map.set(custId, s)
-    }
-
-    return map
-}
-
 export async function getShopCustomersAction(filters: ShopCustomerFilters = {}) {
     const tenantId = await requireTenantId()
     const { page = 1, limit = 25 } = filters
@@ -185,9 +123,9 @@ export async function getShopCustomersAction(filters: ShopCustomerFilters = {}) 
             payload.db.drizzle.execute(sql`
                 SELECT c.*,
                     COUNT(o.id)::int AS order_count,
-                    COALESCE(SUM(o.total), 0)::numeric AS lifetime,
+                    ${LIFETIME_SQL} AS lifetime,
                     COUNT(CASE WHEN o.status = 'completed' THEN 1 END)::int AS completed_count,
-                    COUNT(CASE WHEN o.status = 'cancelled' THEN 1 END)::int AS cancelled_count
+                    ${FAILED_COUNT_SQL} AS failed_count
                 FROM customers c
                 LEFT JOIN orders o ON o.customer_id = c.id AND o.tenant_id = c.tenant_id
                 WHERE ${conds}
@@ -207,8 +145,8 @@ export async function getShopCustomersAction(filters: ShopCustomerFilters = {}) 
             const orderCount = (row.order_count as number) ?? 0
             const lifetime = Number(row.lifetime ?? 0)
             const completedCount = (row.completed_count as number) ?? 0
-            const cancelledCount = (row.cancelled_count as number) ?? 0
-            return mapCustomer(doc, orderCount, lifetime, rate(completedCount, orderCount), rate(cancelledCount, orderCount))
+            const failedCount = (row.failed_count as number) ?? 0
+            return mapCustomer(doc, orderCount, lifetime, rate(completedCount, orderCount), rate(failedCount, orderCount))
         })
 
         const total = totalResult.rows[0]?.total ?? 0
@@ -235,12 +173,12 @@ export async function getShopCustomersAction(filters: ShopCustomerFilters = {}) 
         ])) as unknown as [{ rows: Array<Record<string, unknown>> }, { rows: Array<{ total: number }> }]
 
         const ids = dataResult.rows.map(row => Number(row.id))
-        const statsMap = await fetchOrderStats(payload, ids, tenantId)
+        const statsMap = await fetchCustomerOrderStats(payload, ids, tenantId)
 
         const data = dataResult.rows.map(row => {
             const doc = rowToCustomerDoc(row)
             const s = statsMap.get(Number(row.id))
-            return mapCustomer(doc, s?.count ?? 0, s?.total ?? 0, rate(s?.completed ?? 0, s?.count ?? 0), rate(s?.cancelled ?? 0, s?.count ?? 0))
+            return mapCustomer(doc, s?.count ?? 0, s?.total ?? 0, rate(s?.completed ?? 0, s?.count ?? 0), rate(s?.failed ?? 0, s?.count ?? 0))
         })
 
         const total = totalResult.rows[0]?.total ?? 0
@@ -259,12 +197,12 @@ export async function getShopCustomersAction(filters: ShopCustomerFilters = {}) 
     })
 
     const ids = res.docs.map(d => d.id as number)
-    const statsMap = await fetchOrderStats(payload, ids, tenantId)
+    const statsMap = await fetchCustomerOrderStats(payload, ids, tenantId)
 
     const data = res.docs.map(doc => {
         const s = statsMap.get(doc.id as number)
         const completedRate = rate(s?.completed ?? 0, s?.count ?? 0)
-        const failedRate = rate(s?.cancelled ?? 0, s?.count ?? 0)
+        const failedRate = rate(s?.failed ?? 0, s?.count ?? 0)
         return mapCustomer(doc as Record<string, unknown>, s?.count ?? 0, s?.total ?? 0, completedRate, failedRate)
     })
 
@@ -280,42 +218,22 @@ export async function getShopCustomerDetailAction(id: number) {
     const doc = await payload.findByID({ collection: 'customers', id, depth: 0 })
     assertTenantOwnership(doc as Record<string, unknown>, tenantId)
 
-    const statsMap = await fetchOrderStats(payload, [id], tenantId)
+    const statsMap = await fetchCustomerOrderStats(payload, [id], tenantId)
     const s = statsMap.get(id)
     const completedRate = rate(s?.completed ?? 0, s?.count ?? 0)
-    const failedRate = rate(s?.cancelled ?? 0, s?.count ?? 0)
+    const failedRate = rate(s?.failed ?? 0, s?.count ?? 0)
 
     const mapped = mapCustomer(doc as Record<string, unknown>, s?.count ?? 0, s?.total ?? 0, completedRate, failedRate)
 
     return JSON.parse(JSON.stringify(mapped))
 }
 
-const VALID_RANKS = new Set(['bronze', 'silver', 'gold', 'vip'])
-
-export async function updateShopCustomerAction(id: number, data: UpdateCustomerData) {
+/** `expectedUpdatedAt`: the version the page loaded. Stale → `{ ok: false, code: 'VERSION_CONFLICT', current }`, nothing written. */
+export async function updateShopCustomerAction(id: number, data: UpdateCustomerData, expectedUpdatedAt?: string | null) {
     const tenantId = await requireTenantId()
-    const payload = await getPayload({ config: configPromise })
-
-    const existing = await payload.findByID({ collection: 'customers', id, depth: 0 })
-    assertTenantOwnership(existing as Record<string, unknown>, tenantId)
-
-    if (data.rank !== undefined && data.rank !== null && !VALID_RANKS.has(data.rank)) {
-        throw new Error('Invalid rank value')
-    }
-
-    const updated = await payload.update({
-        collection: 'customers',
-        id,
-        data: {
-            ...(data.name !== undefined && { name: data.name }),
-            ...(data.rank !== undefined && { rank: data.rank }),
-            ...(data.notes !== undefined && { notes: data.notes }),
-            ...(data.addresses !== undefined && { addresses: data.addresses }),
-        },
-        depth: 0,
-    })
-
-    return JSON.parse(JSON.stringify(mapCustomer(updated as Record<string, unknown>)))
+    // the write core is shared with the dashboard assistant (lib/customers/customer-service)
+    const result = await withVersionGuard(() => updateCustomerAs({ tenantId }, id, data, expectedUpdatedAt))
+    return JSON.parse(JSON.stringify(isVersionConflict(result) ? result : mapCustomer(result)))
 }
 
 export async function exportShopCustomersCsvAction(
@@ -336,14 +254,14 @@ export async function exportShopCustomersCsvAction(
     const ids = res.docs.map(d => d.id as number)
     // Export: use a higher order cap (1 000 orders/customer avg) so large tenants
     // get accurate orderCount and lifetime totals in the CSV.
-    const statsMap = await fetchOrderStats(payload, ids, tenantId, Math.min(ids.length * 1_000, 100_000))
+    const statsMap = await fetchCustomerOrderStats(payload, ids, tenantId, Math.min(ids.length * 1_000, 100_000))
 
     // JSON round-trip ensures Payload date fields (Date objects) become ISO strings
     // before toCsv processes them — same pattern used by all other actions.
     const rawRecords = res.docs.map(doc => {
         const s = statsMap.get(doc.id as number)
         const completedRate = rate(s?.completed ?? 0, s?.count ?? 0)
-        const failedRate = rate(s?.cancelled ?? 0, s?.count ?? 0)
+        const failedRate = rate(s?.failed ?? 0, s?.count ?? 0)
         return mapCustomer(doc as Record<string, unknown>, s?.count ?? 0, s?.total ?? 0, completedRate, failedRate)
     })
     const records = JSON.parse(JSON.stringify(rawRecords)) as typeof rawRecords

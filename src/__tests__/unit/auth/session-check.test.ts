@@ -36,7 +36,8 @@ vi.mock('next/headers', () => ({
 
 vi.mock('@payload-config', () => ({ default: {} }))
 
-vi.mock('@/lib/auth', () => ({
+vi.mock('@/lib/auth', async () => ({
+    ...(await vi.importActual<typeof import('@/lib/auth/auth-unavailable')>('@/lib/auth/auth-unavailable')),
     getCurrentUser: mockGetCurrentUser,
 }))
 
@@ -180,4 +181,38 @@ describe('[TC-1270-SC] GET /api/auth/session-check', () => {
         expect(res.status).toBe(500)
         expect(res.data).toEqual({ error: 'Internal Server Error' })
     })
+
+    it('TC-PERF-054: reads the ban status off the session user and the subscription as one light statement', async () => {
+        // Arrange — the session user comes with its membership's tenant populated (status included)
+        mockGetCurrentUser.mockResolvedValue({ ...BASE_USER, tenants: [{ tenant: { id: 'tenant-1', status: 'active' } }] })
+
+        // Act
+        const res = await GET() as any
+
+        // Assert
+        expect(res.data).toMatchObject({ ok: true })
+        expect(mockPayload.find).toHaveBeenCalledTimes(1)
+        expect(mockPayload.find).toHaveBeenCalledWith({
+            collection: 'plan-subscriptions',
+            where: { and: [{ tenant: { equals: 'tenant-1' } }, { name: { equals: 'main' } }] },
+            sort: '-createdAt',
+            limit: 1,
+            pagination: false,
+            depth: 0,
+            select: { status: true, endsAt: true, canceledAt: true, canceledImmediately: true },
+        })
+    })
+
+    it('TC-PERF-054: a suspended tenant on the session user still forces logout without a tenants read', async () => {
+        // Arrange
+        mockGetCurrentUser.mockResolvedValue({ ...BASE_USER, tenants: [{ tenant: { id: 'tenant-1', status: 'suspended' } }] })
+
+        // Act
+        const res = await GET() as any
+
+        // Assert
+        expect(res.data).toMatchObject({ action: 'force_logout', reason: 'Account suspended' })
+        expect(mockPayload.find.mock.calls.map(([args]: [{ collection: string }]) => args.collection)).toEqual(['plan-subscriptions'])
+    })
 })
+

@@ -87,7 +87,7 @@ describe('getOrCreateCrateCartonIdAction', () => {
         expect(mockDelete).not.toHaveBeenCalled()
         expect(mockCreate).toHaveBeenCalledOnce()
         expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-            data: { alt: TENANT_ALT },
+            data: { alt: TENANT_ALT, tenant: TENANT_ID }, // TC-PERF-146: owned by the shop
             file: expect.objectContaining({ name: 'crate-carton-placeholder.png', mimetype: 'image/png' }),
         }))
         expect(result).toBe(99)
@@ -504,7 +504,7 @@ describe('getOrCreateCrateCartonIdAction', () => {
             where: { alt: { equals: TENANT_ALT } },
         }))
         expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-            data: { alt: TENANT_ALT },
+            data: { alt: TENANT_ALT, tenant: TENANT_ID }, // TC-PERF-146: owned by the shop
         }))
     })
 

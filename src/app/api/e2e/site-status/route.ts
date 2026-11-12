@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'E2E setup forbidden in production' }, { status: 403 })
     }
 
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(req)
     if (!user) {
         return NextResponse.json({ error: 'Authenticated test user required' }, { status: 401 })
     }

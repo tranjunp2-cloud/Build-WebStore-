@@ -10,6 +10,7 @@ import { SeverityPill } from '@/app/studio/issues/_components/severity-pill'
 import { IssueStatusBadge } from '@/app/studio/issues/_components/issue-status-badge'
 import { IssueDetailDrawer } from '@/app/studio/issues/_components/issue-detail-drawer'
 import { CreateIssueModal } from './modals/create-issue-modal'
+import { useStudioCan } from './studio-permissions-context'
 import type { IssueRecord, IssueRelatedType, IssueSeverity, IssueStatus } from '@/app/studio/issues/_components/issue-types'
 
 type Props = {
@@ -26,6 +27,7 @@ function relativeTime(iso: string): string {
 }
 
 export function IssuesTabEmbed({ relatedType, relatedId }: Props) {
+    const canWork = useStudioCan()('issue.work')
     const [issues, setIssues] = useState<IssueRecord[]>([])
     const [total, setTotal] = useState(0)
     const [loading, setLoading] = useState(true)
@@ -61,7 +63,7 @@ export function IssuesTabEmbed({ relatedType, relatedId }: Props) {
                 <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
                     {total} issue{total !== 1 ? 's' : ''}
                 </span>
-                <button
+                {canWork && <button
                     type="button"
                     onClick={() => setShowCreate(true)}
                     style={{
@@ -75,7 +77,7 @@ export function IssuesTabEmbed({ relatedType, relatedId }: Props) {
                     }}
                 >
                     + Create issue
-                </button>
+                </button>}
             </div>
 
             {/* List */}
@@ -128,7 +130,7 @@ export function IssuesTabEmbed({ relatedType, relatedId }: Props) {
             />
 
             {/* Create modal */}
-            {showCreate && (
+            {showCreate && canWork && (
                 <CreateIssueModal
                     defaultRelatedType={relatedType}
                     defaultRelatedId={relatedId}

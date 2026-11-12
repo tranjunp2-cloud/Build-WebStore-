@@ -37,7 +37,11 @@ Trọng tâm là kiểm tra tính năng trên thiết bị di động (Nút Menu
 | **TC-F18.07** | `AC-3` | `Logic` | 1. Cuộn Sidebar xuống mục cuối cùng.<br>2. Nhấn chọn chức năng "Help Support". | - Trình duyệt tự mở sang tab ẩn mới với đường link gọi API WhatsApp.<br>- Trang làm việc hiện tại của CMS không bị tải lại hoặc mất nội dung. | Medium |
 | **TC-F18.08** | `UX` | `UX` | 1. Dùng DevTools (F12) để xác minh kích thước nút bấm trên Mobile. | - Bất kỳ khu vực nút bấm nào cũng đạt diện tích chạm (Touch Area) tối thiểu chuẩn là `44x44px`. | Medium |
 | **TC-F18.09** | `UI` | `Menu` | 1. Quan sát Sidebar sau khi flatten IA (#1138).<br>2. Nhấp một mục bất kỳ. | - **KHÔNG còn accordion**: section header là nhãn tĩnh (in hoa, không bấm được, không mũi tên xổ).<br>- Mọi mục là leaf → bấm điều hướng thẳng tới route, không có khối con trượt xuống. | High |
-| **TC-F18.10** | `UI` | `State`| 1. Tenant có dữ liệu ở 5 mục: Orders (nhiều status), Products, Discounts, All Customers, Contact Leads.<br>2. Quan sát badge bên phải các nhãn này trên Sidebar. | - Mỗi mục hiển thị Badge (pill **xám trung tính**, KHÔNG đỏ) = **TỔNG số record** của tenant: Orders đếm **mọi status** (kể cả cancelled); Discounts = tất cả mã; Contact Leads = contact-submissions + subscribers.<br>- Badge **ẩn khi count = 0/undefined** (không hiện "0").<br>- Số > 999 hiển thị `999+`. | Medium |
+| **TC-F18.10** | `UI` | `State`| 1. Tenant có dữ liệu ở 5 mục: Orders (nhiều status), Products, Discounts, All Customers, Contact Leads.<br>2. Quan sát badge bên phải các nhãn này trên Sidebar. | - Mỗi mục hiển thị Badge (pill **xám trung tính**, KHÔNG đỏ) = số record của tenant: Orders đếm **đơn chờ xử lý** — nhóm status Pending (`pending` + `new` + `payment_failed`, `ORDER_STATUS_GROUPS.pending`), KHÔNG đếm confirmed/shipped/cancelled…; Discounts = tất cả mã; Contact Leads = contact-submissions + subscribers.<br>- Badge **ẩn khi count = 0/undefined** (không hiện "0").<br>- Số > 999 hiển thị `999+`. | Medium |
+| **TC-GH2170-01** | `#2170` | `Logic` | 1. Tenant chính có đơn ở status `pending`, `new`, `payment_failed` và các status khác.<br>2. So badge Orders trên Sidebar với ô **Pending** trên trang Orders; lặp với user nhiều tenant hoặc super-admin có tenant chính. | - Theo quyết định **1A của người yêu cầu (2026-11-09)** và thiết kế #1138, badge Orders = ô Pending của tenant chính (`ORDER_STATUS_GROUPS.pending`), **không so với tổng danh sách mọi status**.<br>- Đơn `new` và `payment_failed` được tính vào badge. Với ảnh #2170, QC kỳ vọng 198 thay vì tổng 233. | High |
+| **TC-GH2170-02** | `#2170` | `UI` | 1. Rê chuột vào badge Orders trên Sidebar (EN, rồi đổi sang MY).<br>2. Thu gọn Sidebar, rê chuột vào icon Orders. | - Tooltip badge: **Pending orders** (EN) / **Pesanan belum diproses** (MY); screen reader đọc "175 Pending orders".<br>- Sidebar thu gọn: tooltip "Orders · 175 Pending orders" (EN) / "Pesanan · 175 Pesanan belum diproses" (MY).<br>- Badge khác (Products, Customers…) không có tooltip. | Low |
+| **TC-GH2170-03** | `#2170` | `[x] AUTO` E2E | 1. Đăng nhập tài khoản E2E và mở `/orders` bằng Playwright, chỉ đọc dữ liệu hiện có.<br>2. So badge với ô Pending; chọn filter Pending rồi gọi trang 1/2 với `limit=1`.<br>3. Trên localhost với PostgreSQL tạm, kịch bản dương tự seed 3 Pending + 1 Confirmed cho `qc-shop-1` rồi kiểm tra lại. | - Badge, ô Pending và `totalDocs` của danh sách lọc Pending bằng nhau; khi Pending = 0, badge ẩn.<br>- Đổi trang không làm tổng đếm thay đổi; khi có badge, tooltip là "Pending orders". Kịch bản dương yêu cầu DB loopback và `APP_ENV=qc-test`; trên staging bị skip, không ghi dữ liệu staging. | High |
+| **TC-GH2170-04** | `#2170` | `Manual` | 1. Trên tenant QA cô lập, đổi status một đơn để số Pending tăng/giảm.<br>2. Tải lại `/orders` sau khi dữ liệu ổn định. | - Badge, ô Pending và danh sách lọc Pending cập nhật cùng quy tắc 1A; không giữ số cũ. | High |
 
 ### Nhóm 2: Thanh Công Cụ Phía Trên (Global Top Header)
 
@@ -157,6 +161,15 @@ Trọng tâm là kiểm tra tính năng trên thiết bị di động (Nút Menu
 | **TC-F18.26** | `US-F18-01 Add` | `Sec` | RBAC: Settings menu ẩn cho non-owner. `Sidebar.tsx` line 147-156 có filter — chưa test path. |
 | **TC-F18.27** | `US-F18-01 Add` | `Logic`| Active highlight đúng khi browser back. Chưa test. |
 | **TC-F18.28** | `US-F18-02 Add` | `UI`   | Long email truncate ellipsis trong avatar dropdown. |
+
+### Nhóm 11: CMS Browser Tab Title (GH-2213)
+
+> **Status:** TC-F18.68 Auto — `src/__tests__/unit/dashboard/f18-cms-tab-title-suffix.test.ts`; TC-F18.67 Manual (browser tab). Root layout `src/app/layout.tsx` có template `'%s | Web Store'`; page chỉ khai báo tên trang.
+
+| ID | Ref | Loại | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ |
+|:---|:---|:---|:---|:---|:---:|
+| **TC-F18.67** | `US-F18-03 Add` | `UI` | 1. Đăng nhập CMS.<br>2. Mở `/dashboard`, `/orders`, `/orders/<id>`, `/discounts`, `/discounts/new`, `/discounts/<id>`, `/discounts/usage-history`, `/products/categories`, `/help`.<br>3. Xem tên tab trình duyệt. | - Mỗi tab chỉ có 1 đuôi: `<Tên trang> \| Web Store` (vd `Discounts \| Web Store`).<br>- Không lặp `\| Web Store \| Web Store`, không lẫn `PrimeWeb`. | Medium |
+| **TC-F18.68** | `US-F18-03 Add` | `Logic` | 1. Quét metadata `title` của mọi page/layout CMS dưới `src/app` (trừ `sites/**`, `studio/**`). | - Không page nào tự ghi đuôi `Web Store` / `PrimeWeb`; đuôi chỉ đến từ template root layout. | Medium |
 
 ---
 

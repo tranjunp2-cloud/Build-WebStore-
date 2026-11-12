@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { MoreHorizontal, Pencil, Copy, Rocket, Clock, Archive, Layers, Wrench } from 'lucide-react'
+import { MoreHorizontal, Pencil, Copy, Rocket, Clock, Archive, Layers, Wrench, Send } from 'lucide-react'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -19,7 +19,9 @@ import { PublishTemplateModal } from '../../_components/modals/publish-template-
 import { ArchiveTemplateModal } from '../../_components/modals/archive-template-modal'
 import { ScheduleTemplateModal } from '../../_components/modals/schedule-template-modal'
 import { AddToPackModal }       from '../../_components/modals/add-to-pack-modal'
-import type { AdminTemplate }   from '@/lib/admin/templates-query'
+import { patchTemplate, type AdminTemplate } from '@/lib/admin/templates-query'
+import { canEditTemplateContent, canSetTemplateStatus } from '@/lib/admin/studio-permissions'
+import { useStudioCan, useStudioRoles } from '../../_components/studio-permissions-context'
 
 type Props = {
     template: AdminTemplate
@@ -30,6 +32,23 @@ type ActiveModal = 'clone' | 'publish' | 'archive' | 'schedule' | 'add-to-pack' 
 
 export function TemplateRowActionsMenu({ template, onRefresh }: Props) {
     const [activeModal, setActiveModal] = useState<ActiveModal>(null)
+    const roles = useStudioRoles()
+    const can = useStudioCan()
+    const canClone = can('template.create')
+    const canReview = can('template.review')
+    const canSendForReview = template.status === 'draft' && canSetTemplateStatus(roles, 'draft', 'review')
+    const canArchive = template.status !== 'archived' && canSetTemplateStatus(roles, template.status, 'archived')
+    const canAddToPack = can('pack.edit')
+    const showStatusGroup = canSendForReview || canReview || canArchive
+
+    const handleSendForReview = async () => {
+        try {
+            await patchTemplate(template.id, { status: 'review' })
+            handleDone('Template sent for review')
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Could not send for review')
+        }
+    }
 
     const handleDone = (msg?: string) => {
         setActiveModal(null)
@@ -65,23 +84,35 @@ export function TemplateRowActionsMenu({ template, onRefresh }: Props) {
                             <Wrench size={13} /> Edit in builder
                         </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                        <a
-                            href={`/admin/collections/templates/${template.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                    {canEditTemplateContent(roles, template.status) && (
+                        <DropdownMenuItem asChild>
+                            <a
+                                href={`/admin/collections/templates/${template.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                            >
+                                <Pencil size={13} /> Edit (Payload)
+                            </a>
+                        </DropdownMenuItem>
+                    )}
+                    {canClone && (
+                        <DropdownMenuItem onSelect={() => setActiveModal('clone')} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Copy size={13} /> Clone template
+                        </DropdownMenuItem>
+                    )}
+
+                    {showStatusGroup && <DropdownMenuSeparator style={{ background: 'var(--border)', margin: '4px 0' }} />}
+
+                    {canSendForReview && (
+                        <DropdownMenuItem
+                            onSelect={() => { void handleSendForReview() }}
                             style={{ display: 'flex', alignItems: 'center', gap: 8 }}
                         >
-                            <Pencil size={13} /> Edit (Payload)
-                        </a>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setActiveModal('clone')} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Copy size={13} /> Clone template
-                    </DropdownMenuItem>
-
-                    <DropdownMenuSeparator style={{ background: 'var(--border)', margin: '4px 0' }} />
-
-                    {template.status !== 'live' && (
+                            <Send size={13} /> Send for review
+                        </DropdownMenuItem>
+                    )}
+                    {canReview && template.status !== 'live' && (
                         <DropdownMenuItem
                             onSelect={() => setActiveModal('publish')}
                             style={{ display: 'flex', alignItems: 'center', gap: 8 }}
@@ -89,13 +120,15 @@ export function TemplateRowActionsMenu({ template, onRefresh }: Props) {
                             <Rocket size={13} /> Publish
                         </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem
-                        onSelect={() => setActiveModal('schedule')}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-                    >
-                        <Clock size={13} /> Schedule
-                    </DropdownMenuItem>
-                    {template.status !== 'archived' && (
+                    {canReview && (
+                        <DropdownMenuItem
+                            onSelect={() => setActiveModal('schedule')}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                        >
+                            <Clock size={13} /> Schedule
+                        </DropdownMenuItem>
+                    )}
+                    {canArchive && (
                         <DropdownMenuItem
                             onSelect={() => setActiveModal('archive')}
                             style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--danger)' }}
@@ -104,14 +137,17 @@ export function TemplateRowActionsMenu({ template, onRefresh }: Props) {
                         </DropdownMenuItem>
                     )}
 
-                    <DropdownMenuSeparator style={{ background: 'var(--border)', margin: '4px 0' }} />
-
-                    <DropdownMenuItem
-                        onSelect={() => setActiveModal('add-to-pack')}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-                    >
-                        <Layers size={13} /> Add to pack
-                    </DropdownMenuItem>
+                    {canAddToPack && (
+                        <>
+                            <DropdownMenuSeparator style={{ background: 'var(--border)', margin: '4px 0' }} />
+                            <DropdownMenuItem
+                                onSelect={() => setActiveModal('add-to-pack')}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                            >
+                                <Layers size={13} /> Add to pack
+                            </DropdownMenuItem>
+                        </>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
 

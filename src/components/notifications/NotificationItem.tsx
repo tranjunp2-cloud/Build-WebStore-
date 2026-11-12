@@ -2,7 +2,7 @@
 
 import { formatDistanceToNow } from 'date-fns'
 import { ms as dateFnsMsLocale } from 'date-fns/locale/ms'
-import { ShoppingCart, Megaphone, CircleAlert, FileText, type LucideIcon } from 'lucide-react'
+import { ShoppingCart, Megaphone, CircleAlert, FileText, ClipboardCheck, MessageSquare, type LucideIcon } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { NotificationItem as NotificationItemType } from '@/types/notification'
 
@@ -39,6 +39,12 @@ export function NotificationItem({ notification, onClick }: Props) {
   } else if (type === 'BLOG_PUBLISHED') {
     Icon = FileText
     iconBgClass = 'bg-white/10 text-white'
+  } else if (type === 'AUTOMATION_REMINDER') {
+    Icon = ClipboardCheck
+    iconBgClass = 'bg-[#2DD4BF]/10 text-[#2DD4BF]'
+  } else if (type === 'LEAD_NEW') {
+    Icon = MessageSquare
+    iconBgClass = 'bg-[#A78BFA]/10 text-[#A78BFA]'
   }
 
   return (

@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
             status: 'fixture-ready',
             setupCapability: DASHBOARD_FIXTURE_CAPABILITY,
             tenantId,
+            tenantSlug: tenant.slug,
             dashboardFixture,
         })
     } catch (error: unknown) {

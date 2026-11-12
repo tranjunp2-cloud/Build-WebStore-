@@ -1,12 +1,15 @@
 name: Sync staging → qc-test
 
-# Auto-syncs the qc-test branch whenever staging updates so the QC
-# preview deployment (ech-prime-web-v2-qc.vercel.app) always mirrors
-# the latest dev code. Prevents the "QA tests old code" drift class
-# (see plans/260708-1217-GH-02-qc-auto-sync/).
+# Brings the qc-test branch up to date with staging so the QC preview
+# deployment (ech-prime-web-v2-qc.vercel.app) can be tested apart from staging.
+#
+# Runs on demand only. QC normally tests on staging and uses qc-test only when
+# a build has to be held apart, so syncing on every staging push deployed an
+# environment nobody was looking at (14/10–11/11/2026: 132 qc-test deploys).
+# Before testing on qc-test: Actions → "Sync staging → qc-test" → Run workflow.
 #
 # Flow:
-#   1. On push to staging (or manual dispatch), fetch both branches.
+#   1. On manual dispatch, fetch both branches.
 #   2. If qc-test already contains staging → no-op.
 #   3. Otherwise try merge (FF when possible, merge commit when qc-test
 #      has divergent commits like deploy-trigger chores).
@@ -17,14 +20,6 @@ name: Sync staging → qc-test
 #   6. On merge conflict, open a PR for a human to resolve.
 
 on:
-  push:
-    branches: [staging]
-    paths-ignore:
-      - 'docs/**'
-      - 'plans/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/CONTRIBUTING.md'
-      - '.github/GIT_AND_CI_RULES.md'
   workflow_dispatch:
 
 concurrency:
@@ -34,7 +29,7 @@ concurrency:
 jobs:
   sync:
     name: Sync qc-test with staging
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: write
@@ -42,7 +37,7 @@ jobs:
       actions: write
     steps:
       - name: Checkout with full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

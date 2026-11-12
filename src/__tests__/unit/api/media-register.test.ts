@@ -164,8 +164,32 @@ describe('TC-F30-HMO-019: failed direct-upload registration removes the S3 objec
         await expect(response.json()).resolves.toEqual(media)
         expect(mockRegisterUploadedMedia).toHaveBeenCalledWith(
             {},
-            { alt: 'Hero video', filename: key, mimeType: 'image/png', filesize: 48_000 },
+            { alt: 'Hero video', filename: key, mimeType: 'image/png', filesize: 48_000, tenantId: null },
         )
+    })
+
+    it('[TC-PERF-146] registers the upload under the uploader\'s active tenant', async () => {
+        // Arrange — same stored image, uploader is an active member of tenant 42 (pending membership first)
+        mockGetCurrentUser.mockResolvedValue({
+            id: 1,
+            tenants: [{ tenant: 7, status: 'pending' }, { tenant: { id: 42 }, status: 'active' }],
+        })
+        const key = 'u1-shop.png'
+        mockRegisterUploadedMedia.mockResolvedValue({ id: 5, url: 'u', filename: key, mimeType: 'image/png', filesize: 48_000 })
+        mockS3Send.mockImplementation(async (command: unknown) => {
+            if (command instanceof HeadObjectCommand) return { ContentLength: 48_000, ContentType: 'image/png' }
+            if (command instanceof GetObjectCommand) {
+                return { Body: { transformToByteArray: async () => Uint8Array.from([0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]) } }
+            }
+            return {}
+        })
+
+        // Act
+        const response = await POST(makeRequest(key))
+
+        // Assert
+        expect(response.status).toBe(200)
+        expect(mockRegisterUploadedMedia).toHaveBeenCalledWith({}, expect.objectContaining({ tenantId: 42 }))
     })
 
     it('deletes an image whose bytes do not match a supported image signature', async () => {

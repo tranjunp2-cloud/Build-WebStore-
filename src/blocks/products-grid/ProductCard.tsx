@@ -8,7 +8,9 @@ import { RichText } from '../shared/RichText'
 import { Heading } from '../shared/Typography'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
 import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
+import { useI18n } from '@/i18n'
 import type { ProductItem } from './filter-types'
+import { soldOutLabel } from '../shared/sold-out-label'
 
 interface ProductCardProps {
     product: ProductItem
@@ -16,6 +18,8 @@ interface ProductCardProps {
     theme: ThemeConfig
     siteBasePath: string
     siteName?: string
+    /** The site doc (generationLocale / locale) - the badge text follows the shop's language. */
+    site?: unknown
 }
 
 function formatCompareAtPrice(price: number, currency: string) {
@@ -25,7 +29,8 @@ function formatCompareAtPrice(price: number, currency: string) {
     return `${currency} ${price.toFixed(2)}`
 }
 
-export function ProductCard({ product, variant, theme, siteBasePath, siteName }: ProductCardProps) {
+export function ProductCard({ product, variant, theme, siteBasePath, siteName, site }: ProductCardProps) {
+    const { t, ti } = useI18n()
     const pdpHref = product.slug ? `${siteBasePath}/products/${product.slug}` : '#'
     const hasDiscount = typeof product.compareAtPrice === 'number' && product.compareAtPrice > product.priceRaw
 
@@ -67,6 +72,12 @@ export function ProductCard({ product, variant, theme, siteBasePath, siteName }:
                         <div className="flex h-full w-full items-center justify-center text-3xl opacity-20 sm:text-4xl">🛍️</div>
                     )}
 
+                    {product.inventory <= 0 && (
+                        <span data-testid="sold-out-badge" className="absolute bottom-2 left-2 rounded-full bg-black/75 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white sm:bottom-3 sm:left-3 sm:text-[11px]">
+                            {soldOutLabel(site)}
+                        </span>
+                    )}
+
                     {hasDiscount && (
                         <span className={`absolute rounded-full bg-red-500 px-3 py-1 text-[11px] font-semibold tracking-wide text-white ${variant === 'list' ? 'left-3 top-3' : 'right-3 top-3'}`}>
                             SALE
@@ -95,7 +106,7 @@ export function ProductCard({ product, variant, theme, siteBasePath, siteName }:
 
                     <div className={`flex items-center gap-2.5 ${variant === 'list' ? 'mt-auto pt-3 md:pt-5' : 'pt-3 sm:pt-4'}`}>
                         <RichText
-                            text={product.price}
+                            text={product.priceFrom ? ti(t.storefront.products.fromPrice, { price: product.price }) : product.price}
                             as="p"
                             className={variant === 'list' ? 'text-[12px] font-heading md:text-xl' : 'text-[12px] font-heading sm:text-lg'}
                             style={{ color: 'var(--text-primary)' }}

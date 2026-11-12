@@ -7,6 +7,11 @@ import type { EmailTemplateConfig } from '@/lib/email/types'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useMediaQuery } from '@/hooks/use-media-query'
+import { useI18n } from '@/i18n'
+
+function escapeHtml(value: string): string {
+    return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
 
 interface Props {
     templateType: EmailTemplateType
@@ -16,6 +21,8 @@ interface Props {
 }
 
 export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }: Props) {
+    const { t } = useI18n()
+    const et = t.dashboard.settings.emailTemplates.preview
     const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop')
     const [html, setHtml] = useState<string>('')
     const [subject, setSubject] = useState<string>('')
@@ -92,7 +99,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                 <div className="flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-success" />
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Live Preview
+                        {et.live}
                     </span>
                 </div>
                 <TooltipProvider>
@@ -109,13 +116,13 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                                             onClick={() => setPreviewMode('desktop')}
                                             variant="ghost"
                                             size="icon"
-                                            aria-label="Desktop"
+                                            aria-label={et.desktop}
                                             className={`h-7 w-7 ${previewMode === 'desktop' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
                                         >
                                             <Monitor className="h-4 w-4" />
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent>Desktop</TooltipContent>
+                                    <TooltipContent>{et.desktop}</TooltipContent>
                                 </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -124,13 +131,13 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                                             onClick={() => setPreviewMode('mobile')}
                                             variant="ghost"
                                             size="icon"
-                                            aria-label="Mobile"
+                                            aria-label={et.mobile}
                                             className={`h-7 w-7 ${previewMode === 'mobile' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
                                         >
                                             <Smartphone className="h-4 w-4" />
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent>Mobile</TooltipContent>
+                                    <TooltipContent>{et.mobile}</TooltipContent>
                                 </Tooltip>
                             </>
                         )}
@@ -141,13 +148,13 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                                     onClick={handleRefresh}
                                     variant="ghost"
                                     size="icon"
-                                    aria-label="Refresh"
+                                    aria-label={et.refresh}
                                     className="h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white"
                                 >
                                     <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Refresh</TooltipContent>
+                            <TooltipContent>{et.refresh}</TooltipContent>
                         </Tooltip>
                     </div>
                 </TooltipProvider>
@@ -156,9 +163,9 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
             {/* Mock inbox subject bar — styled as an inbox preview row */}
             <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-white/[0.1] bg-slate-100 dark:bg-[hsl(var(--secondary))] px-4 py-2.5 min-w-0">
                 <Mail className="h-3.5 w-3.5 text-[hsl(var(--primary))] shrink-0" />
-                <span className="shrink-0 text-[11px] font-bold text-[hsl(var(--primary))] uppercase tracking-wide">Subject:</span>
+                <span className="shrink-0 text-[11px] font-bold text-[hsl(var(--primary))] uppercase tracking-wide">{et.subjectLabel}</span>
                 <span className="text-sm font-semibold text-slate-800 dark:text-white truncate min-w-0">
-                    {subject || <span className="font-normal italic text-slate-400 dark:text-slate-600">Default subject (type to override)</span>}
+                    {subject || <span className="font-normal italic text-slate-400 dark:text-slate-600">{et.subjectDefault}</span>}
                 </span>
             </div>
 
@@ -178,21 +185,21 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
 
                 {fetchError ? (
                     <div className="flex flex-col items-center justify-center gap-3 py-24 text-slate-400">
-                        <span className="text-xs text-destructive">Preview unavailable — check console for details</span>
+                        <span className="text-xs text-destructive">{et.unavailable}</span>
                         <Button
                             type="button"
                             onClick={handleRefresh}
                             variant="link"
                             className="text-xs h-auto p-0"
                         >
-                            Retry
+                            {et.retry}
                         </Button>
                     </div>
                 ) : (
                     <iframe
-                        srcDoc={html || '<p style="font-family:sans-serif;color:#94a3b8;padding:40px;text-align:center">Preview will appear here</p>'}
+                        srcDoc={html || `<p style="font-family:sans-serif;color:#94a3b8;padding:40px;text-align:center">${escapeHtml(et.placeholder)}</p>`}
                         sandbox="allow-same-origin"
-                        title="Email preview"
+                        title={et.iframeTitle}
                         style={{
                             width: previewMode === 'desktop' ? '560px' : '360px',
                             maxWidth: '100%',
@@ -225,20 +232,20 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
             <div className="mx-4 mb-3 mt-3 rounded-lg bg-[hsl(var(--card))] px-4 py-3" style={{ border: '1px solid hsl(var(--border))', borderLeft: '4px solid hsl(var(--info))' }}>
                 <p className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
                     <FlaskConical className="h-4 w-4 shrink-0 text-slate-500" />
-                    Demo Data Used In Preview
+                    {et.demoTitle}
                 </p>
                 <div className="grid gap-y-1.5 text-xs" style={{ gridTemplateColumns: 'auto 1fr' }}>
-                    <span className="pr-8 text-slate-500">Order #</span><span className="font-mono text-slate-300">DEMO-001</span>
-                    <span className="pr-8 text-slate-500">Customer</span><span className="font-mono text-slate-300">John Doe</span>
-                    <span className="pr-8 text-slate-500">Total</span><span className="font-mono text-slate-300">MYR 299.00</span>
-                    <span className="pr-8 text-slate-500">Brand</span><span className="font-mono text-slate-300">Aurora Batik</span>
-                    <span className="pr-8 text-slate-500">Support email</span><span className="font-mono text-slate-300">help@aurora-batik.my</span>
+                    <span className="pr-8 text-slate-500">{et.demoOrder}</span><span className="font-mono text-slate-300">DEMO-001</span>
+                    <span className="pr-8 text-slate-500">{et.demoCustomer}</span><span className="font-mono text-slate-300">John Doe</span>
+                    <span className="pr-8 text-slate-500">{et.demoTotal}</span><span className="font-mono text-slate-300">MYR 299.00</span>
+                    <span className="pr-8 text-slate-500">{et.demoBrand}</span><span className="font-mono text-slate-300">Aurora Batik</span>
+                    <span className="pr-8 text-slate-500">{et.demoSupport}</span><span className="font-mono text-slate-300">help@aurora-batik.my</span>
                 </div>
             </div>
 
             {/* Footer */}
             <div className="flex items-center justify-between border-t border-white/[0.06] bg-[hsl(var(--card))] px-4 py-2.5 text-xs text-slate-500">
-                <span>Rendered with sample data · won&apos;t be sent to real customers</span>
+                <span>{et.footerNote}</span>
                 <Button
                     type="button"
                     onClick={onReset}
@@ -246,7 +253,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                     className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white h-auto p-0"
                 >
                     <RotateCcw className="h-3.5 w-3.5" />
-                    Reset to default
+                    {et.resetToDefault}
                 </Button>
             </div>
         </div>

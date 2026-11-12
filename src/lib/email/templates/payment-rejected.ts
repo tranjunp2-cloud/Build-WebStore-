@@ -8,6 +8,7 @@
 
 import { mergeTemplateConfig } from '../merge-template-config'
 import type { EmailTemplateConfig } from '../types'
+import { SHOP_TIME_ZONE } from '@/lib/reports/shop-time'
 
 export type RejectionReason = 'image_blurry' | 'wrong_amount' | 'duplicate_order' | 'other'
 
@@ -45,6 +46,7 @@ function formatDeadline(isoDate: string): string {
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
+            timeZone: SHOP_TIME_ZONE,
             timeZoneName: 'short',
         })
     } catch {

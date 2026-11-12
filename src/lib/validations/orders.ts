@@ -1,7 +1,14 @@
 import { z } from 'zod'
 import { MY_STATES } from '@/lib/shipping'
+import { MAX_CUSTOMER_EMAIL_LENGTH, MY_PHONE_REGEX } from '@/lib/storefront/checkout'
 
 export const MAX_CHECKOUT_ITEMS = 50
+
+// Checkout phone: required + Malaysian mobile, same rule as storefront validatePhone (GH-2208)
+const checkoutPhoneSchema = z.string().trim()
+    .min(1, 'Phone number is required')
+    .max(30)
+    .regex(MY_PHONE_REGEX, 'Invalid phone number (e.g. 012-345 6789)')
 
 // --- Create Order via Stripe Checkout (FPX / Card) ---
 // paymentMethod intentionally omitted — backend builds payment_method_types from tenant flags.
@@ -16,8 +23,8 @@ export const stripeCheckoutSchema = z.object({
     })).min(1).max(MAX_CHECKOUT_ITEMS),
     customer: z.object({
         name: z.string().min(1).max(150),
-        email: z.string().email(),
-        phone: z.string().max(30).optional(),
+        email: z.string().email().max(MAX_CUSTOMER_EMAIL_LENGTH),
+        phone: checkoutPhoneSchema,
         address: z.object({
             line1: z.string().trim().min(1, 'Address line 1 is required'),
             line2: z.string().optional(),
@@ -40,8 +47,8 @@ export const xenditCheckoutSchema = z.object({
     })).min(1).max(MAX_CHECKOUT_ITEMS),
     customer: z.object({
         name: z.string().min(1).max(150),
-        email: z.string().email(),
-        phone: z.string().max(30).optional(),
+        email: z.string().email().max(MAX_CUSTOMER_EMAIL_LENGTH),
+        phone: checkoutPhoneSchema,
         address: z.object({
             line1: z.string().trim().min(1, 'Address line 1 is required'),
             line2: z.string().optional(),
@@ -64,8 +71,8 @@ export const orderCreateSchema = z.object({
     })).min(1).max(MAX_CHECKOUT_ITEMS),
     customer: z.object({
         name: z.string().min(1),
-        email: z.string().email(),
-        phone: z.string().trim().min(1, 'Phone number is required').max(30),
+        email: z.string().email().max(MAX_CUSTOMER_EMAIL_LENGTH),
+        phone: checkoutPhoneSchema,
         address: z.object({
             line1: z.string().trim().min(1, 'Address line 1 is required'),
             line2: z.string().optional(),

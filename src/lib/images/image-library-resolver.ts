@@ -10,6 +10,7 @@
  */
 
 import type { Payload } from 'payload'
+import { unstable_cache } from 'next/cache'
 import { siteAltKeyPrefix } from './image-library-keys'
 
 export type ImageLibraryS3Map = Record<string, string>
@@ -27,11 +28,15 @@ export async function resolveImageLibraryS3Map(
 ): Promise<ImageLibraryS3Map> {
     try {
         const prefix = siteAltKeyPrefix(siteId)
+        // `like` is ILIKE '%…%' over the whole media table; one statement (no COUNT) and only the columns read
+        // below + what the storage adapter builds `url` from (TC-PERF-063).
         const res = await payload.find({
             collection: 'media',
             where: { alt: { like: prefix } },
             limit: 200,
+            pagination: false,
             depth: 0,
+            select: { alt: true, url: true, filename: true, prefix: true },
         })
 
         const map: ImageLibraryS3Map = {}
@@ -51,4 +56,17 @@ export async function resolveImageLibraryS3Map(
         console.warn('[image-library-resolver] failed', err instanceof Error ? err.message : err)
         return {}
     }
+}
+
+/**
+ * Visitor storefront variant: the same map cached for 5 minutes per site and dropped with the site's storefront
+ * tag (`site-${siteId}`, fired on publish and site/page writes). It ran uncached on every page view, scanning the
+ * media table of every tenant (TC-PERF-063). Owner previews and the seeding route keep the live read above.
+ */
+export function resolveImageLibraryS3MapCached(payload: Payload, siteId: number | string): Promise<ImageLibraryS3Map> {
+    return unstable_cache(
+        () => resolveImageLibraryS3Map(payload, siteId),
+        ['image-library-s3', String(siteId)],
+        { revalidate: 300, tags: [`site-${siteId}`] },
+    )()
 }

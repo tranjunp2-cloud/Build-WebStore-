@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isSiteDocTenantUnavailable } from '@/lib/storefront/store-availability'
 import { z } from 'zod'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -37,7 +38,8 @@ export async function POST(req: NextRequest) {
 
         // Check site exists
         const site = await payload.findByID({ collection: 'sites', id: siteId }).catch(() => null)
-        if (!site) {
+        // #2179: banned or expired store answers like an unknown one (no reason given)
+        if (!site || await isSiteDocTenantUnavailable(payload, site)) {
             return NextResponse.json({ error: 'Invalid site' }, { status: 400 })
         }
 

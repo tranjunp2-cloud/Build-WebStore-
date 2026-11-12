@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 import type { Metadata } from 'next'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { requireStudioAccess } from '@/lib/admin/auth-guard'
 import { PacksGrid } from './_components/packs-grid'
 
 export const metadata: Metadata = { title: 'Content Packs' }
@@ -26,7 +26,7 @@ export type PackDoc = {
 }
 
 export default async function PacksPage() {
-    await requireSuperAdmin()
+    await requireStudioAccess()
 
     const payload = await getPayload({ config })
     const result = await payload.find({

@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { cookies } from 'next/headers'
 import { verifyConfirmToken } from '@/lib/orders/upload-token'
 import { verifyOrderToken } from '@/lib/auth/order-token'
+import { generateOrderViewToken, orderViewCookieName, orderViewCookieOptions } from '@/lib/orders/order-view-token'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 
@@ -122,8 +123,14 @@ export async function POST(request: Request, ctx: RouteContext) {
     // restockResults intentionally not returned — buyer-facing endpoint should not
     // expose inventory details. Ops alerts above handle any restock failures.
 
-    // Invalidate the confirm cookie — the order is now terminal.
+    // Invalidate the confirm cookie — the order is now terminal. The buyer is sent on to the tracking page,
+    // so hand this browser a short-lived view cookie to keep seeing their own details there (TC-PERF-177).
     const res = NextResponse.json({ success: true, data: { cancelled: true } })
     res.cookies.set(`ct_${order.id}`, '', { maxAge: 0, path: '/' })
+    try {
+        res.cookies.set(orderViewCookieName(order.id), generateOrderViewToken(order.id, order.orderNumber), orderViewCookieOptions())
+    } catch {
+        // The order is already cancelled; without the view cookie the tracking page just shows the masked view.
+    }
     return res
 }

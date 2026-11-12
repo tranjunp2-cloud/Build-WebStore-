@@ -5,6 +5,8 @@ import config from '@payload-config'
 import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { normalizeDashboardBlocks, parsePeriod, type DashboardBlockId } from '@/lib/dashboard-utils'
 import { getGlanceData, emptyGlanceData } from '@/lib/dashboard/glance-data'
+import { getDashboardSites, getDashboardTenantSettings } from '@/lib/dashboard/dashboard-request-data'
+import { isUsableSite } from '@/lib/dashboard/get-tenant-site-state'
 import { canReadPendingOrders, getPendingOrdersData } from '@/lib/dashboard/pending-orders-data'
 import type { PendingOrdersLoadState } from '@/lib/dashboard/dashboard-types'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
@@ -15,15 +17,18 @@ import { TrafficPerformanceClient } from '@/components/dashboard/revamp/traffic-
 import { SeoHealth } from '@/components/dashboard/revamp/seo-health'
 import { PendingOrders } from '@/components/dashboard/revamp/pending-orders'
 import { DashboardToolbarHeader } from '@/components/dashboard/revamp/dashboard-toolbar-header'
+import { AgentRefresh } from '@/lib/agent-changes/agent-refresh'
+import { dashboardRefreshKinds } from './refresh-kinds'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
+import { LoadRetryState } from '@/components/dashboard/LoadRetryState'
 import './dashboard-revamp.css'
 
 export async function generateMetadata(): Promise<Metadata> {
     const cookieStore = await cookies()
     const isMs = (cookieStore.get('prefer_lang')?.value ?? 'en') === 'ms'
     return {
-        title: isMs ? 'Papan Pemuka | Web Store' : 'Dashboard | Web Store',
+        title: isMs ? 'Papan Pemuka' : 'Dashboard',
         description: isMs
             ? 'Pantau prestasi kedai anda dan urus perniagaan dalam talian.'
             : 'Monitor your store performance and manage your online business.',
@@ -52,77 +57,51 @@ export default async function DashboardRoot({ searchParams }: Props) {
     let hasShippingConfigured = false
     let shippingCompletionSource: OnboardingStep['completionSource']
 
-    const user = await getCurrentUser()
-    const tenantId = tenantIdForQuery(user)
-    if (tenantId) {
-        const payload = await getPayload({ config })
-        const tenantResult = await payload.findByID({ collection: 'tenants', id: tenantId })
-        dashboardPreferences = (tenantResult as { settings?: { dashboardPreferences?: string[] } })?.settings?.dashboardPreferences
-
-        const usableSiteCount = await payload.count({
-            collection: 'sites',
-            where: {
-                and: [
-                    { tenant: { equals: tenantId } },
-                    {
-                        or: [
-                            { generationStatus: { equals: 'completed' } },
-                            { generationStatus: { equals: 'none' } },
-                            { generationStatus: { equals: null } },
-                            { generationStatus: { exists: false } },
-                        ],
-                    },
-                ],
-            },
-        })
-        hasUsableSites = usableSiteCount.totalDocs > 0
-
-        // No usable site → distinguish a failed AI generation from a brand-new (no site) account
-        if (!hasUsableSites) {
-            const failedSiteCount = await payload.count({
-                collection: 'sites',
-                where: { and: [{ tenant: { equals: tenantId } }, { generationStatus: { equals: 'failed' } }] },
-            })
-            hasFailedSite = failedSiteCount.totalDocs > 0
-        }
-
-        if (hasUsableSites) {
-            const [onboardingSitesResult, onboardingProductsCount] = await Promise.all([
-                payload.find({
-                    collection: 'sites',
-                    where: {
-                        and: [
-                            { tenant: { equals: tenantId } },
-                            { or: [
-                                { generationStatus: { equals: 'completed' } },
-                                { generationStatus: { equals: 'none' } },
-                                { generationStatus: { equals: null } },
-                                { generationStatus: { exists: false } },
-                            ] },
-                        ],
-                    },
-                    limit: 1,
-                }),
+    // The session check or the tenant queries can fail on our side (DB incident, pool timeout): show
+    // "Couldn't load — try again" instead of a 500 or a login redirect (TC-PERF-008..009).
+    let user: Awaited<ReturnType<typeof getCurrentUser>> = null
+    let tenantId: string | number | null = null
+    try {
+        user = await getCurrentUser()
+        tenantId = tenantIdForQuery(user)
+        if (tenantId) {
+            // Tenant settings, the tenant's sites and the active-products count in one parallel round, one statement
+            // each; the layout reads the same sites in this request (React cache), and the onboarding steps come off
+            // those rows — no usable/failed COUNTs, no depth-2 tenant/site rows (TC-PERF-056).
+            const payload = await getPayload({ config })
+            const [tenantSettings, sites, activeProducts] = await Promise.all([
+                getDashboardTenantSettings(String(tenantId)),
+                getDashboardSites(String(tenantId)),
                 payload.count({ collection: 'products', where: { tenant: { equals: tenantId }, status: { equals: 'active' } } }),
             ])
-            const siteDoc = onboardingSitesResult.docs[0]
-            siteId = siteDoc?.id != null ? String(siteDoc.id) : null
-            isDesignCustomized = !!(siteDoc as { themeCustomized?: boolean })?.themeCustomized
-            hasPublishedSite = (siteDoc as { status?: string })?.status === 'published'
-            hasProducts = onboardingProductsCount.totalDocs > 0
-            const hasSelfDeliveryShipping = (siteDoc as {
-                shippingConfig?: { shippingSetupConfirmed?: boolean }
-            })?.shippingConfig?.shippingSetupConfirmed === true
-            const hasEasyParcelShipping = (tenantResult as {
-                easyParcelIntegration?: { enabled?: boolean }
-            })?.easyParcelIntegration?.enabled === true
-            hasShippingConfigured = hasSelfDeliveryShipping || hasEasyParcelShipping
-            shippingCompletionSource = hasSelfDeliveryShipping && hasEasyParcelShipping
-                ? 'both'
-                : hasEasyParcelShipping
-                    ? 'easyparcel'
-                    : hasSelfDeliveryShipping ? 'self-delivery' : undefined
+            dashboardPreferences = tenantSettings.dashboardPreferences
+
+            const siteDoc = sites.find(isUsableSite)
+            hasUsableSites = siteDoc !== undefined
+
+            // No usable site → distinguish a failed AI generation from a brand-new (no site) account
+            if (!hasUsableSites) {
+                hasFailedSite = sites.some((site) => site.generationStatus === 'failed')
+            }
+
+            if (siteDoc) {
+                siteId = String(siteDoc.id)
+                isDesignCustomized = !!siteDoc.themeCustomized
+                hasPublishedSite = siteDoc.status === 'published'
+                hasProducts = activeProducts.totalDocs > 0
+                const hasSelfDeliveryShipping = siteDoc.shippingConfig?.shippingSetupConfirmed === true
+                const hasEasyParcelShipping = tenantSettings.easyParcelEnabled
+                hasShippingConfigured = hasSelfDeliveryShipping || hasEasyParcelShipping
+                shippingCompletionSource = hasSelfDeliveryShipping && hasEasyParcelShipping
+                    ? 'both'
+                    : hasEasyParcelShipping
+                        ? 'easyparcel'
+                        : hasSelfDeliveryShipping ? 'self-delivery' : undefined
+            }
         }
+    } catch (error) {
+        console.error('[Dashboard] could not load the dashboard data:', error)
+        return <LoadRetryState />
     }
 
     const blocks = normalizeDashboardBlocks(dashboardPreferences)
@@ -202,8 +181,11 @@ export default async function DashboardRoot({ searchParams }: Props) {
         )
     }
 
+    const refreshKinds = dashboardRefreshKinds(renderBlocks, { onboarding: showOnboarding, canViewOrders })
+
     return (
         <div className="dash-revamp">
+            {refreshKinds.length > 0 && <AgentRefresh kinds={refreshKinds} />}
             <div className="dash-toolbar">
                 <DashboardToolbarHeader period={period} rangeLabel={glance.rangeLabel} />
                 <div className="dt-right">

@@ -6,6 +6,22 @@ export type ServerErrorPayload = {
     message: string
 }
 
+/**
+ * What a server action returns for a structured field error. Next.js production redacts the message of an Error
+ * thrown from a server action, so the JSON-in-message payload below never reaches the browser; a returned value does.
+ */
+export type FieldErrorsResult = ServerErrorPayload & { ok: false }
+
+export function toFieldErrorsResult(payload: ServerErrorPayload): FieldErrorsResult {
+    return { ok: false, code: payload.code, fieldErrors: payload.fieldErrors, message: payload.message }
+}
+
+export function isFieldErrorsResult(value: unknown): value is FieldErrorsResult {
+    if (typeof value !== 'object' || value === null) return false
+    const v = value as { ok?: unknown; code?: unknown; fieldErrors?: unknown }
+    return v.ok === false && v.code === 'FIELD_ERRORS' && typeof v.fieldErrors === 'object' && v.fieldErrors !== null
+}
+
 /** Parses a server action Error into a structured payload, or returns null for plain errors. */
 export function parseServerError(err: unknown): ServerErrorPayload | null {
     if (!(err instanceof Error)) return null

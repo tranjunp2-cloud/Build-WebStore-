@@ -11,7 +11,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, within } from '@testing-library/react'
-import OrderTrackingClient from '@/app/sites/[slug]/orders/[orderNumber]/OrderTrackingClient'
+import type { ComponentProps } from 'react'
+import RealOrderTrackingClient from '@/app/sites/[slug]/orders/[orderNumber]/OrderTrackingClient'
+import { I18nProvider } from '@/i18n'
+
+// The page reads its copy through useI18n(), which needs a provider (the site layout supplies it in prod).
+function OrderTrackingClient(props: ComponentProps<typeof RealOrderTrackingClient>) {
+    return <I18nProvider><RealOrderTrackingClient {...props} /></I18nProvider>
+}
 
 vi.mock('next/navigation', () => ({
     usePathname: () => '/sites/demo/orders/PRM-1042',

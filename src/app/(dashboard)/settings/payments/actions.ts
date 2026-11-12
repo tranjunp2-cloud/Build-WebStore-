@@ -2,12 +2,15 @@
 
 import { getPayload } from 'payload';
 import config from '@payload-config';
-import { getCurrentTenantId } from '@/lib/auth';
+import { getCurrentTenantId, getCurrentUser } from '@/lib/auth';
+import { canReadPayoutAccount, maskAccountNumber, withoutPayoutAccount } from '@/lib/payment/payout-account-access';
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription';
 import type { PlanCode } from '@/collections/PlanSubscriptions';
 import { deauthorizeStripeAccount } from '@/lib/payment/stripe';
 import { xenditFetch, XenditError } from '@/lib/payment/xendit-client'
 import { setCallbackUrl } from '@/lib/payment/xendit';
+import { XENDIT_ENABLED } from '@/lib/payment/xendit-visibility';
+import { IMPERSONATION_FORBIDDEN, isMerchantAccessSessionFromHeaders } from '@/lib/support/merchant-access-session';
 import { withTenantRowLock } from '@/lib/payload/tenant-row-lock';
 
 export type PaymentUpdates = {
@@ -37,6 +40,10 @@ export type SavedPaymentSettings = Omit<PaymentUpdates, 'qr_image'> & {
     account_holder_name: string | null;
     bank_name: string | null;
     account_number: string | null;
+    /** True when the caller may not read or change the payout account (not owner / admin). */
+    bankHidden?: boolean;
+    /** `•••• 1234` of the saved account number, sent only with `bankHidden`. */
+    account_number_masked?: string | null;
 };
 
 export type UpdatePaymentSettingsResult =
@@ -75,6 +82,42 @@ function editablePaymentSettings(value: unknown): SavedPaymentSettings {
     };
 }
 
+/**
+ * What a member who may not read the payout account gets instead of it: a flag so the form skips the bank
+ * checks and never sends bank fields, plus the masked number so they can tell an account is set
+ * (TC-PERF-175).
+ */
+function hiddenPayoutAccount<T extends object>(payments: T): T & { bankHidden: true; account_number_masked: string | null } {
+    const raw = payments as Record<string, unknown>;
+    return {
+        ...withoutPayoutAccount(payments),
+        bankHidden: true,
+        account_number_masked: maskAccountNumber(raw.account_number),
+    };
+}
+
+/**
+ * Fields only an owner / admin may change: the payout account, and the payment QR image, which redirects
+ * buyer payments just like a new account number (TC-PERF-176, TC-PERF-179).
+ */
+const PAYOUT_ACCOUNT_UPDATE_KEYS = ['account_holder_name', 'bank_name', 'account_number', 'qr_image'] as const;
+const PAYOUT_OWNER_ONLY_ERROR = 'Only the shop owner or an admin can change bank details and the payment QR.';
+
+/**
+ * Payout-account rights for the current caller. Inside a merchant-access session (support acting as the
+ * merchant) there are none, whatever the merchant's own role: support can never read or move the payout
+ * destination (TC-F15.39). Detected from every token on the request, not only the one getCurrentUser picked.
+ */
+async function hasPayoutRights(tenantId: unknown): Promise<boolean> {
+    if (await isMerchantAccessSessionFromHeaders()) return false;
+    return canReadPayoutAccount(await getCurrentUser(), tenantId);
+}
+
+/** Error for a blocked payout write: the impersonation code in a support session, else the role message. */
+async function payoutDeniedError(): Promise<string> {
+    return (await isMerchantAccessSessionFromHeaders()) ? IMPERSONATION_FORBIDDEN : PAYOUT_OWNER_ONLY_ERROR;
+}
+
 export async function getPaymentSettings() {
     try {
         const payload = await getPayload({ config });
@@ -88,8 +131,15 @@ export async function getPaymentSettings() {
             collection: 'tenants',
             id: tenantId,
         });
+        const payments = tenant.payments || {};
 
-        return { success: true, payments: tenant.payments || {} };
+        // The payout account is for owners / admins only (TC-PERF-151, TC-PERF-175).
+        return {
+            success: true,
+            payments: await hasPayoutRights(tenantId)
+                ? payments
+                : hiddenPayoutAccount(payments),
+        };
     } catch (error: unknown) {
         console.error("Failed to get payment settings via action:", error);
         return { success: false, error: 'Internal server error' };
@@ -103,6 +153,13 @@ export async function updatePaymentSettings(updates: PaymentUpdates): Promise<Up
 
         if (!tenantId) {
             return { success: false, error: 'Unauthorized: No tenant found for current session.' };
+        }
+
+        // Only owners / admins may change the payout account or the QR image; other members with settings access
+        // can still toggle methods (TC-PERF-176, TC-PERF-179). Checked on the server, not just hidden in the form.
+        const canEditPayoutAccount = await hasPayoutRights(tenantId);
+        if (!canEditPayoutAccount && PAYOUT_ACCOUNT_UPDATE_KEYS.some((key) => updates[key] !== undefined)) {
+            return { success: false, error: await payoutDeniedError() };
         }
 
         const sub = await getActivePlanSubscription(payload, tenantId);
@@ -213,6 +270,12 @@ export async function updatePaymentSettings(updates: PaymentUpdates): Promise<Up
             if (!effective.payment_cod && !effective.payment_qr && !effective.payment_card && !effective.payment_fpx) {
                 return { success: false, error: 'At least one payment method must remain active.' } as const;
             }
+            // A member who can't see the bank fields can't fill them in, so they may only turn bank transfer on
+            // once the owner has saved a holder name and account number.
+            if (!canEditPayoutAccount && paymentsData.payment_qr === true
+                && (!currentPayments.account_holder_name || !currentPayments.account_number)) {
+                return { success: false, error: 'Ask the shop owner or an admin to add the payout bank account first.' } as const;
+            }
 
             const updatedTenant = await payload.update({
                 collection: 'tenants',
@@ -221,9 +284,18 @@ export async function updatePaymentSettings(updates: PaymentUpdates): Promise<Up
                 req,
             });
 
+            const saved = editablePaymentSettings((updatedTenant as { payments?: unknown }).payments);
             return {
                 success: true,
-                payments: editablePaymentSettings((updatedTenant as { payments?: unknown }).payments),
+                // The save reply must not hand the payout account back to a member who can't read it (TC-PERF-176).
+                payments: canEditPayoutAccount
+                    ? saved
+                    : {
+                        ...hiddenPayoutAccount(saved),
+                        account_holder_name: null,
+                        bank_name: null,
+                        account_number: null,
+                    },
             } as const;
         });
     } catch (error: unknown) {
@@ -239,6 +311,10 @@ export async function uploadQrMedia(formData: FormData) {
 
         if (!tenantId) {
             return { success: false, error: 'Unauthorized: No tenant session found.' };
+        }
+        // The upload only exists to become the payment QR, which is owner / admin only (TC-PERF-179).
+        if (!(await hasPayoutRights(tenantId))) {
+            return { success: false, error: await payoutDeniedError() };
         }
 
         const file = formData.get('file') as File;
@@ -261,6 +337,7 @@ export async function uploadQrMedia(formData: FormData) {
             data: {
                 // Embed tenantId in alt to enable ownership verification in updatePaymentSettings
                 alt: `qr-${tenantId}`,
+                tenant: /^\d+$/.test(String(tenantId)) ? Number(tenantId) : tenantId,
             },
             file: {
                 data: buffer,
@@ -279,6 +356,10 @@ export async function uploadQrMedia(formData: FormData) {
 
 // Model C: save merchant's own Xendit API keys
 export async function saveXenditKeys(secretKey: string, callbackToken: string) {
+    if (await isMerchantAccessSessionFromHeaders()) return { success: false, error: IMPERSONATION_FORBIDDEN };
+    // GH-2132: UI is hidden; block direct server-action calls too. disconnectXendit stays allowed (only removes keys).
+    if (!XENDIT_ENABLED) return { success: false, error: 'Xendit is not available.' };
+
     try {
         const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();
@@ -350,6 +431,7 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
 }
 
 export async function disconnectXendit() {
+    if (await isMerchantAccessSessionFromHeaders()) return { success: false, error: IMPERSONATION_FORBIDDEN };
     try {
         const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();
@@ -374,6 +456,7 @@ export async function disconnectXendit() {
 }
 
 export async function disconnectStripe() {
+    if (await isMerchantAccessSessionFromHeaders()) return { success: false, error: IMPERSONATION_FORBIDDEN };
     try {
         const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();

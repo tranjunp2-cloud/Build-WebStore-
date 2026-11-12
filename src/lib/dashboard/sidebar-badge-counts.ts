@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import type { SidebarBadgeKey } from '@/components/dashboard/Sidebar'
+import { ORDER_STATUS_GROUPS } from '@/lib/orders/status-groups'
 
 /**
  * Sidebar badge counts (F18 #1138) — dynamic numbers shown right of nav labels.
@@ -10,7 +11,8 @@ import type { SidebarBadgeKey } from '@/components/dashboard/Sidebar'
  *
  * Five badges: orders, products, customers, discounts, leads (Contact Leads).
  * Some are scoped to an actionable subset rather than a raw total:
- *   - orders   → status='pending' (awaiting the merchant's attention)
+ *   - orders   → the 'pending' status group (pending/new/payment_failed — awaiting the merchant),
+ *                the same group the Orders page Pending card counts (#2170)
  *   - products → status='active' + not soft-deleted (live products, matching storefront read)
  */
 
@@ -24,7 +26,8 @@ const totalOf = (promise: Promise<{ totalDocs: number }>) =>
  */
 async function countLeads(payload: Payload, tenantId: string): Promise<number> {
     const sites = await payload
-        .find({ collection: 'sites', where: { tenant: { equals: tenantId } }, limit: 100, depth: 0 })
+        // ids only, one statement (no COUNT, no columns) — TC-PERF-058
+        .find({ collection: 'sites', where: { tenant: { equals: tenantId } }, limit: 100, depth: 0, pagination: false, select: { id: true } })
         .catch(() => null)
     const siteIds = sites?.docs.map((s) => s.id) ?? []
     if (siteIds.length === 0) return 0
@@ -45,7 +48,7 @@ export async function getSidebarBadgeCounts(
     const tenant = { equals: tenantId }
 
     const [orders, products, customers, discounts, leads] = await Promise.all([
-        totalOf(payload.count({ collection: 'orders', where: { tenant, status: { equals: 'pending' } } })),
+        totalOf(payload.count({ collection: 'orders', where: { tenant, status: { in: ORDER_STATUS_GROUPS.pending } } })),
         totalOf(payload.count({ collection: 'products', where: { tenant, status: { equals: 'active' }, deletedAt: { exists: false } } })),
         totalOf(payload.count({ collection: 'customers', where: { tenant } })),
         totalOf(payload.count({ collection: 'discounts', where: { tenant } })),

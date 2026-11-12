@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { buildBlockFromLibrary } from '@/lib/ai/content-injection'
 import * as composer from '@/lib/ai/template-composer'
+import { categoryMap } from '@/lib/ai/content'
 
 describe('Phase 03 — hero gap-fill delegation', () => {
     afterEach(() => {
@@ -63,16 +64,19 @@ describe('Phase 03 — hero gap-fill delegation', () => {
             expect((block!.headline as string).length).toBeGreaterThan(0)
         })
 
-        it('still delegates when userBiz empty because library default fills mergedBiz', () => {
-            // With empty userBiz, mergedBiz = library biz sample which has
-            // name + description → delegation still fires. This is intended —
-            // composer output is better than legacy even without user data.
+        it('does not delegate (and never shows a library business) when userBiz is empty', () => {
+            // #2103 A1 (TC-AIAUD-161): an empty userBiz is still a real merchant, so the
+            // library sample's name/description are blanked and the composer has nothing
+            // to weave — the generic legacy hero is used instead of a fictional business.
             const spy = vi.spyOn(composer, 'buildHero')
             const block = buildBlockFromLibrary('hero', 'tech', { userBiz: {} })
 
-            expect(spy).toHaveBeenCalled()
+            expect(spy).not.toHaveBeenCalled()
             expect(block).toBeDefined()
             expect(block!.blockType).toBe('hero')
+            for (const pack of Object.values(categoryMap)) {
+                for (const b of pack.businesses) expect(JSON.stringify(block)).not.toContain(b.name)
+            }
         })
     })
 

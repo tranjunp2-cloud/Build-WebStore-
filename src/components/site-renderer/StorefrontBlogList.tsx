@@ -1,5 +1,7 @@
 'use client'
 
+import { blogExcerpt } from '@/lib/blog/excerpt'
+
 import { useEffect, useState, useRef } from 'react'
 import { FileText } from 'lucide-react'
 
@@ -96,14 +98,12 @@ export function StorefrontBlogList({ tenantId, siteBasePath, tenantSlug }: Store
                     const catName = typeof doc.category === 'object' ? doc.category?.name : null
                     const catSlug = typeof doc.category === 'object' ? doc.category?.slug : null
                     const publishDate = doc.publishedAt || doc.createdAt
-                    const content = typeof doc.content === 'string' ? doc.content : ''
-                    const text = content.replace(/<[^>]*>/g, '').trim()
 
                     return {
                         id: String(doc.id),
                         title: doc.title || 'Untitled',
                         slug: doc.slug || '',
-                        excerpt: text.length > 120 ? text.substring(0, 117) + '...' : text,
+                        excerpt: blogExcerpt(doc.content, 120),
                         date: publishDate ? new Date(publishDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
                         category: catName,
                         categorySlug: catSlug,

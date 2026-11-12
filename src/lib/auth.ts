@@ -2,120 +2,101 @@ import { cookies } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextResponse } from 'next/server'
-import type { User } from 'payload'
+import type { JsonObject, TypeWithID, User } from 'payload'
+import { cookieSessionAllowed, validateCsrf } from '@/lib/auth/csrf'
+import { AuthUnavailableError, authUnavailableResponse, isAuthUnavailableError } from '@/lib/auth/auth-unavailable'
+import { memoizePerRequest } from '@/lib/auth/request-memo'
+import {
+    appSessionSecrets,
+    readAuthorizationToken,
+    SessionSignatureError,
+    verifySessionToken,
+    type SessionClaims,
+} from '@/lib/auth/session-token'
+import { loadSessionUser, type SessionUser } from '@/lib/auth/session-user'
+import { extractTenantId } from '@/lib/auth/tenant-id'
+
+export { AuthUnavailableError, authUnavailableResponse, isAuthUnavailableError }
+export { extractTenantId, tenantIdForQuery } from '@/lib/auth/tenant-id'
 
 /**
  * Get the currently authenticated user from Payload CMS session.
  * Use this in Server Components and Route Handlers.
  *
- * @returns The user object or null if not authenticated
+ * Cost (TC-PERF-001..006): the token is verified once with the secret its kind is signed with (Payload's derived
+ * secret for Payload login tokens, raw PAYLOAD_SECRET / SSO_SHARED_SECRET for OTP/SSO tokens) and the user is
+ * loaded at depth 1 with only the fields callers read — no `payload.auth()`, whose operation computes permissions
+ * for every collection on each call. One load per request and token (per-request memo).
+ *
+ * `requireMfa`: only a session that passed the OTP step counts — for everyone, super-admins included. The token
+ * `POST /api/users/login` returns after the password alone (Payload's own token) has no `mfa_verified` claim; the
+ * default gate still lets super-admins use it (Payload admin panel), but the copilot (`/api/agent/*`) must not
+ * (TC-AISEC-013/014).
+ *
+ * @returns The user, or null when there is no session or the token is invalid/expired/revoked.
+ * @throws AuthUnavailableError when the session could not be checked (database/pool/network failure):
+ *   API routes answer 503 + Retry-After, pages show a retry state — never "sign in" (TC-PERF-010..012).
  */
-export async function getCurrentUser(req?: Request) {
-    let token: string | undefined
-
-    // 1. Try Authorization header first (for API calls)
-    if (req) {
-        const authHeader = req.headers.get('authorization')
-        if (authHeader?.startsWith('Bearer ') || authHeader?.startsWith('JWT ')) {
-            token = authHeader.split(' ')[1]
-        }
-    }
-
-    // 2. Fallback to cookie (for Web UI)
+export async function getCurrentUser(
+    req?: Request,
+    options: { requireMfa?: boolean } = {},
+): Promise<(JsonObject & TypeWithID) | null> {
+    // 1. Authorization header first (API calls), 2. the cookie (Web UI)
+    let token = readAuthorizationToken(req)
+    let scope: object | undefined = req
     if (!token) {
+        // Cookie session on a state-changing request: same-site Origin / Referer required (TC-PERF-162)
+        if (req && !cookieSessionAllowed(req)) return null
         const cookieStore = await cookies()
-        token = cookieStore.get('payload-token')?.value
+        token = cookieStore.get('payload-token')?.value ?? null
+        scope = req ?? cookieStore
     }
-
     if (!token) return null
 
-    try {
-        const payload = await getPayload({ config })
+    // The memo holds the user plus whether the token passed OTP, so a requireMfa caller and a plain caller in the
+    // same request share one load; the OTP requirement is applied on the way out.
+    const session = await memoizePerRequest(scope ?? {}, token, () => loadSession(token))
+    if (!session) return null
+    if (options.requireMfa && !session.mfaVerified) return null
+    return session.user
+}
 
-        // Try standard Payload auth first
-        const authResult = await payload.auth({
-            headers: new Headers({
-                Authorization: `JWT ${token}`,
-            }),
-        })
-
-        if (authResult?.user) {
-            return authResult.user
-        }
-
-        // Fallback: decode custom JWT (from verify-otp endpoint OR cross-service SSO)
-        // The verify-otp creates a jose-signed JWT with {id, email, collection, mfa_verified}
-        // which payload.auth() cannot verify — so we decode it manually.
-        //
-        // Cross-service SSO support: when a sibling Payload deployment (e.g.
-        // web-cms-v2) issues a token with its own secret, set
-        // `SSO_SHARED_SECRET` to that peer's secret. We try PAYLOAD_SECRET first,
-        // then fall back to SSO_SHARED_SECRET. Both projects can align PAYLOAD_SECRET
-        // to avoid needing this fallback — this exists for defense-in-depth when
-        // secrets are scoped separately per Vercel project. Fixes staging bug
-        // "signature verification failed at /api/v1/sso/provision".
-        const payloadSecret = process.env.PAYLOAD_SECRET
-        if (!payloadSecret) {
-            console.error('getCurrentUser: PAYLOAD_SECRET is not defined. Cannot decode custom JWT.')
-            return null
-        }
-
-        const { jwtVerify } = await import('jose')
-        const encoder = new TextEncoder()
-        const candidateSecrets = [encoder.encode(payloadSecret)]
-        const ssoSecret = process.env.SSO_SHARED_SECRET
-        if (ssoSecret && ssoSecret !== payloadSecret) {
-            candidateSecrets.push(encoder.encode(ssoSecret))
-        }
-
-        let decoded: Awaited<ReturnType<typeof jwtVerify>>['payload'] | null = null
-        let lastErr: unknown = null
-        for (const secret of candidateSecrets) {
-            try {
-                const result = await jwtVerify(token, secret)
-                decoded = result.payload
-                break
-            } catch (e) {
-                lastErr = e
-            }
-        }
-        if (!decoded) {
-            // Re-throw so outer catch logs a single structured error.
-            throw lastErr ?? new Error('JWT signature verification failed against all candidate secrets')
-        }
-
-        const isIdValid =
-            typeof decoded.id === 'number' ||
-            (typeof decoded.id === 'string' && /^[a-zA-Z0-9-]+$/.test(decoded.id))
-
-        if (
-            isIdValid &&
-            decoded.collection === 'users' &&
-            decoded.mfa_verified === true
-        ) {
-            const user = await payload.findByID({
-                collection: 'users',
-                id: decoded.id as string | number,
-            })
-            return user || null
-        }
-
+async function loadSession(token: string): Promise<{ user: SessionUser; mfaVerified: boolean } | null> {
+    const payloadSecret = process.env.PAYLOAD_SECRET
+    if (!payloadSecret) {
+        console.error('getCurrentUser: PAYLOAD_SECRET is not defined. Cannot verify session tokens.')
         return null
+    }
+
+    let payload: Awaited<ReturnType<typeof getPayload>>
+    try {
+        payload = await getPayload({ config })
     } catch (error) {
-        // error == null catches both null and undefined thrown by payload.auth() for invalid/expired tokens
-        if (error == null) return null
-        const msg = error instanceof Error ? error.message : String(error)
-        if (msg.includes('signature verification failed')) {
+        throw new AuthUnavailableError(error)
+    }
+
+    let claims: SessionClaims | null
+    try {
+        claims = await verifySessionToken(token, {
+            payloadSecret: payload.secret,
+            appSecrets: appSessionSecrets({ PAYLOAD_SECRET: payloadSecret, SSO_SHARED_SECRET: process.env.SSO_SHARED_SECRET }),
+        })
+    } catch (error) {
+        if (error instanceof SessionSignatureError) {
+            // Cross-service SSO: a sibling Payload deployment (e.g. web-cms-v2) signs with its own secret.
             console.error(
                 'getCurrentUser error: signature verification failed. ' +
                 'Hint: this Payload project received a JWT signed by a different secret. ' +
                 'Align PAYLOAD_SECRET across services, or set SSO_SHARED_SECRET to the issuing service\'s secret.',
             )
-        } else {
-            console.error('getCurrentUser error:', error)
         }
+        // Expired / malformed tokens are an ordinary signed-out state: no log line per request.
         return null
     }
+    if (!claims) return null
+
+    const user = await loadSessionUser(payload, claims)
+    return user ? { user, mfaVerified: claims.mfaVerified } : null
 }
 
 /**
@@ -138,37 +119,36 @@ export async function getCurrentUser(req?: Request) {
  */
 export function withAuth<TContext extends { params: Promise<any> } = never>(
     handler: (user: User, req: Request, ctx: TContext) => Promise<NextResponse>,
+    options?: {
+        unauthorizedResponse?: (req: Request) => NextResponse
+        /**
+         * Same-origin check (Origin, else Referer, host must equal Host) before auth runs; a
+         * cross-site request gets 403. A request with neither header (server-to-server, scripts)
+         * passes and still needs a valid session. Opt-in: used by the /api/ai/* POST routes.
+         */
+        csrf?: boolean
+    },
 ) {
     return async (req: Request, ctx: TContext): Promise<NextResponse> => {
-        const user = await getCurrentUser(req)
+        if (options?.csrf && !validateCsrf(req)) {
+            return NextResponse.json({ error: 'CSRF verification failed.' }, { status: 403 })
+        }
+        let user: Awaited<ReturnType<typeof getCurrentUser>>
+        try {
+            user = await getCurrentUser(req)
+        } catch (error) {
+            // DB/pool trouble while checking the session: busy, not signed out (TC-PERF-011).
+            if (isAuthUnavailableError(error)) return authUnavailableResponse()
+            throw error
+        }
         if (!user) {
+            if (options?.unauthorizedResponse) {
+                return options.unauthorizedResponse(req)
+            }
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
         return handler(user as User, req, ctx)
     }
-}
-
-/** Extract the primary tenant ID from an already-fetched user object. */
-export function extractTenantId(user: unknown): string | null {
-    const tenants = (user as { tenants?: Array<{ tenant: string | number | { id: string | number } }> }).tenants
-    if (!tenants || tenants.length === 0) return null
-    const first = tenants[0].tenant
-    if (typeof first === 'string') return first
-    if (typeof first === 'number') return String(first)
-    if (first?.id != null) return String(first.id)
-    return null
-}
-
-/**
- * Same as extractTenantId but coerces all-digit strings to numbers so that
- * payload.find WHERE clauses match Neon PostgreSQL integer FK columns (products.tenant_id integer).
- * Mirrors the coercion in Products.getTenantIds(). Use this for DB query filters and writes.
- */
-export function tenantIdForQuery(user: unknown): string | number | null {
-    const raw = extractTenantId(user)
-    if (raw === null) return null
-    if (/^\d+$/.test(raw)) return Number(raw)
-    return raw
 }
 
 /**

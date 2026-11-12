@@ -7,9 +7,12 @@
  * Visual re-skin: uses builder-shell CSS grid from bundle (builder.css).
  */
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { useBuilderStore } from '@/lib/admin/builder-store'
 import type { Section, BlockPromptOverride } from '@/lib/admin/builder-store'
 import { startAutoSave, loadAutoSave } from '@/lib/admin/builder-auto-save'
+import { canEditTemplateContent } from '@/lib/admin/studio-permissions'
+import { useStudioRoles } from '../../../../_components/studio-permissions-context'
 import { BuilderHeader } from './builder-header'
 import { BuilderLibraryPane } from './builder-library-pane'
 import { BuilderCanvasPane } from './builder-canvas-pane'
@@ -30,6 +33,7 @@ interface Props {
 
 export function BuilderShell({ templateId, initialName, initialStatus, initialSections, initialBlockPromptOverrides = {} }: Props) {
     const { load, addBlock } = useBuilderStore()
+    const roles = useStudioRoles()
     const [name, setName] = useState(initialName)
     const [status, setStatus] = useState(initialStatus)
     const [mode, setMode] = useState<BuilderMode>('builder')
@@ -49,14 +53,24 @@ export function BuilderShell({ templateId, initialName, initialStatus, initialSe
         return stop
     }, [templateId])
 
-    // Sync status change to DB via PATCH (best-effort, non-blocking)
-    function handleStatusChange(newStatus: string) {
-        setStatus(newStatus)
-        fetch(`/api/admin/templates/${templateId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus }),
-        }).catch(() => {/* non-fatal */})
+    // Status only changes in the UI once the server accepted it; a refused move keeps the old status.
+    async function handleStatusChange(newStatus: string): Promise<boolean> {
+        try {
+            const res = await fetch(`/api/admin/templates/${templateId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus }),
+            })
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}))
+                throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+            }
+            setStatus(newStatus)
+            return true
+        } catch (err) {
+            toast.error(`Status change failed: ${err instanceof Error ? err.message : String(err)}`)
+            return false
+        }
     }
 
     // Sync name change to DB via PATCH (best-effort, non-blocking)
@@ -68,6 +82,8 @@ export function BuilderShell({ templateId, initialName, initialStatus, initialSe
             body: JSON.stringify({ name: newName }),
         }).catch(() => {/* non-fatal */})
     }
+
+    const canEdit = canEditTemplateContent(roles, status)
 
     // Catalog overlay (replaces full shell subtree, preserves Zustand state)
     if (mode === 'catalog') {
@@ -87,6 +103,7 @@ export function BuilderShell({ templateId, initialName, initialStatus, initialSe
         return (
             <BuilderBlockDetailOverlay
                 slug={detailBlockSlug}
+                canAdd={canEdit}
                 onAddToTemplate={(blockType: string) => {
                     addBlock(blockType)
                     setMode('builder')
@@ -113,10 +130,11 @@ export function BuilderShell({ templateId, initialName, initialStatus, initialSe
                 mode={mode}
                 onModeChange={(m) => setMode(m)}
             />
-            <BuilderLibraryPane />
-            <BuilderCanvasPane />
+            <BuilderLibraryPane canEdit={canEdit} />
+            <BuilderCanvasPane canEdit={canEdit} />
             <BuilderInspectorPane
                 templateId={templateId}
+                canEdit={canEdit}
                 onOpenBlockDetail={(slug) => {
                     setDetailBlockSlug(slug)
                     setMode('block-detail')

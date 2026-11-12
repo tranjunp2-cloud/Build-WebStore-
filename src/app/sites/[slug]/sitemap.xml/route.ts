@@ -1,6 +1,8 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
+import { storefrontUnavailableFor } from '@/lib/storefront/cached-store-availability'
+import { STORE_UNAVAILABLE_HEADERS } from '@/lib/maintenance'
 import { encodePublicSlugPath, encodePublicSlugSegment, hasActiveCustomDomain, resolveStorefrontOrigin, type TenantLike } from '@/lib/seo/canonical'
 import {
     canSerializePublicSitemap,
@@ -13,6 +15,10 @@ import {
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
         const { slug } = await params
+        // #2179: banned or expired store → 503, nothing to crawl
+        if (await storefrontUnavailableFor(slug, slug === 'custom' ? _req.headers.get('x-tenant-hostname') : null)) {
+            return new Response('Service Unavailable', { status: 503, headers: { ...STORE_UNAVAILABLE_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' } })
+        }
         const payload = await getPayload({ config })
         
         let tenant;

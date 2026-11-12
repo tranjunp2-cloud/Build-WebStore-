@@ -20,7 +20,7 @@ function bustBadgeCache(tenant: unknown): void {
         typeof tenant === 'object' && tenant !== null ? (tenant as { id: string | number }).id : tenant
     if (tenantId == null) return
     try {
-        revalidateTag(`sidebar-badge-counts:${String(tenantId)}`)
+        revalidateTag(`sidebar-badge-counts:${String(tenantId)}`, { expire: 0 })
     } catch {
         // outside request scope (scripts/seeds) — falls back to the cache's 60s TTL
     }

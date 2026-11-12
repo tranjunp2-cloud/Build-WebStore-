@@ -23,10 +23,8 @@ const navBtnStyle: CSSProperties = {
     cursor: 'pointer', padding: 0,
 }
 
-const MAX_THUMBNAILS = 5
-
 export function ProductImageGallery({ images, productName, siteName, primaryColor }: ProductImageGalleryProps) {
-    const displayCount = Math.min(images.length, MAX_THUMBNAILS)
+    const displayCount = images.length
     const [selectedIdx, setSelectedIdx] = useState(0)
     const current = images[selectedIdx]
     const handlePrev = () => setSelectedIdx(i => (i - 1 + displayCount) % displayCount)
@@ -67,7 +65,7 @@ export function ProductImageGallery({ images, productName, siteName, primaryColo
             {/* Thumbnail strip — only shown when product has multiple images */}
             {images.length > 1 && (
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    {images.slice(0, 5).map((img, i) => (
+                    {images.map((img, i) => (
                         <button
                             key={i}
                             type="button"

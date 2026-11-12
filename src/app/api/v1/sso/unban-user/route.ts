@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { revalidateTenantStorefront } from '@/lib/cache/revalidate-storefront'
 
 /**
  * POST /api/v1/sso/unban-user
@@ -47,7 +48,9 @@ export async function POST(req: NextRequest) {
 
         let updated = 0
         for (const tenantId of tenantIds) {
-            await payload.update({ collection: 'tenants', id: tenantId, data: { status: 'active' } })
+            const tenant = await payload.update({ collection: 'tenants', id: tenantId, data: { status: 'active' } })
+            // #2179: post-commit bust, so no storefront read between hook and commit keeps the old status cached
+            revalidateTenantStorefront(tenant)
             updated++
         }
 

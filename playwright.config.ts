@@ -7,6 +7,9 @@ const hasE2EAccount = Boolean(
     && process.env.E2E_TEST_OTP_CODE,
 )
 export const F37_CUSTOM_DOMAIN_TEST = /\[TC-F37-03-52\]/
+const baseURL = process.env.BASE_URL || 'http://localhost:3000'
+// Vitest imports this config with Vite's BASE_URL ("/"), which is not an absolute URL.
+const baseOrigin = URL.canParse(baseURL) ? new URL(baseURL).origin : undefined
 
 export default defineConfig({
     testDir: './e2e',
@@ -20,13 +23,36 @@ export default defineConfig({
         timeout: isStaging ? 15_000 : 10_000,
     },
     use: {
-        baseURL: process.env.BASE_URL || 'http://localhost:3000',
+        baseURL,
+        // Cookie-authenticated writes need a same-host Origin (cookieSessionAllowed, TC-PERF-162). Browsers send
+        // one, APIRequestContext does not; contexts a test creates itself inherit this too.
+        extraHTTPHeaders: baseOrigin ? { Origin: baseOrigin } : undefined,
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
         video: 'on-first-retry',
         actionTimeout: isStaging ? 20_000 : 15_000,
     },
     projects: [
+        {
+            name: 'f15-merchant-access',
+            testDir: './tests',
+            testMatch: /f15-merchant-access\.spec\.ts/,
+            timeout: 180_000,
+            expect: { timeout: 60_000 },
+            use: { ...devices['Desktop Chrome'], storageState: undefined, actionTimeout: 120_000, navigationTimeout: 120_000, trace: 'off', screenshot: 'off', video: 'off' },
+        },
+        {
+            name: 'pw1-footer-category-links',
+            testDir: './tests',
+            use: { ...devices['Desktop Chrome'] },
+            testMatch: /pw1-footer-category-links\.spec\.ts/,
+        },
+        {
+            name: 'f40-website-migration',
+            testDir: './tests',
+            use: { ...devices['Desktop Chrome'] },
+            testMatch: /f40-website-migration\.spec\.ts/,
+        },
         // Smoke tests — no auth needed, run independently
         {
             name: 'smoke',
@@ -46,7 +72,7 @@ export default defineConfig({
                 storageState: './e2e/.auth/user.json',
             },
             dependencies: ['setup'],
-            testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/],
+            testIgnore: [/.*\.setup\.ts/, /smoke\.spec\.ts/, /f40-website-migration\.spec\.ts/],
         },
         // GH-1725 exercises a token-bearing SSO callback with real browser/API
         // boundaries. Disable retained artifacts so v2_token never lands in a
@@ -68,7 +94,7 @@ export default defineConfig({
         {
             name: 'storefront-regression',
             testDir: './tests',
-            testMatch: /(cart-drawer|product-grid-qa-rework)\.spec\.ts/,
+            testMatch: /(cart-drawer|product-grid-qa-rework|f09-mobile-track-order)\.spec\.ts/,
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: undefined,
@@ -126,6 +152,48 @@ export default defineConfig({
             },
             dependencies: ['setup'],
         },
+        // US-F05-10 (TC-F05-10-17): publish → edit → Update live → Unpublish from Settings → Publish again.
+        // Mutates the account's shop (restores it to live in afterAll), so it is an exact-spec project.
+        {
+            name: 'f05-publish-unpublish-settings',
+            testDir: './tests',
+            testMatch: /f05-publish-unpublish-settings\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
+        {
+            name: 'gh-2284-checkout-email-length',
+            testDir: './tests',
+            testMatch: /gh-2284-checkout-email-length\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
+        {
+            name: 'gh-2477-bank-transfer-checkout',
+            testDir: './tests',
+            testMatch: /gh-2477-bank-transfer-checkout\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
+        {
+            name: 'gh-2170-orders-badge',
+            testDir: './tests',
+            testMatch: /gh-2170-orders-badge\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
         {
             name: 'gh-1640-performance',
             testDir: './tests',
@@ -135,6 +203,27 @@ export default defineConfig({
                 storageState: './e2e/.auth/user.json',
             },
             dependencies: ['setup'],
+        },
+        // US-F07-04 verifies the authenticated search API and the 375px editor flow.
+        {
+            name: 'f07-template-search',
+            testDir: './tests',
+            testMatch: /f07-template-search\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: './e2e/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
+        {
+            name: 'f40-migration-diff',
+            testDir: './tests',
+            testMatch: /studio-migration-diff\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: hasE2EAccount ? './e2e/.auth/user.json' : undefined,
+            },
+            dependencies: hasE2EAccount ? ['setup'] : [],
         },
         // GH-1687: authenticated category-management flow that verifies the
         // Parent Category dropdown follows tree preorder instead of API order.
@@ -228,6 +317,19 @@ export default defineConfig({
             testDir: './tests',
             testMatch: /f40-targeted-smoke-api\.spec\.ts/,
             use: { ...devices['Desktop Chrome'], storageState: undefined },
+        },
+        // US-F41-02 uses the persisted Super Admin session for the real Studio
+        // boundary, while its list response is browser-mocked for deterministic
+        // recovery fixtures without an AI/provider dependency.
+        {
+            name: 'f41-generation-attention',
+            testDir: './tests',
+            testMatch: /f41-generation-attention\.spec\.ts/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: hasE2EAccount ? './e2e/.auth/user.json' : undefined,
+            },
+            dependencies: hasE2EAccount ? ['setup'] : [],
         },
         // GH-1684: desktop keeps its native PDF viewer while real mobile browser
         // profiles exercise the canvas path (including WebKit soft-mask images).

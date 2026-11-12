@@ -7,6 +7,7 @@
 
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 import { normalizeComparisonValues } from '@/blocks/feature-comparison/config'
+import { HeroSlideSchema } from '@/blocks/hero/config'
 import { blockRegistry } from '@/blocks/registry'
 
 /** Upload/media field names that must be integer IDs (not objects or URLs) */
@@ -149,6 +150,12 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
 
         // Also normalize upload fields inside nested arrays (testimonials.avatar, etc.)
         for (const [key, val] of Object.entries(b)) {
+            // Hero slides are a JSON field, not Payload upload relationships.
+            // Keep their resolved URL objects through generation and editor saves.
+            if (b.blockType === 'hero' && key === 'slides' && Array.isArray(val)) {
+                b[key] = val.map(slide => HeroSlideSchema.parse(slide))
+                continue
+            }
             if (Array.isArray(val)) {
                 b[key] = (val as unknown[]).map((item: unknown) => {
                     if (item && typeof item === 'object') {

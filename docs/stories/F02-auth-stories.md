@@ -108,10 +108,19 @@ THEN  set auth cookie (lưu phiên đăng nhập)
 ```gherkin
 GIVEN user nhập sai email hoặc password
 WHEN  submit form
-THEN  hiện alert banner "Incorrect email or password"
+THEN  hiện alert banner "Incorrect email or password" (nếu tài khoản đang bị khóa sau 5 lần sai → "Too many unsuccessful sign-in attempts. Please try again in 15 minutes or reset your password.", API 423 — GH-2053)
   AND toast.error (thông báo đỏ) message
   AND KHÔNG redirect, giữ nguyên trang
   AND password field cleared
+```
+
+#### AC-2c: Validation — Password tối thiểu 6 ký tự (GH-2269)
+
+```gherkin
+GIVEN user ở /login
+WHEN  nhập password ít hơn 6 ký tự và submit
+THEN  hiện lỗi inline "Password must be at least 6 characters"
+  AND KHÔNG gọi API đăng nhập
 ```
 
 #### AC-2a: Error — Workspace bị khóa tạm thời (inactivated)
@@ -282,6 +291,15 @@ WHEN  nhập new password + confirm password hợp lệ
 THEN  POST /api/users/reset-password { token, password }
   AND thành công → toast.success (thông báo xanh) "Password reset successful! 🔐"
   AND redirect → /login
+```
+
+#### AC-1a: Validation — Password mới tối thiểu 6 ký tự (GH-2269)
+
+```gherkin
+GIVEN user ở /reset-password?token=xxx
+WHEN  nhập new password ít hơn 6 ký tự
+THEN  hiện lỗi inline "Password must be at least 6 characters", không gửi form
+  AND nếu gọi thẳng POST /api/users/reset-password với password < 6 ký tự → server trả 400, mật khẩu không đổi
 ```
 
 #### AC-2: Token Hết Hạn / Invalid

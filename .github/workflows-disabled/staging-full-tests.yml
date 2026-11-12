@@ -1,0 +1,61 @@
+# Full unit test suite on the staging branch, once a night.
+#
+# Feature PRs into staging only run the specs affected by their change (ci.yml → unit-tests.yml,
+# mode affected); this run catches anything that slipped through, e.g. two PRs that are green on
+# their own but break together. It used to run after every merge, but a 27 min run was cancelled
+# by the next merge most of the time (65 of 84 runs in 28 days), so it now runs once after the
+# working day. It does not block or roll back the deploy; a failure pings Lark.
+#
+# The schedule fires on main, so the branch under test is passed explicitly.
+name: Staging full tests
+
+on:
+  schedule:
+    # 00:00 Asia/Ho_Chi_Minh after each working day (17:00 UTC Mon–Fri).
+    - cron: '0 17 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: staging-full-tests
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: "Test"
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      mode: full
+      ref: staging
+
+  notify-fail:
+    name: "Notify: full tests failed"
+    needs: test
+    if: failure()
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: staging
+
+      - name: Prepare failure info
+        id: fail_info
+        run: |
+          echo "short_sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
+
+      - name: Notify
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'ci_fail'
+          branch: 'staging'
+          author: ${{ github.actor }}
+          commit-sha: ${{ steps.fail_info.outputs.short_sha }}
+          commit-msg: ${{ steps.fail_info.outputs.commit_msg }}
+          failed-step: 'Staging full tests (nightly)'
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -261,6 +261,7 @@ Weight, Length, Width, Height -> Để chuẩn bị tính Shipping Rate F14.
     - **Single Add-Subcategory Affordance:** Chỉ có 1 nút "+" icon per row (ẩn ở L3). Không còn duplicate "+ Add subcategory" inline.
     - **Level Badges:** 3 màu riêng biệt — L1 teal, L2 blue, L3 violet.
     - **Category Image Field:** REMOVED (unused, never rendered anywhere). Modal chỉ còn 4 fields: Name*, Parent, Description, URL Slug.
+      > Đảo lại ở F48 US-F48-16 — ⏸ hoãn (D88, PO 2026-11-10) chờ cutover Commerce OS — xem [docs/stories/F48-media-management-stories-4.md](../stories/F48-media-management-stories-4.md).
 
 ---
 ### 10.5. Giao diện Hiển thị Storefront (PLP & PDP)
@@ -335,7 +336,7 @@ THEN  một bảng tự sinh xuất hiện bên dưới gồm 4 dòng (Trắng-M
 GET /api/products?where[tenant][equals]={id}  → list
 POST /api/products                              → create
 PATCH /api/products/:id                        → update
-DELETE /api/products/:id (soft)               → { deletedAt: now }
+DELETE /api/products/:id                      → hard delete, chỉ super-admin (tenant-owner: 403; xóa mềm qua Dashboard: update { deletedAt: now }, GH-1520)
 POST /api/ai/product-description               → AI generate description
 Auth: required, tenant-scoped
 ```

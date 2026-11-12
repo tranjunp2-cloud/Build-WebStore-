@@ -1,9 +1,10 @@
 'use client'
 
-import type { ReactNode, ComponentType } from 'react'
+import { useMemo, type ReactNode, type ComponentType } from 'react'
 import type { BlockProps } from '../types'
 import type { ContactConfig, FormField } from './config'
 import { useContactForm, PHONE_PATTERN_MY } from './useContactForm'
+import { resolveContactFieldKeys } from '@/lib/contact/contact-field-keys'
 import { AnimatedSection } from '../shared/animations'
 import { GradientBlob, SectionLabel, GlassCard } from '../shared/decorative'
 import { motion } from 'framer-motion'
@@ -155,6 +156,8 @@ type ContactFormProps = {
     inline?: boolean
 }
 
+const API_REQUIRED_KEYS = new Set(['name', 'email', 'message'])
+
 const DEFAULT_FORM_FIELDS: FormField[] = [
     { fieldName: 'name', label: 'Name', fieldType: 'text', required: true },
     { fieldName: 'email', label: 'Email', fieldType: 'email', required: true },
@@ -174,11 +177,14 @@ const DEFAULT_FORM_FIELDS: FormField[] = [
  */
 function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel = 'Send Message →', inline = false }: ContactFormProps) {
     const fields = formFields.length > 0 ? formFields : DEFAULT_FORM_FIELDS
-    const requiredFieldNames = fields
-        .filter(f => f.required)
-        .map(f => f.fieldName || f.fieldType || 'message')
+    // GH-2243: each field submits under a canonical key (name/email/...), whatever its stored fieldName is.
+    const keys = useMemo(() => resolveContactFieldKeys(fields), [fields])
+    // The API (zod) always requires name, email and message: mirror that so the error shows at the field.
+    const requiredFieldNames = fields.flatMap((f, i) =>
+        f.required || API_REQUIRED_KEYS.has(keys[i]!) ? [keys[i]!] : [],
+    )
 
-    const { state, errors, submitError, handleSubmit } = useContactForm({
+    const { state, errors, submitError, handleSubmit, handleFieldChange } = useContactForm({
         siteId,
         requiredFieldNames,
     })
@@ -209,18 +215,19 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
     }
 
     return (
-        <form className={className} onSubmit={handleSubmit} noValidate>
+        <form className={className} onSubmit={handleSubmit} onChange={handleFieldChange} noValidate>
             {fields.map((field, i) => {
-                const fieldName = field.fieldName || field.fieldType || `field-${i}`
+                const fieldName = keys[i]!
                 const error = errors[fieldName as keyof typeof errors]
                 const errorId = error ? `${fieldName}-error` : undefined
+                const isRequired = requiredFieldNames.includes(fieldName)
                 return (
                     <div key={`${i}-${fieldName}`} className={inline ? 'flex-1 min-w-[180px]' : ''}>
                         <label htmlFor={fieldName} className="block text-sm font-medium mb-2 opacity-70">
                             {field.label}
-                            {field.required && <span style={{ color: 'var(--brand-primary)' }}> *</span>}
+                            {isRequired && <span style={{ color: 'var(--brand-primary)' }}> *</span>}
                         </label>
-                        <FormFieldInput field={field} error={!!error} errorId={errorId} inlineRows={inline ? 1 : undefined} />
+                        <FormFieldInput field={field} name={fieldName} required={isRequired} error={!!error} errorId={errorId} inlineRows={inline ? 1 : undefined} />
                         {error && (
                             <p id={errorId} className="mt-1 text-xs" style={{ color: '#ef4444' }} role="alert">
                                 {error}
@@ -265,8 +272,7 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
 const INPUT_BASE_CLASS =
     'w-full px-4 py-3 rounded-xl text-sm outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-muted)] bg-[rgba(var(--brand-primary-rgb),0.03)] border border-[rgba(var(--brand-primary-rgb),0.12)] focus-visible:border-[rgba(var(--brand-primary-rgb),0.45)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.18)] disabled:opacity-50 disabled:cursor-not-allowed'
 
-function FormFieldInput({ field, error, errorId, inlineRows }: { field: FormField; error?: boolean; errorId?: string; inlineRows?: number }) {
-    const name = field.fieldName || field.fieldType || 'field'
+function FormFieldInput({ field, name, required, error, errorId, inlineRows }: { field: FormField; name: string; required: boolean; error?: boolean; errorId?: string; inlineRows?: number }) {
     const isTextarea = field.fieldType === 'textarea'
     const type = field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'
 
@@ -285,8 +291,8 @@ function FormFieldInput({ field, error, errorId, inlineRows }: { field: FormFiel
     const commonProps = {
         id: name,
         name,
-        required: field.required,
-        'aria-required': field.required,
+        required,
+        'aria-required': required,
         'aria-invalid': error,
         'aria-describedby': errorId,
         placeholder: field.placeholder || field.label,

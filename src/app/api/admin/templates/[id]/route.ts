@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { withSuperAdmin, UpdateTemplateSchema } from '@/lib/admin/api-utils'
+import { studioForbidden, withStudioSeat, withSuperAdmin, UpdateTemplateSchema } from '@/lib/admin/api-utils'
+import { canPatchTemplate } from '@/lib/admin/studio-permissions'
 import { isNotFoundError } from '@/lib/api/is-not-found-error'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
-    return withSuperAdmin(async () => {
+    return withStudioSeat(async (_req, { user }) => {
         const { id } = await ctx.params
         if (!isValidTemplateId(id)) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -70,6 +71,9 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
         // update() throws NotFound on a missing id (withSuperAdmin has no catch → 500).
         // Map it to 404 so a non-existent template isn't reported as a server crash. (GH #1535)
         try {
+            const current = await payload.findByID({ collection: 'templates', id, depth: 0 })
+            if (!canPatchTemplate(user.roles, current.status, parsed.data)) return studioForbidden()
+
             const updated = await payload.update({
                 collection: 'templates',
                 id,

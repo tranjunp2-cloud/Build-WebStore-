@@ -54,7 +54,8 @@ test.describe('GH-1734 Self-delivery completion', () => {
             response.url().endsWith(`/api/orders/${orderId}`)
             && response.request().method() === 'PATCH'
         ))
-        await page.getByRole('button', { name: 'Confirm Order', exact: true }).click()
+        // Copy from en.json dashboard.orders.actions (sentence case since GH-1701).
+        await page.getByRole('button', { name: 'Confirm order', exact: true }).click()
         const confirmResponse = await confirmResponsePromise
         expect(confirmResponse.ok(), await confirmResponse.text()).toBe(true)
 
@@ -68,7 +69,7 @@ test.describe('GH-1734 Self-delivery completion', () => {
         const shipResponse = await shipResponsePromise
         expect(shipResponse.ok(), await shipResponse.text()).toBe(true)
 
-        const completeButton = page.getByRole('button', { name: 'Complete Order', exact: true })
+        const completeButton = page.getByRole('button', { name: 'Complete order', exact: true })
         await expect(completeButton).toBeVisible({ timeout: 30_000 })
 
         // Act — confirm completion only after the order has reached shipping.

@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
+import { getPayload, type User } from 'payload'
 import config from '@payload-config'
-import { withAuth } from '@/lib/auth'
+import { extractTenantId, withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { updateDiscountSchema } from '@/lib/validations/discounts'
+import { VersionConflictError } from '@/lib/save-version/save-version'
+import { deleteDiscountAs, DiscountServiceError, updateDiscountAs, type DiscountWriteData } from '@/lib/discounts/discount-service'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -45,47 +47,33 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
  * PUT /api/v1/discounts/[id]
  *
  * Update a discount. usageCount and tenant are stripped — never client-writable.
+ * Optional `expectedUpdatedAt`: a discount changed since is refused, 409 `{ ok: false, code: 'VERSION_CONFLICT', current }`.
  */
 export const PUT = withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const { id } = await ctx.params
         const { data, errorResponse } = await parseRequest(request, updateDiscountSchema)
         if (errorResponse) return errorResponse
+        const { expectedUpdatedAt, ...patch } = data
 
-        const payload = await getPayload({ config })
-
-        // Verify exists + access before update
-        const existing = await payload.findByID({
-            collection: 'discounts',
-            id,
-            user,
-            overrideAccess: false,
-        })
-
-        if (!existing) {
-            return NextResponse.json(
-                { success: false, error: { code: 'NOT_FOUND', message: 'Discount not found' } },
-                { status: 404 },
-            )
-        }
-
-        // Strip protected fields — usageCount has access.update:false on the collection,
-        // but defence-in-depth: strip explicitly here too
-        const { usageCount: _uc, tenant: _t, ...safeData } = data as any
-
+        // Verify exists + access, strip usageCount / tenant, then write (lib/discounts/discount-service)
         let updated
         try {
-            updated = await payload.update({
-                collection: 'discounts',
-                id,
-                data: safeData,
-                user,
-                overrideAccess: false,
-            })
+            updated = await updateDiscountAs({ user: user as unknown as User, tenantId: extractTenantId(user) ?? '' }, id, patch as DiscountWriteData, expectedUpdatedAt)
         } catch (err: any) {
-            if (err?.message?.includes('duplicate') || err?.message?.includes('unique') || err?.code === '23505') {
+            if (err instanceof DiscountServiceError && err.code === 'NOT_FOUND') {
                 return NextResponse.json(
-                    { success: false, error: { code: 'DUPLICATE_CODE', message: 'This code is already in use for your tenant. Try a different code or append a number.' } },
+                    { success: false, error: { code: 'NOT_FOUND', message: 'Discount not found' } },
+                    { status: 404 },
+                )
+            }
+            if (err instanceof VersionConflictError) {
+                // changed since the form loaded: nothing written, `current` is the version to save over
+                return NextResponse.json({ success: false, ...err.toResult() }, { status: 409 })
+            }
+            if (err instanceof DiscountServiceError && err.code === 'DUPLICATE_CODE') {
+                return NextResponse.json(
+                    { success: false, error: { code: 'DUPLICATE_CODE', message: err.message } },
                     { status: 409 },
                 )
             }
@@ -108,28 +96,17 @@ export const PUT = withAuth<RouteContext>(async (user, request, ctx) => {
 export const DELETE = withAuth<RouteContext>(async (user, _request, ctx) => {
     try {
         const { id } = await ctx.params
-        const payload = await getPayload({ config })
-
-        const existing = await payload.findByID({
-            collection: 'discounts',
-            id,
-            user,
-            overrideAccess: false,
-        })
-
-        if (!existing) {
-            return NextResponse.json(
-                { success: false, error: { code: 'NOT_FOUND', message: 'Discount not found' } },
-                { status: 404 },
-            )
+        try {
+            await deleteDiscountAs({ user: user as unknown as User, tenantId: extractTenantId(user) ?? '' }, id)
+        } catch (err: any) {
+            if (err instanceof DiscountServiceError && err.code === 'NOT_FOUND') {
+                return NextResponse.json(
+                    { success: false, error: { code: 'NOT_FOUND', message: 'Discount not found' } },
+                    { status: 404 },
+                )
+            }
+            throw err
         }
-
-        await payload.delete({
-            collection: 'discounts',
-            id,
-            user,
-            overrideAccess: false,
-        })
 
         // 204 No Content — delete succeeded, nothing to return (US-F33-03 AC).
         return new NextResponse(null, { status: 204 })

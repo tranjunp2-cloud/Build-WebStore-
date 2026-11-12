@@ -25,6 +25,7 @@ import msLocale from '@/i18n/locales/ms.json'
 vi.mock('@/i18n', () => ({
     useI18n: () => ({
         t: {
+            mascot: { generationIllustration: 'Website creation incomplete' },
             dashboard: {
                 overview: {
                     stats: {
@@ -283,8 +284,6 @@ describe('SEOHealthWidget', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DashboardEmptyState
 // ─────────────────────────────────────────────────────────────────────────────
-import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
-
 describe('DashboardEmptyState', () => {
     it('[TC-F03.01] renders empty state with CTA directing to /builder/new', () => {
         render(<DashboardEmptyState />)
@@ -334,7 +333,7 @@ describe('DashboardGenerationFailed', () => {
 
     it('[TC-F03.01b] renders illustration image', () => {
         render(<DashboardGenerationFailed />)
-        const img = screen.getByAltText('Website creation incomplete')
+        const img = screen.getByRole('img', { name: 'Website creation incomplete' })
         expect(img).toBeInTheDocument()
     })
 })

@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { formatTrackingEventDisplay } from '@/lib/shipping/tracking-event-display'
+import { normalizeOrderNumber } from '@/lib/orders/normalize-order-number'
 
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'payment_failed'])
 
@@ -12,7 +13,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ orderNumber: string }> },
 ) {
-    const { orderNumber } = await params
+    const { orderNumber: rawOrderNumber } = await params
+    const orderNumber = normalizeOrderNumber(rawOrderNumber)
     const { searchParams } = new URL(request.url)
     const slug = searchParams.get('slug')
 

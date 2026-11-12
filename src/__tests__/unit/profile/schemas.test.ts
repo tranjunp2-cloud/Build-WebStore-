@@ -40,6 +40,21 @@ describe('profilePatchSchema', () => {
         }
     })
 
+    // TC-F23-04-31 (GH-2383): empty lastName is valid (staff invited without a name)
+    it('accepts empty lastName alongside phone', () => {
+        const result = profilePatchSchema.safeParse({ lastName: '', phone: '+60123456789' })
+        expect(result.success).toBe(true)
+    })
+
+    // TC-F23-04-32 (GH-2383): name errors are i18n keys, not raw zod text
+    it('reports nameLength key for 1-char lastName, 51-char lastName and 1-char firstName', () => {
+        for (const data of [{ lastName: 'X' }, { lastName: 'a'.repeat(51) }, { firstName: 'X' }]) {
+            const result = profilePatchSchema.safeParse(data)
+            expect(result.success).toBe(false)
+            if (!result.success) expect(result.error.issues[0].message).toBe('nameLength')
+        }
+    })
+
     // TC-F23-04-04: Empty firstName fails validation
     it('rejects empty firstName (min length 2)', () => {
         const data = {
@@ -161,14 +176,26 @@ describe('passwordChangeSchema', () => {
         }
     })
 
-    // TC-F23-04-14: Password too short (< 8 chars)
-    it('rejects newPassword shorter than 8 characters', () => {
+    // TC-F23-04-14: Password too short (< 6 chars, GH-2269)
+    it('rejects newPassword shorter than 6 characters', () => {
         const data = {
             currentPassword: 'OldPass1!',
-            newPassword: 'Aa1!aaa',
+            newPassword: 'Aa1!a',
         }
         const result = passwordChangeSchema.safeParse(data)
         expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.issues.map(i => i.message)).toContain('passwordMinLength')
+        }
+    })
+
+    // TC-F23-04-14: Exactly 6 chars with uppercase + digit is accepted (GH-2269)
+    it('accepts newPassword of exactly 6 characters', () => {
+        const data = {
+            currentPassword: 'OldPass1!',
+            newPassword: 'Aa1!aa',
+        }
+        expect(passwordChangeSchema.safeParse(data).success).toBe(true)
     })
 
     // TC-F23-04-15: Password missing uppercase fails

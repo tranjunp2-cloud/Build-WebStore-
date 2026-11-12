@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Package, ArrowRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { normalizeOrderNumber } from '@/lib/orders/normalize-order-number'
 
 interface Props {
     slug: string
@@ -21,7 +22,7 @@ export default function OrderLookupClient({ slug, siteName }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        const trimmed = orderNumber.trim()
+        const trimmed = normalizeOrderNumber(orderNumber)
         if (!trimmed) {
             setError(ol.required)
             return

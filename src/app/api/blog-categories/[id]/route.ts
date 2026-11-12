@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { updateCategorySchema } from '@/lib/validations/blog'
+import { BLOG_CATEGORY_DUPLICATE_CODE, blogCategoryNameTaken } from '@/lib/blog/blog-category-name'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -32,12 +33,21 @@ export const PATCH = withFeatureGuard('content_management')(withAuth<RouteContex
             )
         }
 
+        // Renaming onto another category's name used to save a second "Recent News" (GH-2265).
+        if (data!.name && await blogCategoryNameTaken(payload, { tenantId: existingTenantId, name: data!.name, excludeId: id })) {
+            return NextResponse.json(
+                { success: false, error: { code: BLOG_CATEGORY_DUPLICATE_CODE, details: 'Category with this name already exists' } },
+                { status: 409 }
+            )
+        }
+
         const updated = await payload.update({
             collection: 'blog_categories',
             id,
             data: data!,
             user,
             overrideAccess: false,
+            depth: 0,
         })
 
         return NextResponse.json({ success: true, data: updated })

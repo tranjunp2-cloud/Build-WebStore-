@@ -8,6 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
+import { isTenantUnavailable } from '@/lib/storefront/store-availability'
 import config from '@payload-config'
 import { cookies } from 'next/headers'
 import { verifyConfirmToken, generateConfirmToken } from '@/lib/orders/upload-token'
@@ -137,7 +138,8 @@ export async function POST(
         const siteDoc = (typeof order.site === 'object' ? order.site : null) as SiteDoc | null
         const siteId = siteDoc?.id ?? order.site
 
-        if (tenantDoc.status === 'suspended') {
+        // #2179: suspended (banned) or lapsed main subscription → no payment
+        if (await isTenantUnavailable(payload, tenantDoc as unknown as { id: string | number; status?: unknown })) {
             return NextResponse.json(
                 { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
                 { status: 403 },

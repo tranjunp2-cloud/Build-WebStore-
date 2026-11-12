@@ -167,7 +167,8 @@ export function PaymentCard({ order }: { order: PaymentCardOrder }) {
                     >
                         {proofUrl ? (
                             <>
-                                <Image src={proofUrl} alt="Payment Receipt" fill className="object-cover" />
+                                {/* Receipts are private (/api/media/private/{id}, cookie-checked): the image optimizer would fetch without the session. */}
+                                <Image src={proofUrl} alt="Payment Receipt" fill className="object-cover" unoptimized />
                                 <div
                                     className="side-proof-overlay"
                                     style={{ opacity: proofHovered ? 1 : 0 }}

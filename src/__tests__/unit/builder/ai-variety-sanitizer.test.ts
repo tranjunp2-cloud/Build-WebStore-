@@ -6,7 +6,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('openai', () => ({ default: vi.fn() }))
 vi.mock('@/blocks/registry', () => ({
   blockRegistry: {
     getAllMeta: () => [],

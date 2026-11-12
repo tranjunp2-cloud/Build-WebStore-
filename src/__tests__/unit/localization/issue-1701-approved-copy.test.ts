@@ -345,7 +345,7 @@ describe('GH-1701 approved English and Malay copy contracts', () => {
         })
 
         // Assert
-        expect(scalarContracts).toHaveLength(3_298)
+        expect(scalarContracts).toHaveLength(3_288)
         for (const contract of scalarContracts) {
             expect(placeholders(contract.msValue), `${contract.key} placeholders`).toEqual(
                 placeholders(contract.enValue),

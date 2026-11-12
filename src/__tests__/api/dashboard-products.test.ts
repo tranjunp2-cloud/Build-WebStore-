@@ -43,10 +43,11 @@ describe('GET /api/dashboard/products [TC-GH1432-PERF-03]', () => {
             collection: 'products',
             user: mockUser,
             overrideAccess: false,
+            // one read of the whole set, no COUNT (TC-PERF-053)
             pagination: false,
-            limit: 100,
+            limit: 0,
             depth: 1,
-            sort: '-createdAt',
+            sort: ['-createdAt', '-id'],
             where: {
                 and: [
                     { deletedAt: { exists: false } },

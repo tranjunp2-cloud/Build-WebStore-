@@ -17,6 +17,12 @@ export async function getUnifiedRunHistory(payload: Payload, filters: UnifiedHis
   // against a database before migrations, while deployed builds always use
   // the snapshot-stable SQL read model installed by db-setup.
   if (process.env.NODE_ENV === "development" || !db?.drizzle) return null;
+  // Array filters must reach Postgres as ONE array parameter. A bare JS array in
+  // a Drizzle `sql` template expands into a parenthesised value list instead:
+  // `[]` renders `()` (a syntax error) and `['a', 'b']` renders the row
+  // `($1, $2)`, which cannot be cast to `text[]`.
+  const profiles = filters.profiles?.length ? sql.param(filters.profiles) : null;
+  const testCasePackIds = sql.param(filters.testCasePackIds ?? []);
   const result = await db.drizzle.execute(sql`
     WITH dispatch_snapshot AS (
       SELECT DISTINCT ON (d.id) d.*, e.status AS event_status, e.occurred_at AS cursor_at
@@ -40,12 +46,12 @@ export async function getUnifiedRunHistory(payload: Payload, filters: UnifiedHis
       FROM qa_test_runs r WHERE r.finished_at >= ${filters.since} AND r.finished_at <= ${filters.snapshot}::timestamptz AND NOT EXISTS (SELECT 1 FROM qa_smoke_dispatches d WHERE d.terminal_run_id = r.id)
     ) SELECT * FROM history WHERE (${filters.targetId ?? null}::text IS NULL OR target_id = ${filters.targetId ?? null})
       AND (${filters.suite ?? null}::text IS NULL OR suite = ${filters.suite ?? null})
-      AND (${filters.profiles?.length ? filters.profiles : null}::text[] IS NULL OR profile = ANY(${filters.profiles?.length ? filters.profiles : null}::text[]))
+      AND (${profiles}::text[] IS NULL OR profile = ANY(${profiles}::text[]))
       AND (${filters.pullRequest ?? null}::numeric IS NULL OR pull_request = ${filters.pullRequest ?? null})
       AND (${filters.commitSha ?? null}::text IS NULL OR commit_sha = ${filters.commitSha ?? null})
       AND (${filters.packId ?? null}::text IS NULL OR pack_id = ${filters.packId ?? null})
       AND (${filters.status ?? null}::text IS NULL OR status = ${filters.status ?? null})
-      AND (${filters.testCaseId ?? null}::text IS NULL OR (source = 'run' AND EXISTS (SELECT 1 FROM qa_test_results x WHERE x.run_id = history.id AND x.test_case_id = ${filters.testCaseId ?? null})) OR (source = 'dispatch' AND pack_id = ANY(${filters.testCasePackIds?.length ? filters.testCasePackIds : []}::text[])))
+      AND (${filters.testCaseId ?? null}::text IS NULL OR (source = 'run' AND EXISTS (SELECT 1 FROM qa_test_results x WHERE x.run_id = history.id AND x.test_case_id = ${filters.testCaseId ?? null})) OR (source = 'dispatch' AND pack_id = ANY(${testCasePackIds}::text[])))
       AND (${cursor?.at ?? null}::timestamptz IS NULL OR (cursor_at, source, id) < (${cursor?.at ?? null}::timestamptz, ${cursor?.source ?? "run"}, ${cursor?.id ?? 0}))
     ORDER BY cursor_at DESC, source DESC, id DESC LIMIT 51`);
   return result.rows;

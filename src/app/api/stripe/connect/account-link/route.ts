@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { getStripeClient } from '@/lib/payment/stripe'
+import { guardPayoutConnect } from '@/lib/payment/payout-connect-guard'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 
 /** Minimal shape of a tenant document for Stripe Connect account-link flow. */
@@ -43,6 +44,9 @@ export const POST = withFeatureGuard('payment_integration')(withAuth(async (user
                 { status: 403 },
             )
         }
+
+        const blocked = guardPayoutConnect(request, user, tenantId)
+        if (blocked) return blocked
 
         const payload = await getPayload({ config })
         const tenant = await payload.findByID({ collection: 'tenants', id: tenantId })

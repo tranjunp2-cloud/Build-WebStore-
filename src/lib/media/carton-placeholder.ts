@@ -149,7 +149,10 @@ export async function findOrCreateCartonMedia(
     try {
         const res = await payload.create({
             collection: 'media',
-            data: { alt: altKey },
+            data: {
+                alt: altKey,
+                ...(tenantId != null ? { tenant: /^\d+$/.test(String(tenantId)) ? Number(tenantId) : tenantId } : {}),
+            },
             file: {
                 data: fileData,
                 name: 'crate-carton-placeholder.png',

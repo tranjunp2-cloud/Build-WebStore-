@@ -54,9 +54,11 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
                     className="flex-1 border-b border-dotted mx-3 min-w-[40px]"
                     style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.188)` }}
                 />
-                <span className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
-                    {item.currency || 'RM'} {item.price}
-                </span>
+                {item.price ? (
+                    <span className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
+                        {item.currency || 'RM'} {item.price}
+                    </span>
+                ) : null}
             </div>
         </div>
     )
@@ -81,9 +83,11 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
                     {item.tag && <TagBadge tag={item.tag} />}
                 </div>
                 {item.description && <Body size="small" className="opacity-50 mb-3"><RichText text={item.description} as="span" /></Body>}
-                <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
-                    {item.currency || 'RM'} {item.price}
-                </p>
+                {item.price ? (
+                    <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
+                        {item.currency || 'RM'} {item.price}
+                    </p>
+                ) : null}
             </div>
         </div>
     )
@@ -98,9 +102,11 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
                 <RichText text={item.name} as="span" className="font-medium" />
                 {item.tag && <TagBadge tag={item.tag} />}
             </div>
-            <span className="font-bold text-sm" style={{ color: 'var(--brand-primary)' }}>
-                {item.currency || 'RM'} {item.price}
-            </span>
+            {item.price ? (
+                <span className="font-bold text-sm" style={{ color: 'var(--brand-primary)' }}>
+                    {item.currency || 'RM'} {item.price}
+                </span>
+            ) : null}
         </div>
     )
 

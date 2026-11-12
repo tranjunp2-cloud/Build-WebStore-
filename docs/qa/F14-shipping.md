@@ -872,6 +872,7 @@ Project hiện tại đã có `@playwright/test@^1.58.2` + `playwright.config.ts
 | **TC-F14.31** | Unit | Happy path 8.00 → no error | validateRate('8.00', opts) | {error:''} | FR-08 |
 | **TC-F14.32** | Unit | Multiple dots 1.2.3 → errorFormat | validateRate('1.2.3', opts) | {error:'Numbers only'} | FR-08 |
 | **TC-F14.33** | Unit | Sub-cent 0.001 + minSen=1 → errorNegative | validateRate('0.001', {minSen:1}) | {error:'Cannot be negative'} | FR-08 |
+| **TC-F14.160** | Unit | Below minSen + errorTooLow → errorTooLow (#2285) | validateRate('0', {minSen:1, messages:{errorTooLow}}) | {error: errorTooLow} — not errorNegative | FR-08 |
 
 #### Component wiring (TC-F14.34–F14.38)
 
@@ -883,6 +884,7 @@ Project hiện tại đã có `@playwright/test@^1.58.2` + `playwright.config.ts
 | **TC-F14.37** | Func | Paste trim + format " 8,50 " → 8.50 | Paste ' 8,50 ' (with spaces) | Input value becomes '8.50' | FR-06 |
 | **TC-F14.38** | Func | onChange filter rejects letters | Type 'a' when input is empty | Input remains empty (filter blocked 'a') | FR-06 |
 | **TC-F14.39** | Func | Paste "RM 8.00" strips prefix → 8.00 (AC-11) | Paste 'RM 8.00' into west rate | Input value becomes '8.00', no error shown | FR-08 |
+| **TC-F14.161** | Func | Free threshold 0 → freeError range message (#2285) | Type '0' into free threshold, blur | Alert shows freeError ("between RM 0.01 and RM 100,000"), not "negative"; aria-invalid='true' | FR-08 |
 
 #### Reset behavior (TC-F14.40–F14.42)
 

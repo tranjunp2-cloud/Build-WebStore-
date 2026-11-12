@@ -139,4 +139,18 @@ describe('[TC-F37-01-14] getTrafficData — excludes internal feature-adoption e
             less_than: '2026-08-03T16:00:00.000Z',
         })
     })
+
+    it('[TC-PERF-059] reads the events as one light statement: the 4 columns it aggregates, depth 0, no COUNT', async () => {
+        const { getTrafficData } = await import('@/lib/dashboard/traffic-data')
+        await getTrafficData('7d', 'UTC')
+
+        expect(mockFind.mock.calls[0][0]).toMatchObject({
+            collection: 'analytics',
+            limit: 5000,
+            pagination: false,
+            depth: 0,
+            select: { event: true, createdAt: true, pageUrl: true, referrer: true },
+        })
+    })
 })
+

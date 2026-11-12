@@ -220,4 +220,35 @@ describe.skipIf(!RUN_TEST)('[TC-F03.05 / TC-F03.77] At-a-glance PostgreSQL query
         expect(result.stats.revenue).toEqual({ value: 0, delta: 0, currency: true })
         expect(result.sparks.revenue).toEqual([0, 0, 0, 0, 0, 0, 0])
     })
+
+    it('[TC-PERF-057] one analytics statement gives both windows\' totals and the current daily series', async () => {
+        // Arrange — 7d window: current 21–27 Jul, previous 14–20 Jul (UTC); other tenant / event / range ignored
+        await pool.query(`
+            INSERT INTO analytics (tenant_id, event, created_at) VALUES
+                (65, 'pageview', '2026-07-21T00:00:00.000Z'),
+                (65, 'pageview', '2026-07-21T23:59:59.999Z'),
+                (65, 'pageview', '2026-07-27T08:00:00.000Z'),
+                (65, 'click', '2026-07-22T10:00:00.000Z'),
+                (65, 'add_to_cart', '2026-07-23T10:00:00.000Z'),
+                (65, 'checkout', '2026-07-23T11:00:00.000Z'),
+                (65, 'pageview', '2026-07-14T00:00:00.000Z'),
+                (65, 'click', '2026-07-20T23:59:59.999Z'),
+                (65, 'purchase', '2026-07-22T10:00:00.000Z'),
+                (65, 'pageview', '2026-07-13T23:59:59.999Z'),
+                (65, 'pageview', '2026-07-28T00:00:00.000Z'),
+                (66, 'pageview', '2026-07-22T10:00:00.000Z');
+        `)
+
+        // Act
+        const result = await getGlanceData('7d', { user: authorizedUser })
+
+        // Assert
+        expect(mocks.count).not.toHaveBeenCalled()
+        expect(result.stats.views).toEqual({ value: 3, delta: 200 })
+        expect(result.stats.leads).toEqual({ value: 1, delta: 0 })
+        expect(result.stats.engage).toEqual({ value: 2, delta: 100 })
+        expect(result.sparks.views).toEqual([2, 0, 0, 0, 0, 0, 1])
+        expect(result.sparks.leads).toEqual([0, 1, 0, 0, 0, 0, 0])
+        expect(result.sparks.engage).toEqual([0, 0, 2, 0, 0, 0, 0])
+    })
 })

@@ -7,6 +7,7 @@ import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
 import type { EmailTemplateConfig } from '../types'
+import { formatDate } from './shared/email-utils'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -28,6 +29,9 @@ export interface OrderRefundedData {
     }>
     subtotal: number
     shippingFee: number
+    /** Discount in RM (not sen). Row is hidden when null/0. */
+    discountAmount?: number | null
+    discountCode?: string | null
     total: number
     refundAmount: number
     paymentMethod: 'cod' | 'stripe' | 'bank_transfer'
@@ -48,15 +52,6 @@ function esc(s: string): string {
 function fp(amount: number, currency: string, locale: EmailLocale): string {
     if (currency === 'MYR') return locale === 'ms' ? `RM${amount.toFixed(2)}` : `MYR ${amount.toFixed(2)}`
     return `${currency} ${amount.toFixed(2)}`
-}
-
-function formatDate(iso: string, locale: EmailLocale): string {
-    try {
-        return new Date(iso).toLocaleString(locale === 'ms' ? 'en-MY' : 'en-GB', {
-            weekday: 'long', year: 'numeric', month: 'long',
-            day: 'numeric', hour: '2-digit', minute: '2-digit',
-        })
-    } catch { return iso }
 }
 
 function buildAddress(addr: OrderRefundedData['customerAddress']): string {
@@ -88,6 +83,15 @@ export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTempla
             <td align="right" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-size:13.5px;color:#0F172A;vertical-align:top;">${fmtPrice(item.unitPrice)}</td>
             <td align="right" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-size:13.5px;color:#0F172A;vertical-align:top;">${fmtPrice(item.lineTotal)}</td>
         </tr>`).join('')
+
+    const discountRow = data.discountAmount && data.discountAmount > 0
+        ? `<tr>
+              <td colspan="3" style="padding:6px 14px;font-size:13.5px;color:#0F172A;">
+                ${t.discount}${data.discountCode ? ` <span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#F1F5F9;color:#475569;font-size:12px;margin-left:6px;">${esc(data.discountCode)}</span>` : ''}
+              </td>
+              <td align="right" style="padding:6px 14px;font-size:13.5px;color:#EF4444;">-${fmtPrice(data.discountAmount)}</td>
+            </tr>`
+        : ''
 
     const defaultSubject = `${data.shopName} - ${tR.subject} - ${data.orderNumber}`
     const subject = (typeof config?.subject === 'string' && config.subject.length > 0)
@@ -123,7 +127,7 @@ export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTempla
       </td></tr>
 
       <tr><td style="padding:18px 40px 6px;">
-        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting} ${esc(data.customerName)},</div>
+        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
         <div style="font-size:14px;line-height:22px;color:#475569;">${tR.body}</div>
@@ -217,6 +221,7 @@ export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTempla
               <td colspan="3" style="padding:12px 14px 6px;font-size:13.5px;color:#0F172A;">${t.subtotal}</td>
               <td align="right" style="padding:12px 14px 6px;font-size:13.5px;color:#0F172A;">${fmtPrice(data.subtotal)}</td>
             </tr>
+            ${discountRow}
             <tr>
               <td colspan="3" style="padding:6px 14px;font-size:13.5px;color:#0F172A;">${t.shippingFee}</td>
               <td align="right" style="padding:6px 14px;font-size:13.5px;color:#0F172A;">${fmtPrice(data.shippingFee)}</td>
@@ -226,7 +231,7 @@ export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTempla
               <td align="right" style="padding:6px 14px;font-size:14px;font-weight:700;color:#0F172A;">${fmtPrice(data.total)}</td>
             </tr>
             <tr>
-              <td colspan="3" style="padding:6px 14px 14px;font-size:13.5px;font-weight:700;color:#8B5CF6;">Refunded</td>
+              <td colspan="3" style="padding:6px 14px 14px;font-size:13.5px;font-weight:700;color:#8B5CF6;">${tR.refundedAmount}</td>
               <td align="right" style="padding:6px 14px 14px;font-size:13.5px;font-weight:700;color:#8B5CF6;">${fmtPrice(data.refundAmount)}</td>
             </tr>
           </tbody>

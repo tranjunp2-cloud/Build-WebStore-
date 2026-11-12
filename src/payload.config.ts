@@ -6,7 +6,10 @@ import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
 import sharp from 'sharp'
 import { s3Storage } from '@payloadcms/storage-s3'
-import { s3PublicUrl } from './lib/media/s3-public-url'
+import { MEDIA_OBJECT_ACL, s3PublicUrl } from './lib/media/s3-public-url'
+import { privateMediaAclPlugin } from './lib/media/private-media-acl'
+import { payloadPoolLimits } from './lib/db/pool-options'
+import { readReplicaOptions, withoutSslmode } from './lib/payload/read-replicas'
 
 import { Tenants } from './collections/Tenants'
 import { Users } from './collections/Users'
@@ -28,10 +31,13 @@ import { Categories } from './collections/Categories'
 import { Notifications } from './collections/Notifications'
 import { PushSubscriptions } from './collections/PushSubscriptions'
 import { AiUsageLogs } from './collections/AiUsageLogs'
+import { AiShopLimits } from './collections/AiShopLimits'
+import { AiCapAlerts } from './collections/AiCapAlerts'
 import { TemplateQualityScores } from './collections/TemplateQualityScores'
 import { BlockCatalogEntries } from './collections/BlockCatalogEntries'
 import { BlockVariants } from './collections/BlockVariants'
 import { AiGenerationRecords } from './collections/AiGenerationRecords'
+import { GenerationRecoveryJobs } from './collections/GenerationRecoveryJobs'
 import { TemplateIssues } from './collections/TemplateIssues'
 import { ContentPacks } from './collections/ContentPacks'
 import { TemplateVersions } from './collections/TemplateVersions'
@@ -59,8 +65,8 @@ const require = createRequire(import.meta.url)
 /** Trả về connection string (bỏ sslmode để tránh parse ghi đè pool.ssl). */
 function getDatabaseConnectionString(): string {
   const raw = process.env.DATABASE_URI || process.env.DATABASE_URL || 'postgresql://localhost/primeweb'
-  const withoutSslmode = raw.replace(/[?&]sslmode=[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, '')
-  return withoutSslmode || raw
+  // `?sslmode=require&x=y` must stay a valid URL (`?x=y`), not `…/db&x=y`
+  return withoutSslmode(raw) || raw
 }
 
 /** Có phải DB từ xa (cần SSL, có thể self-signed) không. */
@@ -150,10 +156,13 @@ export default buildConfig({
     Notifications,
     PushSubscriptions,
     AiUsageLogs,
+    AiShopLimits,
+    AiCapAlerts,
     TemplateQualityScores,
     BlockCatalogEntries,
     BlockVariants,
     AiGenerationRecords,
+    GenerationRecoveryJobs,
     TemplateIssues,
     ContentPacks,
     TemplateVersions,
@@ -185,17 +194,21 @@ export default buildConfig({
       // Remote DB (Neon): require valid SSL cert.
       // Local dev: no SSL needed.
       ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: true } } : {}),
-      // Bumped 10 → 25 (2026-07-06) for QC beta event 200 concurrent users.
-      // Payload session pooling + Drizzle needs ~25 conns for 200 VU load test.
-      // Applied to all envs (QC + staging + prod) so staging load tests
-      // reproduce prod behaviour. Plan: plans/260706-1653-GH-02-.../plan.md
-      // (Validation Summary decision #3).
-      max: 25,
+      // max: DATABASE_POOL_MAX (default 25, the 2026-07-06 QC beta value; 10 on the Neon -pooler host),
+      // plus a connect timeout so a full pool fails fast instead of hanging until maxDuration.
+      // Plan: plans/261022-ai-security-reliability-600-users (C4).
+      ...payloadPoolLimits({
+        max: process.env.DATABASE_POOL_MAX,
+        connectTimeoutMs: process.env.DATABASE_POOL_CONNECT_TIMEOUT_MS,
+      }),
     },
     // Push schema only when explicitly requested to avoid expensive sync on every
     // local Docker request. Use `PAYLOAD_PUSH_SCHEMA=true` or the db push script
     // when you intentionally need a schema update.
     push: shouldPushSchema(),
+    // Reads on Neon read replica(s) when DATABASE_URI_READ_REPLICA is set (comma list, -pooler hosts); each replica
+    // pool reuses the pool options above. Unset = all reads on the primary. src/lib/payload/read-replicas.ts
+    ...readReplicaOptions(process.env.DATABASE_URI_READ_REPLICA, getDatabaseConnectionString()),
   }),
   sharp,
   plugins: [
@@ -211,6 +224,7 @@ export default buildConfig({
               },
             },
             bucket: process.env.S3_BUCKET as string,
+            acl: MEDIA_OBJECT_ACL,
             config: {
               endpoint: process.env.S3_ENDPOINT,
               region: process.env.S3_REGION || 'us-east-1',
@@ -221,6 +235,9 @@ export default buildConfig({
               forcePathStyle: true, // Required for MinIO
             },
           }),
+          // After s3Storage: its single static acl writes every object public-read; private rows (payment
+          // receipts) get their stored objects set to `private` right after the upload (TC-PERF-146).
+          privateMediaAclPlugin(),
         ]
       : []),
     // Multi-tenant isolation handled via custom access control + middleware

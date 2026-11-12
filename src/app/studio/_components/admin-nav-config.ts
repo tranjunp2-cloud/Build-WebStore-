@@ -42,7 +42,7 @@ export const NAV_SECTIONS: NavSection[] = [
         items: [
             { href: '/studio/blocks', label: 'Block usage', phase: 4 },
             { href: '/studio/packs', label: 'Content packs', phase: 8 },
-            { href: '/studio/performance', label: 'AI quality', phase: 7 },
+            { href: '/studio/performance', label: 'AI usage', phase: 7 },
         ],
     },
     {
@@ -52,6 +52,7 @@ export const NAV_SECTIONS: NavSection[] = [
             { href: '/studio/issues', label: 'Issues & feedback', phase: 6, badge: '8' },
             { href: '/studio/qa', label: 'QA Control Center', phase: 8 },
             { href: '/studio/qa/visual-review', label: 'Visual CMS Review', phase: 8, badge: 'NEW' },
+            { href: '/studio/qa/migration-diff', label: 'Site Migration Diff', phase: 8, badge: '2,000' },
         ],
     },
     {
@@ -64,7 +65,8 @@ export const NAV_SECTIONS: NavSection[] = [
     {
         title: 'Admin',
         items: [
-            { href: '/studio/settings', label: 'Settings', phase: null },
+            { href: '/studio/settings/ai', label: 'Settings', phase: null },
+            { href: '/studio/merchant-access', label: 'Merchant CMS access', phase: null },
         ],
     },
 ]

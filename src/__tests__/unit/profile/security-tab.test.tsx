@@ -17,7 +17,7 @@ vi.mock('@/i18n', () => ({
                     updatePassword: 'Update Password',
                     changing: 'Changing...',
                     changed: 'Password changed successfully',
-                    ruleMinLength: 'At least 8 characters',
+                    ruleMinLength: 'At least 6 characters',
                     ruleUppercase: 'One uppercase letter',
                     ruleNumber: 'One number',
                 },

@@ -3,9 +3,14 @@ import type { Viewport } from 'next'
 import payloadConfig from '@payload-config'
 import { getPayload } from 'payload'
 import { PreviewSiteRenderer } from './PreviewSiteRenderer'
+import { resolveInitialActiveLocale } from '@/lib/detect-locale'
+import { localizedSiteAndPage, siteBrand } from '@/lib/i18n/locale-display'
+import { readPageTranslations } from '@/lib/i18n/page-translations'
+import { siteLanguagesOf } from '@/lib/site-languages'
 import { PreviewScripts, BuilderLinkScripts } from '@/components/editor/PreviewScripts'
 import { AppShell } from '@/components/AppShell'
 import { getCurrentUser } from '@/lib/auth'
+import { STOREFRONT_POPULATE, withPublicSiteTenant, withPublicSiteTenants } from '@/lib/cache/tenant'
 import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 import type { PlatformUser } from '@/types/user'
 import { PreviewAccessDenied, PreviewNoPage, PreviewLoadError } from './PreviewErrors'
@@ -59,6 +64,8 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         collection: 'sites',
         id: siteId,
         depth: 2,
+        // Same trim as the storefront: the populated tenant keeps its public fields only (TC-PERF-126).
+        populate: STOREFRONT_POPULATE,
         // findByID THROWS NotFound by default — disableErrors makes it return null
         // so the guard below handles a missing site as a 404 instead of crashing the RSC render.
         disableErrors: true,
@@ -74,11 +81,12 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
     }
 
     // 3. Tenant Isolation Check (P0 Security Rule - Tenant Isolation)
-    // Ensure user has access to this site's tenant
+    // Ensure user has access to this site's tenant (super-admin has platform-wide access)
+    const isSuperAdmin = Boolean(user.roles?.includes('super-admin'))
     const userTenants = user.tenants?.map((t: NonNullable<PlatformUser['tenants']>[number]) => typeof t.tenant === 'object' ? t.tenant.id : t.tenant) || []
     const siteTenantId = typeof site.tenant === 'object' ? site.tenant?.id : site.tenant
 
-    if (!userTenants.includes(siteTenantId)) {
+    if (!isSuperAdmin && !userTenants.includes(siteTenantId)) {
         return <PreviewAccessDenied />
     }
 
@@ -91,9 +99,10 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             id: pageId,
             draft: true,
             depth: 3,
+            populate: STOREFRONT_POPULATE,
             // Same as the site lookup: return null on missing id instead of throwing NotFound.
             disableErrors: true,
-        })
+        }).then(withPublicSiteTenant)
         if (!page) {
             return notFound()
         }
@@ -120,8 +129,9 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                 draft: true,
                 limit: 1,
                 depth: 3,
+                populate: STOREFRONT_POPULATE,
             })
-            page = notFoundResult.docs[0] || {
+            page = withPublicSiteTenant(notFoundResult.docs[0]) || {
                 id: 0,
                 title: '404 — Page Not Found',
                 slug: '404',
@@ -144,8 +154,9 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             draft: true,
             limit: 1,
             depth: 3,
+            populate: STOREFRONT_POPULATE,
         })
-        page = pagesResult.docs[0] || null
+        page = withPublicSiteTenant(pagesResult.docs[0]) || null
     }
 
     if (!page) return <PreviewNoPage />
@@ -196,6 +207,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     draft: true,
                     limit: 1,
                     depth: 3,
+                    populate: STOREFRONT_POPULATE,
                 })
                 const homepage = homepageResult.docs[0] as any
                 if (homepage?.layout) {
@@ -257,9 +269,24 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             collection: 'pages',
             where: { site: { equals: siteId } },
             limit: 100,
+            populate: STOREFRONT_POPULATE,
         })
 
         const imageLibraryS3 = await resolveImageLibraryS3Map(payload, siteId)
+
+        // One language of the draft: the editor canvas opens in the language the editor opens in
+        // (first paint = what the editor shows), Preview in the site's primary one (what visitors
+        // will get). The sections stay as written; the language's copy goes over them.
+        const draftSite = {
+            ...site,
+            headerBlock: (site as Record<string, unknown>).pendingHeaderBlock ?? site.headerBlock,
+            footerBlock: (site as Record<string, unknown>).pendingFooterBlock ?? site.footerBlock,
+            globalBlocks: (site as Record<string, unknown>).pendingGlobalBlocks ?? site.globalBlocks,
+        }
+        const languages = siteLanguagesOf(site as Parameters<typeof siteLanguagesOf>[0])
+        const generationLocale = String((site as Record<string, unknown>).generationLocale || site.locale || 'en')
+        const language = editor ? resolveInitialActiveLocale(generationLocale, site.locale ?? undefined, languages) : languages[0]!
+        const shown = localizedSiteAndPage(draftSite, page, language, await readPageTranslations(page.id, 'draft'), siteBrand(site))
 
         return (
             <AppShell>
@@ -267,13 +294,8 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     {/* Render with true SiteRenderer in Editor Mode */}
                     <PreviewSiteRenderer
                         site={{
-                            ...site,
-                            // F26-04: override headerBlock / footerBlock / globalBlocks with the
-                            // DRAFT (pending) versions so /preview reflects the latest editor save,
-                            // including locale switches that haven't been published yet.
-                            headerBlock: (site as Record<string, unknown>).pendingHeaderBlock ?? site.headerBlock,
-                            footerBlock: (site as Record<string, unknown>).pendingFooterBlock ?? site.footerBlock,
-                            globalBlocks: (site as Record<string, unknown>).pendingGlobalBlocks ?? site.globalBlocks,
+                            // the DRAFT (pending) header / footer / widgets, in the language shown
+                            ...shown.site,
                             tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
                                 ? (site.tenant as { slug?: string }).slug || ''
                                 : '',
@@ -284,8 +306,8 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                             blogPreviewPath: `/preview/${siteId}/blog`,
                             imageLibraryS3,
                         }}
-                        page={page}
-                        pages={navPagesResult.docs as unknown as NavPage[]}
+                        page={shown.page}
+                        pages={withPublicSiteTenants(navPagesResult.docs) as unknown as NavPage[]}
                         isBuilderPreview={!!builder}
                         isEditorIframe={isEditorIframe}
                     />

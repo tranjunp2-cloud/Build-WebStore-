@@ -273,6 +273,73 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         expect(updatePaymentSettings).not.toHaveBeenCalled();
     });
 
+    it('[TC-PERF-175] A member who may not read the payout account sees the masked number and can still save a toggle', async () => {
+        // Arrange: QR on, bank fields withheld by the server for a non-owner / admin member
+        vi.mocked(getPaymentSettings).mockResolvedValueOnce({
+            success: true,
+            payments: {
+                payment_cod: false,
+                payment_qr: true,
+                qr_image: { id: 'img-1', url: 'https://example.com/qr.png' },
+                bankHidden: true,
+                account_number_masked: '•••• 7890',
+            },
+        } as never);
+        render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        await waitFor(() => expect(screen.getByTestId('payout-account-number')).toBeInTheDocument());
+        const accountInput = screen.getByTestId('payout-account-number') as HTMLInputElement;
+        expect(accountInput.value).toBe('•••• 7890');
+        expect(accountInput.disabled).toBe(true);
+
+        // Act: turn COD on and save
+        fireEvent.click(screen.getAllByRole('switch')[0]);
+        fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+        // Assert: no bank validation error, and no bank field sent to the server
+        await waitFor(() => expect(updatePaymentSettings).toHaveBeenCalledWith({ payment_cod: true }));
+        expect(screen.queryByText('Enter the account holder name.')).not.toBeInTheDocument();
+    });
+
+    it('[TC-PERF-179] A member who may not change the payout account sees the QR read-only with the owner-only note', async () => {
+        // Arrange: QR set, bank fields withheld by the server for a non-owner / admin member
+        vi.mocked(getPaymentSettings).mockResolvedValueOnce({
+            success: true,
+            payments: {
+                payment_cod: false,
+                payment_qr: true,
+                qr_image: { id: 'img-1', url: 'https://example.com/qr.png' },
+                bankHidden: true,
+                account_number_masked: '•••• 7890',
+            },
+        } as never);
+
+        // Act
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        await waitFor(() => expect(screen.getByTestId('payout-owner-only-note')).toBeInTheDocument());
+
+        // Assert: translated note shown, no way to remove or replace the QR image
+        expect(screen.getByTestId('payout-owner-only-note').textContent)
+            .toBe('Only the shop owner or an admin can change bank details and the payment QR.');
+        expect(container.querySelector('button[title="Remove"]')).toBeNull();
+        expect(container.querySelector('input[type="file"]')).toBeNull();
+    });
+
+    it('[TC-PERF-179] An owner keeps the QR remove / replace controls and sees no owner-only note', async () => {
+        // Arrange
+        vi.mocked(getPaymentSettings).mockResolvedValueOnce({
+            success: true,
+            payments: { payment_cod: false, payment_qr: true, qr_image: { id: 'img-1', url: 'https://example.com/qr.png' } },
+        } as never);
+
+        // Act
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        await waitFor(() => expect(container.querySelector('button[title="Remove"]')).not.toBeNull());
+
+        // Assert
+        expect(container.querySelector('input[type="file"]')).not.toBeNull();
+        expect(screen.queryByTestId('payout-owner-only-note')).toBeNull();
+    });
+
     it('[TC-F19.20] Cancel button reverts unsaved changes', async () => {
         // Arrange: default (COD off)
         render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);

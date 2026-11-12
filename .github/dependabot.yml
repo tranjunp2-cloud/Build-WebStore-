@@ -1,36 +1,114 @@
 # Dependabot — Auto dependency update PRs
 # Targets staging branch (per team workflow: feature/fix PRs → staging)
+#
+# Dependabot reads THIS file from the default branch (main) only. A change here has no effect
+# until it reaches main.
+#
+# Monthly and grouped: each run opens at most one PR per group, so CI runners are not flooded
+# with one full CI run per package (a lockfile change runs the full test suite).
+# Security updates (Dependabot alerts) are NOT governed by this file: per GitHub docs they use
+# the default branch (main), one PR per package, and ignore/groups/cooldown below do not apply.
+# Review them like a hotfix: retarget to staging (or redo the fix in a planned PR), never merge
+# straight into main without the staging → QA → main flow.
 version: 2
 
 updates:
-  # npm dependencies
+  # npm dependencies (repo root; services/ai-platform is synced from the monorepo, not updated here)
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
-      interval: 'weekly'
-      day: 'monday'
-    open-pull-requests-limit: 5
+      interval: 'monthly'
+      timezone: 'Asia/Ho_Chi_Minh'
+    # One PR per group: payload, dev-dependencies, production.
+    open-pull-requests-limit: 3
     target-branch: 'staging'
+    # Lockfile merges on staging would otherwise rebase every open npm PR, and each rebase is a
+    # full CI run (lockfile → full test suite). Comment `@dependabot rebase` when ready to merge.
+    rebase-strategy: 'disabled'
+    # Skip releases younger than this: most broken releases are yanked or patched within days.
+    cooldown:
+      default-days: 7
+      semver-patch-days: 3
     labels:
       - 'dependencies'
       - 'chore'
     commit-message:
       prefix: 'chore(deps)'
+    ignore:
+      # Major upgrades (next, nanoid, jsdom, ckeditor, jose, lucide-react…) change APIs — do them
+      # in a planned PR.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # Must equal the drizzle-orm version pinned by @payloadcms/drizzle; bump it by hand
+      # together with the payload group, otherwise every SQL helper fails typecheck.
+      - dependency-name: 'drizzle-orm'
+      # Pre-1.0 packages: under semver a 0.x → 0.(x+1) bump is "minor" but may break the API
+      # (icon renames, native binary changes…). Only patches come in automatically.
+      - dependency-name: '@assistant-ui/react'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: '@mozilla/readability'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: 'class-variance-authority'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: 'lucide-react'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: 'sharp'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: 'three'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: '@types/three'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: '@tailwindcss/typography'
+        update-types: ['version-update:semver-minor']
     groups:
-      minor-and-patch:
+      # Payload packages move together, in their own PR. Before merging, check the drizzle-orm
+      # pin: `npm view @payloadcms/drizzle@<new> dependencies.drizzle-orm` must equal package.json.
+      payload:
+        patterns:
+          - 'payload'
+          - '@payloadcms/*'
+      # Tooling only (types, test, lint, build tools) — lowest risk. Minor/patch only, so a pair
+      # split across groups (react / @types/react, next / eslint-config-next) can briefly differ
+      # by a minor version without breaking anything.
+      dev-dependencies:
+        dependency-type: 'development'
+        update-types:
+          - 'minor'
+          - 'patch'
+      # Runtime packages (next, react, tiptap…) — reviewed by hand.
+      production:
+        dependency-type: 'production'
         update-types:
           - 'minor'
           - 'patch'
 
-  # GitHub Actions versions
+  # GitHub Actions versions — workflows and the composite actions under .github/actions.
+  # Minor/patch in one PR; majors in a separate PR (they can change deploy-only steps such as
+  # cache/checkout, which PR CI does not exercise — review and watch the next staging deploy).
   - package-ecosystem: 'github-actions'
-    directory: '/'
+    directories:
+      - '/'
+      - '/.github/actions/*'
     schedule:
-      interval: 'weekly'
-      day: 'monday'
+      interval: 'monthly'
+      timezone: 'Asia/Ho_Chi_Minh'
     target-branch: 'staging'
+    cooldown:
+      default-days: 7
     labels:
       - 'ci'
       - 'dependencies'
     commit-message:
       prefix: 'ci(actions)'
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      github-actions-major:
+        patterns:
+          - '*'
+        update-types:
+          - 'major'

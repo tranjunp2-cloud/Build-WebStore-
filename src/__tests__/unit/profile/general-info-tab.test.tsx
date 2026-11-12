@@ -25,6 +25,7 @@ vi.mock('@/i18n', () => ({
                     saveFailed: 'Failed to save profile',
                     networkError: 'Network error. Please try again.',
                     invalidPhone: 'Please enter a valid phone number',
+                    nameLength: 'Enter 2 to 50 characters.',
                 },
             },
         },
@@ -251,5 +252,28 @@ describe('GeneralInfoTab', () => {
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith('Network error. Please try again.')
         })
+    })
+
+    // TC-F23-02-10 (GH-2383): empty lastName + phone change still saves
+    it('saves when lastName is empty and phone changes', async () => {
+        vi.mocked(global.fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response)
+        render(<GeneralInfoTab user={{ ...mockUser, lastName: '' }} onUserUpdate={mockOnUserUpdate} />)
+
+        fireEvent.change(screen.getByTestId('phone-input'), { target: { value: '+60111222333' } })
+        fireEvent.submit(screen.getByTestId('save-btn').closest('form')!)
+
+        await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+        expect(mockOnUserUpdate).toHaveBeenCalled()
+    })
+
+    // TC-F23-02-11 (GH-2383): 51-char lastName shows inline i18n error, no request
+    it('shows inline nameLength error under lastName for 51 chars', async () => {
+        render(<GeneralInfoTab user={mockUser} onUserUpdate={mockOnUserUpdate} />)
+
+        fireEvent.change(screen.getByDisplayValue('Doe'), { target: { value: 'a'.repeat(51) } })
+        fireEvent.submit(screen.getByTestId('save-btn').closest('form')!)
+
+        expect(await screen.findByText('Enter 2 to 50 characters.')).toBeInTheDocument()
+        expect(global.fetch).not.toHaveBeenCalled()
     })
 })

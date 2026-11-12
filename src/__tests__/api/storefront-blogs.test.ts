@@ -8,6 +8,13 @@ vi.mock('payload', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 
 import { GET } from '@/app/api/storefront/blogs/route'
+// #2179: store availability has its own tests (store-unavailable.test.ts); here a store is unavailable only when suspended.
+vi.mock('@/lib/storefront/store-availability', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/storefront/store-availability')>()),
+    isTenantUnavailable: vi.fn(async (_payload: unknown, tenant: { status?: unknown } | null) => tenant?.status === 'suspended'),
+    isTenantIdUnavailable: vi.fn(async () => false),
+}))
+import { isTenantIdUnavailable, isTenantUnavailable } from '@/lib/storefront/store-availability'
 
 describe('GET /api/storefront/blogs [TC-F17-07]', () => {
     beforeEach(() => vi.clearAllMocks())
@@ -30,6 +37,15 @@ describe('GET /api/storefront/blogs [TC-F17-07]', () => {
             }),
             overrideAccess: true,
         }))
+    })
+
+    it('[TC-F09.283] unavailable store returns no blogs', async () => {
+        vi.mocked(isTenantIdUnavailable).mockResolvedValueOnce(true)
+
+        const res = await GET(new Request('http://localhost/api/storefront/blogs?tenant=1'))
+
+        expect(await res.json()).toEqual({ docs: [], totalDocs: 0 })
+        expect(mockFind).not.toHaveBeenCalled()
     })
 
     it('[TC-02] returns empty for missing tenant', async () => {
@@ -97,4 +113,22 @@ describe('GET /api/storefront/blogs [TC-F17-07]', () => {
         expect(body.totalPages).toBe(3)
         expect(body.page).toBe(1)
     })
+
+    it('[TC-PERF-128] reads only the card fields: no tenant row, no author row', async () => {
+        // Arrange
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0, page: 1, totalPages: 0 })
+
+        // Act
+        await GET(new Request('http://localhost/api/storefront/blogs?tenant=1'))
+
+        // Assert
+        const args = mockFind.mock.calls.find(([a]) => a.collection === 'blogs')![0]
+        expect(args.depth).toBe(1)
+        expect(args.select).toMatchObject({ title: true, slug: true, category: true, thumbnail: true })
+        expect(args.select).not.toHaveProperty('tenant')
+        expect(args.select).not.toHaveProperty('site')
+        expect(args.select).not.toHaveProperty('author')
+        expect(Object.keys(args.populate).sort()).toEqual(['blog_categories', 'media'])
+    })
 })
+

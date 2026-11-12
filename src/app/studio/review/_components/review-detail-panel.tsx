@@ -6,6 +6,7 @@
  * All action callbacks come from ReviewQueue (state lives there).
  */
 import { Eye, Pencil, RotateCcw } from 'lucide-react'
+import { useStudioCan } from '../../_components/studio-permissions-context'
 import type { ComplianceResult } from '@/lib/admin/dna-compliance'
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -40,6 +41,7 @@ export function ReviewDetailPanel({
     onNoteChange, onApprove, onRequestChanges,
 }: Props) {
     const statusMeta = STATUS_META[item.status]
+    const canDecide = useStudioCan()('template.review')
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -146,6 +148,7 @@ export function ReviewDetailPanel({
                             <span className="card-title">Decision</span>
                         </div>
                         <div style={{ padding: '0 16px 16px' }}>
+                            {canDecide && <>
                             <textarea
                                 className="input"
                                 placeholder="Notes for author (optional)…"
@@ -174,6 +177,7 @@ export function ReviewDetailPanel({
                                     {approving ? 'Approving…' : '✓ Approve'}
                                 </button>
                             </div>
+                            </>}
                             <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-3)', textAlign: 'center' }}>
                                 {item.dnaCache && !item.dnaCache.pass
                                     ? <>⚠ DNA compliance failed — can still approve</>

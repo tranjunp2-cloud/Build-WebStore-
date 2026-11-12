@@ -55,6 +55,9 @@ test.describe("F40 GitHub issue mapping browser flow", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
+      // Password login on purpose: F40_E2E_ADMIN_EMAIL is a super-admin (scripts/f40-github-issue-fixture.ts),
+      // whose password-step token app routes still accept (TC-PERF-142); the E2E OTP bypass refuses super-admins.
+      // The context inherits baseURL and the config's Origin header, which the cookie-authenticated POSTs need.
       const login = await page.request.post("/api/users/login", { data: { email, password } });
       expect(login.ok()).toBe(true);
 

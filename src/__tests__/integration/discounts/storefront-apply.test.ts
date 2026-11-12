@@ -29,6 +29,13 @@ vi.mock('@/lib/rateLimit', () => ({
 import { POST } from '@/app/api/storefront/discounts/apply/route'
 import { getPayload } from 'payload'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { isTenantUnavailable } from '@/lib/storefront/store-availability'
+// #2179: store availability has its own tests (store-unavailable.test.ts); here a store is unavailable only when suspended.
+vi.mock('@/lib/storefront/store-availability', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/storefront/store-availability')>()),
+    isTenantUnavailable: vi.fn(async (_payload: unknown, tenant: { status?: unknown } | null) => tenant?.status === 'suspended'),
+    isTenantIdUnavailable: vi.fn(async () => false),
+}))
 
 const mockGetPayload = vi.mocked(getPayload)
 const mockCheckRateLimit = vi.mocked(checkRateLimit)
@@ -98,6 +105,23 @@ describe('POST /api/storefront/discounts/apply — TC-F33-20: Success response',
             type: 'percentage',
             value: 20,
         })
+    })
+
+    it('[TC-F09.283] unavailable store: silent ok:false, discount never looked up', async () => {
+        // Arrange
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'tenant-1', slug: 'mysite', status: 'active' }] })
+        vi.mocked(isTenantUnavailable).mockResolvedValueOnce(true)
+
+        // Act
+        const response = await POST(new NextRequest('http://localhost/api/storefront/discounts/apply', {
+            method: 'POST',
+            body: JSON.stringify({ siteSlug: 'mysite', code: 'SUMMER20', subtotalSen: 100000 }),
+            headers: { 'Content-Type': 'application/json' },
+        }))
+
+        // Assert
+        expect(await response.json()).toEqual({ ok: false })
+        expect(mockFind).toHaveBeenCalledTimes(1)
     })
 
     it('returns discount object with id, code, type, value only', async () => {

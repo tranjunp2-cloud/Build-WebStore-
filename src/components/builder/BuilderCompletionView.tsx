@@ -1,8 +1,10 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { ArrowDown, ArrowUp, CheckCircle2, Clock3, ExternalLink, LayoutDashboard, Loader2, Rocket } from 'lucide-react'
-import { BuilderPreviewMode, BuilderPreviewModeToggle, BuilderPreviewSurface } from '@/components/builder/BuilderPreviewPrimitives'
+import { ArrowDown, ArrowRight, ArrowUp, ExternalLink, Loader2, Rocket } from 'lucide-react'
+import type { BuilderPreviewMode } from '@/components/builder/BuilderPreviewPrimitives'
+import { CompletionPreviewPanel } from '@/components/builder/completion/CompletionPreviewPanel'
+import { CompletionReadyCard } from '@/components/builder/completion/CompletionReadyCard'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useI18n } from '@/i18n'
 
@@ -56,7 +58,7 @@ function CompletionPrimaryButton({
 }) {
     return (
         <button
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-4 text-sm font-semibold text-white shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),0px_4px_6px_0px_rgba(0,0,0,0.1)] transition-all duration-300 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(90deg,#3b82f6,#2dd4bf)] px-4 text-sm font-semibold text-white shadow-[0_12px_26px_-12px_rgba(45,212,191,0.6),inset_0_1px_0_rgba(255,255,255,0.22)] transition-[filter,transform] duration-200 hover:brightness-110 active:scale-[0.98] motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             onClick={onClick}
             type="button"
@@ -80,7 +82,7 @@ function CompletionSecondaryButton({
 }) {
     return (
         <button
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-[rgba(59,130,246,0.15)] bg-transparent px-4 text-sm font-medium text-[#f8fafc] transition-colors hover:border-[rgba(59,130,246,0.3)] hover:bg-white/[0.02] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-400/[0.24] bg-slate-400/[0.06] px-4 text-sm font-semibold text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md transition-colors hover:border-sky-400/55 hover:bg-sky-400/[0.08] hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             onClick={onClick}
             type="button"
@@ -88,109 +90,6 @@ function CompletionSecondaryButton({
             {icon}
             <span>{label}</span>
         </button>
-    )
-}
-
-function CompletionStatusCard({
-    siteName,
-    totalBlocks,
-    generationTimeLabel,
-}: {
-    siteName: string
-    totalBlocks: number
-    generationTimeLabel: string
-}) {
-    const { t, ti } = useI18n()
-    const c = t.onboarding.completion
-    return (
-        <div className="relative h-auto min-h-[174px] w-full max-w-[448px] rounded-bl-2xl rounded-br-2xl rounded-tl-lg rounded-tr-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[21px] pb-4 pt-[17px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
-            <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />
-            <div className="relative flex flex-col items-start gap-4">
-                <p className="text-sm font-medium leading-5 text-[#f8fafc]">
-                    <span className="bg-[linear-gradient(158.2deg,#3b82f6_0%,#2dd4bf_100%)] bg-clip-text font-semibold text-transparent">&quot;{siteName}&quot;</span> {c.successMessage}
-                </p>
-
-                <div className="flex h-12 w-full flex-col items-start gap-2">
-                    <div className="flex h-5 w-full items-center gap-2">
-                        <LayoutDashboard className="size-4 text-[#94a3b8]" />
-                        <p className="text-sm leading-5 text-[#f8fafc]">
-                            <span className="font-medium">{ti(c.sectionsGenerated, { count: totalBlocks })}</span>
-                            <span className="text-[#94a3b8]"> {c.sectionsGeneratedLabel}</span>
-                        </p>
-                    </div>
-                    <div className="flex h-5 w-full items-center gap-2">
-                        <Clock3 className="size-4 text-[#94a3b8]" />
-                        <p className="text-sm leading-5 text-[#f8fafc]">
-                            <span className="font-medium">+{generationTimeLabel}</span>
-                            <span className="text-[#94a3b8]"> {c.generationTimeLabel}</span>
-                        </p>
-                    </div>
-                </div>
-
-                <p className="max-w-[377px] text-sm leading-5 text-[#94a3b8]">
-                    {c.description}
-                </p>
-            </div>
-        </div>
-    )
-}
-
-function CompletionPreviewPanel({
-    mode,
-    onModeChange,
-    previewContent,
-    onOpenPreview,
-    siteId,
-    showBannerPad,
-}: {
-    mode: BuilderPreviewMode
-    onModeChange: (mode: BuilderPreviewMode) => void
-    previewContent: ReactNode
-    onOpenPreview: () => void
-    siteId?: string | null
-    showBannerPad?: boolean
-}) {
-    const { t } = useI18n()
-    const c = t.onboarding.completion
-    return (
-        <div className="relative h-screen overflow-hidden">
-            <div className="absolute inset-0 bg-[linear-gradient(104.73deg,#0b1120_0%,#0b1120_50%,rgba(59,130,246,0.05)_100%)]" />
-            <div className="relative flex h-full flex-col">
-                <div className="bg-[linear-gradient(174.85deg,#0b1120_0%,#0b1120_50%,rgba(59,130,246,0.05)_100%)] px-6 pt-5">
-                    <div className="grid min-h-[50px] grid-cols-[1fr_auto_1fr] items-center gap-4">
-                        <div className="flex min-w-0 flex-col gap-0.5">
-                            <h2 className="text-[18px] font-semibold leading-7 text-[#2dd4bf]">
-                                {c.previewTitle}
-                            </h2>
-                            <p className="text-xs leading-4 text-[rgba(248,250,252,0.7)]">
-                                {c.previewSubtitle}
-                            </p>
-                        </div>
-
-                        <div className="flex justify-center">
-                            <BuilderPreviewModeToggle mode={mode} onChange={onModeChange} />
-                        </div>
-
-                        <div className="flex justify-end">
-                            <button
-                                className="flex h-10 items-center gap-2 whitespace-nowrap rounded-full bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-4 text-sm font-semibold text-white shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),0px_4px_6px_0px_rgba(0,0,0,0.1)] transition-all hover:brightness-110"
-                                onClick={onOpenPreview}
-                                type="button"
-                            >
-                                <ExternalLink className="size-4" />
-                                <span>{c.viewFullPreview}</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className={`relative flex-1 overflow-hidden px-6 pt-4 ${showBannerPad ? 'pb-[88px]' : 'pb-6'}`}>
-                    <BuilderPreviewSurface mode={mode} variant="panel" siteId={siteId}>
-                        {previewContent}
-                    </BuilderPreviewSurface>
-                </div>
-            </div>
-        </div>
     )
 }
 
@@ -224,10 +123,10 @@ export default function BuilderCompletionView({
     const leftBody = (
         <div className="flex flex-col gap-4">
             <div className="flex items-start gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]">
+                <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]">
                     <Rocket className="h-4 w-4 text-white" aria-hidden />
                 </div>
-                <div className="relative rounded-bl-2xl rounded-br-2xl rounded-tl-lg rounded-tr-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[17px] py-[13px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
+                <div className="relative rounded-xl border border-slate-400/[0.13] bg-[linear-gradient(160deg,rgba(51,65,85,0.42),rgba(30,41,59,0.32))] px-4 py-[11px] shadow-[0_10px_24px_-12px_rgba(0,0,0,0.6)] backdrop-blur-xl">
                     <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />
                     <p className="relative text-sm leading-5 text-[#f8fafc]">
                         {g.startingMessage}
@@ -235,16 +134,11 @@ export default function BuilderCompletionView({
                 </div>
             </div>
 
-            <div className="flex items-start gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#00c950_0%,#00bc7d_100%)]">
-                    <CheckCircle2 className="h-4 w-4 text-white" aria-hidden />
-                </div>
-                <CompletionStatusCard
-                    generationTimeLabel={generationTimeLabel}
-                    siteName={siteName}
-                    totalBlocks={totalBlocks}
-                />
-            </div>
+            <CompletionReadyCard
+                generationTimeLabel={generationTimeLabel}
+                siteName={siteName}
+                totalBlocks={totalBlocks}
+            />
 
             <div className="rounded-2xl border border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
                 <div className="flex items-start justify-between gap-3">
@@ -314,12 +208,11 @@ export default function BuilderCompletionView({
         </div>
     )
 
-    // Design 2026-04-14: two primary actions side-by-side (Open Editor + Publish Website)
-    // with a tertiary "Go To Dashboard" text link below. Matches the approved reference
-    // at docs/design/F01 completion screen.
+    // Prototype builder-v2: full-width dock — gradient primary, outline secondary,
+    // subtle text button with arrow for dashboard.
     const leftFooter = (
-        <div className="flex flex-col items-center gap-4">
-            <div className="flex w-full gap-3">
+        <div className="grid gap-2.5">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2.5">
                 <CompletionPrimaryButton
                     icon={<ExternalLink className="size-4" />}
                     label={c.openEditor}
@@ -334,20 +227,22 @@ export default function BuilderCompletionView({
                 />
             </div>
             <button
-                className="text-sm font-medium text-[#3b82f6] underline underline-offset-4 transition-colors hover:text-[#60a5fa] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex h-8 items-center gap-1.5 justify-self-center rounded-lg px-2.5 text-[13px] font-medium text-slate-400 transition-colors hover:bg-white/[0.04] hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isPublishing || isNavigating}
                 onClick={onDashboard}
                 type="button"
             >
                 {isNavigating ? c.loading : c.goToDashboard}
+                <ArrowRight className="size-3.5" aria-hidden />
             </button>
         </div>
     )
 
     return (
         <BuilderStepScreen
+            compactLeft
             floatingControls={floatingControls}
-            gridClassName="lg:grid-cols-[clamp(380px,28vw,460px)_1fr]"
+            gridClassName="lg:grid-cols-[min(440px,40%)_1fr]"
             leftBody={leftBody}
             leftFooter={isBlocked ? undefined : leftFooter}
             right={(

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { buildMaintenanceHtml } from '@/lib/maintenance'
+import { buildMaintenanceHtml, buildStoreUnavailableHtml, shouldReturnStoreUnavailable, STORE_UNAVAILABLE_HEADERS } from '@/lib/maintenance'
+import { isShopTodoKind } from '@/lib/insights/shop-todo-text'
+import { withFrameProtection } from '@/lib/auth/frame-protection'
+import { isPreOtpTenantPayloadToken } from '@/lib/auth/admin-panel-guard'
+import { canUseMerchantAccess, canViewStudio, isStudioTeamSeat, isSuperAdminOnlyStudioPath } from '@/lib/admin/studio-roles'
 
 const ADMIN_PATHS = ['/admin', '/api']
-// Studio internal admin — requires super-admin role (checked below)
+// Studio internal admin — super-admin or a team seat (checked below)
 const STUDIO_PATH = '/studio'
+// Support area (merchant CMS access) — super-admin or the `support` role (checked below)
+const SUPPORT_PATH = '/support'
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
 
 /**
@@ -78,7 +84,7 @@ export async function middleware(req: NextRequest) {
 
     // ── Studio admin guard (/studio/*) ────────────────────────────────
     // Edge-runtime: cannot call Payload local API. Decode JWT directly via jose.
-    // Defense-in-depth: layout.tsx also calls requireSuperAdmin() on the server.
+    // Defense-in-depth: layout.tsx also calls requireStudioAccess() on the server.
     if (pathname.startsWith(STUDIO_PATH)) {
         const tokenCookie = req.cookies.get('payload-token')?.value
         if (!tokenCookie) {
@@ -89,23 +95,53 @@ export async function middleware(req: NextRequest) {
             // Payload v3 signs JWT with a derived key (not raw PAYLOAD_SECRET),
             // so jose's jwtVerify fails in edge runtime. We decode unverified
             // and defer real verification to the Next.js server layer:
-            // layout.tsx calls requireSuperAdmin() which hits Payload local API.
+            // layout.tsx calls requireStudioAccess() which hits Payload local API.
             // Cookie is httpOnly and set by Payload server — middleware decoding
             // it here is only a routing hint, not the security boundary.
             const { decodeJwt } = await import('jose')
             const decoded = decodeJwt(tokenCookie)
-            const roles = (decoded.roles as string[] | undefined) ?? []
+            // A token minted without the roles claim (SSO, session refresh) is passed on: the layout and
+            // the AI settings pages check the real roles.
+            const roles = decoded.roles as string[] | undefined
             const exp = decoded.exp as number | undefined
             if (exp && exp * 1000 < Date.now()) {
                 url.pathname = '/admin'
                 return NextResponse.redirect(url)
             }
-            if (!roles.includes('super-admin')) {
+            if (roles === undefined) return NextResponse.next()
+            if (!canViewStudio(roles)) {
                 url.pathname = '/admin'
+                return NextResponse.redirect(url)
+            }
+            // AI settings (provider keys, routing, spend caps) stay super-admin only.
+            if (isStudioTeamSeat(roles) && isSuperAdminOnlyStudioPath(pathname)) {
+                url.pathname = '/studio'
                 return NextResponse.redirect(url)
             }
         } catch {
             url.pathname = '/admin'
+            return NextResponse.redirect(url)
+        }
+        return NextResponse.next()
+    }
+
+    // ── Support area guard (/support/*) ───────────────────────────────
+    // Routing hint only, like the Studio guard: src/app/support/layout.tsx checks the DB roles.
+    if (pathname === SUPPORT_PATH || pathname.startsWith(`${SUPPORT_PATH}/`)) {
+        const tokenCookie = req.cookies.get('payload-token')?.value
+        try {
+            const { decodeJwt } = await import('jose')
+            const decoded = tokenCookie ? decodeJwt(tokenCookie) : null
+            // Routing hint only: the support layout checks the real roles. A token minted without the roles
+            // claim (session refresh) is passed on so the layout can decide.
+            const roles = decoded?.roles as string[] | undefined
+            const exp = decoded?.exp as number | undefined
+            if (!decoded || (exp && exp * 1000 < Date.now()) || (roles !== undefined && !canUseMerchantAccess(roles))) {
+                url.pathname = '/login'
+                return NextResponse.redirect(url)
+            }
+        } catch {
+            url.pathname = '/login'
             return NextResponse.redirect(url)
         }
         return NextResponse.next()
@@ -116,13 +152,25 @@ export async function middleware(req: NextRequest) {
     // When ADMIN_DOMAIN equals SERVER_DOMAIN (e.g. web-cms-v2.dev.ecommercehub.my),
     // the admin rewrite would catch /api/* requests and rewrite them to /admin/api/*
     // which returns HTML instead of JSON → "Fetching user failed" error.
-    if (pathname.startsWith('/api/') || pathname.startsWith('/admin')) {
-        return NextResponse.next()
-    }
-
     // ── Derived domains ──────────────────────────────────────────────
     const ADMIN_DOMAIN = process.env.NEXT_PUBLIC_ADMIN_DOMAIN || `admin.${PLATFORM_DOMAIN}`
     const SERVER_DOMAIN = (process.env.NEXT_PUBLIC_SERVER_URL || '').replace(/^https?:\/\//, '').split(':')[0]
+
+    // ── Payload admin panel: no tenant user's password-step token (TC-PERF-154) ──
+    // Payload renders the signed-in user (memberships populated with whole tenant rows) into every admin page,
+    // the "unauthorized" one included. Send such a token to the OTP login instead of rendering anything.
+    const rendersAdmin = pathname.startsWith('/admin') || (hostname === ADMIN_DOMAIN && ADMIN_DOMAIN !== SERVER_DOMAIN && !pathname.startsWith('/api/'))
+    if (rendersAdmin && isPreOtpTenantPayloadToken(req.cookies.get('payload-token')?.value)) {
+        url.pathname = '/login'
+        url.search = ''
+        const res = NextResponse.redirect(url)
+        res.cookies.delete('payload-token')
+        return res
+    }
+
+    if (pathname.startsWith('/api/') || pathname.startsWith('/admin')) {
+        return NextResponse.next()
+    }
 
     // ── Admin domain: rewrite root → /admin for dedicated admin subdomain ──
     // Only apply when ADMIN_DOMAIN is a SEPARATE domain from SERVER_URL.
@@ -170,6 +218,10 @@ export async function middleware(req: NextRequest) {
                     if (data.redirect && data.newSlug && data.newSlug !== tenantSlug) {
                         const redirectUrl = `https://${data.newSlug}.${PLATFORM_DOMAIN}${pathname}`
                         return NextResponse.redirect(redirectUrl, { status: 301 })
+                    }
+                    // #2179: banned or expired store → 503 "temporarily unavailable" (takes precedence over maintenance)
+                    if (shouldReturnStoreUnavailable(data)) {
+                        return new NextResponse(buildStoreUnavailableHtml(data.locale), { status: 503, headers: STORE_UNAVAILABLE_HEADERS })
                     }
                     // BUG-F05-006: Return 503 for maintenance mode (draft + was published)
                     if (data.maintenance && !pathname.startsWith('/api')) {
@@ -220,7 +272,12 @@ export async function middleware(req: NextRequest) {
             try {
                 const checkRes = await fetch(checkUrl, { cache: 'no-store', signal: controller.signal })
                 if (checkRes.ok) {
-                    const { primaryDomain, isPrimary } = await checkRes.json()
+                    const domainData = await checkRes.json()
+                    const { primaryDomain, isPrimary } = domainData
+                    // #2179: banned or expired store → 503 before any primary-domain redirect
+                    if (shouldReturnStoreUnavailable(domainData)) {
+                        return new NextResponse(buildStoreUnavailableHtml(domainData.locale), { status: 503, headers: STORE_UNAVAILABLE_HEADERS })
+                    }
                     if (!isPrimary && primaryDomain && primaryDomain !== hostname) {
                         const redirectUrl = `https://${primaryDomain}${pathname}`
                         return NextResponse.redirect(redirectUrl, { status: 301 })
@@ -280,15 +337,19 @@ export async function middleware(req: NextRequest) {
             return res
         }
 
+        // A reminder link (`/orders?todo=<kind>`, from the automations digest email) keeps its task through sign-in.
+        // Only a known kind survives: free text in a link (`?ask=`) is never carried across the login.
+        const todo = req.nextUrl.searchParams.get('todo')
+        const returnUrl = isShopTodoKind(todo) ? `${pathname}?todo=${todo}` : pathname
         if (!hasToken) {
             url.pathname = '/login'
-            url.searchParams.set('returnUrl', pathname)
+            url.searchParams.set('returnUrl', returnUrl)
             return NextResponse.redirect(url)
         }
         if (hasToken && !mfaVerified) {
             url.pathname = '/verify-otp'
             if (tokenEmail) url.searchParams.set('email', tokenEmail)
-            url.searchParams.set('returnUrl', pathname)
+            url.searchParams.set('returnUrl', returnUrl)
             return NextResponse.redirect(url)
         }
     }
@@ -305,7 +366,8 @@ export async function middleware(req: NextRequest) {
     }
 
     // ── Main platform (primeweb.app) — Dashboard & marketing ───────────────
-    return NextResponse.next()
+    // the dashboard and the editor may only be framed by this origin (storefront hosts returned above, untouched)
+    return withFrameProtection(NextResponse.next(), pathname)
 }
 
 export const config = {

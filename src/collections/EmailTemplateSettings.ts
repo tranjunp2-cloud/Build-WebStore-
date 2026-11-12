@@ -1,11 +1,15 @@
-import type { CollectionConfig } from 'payload'
+import type { Access, CollectionConfig } from 'payload'
 import { EMAIL_TEMPLATE_TYPES } from '../lib/email/types'
-import { invalidateTemplateConfigCache } from '../lib/email/get-template-config'
-import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
-import type { PlanCode } from '@/collections/PlanSubscriptions'
+import type { invalidateTemplateConfigCache as InvalidateTemplateConfigCache } from '../lib/email/get-template-config'
+
+// Loaded on use: it imports the Payload config, which imports this collection (a static import is a cycle that breaks production builds).
+const invalidateTemplateConfigCache: typeof InvalidateTemplateConfigCache = async (...args) =>
+    (await import('../lib/email/get-template-config')).invalidateTemplateConfigCache(...args)
 
 // Security-critical templates — disabling via any API path is rejected at collection level
 const CRITICAL_TYPES = ['otp-verification', 'forgot-password', 'password-changed'] as const
+
+const isSuperAdmin: Access = ({ req }) => Boolean(req.user?.roles?.includes('super-admin'))
 
 export const EmailTemplateSettings: CollectionConfig = {
     slug: 'email-template-settings',
@@ -15,21 +19,9 @@ export const EmailTemplateSettings: CollectionConfig = {
         description: 'Per-tenant email template content overrides (subject, greeting, CTA, closing).',
     },
     access: {
-        create: async ({ req }) => {
-            if (!req.user) return false
-            if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
-            ) ?? []
-            if (tenantIds.length === 0) return false
-            const tenantId = tenantIds[0]
-            try {
-                const sub = await getActivePlanSubscription(req.payload, tenantId)
-                if (!sub) return false
-                if (!(await canUse(req.payload, sub.plan as PlanCode, 'email_template_configuration'))) return false
-            } catch { return false }
-            return { tenant: { in: tenantIds } }
-        },
+        // GH-1520 (Option D): native REST writes are super-admin only. Dashboard writes go through
+        // template-settings-service (overrideAccess:true + own plan/tenant checks); tenant-owners keep REST read.
+        create: isSuperAdmin,
         read: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
@@ -39,30 +31,8 @@ export const EmailTemplateSettings: CollectionConfig = {
             if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
-        update: async ({ req }) => {
-            if (!req.user) return false
-            if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
-            ) ?? []
-            if (tenantIds.length === 0) return false
-            const tenantId = tenantIds[0]
-            try {
-                const sub = await getActivePlanSubscription(req.payload, tenantId)
-                if (!sub) return false
-                if (!(await canUse(req.payload, sub.plan as PlanCode, 'email_template_configuration'))) return false
-            } catch { return false }
-            return { tenant: { in: tenantIds } }
-        },
-        delete: ({ req }) => {
-            if (!req.user) return false
-            if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
-            ) ?? []
-            if (tenantIds.length === 0) return false
-            return { tenant: { in: tenantIds } }
-        },
+        update: isSuperAdmin,
+        delete: isSuperAdmin,
     },
     hooks: {
         beforeChange: [

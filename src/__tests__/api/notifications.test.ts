@@ -15,6 +15,7 @@ vi.mock('payload', () => ({
             page: 1,
             limit: 20
         }),
+        count: vi.fn().mockResolvedValue({ totalDocs: 2 }),
         update: vi.fn().mockResolvedValue({ id: 1, isRead: true }),
         // mark-read now uses a single batched raw UPDATE via payload.db.drizzle (GH #1535)
         db: { drizzle: { execute: vi.fn().mockResolvedValue({ rowCount: 2 }) } },
@@ -65,6 +66,7 @@ describe('/api/notifications', () => {
             const { getPayload } = await import('payload')
             vi.mocked(getPayload).mockResolvedValueOnce({
                 find: vi.fn().mockRejectedValue(new Error('DB Error')),
+                count: vi.fn().mockResolvedValue({ totalDocs: 0 }),
             } as unknown as Payload)
 
             const res = await GET(createRequest('/api/notifications'))
@@ -141,6 +143,7 @@ describe('/api/notifications', () => {
                     name: 'NotFound',
                     message: 'Notifications collection not found',
                 }),
+                count: vi.fn().mockResolvedValue({ totalDocs: 0 }),
             } as unknown as Payload)
 
             // Act
@@ -160,6 +163,7 @@ describe('/api/notifications', () => {
                     name: 'NotFoundError',
                     message: 'Document not found',
                 }),
+                count: vi.fn().mockResolvedValue({ totalDocs: 0 }),
             } as unknown as Payload)
 
             // Act
@@ -177,6 +181,7 @@ describe('/api/notifications', () => {
                     status: 404,
                     message: 'Not found',
                 }),
+                count: vi.fn().mockResolvedValue({ totalDocs: 0 }),
             } as unknown as Payload)
 
             // Act
@@ -184,6 +189,87 @@ describe('/api/notifications', () => {
 
             // Assert
             expect(res.status).toBe(404)
+        })
+    })
+
+    // ── TC-PERF-023/024: cheap poll target ───────────────────────────────────
+    describe('GET /api/notifications is cheap to poll [TC-PERF-023, TC-PERF-024]', () => {
+        it('TC-PERF-023: runs the list without a total count (pagination: false) and the unread count as COUNT, scoped to user + tenant', async () => {
+            // Arrange
+            const { getPayload } = await import('payload')
+            const find = vi.fn().mockResolvedValue({ docs: [] })
+            const count = vi.fn().mockResolvedValue({ totalDocs: 4 })
+            vi.mocked(getPayload).mockResolvedValueOnce({ find, count } as unknown as Payload)
+
+            // Act
+            const res = await GET(createRequest('/api/notifications?since=2026-10-20T03:00:00Z&limit=20'))
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(await res.json()).toEqual({ unreadCount: 4, items: [] })
+            expect(find).toHaveBeenCalledTimes(1)
+            expect(find.mock.calls[0][0]).toMatchObject({
+                collection: 'notifications',
+                pagination: false,
+                limit: 20,
+                sort: '-createdAt',
+                depth: 0,
+                overrideAccess: false,
+                where: { and: expect.arrayContaining([{ user: { equals: 100 } }, { tenant: { equals: 200 } }, { createdAt: { greater_than: '2026-10-20T03:00:00.000Z' } }]) },
+            })
+            expect(count).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'notifications',
+                overrideAccess: false,
+                where: { and: [{ user: { equals: 100 } }, { tenant: { equals: 200 } }, { isRead: { equals: false } }] },
+            }))
+        })
+
+        it('TC-F16.16: offset=20 turns pagination on with page 2 (offset ignored otherwise) and returns hasMore', async () => {
+            // Arrange
+            const { getPayload } = await import('payload')
+            const find = vi.fn().mockResolvedValue({ docs: [], hasNextPage: true })
+            const count = vi.fn().mockResolvedValue({ totalDocs: 0 })
+            vi.mocked(getPayload).mockResolvedValueOnce({ find, count } as unknown as Payload)
+
+            // Act
+            const res = await GET(createRequest('/api/notifications?limit=20&offset=20'))
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(find.mock.calls[0][0]).toMatchObject({ limit: 20, page: 2, pagination: true })
+            expect((await res.json()).hasMore).toBe(true)
+        })
+
+        it('TC-PERF-024: answers with a weak ETag and Cache-Control private, max-age=0', async () => {
+            // Act
+            const res = await GET(createRequest('/api/notifications?since=1720704000000'))
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(res.headers.get('Cache-Control')).toBe('private, max-age=0')
+            expect(res.headers.get('ETag')).toMatch(/^W\/"[A-Za-z0-9_-]+"$/)
+        })
+
+        it('TC-PERF-024: answers 304 with no body when If-None-Match carries the same ETag, 200 when it changed', async () => {
+            // Arrange
+            const first = await GET(createRequest('/api/notifications?since=1720704000000'))
+            const etag = first.headers.get('ETag')!
+
+            // Act
+            const same = await GET(new NextRequest(new URL('/api/notifications?since=1720704000000', 'http://localhost:3000'), { headers: { 'If-None-Match': etag } }))
+            const { getPayload } = await import('payload')
+            vi.mocked(getPayload).mockResolvedValueOnce({
+                find: vi.fn().mockResolvedValue({ docs: [] }),
+                count: vi.fn().mockResolvedValue({ totalDocs: 9 }),
+            } as unknown as Payload)
+            const changed = await GET(new NextRequest(new URL('/api/notifications?since=1720704000000', 'http://localhost:3000'), { headers: { 'If-None-Match': etag } }))
+
+            // Assert
+            expect(same.status).toBe(304)
+            expect(await same.text()).toBe('')
+            expect(same.headers.get('ETag')).toBe(etag)
+            expect(changed.status).toBe(200)
+            expect((await changed.json()).unreadCount).toBe(9)
         })
     })
 

@@ -5,8 +5,11 @@
  *   TC-F07.039 — Apply template to existing site (smart mapping)
  *   TC-F07.016 — Unauthorized access blocked (401/403)
  *   TC-F07.023 — New site creation from template (backward compat)
+ *   TC-F01.115 — GH-2154: creating a new site from a template is refused when the account already has one
  *   TC-F07.022 — Rate limit protection (429)
  *   TC-F07.050 — GH-731: service-cards empty titles coerced before payload.update on apply-template
+ *   TC-AIWB-121 — applying a template bumps the editor draft revision (site + reskinned pages) inside the swap
+ *                 transaction and answers the applying tab's new draftVersion
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -107,11 +110,21 @@ let mockTenant: Record<string, unknown> | null = { ...DEFAULT_TENANT }
 let mockSite: Record<string, unknown> | null = { ...DEFAULT_SITE }
 let mockHomepage: Record<string, unknown> | null = { ...DEFAULT_HOMEPAGE }
 let mockCreatedSite = { id: 999, name: DEFAULT_TEMPLATE.name }
+let mockTenantSites: Array<Record<string, unknown>> = [] // rows the tenant already owns (GH-2154 guard)
 
 const mockTransaction = {
     commitTransaction: vi.fn().mockResolvedValue(undefined),
     rollbackTransaction: vi.fn().mockResolvedValue(undefined),
 }
+
+const mockTransactionExecute = vi.fn().mockResolvedValue(undefined)
+let mockTransactionExecuteCall = 0
+let mockExistingSiteRequest = false
+const mockDrizzleTransaction = vi.fn().mockImplementation(async (
+    operation: (transaction: { execute: typeof mockTransactionExecute }) => Promise<unknown>,
+) => operation({ execute: mockTransactionExecute }))
+
+type MockCreateOptions = { collection: string; data: Record<string, unknown>; req?: unknown }
 
 const mockPayloadInstance = {
     findByID: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
@@ -122,9 +135,10 @@ const mockPayloadInstance = {
     }),
     find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
         if (collection === 'tenants') return { docs: mockTenant ? [mockTenant] : [] }
+        if (collection === 'sites') return { docs: mockTenantSites }
         return { docs: [] }
     }),
-    create: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+    create: vi.fn(async ({ collection }: MockCreateOptions) => {
         if (collection === 'sites') return mockCreatedSite
         return { id: 1000 + Math.random() }
     }),
@@ -137,17 +151,24 @@ const mockPayloadInstance = {
             execute: vi.fn().mockImplementation(async () => ({
                 rows: mockHomepage ? [{ id: (mockHomepage as Record<string, unknown>).id }] : [],
             })),
+            transaction: mockDrizzleTransaction,
         },
+        sessions: {} as Record<string, { db: { execute: typeof mockTransactionExecute } }>,
+        transactionOptions: undefined,
     },
 }
 
 // ── Route handler — imported AFTER all mocks ─────────────────────────────────
 
 import { POST } from '@/app/api/ai/apply-template/route'
+import { canUseWithinLimit, recordUsage } from '@/lib/subscriptions/plan-subscription'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import type { SQL } from 'drizzle-orm'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeRequest(body: Record<string, unknown>) {
+    mockExistingSiteRequest = body.siteId != null
     return new NextRequest('http://localhost:3000/api/ai/apply-template', {
         method: 'POST',
         body: JSON.stringify(body),
@@ -163,6 +184,7 @@ describe('POST /api/ai/apply-template', () => {
 
         // Reset all control flags and mock state to known defaults
         mockRateLimitAllowed = true
+        vi.mocked(canUseWithinLimit).mockResolvedValue(true)
         mockUser = {
             id: 'user-42',
             email: 'owner@example.com',
@@ -173,6 +195,7 @@ describe('POST /api/ai/apply-template', () => {
         mockSite = { ...DEFAULT_SITE }
         mockHomepage = { ...DEFAULT_HOMEPAGE }
         mockCreatedSite = { id: 999, name: DEFAULT_TEMPLATE.name }
+        mockTenantSites = []
 
         // Re-wire mock implementations after clearAllMocks resets them
         mockPayloadInstance.findByID.mockImplementation(async ({ collection }: { collection: string }) => {
@@ -183,17 +206,37 @@ describe('POST /api/ai/apply-template', () => {
         })
         mockPayloadInstance.find.mockImplementation(async ({ collection }: { collection: string }) => {
             if (collection === 'tenants') return { docs: mockTenant ? [mockTenant] : [] }
+            if (collection === 'sites') return { docs: mockTenantSites }
             return { docs: [] }
         })
-        mockPayloadInstance.create.mockImplementation(async ({ collection }: { collection: string }) => {
+        mockPayloadInstance.create.mockImplementation(async ({ collection }: MockCreateOptions) => {
             if (collection === 'sites') return mockCreatedSite
             return { id: 1000 }
         })
-        mockPayloadInstance.update.mockResolvedValue({})
+        mockPayloadInstance.update.mockReset().mockResolvedValue({})
         mockPayloadInstance.delete.mockResolvedValue({})
         mockPayloadInstance.db.drizzle.execute.mockImplementation(async () => ({
             rows: mockHomepage ? [{ id: (mockHomepage as Record<string, unknown>).id }] : [],
         }))
+        mockTransactionExecute.mockResolvedValue(undefined)
+        mockTransactionExecuteCall = 0
+        mockExistingSiteRequest = false
+        mockTransactionExecute.mockImplementation(async () => {
+            mockTransactionExecuteCall++
+            if (!mockExistingSiteRequest) return { rows: [] }
+            if (mockTransactionExecuteCall === 2) {
+                const tenant = mockSite?.tenant
+                const tenantId = typeof tenant === 'object' && tenant !== null
+                    ? (tenant as { id?: unknown }).id
+                    : tenant
+                return { rows: mockSite && String(tenantId) === 'tenant-99' ? [{ id: 101 }] : [] }
+            }
+            if (mockTransactionExecuteCall === 3) {
+                return { rows: mockHomepage ? [{ id: (mockHomepage as Record<string, unknown>).id }] : [] }
+            }
+            return { rows: [] }
+        })
+        mockPayloadInstance.db.sessions = {}
     })
 
     // ── TC-F07.022: Rate limiting ─────────────────────────────────────────────
@@ -250,6 +293,175 @@ describe('POST /api/ai/apply-template', () => {
         })
     })
 
+    // ── TC-F01.115: GH-2154 one website per account ───────────────────────────
+
+    describe('[TC-F01.115] create-new from template is refused for an account that already has a site (GH-2154)', () => {
+        const siteCreates = () => mockPayloadInstance.create.mock.calls.filter((c) => c[0].collection === 'sites')
+
+        it.each(['completed', 'none'])('answers 409 SITE_ALREADY_EXISTS for a %s site and creates nothing', async (generationStatus) => {
+            // Arrange
+            mockTenantSites = [{ id: 1, generationStatus, updatedAt: new Date().toISOString() }]
+
+            // Act
+            const res = await POST(makeRequest({ templateId: 'tpl-modern' }))
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(409)
+            expect(body).toEqual({
+                success: false,
+                error: { code: 'SITE_ALREADY_EXISTS', message: expect.any(String) },
+            })
+            expect(mockPayloadInstance.create).not.toHaveBeenCalled()
+            expect(recordUsage).not.toHaveBeenCalled()
+        })
+
+        it('answers 409 GENERATION_IN_PROGRESS while a generation is running', async () => {
+            mockTenantSites = [{ id: 1, generationStatus: 'generating', updatedAt: new Date().toISOString() }]
+
+            const res = await POST(makeRequest({ templateId: 'tpl-modern' }))
+
+            expect(res.status).toBe(409)
+            expect((await res.json()).error.code).toBe('GENERATION_IN_PROGRESS')
+            expect(mockPayloadInstance.create).not.toHaveBeenCalled()
+        })
+
+        it('keeps the legacy slug and quota unchanged when stopped under the tenant lock', async () => {
+            // Arrange — the losing request must never upgrade the tenant slug.
+            mockTenant = { ...DEFAULT_TENANT, slug: 'store-123' }
+            mockPayloadInstance.findByID.mockImplementation(async ({ collection }: { collection: string }) => {
+                if (collection === 'templates') return mockTemplate
+                return collection === 'tenants' ? mockTenant : null
+            })
+            // Early read (outside the lock) sees no site, the re-read under the lock sees one.
+            mockPayloadInstance.find.mockImplementation(async ({ collection, req }: { collection: string; req?: unknown }) => {
+                if (collection === 'tenants') return { docs: [] }
+                return { docs: collection === 'sites' && req ? [{ id: 1, generationStatus: 'completed' }] : [] }
+            })
+
+            // Act
+            const res = await POST(makeRequest({ templateId: 'tpl-modern' }))
+
+            // Assert
+            expect(res.status).toBe(409)
+            expect((await res.json()).error.code).toBe('SITE_ALREADY_EXISTS')
+            expect(mockPayloadInstance.create).not.toHaveBeenCalled()
+            expect(mockPayloadInstance.update).not.toHaveBeenCalled()
+            expect(mockTenant.slug).toBe('store-123')
+            expect(recordUsage).not.toHaveBeenCalled()
+        })
+
+        it('serializes competing templates so only the winner upgrades the legacy slug', async () => {
+            // Arrange
+            mockTenant = { ...DEFAULT_TENANT, slug: 'store-123' }
+            mockPayloadInstance.findByID.mockImplementation(async ({ collection, id }: { collection: string; id: string }) =>
+                collection === 'templates' ? { ...DEFAULT_TEMPLATE, name: id } : { ...mockTenant })
+            let releaseEarlyReads!: () => void
+            const bothEarlyReads = new Promise<void>(resolve => { releaseEarlyReads = resolve })
+            let earlyReads = 0
+            mockPayloadInstance.find.mockImplementation(async ({ collection, req }: { collection: string; req?: unknown }) => {
+                if (collection !== 'sites') return { docs: [] }
+                if (req) return { docs: mockTenantSites }
+                if (++earlyReads === 2) releaseEarlyReads()
+                await bothEarlyReads
+                return { docs: [] }
+            })
+            let tail: Promise<unknown> = Promise.resolve()
+            const serialize = (operation: (tx: { execute: typeof mockTransactionExecute }) => Promise<unknown>) => {
+                const next = tail.then(() => operation({ execute: mockTransactionExecute }))
+                tail = next.catch(() => undefined)
+                return next
+            }
+            mockDrizzleTransaction.mockImplementationOnce(serialize).mockImplementationOnce(serialize)
+            mockPayloadInstance.create.mockImplementation(async ({ collection }: MockCreateOptions) => {
+                if (collection === 'sites') mockTenantSites = [{ id: 999, generationStatus: 'generating', updatedAt: new Date().toISOString() }]
+                return mockCreatedSite
+            })
+            mockPayloadInstance.update.mockImplementation(async ({ collection, data }: MockCreateOptions) => {
+                if (collection === 'tenants') mockTenant = { ...mockTenant, ...data }
+                return {}
+            })
+
+            // Act — both requests pass the early guard before either takes the row lock.
+            const responses = await Promise.all(['Bakery', 'Salon'].map(templateId => POST(makeRequest({ templateId }))))
+
+            // Assert — one site/pages/quota write, and the losing template cannot change its URL.
+            expect(responses.map(res => res.status).sort()).toEqual([200, 409])
+            expect(siteCreates()).toHaveLength(1)
+            expect(mockTenant?.slug).toBe(String(siteCreates()[0][0].data.name).toLowerCase())
+            expect(mockPayloadInstance.create.mock.calls.filter(([call]) => call.collection === 'pages')).toHaveLength(2)
+            expect(recordUsage).toHaveBeenCalledTimes(1)
+            const transactionReq = siteCreates()[0][0].req
+            expect(transactionReq).toBeDefined()
+            expect(mockPayloadInstance.update.mock.calls.filter(([call]) => call.collection === 'tenants')).toHaveLength(1)
+            expect(mockPayloadInstance.find).toHaveBeenCalledWith(expect.objectContaining({ collection: 'tenants', req: transactionReq }))
+            expect(mockPayloadInstance.findByID).toHaveBeenCalledWith({
+                collection: 'tenants', id: 'tenant-99', req: transactionReq,
+            })
+            expect(mockPayloadInstance.update).toHaveBeenCalledWith({
+                collection: 'tenants', id: 'tenant-99', data: { slug: mockTenant?.slug }, req: transactionReq,
+            })
+        })
+
+        it.each(['Shop', '123'])('keeps the legacy slug and creates the site when template %s yields an unusable slug', async (name) => {
+            // Arrange
+            mockTemplate = { ...DEFAULT_TEMPLATE, name }
+            mockTenant = { ...DEFAULT_TENANT, slug: 'store-123' }
+            mockPayloadInstance.findByID.mockImplementation(async ({ collection }: { collection: string }) =>
+                collection === 'templates' ? mockTemplate : mockTenant)
+            mockPayloadInstance.find.mockResolvedValue({ docs: [] })
+            mockPayloadInstance.update.mockImplementation(async ({ collection, data }: MockCreateOptions) => {
+                if (collection === 'tenants') mockTenant = { ...mockTenant, ...data }
+                return {}
+            })
+
+            // Act
+            const res = await POST(makeRequest({ templateId: 'tpl-modern' }))
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(siteCreates()).toHaveLength(1)
+            expect(mockTenant?.slug).toBe('store-123')
+            expect(mockPayloadInstance.update).not.toHaveBeenCalledWith(expect.objectContaining({ collection: 'tenants' }))
+            expect(recordUsage).toHaveBeenCalledExactlyOnceWith(mockPayloadInstance, 'mock-sub-1', 'template_limit')
+        })
+
+        it('aborts before creating a site or charging quota if the transactional slug write fails', async () => {
+            // Arrange
+            mockPayloadInstance.findByID.mockImplementation(async ({ collection }: { collection: string }) =>
+                collection === 'templates' ? mockTemplate : { ...DEFAULT_TENANT, slug: 'store-123' })
+            mockPayloadInstance.find.mockResolvedValue({ docs: [] })
+            mockPayloadInstance.update.mockRejectedValueOnce(new Error('slug write failed'))
+            // Act
+            const res = await POST(makeRequest({ templateId: 'tpl-modern' }))
+            // Assert
+            expect(res.status).toBe(500)
+            expect(mockPayloadInstance.create).not.toHaveBeenCalled()
+            expect(recordUsage).not.toHaveBeenCalled()
+        })
+
+        it('still creates a site for an account with no site, or only a failed one', async () => {
+            for (const sites of [[], [{ id: 1, generationStatus: 'failed', updatedAt: new Date().toISOString() }]]) {
+                mockPayloadInstance.create.mockClear()
+                mockTenantSites = sites
+
+                const res = await POST(makeRequest({ templateId: 'tpl-modern' }))
+
+                expect(res.status).toBe(200)
+                expect(siteCreates()).toHaveLength(1)
+            }
+        })
+
+        it('does not apply the guard to the editor path (siteId given)', async () => {
+            mockTenantSites = [{ id: 101, generationStatus: 'completed' }]
+
+            const res = await POST(makeRequest({ templateId: 'tpl-modern', siteId: '101', pageId: '201' }))
+
+            expect(res.status).toBe(200)
+            expect((await res.json()).data.applied).toBe(true)
+        })
+    })
+
     // ── TC-F07.023: Backward compat — create new site ─────────────────────────
 
     describe('[TC-F07.023] New site creation from template (no siteId)', () => {
@@ -268,7 +480,7 @@ describe('POST /api/ai/apply-template', () => {
             expect(body.siteId).toBe(999)
             expect(body.siteName).toBe('Modern Business')
             expect(body.templateName).toBe('Modern Business')
-            expect(body.applied).toBeUndefined() // backward compat: no applied field
+            expect(body.applied).toBeUndefined()
         })
 
         it('creates site with template theme, homepage, and 404 page', async () => {
@@ -297,7 +509,7 @@ describe('POST /api/ai/apply-template', () => {
             expect(slugs).toContain('404')
         })
 
-        it('increments template usageCount by 1 when creating new site', async () => {
+        it('records template usage after creating a new site', async () => {
             // Arrange
             const req = makeRequest({ templateId: 'tpl-modern' })
 
@@ -305,11 +517,15 @@ describe('POST /api/ai/apply-template', () => {
             await POST(req)
 
             // Assert
-            const templateUpdateCall = mockPayloadInstance.update.mock.calls.find(
-                (c: any[]) => c[0].collection === 'templates'
-            )
-            expect(templateUpdateCall).toBeDefined()
-            expect(templateUpdateCall[0].data.usageCount).toBe(6) // 5 + 1
+            expect(mockPayloadInstance.update).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'templates', data: { usageCount: 6 },
+            }))
+            expect(recordUsage).toHaveBeenCalledWith(mockPayloadInstance, 'mock-sub-1', 'template_limit')
+            // GH-2154: new site creation and any legacy slug upgrade share a tenant-lock transaction.
+            expect(mockDrizzleTransaction).toHaveBeenCalledTimes(1)
+            // ...and the site row is written through that transaction's req, not outside it.
+            const siteCreate = mockPayloadInstance.create.mock.calls.find((c) => c[0].collection === 'sites')
+            expect(siteCreate?.[0].req).toBeDefined()
         })
 
         it('returns 404 when templateId does not match any template', async () => {
@@ -380,9 +596,70 @@ describe('POST /api/ai/apply-template', () => {
 
     describe('[TC-F07.039] Apply template to existing site (siteId provided)', () => {
 
+        it('rejects a requested page absent from the live site-scoped rows before usage recording or writes', async () => {
+            // Arrange — only the current site's live homepage is returned by the locked query.
+            // The requested page 202 is absent from that authorized result in all three cases.
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101', pageId: '202' })
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+            try {
+                // Act
+                const res = await POST(req)
+                const body = await res.json()
+
+                // Assert — check the SQL authorization/deletion predicates as well as the result.
+                const calls = mockTransactionExecute.mock.calls as unknown as Array<[SQL]>
+                const query = new PgDialect().sqlToQuery(calls[2][0])
+                expect(query.sql).toContain('pages.site_id = $1')
+                expect(query.sql).toContain('sites.tenant_id = $2')
+                expect(query.sql).toContain('pages.deleted_at IS NULL')
+                expect(query.sql).toContain('FOR UPDATE OF pages')
+                expect(query.params).toEqual([101, 'tenant-99', 202])
+                expect(res.status).toBe(404)
+                expect(body.error.code).toBe('PAGE_NOT_FOUND')
+                expect(recordUsage).not.toHaveBeenCalled()
+                expect(mockPayloadInstance.update).not.toHaveBeenCalled()
+                expect(mockPayloadInstance.create).not.toHaveBeenCalled()
+            } finally {
+                consoleError.mockRestore()
+            }
+        })
+
+        it('normalizes a leading-zero page ID and applies to the requested page', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101', pageId: '00201' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(body.data.appliedState.page.id).toBe(201)
+            expect(mockPayloadInstance.update).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'pages', id: 201,
+            }))
+        })
+
+        it.each(['0', 0, '-1', '1.5', '9007199254740993', Number.MAX_SAFE_INTEGER + 1])('rejects invalid page ID %s before entering the transaction', async (pageId) => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101', pageId })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(400)
+            expect(body.error.code).toBe('VALIDATION_ERROR')
+            expect(mockDrizzleTransaction).not.toHaveBeenCalled()
+            expect(recordUsage).not.toHaveBeenCalled()
+            expect(mockPayloadInstance.update).not.toHaveBeenCalled()
+        })
+
         it('returns 200 with applied:true when siteId is valid and owned by user', async () => {
             // Arrange
-            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101', pageId: '201' })
 
             // Act
             const res = await POST(req)
@@ -391,10 +668,15 @@ describe('POST /api/ai/apply-template', () => {
             // Assert
             expect(res.status).toBe(200)
             expect(body.success).toBe(true)
-            expect(body.applied).toBe(true)
-            expect(body.siteId).toBe(101)
-            expect(body.siteName).toBe('My Site')
-            expect(body.templateName).toBe('Modern Business')
+            expect(body.data.applied).toBe(true)
+            expect(body.data.siteId).toBe(101)
+            expect(body.data.siteName).toBe('My Site')
+            expect(body.data.templateName).toBe('Modern Business')
+            expect(body.data.appliedState).toEqual(expect.objectContaining({
+                site: expect.objectContaining({ theme: DEFAULT_TEMPLATE.defaultTheme }),
+                page: expect.objectContaining({ id: 201, layout: expect.any(Array) }),
+            }))
+            expect(body.meta.timestamp).toEqual(expect.any(String))
         })
 
         it('updates site theme with template defaultTheme', async () => {
@@ -433,6 +715,74 @@ describe('POST /api/ai/apply-template', () => {
             expect(layout[0].blockType).toBe('hero')
         })
 
+        it('updates only the active non-homepage while reading homepage globals as context', async () => {
+            // Arrange
+            const homepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    { blockType: 'navigation', variant: 'default', logoText: 'My Brand' },
+                    { blockType: 'hero', variant: 'centered', headline: 'Home hero' },
+                    { blockType: 'footer', variant: 'default', copyrightText: 'My Copyright' },
+                ],
+            }
+            const aboutPage = {
+                id: 202,
+                slug: 'about',
+                isHomepage: false,
+                layout: [
+                    { blockType: 'hero', variant: 'centered', headline: 'About us' },
+                    { blockType: 'faq', variant: 'accordion', headline: 'Questions' },
+                ],
+            }
+            mockTemplate = {
+                ...DEFAULT_TEMPLATE,
+                templatePages: [{
+                    isHomepage: true,
+                    layout: [
+                        { blockType: 'navigation', variant: 'transparent', logoText: 'Template logo' },
+                        { blockType: 'hero', variant: 'split-left', headline: 'Template hero' },
+                        { blockType: 'footer', variant: 'minimal', copyrightText: 'Template copyright' },
+                    ],
+                }],
+            }
+            mockPayloadInstance.findByID.mockImplementation(async ({ collection, id }: { collection: string; id?: number | string }) => {
+                if (collection === 'templates') return mockTemplate
+                if (collection === 'sites') return mockSite
+                if (collection === 'pages') return String(id) === '202' ? aboutPage : homepage
+                return null
+            })
+            mockTransactionExecute.mockImplementation(async () => {
+                mockTransactionExecuteCall++
+                if (mockTransactionExecuteCall === 2) return { rows: [{ id: 101 }] }
+                if (mockTransactionExecuteCall === 3) return { rows: [{ id: 201 }, { id: 202 }] }
+                return { rows: [] }
+            })
+
+            // Act
+            const response = await POST(makeRequest({ templateId: 'tpl-modern', siteId: '101', pageId: '202' }))
+            const body = await response.json()
+
+            // Assert — the homepage is context only, so one editor undo can restore every page write.
+            expect(response.status).toBe(200)
+            const pageUpdates = mockPayloadInstance.update.mock.calls
+                .map((call: [{ collection: string; id?: number | string; data?: { layout?: Record<string, unknown>[] } }]) => call[0])
+                .filter(call => call.collection === 'pages')
+            expect(pageUpdates).toHaveLength(1)
+            expect(pageUpdates[0].id).toBe(202)
+            expect(pageUpdates[0].data?.layout).toEqual([
+                expect.objectContaining({ blockType: 'hero', variant: 'split-left', headline: 'About us' }),
+                expect.objectContaining({ blockType: 'faq', variant: 'accordion', headline: 'Questions' }),
+            ])
+            expect(body.data.appliedState.page.id).toBe(202)
+
+            const siteUpdate = mockPayloadInstance.update.mock.calls
+                .map((call: [{ collection: string; data?: Record<string, unknown> }]) => call[0])
+                .find(call => call.collection === 'sites' && call.data?.theme)
+            expect(siteUpdate?.data?.pendingHeaderBlock).toEqual(
+                expect.objectContaining({ variant: 'transparent', logoText: 'My Brand' }),
+            )
+        })
+
         it('skips homepage layout update when site has no homepage', async () => {
             // Arrange
             mockHomepage = null
@@ -449,7 +799,7 @@ describe('POST /api/ai/apply-template', () => {
             expect(res.status).toBe(200)
         })
 
-        it('increments template usageCount by 1 when applying to existing site', async () => {
+        it('increments template usageCount when applying to existing site', async () => {
             // Arrange
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
@@ -457,11 +807,9 @@ describe('POST /api/ai/apply-template', () => {
             await POST(req)
 
             // Assert
-            const templateUpdateCall = mockPayloadInstance.update.mock.calls.find(
-                (c: any[]) => c[0].collection === 'templates'
-            )
-            expect(templateUpdateCall).toBeDefined()
-            expect(templateUpdateCall[0].data.usageCount).toBe(6) // 5 + 1
+            expect(mockPayloadInstance.update).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'templates', data: { usageCount: 6 },
+            }))
         })
 
         it('updates existing pages in-place when applying template (smart mapping)', async () => {
@@ -478,16 +826,197 @@ describe('POST /api/ai/apply-template', () => {
             expect(pageUpdateCalls.length).toBeGreaterThanOrEqual(1)
         })
 
-        it('finds all existing pages by site ID for deletion', async () => {
+        it('TC-AIWB-121: bumps the site and reskinned page revisions in the swap transaction and answers the new draftVersion', async () => {
+            // Arrange
+            const dialect = new PgDialect()
+            mockPayloadInstance.db.drizzle.execute.mockImplementation(async (query: SQL) => {
+                const text = dialect.sqlToQuery(query).sql
+                if (text.includes('FROM sites')) return { rows: [{ editor_revision: 8, editor_last_save_id: null }] }
+                if (text.includes('FROM pages')) return { rows: [{ editor_revision: 4, editor_last_save_id: null }] }
+                return { rows: mockHomepage ? [{ id: (mockHomepage as Record<string, unknown>).id }] : [] }
+            })
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101', pageId: '201' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(200)
+            const bumps = mockTransactionExecute.mock.calls
+                .map(([query]: [SQL]) => dialect.sqlToQuery(query))
+                .filter(query => query.sql.includes('editor_revision = editor_revision + 1'))
+            expect(bumps.map(query => query.sql.split(' ')[1])).toEqual(['sites', 'pages'])
+            expect(bumps[0].params).toEqual([null, 101])
+            expect(bumps[1].params).toEqual([null, 201, 101])
+            expect(body.data.draftVersion).toBe('8.4')
+        })
+
+        it('runs the complete template swap in one transaction', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            const res = await POST(req)
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(mockDrizzleTransaction).toHaveBeenCalledTimes(1)
+
+            const swapUpdates = mockPayloadInstance.update.mock.calls
+                .map((call: [{ collection: string; req?: { transactionID?: string } }]) => call[0])
+                .filter(call => call.collection === 'sites' || call.collection === 'pages')
+
+            expect(swapUpdates).not.toHaveLength(0)
+            expect(swapUpdates.every(call => typeof call.req?.transactionID === 'string')).toBe(true)
+            expect(new Set(swapUpdates.map(call => call.req?.transactionID)).size).toBe(1)
+        })
+
+        it('TC-F07.039: preserves the stable block ID used by locale_content', async () => {
+            // Arrange
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    {
+                        id: '5f47ac10b58c4c6b9f0e8a2d',
+                        blockType: 'hero',
+                        variant: 'centered',
+                        headline: 'Localized hero',
+                    },
+                ],
+            }
+
+            // Act
+            await POST(makeRequest({ templateId: 'tpl-modern', siteId: '101' }))
+
+            // Assert
+            const pageUpdate = mockPayloadInstance.update.mock.calls.find(
+                (call: [{ collection: string }]) => call[0].collection === 'pages',
+            )
+            expect(pageUpdate?.[0].data.layout[0].id).toBe('5f47ac10b58c4c6b9f0e8a2d')
+            expect(pageUpdate?.[0].draft).toBe(true)
+        })
+
+        it('TC-F07.039: applies the template layout to an empty homepage', async () => {
+            // Arrange
+            mockHomepage = { ...DEFAULT_HOMEPAGE, layout: [] }
+
+            // Act
+            const response = await POST(makeRequest({ templateId: 'tpl-modern', siteId: '101' }))
+            const body = await response.json()
+
+            // Assert
+            const pageUpdate = mockPayloadInstance.update.mock.calls.find(
+                (call: [{ collection: string }]) => call[0].collection === 'pages',
+            )
+            // [TC-AIAUD-213] the template's features block has no rows; Payload refuses an empty
+            // required `features` list, so the shared sanitizer drops it instead of failing the page.
+            const layout = pageUpdate?.[0].data.layout as Array<{ blockType: string }>
+            expect(layout.map((block) => block.blockType)).toEqual(['hero'])
+            expect(body.data.pagesUpdated).toBe(1)
+        })
+
+        it('TC-F07.040: reports unmatched sections without injecting them into the new layout', async () => {
+            // Arrange
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    { blockType: 'hero', headline: 'Keep me' },
+                    { blockType: 'faq', headline: 'Old FAQ', items: [{ question: 'Q', answer: 'A' }] },
+                ],
+            }
+
+            // Act
+            const response = await POST(makeRequest({ templateId: 'tpl-modern', siteId: '101' }))
+            const body = await response.json()
+
+            // Assert
+            const pageUpdate = mockPayloadInstance.update.mock.calls.find(
+                (call: [{ collection: string }]) => call[0].collection === 'pages',
+            )
+            const layout = pageUpdate?.[0].data.layout as Array<{ blockType: string }>
+
+            expect(layout.some(block => block.blockType === 'faq')).toBe(false)
+            expect(body.data.unmatchedBlocks).toContain('faq')
+        })
+
+        it('TC-F07.039: reskins canonical header/footer as pending draft data', async () => {
+            // Arrange
+            const headerLocales = { vi: { logoText: 'Thương hiệu của tôi', links: [{ label: 'Trang chủ', url: '/' }] } }
+            const footerLocales = { vi: { copyrightText: 'Bản quyền của tôi' } }
+            mockTemplate = {
+                ...DEFAULT_TEMPLATE,
+                templatePages: [{
+                    isHomepage: true,
+                    layout: [
+                        { blockType: 'navigation', variant: 'transparent', logoText: 'Template logo' },
+                        { blockType: 'hero', variant: 'split', headline: 'Template hero' },
+                        { blockType: 'footer', variant: 'minimal', copyrightText: 'Template copyright' },
+                    ],
+                }],
+            }
+            mockSite = {
+                ...DEFAULT_SITE,
+                pendingHeaderBlock: { blockType: 'navigation', variant: 'default', logoText: 'My Brand', _localeContent: headerLocales },
+                pendingFooterBlock: { blockType: 'footer', variant: 'default', copyrightText: 'My Copyright', _localeContent: footerLocales },
+            }
+
+            // Act
+            await POST(makeRequest({ templateId: 'tpl-modern', siteId: '101' }))
+
+            // Assert
+            const siteUpdate = mockPayloadInstance.update.mock.calls.find(
+                (call: [{ collection: string; data?: { theme?: unknown } }]) => call[0].collection === 'sites' && call[0].data?.theme,
+            )?.[0]
+            expect(siteUpdate.data.pendingHeaderBlock).toMatchObject({ variant: 'transparent', logoText: 'My Brand' })
+            expect(siteUpdate.data.pendingFooterBlock).toMatchObject({ variant: 'minimal', copyrightText: 'My Copyright' })
+            expect(siteUpdate.data.pendingHeaderBlock._localeContent).toEqual(headerLocales)
+            expect(siteUpdate.data.pendingFooterBlock._localeContent).toEqual(footerLocales)
+        })
+
+        it('TC-F07.022: rejects an exhausted template allowance before swap writes', async () => {
+            // Arrange
+            vi.mocked(canUseWithinLimit).mockResolvedValue(false)
+
+            // Act
+            const response = await POST(makeRequest({ templateId: 'tpl-modern', siteId: '101' }))
+            const body = await response.json()
+
+            // Assert
+            expect(response.status).toBe(403)
+            expect(body.error.code).toBe('FEATURE_LOCKED')
+            expect(mockPayloadInstance.update).not.toHaveBeenCalledWith(
+                expect.objectContaining({ collection: 'pages' }),
+            )
+        })
+
+        it('returns an error when a swap write fails, allowing the transaction to roll back', async () => {
+            // Arrange
+            mockPayloadInstance.update.mockImplementation(async ({ collection }: { collection: string }) => {
+                if (collection === 'pages') throw new Error('page update failed')
+                return {}
+            })
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+            // Act
+            const res = await POST(makeRequest({ templateId: 'tpl-modern', siteId: '101' }))
+
+            // Assert
+            expect(res.status).toBe(500)
+            expect(mockDrizzleTransaction).toHaveBeenCalledTimes(1)
+            consoleError.mockRestore()
+        })
+
+        it('finds all existing pages inside the tenant transaction', async () => {
             // Arrange
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
             await POST(req)
 
-            // Assert — route now uses drizzle.execute (raw SQL) to fetch page IDs
-            // instead of payload.find, bypassing the aggregate-SQL bug (GH-767).
-            expect(mockPayloadInstance.db.drizzle.execute).toHaveBeenCalled()
+            // Assert — tenant lock, site lock, page read, then the site + page draft revision bumps (TC-AIWB-121)
+            // all share one session.
+            expect(mockTransactionExecute).toHaveBeenCalledTimes(5)
             // payload.findByID must be called for the fetched page IDs
             const pageFindByIDCall = mockPayloadInstance.findByID.mock.calls.find(
                 (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
@@ -500,7 +1029,7 @@ describe('POST /api/ai/apply-template', () => {
 
     describe('[TC-F07.016] Authorization and tenant ownership', () => {
 
-        it('returns 403 when site belongs to a different tenant', async () => {
+        it('returns tenant-safe 404 when site belongs to a different tenant', async () => {
             // Arrange — site tenant does NOT match user's tenant
             mockSite = { ...DEFAULT_SITE, tenant: { id: 'tenant-DIFFERENT' } }
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
@@ -510,11 +1039,11 @@ describe('POST /api/ai/apply-template', () => {
             const body = await res.json()
 
             // Assert
-            expect(res.status).toBe(403)
-            expect(body.error).toMatch(/unauthorized/i)
+            expect(res.status).toBe(404)
+            expect(body.error.message).toMatch(/site not found/i)
         })
 
-        it('returns 403 when site.tenant is a scalar ID not matching user tenant', async () => {
+        it('returns tenant-safe 404 when scalar site.tenant does not match user tenant', async () => {
             // Arrange — tenant stored as plain ID string (non-populated relationship)
             mockSite = { ...DEFAULT_SITE, tenant: 'tenant-DIFFERENT' }
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
@@ -524,8 +1053,8 @@ describe('POST /api/ai/apply-template', () => {
             const body = await res.json()
 
             // Assert
-            expect(res.status).toBe(403)
-            expect(body.error).toMatch(/unauthorized/i)
+            expect(res.status).toBe(404)
+            expect(body.error.message).toMatch(/site not found/i)
         })
 
         it('accepts ownership when site.tenant is a scalar ID matching user tenant', async () => {
@@ -539,7 +1068,7 @@ describe('POST /api/ai/apply-template', () => {
 
             // Assert
             expect(res.status).toBe(200)
-            expect(body.applied).toBe(true)
+            expect(body.data.applied).toBe(true)
         })
 
         it('returns 404 when siteId does not match any site in database', async () => {
@@ -553,7 +1082,7 @@ describe('POST /api/ai/apply-template', () => {
 
             // Assert
             expect(res.status).toBe(404)
-            expect(body.error).toMatch(/site not found/i)
+            expect(body.error.message).toMatch(/site not found/i)
         })
     })
 
@@ -561,22 +1090,23 @@ describe('POST /api/ai/apply-template', () => {
 
     describe('Edge cases', () => {
 
-        it('keeps existing layout when template has no defaultBlocks (re-skin path)', async () => {
+        it('skips a page write when template has no defaultBlocks and layout is unchanged', async () => {
             // Arrange — template has no blocks → templateBlocksClean is empty
             // → smart mapping skipped → re-skin path keeps existing blocks
             mockTemplate = { ...DEFAULT_TEMPLATE, defaultBlocks: undefined }
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
-            await POST(req)
+            const res = await POST(req)
+            const body = await res.json()
 
-            // Assert — page UPDATED (re-skin), existing layout preserved
+            // Assert — no redundant page write; the stored layout is already correct.
             const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
                 (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
             )
-            expect(pageUpdateCall).toBeDefined()
-            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
-            expect(layout.length).toBeGreaterThan(0)
+            expect(pageUpdateCall).toBeUndefined()
+            expect(body.data.pagesUpdated).toBe(0)
+            expect(res.status).toBe(200)
         })
 
         it('passes siteId as Number when calling payload.findByID and payload.update for sites', async () => {
@@ -608,28 +1138,29 @@ describe('POST /api/ai/apply-template', () => {
             const body = await res.json()
 
             // Assert
-            expect(typeof body.siteId).toBe('number')
-            expect(body.siteId).toBe(101)
+            expect(typeof body.data.siteId).toBe('number')
+            expect(body.data.siteId).toBe(101)
         })
 
         // ── TC-F07.040: null defaultBlocks ────────────────────────────────────
 
-        it('TC-F07.040: apply template with null defaultBlocks keeps existing layout (re-skin)', async () => {
+        it('TC-F07.040: skips a page write when null defaultBlocks leaves layout unchanged', async () => {
             // Arrange — template.defaultBlocks is null → templateBlocksClean = []
             // → re-skin path preserves existing blocks
             mockTemplate = { ...DEFAULT_TEMPLATE, defaultBlocks: null }
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
-            await POST(req)
+            const res = await POST(req)
+            const body = await res.json()
 
-            // Assert — page updated with existing layout preserved (re-skin)
+            // Assert — no redundant page write; the stored layout is already correct.
             const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
                 (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
             )
-            expect(pageUpdateCall).toBeDefined()
-            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
-            expect(layout.length).toBeGreaterThan(0)
+            expect(pageUpdateCall).toBeUndefined()
+            expect(body.data.pagesUpdated).toBe(0)
+            expect(res.status).toBe(200)
         })
 
         // ── TC-F07.041: null defaultTheme ─────────────────────────────────────
@@ -658,6 +1189,10 @@ describe('POST /api/ai/apply-template', () => {
         // ── TC-F07.044–046: contact formFields sanitization ────────────────────
 
         it('TC-F07.044: valid contact formFields are preserved during template apply', async () => {
+            mockTemplate = {
+                ...DEFAULT_TEMPLATE,
+                defaultBlocks: [{ blockType: 'contact', headline: 'Template contact', formFields: [] }],
+            }
             mockHomepage = {
                 ...DEFAULT_HOMEPAGE,
                 layout: [
@@ -689,6 +1224,10 @@ describe('POST /api/ai/apply-template', () => {
         })
 
         it('TC-F07.045: invalid formFields items are filtered out (missing/wrong type)', async () => {
+            mockTemplate = {
+                ...DEFAULT_TEMPLATE,
+                defaultBlocks: [{ blockType: 'contact', headline: 'Template contact', formFields: [] }],
+            }
             mockHomepage = {
                 ...DEFAULT_HOMEPAGE,
                 layout: [
@@ -722,6 +1261,10 @@ describe('POST /api/ai/apply-template', () => {
         })
 
         it('TC-F07.046: all-invalid formFields falls back to default 3 fields', async () => {
+            mockTemplate = {
+                ...DEFAULT_TEMPLATE,
+                defaultBlocks: [{ blockType: 'contact', headline: 'Template contact', formFields: [] }],
+            }
             mockHomepage = {
                 ...DEFAULT_HOMEPAGE,
                 layout: [
@@ -794,7 +1337,7 @@ describe('POST /api/ai/apply-template', () => {
 
                 // Apply should still succeed despite usageCount failure
                 expect(res.status).toBe(200)
-                expect(body.applied).toBe(true)
+                expect(body.data.applied).toBe(true)
             } finally {
                 // Restore original mock to avoid polluting subsequent tests
                 if (originalImpl) {
@@ -837,7 +1380,7 @@ describe('POST /api/ai/apply-template', () => {
 
             // Assert — schema coerces 42 → "42", route calls findByID with "42"
             expect(res.status).toBe(200)
-            expect(body.applied).toBe(true)
+            expect(body.data.applied).toBe(true)
             const templateFindCall = mockPayloadInstance.findByID.mock.calls.find(
                 (c: any[]) => c[0].collection === 'templates'
             )
@@ -848,6 +1391,10 @@ describe('POST /api/ai/apply-template', () => {
 
         // ── TC-F07.050: GH-731 service-cards empty titles coerced on apply ─────
         it('TC-F07.050: service-cards with empty titles in existing layout are coerced before payload.update', async () => {
+            mockTemplate = {
+                ...DEFAULT_TEMPLATE,
+                defaultBlocks: [{ blockType: 'service-cards', variant: 'grid', headline: 'Template services', services: [] }],
+            }
             // Arrange — homepage has a service-cards block with empty service titles
             // (simulates data written to DB before the AI gen sanitization fix)
             mockHomepage = {

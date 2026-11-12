@@ -10,6 +10,13 @@ vi.mock('@payload-config', () => ({ default: {} }))
 import { GET as getRobots } from '@/app/sites/[slug]/robots.txt/route'
 import { GET as getSitemap } from '@/app/sites/[slug]/sitemap.xml/route'
 import { GET as getLlmsTxt } from '@/app/sites/[slug]/llms.txt/route'
+// #2179: store availability has its own tests (store-unavailable.test.ts); every store is available here.
+vi.mock('@/lib/storefront/cached-store-availability', () => ({
+    isCachedStoreUnavailable: vi.fn(async () => false),
+    storeUnavailableLocaleOf: vi.fn(async () => 'en'),
+    storeUnavailableResponse: vi.fn(async () => null),
+    storefrontUnavailableFor: vi.fn(async () => null),
+}))
 
 type DiscoveryRoute = typeof getRobots
 

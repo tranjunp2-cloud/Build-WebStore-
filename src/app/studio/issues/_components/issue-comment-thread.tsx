@@ -5,6 +5,7 @@
  * Optimistic UI: new comment shown immediately, reverted on error.
  */
 import { useState } from 'react'
+import { useStudioCan } from '@/app/studio/_components/studio-permissions-context'
 import type { IssueComment } from './issue-types'
 import { IssueMarkdown } from './issue-markdown'
 
@@ -31,6 +32,7 @@ type Props = {
 }
 
 export function IssueCommentThread({ issueId, comments, onCommentAdded }: Props) {
+    const canComment = useStudioCan()('issue.work')
     const [list, setList] = useState<IssueComment[]>(comments)
     const [body, setBody] = useState('')
     const [submitting, setSubmitting] = useState(false)
@@ -106,7 +108,7 @@ export function IssueCommentThread({ issueId, comments, onCommentAdded }: Props)
                 </div>
             ))}
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            {canComment && <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                 <textarea
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
@@ -144,7 +146,7 @@ export function IssueCommentThread({ issueId, comments, onCommentAdded }: Props)
                         {submitting ? 'Posting…' : 'Post comment'}
                     </button>
                 </div>
-            </form>
+            </form>}
         </div>
     )
 }

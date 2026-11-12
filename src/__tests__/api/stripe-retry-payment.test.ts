@@ -48,6 +48,13 @@ import { verifyOrderToken } from '@/lib/auth/order-token'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
 import { cookies } from 'next/headers'
+// #2179: store availability has its own tests (store-unavailable.test.ts); here a store is unavailable only when suspended.
+vi.mock('@/lib/storefront/store-availability', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/storefront/store-availability')>()),
+    isTenantUnavailable: vi.fn(async (_payload: unknown, tenant: { status?: unknown } | null) => tenant?.status === 'suspended'),
+    isTenantIdUnavailable: vi.fn(async () => false),
+}))
+import { isTenantIdUnavailable, isTenantUnavailable } from '@/lib/storefront/store-availability'
 
 const mockCreateCheckoutSession = vi.mocked(createStripeCheckoutSession)
 const mockVerifyConfirmToken = vi.mocked(verifyConfirmToken)
@@ -456,6 +463,23 @@ describe('POST /api/orders/[id]/retry-payment [TC-F13.153-154]', () => {
     })
 
     // ─── Suspended tenant ─────────────────────────────────────────────
+    it('[TC-F09.284] returns 403 when the main subscription lapsed (tenant active)', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue(VALID_PENDING_ORDER)
+        mockCookies.mockResolvedValue({ get: vi.fn((key) => (key === 'ct_123' ? { value: 'valid-token' } : undefined)) } as any)
+        mockVerifyConfirmToken.mockReturnValue(true)
+        vi.mocked(isTenantUnavailable).mockResolvedValueOnce(true)
+
+        // Act
+        const res = await POST(mockRequest({}), { params: Promise.resolve({ id: '123' }) })
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(403)
+        expect(body.error.code).toBe('STORE_UNAVAILABLE')
+        expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+    })
+
     it('[Unlabeled] returns 403 when tenant is suspended', async () => {
         // Arrange
         const suspendedOrder = {

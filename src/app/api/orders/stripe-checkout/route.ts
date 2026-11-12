@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
+import { generateOrderNumber } from '@/lib/orders/generate-order-number'
 import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { stripeCheckoutSchema } from '@/lib/validations/orders'
+import { MAX_CUSTOMER_EMAIL_LENGTH } from '@/lib/storefront/checkout'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
+import { isTenantUnavailable } from '@/lib/storefront/store-availability'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
@@ -84,6 +87,12 @@ export async function POST(request: NextRequest) {
 
     const parse = stripeCheckoutSchema.safeParse(rawBody)
     if (!parse.success) {
+        if (parse.error.issues.some(issue => issue.code === 'too_big' && issue.path.join('.') === 'customer.email')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'EMAIL_TOO_LONG', message: `Email must not exceed ${MAX_CUSTOMER_EMAIL_LENGTH} characters` } },
+                { status: 422 },
+            )
+        }
         console.warn('[stripe-checkout] validation error:', parse.error.message)
         return NextResponse.json(
             { success: false, error: { code: 'INVALID_BODY', message: 'Invalid request body' } },
@@ -138,8 +147,8 @@ export async function POST(request: NextRequest) {
 
         const tenantTyped = tenant as unknown as TenantDoc
 
-        // TC-F13.88: suspended tenant cannot accept payments
-        if (tenantTyped.status === 'suspended') {
+        // TC-F13.88: suspended tenant cannot accept payments; #2179: nor a store whose main subscription has lapsed
+        if (await isTenantUnavailable(payload, { id: tenantId, status: tenantTyped.status })) {
             return NextResponse.json(
                 { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
                 { status: 403 },
@@ -286,7 +295,7 @@ export async function POST(request: NextRequest) {
         // Shared gateway-agnostic total (F33) — identical formula as COD/QR so all gateways charge the same.
         const shippingFeeSen = bestRate.priceSen
         const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
-        const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
+        const orderNumber = generateOrderNumber()
         // Per-order secret for magic-link tokens — enables cross-device retry from the re-payment email (AC-3)
         const magicLinkSecret = randomBytes(32).toString('hex')
 
@@ -612,6 +621,8 @@ export async function POST(request: NextRequest) {
                 items: orderItems.map(i => ({ name: i.productName, variant: i.variant || undefined, quantity: i.quantity, lineTotal: i.unitPrice * i.quantity })),
                 orderTotal: order.total,
                 shippingFee,
+                discountAmount: discountRM || null,
+                discountCode: discountRow?.code ?? null,
                 currency,
                 locale: siteLocale,
             }, sellerCmsConfig ?? undefined)

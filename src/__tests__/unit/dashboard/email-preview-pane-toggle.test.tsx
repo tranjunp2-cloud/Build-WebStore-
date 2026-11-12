@@ -2,6 +2,9 @@ import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { I18nProvider } from '@/i18n'
+import en from '@/i18n/locales/en.json'
+import ms from '@/i18n/locales/ms.json'
 import { EmailPreviewPane } from '@/app/(dashboard)/settings/email-templates/_components/EmailPreviewPane'
 
 // GH-1499 issue 4 — code review follow-up: the Desktop/Mobile toggle visibility and
@@ -22,14 +25,16 @@ function mockMatchMedia(belowDesktop: boolean) {
     return matchMediaSpy
 }
 
-function renderPane() {
+function renderPane(uiLocale: 'en' | 'ms' = 'en') {
     return render(
-        <EmailPreviewPane
-            templateType="order-confirmation"
-            locale="en"
-            draftConfig={{ enabled: true }}
-            onReset={vi.fn()}
-        />
+        <I18nProvider defaultLocale={uiLocale}>
+            <EmailPreviewPane
+                templateType="order-confirmation"
+                locale="en"
+                draftConfig={{ enabled: true }}
+                onReset={vi.fn()}
+            />
+        </I18nProvider>
     )
 }
 
@@ -77,5 +82,42 @@ describe('[TC-F32.93] EmailPreviewPane — Desktop/Mobile toggle visibility', ()
             const iframe = container.querySelector('iframe')
             expect(iframe).toHaveStyle({ width: '360px' })
         })
+    })
+})
+
+describe('[TC-F32.105] EmailPreviewPane — chrome text follows CMS UI locale', () => {
+    beforeEach(() => {
+        window.localStorage.clear()
+        mockMatchMedia(false)
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({ subject: 'Test subject', html: '<p>preview</p>' }),
+        }))
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        vi.restoreAllMocks()
+    })
+
+    it('shows Malay footer note, reset button and demo data labels when UI locale is ms', async () => {
+        const msPreview = ms.dashboard.settings.emailTemplates.preview
+        const enPreview = en.dashboard.settings.emailTemplates.preview
+        renderPane('ms')
+
+        expect(await screen.findByText(msPreview.footerNote)).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: msPreview.resetToDefault })).toBeInTheDocument()
+        expect(screen.getByText(msPreview.demoTitle)).toBeInTheDocument()
+        expect(screen.getByText(msPreview.live)).toBeInTheDocument()
+        expect(screen.queryByText(enPreview.footerNote)).not.toBeInTheDocument()
+        expect(screen.queryByText(enPreview.resetToDefault)).not.toBeInTheDocument()
+    })
+
+    it('keeps English text when UI locale is en', async () => {
+        const enPreview = en.dashboard.settings.emailTemplates.preview
+        renderPane('en')
+
+        expect(await screen.findByText(enPreview.footerNote)).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: enPreview.resetToDefault })).toBeInTheDocument()
     })
 })

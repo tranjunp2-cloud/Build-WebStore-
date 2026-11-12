@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
+import { SignJWT } from 'jose'
 
 // ─── Mocks ────────────────────────────────────────────────────────────
-// Auth strategy: this file exercises the REAL withAuth wrapper and mocks payload.auth
-// (integration-level — verifies withAuth→auth chaining). orders-refund.test.ts mocks
-// @/lib/auth directly for handler-unit isolation. Both strategies are intentional.
+// Auth strategy: this file exercises the REAL withAuth wrapper and token verification with a really signed
+// session token, and fakes only the session's user read (loadSessionUser) — integration-level, verifies
+// withAuth→auth chaining. orders-refund.test.ts mocks @/lib/auth directly for handler-unit isolation.
 
 const mockAuth = vi.fn()
+vi.mock('@/lib/auth/session-user', () => ({ loadSessionUser: async () => (await mockAuth())?.user ?? null }))
 const mockFindByID = vi.fn()
 const mockUpdate = vi.fn()
 const mockRefundsCreate = vi.fn()
@@ -14,7 +16,7 @@ const mockSendEmail = vi.fn()
 
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
-        auth: mockAuth,
+        secret: 'derived-secret-for-refund-tests-01',
         findByID: mockFindByID,
         update: mockUpdate,
         sendEmail: mockSendEmail,
@@ -53,8 +55,17 @@ import { POST } from '@/app/api/orders/[id]/refund/route'
 
 // ─── Test Helpers ─────────────────────────────────────────────────────
 
+const PAYLOAD_SECRET = 'raw-secret-for-refund-tests-012345'
+let sessionToken = ''
+beforeAll(async () => {
+    vi.stubEnv('PAYLOAD_SECRET', PAYLOAD_SECRET)
+    sessionToken = await new SignJWT({ id: 1, collection: 'users', mfa_verified: true })
+        .setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('1h')
+        .sign(new TextEncoder().encode(PAYLOAD_SECRET))
+})
+
 function createRequest() {
-    return { headers: new Headers({ Authorization: 'Bearer testtoken' }) } as any
+    return { headers: new Headers({ Authorization: `Bearer ${sessionToken}` }) } as any
 }
 
 function createContext(id: string) {

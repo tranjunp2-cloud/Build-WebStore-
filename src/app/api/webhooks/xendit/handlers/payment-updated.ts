@@ -2,32 +2,46 @@ import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import { reconcileOrderPaid } from '@/lib/payment/reconcile-order-paid'
 
+/** The one order a payment webhook is about; its shop's callback token is the one checked (TC-PERF-147). */
+export interface WebhookOrder {
+    id: number
+    total: number
+    status: string
+    currency: string
+    tenantId: number | string | null
+}
+
+function toWebhookOrder(doc: Record<string, any>): WebhookOrder {
+    const tenant = doc.tenant && typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+    return {
+        id: Number(doc.id),
+        total: Number(doc.total),
+        status: String(doc.status),
+        currency: String(doc.currency || 'MYR').toUpperCase(),
+        tenantId: tenant ?? null,
+    }
+}
+
 /**
- * Find order by reference_id (= our order.id, string) OR by xenditPaymentRequestId.
- * reference_id is persisted at order creation; xenditPaymentRequestId persisted after PR created.
- * Using both covers the race where webhook fires before PR id is saved.
+ * Find the order by reference_id / external_id (= our order.id, string) OR by xenditPaymentRequestId.
+ * reference_id is persisted at order creation; xenditPaymentRequestId persisted after the PR / invoice is created.
+ * Using both covers the race where the webhook fires before the id is saved. The route verifies the callback token
+ * against THIS order's shop and the handlers update only this order: the token used to be checked against the
+ * order of `data.reference_id` while an invoice event updated the order of `external_id`, so one shop's token
+ * could mark another shop's order paid.
  */
-async function findOrderByPayment(
+export async function findWebhookOrder(
     payload: Payload,
     referenceId: string | undefined,
     paymentRequestId: string | undefined,
-): Promise<{ id: number; total: number; status: string } | null> {
-    // Try reference_id first (order.id as string)
-    if (referenceId && !isNaN(Number(referenceId))) {
+): Promise<WebhookOrder | null> {
+    if (referenceId && /^\d{1,15}$/.test(String(referenceId))) {
         const order = await payload
-            .findByID({
-                collection: 'orders',
-                id: Number(referenceId),
-                depth: 0,
-                overrideAccess: true,
-            })
+            .findByID({ collection: 'orders', id: Number(referenceId), depth: 0, overrideAccess: true })
             .catch(() => null) as Record<string, any> | null
-        if (order) {
-            return { id: Number(order.id), total: Number(order.total), status: String(order.status) }
-        }
+        if (order) return toWebhookOrder(order)
     }
-    // Fallback: lookup by xenditPaymentRequestId
-    if (paymentRequestId) {
+    if (paymentRequestId && typeof paymentRequestId === 'string') {
         const { docs } = await payload.find({
             collection: 'orders',
             where: { xenditPaymentRequestId: { equals: paymentRequestId } },
@@ -35,41 +49,62 @@ async function findOrderByPayment(
             depth: 0,
             overrideAccess: true,
         })
-        if (docs[0]) {
-            const d = docs[0] as Record<string, any>
-            return { id: Number(d.id), total: Number(d.total), status: String(d.status) }
-        }
+        if (docs[0]) return toWebhookOrder(docs[0] as Record<string, any>)
     }
     return null
 }
 
-export async function handlePaymentEvent(payload: Payload, event: string, data: Record<string, any>): Promise<void> {
-    const paymentRequestId: string | undefined = data.payment_request_id ?? data.id
-    const referenceId: string | undefined = data.reference_id
-    const channelCode: string = data.channel_code ?? ''
-    // data.amount is RM major unit — compare directly to order.total (RM). NO /100 or *100.
-    const webhookAmount: number | undefined = data.amount != null ? Number(data.amount) : undefined
+/** Ids a webhook names its order by: payment events in `data`, invoice events at the root. */
+export function webhookOrderRefs(event: string, body: Record<string, any>): { referenceId?: string; paymentRequestId?: string } {
+    const data: Record<string, any> = body.data ?? {}
+    if (!event) return { referenceId: body.external_id, paymentRequestId: body.id }
+    return { referenceId: data.reference_id, paymentRequestId: data.payment_request_id ?? data.id }
+}
 
-    const order = await findOrderByPayment(payload, referenceId, paymentRequestId)
-    if (!order) {
-        console.warn('[Xendit Webhook] No order for payment', { referenceId, paymentRequestId, event })
-        return
-    }
+const toCents = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === '') return null
+    const n = Number(value)
+    return Number.isFinite(n) ? Math.round(n * 100) : null
+}
+
+/**
+ * The paid amount and currency must be present and equal the order's (amounts in the same major unit as
+ * `order.total`, compared in cents). A webhook that leaves out `amount` no longer skips the check.
+ */
+export function paidAmountMatches(order: WebhookOrder, amount: unknown, currency: unknown): boolean {
+    const paid = toCents(amount)
+    const expected = toCents(order.total)
+    if (paid === null || expected === null || paid !== expected) return false
+    return typeof currency === 'string' && currency.trim().toUpperCase() === order.currency
+}
+
+const markFailed = (payload: Payload, orderId: number) => (payload.db.drizzle as any).execute(sql`
+    UPDATE orders SET payment_status = 'payment_failed', updated_at = NOW()
+    WHERE id = ${orderId} AND status = 'pending'
+`)
+
+export async function handlePaymentEvent(
+    payload: Payload,
+    event: string,
+    data: Record<string, any>,
+    order: WebhookOrder,
+): Promise<void> {
+    const paymentRequestId: string | undefined = data.payment_request_id ?? data.id
+    const channelCode: string = data.channel_code ?? ''
 
     // payment.failure (v2) | payment_request.expiry (v3) → mark as failed
     if (event === 'payment.failure' || event === 'payment_request.expiry') {
-        await (payload.db.drizzle as any).execute(sql`
-            UPDATE orders SET payment_status = 'payment_failed', updated_at = NOW()
-            WHERE id = ${order.id} AND status = 'pending'
-        `)
+        await markFailed(payload, order.id)
         console.log(`[Xendit Webhook] Order ${order.id} marked payment_failed`)
         return
     }
 
-    // payment.capture | payment.authorization (v2) | payment_request.succeeded (v3) → treat as paid
-    if (webhookAmount != null && Math.abs(webhookAmount - order.total) > 0.01) {
+    // payment.capture | payment.authorization (v2) | payment_request.succeeded (v3) → treat as paid.
+    // data.amount is RM major unit — compared to order.total (RM). v3 captures name it request_amount.
+    const amount = data.amount ?? data.request_amount ?? data.captures?.[0]?.capture_amount
+    if (!paidAmountMatches(order, amount, data.currency)) {
         console.error(
-            `[Xendit Webhook] Amount mismatch on order ${order.id}: webhook=${webhookAmount} order=${order.total} (RM). Not reconciling.`,
+            `[Xendit Webhook] Amount/currency mismatch on order ${order.id}: webhook=${amount} ${data.currency} order=${order.total} ${order.currency}. Not reconciling.`,
         )
         return
     }
@@ -89,42 +124,27 @@ export async function handlePaymentEvent(payload: Payload, event: string, data: 
  * Invoice payloads have no `event` field — detected by presence of `external_id` at root.
  * external_id = our order.id. status = 'PAID' | 'EXPIRED' | 'PENDING'.
  */
-export async function handleInvoiceEvent(payload: Payload, body: Record<string, any>): Promise<void> {
-    const invoiceId: string | undefined = body.id           // inv-...
-    const externalId: string | undefined = body.external_id // our order.id
+export async function handleInvoiceEvent(payload: Payload, body: Record<string, any>, order: WebhookOrder): Promise<void> {
+    const invoiceId: string | undefined = body.id // inv-...
     const status: string = (body.status ?? '').toUpperCase()
-    // amount is RM major unit
-    const webhookAmount: number | undefined = body.amount != null ? Number(body.amount) : undefined
-
-    const order = await findOrderByPayment(payload, externalId, invoiceId)
-    if (!order) {
-        console.warn('[Xendit Webhook] No order for invoice', { externalId, invoiceId, status })
-        return
-    }
 
     if (status === 'EXPIRED') {
-        await (payload.db.drizzle as any).execute(sql`
-            UPDATE orders SET payment_status = 'payment_failed', updated_at = NOW()
-            WHERE id = ${order.id} AND status = 'pending'
-        `)
+        await markFailed(payload, order.id)
         console.log(`[Xendit Webhook] Invoice expired → order ${order.id} marked payment_failed`)
         return
     }
 
     if (status === 'PAID') {
-        if (webhookAmount != null && Math.abs(webhookAmount - order.total) > 0.01) {
+        // paid_amount is what the buyer paid; amount the invoice total (RM major unit)
+        const amount = body.paid_amount ?? body.amount
+        if (!paidAmountMatches(order, amount, body.currency)) {
             console.error(
-                `[Xendit Webhook] Invoice amount mismatch on order ${order.id}: webhook=${webhookAmount} order=${order.total} (RM). Not reconciling.`,
+                `[Xendit Webhook] Invoice amount/currency mismatch on order ${order.id}: webhook=${amount} ${body.currency} order=${order.total} ${order.currency}. Not reconciling.`,
             )
             return
         }
         const channelCode = body.paymentChannel ?? body.payment_channel ?? body.paymentMethod ?? body.payment_method ?? ''
-        console.log(`[Xendit Webhook] Invoice PAID order=${order.id} channel=${channelCode}`, {
-            paymentChannel: body.paymentChannel,
-            payment_channel: body.payment_channel,
-            paymentMethod: body.paymentMethod,
-            payment_method: body.payment_method,
-        })
+        console.log(`[Xendit Webhook] Invoice PAID order=${order.id} channel=${channelCode}`)
         await reconcileOrderPaid(payload, {
             orderId: order.id,
             xenditData: {

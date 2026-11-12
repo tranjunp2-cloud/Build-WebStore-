@@ -30,6 +30,7 @@ import {
     type PixabayPhoto,
 } from './pixabay-client'
 import { withMediaCreateLock } from './media-create-lock'
+import { buildStockAlt, MAX_STOCK_ALT_LENGTH } from './stock-alt'
 
 /** Render-box width per block — drives Pixabay size pick (largeImageURL vs webformatURL). */
 interface SizePreset {
@@ -37,10 +38,9 @@ interface SizePreset {
 }
 
 import { normalizeComposerCategory } from './composer-category-resolver'
-import { CATEGORY_BASE_KEYWORDS } from './image-keywords'
 import { getIndustryImages } from '@/lib/images/industry-images'
 import type { ThemeMood } from './theme-moods'
-import { VN_CATEGORY_QUERIES, type ImagePool } from './image-pool'
+import { categorySearchPhrase, type ImagePool } from './image-pool'
 
 export interface MediaPipelineContext {
     businessName: string
@@ -63,6 +63,11 @@ export interface MediaPipelineContext {
     pool?: ImagePool
     // Plan 260424: LLM-translated English keywords to override hardcoded dictionaries
     englishKeywords?: string[]
+    // GH-1611: user-typed product terms already translated to English (the same
+    // terms the pool gate uses). `englishKeywords` carries RAW user-language
+    // terms, which never occur in English Pixabay tags — gating on them alone
+    // rejects every on-subject photo. Used for the relevance gate only.
+    gateTerms?: string[]
     // Plan 260703 Phase 06 (gen-perf) — pool photo id -> Media id, populated
     // during the GPT window when GEN_POOL_PREUPLOAD=true. batchFetchFromPool
     // consumes this to skip download+upload for photos already persisted.
@@ -136,9 +141,11 @@ function sanitizeAlt(raw: string | null | undefined): string {
  * alt informative. Format: `${description} — Photo by ${photographer}`
  */
 function buildAttributedAlt(photo: PixabayPhoto, fallbackContext: string): string {
-    const desc = sanitizeAlt(photo.alt) || fallbackContext
+    // #2103 A5: raw Pixabay tags repeat words and run long — dedupe, keep 2-3, prefix the subject.
+    const desc = buildStockAlt(sanitizeAlt(photo.alt), fallbackContext)
     const photographer = sanitizeAlt(photo.photographer)
-    return photographer ? `${desc} — Photo by ${photographer}` : desc
+    const attributed = photographer ? `${desc} — Photo by ${photographer}` : desc
+    return attributed.length <= MAX_STOCK_ALT_LENGTH ? attributed : desc
 }
 
 /** Pick up to `n` random photos from an array without replacement. */
@@ -172,13 +179,18 @@ export async function uploadBufferToMedia(
         mimetype: string
         alt: string
         tenantId: string
+        /** defaults to true: this pipeline stores AI-sourced site imagery */
+        aiGenerated?: boolean
     },
 ): Promise<number> {
+    // the owner workspace, so the shop's library (AI copilot) lists it; an id that isn't one is left off
+    const tenant = /^\d+$/.test(String(args.tenantId)) ? Number(args.tenantId) : undefined
     const createArgs = {
         collection: 'media',
         data: {
             alt: args.alt,
-            aiGenerated: true,
+            aiGenerated: args.aiGenerated ?? true,
+            ...(tenant !== undefined ? { tenant } : {}),
         },
         file: {
             data: args.buffer,
@@ -242,7 +254,7 @@ async function fetchAndStorePoolPhoto(
     const { buffer, mimetype } = await downloadPhotoBuffer(photo.url)
     const extension = mimetype.includes('png') ? 'png' : 'jpg'
     const filename = `${blockType}-${photo.id}-${Date.now()}.${extension}`
-    const alt = photo.alt || `${ctx.businessName} ${blockType}`
+    const alt = buildStockAlt(photo.alt, `${ctx.businessName} ${blockType}`)
     const mediaId = await uploadBufferToMedia(payload, {
         buffer,
         filename,
@@ -575,7 +587,11 @@ export async function getMediaForBlock(
     // adjectives — gating on those would both admit off-industry photos (a
     // 1-word adjective like "minimalist" matches a clothing flatlay) and reject
     // on-industry ones, leaving non-hero blocks with no image at all.
-    const subjectTerms = (ctx.englishKeywords ?? []).map((k) => k.trim()).filter(Boolean)
+    // GH-1611: raw terms match VN-tagged results (lang=vi query); translated
+    // gateTerms match English-tagged ones. A photo passes if it matches either.
+    const subjectTerms = [...new Set(
+        [...(ctx.englishKeywords ?? []), ...(ctx.gateTerms ?? [])].map((k) => k.trim()).filter(Boolean),
+    )]
     const categoryMapped = Boolean(PIXABAY_CATEGORY_BY_COMPOSER[composerCategory])
     const gateTerms = (photos: PixabayPhoto[], terms: string[]): PixabayPhoto[] => {
         if (terms.length === 0) {
@@ -591,8 +607,9 @@ export async function getMediaForBlock(
     // English category base keyword — an empty result here means the block
     // keeps whatever URL GPT hallucinated into it (GH-1185 QC retest).
     const categoryFallback = async (): Promise<BatchFetchResult> => {
-        const vnQuery = isVN ? VN_CATEGORY_QUERIES[composerCategory] : undefined
-        const fallbackQuery = vnQuery ?? CATEGORY_BASE_KEYWORDS[composerCategory]?.[0]
+        // GH-1611: bakery merchants get a bakery phrase, not "coffee shop".
+        const vnQuery = isVN ? categorySearchPhrase(composerCategory, subjectTerms, true) : undefined
+        const fallbackQuery = vnQuery ?? categorySearchPhrase(composerCategory, subjectTerms, false)
         // `!== keywords[0]` guard: tier-2 broadens to keywords[0], and on the
         // scaffolding path deriveKeywords puts a random CATEGORY_BASE_KEYWORDS
         // entry there — re-issuing the byte-identical just-failed search

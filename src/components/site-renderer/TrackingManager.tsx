@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { uuid } from '@/lib/uuid'
 
 interface TrackingManagerProps {
     siteId: string
@@ -25,7 +26,7 @@ export function TrackingManager({ siteId, isOwner }: TrackingManagerProps) {
         try {
             sessionId = sessionStorage.getItem('pw-session') || ''
             if (!sessionId) {
-                sessionId = crypto.randomUUID()
+                sessionId = uuid()
                 sessionStorage.setItem('pw-session', sessionId)
             }
         } catch { /* private browsing */ }

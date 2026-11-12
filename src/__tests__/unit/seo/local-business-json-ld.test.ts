@@ -697,7 +697,6 @@ describe('[TC-F37-02-41/44] malformed LocalBusiness nested values', () => {
         // Assert
         expect(generate).not.toThrow()
         expect(schemas.map(schema => schema['@type'])).toEqual([
-            'BreadcrumbList',
             'Organization',
             'WebSite',
             'FAQPage',

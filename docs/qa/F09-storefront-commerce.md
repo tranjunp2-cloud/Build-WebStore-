@@ -1,9 +1,10 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F09 - Storefront Commerce
-> **Phiên bản:** 5.5 | **Cập nhật:** 2026-05-18 (thêm TC-F09.205..222 — GH-1023 Floating Cart Global Injection + Commerce Detection + Scope Tags) | **Thực hiện:** QA Team
+> **Phiên bản:** 5.6 | **Cập nhật:** 2026-11-10 (thêm TC-F09-2378-01..07; trước đó: thêm TC-F09.205..222 — GH-1023 Floating Cart Global Injection + Commerce Detection + Scope Tags) | **Thực hiện:** QA Team
 > **Nguồn Tham chiếu:** PRD (`F09-storefront-commerce.md`)User Stories (14 Core ACs)Figma (Node 30905:1342)
 > **Kỹ năng ứng dụng (.agent):** BDD (Gherkin)Malaysia Market Context (SST/MY Shipping)Mobile Native UXSecurity QR Proof Validation.
 
 ### Changelog
+- **v5.6 (2026-11-10)** — Thêm TC-F09-2378-01..07: mô tả dự phòng (từ `description`) cho quick view, meta description, JSON-LD (GH-2378).
 - **v5.4 (2026-05-15)** — Thêm TC-F09.182..204 (23 TCs) — Checkout design coverage ledger theo F14 pattern. 20 offline source-content design contracts (4 sections layoutcontact/shipping/payment fieldspostcode inputMode + patternMY_STATES 16COD/QR conditional uploadcurrency formatorder summary SST+shipping+total formulasecure indicatorbutton stateserror bannerproof previewempty cart guardsuccess orderResultdebounced shipping calc 300msi18n appliedmobile responsiveshipping hint tierdesign doc reference) + 3 live browser flows (state dropdown countQR upload togglemobile 375px no overflow). 20/20 offline PASS3 live env-gated (BASE_URL=staging).
 - **v5.3 (2026-05-15)** — Thêm TC-F09.158..181 (24 TCs) phủ 4 domain Payment/Shipping/Postcode/Tracking. Payment (8): enum strict cod|qr_bankingcase-sensitivemissing field rejectCOD no-proofQR proof persistencecurrency lock MYRdefault MYR fallbackpending status. Shipping (6): shippingFee persistedmulti-product single flat-rate (BR-03)East rate 15total = subtotal+shipping+tax (BR-04+BR-05)state exact persistcountry default Malaysia. Postcode (4): leading-zero 50000optional empty stringmax-length permissive (Wave 7+ regex gap)state-postcode cross-check NOT enforced (deferred). Tracking (6): persist on PATCH shippedoptional per BR-09special chars accepted500-char max permissivestatus required for tracking-only PATCHGET returns field.
 - **v5.2 (2026-05-15)** — Thêm TC-F09.127..157 (31 TCs) lấp coverage gap cho 4 endpoints orders/list/[id]/bulk-update/metrics (0% → 91-100%). Overall 58.81% → 85.2%.
@@ -81,7 +82,7 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.28** | `AC-1` | `Sec` | **[Positive]** QR Banking — Bắt buộc upload Receipt | 1. Chọn phương thức "QR Banking" tại Checkout. | - Khung upload File xuất hiện.<br>- Nút Place Order bị Disabled cho đến khi upload xong. | Blocker | [ ] |
 | **TC-F09.29** | `AC-1` | `Sec` | **[Negative]** Chặn file rác khi upload Receipt | 1. Upload file `.exe` hoặc ảnh > 2MB. | - Báo lỗi "File size exceeded" hoặc "Invalid format".<br>- Field upload được reset. | High | [ ] |
 | **TC-F09.30** | `AC-2` | `API` | **[Positive]** Place Order thành công | 1. Điền đầy đủ thông tin hợp lệ.<br>2. Nhấn Place Order. | - Redirect sang `/order/:id/confirm`.<br>- DB Order Status = `pending`.<br>- Giỏ hàng bị xóa. | Blocker | [x] |
-| **TC-F09.31** | `AC-2` | `Logic` | **[Positive]** Format mã đơn hàng (ORD-XXXXXXXX) | 1. Hoàn tất đặt hàngxem mã đơn. | - Mã khớp format `ORD-` + 8 ký tự/số ngẫu nhiên độc nhất. | High | [ ] |
+| **TC-F09.31** | `AC-2` | `Logic` | **[Positive]** Format mã đơn hàng (ORD-<ts36>-<16 hex>) | 1. Hoàn tất đặt hàngxem mã đơn. | - Mã khớp `ORD-<timestamp base36>-<16 ký tự hex HOA>` (64 bit ngẫu nhiên, GH-2081; unit: TC-F10.tracking.08). | High | [ ] |
 | **TC-F09.32** | `AC-3` | `Sec` | **[Positive]** Khách không cần đăng nhập (Guest Checkout) | 1. Dùng Browser ẩn danh (chưa đăng nhập).<br>2. Thực hiện Checkout. | - Vào được trang Checkout và đặt hàng bình thường.<br>- Không bị redirect sang Login. | Blocker | [x] |
 | **TC-F09.33** | `AC-3` | `Bus` | **[Positive]** Tính thuế SST 6% đúng | 1. Kiểm tra phần Order Summary tại Checkout. | - SST 6% tính trên Subtotal (vd: Sub RM 100 → SST RM 6.00). | Critical | [x] |
 | **TC-F09.34** | `Market` | `Bus` | **[Positive]** Phí Ship khác nhau West/East Malaysia | 1. Chọn Bang Selangor (West).<br>2. Đổi sang Sabah (East). | - Selangor: RM 8.00; Sabah: RM 15.00.<br>- Phí ship cập nhật ngay khi đổi Bang. | Critical | [x] |
@@ -102,7 +103,7 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **TC-F09.38** | `AC-1` | `UX` | **[Positive]** Nút Add-to-Cart Sticky ở đáy PDP | 1. Cuộn trang PDP xuống dưới trên Mobile. | - Nút Add to Cart dính ở đáy màn hình.<br>- Dễ nhấn bằng ngón cái. | High | [ ] |
+| **TC-F09.38** | `AC-1` | `UX` | **[Positive]** Nút Add-to-Cart Sticky ở đáy PDP | 1. Cuộn trang PDP xuống dưới trên Mobile. | - Nút Add to Cart dính ở đáy màn hình.<br>- Dễ nhấn bằng ngón cái. | High | [x] |
 | **TC-F09.39** | `AC-2` | `UI` | **[Positive]** Filter/Sort dạng Bottom Sheet | 1. Tap Filter trên Mobile. | - Panel trượt từ dưới lên (Bottom Sheet).<br>- Vuốt xuống để đóng. | High | [ ] |
 | **TC-F09.40** | `AC-3` | `UI` | **[Positive]** Cart Drawer Full-Screen trên Mobile | 1. Mở giỏ hàng trên Mobile. | - Drawer chiếm 100% width màn hình.<br>- Nút [CHECKOUT] toSticky ở đáy. | High | [ ] |
 | **TC-F09.41** | `Design` | `UI` | **[Positive]** Safe Area Inset cho iOS | 1. Kiểm tra trên iPhone 14 Pro Max. | - Nút Sticky không bị che bởi Home indicator iOS.<br>- Padding-bottom đúng chuẩn. | Medium | [ ] |
@@ -358,7 +359,7 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | 3 | Thấy gợi ý Cross-sellAdd luôn. | Item thêm vào mà không đóng Drawer (TC-F09.20). |
 | 4 | Vào Checkout (Browser ẩn danh). | Không bị redirect Loginform đầy đủ 3 section (TC-F09.2232). |
 | 5 | Chọn SelangorQR Bankingupload Receipt 1.5MB. | Phí ship RM 8.00SST 6% tính đúngPlace Order kích hoạt (TC-F09.283334). |
-| 6 | Nhấn Place Ordersang Confirm page. | Mã ORD-XXXXXXXX hợp lệOrder Status = `pending` (TC-F09.3031). |
+| 6 | Nhấn Place Ordersang Confirm page. | Mã ORD-<ts36>-<16 hex> hợp lệOrder Status = `pending` (TC-F09.3031). |
 
 ---
 
@@ -580,6 +581,35 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.260** | Browser | High | Mobile 375px không horizontal overflow | Product grid và filter drawer giữ `scrollWidth <= clientWidth` | GH-1665 Phase03 | [x] |
 | **TC-F09.261** | Unit | Critical | Rapid filter chỉ settle request mới nhất | Request A bị abort không clear reposition pending của request B | GH-1665 Phase02 | [x] |
 
+### TC-F09.262–264: Trang checkout luôn truy cập được, đặt hàng vẫn được bảo vệ
+
+> **File test nguồn:** `src/__tests__/unit/storefront/checkout-access.test.tsx`
+>
+> Trang `/sites/<slug>/checkout` không còn bị thay bằng màn hình "giỏ trống" hay "checkout không khả dụng". Việc đặt hàng vẫn bị chặn ở nút Place order (`canPlaceOrder`) và ở server (`PAYMENT_METHOD_DISABLED`, `items.min(1)`).
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.262** | Unit | High | Giỏ trống vẫn hiện form checkout | Có `Order Summary` và form; không có màn hình "giỏ trống"; nút Place order disabled | PR #1997 | [x] |
+| **TC-F09.263** | Unit | High | Tenant không có phương thức thanh toán: hiện thông báo trong trang, nút Place order vẫn disabled khi form đủ | Có `role="alert"` "Checkout unavailable"; form vẫn hiển thị; nút disabled | PR #1997 | [x] |
+| **TC-F09.264** | Unit | Medium | Control: tenant có phương thức thanh toán, form đủ | Không có thông báo; nút Place order enabled | PR #1997 | [x] |
+
+### TC-F09.265–272: Storefront không lộ secret / số tài khoản / email tác giả (GH-2077)
+
+> **File test nguồn:** `src/__tests__/unit/storefront/public-site-dto.test.ts`, `src/__tests__/api/storefront-site-by-slug.test.ts`
+>
+> Mọi trang storefront đưa site/page/pages qua `toPublicSite` / `toPublicDoc` (`src/lib/storefront/public-site-dto.ts`) trước khi render: site chỉ giữ field allow-list, mọi `tenant` đã populate thu về id.
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.265** | Unit | Critical | `toPublicSite` chỉ giữ field render | Không còn tenant secret, paymentConfig, shippingConfig, brief AI, trackedKeywords; tenant = id | GH-2077 | [x] |
+| **TC-F09.266** | Unit | Critical | `toPublicDoc` thu `tenant` đã populate ở mọi độ sâu | `page.tenant`, `media.tenant` → id | GH-2077 | [x] |
+| **TC-F09.267** | Unit | Critical | `page.site` đã populate → site public | Không còn secret trong JSON | GH-2077 | [x] |
+| **TC-F09.268** | Unit | Medium | Giá trị thường / tenant id giữ nguyên | Bản sao, bằng giá trị | GH-2077 | [x] |
+| **TC-F09.269** | Unit | Critical | `/api/storefront/site-by-slug` không trả số tài khoản | Không có `bankAccountNo` / `bankAccountHolder` | GH-2077 | [x] |
+| **TC-F09.270** | Unit | High | `toPublicDoc` thu `tenants[]` (danh sách thành viên của user) về id | `{ tenant: {...} }` và tenant doc trong mảng → id | GH-2077 review | [x] |
+| **TC-F09.271** | Unit | Medium | Site không có `seo` / tenant chưa populate | Không thêm `seo`, tenant id giữ nguyên | GH-2077 review | [x] |
+| **TC-F09.272** | Unit | Critical | Tên tác giả blog công khai không bao giờ là email | Có tên → "Họ Tên"; không có tên → không hiện byline (không fallback email) | GH-2077 review | [x] |
+
 ### TC-F09.64: Product component variant guard
 
 | ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
@@ -590,3 +620,89 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.64d** | Unit | High | Switching variants updates button state reactively | Click Red → Blue updates title & passes variantName | GH-1084 Phase01 | [x] |
 | **TC-F09.64e** | Unit | Medium | Out-of-stock variant button disabled | stock=0 → disabledclick ignored | GH-1084 Phase01 | [x] |
 | **TC-F09.64f** | Unit | Medium | Empty/undefined variants handled gracefully | hasVariants=true + variants=[] → no selector | GH-1084 Phase01 | [x] |
+
+### TC-F09.265–273: Variant product price display + labels (GH-2082)
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.265** | Unit | High | `variantPriceRange` trả giá thấp nhất/cao nhất của biến thể | `{min,max}`; null khi không có biến thể có giá | GH-2082 | [x] |
+| **TC-F09.266** | Unit | Critical | Giá gốc 0 + biến thể giá khác nhau, chưa chọn biến thể | Hiện "From RM 59.00", không hiện RM 0.00 | GH-2082 | [x] |
+| **TC-F09.267** | Unit | Medium | Mọi biến thể cùng giá | Hiện đúng giá đó, không có chữ "From" | GH-2082 | [x] |
+| **TC-F09.268** | Unit | High | Chọn biến thể (EN) | Hiện giá biến thể, nhãn "Variant", "3 left"; không còn "Phân loại"/"Còn" | GH-2082 | [x] |
+| **TC-F09.269** | Unit | Medium | Locale BM | Nhãn "Varian", "Tinggal 10" | GH-2082 | [x] |
+| **TC-F09.270** | Unit | High | `listingPrice` cho thẻ sản phẩm (grid / featured / quick view) | Biến thể: giá thấp nhất, isFrom khi giá khác nhau, bỏ compare-at gốc; SP thường giữ nguyên | GH-2082 | [x] |
+| **TC-F09.271** | Unit | High | Thẻ grid của SP biến thể giá gốc 0 | Hiện "From RM 59.00", không hiện RM 0.00 | GH-2082 | [x] |
+| **TC-F09.272** | Unit | High | JSON-LD `offers` của SP biến thể (`buildProductOffers`) | `AggregateOffer` với `lowPrice`/`highPrice` theo biến thể; `offerCount` chỉ đếm biến thể có giá; còn hàng khi có biến thể stock > 0 | GH-2082 | [x] |
+| **TC-F09.273** | Unit | Medium | JSON-LD `offers` của SP thường / SP biến thể không có giá | `Offer` với giá gốc, tình trạng theo `inventory` | GH-2082 | [x] |
+| **TC-F09.274** | Unit | High | `POST /api/orders/checkout` với tenant `status='suspended'`, `paymentMethod=cod` | 403 `STORE_UNAVAILABLE`, không tạo order, không trừ kho (parity TC-F13.88) | GH-2179 | [x] |
+| **TC-F09.275** | Unit | High | `POST /api/orders/checkout` với tenant `status='suspended'`, `paymentMethod=bank_transfer` | 403 `STORE_UNAVAILABLE`, không tạo order | GH-2179 | [x] |
+| **TC-F09.276** | Unit | Medium | `POST /api/orders/checkout` với tenant `suspended` đồng thời COD/QR tắt | 403 `STORE_UNAVAILABLE` (không phải 422 `PAYMENT_METHOD_DISABLED`): guard suspended chạy trước kiểm payment method | GH-2179 review | [x] |
+| **TC-F09.277** | Unit | Critical | `isStoreUnavailable`: store bị ban hoặc gói main hết hạn | `suspended`, sub hết hạn / `ended` / huỷ ngay → unavailable; sub còn hạn hoặc không có sub → available | GH-2179 #6 | [x] |
+| **TC-F09.278** | Unit | High | Trang 503 "tạm ngưng": ngôn ngữ + nội dung | `ms`/`ms-MY`/`ms_MY` → BM, còn lại → EN; copy đúng BA; `noindex`; header `Retry-After`, `no-store`, `X-Robots-Tag`; không có tên store | GH-2179 #6 | [x] |
+| **TC-F09.279** | Unit | High | `/api/slug/redirect` + `/api/domain-primary` báo store unavailable | Trả `unavailable:true` + `locale` (ưu tiên hơn maintenance); store available giữ nguyên shape cũ | GH-2179 #6 | [x] |
+| **TC-F09.280** | Unit | Critical | Middleware subdomain + custom domain | 503 + noindex, thay cho maintenance và redirect primary domain; lookup lỗi → fail-open | GH-2179 #6 | [x] |
+| **TC-F09.281** | Unit | High | Page `[[...path]]`, product, blog khi store unavailable | Render `MaintenancePage` biến thể unavailable (cả với owner); metadata `noindex`, title là copy chung, không lộ tên store/sản phẩm | GH-2179 #6 | [x] |
+| **TC-F09.282** | Unit | High | `sitemap.xml`, `robots.txt`, `llms.txt` khi store unavailable | 503 `noindex`, không đọc nội dung | GH-2179 #6 | [x] |
+| **TC-F09.283** | Unit | High | API public khi store unavailable | products/bounds/categories/blogs/cart trả rỗng như store không tồn tại; `site-by-slug` 404; `discounts/apply` `{ok:false}`; `subscribe`, `contact-submit` 400 `Invalid site`, không lưu gì. API danh sách lấy trạng thái từ cache tenant nên ban/unban có hiệu lực ngay | GH-2179 #6 | [x] |
+| **TC-F09.284** | Unit | Critical | Checkout COD/QR, Stripe, Xendit, retry-payment, calculate-shipping khi store unavailable (bị ban hoặc gói main hết hạn) | 403 `STORE_UNAVAILABLE`, không tạo order/invoice/session, không báo giá ship | GH-2179 #6 | [x] |
+| **TC-F09.285** | Unit | High | Ghi qua SSO có hiệu lực ngay trên storefront | Hook `plan-subscriptions` bust `plan-subscription:<tenant>` (tenant mới và cũ); renew/upgrade/downgrade bust lại sau khi ghi; renew sửa gói main mới nhất; ban/unban bust cache tenant sau khi ghi | GH-2179 #6 | [x] |
+| **TC-F09.286** | Manual | Critical | Dev sau rollout | Store bị ban (vd 1327) → 503; store hết hạn → 503; 2917 → 200; gia hạn qua SSO → mở lại ngay; unban → web và danh sách sản phẩm hiện lại ngay | GH-2179 #6 | [ ] |
+| **TC-F09.287** | E2E | Low | Checkout 320px (iPhone SE 1) có giỏ hàng | `innerWidth`=320 (không bị zoom-out), `scrollWidth` ≤ `innerWidth`, `.ck-form` ≤ 320px, ô Promo + nút Apply cao ≥ 44px; 375px vẫn không overflow | GH-2286 | [ ] |
+| **TC-F09.288** | Unit | Medium | `generateBreadcrumbSchema`: slug `/`, `home`, rỗng → chỉ item Home, không có `%2F`; slug lồng `a/b` → `/a/b` | Không còn item JSON-LD `…/%2F` trên trang chủ | GH-2100 | [x] |
+| **TC-F09.289** | Unit | Medium | `generatePageSchemas` trang chủ không có BreadcrumbList; trang con vẫn có | Trang chủ chỉ còn Organization/WebSite | GH-2100 | [x] |
+| **TC-F09.290** | Unit | High | `cartStore.addItem(item, qty)` cộng đúng qty, clamp theo inventory, qty không hợp lệ → 1, mặc định vẫn +1 | Hành vi cũ giữ nguyên | GH-2100 | [x] |
+| **TC-F09.291** | Unit | Medium | Storefront live mobile, nav `transparent`/`floating` (overlay): block nội dung đầu tiên (hero) | Wrapper có `data-mobile-nav-offset`; CSS (<768px) đẩy `padding-top` ≥ `--nav-height` (+1rem cho floating) nên tiêu đề không bị header che; desktop giữ overlay; không áp khi nav in-flow, khi user đặt `blockSpacing.paddingTop`, hoặc trong editor (đã có offset) | GH-2167 | [x] |
+| **TC-F09.292** | Unit | Medium | Hero `slideshow` ở mobile, nội dung (h1 + mô tả + CTA) cao hơn khung `aspect-ratio` | Nội dung nằm trong wrapper `my-auto` (không dùng `justify-center` trên container `overflow-y-auto`) nên phần tràn cuộn từ trên, tiêu đề không bị cắt ở mép trên khung | GH-2167 | [x] |
+| **TC-F09.293** | Unit | High | `ProductAddToCartSection` có ô số lượng: [1, tồn kho], reset về 1 khi đổi biến thể, disabled khi hết hàng, truyền qty cho nút thêm giỏ | Add to cart thêm đúng số lượng đã chọn | GH-2100 | [x] |
+| **TC-F09.294** | E2E | High | GET PDP sản phẩm không active/không tồn tại → HTTP 404 (vẫn hiện trang Not Found); SP active → 200 | Không còn soft 404 (đã xoá `loading.tsx` của PDP) | GH-2100 | [ ] |
+| **TC-F09.295** | Unit | Medium | Mobile drawer: form Track order hiển thị inline (variant `inline` của `NavOrderSearch`) khi tenant có cart widget (QC D5-02) | Có input mã đơn + nút gửi, không cần popup | GH-2275 | [x] |
+| **TC-F09.296** | Unit | Medium | Nhập mã đơn trong drawer mobile rồi gửi (kể cả ký tự đặc biệt, path `/sites/<slug>`) | `router.push('/orders/<mã encode>')` (hoặc `/sites/<slug>/orders/<mã>`), drawer đóng | GH-2275 | [x] |
+| **TC-F09.297** | Unit | Medium | Gửi form với mã rỗng trong drawer mobile | Hiện lỗi `orderLookup.required`, không điều hướng, drawer giữ nguyên | GH-2275 | [x] |
+| **TC-F09.298** | E2E | Medium | 375×812, store có cart widget: mở ☰ ở các variant nav dùng drawer chung (default/transparent/centered/mega) và floating | Thấy form Track order, tra cứu đúng như desktop; store không có cart widget thì không hiện. Menu dài (~20 link/submenu): panel cuộn được trong viewport, cuộn tới form và gửi được. Spec: `tests/f09-mobile-track-order.spec.ts` (chưa chạy với staging) | GH-2275 | [ ] |
+| **TC-F09.299** | Unit | High | Checkout: SĐT không phải di động MY (vd `123456789`) hoặc để trống | Nút PLACE ORDER bị khóa (kể cả khi chưa blur); SĐT hợp lệ (`012-345 6789`) → nút bật | GH-2208 | [x] |
+| **TC-F09.300** | Unit | High | `POST /api/orders/checkout` (COD/QR) với SĐT sai định dạng MY | 400 `VALIDATION_ERROR`, không tạo order; schema dùng chung `MY_PHONE_REGEX` với `validatePhone` | GH-2208 | [x] |
+| **TC-F09.301** | Unit | High | `stripeCheckoutSchema` / `xenditCheckoutSchema` với SĐT sai hoặc thiếu | Bị từ chối (SĐT bắt buộc + đúng định dạng MY như COD) | GH-2208 | [x] |
+
+### TC-F09-2207-01..06: Trang sản phẩm hiện Description nhập từ CMS (GH-2207)
+
+> **File test nguồn:** `src/__tests__/unit/storefront/product-dp-description.test.tsx`
+>
+> Form Add/Edit product chỉ lưu `description` (rich text). Trang sản phẩm render `description` qua `renderBlogContent` (Lexical → HTML, có DOMPurify); `description` rỗng → dùng `shortDescription`. Không đổi meta/JSON-LD, không đọc `descriptionBM`.
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09-2207-01** | Unit | Critical | SP chỉ có `description` nhập từ form (không có short description) | Hiện mục Description, mỗi đoạn là 1 `<p>` | GH-2207 | [x] |
+| **TC-F09-2207-02** | Unit | High | `description` là HTML PW1 nằm trong 1 text node | Render thành HTML (`<strong>`, `<li>`), không hiện thẻ thô | GH-2207 | [x] |
+| **TC-F09-2207-03** | Unit | Medium | `description` là chuỗi thường (SP mẫu AI) + có short description | Hiện `description`, không hiện short description | GH-2207 | [x] |
+| **TC-F09-2207-04** | Unit | High | `description` thiếu / chỉ có đoạn rỗng | Dùng `shortDescription`; rich text hỏng (render ném lỗi) → dùng `shortDescription`, không 500; chỉ có ảnh → vẫn hiện `description`; cả hai rỗng → ẩn mục Description | GH-2207 | [x] |
+| **TC-F09-2207-05** | Unit | Critical | `description` chứa `<script>` / `onerror` | Bị loại bỏ, chỉ còn nội dung an toàn | GH-2207 | [x] |
+| **TC-F09-2207-06** | Unit | Medium | `description` là chuỗi thường nhiều dòng (SP mẫu AI) | Giữ xuống dòng / dòng trống khi hiển thị (`whitespace-pre-line`), bỏ dòng trống đầu/cuối; mô tả HTML không áp `whitespace-pre-line` | GH-2207 | [x] |
+
+### TC-F09-2378-01..09: Mô tả dự phòng cho quick view, meta, JSON-LD (GH-2378)
+
+> **File test nguồn:** `src/__tests__/unit/products/product-summary-text.test.ts`, `src/__tests__/unit/storefront/product-dp-seo-description.test.tsx`, `src/__tests__/api/storefront-products.test.ts`, `src/__tests__/unit/collections/hook-reads-join-transaction.test.ts`, `tests/product-grid-qa-rework.spec.ts`
+>
+> SP tạo bằng form chỉ có `description`. Quick view, meta description, og/twitter và JSON-LD dùng `shortDescription`, thiếu thì lấy text thuần từ `description` (cắt ≤160 ký tự ở ranh giới từ, quick view ≤300). `seo.description` do merchant nhập vẫn ưu tiên cho meta.
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|---|---|---|---|---|---|---|
+| **TC-F09-2378-01** | Unit | High | `description` Lexical nhiều đoạn | Text thuần, mỗi đoạn cách nhau 1 khoảng trắng | GH-2378 | [x] |
+| **TC-F09-2378-02** | Unit | Critical | `description` là HTML PW1 trong text node, có `<script>` / `onerror` / `&amp;` | Không còn thẻ, không còn nội dung script, entity được decode; CSS trong `<style>` bị bỏ, ô bảng cách nhau, `>` trong thuộc tính không lọt chữ; chuỗi thường và dữ liệu hỏng → '' | GH-2378 | [x] |
+| **TC-F09-2378-03** | Unit | High | Mô tả dài; có `shortDescription`; cả hai rỗng | Cắt ở ranh giới từ + `…`, độ dài ≤ max, không cắt đôi emoji; `shortDescription` trả nguyên (không cắt); rỗng → '' | GH-2378 | [x] |
+| **TC-F09-2378-04** | Unit | Critical | Trang SP chỉ có `description` | meta, og, twitter và JSON-LD description = text từ `description`; không có gì → meta dùng câu "Buy … from …", JSON-LD '' | GH-2378 | [x] |
+| **TC-F09-2378-05** | Unit | High | Có `shortDescription` / có `seo.description` | `shortDescription` được dùng như cũ; `seo.description` thắng cho meta | GH-2378 | [x] |
+| **TC-F09-2378-06** | API | High | `GET /api/storefront/products?summary=1` với SP chỉ có `description` | Field `summary` có text (không có `summary=1` → không trả field, tránh render mô tả cho grid); có `shortDescription` thì `summary` = `shortDescription`. Quick view đọc `summary` (browser regression TC-09 kiểm tra map/modal) | GH-2378 | [x] |
+| **TC-F09-2378-07** | Unit | High | Hook afterChange Products khi `shortDescription` rỗng | `queueSEOAutoGeneration` nhận text từ `description` làm ngữ cảnh | GH-2378 | [x] |
+| **TC-F09-2378-08** | Unit | High | Helper summary lỗi khi lưu SP active | Vẫn queue bằng shortDescription, không chặn save; cảnh báo chỉ có nhãn và product ID, không log nội dung/lỗi nhạy cảm | GH-2378 | [x] AUTO |
+| **TC-F09-2378-09** | E2E | High | Quick View fetch/map/modal trong browser | Request có summary=1; mở modal thấy summary khi thiếu shortDescription; mô tả ngắn vẫn ưu tiên | GH-2378 | [x] AUTO |
+
+### TC-F09-2477-01..05: Bank transfer chỉ phụ thuộc cờ tenant `payment_qr` (GH-2477)
+
+| TC-ID | Loại | Ưu tiên | Kịch bản | Kỳ vọng | Issue | Trạng thái |
+|-------|------|---------|----------|---------|-------|------------|
+| **TC-F09-2477-01** | API | Critical | `site-by-slug`: tenant `payment_qr=true` + site `enableQrBanking=false` (store chuyển từ PW1) | `enableQrBanking:true`, `hasPaymentMethods:true`, không lộ số tài khoản | GH-2477 | [x] AUTO |
+| **TC-F09-2477-02** | API | High | `site-by-slug`: tenant `payment_qr=false` + site `true`/undefined | `enableQrBanking:false`, `hasPaymentMethods:false` | GH-2477 | [x] AUTO |
+| **TC-F09-2477-03** | API | Critical | `POST /api/orders/checkout` `bank_transfer`, tenant `payment_qr=true`, site `enableQrBanking=false` | Tạo đơn thành công (200), không 422 | GH-2477 | [x] AUTO |
+| **TC-F09-2477-04** | API | High | `bank_transfer` khi tenant `payment_qr=false` | 422 `PAYMENT_METHOD_DISABLED`, không tạo đơn | GH-2477 | [x] AUTO |
+| **TC-F09-2477-05** | API | High | COD khi site `enableCod=false` (tenant `payment_cod=true`) | Vẫn 422 `PAYMENT_METHOD_DISABLED` (COD không đổi) | GH-2477 | [x] AUTO |
+| **TC-F09-2477-06** | E2E | Critical | Trang checkout SSR thật: site `enableQrBanking=false` + tenant `payment_qr=true`; sau đó tắt tenant rồi reload. Spec: `tests/gh-2477-bank-transfer-checkout.spec.ts` (chưa chạy với staging) | Bật: hiện và chọn được Bank transfer / DuitNow QR; tắt + reload: không còn lựa chọn | GH-2477 | [ ] |

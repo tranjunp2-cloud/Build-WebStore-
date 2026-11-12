@@ -12,7 +12,7 @@ const mockI18nValue = {
                 updatePassword: 'Update Password',
                 changing: 'Changing...',
                 changed: 'Password changed successfully',
-                ruleMinLength: 'At least 8 characters',
+                ruleMinLength: 'At least 6 characters',
                 ruleUppercase: 'One uppercase letter',
                 ruleNumber: 'One number',
             },
@@ -121,6 +121,25 @@ describe('PasswordChangeForm', () => {
         return waitFor(() => {
             expect(submitBtn).not.toBeDisabled()
         })
+    })
+
+    // TC-F23-04-14: 6-character new password meets the length rule; 5 does not (GH-2269)
+    it('enables Update Password at 6 characters and keeps it disabled at 5', async () => {
+        // Arrange
+        const { container } = render(<PasswordChangeForm onDone={mockOnDone} onCancel={mockOnCancel} />)
+        const submitBtn = screen.getByRole('button', { name: 'Update Password' })
+
+        // Act — 5 characters
+        fillAll(container, { current: 'oldpass1', next: 'Newp1', confirm: 'Newp1' })
+
+        // Assert
+        await waitFor(() => expect(submitBtn).toBeDisabled())
+
+        // Act — 6 characters
+        fillAll(container, { next: 'Newpa1', confirm: 'Newpa1' })
+
+        // Assert
+        await waitFor(() => expect(submitBtn).not.toBeDisabled())
     })
 
     // TC-F23-04-29: Cancel resets the form and notifies the parent to collapse

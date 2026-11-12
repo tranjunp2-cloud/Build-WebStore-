@@ -1,11 +1,13 @@
 /**
  * Shared utilities for Studio admin API routes.
- * Provides super-admin auth wrapper and common Zod schemas.
+ * Provides the Studio auth wrappers and common Zod schemas.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
+import { authUnavailableResponse, getCurrentUser, isAuthUnavailableError } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { z } from 'zod'
+import { canViewStudio, isSuperAdmin } from './studio-roles'
+import { hasStudioPermission, type StudioPermission } from './studio-permissions'
 
 export type AdminHandler = (
     req: NextRequest,
@@ -16,13 +18,32 @@ type AdminRouteContext = {
     params?: Record<string, string> | Promise<Record<string, string>>
 }
 
-/**
- * Wraps an API route handler with super-admin auth enforcement.
- * Returns 401 if unauthenticated, 403 if wrong role.
- */
-export function withSuperAdmin(handler: AdminHandler) {
+export type WithSuperAdminOptions = {
+    /**
+     * Let the read-only studio-viewer call this route's GET / HEAD (default true). Set false for reads
+     * a viewer must not see (AI provider keys, routing, spend caps). Writes are always super-admin only.
+     */
+    viewerCanRead?: boolean
+}
+
+const READ_METHODS = new Set(['GET', 'HEAD'])
+
+/** For AI settings routes: provider keys, model routing and spend caps are super-admin reads too. */
+export const AI_SETTINGS_SUPER_ADMIN_ONLY: WithSuperAdminOptions = { viewerCanRead: false }
+
+type RoleCheck = (roles: string[] | undefined, method: string) => boolean
+
+/** Returns 401 if unauthenticated, 403 if the check refuses, 503 if the session could not be checked. */
+function guardStudioRoute(isAllowed: RoleCheck, handler: AdminHandler) {
     return async (req: NextRequest, ctx?: AdminRouteContext) => {
-        const rawUser = await getCurrentUser()
+        let rawUser: Awaited<ReturnType<typeof getCurrentUser>>
+        try {
+            rawUser = await getCurrentUser()
+        } catch (error) {
+            // The session could not be checked (DB incident): 503 busy, not 401 (TC-PERF-011).
+            if (isAuthUnavailableError(error)) return authUnavailableResponse()
+            throw error
+        }
 
         if (!rawUser) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -30,13 +51,33 @@ export function withSuperAdmin(handler: AdminHandler) {
 
         const user = rawUser as unknown as PlatformUser
 
-        if (!user.roles?.includes('super-admin')) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-        }
+        if (!isAllowed(user.roles, req.method)) return studioForbidden()
 
         const params = ctx?.params ? await ctx.params : undefined
         return handler(req, { user, params })
     }
+}
+
+export function studioForbidden() {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+}
+
+/** Studio route: super-admin for everything, any team seat for reads. */
+export function withSuperAdmin(handler: AdminHandler, { viewerCanRead = true }: WithSuperAdminOptions = {}) {
+    return guardStudioRoute(
+        (roles, method) => isSuperAdmin(roles) || (viewerCanRead && READ_METHODS.has(method) && canViewStudio(roles)),
+        handler,
+    )
+}
+
+/** Studio route that needs one permission from the team seat table. */
+export function withStudioPermission(permission: StudioPermission, handler: AdminHandler) {
+    return guardStudioRoute((roles) => hasStudioPermission(roles, permission), handler)
+}
+
+/** Studio route whose permission depends on the request body or the record: the handler MUST check it. */
+export function withStudioSeat(handler: AdminHandler) {
+    return guardStudioRoute((roles) => canViewStudio(roles), handler)
 }
 
 // ── Common Zod schemas ──────────────────────────────────────────────────────
@@ -73,7 +114,7 @@ export const CreateTemplateSchema = z.object({
 export const UpdateTemplateSchema = CreateTemplateSchema.partial()
 
 export const BulkActionSchema = z.object({
-    ids: z.array(z.union([z.string(), z.number()])).min(1),
+    ids: z.array(z.union([z.string(), z.number()])).min(1).max(200),
     action: z.enum(['publish', 'archive', 'schedule', 'delete', 're-score']),
     /** ISO string — only required when action=schedule */
     scheduledFor: z.string().datetime().optional(),

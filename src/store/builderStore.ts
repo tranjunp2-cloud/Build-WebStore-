@@ -7,6 +7,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { StateStorage } from 'zustand/middleware'
 import type { ThemeConfig } from '@/blocks/types'
+import type { BuyingMethod } from '@/lib/validations/ai'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,10 @@ export type BusinessInfo = {
     businessUrl?: string
     source?: 'form' | 'url'
     slug?: string
+    // #2103 A1: optional facts the merchant states themselves — the AI may only claim what is here
+    buyingMethods?: BuyingMethod[]
+    serviceArea?: string
+    shopFacts?: string
 }
 
 type BuilderState = {

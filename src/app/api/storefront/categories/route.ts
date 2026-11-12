@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { isCachedSiteUnavailable } from '@/lib/storefront/cached-store-availability'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -37,6 +38,8 @@ export async function GET(req: Request) {
         }
 
         const payload = await getPayload({ config })
+        // #2179: banned or expired store answers like an unknown one (no reason given)
+        if (await isCachedSiteUnavailable(siteIdNum)) return NextResponse.json({ docs: [] })
 
         const where: Where = {
             and: [

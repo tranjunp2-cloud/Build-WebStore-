@@ -8,6 +8,7 @@ import {
     generateLocalBusinessSchema,
     generateWebPageSchema,
     generatePageSchemas,
+    generateBreadcrumbSchema,
 } from '@/lib/seo/json-ld'
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -205,5 +206,35 @@ describe('[TC-F03.G3-09] generatePageSchemas — LocalBusiness enriched', () => 
             addressCountry: 'MY',
         })
         expect(lb.sameAs).toBeDefined()
+    })
+})
+
+// ── GH-2100: breadcrumb trang chủ / slug lồng nhau ─────────────────────────
+
+describe('[TC-F09.288] generateBreadcrumbSchema — homepage slug & nested slug', () => {
+    const items = (page: Record<string, unknown>) =>
+        ((generateBreadcrumbSchema(null, page, 'https://shop.example') as { itemListElement: { item: string }[] }).itemListElement)
+
+    it.each(['/', 'home', ''])('slug %j → only Home item, no %%2F', slug => {
+        const list = items({ slug, name: 'Home' })
+        expect(list).toHaveLength(1)
+        expect(JSON.stringify(list)).not.toContain('%2F')
+    })
+
+    it('nested slug keeps "/" separators', () => {
+        expect(items({ slug: 'a/b', name: 'B' })[1].item).toBe('https://shop.example/a/b')
+    })
+
+    it('regular slug is unchanged', () => {
+        expect(items({ slug: 'about', name: 'About' })[1].item).toBe('https://shop.example/about')
+    })
+})
+
+describe('[TC-F09.289] generatePageSchemas — no BreadcrumbList on homepage', () => {
+    it('homepage omits BreadcrumbList, subpage keeps it', () => {
+        const home = generatePageSchemas({ blocks: [], site: baseSite, page: { slug: '/', name: 'Home' }, isHomepage: true })
+        expect(home.map(s => s['@type'])).not.toContain('BreadcrumbList')
+        const sub = generatePageSchemas({ blocks: [], site: baseSite, page: { slug: 'about', name: 'About' }, isHomepage: false })
+        expect(sub.map(s => s['@type'])).toContain('BreadcrumbList')
     })
 })

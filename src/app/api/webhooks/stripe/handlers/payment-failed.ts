@@ -4,6 +4,8 @@ import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 import { signOrderToken } from '@/lib/auth/order-token'
 import { paymentRetryEmail } from '@/lib/email/templates/payment-retry'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
+import { orderActionUrl } from '@/lib/notifications/order-action-url'
 
 /** Minimal shape of an order document used in payment-failed handler (depth:0 lookup). */
 interface OrderDoc {
@@ -91,19 +93,18 @@ export async function handlePaymentFailed(
 
     console.log(`[Stripe Webhook] Order ${order.id} marked as payment_failed`)
 
-    // Fire-and-forget: notify merchant of failed payment
-    import('@/lib/notifications/notify-tenant-owners')
-        .then(({ notifyTenantOwners }) => {
-            const tId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
-            return notifyTenantOwners(payload, tId, {
-                type: 'SYSTEM_ALERT',
-                title: `Payment Failed - Order #${order.orderNumber}`,
-                message: `Payment for order #${order.orderNumber} has failed. Customer may retry.`,
-                actionUrl: '/orders',
-                metadata: { orderNumber: order.orderNumber },
-            })
+    // Notify merchant of failed payment after the response is sent
+    const tId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
+    runAfterResponse('Notification PAYMENT_FAILED', async () => {
+        const { notifyTenantOwners } = await import('@/lib/notifications/notify-tenant-owners')
+        await notifyTenantOwners(payload, tId, {
+            type: 'SYSTEM_ALERT',
+            title: `Payment Failed - Order #${order.orderNumber}`,
+            message: `Payment for order #${order.orderNumber} has failed. Customer may retry.`,
+            actionUrl: orderActionUrl(order.id),
+            metadata: { orderNumber: order.orderNumber },
         })
-        .catch((err) => console.error('[Notification] PAYMENT_FAILED hook failed', err))
+    })
 
     // Fire-and-forget: send re-payment email to buyer with magic-link to retry
     sendPaymentRetryEmail(payload, order.id, order.orderNumber).catch((err) =>

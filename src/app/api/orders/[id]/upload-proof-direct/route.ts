@@ -3,7 +3,10 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { notifyTenantOwners } from '@/lib/notifications/notify-tenant-owners'
 import { verifyUploadToken } from '@/lib/orders/upload-token'
+import { hasPdfSignature, paymentProofAlt, proofFilename } from '@/lib/orders/proof-filename'
 import { PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
+import { orderActionUrl } from '@/lib/notifications/order-action-url'
 
 const UPLOADABLE_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
 
@@ -38,6 +41,10 @@ export async function POST(
     }
     if (file.size > PROOF_MAX_SIZE_BYTES) {
         return NextResponse.json({ error: 'File too large. Maximum size is 5 MB.' }, { status: 422 })
+    }
+    // The Media hook checks image signatures only: a "PDF" must really start like one (TC-PERF-170).
+    if (file.type === 'application/pdf' && !hasPdfSignature(new Uint8Array(await file.slice(0, 5).arrayBuffer()))) {
+        return NextResponse.json({ error: 'Invalid file type. Upload a JPEG, PNG, or PDF.' }, { status: 422 })
     }
 
     const payload = await getPayload({ config })
@@ -75,8 +82,14 @@ export async function POST(
         const buffer = Buffer.from(await file.arrayBuffer())
         const mediaDoc = await payload.create({
             collection: 'media',
-            data: { alt: `Payment proof — order ${order.orderNumber}` },
-            file: { data: buffer, name: file.name, mimetype: file.type, size: file.size },
+            // Private to the shop (TC-PERF-146): only its members open it, through /api/media/private/{id}. The
+            // stored name is random so the object key can't be guessed from the buyer's file name.
+            data: {
+                alt: paymentProofAlt(order.orderNumber),
+                tenant: typeof order.tenant === 'object' ? order.tenant?.id : order.tenant,
+                private: true,
+            },
+            file: { data: buffer, name: proofFilename(file), mimetype: file.type, size: file.size },
             overrideAccess: true,
         })
         mediaId = mediaDoc.id
@@ -103,19 +116,21 @@ export async function POST(
     }
 
     const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
-    notifyTenantOwners(payload, tenantId, {
-        type: 'ORDER_NEW',
-        title: `Payment Proof Uploaded — Order #${order.orderNumber}`,
-        message: `${order.customerName} submitted payment proof for order #${order.orderNumber}`,
-        actionUrl: '/orders',
-        metadata: {
-            orderNumber: order.orderNumber,
-            currency: order.currency ?? 'MYR',
-            total: String(order.total ?? 0),
-            customerName: order.customerName,
-        },
-        dedupeKey: `PROOF_UPLOADED:${order.orderNumber}`,
-    }).catch((err) => console.error('[upload-proof-direct] notify failed', err))
+    runAfterResponse('upload-proof-direct notify', async () => {
+        await notifyTenantOwners(payload, tenantId, {
+            type: 'ORDER_NEW',
+            title: `Payment Proof Uploaded — Order #${order.orderNumber}`,
+            message: `${order.customerName} submitted payment proof for order #${order.orderNumber}`,
+            actionUrl: orderActionUrl(order.id),
+            metadata: {
+                orderNumber: order.orderNumber,
+                currency: order.currency ?? 'MYR',
+                total: String(order.total ?? 0),
+                customerName: order.customerName,
+            },
+            dedupeKey: `PROOF_UPLOADED:${order.orderNumber}`,
+        })
+    })
 
     return NextResponse.json({ success: true })
 }

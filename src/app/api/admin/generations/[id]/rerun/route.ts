@@ -13,13 +13,16 @@ export const maxDuration = 300
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { withSuperAdmin, checkRateLimit } from '@/lib/admin/api-utils'
-import { generateSiteWithAI } from '@/lib/ai/openai-generator'
+import { withStudioPermission, checkRateLimit } from '@/lib/admin/api-utils'
+import { generateSiteWithAI, resolveSiteGenerationMode } from '@/lib/ai/openai-generator'
+import { finishCapture, startCapture } from '@/lib/ai/capture-generation'
+import { resolveGenerationRecordActor } from '@/lib/ai/generation-actor'
+import { runWithAiActor } from '@/lib/ai-platform/actor-scope'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
-    return withSuperAdmin(async (_req, adminCtx) => {
+    return withStudioPermission('generation.retry', async (_req, adminCtx) => {
         const { id } = await ctx.params
 
         if (!id || isNaN(Number(id))) {
@@ -74,20 +77,46 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             products: parts[3] ?? '',
         }
 
+        const capture = await startCapture({
+            endpoint: 'site-generator-rerun-composition',
+            prompt: promptText,
+            category: businessInfo.industry || undefined,
+            userId: adminCtx.user.id,
+            payload,
+        })
         try {
-            // generateSiteWithAI creates its own capture record via the wrapped function
-            const { result } = await generateSiteWithAI(businessInfo)
+            // Runs as the merchant who made the request, billed to their workspace.
+            // No actor → rule-based, with the reason recorded (not a plain success).
+            const { actor, skipReason } = await resolveGenerationRecordActor(payload, { user: record.user, tenant: record.tenant })
+            const { result, modeReason, aiSkipReason } = actor
+                ? await runWithAiActor(actor, () => generateSiteWithAI(businessInfo))
+                : await generateSiteWithAI(businessInfo, undefined, 'auto', undefined, undefined, undefined, {
+                    modeDecision: await resolveSiteGenerationMode(skipReason),
+                })
+            await finishCapture(capture, {
+                status: 'success',
+                selectedBlocks: result.blocks.map((block) => String((block as { blockType?: unknown }).blockType ?? '')),
+                outputSnapshot: {
+                    path: 'admin-rerun-composition',
+                    siteName: result.siteName,
+                    ...(modeReason ? { modeReason } : {}),
+                    ...(aiSkipReason ? { aiSkipReason } : {}),
+                },
+            })
 
             return NextResponse.json({
                 data: {
                     message: 'Rerun completed',
                     siteName: result.siteName,
                     blockCount: result.blocks.length,
+                    ...(modeReason ? { modeReason } : {}),
+                    ...(aiSkipReason ? { aiSkipReason } : {}),
                 },
             })
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err)
-            return NextResponse.json({ error: `Rerun failed: ${message}` }, { status: 500 })
+            await finishCapture(capture, { status: 'failed', error: message })
+            return NextResponse.json({ error: 'Rerun failed. Please try again later.' }, { status: 500 })
         }
     })(req)
 }

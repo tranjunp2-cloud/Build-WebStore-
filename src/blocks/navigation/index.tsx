@@ -67,7 +67,7 @@ function NavLogo({
     scrolled = false,
 }: NavLogoProps) {
     if (logo?.url) {
-        return <Image src={logo.url} alt={logoText || 'Logo'} width={0} height={0} sizes="(max-width: 768px) 128px, 256px" className={className || 'h-6 sm:h-8 w-auto'} />
+        return <Image src={logo.url} alt={logoText || 'Logo'} width={0} height={0} sizes="(max-width: 640px) 180px, 240px" className={`h-10 sm:h-11 w-auto max-w-[min(45vw,180px)] sm:max-w-[240px] object-contain ${className ?? ''}`} />
     }
     const shouldShowGradient =
         gradientMode === 'always' || (gradientMode === 'when-scrolled' && scrolled)
@@ -285,6 +285,8 @@ type NavMobileDrawerProps = {
     ctaButton?: { show: boolean; label: string; url: string }
     showLanguageSwitcher?: boolean
     background?: string
+    /** Tenant slug; when set, shows the Track order form inside the drawer (GH-2275). */
+    orderSearchSlug?: string
 }
 
 /**
@@ -292,13 +294,14 @@ type NavMobileDrawerProps = {
  * Sidebar + pill have their own drawer designs and don't use this helper.
  * Each link is rendered via MobileNavItem so nested children are walked recursively.
  */
-function NavMobileMenuDrawer({
+export function NavMobileMenuDrawer({
     open,
     onClose,
     links,
     ctaButton,
     showLanguageSwitcher,
     background = NAV_SURFACE_BG_SOLID,
+    orderSearchSlug,
 }: NavMobileDrawerProps) {
     return (
         <AnimatePresence>
@@ -308,7 +311,7 @@ function NavMobileMenuDrawer({
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.2, ease: 'easeInOut' }}
-                    className="md:hidden overflow-hidden"
+                    className="md:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain"
                     style={{
                         background,
                         color: NAV_SURFACE_TEXT,
@@ -319,6 +322,9 @@ function NavMobileMenuDrawer({
                         {links.map((link, i) => (
                             <MobileNavItem key={i} link={link} onNavigate={onClose} />
                         ))}
+                        {orderSearchSlug && (
+                            <NavOrderSearch slug={orderSearchSlug} variant="inline" onNavigate={onClose} />
+                        )}
                         {showLanguageSwitcher && (
                             <NavLangSwitcherPlaceholder className="flex px-4 py-2" />
                         )}
@@ -442,6 +448,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                 links={links}
                 ctaButton={ctaButton}
                 showLanguageSwitcher={mergedBlock.showLanguageSwitcher}
+                orderSearchSlug={showOrderSearch && slug ? slug : undefined}
             />
         </motion.nav>
     )
@@ -526,6 +533,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
                 links={links}
                 ctaButton={ctaButton}
                 showLanguageSwitcher={mergedBlock.showLanguageSwitcher}
+                orderSearchSlug={showOrderSearch && slug ? slug : undefined}
             />
         </motion.nav>
     )
@@ -898,6 +906,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                 links={links}
                 ctaButton={ctaButton}
                 showLanguageSwitcher={mergedBlock.showLanguageSwitcher}
+                orderSearchSlug={showOrderSearch && slug ? slug : undefined}
             />
         </motion.nav>
     )
@@ -1084,6 +1093,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                 links={links}
                 ctaButton={ctaButton}
                 showLanguageSwitcher={mergedBlock.showLanguageSwitcher}
+                orderSearchSlug={showOrderSearch && slug ? slug : undefined}
             />
         </motion.nav>
     )
@@ -1128,7 +1138,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
             >
                 {/* Logo */}
                 <NavLogoLink block={mergedBlock as Record<string, unknown>} className="font-bold text-lg font-heading cursor-pointer shrink-0">
-                    <NavLogo logo={mergedBlock.logo} logoText={logoText} className="h-6 w-auto" />
+                    <NavLogo logo={mergedBlock.logo} logoText={logoText} className="!h-10" />
                 </NavLogoLink>
 
                 {/* Desktop Links */}
@@ -1171,7 +1181,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        className="md:hidden mt-2 rounded-2xl overflow-hidden"
+                        className="md:hidden mt-2 rounded-2xl max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain"
                         style={{
                             background: `color-mix(in srgb, var(--background, #ffffff) 95%, transparent)`,
                             color: NAV_SURFACE_TEXT,
@@ -1185,6 +1195,9 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                             {links.map((link, i) => (
                                 <MobileNavItem key={i} link={link} onNavigate={() => setMobileMenuOpen(false)} />
                             ))}
+                            {showOrderSearch && slug && (
+                                <NavOrderSearch slug={slug} variant="inline" onNavigate={() => setMobileMenuOpen(false)} />
+                            )}
                             {mergedBlock.showLanguageSwitcher && (
                                 <NavLangSwitcherPlaceholder className="flex px-4 py-2" />
                             )}

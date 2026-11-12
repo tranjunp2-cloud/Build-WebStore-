@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useFormContext, useFieldArray, useWatch } from 'react-hook-form'
 import type { FieldError } from 'react-hook-form'
-import { ProductFormValues } from './schema'
+import { ProductFormValues, MAX_OPTIONS_PER_TIER } from './schema'
 import { Plus, Wand2, Trash2 } from 'lucide-react'
 import { cn, formatPrice } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -11,6 +11,7 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { SkuMatrixMobile } from './SkuMatrixMobile'
 import { computeDuplicateIndicesForOptions, isNonEmptyTier, buildVariantMatrix, cartesianProductOfTiers, hasNumericValue } from './variant-utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { DisableVariantsConfirmDialog } from './DisableVariantsConfirmDialog'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 
@@ -25,6 +26,7 @@ export function VariantOptionsSection() {
     const { t } = useI18n()
     const [isGenerating, setIsGenerating] = useState(false)
     const [tierToDelete, setTierToDelete] = useState<number | null>(null)
+    const [confirmDisableOpen, setConfirmDisableOpen] = useState(false)
 
     const errors = formState.errors
 
@@ -100,6 +102,15 @@ export function VariantOptionsSection() {
     })
 
     const hasDuplicates = Object.keys(duplicateOptionIndices).length > 0
+
+    // Array-level error for one tier's values. "At least one value" arrives on `options.message`, but the
+    // 30-value max lands on `options.root` (the array has child entries), which was never rendered (GH-2261).
+    // Skipped while rows already say "This value is already added", so duplicates are not reported twice.
+    const tierValuesError = (index: number) => {
+        if (duplicateOptionIndices[index]) return undefined
+        const optionsError = errors.tiers?.[index]?.options as (FieldError & { root?: FieldError }) | undefined
+        return optionsError?.message ?? optionsError?.root?.message
+    }
 
     const activeTiers = watchedTiers.filter(isNonEmptyTier)
     const activeTierNames = activeTiers.map(t => t.name.trim().toLowerCase()).filter(Boolean)
@@ -293,6 +304,16 @@ export function VariantOptionsSection() {
                 <Switch
                     checked={!!hasVariants}
                     onCheckedChange={(newVal) => {
+                        // GH-2163: turning off with matrix data (variant rows or a non-empty tier)
+                        // asks first; the switch is controlled so it stays On until confirmed.
+                        if (!newVal) {
+                            const hasMatrixData = (getValues('variants') || []).length > 0
+                                || (getValues('tiers') || []).some(isNonEmptyTier)
+                            if (hasMatrixData) {
+                                setConfirmDisableOpen(true)
+                                return
+                            }
+                        }
                         setValue('hasVariants', newVal, { shouldDirty: true })
                         if (newVal && tiers.length === 0) {
                             appendTier({ id: crypto.randomUUID(), name: '', options: [] })
@@ -423,21 +444,23 @@ export function VariantOptionsSection() {
                                             )
                                         })}
 
-                                        {/* Array-root error (e.g. "at least one option required") */}
-                                        {(errors.tiers?.[index]?.options as FieldError | undefined)?.message && (
-                                            <span className="text-[12px] text-destructive">
-                                                {(errors.tiers![index]!.options as FieldError).message}
+                                        {tierValuesError(index) ? (
+                                            <span className="text-[12px] text-destructive">{tierValuesError(index)}</span>
+                                        ) : tier.options.length >= MAX_OPTIONS_PER_TIER && (
+                                            <span className="text-[12px] text-muted-foreground">
+                                                {t.dashboard.products.form.errors?.optionMax || 'You can add up to 30 options per tier.'}
                                             </span>
                                         )}
 
                                         <button
                                             type="button"
+                                            disabled={tier.options.length >= MAX_OPTIONS_PER_TIER}
                                             onClick={() => {
                                                 const liveTier = getValues(`tiers.${index}`) || tier
                                                 const newOptions = [...(liveTier.options || []), '']
                                                 updateTier(index, { ...liveTier, options: newOptions })
                                             }}
-                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.12] bg-transparent py-3 text-[14px] font-medium text-primary hover:bg-primary/5 transition-colors"
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.12] bg-transparent py-3 text-[14px] font-medium text-primary hover:bg-primary/5 transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                                         >
                                             <Plus className="h-4 w-4" />
                                             {t.dashboard.products.form.sections?.addOption || 'Add values'}
@@ -570,6 +593,23 @@ export function VariantOptionsSection() {
                 )}
             </div>
             )}
+
+            <DisableVariantsConfirmDialog
+                open={confirmDisableOpen}
+                onCancel={() => setConfirmDisableOpen(false)}
+                onConfirm={() => {
+                    // Whole-array setValue for tiers (field-array desync, see master-fields-tier-toggle-sync).
+                    // baseInventory/basePrice are left untouched (GH-1525 decision #1).
+                    replaceVariants([])
+                    setValue('tiers', [], { shouldDirty: true })
+                    lastGeneratedTiersSignatureRef.current = null
+                    lastGeneratedBasePriceRef.current = null
+                    lastGeneratedCompareAtPriceRef.current = null
+                    lastGeneratedBaseSkuRef.current = null
+                    setValue('hasVariants', false, { shouldDirty: true })
+                    setConfirmDisableOpen(false)
+                }}
+            />
 
             {/* Tier delete confirmation dialog */}
             <Dialog open={tierToDelete !== null} onOpenChange={(open) => { if (!open) setTierToDelete(null) }}>

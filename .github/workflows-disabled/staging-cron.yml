@@ -1,0 +1,71 @@
+# Staging Cron — calls the scheduled routes on staging (audit H-A5).
+#
+# Vercel Cron fires on production deployments only; staging deploys with
+# --target=staging, so nothing in vercel.json "crons" ever runs there
+# (no SSO step retry, no generation recovery, no payment expiry / order
+# reconcile).
+#
+# Setup (until then every run exits 0 with a notice):
+#   secrets.STAGING_CRON_SECRET     = CRON_SECRET of staging prime-web
+#   vars.STAGING_APP_URL            = https://<staging prime-web host>          (no trailing slash)
+# GitHub runs `schedule` from the default branch only: it starts once this file is on main.
+name: Staging Cron
+
+on:
+  schedule:
+    # SSO steps, generation recovery, payment expiry, order reconcile
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# a run never overlaps the previous one
+concurrency:
+  group: staging-cron
+  cancel-in-progress: false
+
+jobs:
+  cron:
+    name: 'Call staging cron routes'
+    # Only HTTP calls every 10 min. A hosted runner bills a full minute per run (about 130 min/day of the org quota),
+    # so this uses the light self-hosted pool, which heavy CI jobs do not occupy.
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - name: Call cron routes
+        env:
+          CRON_SECRET: ${{ secrets.STAGING_CRON_SECRET }}
+          APP_URL: ${{ vars.STAGING_APP_URL }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "$CRON_SECRET" ] || [ -z "$APP_URL" ]; then
+            echo "::notice::Staging cron is not set up (secrets.STAGING_CRON_SECRET / vars.STAGING_APP_URL empty) — nothing called."
+            exit 0
+          fi
+
+          APP_URL="${APP_URL%/}"
+          FAILED=0
+
+          call() {
+            local url="$1"
+            echo "::group::GET $url"
+            local body
+            if body=$(curl --silent --show-error --fail-with-body --max-time 130 \
+                -H "Authorization: Bearer $CRON_SECRET" "$url" 2>&1); then
+              echo "${body:0:500}"
+            else
+              echo "${body:0:500}"
+              echo "::error::Cron call failed: $url"
+              FAILED=1
+            fi
+            echo "::endgroup::"
+          }
+
+          call "$APP_URL/api/cron/process-sso-steps"
+          call "$APP_URL/api/cron/process-generation-recovery"
+          call "$APP_URL/api/cron/payment-expiry"
+          call "$APP_URL/api/cron/reconcile-orders"
+
+          exit "$FAILED"

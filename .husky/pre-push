@@ -1,0 +1,17 @@
+# Same gates as the CI PR jobs, on what changed since origin/staging: migrations + env manifests +
+# Payload import cycles + oxlint + typecheck + related tests (~20 s – 4 min). See scripts/verify.mjs.
+# Do not bypass with --no-verify (repo rule); fix the failure instead.
+
+# Branch deletions only (every local sha is all zeros) — nothing to check.
+ZERO=0000000000000000000000000000000000000000
+ONLY_DELETES=1
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  [ "$local_sha" != "$ZERO" ] && ONLY_DELETES=0
+done
+[ "$ONLY_DELETES" = 1 ] && exit 0
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "⚠️  pre-push: node not found on PATH — skipping npm run verify (CI still runs every check)"
+  exit 0
+fi
+node scripts/verify.mjs

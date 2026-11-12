@@ -259,24 +259,20 @@ describe('[TC-S3-009] All 11 content files have valid Malaysian data', () => {
                 expect(result.valid).toBe(true)
             })
 
-            it('has at least 3 testimonials with valid ratings', () => {
-                // Assert
-                expect(content.testimonials.length).toBeGreaterThanOrEqual(3)
-                for (const t of content.testimonials) {
-                    expect(t.rating).toBeGreaterThanOrEqual(1)
-                    expect(t.rating).toBeLessThanOrEqual(5)
-                }
+            it('TC-AIAUD-026: has NO library testimonials (invented reviewers removed, #2103 A1)', () => {
+                // Assert — reviews come only from the merchant's own site import
+                expect(content.testimonials).toEqual([])
             })
 
-            it('has at least 3 FAQ items', () => {
-                // Assert
-                expect(content.faqItems.length).toBeGreaterThanOrEqual(3)
+            it('TC-AIAUD-026: has NO library FAQ items (invented policies removed, #2103 A1)', () => {
+                // Assert — FAQ is built from the merchant's FACTS only
+                expect(content.faqItems).toEqual([])
             })
         })
     }
 
-    it('restaurant content descriptions contain RM pricing', () => {
-        // Arrange — restaurant is the canonical example of RM prices in PRD
+    it('restaurant content descriptions contain NO invented RM prices (#2103 A1)', () => {
+        // Arrange — prices come from what the merchant typed, never from the library
         const allDescriptions = restaurantContent.businesses
             .map((b) => b.description)
             .join(' ')
@@ -285,7 +281,7 @@ describe('[TC-S3-009] All 11 content files have valid Malaysian data', () => {
         const result = hasRMPricing(allDescriptions)
 
         // Assert
-        expect(result).toBe(true)
+        expect(result).toBe(false)
     })
 
     it('no content file uses $ currency instead of RM', () => {

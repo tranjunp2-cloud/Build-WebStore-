@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-08-05
+last_updated: 2026-11-04
 ---
 
 # Project Changelog
@@ -14,6 +14,124 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ---
 
 ## [Unreleased] — Staging
+
+### F15 — Phân quyền Studio theo team
+- 4 role mới: `studio-content`, `studio-reviewer`, `studio-qa`, `studio-ops`. Bảng quyền ở `src/lib/admin/studio-permissions.ts`; API kiểm theo quyền, route nhiều hành động kiểm từng hành động. Người sửa template không publish được, Dev không tự đóng lỗi. Studio ẩn nút theo quyền, thêm nút "Send for review". Migration: `users_roles.add_studio_content|reviewer|qa|ops`. Test TC-F15.38..44.
+
+### F02 / F23 — Mật khẩu tối thiểu 6 ký tự thay vì 8 (GH-2269)
+
+- Login, Reset password và Đổi mật khẩu trong Profile giờ nhận mật khẩu từ 6 ký tự (Profile vẫn cần 1 chữ hoa + 1 chữ số). Trước đây form Login chặn mật khẩu dưới 8 ký tự dù tài liệu không yêu cầu, nên tài khoản SSO/PW1 có mật khẩu 6–7 ký tự không đăng nhập được trên web; nay đăng nhập được. Mật khẩu dưới 6 ký tự vẫn bị form Login chặn.
+- Độ dài gom về một hằng số `PASSWORD_MIN_LENGTH` (`src/lib/auth/password-rules.ts`). Server `/api/users/reset-password` chặn mật khẩu dưới 6 ký tự (trả 400) qua hook `enforceResetPasswordMinLength`; `/api/users/me/password` chặn qua `passwordBaseSchema`.
+- Chuỗi EN/MS cập nhật "6 characters / 6 aksara". Test TC-F02.67..70, TC-F23-04-14.
+
+### F05 — Unpublish chuyển sang Cài đặt → Domains, toolbar Editor rõ trạng thái publish (US-F05-10, GH-2434)
+
+- Editor không còn Unpublish và dropdown "View live": mỗi trạng thái chỉ một nút chính (Publish / Update live; khi đã đồng bộ chỉ còn link `● tên-miền ↗` + Copy link, không có Preview). Nhãn lưu cho site live: "Draft saved · Not live yet" / "Saved · Live".
+- `/settings/domains` có card "Website status" (Live / Under maintenance / Draft) với nút Unpublish (chỉ hiện cho user có quyền `builder`, gọi lại `DELETE /api/sites/:id/publish`), modal xác nhận có checkbox bắt buộc và cảnh báo SEO/quảng cáo. i18n en/ms. Không đổi API/schema/env. Test TC-F05-10-13..16 (-17 E2E).
+
+### F10 — Trang theo dõi đơn: nhãn tổng tiền, chip COD, bỏ Address Verified (GH-2316)
+
+- Dòng tổng ở "Items in this Order" chỉ ghi "Total paid" khi `paymentStatus = paid`, các trạng thái khác (unpaid, awaiting, failed, cancelled, refunded) ghi "Total"; chuỗi qua i18n `storefront.orderTracking` (en/ms). Bỏ tag "Address Verified" (không có dữ liệu xác minh nào đứng sau). Đơn COD đã completed nhưng `paymentStatus` còn unpaid hiện chip xám "Cash on delivery" thay vì "Pending · COD" (chỉ hiển thị, không đổi dữ liệu). Không đổi schema/env. Test TC-F10.tracking.05..07 (.07 manual).
+
+### F25 — Form liên hệ site AI tạo không còn báo "Name is required" (GH-2243)
+
+- Form contact giờ gửi mỗi ô dưới key chuẩn `name`/`email`/`phone`/`subject`/`message` dựa trên tên ô (kể cả tiếng Mã Lai: nama, emel, mesej) hoặc loại ô, nên site AI cũ có `fieldName` lạ (vd mô tả shop) vẫn gửi được, lead + email/chuông chủ shop chạy; kiểm tra bắt buộc ở client dùng cùng cách ánh xạ. Server giữ nguyên validate.
+- AI gen: không còn ghi đè `fieldName` bằng mô tả shop khi sửa trang lệch ngôn ngữ, không gán placeholder "E-mel" cho mọi ô form; `nama`→`name`. Ô name/email/message luôn bắt buộc ở client (kèm dấu `*`, `aria-required`) như API. Test TC-F01-CONTACT-KEY-01..06. Không đổi schema/env.
+
+### F08 — Server chặn tên thuộc tính sản phẩm trùng nhau (GH-2380)
+
+- Collection `products` có hook `beforeValidate` từ chối danh sách `attributes` có tên trùng (bỏ khoảng trắng đầu/cuối, không phân biệt hoa/thường): lỗi "Each attribute name must be unique." gắn vào `attributes.<i>.key` của từng bản từ thứ 2 trở đi, áp dụng cho API, import, bulk và AI. Chỉ kiểm khi danh sách attributes bị sửa, nên sản phẩm cũ đã trùng vẫn sửa các trường khác được; import PW1 (migration context) bỏ qua. Logic nằm ở `src/lib/products/attribute-names.ts` để form dùng chung sau khi #2307 merge. Không đổi schema/env. Test TC-F08-04-143..147.
+
+### F01 — Sidebar Block settings dùng màu primary thay xanh dương cố định (GH-2115)
+
+- Các control còn sót `blue-*` trong `SettingsPanel` (dropdown mã nước, ô hex, khung upload logo footer, color picker, toggle + ô link announcement bar, chip "show label" cart widget) và nút "+ Add" (kể cả Logo cloud, Portfolio grid) chuyển sang token `--primary`, chữ light mode dùng `--editor-text` như `VariantChip`. Màu nút "+ Add" gom vào `settings-add-button-class.ts`. Test TC-GH2115-01..02, 04 (mục đang chọn của dropdown mã nước có nền tint).
+
+### F17 — Slug danh mục blog giống nhau ở mọi màn hình (GH-2317)
+
+- Tạo/đổi tên danh mục trong modal Manage categories giờ sinh slug bằng `toBlogCategorySlug()` như trang Blog → Categories (API): bỏ dấu, "Tin tức" → `tin-tuc` thay vì `tin-t-c`. Slug cũ đã lưu không đổi; danh mục cũ đổi tên qua modal sẽ nhận slug mới (URL danh mục đổi, như trước đây). Không đổi schema/env. Test TC-F17-05-09.
+- Slug giữ được chữ `đ` và tên không có chữ Latin: "Đồ uống" → `do-uong` (trước: `o-uong`); tên tiếng Trung/Nhật được phiên âm ("新闻" → `xin-wen`, "ニュース" → `nyusu`) bằng hàm phiên âm dùng chung với slug tên miền site (tách ra `src/lib/utils/slug-romanize.ts`); tên chỉ có emoji/ký hiệu, hoặc tiếng Hàn/Thái (chưa phiên âm) → `category-<mã 7 ký tự cố định theo tên, không phân biệt hoa/thường và số khoảng trắng>`. API `POST`/`PATCH /api/blog-categories` cắt khoảng trắng tên trước khi kiểm (tên chỉ có khoảng trắng → 400 thay vì lỗi 500 chung). Trước đây các tên này ra slug rỗng, field slug bắt buộc nên không tạo được danh mục (toast lỗi chung). Slug đã lưu giữ nguyên. Mã lỗi `BLOG_CATEGORY_DUPLICATE_CODE` chuyển sang `blog-category-codes.ts` để màn hình client không kéo thư viện phiên âm vào bundle. Test TC-F17-05-10..11.
+
+### F32 — Sửa nội dung email đơn hàng: dòng giảm giá, ngày đặt, lời chào (GH-2240)
+
+- Email "New order" gửi chủ shop có dòng Discount (mã + số tiền) khi đơn dùng mã, khớp với email khách (COD, chuyển khoản, Stripe; Xendit không hỗ trợ mã nên không đổi) (GH-2210).
+- Email "Order completed" ghi Order date là giờ khách đặt đơn thay vì giờ hoàn tất (GH-2211).
+- Email hoàn tiền chào "Hi {tên}," một lần thay vì lặp tên (GH-2212).
+- Email hoàn tiền: cột thành tiền tính đơn giá × số lượng (trước hiện RM0.00), có dòng giảm giá nên tổng cộng khớp, nhãn số tiền hoàn được dịch (tiếng Malay "Jumlah dibayar balik"). Áp dụng cho cả 3 luồng gửi email hoàn tiền: hoàn tiền trên dashboard, hoàn tiền từ Stripe Dashboard (webhook), huỷ đơn Xendit đã trả (GH-2240 UAT).
+- Dữ liệu preview email trong CMS có thêm mã giảm giá và ngày đặt. Không đổi schema/env. Test TC-F32.98..104.
+
+### F09 — Storefront nhỏ: PDP sản phẩm không hiển thị trả 404, bỏ breadcrumb JSON-LD `/%2F` trang chủ, ô số lượng PDP (GH-2100)
+
+- PDP sản phẩm draft/archived/không tồn tại nay trả HTTP 404 thật: xoá `products/[productSlug]/loading.tsx` (skeleton làm Next gửi status 200 trước khi `notFound()` chạy); metadata thêm `noindex`.
+- JSON-LD: trang chủ không còn BreadcrumbList (trước đó có item `…/%2F`); slug lồng được encode theo từng segment. Trang khác giữ nguyên.
+- PDP có ô số lượng `[ - 1 + ]` (giới hạn theo tồn kho, reset khi đổi biến thể); `cartStore.addItem(item, quantity = 1)` — mặc định giữ hành vi cũ. Test TC-F09.288–290, 293–294. `/products` 404 là chủ đích (gh-847), không đổi.
+
+### F25 — Chủ shop nhận email + chuông khi có contact lead mới (GH-2157); form liên hệ xoá lỗi khi nhập đúng (GH-2165)
+
+- Trước đây `POST /api/contact-submit` lấy người nhận từ `site.ownerEmail`/`tenant.email` — hai field không tồn tại trong schema nên không bao giờ gửi mail. Nay gửi cho mọi user có role `owner` + `active` của tenant, dùng template F32 `contact-from-seller` (tôn trọng công tắc tắt template của tenant), nút trỏ `/contact-leads`.
+- Thêm chuông in-app type `LEAD_NEW` (chỉ owner, dedupe theo id lead, không chứa email/SĐT/nội dung). Migration enum `notifications.type_lead_new`.
+- Mail + chuông chạy sau response (`runAfterResponse`). `getTenantOwnerEmails` có tham số `roles` tuỳ chọn (hành vi cũ giữ nguyên). Test TC-F04.CS.17..32. Known gap: template chưa có hàng subject của lead.
+- Form liên hệ storefront (`useContactForm`): lỗi "X is required" nay biến mất ngay khi field hợp lệ (trước đó giữ nguyên tới lần bấm gửi tiếp theo). Chỉ kiểm tra lại field đang báo lỗi, không hiện lỗi mới khi đang gõ. Test TC-F01-CONTACT-ERR-01..04.
+
+### F32 — Email khách hiện giờ Malaysia và lý do hoàn tiền (GH-2158)
+
+- Mọi email gửi khách có ngày giờ (xác nhận, đang giao, hoàn thành, hủy, hết hạn, chờ thanh toán, hoàn tiền, chuyển khoản, thanh toán bị từ chối) giờ hiển thị theo giờ Malaysia (`Asia/Kuala_Lumpur`) thay vì UTC. `formatDate` gộp về một hàm dùng chung ở `shared/email-utils.ts`.
+- Hoàn tiền lưu lý do seller nhập vào `orders.refund_reason` (cột mới, migration `orders.refund_reason` trong `scripts/db-setup.js`), cắt tối đa 500 ký tự, xóa khi rollback Stripe/Xendit, và hiển thị ở trường "Refund note" của email hoàn tiền (HTML được escape). Hoàn tiền qua Copilot AI và webhook Stripe không có lý do nên vẫn hiện "—".
+- Test TC-F10.R15..R20, TC-F32.95.
+
+### F34 — Tạm ẩn Xendit ở Settings > Payments và checkout (GH-2132)
+
+- Section Xendit biến mất khỏi `/settings/payments` cho mọi tenant (đã/chưa kết nối); checkout storefront không còn "Pay with Xendit" và Xendit không tính vào `hasPaymentMethods`.
+- `POST /api/orders/xendit-checkout` trả 422 `PAYMENT_METHOD_DISABLED`. Đơn Xendit đang dở (retry, webhook, reconcile, cancel, refund) không đổi.
+- Công tắc duy nhất `XENDIT_ENABLED` ở `src/lib/payment/xendit-visibility.ts` (tạm thời — đặt `true` để bật lại). Không đổi schema/env. Tenant chỉ bật mỗi Xendit sẽ không đặt hàng được cho tới khi bật lại.
+- Server action `saveXenditKeys` cũng bị chặn khi cờ tắt (`disconnectXendit` vẫn dùng được). Test TC-F34X-24-01..07, 09..11 (08 manual).
+
+### F01 — AI gen dùng thông tin liên hệ của user thay vì dữ liệu mẫu (GH-2048)
+
+- Block Contact không còn phone/email/address mẫu theo category (vd `grow@dannytandigital.my`) trên site gen thật, gồm cả trang Home (gap-fill ở `content-injection.ts`). Gallery/preview không có override vẫn giữ dữ liệu mẫu.
+- Phone/email trống trong wizard được điền theo thứ tự ưu tiên: form > `sites.contactInfo` đã có > account (`user.email`/`user.phone`, bỏ email QC `@primeweb.local`). Regenerate không ghi đè contact chủ site đã sửa; PW1 migration không dùng account của owner.
+- `sites.contactInfo` được ghi khi gen (chỉ field có giá trị), nên Global > Contact info khớp với block. Address rỗng trừ khi user nhập. Footer bỏ link `mailto:` khi không có email.
+- Logic ở `src/lib/ai/user-contact-defaults.ts`; test TC-F01-W.02 (đổi) + TC-F01-W.09 (mới).
+
+### F02 — Login: đúng thông báo khi OTP cooldown và khóa tài khoản (GH-2053)
+
+- `send-otp` 429 trả thêm `code: 'OTP_COOLDOWN'` + `retryAfter` (giây) + header `Retry-After`. Login page không còn báo "Connection problem" khi OTP vừa gửi <60s: chuyển sang `/verify-otp` với countdown khớp mã cũ (`src/lib/auth/login-otp-cooldown.ts`). Lỗi gửi OTP khác dùng `auth.errors.otpSendFailed`.
+- Login endpoint trả `423` + `code: 'ACCOUNT_LOCKED'` khi `payload.login` thất bại và `lockUntil` còn hiệu lực (tra qua `isAccountLocked`, lỗi tra cứu → fallback `401 Login failed`). Login page hiện `auth.errors.accountLocked` (copy GH-1701 đã duyệt, giữ nguyên), sai mật khẩu thường giữ "Incorrect email or password". Cooldown send-otp tính theo `OTP_TTL_MS` (trước đây cứng 5 phút → dev TTL 30 phút bị cooldown ~26 phút). Không đổi schema. Tests: TC-F02.44 – TC-F02.48.
+- Câu khóa đổi thành "Too many unsuccessful sign-in attempts. Please try again in 15 minutes or reset your password." (en + ms).
+- Đổi mật khẩu giờ gỡ khóa ngay: Payload không tự xóa `lockUntil`/`loginAttempts` khi reset, nên user reset xong vẫn bị khóa đủ 15 phút. Thêm 2 hook ở `src/lib/auth/clear-login-lock-on-password-change.ts`: `beforeChange` (password đổi qua `payload.update` — SSO reset, Profile, admin panel) và `afterOperation` `resetPassword` (reset qua email). Link reset sai/hết hạn không gỡ khóa. Không đổi schema. Tests: TC-F02.49 – TC-F02.58.
+
+### F34 — SSO upgrade/downgrade cùng gói không xóa usage (GH-2011)
+
+- `upsertPlanSubscription()` chỉ chạy `clearUsage()` + `recountStaffUsage()` khi `plan` đổi (`plan` đã gồm gói + loại TM; row migrate từ PW1 không có `packCode` nên không so `packCode`). SSO retry hoặc gửi lại đúng gói hiện tại thì usage (vd. `template_limit`) giữ nguyên; subscription (`startsAt`/`endsAt`/`status`) và `Tenants.plan` vẫn được cập nhật. Khớp spec #1246 ("clearUsage gọi khi đổi plan"). Không đổi API/schema. Tests: TC-SUB-046, TC-SUB-047, TC-SUB-048.
+
+### F05 — Redesign Pages panel / Page library (US-F05-02, GH-1984)
+
+- **New card layout:** page name + badges on one row, eye/trash as icon buttons on the right, `path · dd-mm` below; the whole card selects the page. The selected card gets a teal accent and a small "Edit with AI chat" button.
+- **Add new page moved to the end of the list** (dashed button → inline form with `URL: /slug` preview). Duplicate name/slug (incl. `home` and `404`) and names with no letters/numbers are rejected inline; the server's 409 stays as fallback. The empty state keeps the button.
+- **Inline delete confirm** replaces the modal (Esc/Cancel close it); soft delete + Undo toast unchanged.
+- **Hidden badge:** a page with `isVisible = false` shows a grey `Hidden` badge (was Live + amber "Hidden"). Live / Draft / No Link logic unchanged.
+- **Toasts** name the page ("Menu hidden from your website", "Page “X” created — add it to Menu to show it", deleted/restored) with a teal check icon and border; scoped to this panel via `page-toast.tsx`, the shared editor Toaster is unchanged.
+- **Custom 404** is pinned to the bottom of the panel; its button reads "Editing 404 page" while selected.
+- **Internals:** `PageManagerPanel.tsx` (628 → 176 lines) now composes `src/components/editor/page-manager/*`. Light theme colours added. i18n keys added for en/ms; unused `visible`/`hidden`/`deleteConfirm*` removed. No API, store or schema change. Tests: TC-F05-02-18..27.
+
+### F16 — Realtime notification qua Firebase RTDB signal, bỏ polling (GH-1972)
+
+- **Realtime:** server ghi "chuông báo" `{at}` lên Firebase RTDB (`pw2/{env}/u/{userId}`, `pw2/{env}/broadcast`); client nghe rồi gọi `GET /api/notifications`. Bỏ vòng poll 15s/60s; chỉ poll 60s khi Firebase tắt/lỗi. Auth bằng custom token (`/api/notifications/firebase-token`), rules `firebase/pw2-database-rules.json`.
+- **Độ tin cậy trên Vercel:** producer chạy trong `after()` (`runAfterResponse`); signal gửi trước push; push không còn chạy trong transaction của create; ORDER_NEW bỏ qua đơn đã bị checkout xoá.
+- **Dọn dẹp:** gỡ trigger `pg_notify` không có listener (`notifications.drop_pg_notify_trigger`). Env mới (server-only): `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_DATABASE_URL`, `FIREBASE_WEB_API_KEY`. Tests: TC-F16.45–.57.
+
+### F23 — Sync Store Owner avatar from SSO (US-F23-05, GH-1723)
+
+- **Owner avatar is SSO-owned:** `POST /api/users/me/avatar` now returns 403 for Owners and the `users.avatar` field denies Owner updates through REST/GraphQL (`canUpdateAvatarField`). Staff upload is unchanged. TC-F23-SSO-10.
+- **New SSO push endpoint:** `POST /api/v1/sso/sync-avatar` (super-admin Bearer, same as the other `/v1/sso/*` routes). SSO sends `PRESENT`/`ABSENT` on avatar change, on every PW2 open and during backfill. PWv2 downloads the image into Media and links it, then deletes the previous avatar Media only when an avatar flow created it (`alt: 'User avatar'`) and no other user uses it. Idempotent: duplicate `avatar_key` and older `changed_at` are no-ops.
+- **Safe download (no config):** HTTPS only, never follows redirects (3xx → 422), the host must resolve to public addresses only (loopback/private/link-local/metadata/CGNAT/multicast blocked, incl. IPv6 forms), ≤ 2 MB, JPEG/PNG bytes that decode, ≤ 50 MP. Permanent rejection → 422 (SSO does not retry), transient → 502 (SSO retries).
+- **Race-safe writes:** binding `ssoUserId` and the avatar compare-and-set on `ssoAvatarSyncedAt` are each one atomic `UPDATE … WHERE … RETURNING` (`src/lib/sso/avatar-sync/sso-user-sql.ts`); only Postgres `23505` counts as a conflict, other DB errors return 500 so SSO retries. The raw SQL deliberately bypasses Payload hooks: the audit hook never set anything for Local-API writes and the welcome email is create-only. Media creation goes through `withMediaCreateLock` (GH-1185); verified with 8 parallel-sync rounds (exactly one winner each, no orphan Media).
+- **Immutable identity:** new `users.ssoUserId` (unique), `ssoAvatarKey`, `ssoAvatarSyncedAt` (+ `db-setup.js` migrations; server-only, create/update access denied). Provision stores `sso_user_id`, returns 409 before creating a tenant if that id is already bound, and removes its new tenant and answers 409 if it loses a race on the id. **Existing Owners bind by email on their first sync** (GH-1979: `ALLOW_EMAIL_BIND = true`; only when the email matches exactly one unbound Owner, otherwise `409` `ambiguous_email` / `not_owner` / `sso_id_conflict`), then map by `sso_user_id`. Before GH-1979 the flag was off and Owners created before `sso_user_id` existed got `409 email_bind_disabled`. PRD BR-23-04 / FR-23-13 updated (v1.4) to allow this first-time bind.
+- **No new env var.** Contract: `plans/261020-1358-gh-1723-sso-owner-avatar-sync/contract-sso-pw2-avatar-sync.md`. Tests: TC-F23-SSO-01..11.
+
+### F35 — PW1 website migration: unblock pending stores (GH-1956)
+
+- **Root cause:** 44 of the 58 pending stores were not BE mapping gaps. 18 stores kept `product_category` pointing at a template-owned category (PW1 template cloning copies it verbatim); 26 stores selected fixed products the BE export deliberately excluded (`NO_VALID_VARIANTS`, `MISSING_VARIANT_DOMAIN`). The other 14 pass product selection; their pending cause needs the Neon batch logs.
+- **Fix:** `resolveProductSelections` leaves a template-owned category listing empty and drops fixed products that the BE evidence marks as not emitted, each with a store warning. Missing mappings without evidence still fail `BE_MAPPING_INVALID`. Tests: TC-F35.M62, TC-F35.M63.
 
 ### F37 — Unified SEO Health Score + Checklist (US-F37-04, GH-1312)
 
@@ -42,6 +160,7 @@ A bakery's generated Gallery mixed cake photos with clothing photos (jeans flatl
 - **Fallback tiers no longer search by internal key.** Broadened/scaffolding queries used the composer key verbatim (`q="fnb"` → 0 hits; `q="business"` → the retail photos in this bug). They now use `CATEGORY_BASE_KEYWORDS[category][0]` (`'coffee shop'`).
 - **Pool sizing:** a bucket now counts as filled only when it can serve the hungriest block that draws from it (gallery = 6), not at half the bucket size. Previously the ladder stopped at 4 of 9, and media-injector patched gallery's 2-slot deficit with an off-pool search whose photos were appended last — the exact "first 4 right, last 2 wrong" pattern reported.
 - **Observability:** `[image-pool] UNDERFILL` warn (category, query, per-bucket counts) when the pool cannot fill.
+- **Follow-up (QA retest reject):** Pixabay timeout recovery nay vẫn gate theo sản phẩm merchant (trước đây bỏ gate khi category có filter Pixabay → `beauty`/`health` dùng chung `health`). `resolveComposerCategory` thêm từ khoá VN `tiệm hoa`, `cửa hàng hoa`, `bánh kẹo`, `bánh ngọt`, `bánh mì`. Test TC-GH1611-33..36.
 - Tests: `composer-category-resolver.test.ts` pins idempotency across all 14 `TEMPLATE_CATEGORY_OPTIONS` values, so a newly added industry option cannot drift unnoticed.
 
 ### F36 — Order Detail Redesign (Full-Page 2-Column with EasyParcel Fulfillment, GH-1333)

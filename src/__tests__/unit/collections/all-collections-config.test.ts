@@ -34,6 +34,7 @@ import { Analytics } from '@/collections/Analytics'
 import { SEOMetaJobs } from '@/collections/SEOMetaJobs'
 import { BlogCategories } from '@/collections/BlogCategories'
 import { Media } from '@/collections/Media'
+import { PushSubscriptions } from '@/collections/PushSubscriptions'
 
 // ─── All Collections Config Validation ────────────────────────────────
 // Tests structure, access control, and field presence for every collection.
@@ -77,9 +78,33 @@ describe('Users collection [TC-F02]', () => {
         expect(Users.hooks).toBeDefined()
     })
 
+    // TC-PERF-150: no self-registration over REST (SSO provision / staff invite / seeders use the Local API)
     testAccess('create', Users.access?.create, [
-        { desc: 'allows public (registration)', req: noUser, expected: true },
+        { desc: 'denies anonymous (TC-PERF-150)', req: noUser, expected: false },
+        { desc: 'denies a tenant owner (TC-PERF-150)', req: normalUser, expected: false },
+        { desc: 'allows super-admin', req: superAdmin, expected: true },
     ])
+
+    // TC-PERF-142: the Payload admin panel is for super-admins; a tenant user's password token gets nothing there
+    testAccess('admin', (Users.access as any)?.admin, [
+        { desc: 'denies anonymous', req: noUser, expected: false },
+        { desc: 'denies a tenant owner', req: normalUser, expected: false },
+        { desc: 'allows super-admin', req: superAdmin, expected: true },
+    ])
+
+    it('[TC-PERF-132] a request cannot pick its own roles: only a super-admin may set roles on create or update', () => {
+        // Arrange
+        const roles = (Users.fields as any[]).find((f) => f.name === 'roles')
+        const tenants = (Users.fields as any[]).find((f) => f.name === 'tenants')
+
+        // Act / Assert: public sign-up with roles: ["super-admin"] made a super-admin before
+        for (const op of ['create', 'update'] as const) {
+            expect(roles.access[op]({ req: noUser })).toBe(false)
+            expect(roles.access[op]({ req: normalUser })).toBe(false)
+            expect(roles.access[op]({ req: superAdmin })).toBe(true)
+            expect(tenants.access[op]({ req: noUser })).toBe(false)
+        }
+    })
 
     testAccess('delete', Users.access?.delete, [
         { desc: 'denies normal user', req: normalUser, expected: false },
@@ -100,6 +125,23 @@ describe('Pages collection [TC-F04]', () => {
         expect(names).toContain('site')
         expect(names).toContain('layout')
         expect(names).toContain('seo')
+    })
+
+    // TC-PERF-133: no access block made every page and draft readable / writable by any logged-in account
+    testAccess('read', Pages.access?.read, [
+        { desc: 'denies public', req: noUser, expected: false },
+        { desc: 'allows super-admin', req: superAdmin, expected: true },
+    ])
+    it('[TC-PERF-133] read and readVersions are scoped to the member tenants through the site', () => {
+        expect(Pages.access!.read!({ req: normalUser } as any)).toEqual({ 'site.tenant': { in: ['tenant-1'] } })
+        expect(Pages.access!.readVersions!({ req: normalUser } as any)).toEqual({ 'version.site.tenant': { in: ['tenant-1'] } })
+        expect(Pages.access!.read!({ req: { user: { id: 2, roles: [], tenants: [] } } } as any)).toBe(false)
+    })
+    it('[TC-PERF-133] REST create / update / delete are super-admin only', () => {
+        for (const op of ['create', 'update', 'delete'] as const) {
+            expect(Pages.access![op]!({ req: normalUser } as any)).toBe(false)
+            expect(Pages.access![op]!({ req: superAdmin } as any)).toBe(true)
+        }
     })
 })
 
@@ -227,6 +269,12 @@ describe('Analytics collection [TC-F22]', () => {
 
 // ─── SEOMetaJobs ──────────────────────────────────────────────────────
 describe('SEOMetaJobs collection', () => {
+    it('[TC-PERF-133] queue is super-admin only over REST', () => {
+        for (const op of ['read', 'update', 'delete'] as const) {
+            expect((SEOMetaJobs.access as any)[op]({ req: normalUser })).toBe(false)
+            expect((SEOMetaJobs.access as any)[op]({ req: superAdmin })).toBe(true)
+        }
+    })
     it('has slug "seo-meta-jobs"', () => expect(SEOMetaJobs.slug).toBe('seo-meta-jobs'))
     it('uses "targetId" as admin title', () => expect(SEOMetaJobs.admin?.useAsTitle).toBe('targetId'))
 
@@ -265,4 +313,15 @@ describe('Media collection', () => {
         { desc: 'denies unauthenticated', req: noUser, expected: false },
         { desc: 'allows authenticated', req: normalUser, expected: true },
     ])
+})
+
+// ─── PushSubscriptions ────────────────────────────────────────────────
+describe('PushSubscriptions owner fields [TC-PERF-134]', () => {
+    it('a member cannot re-point user / tenant to receive another member\'s pushes', () => {
+        for (const name of ['user', 'tenant']) {
+            const field = (PushSubscriptions.fields as any[]).find((f) => f.name === name)
+            expect(field.access.update({ req: normalUser })).toBe(false)
+            expect(field.access.update({ req: superAdmin })).toBe(true)
+        }
+    })
 })

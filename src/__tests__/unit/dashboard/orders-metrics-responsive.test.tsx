@@ -39,6 +39,7 @@ vi.mock('lucide-react', () => ({
 
 // ── Import after mocks ───────────────────────────────────────────────────────
 import { OrdersMetrics } from '@/app/(dashboard)/orders/_components/OrdersMetrics'
+import { DashboardQueryProvider, resetQueryCache } from '../../helpers/query-provider'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)
@@ -46,6 +47,7 @@ import { OrdersMetrics } from '@/app/(dashboard)/orders/_components/OrdersMetric
 
 describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', () => {
     beforeEach(() => {
+        resetQueryCache()
         // Mock the fetch call that OrdersMetrics makes internally
         vi.spyOn(global, 'fetch').mockResolvedValue({
             ok: true,
@@ -81,7 +83,7 @@ describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', (
      */
     it('container has both mobile horizontal-scroll AND md+ grid layout classes', async () => {
         // Arrange
-        render(<OrdersMetrics />)
+        render(<DashboardQueryProvider><OrdersMetrics /></DashboardQueryProvider>)
 
         // Act — Wait for fetch to complete and component to render
         await waitFor(() => {
@@ -116,7 +118,7 @@ describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', (
      */
     it('each card has mobile min-width floor AND md+ shrink override classes', async () => {
         // Arrange
-        render(<OrdersMetrics />)
+        render(<DashboardQueryProvider><OrdersMetrics /></DashboardQueryProvider>)
 
         // Act — Wait for fetch to complete
         await waitFor(() => {
@@ -125,7 +127,7 @@ describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', (
 
         const container = document.querySelector('[class*="flex"][class*="overflow-x-auto"]')
         // Select direct children that have both shrink-0 and min-w-[130px] (excludes icon containers)
-        const cards = container?.querySelectorAll(':scope > div[class*="min-w-[130px]"]')
+        const cards = container?.querySelectorAll(':scope > button[class*="min-w-[130px]"]')
 
         // Assert — 7 cards total
         expect(cards?.length).toBe(7)
@@ -162,7 +164,7 @@ describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', (
      */
     it('label spans have line-clamp-2 AND xl:line-clamp-1 classes', async () => {
         // Arrange
-        render(<OrdersMetrics />)
+        render(<DashboardQueryProvider><OrdersMetrics /></DashboardQueryProvider>)
 
         // Act — Wait for fetch to complete
         await waitFor(() => {
@@ -200,7 +202,7 @@ describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', (
      */
     it('renders all 7 status labels from i18n (verified via DOM text)', async () => {
         // Arrange
-        render(<OrdersMetrics />)
+        render(<DashboardQueryProvider><OrdersMetrics /></DashboardQueryProvider>)
 
         // Assert — All 7 expected labels appear in the DOM
         // The first 5 use metrics keys, last 2 use status keys (confirmed/refunded)
@@ -221,7 +223,7 @@ describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', (
      */
     it('cards have responsive padding classes (p-2 mobile, 2xl:p-[17px] desktop)', async () => {
         // Arrange
-        render(<OrdersMetrics />)
+        render(<DashboardQueryProvider><OrdersMetrics /></DashboardQueryProvider>)
 
         // Act — Wait for fetch to complete
         await waitFor(() => {
@@ -229,8 +231,8 @@ describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', (
         })
 
         const container = document.querySelector('[class*="flex"][class*="overflow-x-auto"]')
-        // Select direct children that have min-w-[130px] (the card divs, not icon containers)
-        const cards = container?.querySelectorAll(':scope > div[class*="min-w-[130px]"]')
+        // Select direct children that have min-w-[130px] (the card buttons, not icon containers)
+        const cards = container?.querySelectorAll(':scope > button[class*="min-w-[130px]"]')
 
         // Assert
         cards?.forEach((card) => {
@@ -256,7 +258,7 @@ describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', (
      */
     it('icon and gap sizes have responsive classes (mobile vs xl)', async () => {
         // Arrange
-        render(<OrdersMetrics />)
+        render(<DashboardQueryProvider><OrdersMetrics /></DashboardQueryProvider>)
 
         // Act — Wait for fetch to complete
         await waitFor(() => {
@@ -264,8 +266,8 @@ describe('TC-F10.responsive.01 — OrdersMetrics Responsive Layout (GH-1490)', (
         })
 
         const container = document.querySelector('[class*="flex"][class*="overflow-x-auto"]')
-        // Select direct children that have min-w-[130px] (the card divs, not icon containers)
-        const cards = container?.querySelectorAll(':scope > div[class*="min-w-[130px]"]')
+        // Select direct children that have min-w-[130px] (the card buttons, not icon containers)
+        const cards = container?.querySelectorAll(':scope > button[class*="min-w-[130px]"]')
 
         // Assert gap in container
         const containerClassName = container?.className || ''

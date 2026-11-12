@@ -2,7 +2,7 @@
 # Hot reload via volume mount in docker-compose.yml
 # npm install cached — chỉ re-run khi package.json thay đổi
 # ────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:24.22.1-alpine
 
 # Required for sharp (image processing) + native modules
 RUN apk add --no-cache libc6-compat

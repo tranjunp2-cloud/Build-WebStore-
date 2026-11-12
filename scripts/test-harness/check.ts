@@ -12,6 +12,9 @@
  *   2 — invalid input (missing matrix.json, bad schema)
  */
 
+// Must run before registry/composer imports in standalone Node.
+import './register-css.cjs'
+
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { MatrixReport, StructuralReport, GuardStatus } from './types'

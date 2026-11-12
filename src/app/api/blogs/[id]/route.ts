@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { SAFE_RELATION_POPULATE } from '@/lib/payload/safe-populate'
 import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -20,7 +21,12 @@ export const GET = withAuth<RouteContext>(async (user, _req, ctx) => {
         const { id } = await ctx.params
         const payload = await getPayload({ config })
 
-        const blog = await payload.findByID({ collection: 'blogs', id, depth: 1 })
+        const blog = await payload.findByID({
+            collection: 'blogs',
+            id,
+            depth: 1,
+            populate: SAFE_RELATION_POPULATE,
+        })
 
         // Verify ownership (tenant-scoped)
         const tenantId = user.tenants?.[0]?.tenant
@@ -89,6 +95,8 @@ export const PATCH = withFeatureGuard('content_management')(withAuth<RouteContex
             data: updateData,
             user,
             overrideAccess: false,
+            depth: 1,
+            populate: SAFE_RELATION_POPULATE, // same reply shape as GET, no whole tenant / site rows (TC-PERF-129)
         })
 
         return NextResponse.json({ success: true, data: updated })

@@ -17,6 +17,7 @@ import {
     TableCell,
 } from '@/components/ui/table'
 import type { ShopCustomerRecord, SortKey } from '../_lib/shop-customer-record'
+import { formatRelativeDate } from '../_lib/relative-time'
 
 type Props = {
     records: ShopCustomerRecord[]
@@ -32,15 +33,6 @@ type Props = {
     setSortDir: (d: 'asc' | 'desc') => void
     onRowClick: (id: number) => void
     hasFilters: boolean
-}
-
-function relativeDate(iso: string, today: string, yesterday: string): string {
-    const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
-    if (d === 0) return today
-    if (d === 1) return yesterday
-    if (d < 30) return `${d}d ago`
-    if (d < 365) return `${Math.floor(d / 30)}mo ago`
-    return `${Math.floor(d / 365)}y ago`
 }
 
 function SkeletonRow() {
@@ -129,7 +121,7 @@ export function CustomersListTable({
         return !hasFilters ? (
             <TableEmptyState icon={<Users />} title={tb.emptyTitle} subtitle={tb.emptySubtitle} />
         ) : (
-            <TableEmptyState icon={<SearchX />} title={tb.filteredTitle} subtitle={tb.filteredSubtitle} />
+            <TableEmptyState icon={<SearchX />} scene="searchEmpty" title={tb.filteredTitle} subtitle={tb.filteredSubtitle} />
         )
     }
 
@@ -213,7 +205,7 @@ export function CustomersListTable({
                             </TableCell>
                             <TableCell className="whitespace-nowrap">
                                 <span className="text-[12px]" style={{ color: 'var(--dash-text-muted)' }}>
-                                    {c.latestOrderAt ? relativeDate(c.latestOrderAt, tb.today, tb.yesterday) : '—'}
+                                    {c.latestOrderAt ? formatRelativeDate(c.latestOrderAt, tb) : '—'}
                                 </span>
                             </TableCell>
                         </TableRow>

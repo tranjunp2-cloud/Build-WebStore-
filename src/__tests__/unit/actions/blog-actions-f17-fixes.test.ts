@@ -49,7 +49,7 @@ describe('createBlogCategoryAction — duplicate name [TC-F17.05]', () => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: 'cat-existing', name: 'Tech' }] })
 
         const result = await createBlogCategoryAction({ name: 'Tech' })
-        expect(result).toEqual({ error: 'A category with this name already exists' })
+        expect(result).toEqual({ error: 'A category with this name already exists', code: 'DUPLICATE_SLUG' })
         expect(mockCreate).not.toHaveBeenCalled()
     })
 
@@ -497,5 +497,55 @@ describe('Sibling actions — fail-open regression fixes (TC-F17-SEC-04..09)', (
 
         const result = await bulkDeleteBlogsAction(['blog-1', 'blog-2'])
         expect(result).toEqual({ deleted: 2 })
+    })
+})
+
+// ─── GH-2317: one slug rule for the modal (server actions) and the API ─────────
+
+describe('Blog category slug matches the API (TC-F17-05-09)', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    it('TC-F17-05-09: createBlogCategoryAction strips accents like the API ("Tin tức" -> tin-tuc)', async () => {
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'site-1' }] }) // site lookup
+        mockFind.mockResolvedValueOnce({ docs: [] }) // duplicate check
+        mockCreate.mockResolvedValue({ id: 'cat-new', name: 'Tin tức', slug: 'tin-tuc' })
+
+        await createBlogCategoryAction({ name: 'Tin tức' })
+
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ slug: 'tin-tuc' }),
+        }))
+    })
+
+    it('TC-F17-05-09: updateBlogCategoryAction strips accents like the API ("Café Tips" -> cafe-tips)', async () => {
+        mockFindByID.mockResolvedValueOnce({ id: 'cat-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce({ docs: [] }) // duplicate check
+        mockUpdate.mockResolvedValue({ id: 'cat-1', name: 'Café Tips', slug: 'cafe-tips' })
+
+        await updateBlogCategoryAction('cat-1', { name: 'Café Tips' })
+
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ slug: 'cafe-tips' }),
+        }))
+    })
+
+    it('TC-F17-05-09: a stored legacy slug (tin-t-c) still blocks a name that now maps to it', async () => {
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'site-1' }] })
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'cat-old', name: 'Tin tức', slug: 'tin-t-c' }] })
+
+        const result = await createBlogCategoryAction({ name: 'Tin t c' })
+
+        expect(result).toEqual({ error: 'A category with this name already exists', code: 'DUPLICATE_SLUG' })
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('TC-F17-05-09: "Tin tuc" is blocked by a legacy "Tin tức" row (slug tin-t-c) through its name', async () => {
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'site-1' }] })
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'cat-old', name: 'Tin tức', slug: 'tin-t-c' }] })
+
+        const result = await createBlogCategoryAction({ name: 'Tin tuc' })
+
+        expect(result).toEqual({ error: 'A category with this name already exists', code: 'DUPLICATE_SLUG' })
+        expect(mockCreate).not.toHaveBeenCalled()
     })
 })

@@ -4,16 +4,23 @@
  *
  * Covers:
  *   TC-F26-04-07: Rate limit exceeded → 429
- *   TC-F26-04-08: Invalid targetLocale 'en' → 400 validation error
- *   TC-F26-04-09: Cache hit → {translated, cached: true}, no OpenAI call
- *   TC-F26-04-10: Missing OPENAI_API_KEY → {translated: originalContent, status: 'fallback'}
- *   TC-F26-04-11: Successful AI translation → {translated, cached: false}, cached for next call
- *   TC-F26-04-12: AI returns malformed JSON → fallback with original content
+ *   TC-F26-04-08: targetLocale 'en' accepted; output HTML-sanitized
+ *   TC-F26-04-09: Cache hit → {translated, cached: true}, no platform call
+ *   TC-F26-04-10: AI platform not configured → {translated: originalContent, status: 'fallback'}
+ *   TC-F26-04-11: Successful platform translation → {translated, cached: false}, cached for next call
+ *   TC-F26-04-12: Platform output off-contract or outage → fallback with original content, not cached
+ *   TC-AICP-24:   cache hit is served before the rate limit
+ *   TC-AISEC-01:  not configured → fallback, OpenAI client never constructed
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST as TranslatePOST } from '@/app/api/ai/translate/route'
+// withAuth-wrapped handler takes (req, ctx); the route does not read ctx.
+const translate = (req: NextRequest) => TranslatePOST(req, undefined as never)
+import { clearTranslationCache } from '@/lib/ai/translate-cache'
+import { checkRateLimit } from '@/lib/rateLimit'
+import { AgentAccessError, resolveActorForUser } from '@/lib/ai-platform/context'
 
 // Bypass withAuth HOC — inject mock user directly
 vi.mock('@/lib/auth', () => ({
@@ -22,13 +29,6 @@ vi.mock('@/lib/auth', () => ({
             const user = { id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }
             return handler(user, req, ctx)
         }
-    }),
-}))
-
-// Mock next/headers
-vi.mock('next/headers', () => ({
-    cookies: vi.fn().mockResolvedValue({
-        get: vi.fn().mockReturnValue({ value: 'valid-token' }),
     }),
 }))
 
@@ -42,43 +42,18 @@ vi.mock('@/lib/rateLimit', () => ({
     })),
 }))
 
-// Mock translate-cache — controlled per test
-let mockCacheStore: Record<string, Record<string, unknown>> = {}
-vi.mock('@/lib/ai/translate-cache', () => ({
-    getCachedTranslation: vi.fn().mockImplementation((blockType: string, locale: string) => {
-        const key = `${blockType}||${locale}`
-        return mockCacheStore[key] ?? null
-    }),
-    setCachedTranslation: vi.fn().mockImplementation(
-        (blockType: string, locale: string, content: Record<string, unknown>) => {
-            mockCacheStore[`${blockType}||${locale}`] = content
-        },
-    ),
+// The caller's verified workspace: the platform bills and caches per organization.
+vi.mock('@/lib/ai-platform/context', () => ({
+    AgentAccessError: class AgentAccessError extends Error {
+        constructor(message: string, readonly status: number) { super(message) }
+    },
+    resolveActorForUser: vi.fn(async () => ({ user: { id: 'user-xyz' }, tenantId: 'tenant-1', organizationId: 'org_1', role: 'owner' })),
+    signAgentContextToken: vi.fn(async () => 'ctx-token'),
 }))
 
-// Top-level OpenAI mock — vi.mock() must be top-level per testing.md
-vi.mock('openai', () => {
-    const OpenAI = vi.fn()
-    OpenAI.prototype.chat = {
-        completions: {
-            create: vi.fn().mockResolvedValue({
-                choices: [
-                    {
-                        message: {
-                            content: JSON.stringify({
-                                headline: 'Selamat Datang',
-                                subheadline: 'Perniagaan Anda',
-                            }),
-                        },
-                    },
-                ],
-            }),
-        },
-    }
-    return { default: OpenAI }
-})
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const fetchMock = vi.fn<typeof fetch>()
 
 function makeRequest(body: unknown) {
     return new NextRequest('http://localhost:3000/api/ai/translate', {
@@ -87,11 +62,28 @@ function makeRequest(body: unknown) {
     })
 }
 
+function platformReply(fields: Record<string, string>) {
+    return Response.json({
+        taskId: 'i18n.translate-blocks',
+        promptVersion: 'i18n-translate-blocks@2',
+        requestId: 'req_1',
+        output: { fields },
+        usage: { provider: 'openai', model: 'gpt-4.1-mini', costUsdMicros: 30, latencyMs: 800, fallbacks: [] },
+    })
+}
+
+function sentTaskInput(call = 0) {
+    const [, init] = fetchMock.mock.calls[call]!
+    return JSON.parse(String(init?.body)).input as Record<string, unknown>
+}
+
 const VALID_BODY = {
     blockType: 'hero',
     targetLocale: 'ms',
     content: { headline: 'Welcome', subheadline: 'Your Business' },
 }
+
+const TRANSLATED = { headline: 'Selamat Datang', subheadline: 'Perniagaan Anda' }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -99,7 +91,16 @@ describe('POST /api/ai/translate', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockRateLimitAllowed = true
-        mockCacheStore = {}
+        clearTranslationCache()
+        vi.stubEnv('AI_PLATFORM_URL', 'http://ai.internal:8300')
+        vi.stubEnv('AI_PLATFORM_CONTEXT_SECRET', 'test-context-secret-at-least-32-characters')
+        vi.stubGlobal('fetch', fetchMock)
+        fetchMock.mockReset()
+    })
+
+    afterEach(() => {
+        vi.unstubAllEnvs()
+        vi.unstubAllGlobals()
     })
 
     // TC-F26-04-07: Rate limit exceeded
@@ -110,12 +111,13 @@ describe('POST /api/ai/translate', () => {
             const req = makeRequest(VALID_BODY)
 
             // Act
-            const res = await TranslatePOST(req)
+            const res = await translate(req)
             const body = await res.json()
 
             // Assert
             expect(res.status).toBe(429)
             expect(body.error).toMatch(/rate limit/i)
+            expect(fetchMock).not.toHaveBeenCalled()
         })
     })
 
@@ -123,59 +125,76 @@ describe('POST /api/ai/translate', () => {
     describe('TC-F26-04-08: targetLocale "en" accepted as valid translation target', () => {
         it('accepts targetLocale "en" since EN sites can now be source for VI/EL/etc.', async () => {
             // Arrange
+            fetchMock.mockResolvedValueOnce(platformReply({ headline: 'Welcome', subheadline: 'Your Business' }))
             const req = makeRequest({ ...VALID_BODY, targetLocale: 'en' })
 
             // Act
-            const res = await TranslatePOST(req)
+            const res = await translate(req)
 
             // Assert — not rejected as validation error
-            expect(res.status).not.toBe(400)
+            expect(res.status).toBe(200)
+            expect(sentTaskInput()).toMatchObject({ targetLocale: 'en' })
         })
     })
 
     // TC-F26-04-09: Cache hit
-    describe('TC-F26-04-09: cache hit → {translated, cached: true}, no OpenAI call', () => {
+    describe('TC-F26-04-09: cache hit → {translated, cached: true}, no platform call', () => {
         it('returns cached translation and skips AI when cache is warm', async () => {
-            // Arrange — pre-populate cache
-            const cachedContent = { headline: 'Selamat Datang (cached)', subheadline: 'Perniagaan' }
-            mockCacheStore['hero||ms'] = cachedContent
-            const req = makeRequest(VALID_BODY)
+            // Arrange — warm the cache with one real translation
+            fetchMock.mockResolvedValueOnce(platformReply(TRANSLATED))
+            await translate(makeRequest(VALID_BODY))
+            fetchMock.mockClear()
 
             // Act
-            const res = await TranslatePOST(req)
+            const res = await translate(makeRequest(VALID_BODY))
             const body = await res.json()
 
             // Assert
             expect(res.status).toBe(200)
             expect(body.cached).toBe(true)
-            expect(body.translated).toEqual(cachedContent)
-
-            // OpenAI must NOT have been called
-            const OpenAIMod = await import('openai')
-            const OpenAI = OpenAIMod.default as any
-            expect(OpenAI.prototype.chat.completions.create).not.toHaveBeenCalled()
+            expect(body.translated).toEqual(TRANSLATED)
+            expect(fetchMock).not.toHaveBeenCalled()
         })
     })
 
-    // TC-F26-04-10: Missing OPENAI_API_KEY
-    describe('TC-F26-04-10: missing OPENAI_API_KEY → fallback with original content', () => {
-        it('returns original content with status "fallback" when API key is absent', async () => {
+    // TC-AICP-24: cache hits must not consume the caller's rate-limit quota
+    describe('TC-AICP-24: cache hit is served before the rate limit', () => {
+        it('returns the cached translation even when the rate limit is exhausted', async () => {
             // Arrange
-            const prev = process.env.OPENAI_API_KEY
-            delete process.env.OPENAI_API_KEY
+            fetchMock.mockResolvedValueOnce(platformReply(TRANSLATED))
+            await translate(makeRequest(VALID_BODY))
+            vi.mocked(checkRateLimit).mockClear()
+            mockRateLimitAllowed = false
+
+            // Act
+            const hit = await translate(makeRequest(VALID_BODY))
+            const miss = await translate(makeRequest({ ...VALID_BODY, content: { headline: 'Edited' } }))
+
+            // Assert
+            expect(hit.status).toBe(200)
+            expect((await hit.json()).cached).toBe(true)
+            expect(miss.status).toBe(429)
+            expect(checkRateLimit).toHaveBeenCalledTimes(1)
+            expect(checkRateLimit).toHaveBeenCalledWith('ai:translate:user-xyz', 30)
+        })
+    })
+
+    // TC-F26-04-10 / TC-AISEC-01: platform not configured
+    describe('TC-F26-04-10: AI platform not configured → 503, no translation [TC-AIREL-240]', () => {
+        it('answers 503 { ok:false, status:"fallback" } with no `translated`, and never builds an OpenAI client [TC-AISEC-01]', async () => {
+            // Arrange
+            vi.stubEnv('AI_PLATFORM_URL', '')
             const req = makeRequest(VALID_BODY)
 
             // Act
-            const res = await TranslatePOST(req)
+            const res = await translate(req)
             const body = await res.json()
 
             // Assert
-            expect(res.status).toBe(200)
-            expect(body.status).toBe('fallback')
-            expect(body.translated).toEqual(VALID_BODY.content)
-
-            // Restore
-            if (prev !== undefined) process.env.OPENAI_API_KEY = prev
+            expect(res.status).toBe(503)
+            expect(body).toEqual({ ok: false, status: 'fallback', error: expect.any(String) })
+            expect(body).not.toHaveProperty('translated')
+            expect(fetchMock).not.toHaveBeenCalled()
         })
     })
 
@@ -183,77 +202,89 @@ describe('POST /api/ai/translate', () => {
     describe('TC-F26-04-11: successful AI translation → {translated, cached: false}, stored in cache', () => {
         it('returns AI translation with cached:false and writes to cache', async () => {
             // Arrange
-            process.env.OPENAI_API_KEY = 'test-key'
-            const expectedTranslation = { headline: 'Selamat Datang', subheadline: 'Perniagaan Anda' }
-
-            const OpenAIMod = await import('openai')
-            const OpenAI = OpenAIMod.default as any
-            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
-                choices: [{ message: { content: JSON.stringify(expectedTranslation) } }],
-            })
-
-            const req = makeRequest(VALID_BODY)
+            fetchMock.mockResolvedValueOnce(platformReply(TRANSLATED))
 
             // Act
-            const res = await TranslatePOST(req)
+            const res = await translate(makeRequest(VALID_BODY))
             const body = await res.json()
 
-            // Assert — response shape
+            // Assert — response shape and the task the platform received
             expect(res.status).toBe(200)
             expect(body.cached).toBe(false)
-            expect(body.translated).toEqual(expectedTranslation)
+            expect(body.translated).toEqual(TRANSLATED)
+            const [url] = fetchMock.mock.calls[0]!
+            expect(url).toBe('http://ai.internal:8300/v1/tasks/i18n.translate-blocks/run')
+            expect(sentTaskInput()).toEqual({ targetLocale: 'ms', fields: { headline: 'Welcome', subheadline: 'Your Business' } })
 
-            // Assert — cache was populated for subsequent calls
-            const { setCachedTranslation } = await import('@/lib/ai/translate-cache')
-            expect(setCachedTranslation).toHaveBeenCalledWith('hero', 'ms', expectedTranslation)
+            // Assert — cache was populated for subsequent calls with the same content
+            const again = await translate(makeRequest(VALID_BODY))
+            expect(await again.json()).toEqual({ translated: TRANSLATED, cached: true })
+            expect(fetchMock).toHaveBeenCalledTimes(1)
+        })
+
+        it('writes translated strings back at their nested paths', async () => {
+            // Arrange
+            const content = { headline: 'Welcome', items: [{ title: 'Shop' }] }
+            fetchMock.mockResolvedValueOnce(platformReply({ headline: 'Selamat Datang', 'items.0.title': 'Kedai' }))
+
+            // Act
+            const res = await translate(makeRequest({ ...VALID_BODY, content }))
+
+            // Assert
+            expect(await res.json()).toEqual({ translated: { headline: 'Selamat Datang', items: [{ title: 'Kedai' }] }, cached: false })
+            expect(sentTaskInput()).toMatchObject({ fields: { headline: 'Welcome', 'items.0.title': 'Shop' } })
         })
     })
 
-    // TC-F26-04-12: AI returns malformed JSON
-    describe('TC-F26-04-12: AI returns malformed JSON → fallback with original content', () => {
-        it('returns original content with status "fallback" when AI response is not valid JSON', async () => {
-            // Arrange
-            process.env.OPENAI_API_KEY = 'test-key'
-
-            const OpenAIMod = await import('openai')
-            const OpenAI = OpenAIMod.default as any
-            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
-                choices: [{ message: { content: 'This is not JSON at all!!!' } }],
-            })
-
-            const req = makeRequest(VALID_BODY)
+    // TC-F26-04-12: platform output off-contract, or platform outage
+    describe('TC-F26-04-12: platform output invalid or outage → 502, never the original text [TC-AIREL-240]', () => {
+        it('answers 502 with no `translated` when the platform output does not match the task contract', async () => {
+            // Arrange — `fields` must be a record of strings
+            fetchMock.mockResolvedValueOnce(Response.json({
+                taskId: 'i18n.translate-blocks',
+                promptVersion: 'i18n-translate-blocks@2',
+                requestId: 'req_1',
+                output: { fields: 'This is not JSON at all!!!' },
+                usage: { provider: 'openai', model: 'gpt-4.1-mini', costUsdMicros: 30, latencyMs: 800, fallbacks: [] },
+            }))
 
             // Act
-            const res = await TranslatePOST(req)
+            const res = await translate(makeRequest(VALID_BODY))
             const body = await res.json()
 
             // Assert
-            expect(res.status).toBe(200)
-            expect(body.status).toBe('fallback')
-            expect(body.translated).toEqual(VALID_BODY.content)
+            expect(res.status).toBe(502)
+            expect(body).toEqual({ ok: false, status: 'fallback', error: expect.any(String) })
+            expect(body).not.toHaveProperty('translated')
         })
 
-        it('strips markdown fences and parses successfully when AI wraps JSON in ```json blocks', async () => {
-            // Arrange — valid JSON wrapped in code fences (common model behaviour)
-            process.env.OPENAI_API_KEY = 'test-key'
-            const inner = { headline: 'Selamat Datang', subheadline: 'Perniagaan Anda' }
-
-            const OpenAIMod = await import('openai')
-            const OpenAI = OpenAIMod.default as any
-            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
-                choices: [{ message: { content: `\`\`\`json\n${JSON.stringify(inner)}\n\`\`\`` } }],
-            })
-
-            const req = makeRequest(VALID_BODY)
+        it('does not cache a fallback, so the next call asks the platform again', async () => {
+            // Arrange
+            fetchMock.mockResolvedValueOnce(Response.json({ detail: 'upstream 503 from provider x' }, { status: 503 }))
+            fetchMock.mockResolvedValueOnce(platformReply(TRANSLATED))
 
             // Act
-            const res = await TranslatePOST(req)
-            const body = await res.json()
+            const failed = await translate(makeRequest(VALID_BODY))
+            const retried = await translate(makeRequest(VALID_BODY))
 
-            // Assert — fence-stripped JSON is parsed correctly, NOT treated as fallback
-            expect(res.status).toBe(200)
-            expect(body.cached).toBe(false)
-            expect(body.translated).toEqual(inner)
+            // Assert
+            expect(failed.status).toBe(502)
+            expect(await failed.json()).toEqual({ ok: false, status: 'fallback', error: expect.any(String) })
+            expect(await retried.json()).toEqual({ translated: TRANSLATED, cached: false })
+            expect(fetchMock).toHaveBeenCalledTimes(2)
+        })
+
+        it('fails without calling the platform when the caller has no active workspace', async () => {
+            // Arrange
+            vi.mocked(resolveActorForUser).mockRejectedValueOnce(new AgentAccessError('You are not an active member of this workspace.', 403))
+
+            // Act
+            const res = await translate(makeRequest(VALID_BODY))
+
+            // Assert
+            expect(res.status).toBe(502)
+            expect(await res.json()).toEqual({ ok: false, status: 'fallback', error: expect.any(String) })
+            expect(fetchMock).not.toHaveBeenCalled()
         })
     })
 
@@ -264,10 +295,11 @@ describe('POST /api/ai/translate', () => {
             const req = makeRequest({ ...VALID_BODY, targetLocale: 'zh' })
 
             // Act
-            const res = await TranslatePOST(req)
+            const res = await translate(req)
 
             // Assert — zod enum rejects Phase-2 locales
             expect(res.status).toBe(400)
+            expect(fetchMock).not.toHaveBeenCalled()
         })
     })
 
@@ -275,25 +307,17 @@ describe('POST /api/ai/translate', () => {
     describe('QA TC-F26-04-08: XSS in AI output stripped before insert', () => {
         it('removes <script> tags from translated string values', async () => {
             // Arrange — model returns an XSS payload inside a translated field
-            const prev = process.env.OPENAI_API_KEY
-            process.env.OPENAI_API_KEY = 'test-key'
-            const OpenAIMod = await import('openai')
-            const OpenAI = OpenAIMod.default as any
-            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
-                choices: [{ message: { content: JSON.stringify({ headline: "<script>alert('xss')</script>Selamat Datang" }) } }],
-            })
+            fetchMock.mockResolvedValueOnce(platformReply({ headline: "<script>alert('xss')</script>Selamat Datang", subheadline: 'Perniagaan Anda' }))
             const req = makeRequest(VALID_BODY)
 
             // Act
-            const res = await TranslatePOST(req)
+            const res = await translate(req)
             const body = await res.json()
 
             // Assert — script tag stripped, safe text retained
             expect(res.status).toBe(200)
             expect(JSON.stringify(body.translated)).not.toContain('<script>')
             expect(body.translated.headline).toContain('Selamat Datang')
-
-            process.env.OPENAI_API_KEY = prev
         })
     })
 })

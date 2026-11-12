@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { getCurrentUser } from '@/lib/auth'
+import { activeTenantIds } from '@/lib/media/media-access'
 import { checkUploadSize } from '@/lib/media/upload-limits'
 import { buildS3Client } from '@/lib/media/s3-client'
 import { findRegisteredMedia, registerUploadedMedia } from '@/lib/media/register-media'
@@ -61,7 +62,7 @@ async function readImageSignatureWithRetry(
 }
 
 export async function POST(req: NextRequest) {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     let body: { key?: unknown; alt?: unknown }
@@ -129,7 +130,9 @@ export async function POST(req: NextRequest) {
         const existing = await findRegisteredMedia(payload, key)
         if (existing) return NextResponse.json(existing)
 
-        const media = await registerUploadedMedia(payload, { alt, filename: key, mimeType, filesize: size })
+        const media = await registerUploadedMedia(payload, {
+            alt, filename: key, mimeType, filesize: size, tenantId: activeTenantIds(user)[0] ?? null,
+        })
         return NextResponse.json(media)
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)

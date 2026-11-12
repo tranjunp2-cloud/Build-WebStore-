@@ -42,6 +42,25 @@ export const VI_MS_TO_EN: Record<string, string> = {
   'banh mi': 'vietnamese banh mi sandwich',
   'bánh xèo': 'vietnamese crispy pancake',
   'banh xeo': 'vietnamese crispy pancake',
+  // GH-1611: bakery terms. Single, most-commonly-tagged head word on purpose —
+  // the relevance gate needs every word of a 1-2 word term in the photo tags, and
+  // Pixabay tags a cake "cake, dessert", rarely "bakery" and never "cake pastry". Without these entries a
+  // failed LLM translation left the pool gated on "coffee shop" for a bakery.
+  'bánh kem': 'cake',
+  'bánh ngọt': 'pastry',
+  'bánh quy': 'cookie',
+  'bánh kẹo': 'candy',
+  'bánh': 'cake',
+  'kẹo': 'candy',
+  'cupcake': 'cupcake',
+  'kek': 'cake',
+  // unaccented spellings (merchants often type without diacritics)
+  'banh kem': 'cake',
+  'banh ngot': 'pastry',
+  'banh quy': 'cookie',
+  'banh keo': 'candy',
+  'banh': 'cake',
+  'keo': 'candy',
   'gỏi cuốn': 'vietnamese fresh spring roll',
   'goi cuon': 'vietnamese fresh spring roll',
   'chả giò': 'vietnamese fried spring roll',
@@ -103,6 +122,11 @@ export const VI_MS_TO_EN: Record<string, string> = {
   'rawatan wajah': 'facial treatment',
 }
 
+// GH-1611: ambiguous generic words. Matching them INSIDE a longer dish name would
+// mistranslate savory dishes ("bánh canh cua", "bánh cuốn" ≠ bakery), so these
+// only match when the whole term is exactly the word.
+const EXACT_MATCH_ONLY = new Set(['bánh', 'kẹo', 'banh', 'keo'])
+
 const PRODUCT_TRANSLATION_ENTRIES = Object.entries(VI_MS_TO_EN)
   .sort((a, b) => b[0].length - a[0].length)
 
@@ -126,9 +150,9 @@ export function translateKnownProductTerm(term: string): string | null {
   const padded = ` ${normalized} `
   for (const [foreign, english] of PRODUCT_TRANSLATION_ENTRIES) {
     const normalizedForeign = normalizeProductLookup(foreign)
-    if (normalized === normalizedForeign || padded.includes(` ${normalizedForeign} `)) {
-      return english
-    }
+    if (normalized === normalizedForeign) return english
+    if (EXACT_MATCH_ONLY.has(foreign)) continue
+    if (padded.includes(` ${normalizedForeign} `)) return english
   }
   return null
 }

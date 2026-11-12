@@ -164,6 +164,7 @@ export function DiscountsUsageHistoryLayout() {
                 <TableEmptyState
                     compact
                     icon={<SearchX />}
+                    scene="searchEmpty"
                     title={d.emptyNoResultsTitle}
                     subtitle={d.emptyNoResultsSubtitle}
                     action={

@@ -46,6 +46,8 @@ export interface NavLeaf {
     /** Dev-only item: hidden on Production, visible on dev/staging/sandbox. */
     devOnly?: boolean
     badgeKey?: SidebarBadgeKey
+    /** What the badge number counts — hover hint + accessible name of the pill (#2170). */
+    badgeHint?: { en: string; ms: string }
 }
 
 export interface NavSection {
@@ -82,7 +84,7 @@ export const NAV_SECTIONS: NavSection[] = [
     {
         header: { en: 'Core Operations', ms: 'Operasi Teras' },
         items: [
-            { label: { en: 'Orders', ms: 'Pesanan' }, icon: ShoppingCart, href: '/orders', permissionId: 'orders', badgeKey: 'orders' },
+            { label: { en: 'Orders', ms: 'Pesanan' }, icon: ShoppingCart, href: '/orders', permissionId: 'orders', badgeKey: 'orders', badgeHint: { en: 'Pending orders', ms: 'Pesanan belum diproses' } },
             { label: { en: 'Products', ms: 'Produk' }, icon: Package, href: '/products', permissionId: 'products', badgeKey: 'products' },
             { label: { en: 'Discounts', ms: 'Diskaun' }, icon: Percent, href: '/discounts', permissionId: 'orders', badgeKey: 'discounts' },
         ],

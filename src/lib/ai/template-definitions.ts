@@ -114,16 +114,24 @@ export const TEMPLATE_DEFINITIONS: ComposerInputLegacy[] = [
   { category: 'fnb', businessIndex: 3, variant: 'premium', themePreset: FNB_PRESETS[4]! },
 ]
 
-// ── Template Presets (56 blueprints) ───────────────────────────────────────
-// 4 per category × 14 categories = 56 templates — ALL premium
+// ── Template Presets (58 blueprints) ───────────────────────────────────────
+// 56 category blueprints + 2 sports-retail search presets — ALL premium
 import { BATCH1_PRESETS } from './template-presets-batch1'
 import { BATCH2_PRESETS } from './template-presets-batch2'
 import { BATCH3_PRESETS } from './template-presets-batch3'
+import { SPORTS_RETAIL_PRESETS } from './template-presets-sports-retail'
 
-export const TEMPLATE_PRESETS: TemplatePreset[] = [
+/** Presets eligible for ordinary AI fallback generation. */
+export const GENERATION_TEMPLATE_PRESETS: TemplatePreset[] = [
   ...BATCH1_PRESETS,
   ...BATCH2_PRESETS,
   ...BATCH3_PRESETS,
+]
+
+/** Full managed inventory exposed by template browse and semantic search. */
+export const TEMPLATE_PRESETS: TemplatePreset[] = [
+  ...GENERATION_TEMPLATE_PRESETS,
+  ...SPORTS_RETAIL_PRESETS,
 ]
 
 // buildGallery currently materializes six image slots for every gallery block.
@@ -134,7 +142,7 @@ export function selectTemplatePreset(
   category: string,
   seed: number,
 ): TemplatePreset | undefined {
-  const candidates = TEMPLATE_PRESETS.filter((preset) => preset.category === category)
+  const candidates = GENERATION_TEMPLATE_PRESETS.filter((preset) => preset.category === category)
   if (candidates.length === 0) return undefined
   return candidates[Math.abs(Math.floor(seed)) % candidates.length]
 }

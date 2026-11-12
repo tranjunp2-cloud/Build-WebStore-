@@ -11,6 +11,16 @@ vi.mock('@/lib/rateLimit', () => ({
 }))
 
 import { GET } from '@/app/api/storefront/products/bounds/route'
+// #2179: store availability has its own tests (store-unavailable.test.ts); here a store is unavailable only when suspended.
+vi.mock('@/lib/storefront/store-availability', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/storefront/store-availability')>()),
+    isTenantUnavailable: vi.fn(async (_payload: unknown, tenant: { status?: unknown } | null) => tenant?.status === 'suspended'),
+    isTenantIdUnavailable: vi.fn(async () => false),
+}))
+// #2179: store availability has its own tests (store-unavailable.test.ts); available unless a test says otherwise.
+vi.mock('@/lib/storefront/cached-store-availability', () => ({ isCachedSiteUnavailable: vi.fn(async () => false) }))
+import { isCachedSiteUnavailable } from '@/lib/storefront/cached-store-availability'
+import { isTenantIdUnavailable, isTenantUnavailable } from '@/lib/storefront/store-availability'
 
 describe('GET /api/storefront/products/bounds [TC-F09.251]', () => {
     beforeEach(() => {
@@ -35,7 +45,7 @@ describe('GET /api/storefront/products/bounds [TC-F09.251]', () => {
         // Assert
         expect(res.status).toBe(200)
         expect(body).toEqual({
-            minPrice: 10,
+            categoryIds: [],            minPrice: 10,
             maxPrice: 70,
             attributes: [
                 { key: 'color', values: ['blue', 'red'] },
@@ -52,7 +62,7 @@ describe('GET /api/storefront/products/bounds [TC-F09.251]', () => {
                     { deletedAt: { exists: false } },
                 ]),
             }),
-            select: { price: true, attributes: true },
+            select: { price: true, attributes: true, currency: true, category: true },
             overrideAccess: true,
         }))
     })
@@ -83,7 +93,7 @@ describe('GET /api/storefront/products/bounds [TC-F09.251]', () => {
         // Assert
         expect(res.status).toBe(200)
         expect(body).toEqual({
-            minPrice: 5,
+            categoryIds: [],            minPrice: 5,
             maxPrice: 45,
             attributes: [
                 { key: 'color', values: ['green', 'red'] },
@@ -105,7 +115,16 @@ describe('GET /api/storefront/products/bounds [TC-F09.251]', () => {
 
         // Assert
         expect(res.status).toBe(200)
-        expect(body).toEqual({ minPrice: 0, maxPrice: 0, attributes: [] })
+        expect(body).toEqual({ minPrice: 0, maxPrice: 0, attributes: [], categoryIds: [] })
+    })
+
+    it('[TC-F09.283] unavailable store returns zero bounds without querying products', async () => {
+        vi.mocked(isCachedSiteUnavailable).mockResolvedValueOnce(true)
+
+        const res = await GET(new Request('http://localhost/api/storefront/products/bounds?site=5'))
+
+        expect(await res.json()).toEqual({ minPrice: 0, maxPrice: 0, attributes: [] })
+        expect(mockFind).not.toHaveBeenCalled()
     })
 
     it('[TC-F09.252] missing site returns zeros without calling Payload', async () => {

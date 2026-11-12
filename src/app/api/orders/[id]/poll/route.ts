@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { tenantIdForQuery } from '@/lib/auth/tenant-id'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,10 +17,14 @@ type RouteContext = { params: Promise<{ id: string }> }
  * watches via a `select`ed depth-0 read — a tiny single-row query instead of the
  * full depth=2 order fetch (`GET /api/orders/[id]`). The client compares `updatedAt`
  * and only re-pulls the full order when it changed, so the frequent poll stays cheap.
- * Access-controlled (overrideAccess:false) so a merchant only ever polls own orders.
+ * Access-controlled and scoped to the dashboard's primary workspace.
  */
 export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
     try {
+        const tenantId = tenantIdForQuery(user)
+        if (tenantId === null) {
+            return NextResponse.json({ success: false, error: { code: 'NO_WORKSPACE', message: 'No active workspace' } }, { status: 403 })
+        }
         const { id } = await ctx.params
         const payload = await getPayload({ config })
 
@@ -29,10 +34,14 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
             depth: 0,
             user,
             overrideAccess: false,
-            select: { updatedAt: true, status: true, awbNo: true, shippingTrackingStatus: true },
+            select: { tenant: true, updatedAt: true, status: true, awbNo: true, shippingTrackingStatus: true },
         })
 
-        if (!order) {
+        const orderTenant = order?.tenant
+        const orderTenantId = orderTenant && typeof orderTenant === 'object' && 'id' in orderTenant
+            ? orderTenant.id
+            : orderTenant
+        if (!order || String(orderTenantId) !== String(tenantId)) {
             return NextResponse.json({ success: false, error: { code: 'NOT_FOUND' } }, { status: 404 })
         }
 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Download, Plus, Percent, SearchX } from 'lucide-react'
@@ -11,6 +12,10 @@ import { DiscountsToolbar, type StatusFilter } from './discounts-toolbar'
 import { DiscountsTable, type Discount } from './discounts-table'
 import { DiscountDeleteDialog } from './discount-delete-dialog'
 import { useI18n } from '@/i18n'
+import { queryKeys } from '@/hooks/queries/query-keys'
+import { refreshQueries } from '@/hooks/queries/refresh-queries'
+import { useKeptData } from '@/hooks/queries/use-kept-data'
+import { useQueryScope } from '@/providers/query-provider'
 import { DiscountsTabNav } from './discounts-tab-nav'
 import { useUrlPagination } from './use-url-pagination'
 
@@ -22,8 +27,6 @@ export function DiscountsClientLayout() {
     const { t, ti } = useI18n()
     const d = t.dashboard.discounts.list
 
-    const [discounts, setDiscounts] = useState<Discount[]>([])
-    const [total, setTotal] = useState(0)
     // Page + limit synced to URL (?page=N&limit=M); default 10/page (Bug #12 AC, both tabs).
     const { page, setPage, limit, setLimit } = useUrlPagination(10)
     const [search, setSearch] = useState('')
@@ -31,61 +34,49 @@ export function DiscountsClientLayout() {
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
     const [sortBy, setSortBy] = useState<SortKey>('createdAt')
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-    const [loading, setLoading] = useState(true)
-    const [isFirstLoad, setIsFirstLoad] = useState(true)
     // Delete-confirm modal target (null = closed). Same styled modal the edit form uses — no native confirm().
     const [deleteTarget, setDeleteTarget] = useState<Discount | null>(null)
 
-    // Generation ref — stale fetch guard (same pattern as customers layout)
-    const genRef = useRef(0)
+    // One cached query per page + filters + sort; the previous rows stay while another page loads, and a request
+    // overtaken by a newer one is aborted. A write elsewhere refetches the page on screen in place
+    // (the dashboard's query invalidation): no spinner, and a failed background refetch keeps the rows.
+    const scope = useQueryScope()
+    const queryClient = useQueryClient()
+    const listParams = { page, limit, sortBy, sortDir, statusFilter, typeFilter, search }
+    const query = useQuery({
+        queryKey: queryKeys.discounts.list(scope, listParams),
+        queryFn: async ({ signal }) => {
+            const sort = sortDir === 'desc' ? `-${sortBy}` : sortBy
+            const params = new URLSearchParams({ page: String(page), limit: String(limit), sort })
+            if (statusFilter !== 'all') params.set('status', statusFilter)
+            if (typeFilter !== 'all') params.set('type', typeFilter)
+            if (search) params.set('search', search)
+            const res = await fetch(`/api/v1/discounts?${params.toString()}`, { credentials: 'include', signal })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            // API returns Payload pagination shape: { docs, totalDocs, totalPages, page }
+            const json = await res.json()
+            return { docs: (json.docs ?? []) as Discount[], totalDocs: (json.totalDocs ?? 0) as number }
+        },
+        placeholderData: keepPreviousData,
+    })
+    const shown = useKeptData(query.data)
+    const discounts = shown?.docs ?? []
+    const total = shown?.totalDocs ?? 0
+    const loading = query.isPending || query.isPlaceholderData
+    // nothing loaded yet: no empty state (the first answer decides between the table and the onboarding card)
+    const isFirstLoad = shown === undefined
+
+    const { errorUpdatedAt, isRefetchError, error } = query
+    useEffect(() => {
+        if (!errorUpdatedAt) return
+        console.error('[Discounts load]', error)
+        if (!isRefetchError) toast.error(d.loadFailed)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [errorUpdatedAt])
 
     // GH-1579: snap back when deletions strand page past the last page.
     // Disabled while loading so the URL-restored ?page=N isn't clobbered before data arrives.
     useTablePageClamp(page, total, limit, setPage, !loading)
-
-    const load = useCallback(async () => {
-        const gen = ++genRef.current
-        setLoading(true)
-        try {
-            const sort = sortDir === 'desc' ? `-${sortBy}` : sortBy
-            const params = new URLSearchParams({
-                page: String(page),
-                limit: String(limit),
-                sort,
-            })
-            if (statusFilter !== 'all') params.set('status', statusFilter)
-            if (typeFilter !== 'all') params.set('type', typeFilter)
-            if (search) params.set('search', search)
-
-            const res = await fetch(`/api/v1/discounts?${params.toString()}`, {
-                credentials: 'include',
-            })
-            if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            const json = await res.json()
-
-            if (gen !== genRef.current) return
-
-            // API returns Payload pagination shape: { docs, totalDocs, totalPages, page }
-            setDiscounts(json.docs ?? [])
-            setTotal(json.totalDocs ?? 0)
-            setIsFirstLoad(false)
-        } catch (err) {
-            if (gen !== genRef.current) return
-            console.error('[Discounts load]', err)
-            toast.error(d.loadFailed)
-        } finally {
-            if (gen === genRef.current) setLoading(false)
-        }
-    }, [search, statusFilter, typeFilter, sortBy, sortDir, page, limit, d.loadFailed])
-
-    useEffect(() => { load() }, [load])
-
-    // Latest-load ref: post-delete reconciliation must fetch with the CURRENT
-    // page/filters, not the ones captured when the user clicked confirm — the
-    // stale closure could resolve after a pager click and recommit an empty
-    // page as the newest gen (GH-1579 re-review M1).
-    const loadRef = useRef(load)
-    loadRef.current = load
 
     // Stable handlers — reset page on filter/sort change
     const handleSearch       = useCallback((q: string)              => { setSearch(q);        setPage(1) }, [])
@@ -153,12 +144,13 @@ export function DiscountsClientLayout() {
             // deleting across the 11→10 boundary must pull in the row that lives on the
             // next server page (a bare total decrement would strand it invisibly), and
             // the page clamp handles any page overflow after the refetch (GH-1579).
-            loadRef.current()
+            // Every cached page and the tab counts are stale; the page on view (current filters) refetches.
+            void refreshQueries(queryClient, queryKeys.discounts.all(scope))
         } catch (err) {
             console.error('[Discounts delete]', err)
             toast.error(ti(d.deleteFailed, { code: discount.code }))
         }
-    }, [deleteTarget, d.deleteSuccess, d.deleteFailed, ti])
+    }, [deleteTarget, d.deleteSuccess, d.deleteFailed, ti, queryClient, scope])
 
     const hasFilters = !!(search || statusFilter !== 'all' || typeFilter !== 'all')
     const isEmpty = !loading && discounts.length === 0
@@ -203,6 +195,7 @@ export function DiscountsClientLayout() {
                 hasFilters ? (
                     <TableEmptyState
                         icon={<SearchX />}
+                        scene="searchEmpty"
                         title={d.emptyNoResults}
                         subtitle={d.emptyNoResultsSubtitle}
                     />

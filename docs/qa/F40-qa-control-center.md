@@ -18,7 +18,7 @@ AND the terminal run records target editor-productgrid-variants, fixture QA-Tshi
 
 **Safety:** the pack is staging-only, uses the registered fixture lease, runs no arbitrary command and never creates a GitHub issue.
 
-> Source: `docs/prd/qa-control-center.md`, `docs/design/qa-control-center-ux.md`, and `docs/stories/F40-qa-control-center-stories.md`.
+> Source: `docs/prd/F40-qa-control-center.md`, `docs/design/qa-control-center-ux.md`, and `docs/stories/F40-qa-control-center-stories.md`.
 
 ## US-F40-05 — GitHub Issue Sync and Confirmed Target Mapping
 
@@ -39,6 +39,7 @@ AND the terminal run records target editor-productgrid-variants, fixture QA-Tshi
 | TC-F40-07-03 | API     | Critical | One confirmation idempotency key produces one dispatch; fixture/profile capacity blocks safely.                                   | [x] AUTO | `src/__tests__/api/f40-manual-runs.test.ts`                              |
 | TC-F40-07-04 | API     | Critical | Only a non-terminal dispatch can be cancelled; cancellation keeps a possibly running fixture lease until terminal reconciliation. | [x] AUTO | `src/__tests__/api/f40-manual-run-cancel.test.ts`                        |
 | TC-F40-07-05 | API/E2E | High     | Seven-day run history filters target/profile/PR/SHA and presents only safe evidence availability.                                 | [x] AUTO | `src/__tests__/api/f40-qa-runs.test.ts`, `tests/f40-manual-runs.spec.ts` |
+| TC-F40-07-06 | Unit    | Critical | The run-history SQL read model binds the `profile` and test-case pack-ID filters as one Postgres array parameter each, so the query parses with empty, single and multi-value filters (no `()` or row-constructor casts). | [x] AUTO | `src/__tests__/unit/qa/f40-run-history-read-model.test.ts`               |
 
 ### US-F40-07 operational contract
 
@@ -105,3 +106,100 @@ The stateful test intentionally skips when its fixture variables are absent. Bef
 | TC-F40-06-03 | API  | Critical | Finding reads/promotions require super-admin, validate strictly, and cancel never contacts GitHub.                           | [x] AUTO | `src/__tests__/api/f40-findings.test.ts`     |
 | TC-F40-06-04 | API  | Critical | Confirming promotion creates/reconciles exactly one marked GitHub issue; remote failure retains the internal finding safely. | [x] AUTO | `src/__tests__/api/f40-findings.test.ts`     |
 | TC-F40-06-05 | E2E  | Critical | QA reviews a finding, cancels without issue creation, then confirms one linked GitHub ticket.                                | [x] AUTO | `tests/f40-findings.spec.ts`                 |
+
+## US-F40-11 — Deep Field-by-Field Database Diff Inspector
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-11-07 | Unit | High | A record with `matchStatus = match` but an error/warning field remains visible when **Chỉ Lỗi** is enabled. | [x] AUTO | `src/__tests__/unit/qa/f40-field-diff-inspector.test.ts` |
+| TC-F40-11-08 | Unit | High | A Product with multiple SKU rows produces one Product entity candidate while retaining a deterministic primary SKU. | [x] AUTO | `src/__tests__/unit/qa/f40-pw1-mysql-connector.test.ts` |
+| TC-F40-11-09 | Unit | High | The field-inspector status separates a meaningful matching value from two empty values, and never marks stale/different values as a match. | [x] AUTO | `src/__tests__/unit/qa/f40-field-diff-inspector.test.ts` |
+| TC-F40-11-10 | Unit | High | The UI demo fixture exposes all evidence states only for its explicit `SITE-0001` QA fixture; it is not a migration result. | [x] AUTO | `src/__tests__/unit/qa/f40-field-diff-inspector.test.ts` |
+| TC-F40-11-E2E-03 | E2E | High | A super-admin opens the `SITE-0001` UI fixture, sees attention records by default, expands/collapses one record, and filters exact evidence states. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+
+## US-F40-12 — Visual Parity Inspector
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-12-11 | Unit | High | **Highlight Diff Gaps** identifies P0/P1 PW2 visual gaps with an explanatory label and ignores matched blocks. | [x] AUTO | `src/__tests__/unit/qa/f40-visual-parity-inspector.test.ts` |
+
+## US-F40-13 — PW2 Render Evidence
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-13-01 | Unit | Critical | No approved mapping returns `unverified`; never infer PW2 data from preview. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-render-evidence.test.ts` |
+| TC-F40-13-02 | Unit | Critical | Overall pass requires migrated data, supported component and verified live render. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-render-evidence.test.ts` |
+| TC-F40-13-06 | Unit | Critical | Sensitive evidence field is removed before response serialization. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-render-evidence.test.ts` |
+| TC-F40-13-03 | API | Critical | Evidence and explicit live-check endpoints require Super Admin authentication. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+| TC-F40-13-04 | E2E | High | Demo mode is visibly labelled as non-production evidence. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+| TC-F40-13-05 | E2E | Critical | The inferred PW2 preview is replaced when data/component evidence is incomplete. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+| TC-F40-13-07 | Manual | Critical | Approved PW1→PW2 mapping identifies the actual PW2 layout block. | [ ] MANUAL | Team migration mapping handoff |
+| TC-F40-13-08 | Manual | High | On-demand live check confirms or rejects the real PW2 block without exposing customer data. | [ ] MANUAL | Team live-check runner handoff |
+
+## US-F40-14 — Commerce và Settings Migration Reconciliation
+
+| TC-ID | Type | Priority | Scenario | Status | Automated by |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-14-01 | Unit | Critical | Khi chưa có mapping evidence, snapshot chỉ là `Chưa xác minh`; không được suy đoán bản ghi khớp từ SKU/email/order number; exception mở hoặc dữ liệu bị cắt cũng không được báo pass. ID nội bộ hợp lệ của Product/Order/Discount/Customer có thể truy vết ở API Super Admin; ID không hợp lệ vẫn bị che. Chỉ hiện giá trị gốc mà evidence F42 thực sự lưu; tên và PII Customer trong snapshot hiện tại không được lưu dạng hiển thị nên phải báo thiếu evidence, không suy diễn từ fingerprint. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts`, `src/__tests__/unit/qa/f40-f42-ledger-evidence-provider.test.ts` |
+| TC-F40-14-02 | E2E | Critical | Super Admin mở Đối soát Commerce, bật dữ liệu mẫu và lọc theo Products. | [x] AUTO | `tests/studio-migration-diff.spec.ts` |
+| TC-F40-14-03 | Unit/API | High | Adapter evidence versioned có thể được đăng ký mà không thay đổi contract UI; run và issue chỉ đọc được khi Super Admin chọn đúng ID store PW1 số và child run đã VERIFIED. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-reconciliation.test.ts`, `src/__tests__/api/f40-migration-reconciliation-ledger-routes.test.ts` |
+| TC-F40-14-04 | Manual | Critical | Staging có schema F42 và một child run VERIFIED: nhập đúng ID store PW1 → chọn run → kiểm tra mapping/issue; không dùng mã F40 `SITE-xxxx` làm crosswalk. | [ ] MANUAL | Migration owner cung cấp child run ID + source store ID |
+| TC-F40-14-05 | Unit/API/E2E | Critical | View `source_coverage` chỉ Super Admin, Store PW1 số; snapshot được pin khi có field generation; thiếu sidecar hợp lệ trả `state: unavailable`, thiếu schema trả 503, không trình bày tổng 0 như đã xác minh. Browser hiển thị hai phạm vi và trường ngoài registry rõ. | [x] AUTO | `src/__tests__/api/f40-migration-reconciliation-ledger-routes.test.ts`, `tests/f40-website-migration.spec.ts` (fixture phụ thuộc môi trường; skip không phải staging PASS) |
+| TC-F40-14-06 | Manual staging | Critical | Một real artifact có selected CSV/sidecar hash: đối chiếu toàn nguồn theo Store và snapshot, field bị che/unattributed, record không emit, importExpected riêng, Order aggregate và target drift; xác nhận trên cùng revision trước kết luận Commerce. | [ ] MANUAL | QC + F42/F40 ghi expected/actual và evidence theo kế hoạch Commerce; hiện chưa PASS |
+| TC-F40-14-07 | Unit/API/E2E | Critical | Từ một mapping của run VERIFIED, Super Admin mở chi tiết field PW1/PW2 đúng Store/run/generation/digest của bản ghi, gồm SKU hoặc Order item liên quan; mã tham chiếu khác Store/run bị từ chối và generation đổi trả 409. Chỉ trả giá trị hiển thị thực sự được F42 lưu; Giá trị gốc của các key private (`orders.code`, `customers.name/email/phone`, `promotion_codes.code`, `store_email_templates.subject`) không bao giờ trả ra browser dù evidence có lưu; fingerprint/element key cũng không trả ra. Nếu chưa có field evidence, hiển thị thiếu bằng chứng; trạng thái mapping 1-1 không thay thế kết quả đối soát field. | [x] AUTO | `src/__tests__/api/f40-migration-reconciliation-ledger-routes.test.ts`, `src/__tests__/unit/qa/reconciliation-record-reference.test.ts`, `src/__tests__/unit/qa/f42-field-evidence-private-values.test.ts`, `src/__tests__/unit/qa/f40-record-field-evidence-panel.test.tsx`, `tests/studio-migration-diff.spec.ts` (fixture phụ thuộc môi trường; skip không phải staging PASS) |
+| TC-F40-14-08 | Component | High | Đổi nhóm, trạng thái hoặc trang field trong cùng Store/run/generation không tải lại kiểm kê nguồn PW1; đổi snapshot/run hoặc làm mới evidence mới tải lại kiểm kê nguồn. | [x] AUTO | `src/__tests__/unit/qa/f40-field-evidence-panel.test.tsx` |
+| TC-F40-14-09 | Unit/API | High | Query preview giá trị PW1/PW2 của ledger lỗi (schema F42 lệch, timeout) thì ledger VERIFIED vẫn trả 200 với mã tham chiếu từng dòng nhưng không có preview, chỉ ghi log tên lỗi. Khi đó `fieldGeneration` không được gán nên chi tiết record hiện "Chưa có generation field evidence hợp lệ… Tải lại run": đây là trạng thái degrade chủ ý, không phải lỗi dữ liệu. | [x] AUTO | `src/__tests__/api/f40-migration-reconciliation-ledger-routes.test.ts` |
+
+## Website migration — live ledger and durable audit
+
+**Standalone deployment:** bản F40 này không triển khai schema/exporter/importer F42. Thiếu website ledger bắt buộc trả `503 / F42_SOURCE_UNAVAILABLE`; UI báo nguồn chưa sẵn sàng, không công bố “0 website” hoặc tổng/kết quả giả. Thiếu field evidence không đồng nghĩa website không tồn tại. Contract đọc cục bộ ghim `field-evidence-v26` / `qc-fields-v1`; xem [điều kiện tích hợp](F40-field-evidence-integration.md). Chỉ được đạt tự động khi đủ 100% phạm vi bắt buộc và khớp 100%; QC thủ công không thay đổi kết quả tự động.
+
+| TC-ID | Type | Priority | Scenario | Automation | Source |
+|---|---|---|---|---|---|
+| TC-F40-MIG-REPORT-01 | Unit | Critical | Automatic report prioritizes proven migration/current-audit/field failures, marks stale audit/QC for recheck, and keeps missing/partial evidence insufficient. Matching available fields or manual QC Pass never certify complete website acceptance. | [x] AUTO | `src/__tests__/unit/qa/migration-report-status.test.ts` |
+| TC-F40-MIG-LIVE-01 | Unit | Critical | Compare source-bound content; missing fields are unverified; changed links/media and selected product order are visible. Ignore AI style decisions. Inside a compared value an omitted optional field and a destination `null` are equal (e.g. carousel `linkUrl: null`); a lost non-null value still differs and a missing top-level field stays unverified. | [x] AUTO | `src/__tests__/unit/qa/f40-website-migration.test.ts` |
+| TC-F40-MIG-LIVE-08 | Unit/E2E | Critical | Field evidence v26: no synthetic/older-run fallback; missing evidence has no percentage; coverage includes unsupported/unverified; real browser opens field panel and filters rows; no raw private fields returned. | [x] AUTO | `src/__tests__/unit/qa/f40-website-migration.test.ts`, `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-09 | E2E | Critical | Đánh giá QC opens an inline Pass/Failed dropdown in live comparison, not a review page. Escape closes only the menu and restores trigger focus. Quick verdict requests require admin, strict input, completed/committed evidence and current version; legacy detailed Pass still requires all five checks. Quick decisions do not certify detailed checks or automatic parity. This regression validates rejected requests only, without saving real QC verdicts. | [x] AUTO | `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-10 | Unit/E2E | Critical | Five overview cards show total, not started, running, completed, failed website generation with matching table filters. Import verification, publication, audit and QC never change generation lifecycle. Content comparison remains separate: missing evidence shows 0% placeholder with explicit reason; progress red <85, yellow ≥85 unless fully accepted, green only exactly100% and automatic passed. No QC verdict saved. | [x] AUTO | `src/__tests__/unit/qa/migration-report-status.test.ts`, `src/__tests__/unit/qa/f40-migration-lifecycle.test.ts`, `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-16 | Unit/Integration/E2E | Critical | Catalog includes registered F42 source-only IDs and deduplicates repeated batches in one proven source/target scope. Four lifecycle counts sum to total. Unmapped sources have no PW2 link or comparison/QC action. Missing/ambiguous scope, unproven legacy identity or noncanonical source IDs fail explicitly, never fabricate counts. Browser uses real authenticated API; SQL fixtures use only temporary tables with rollback. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-lifecycle.test.ts`, `src/__tests__/integration/f40-catalog-scope.ts`, `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-17 | Unit | High | Live catalog is paginated by the server: each request carries limit/page and returns only the visible page, and the pagination control anchors first/last pages with a windowed list. Debounced search commits reset to page 1 in a single request — no per-keystroke request carries a stale query. Summary lifecycle and QC counts describe the whole catalog regardless of search or status filters. | [x] AUTO | `src/__tests__/unit/qa/f40-migration-pagination.test.tsx` |
+| TC-F40-MIG-LIVE-02 | E2E | Critical | Unauthenticated callers cannot read migration evidence. Super-admin opens real catalog, selects a store and reads mapped page/block evidence. | [x] AUTO | `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-11 | E2E | High | Inspector page tabs use the unique PW2 menu label matching exact mapped destination path; otherwise current CMS title/slug. Missing destination explicit. Read-only SQL validates API and browser labels, with no inference by navigation order or changed identity/URLs. | [x] AUTO | `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-12 | Unit/E2E | Critical | Missing F42 schema returns safe HTTP503 F42_SOURCE_UNAVAILABLE; authenticated real browser displays actionable unavailable state, no false zero totals or synthetic report; refresh retains explicit unavailable state. Uses dedicated synthetic local DB with no F42 tables, never mutates shared DB. | [x] AUTO | `src/__tests__/unit/qa/f42-source-contract.test.ts`, `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-13 | Unit/E2E | High | Readable block cards label expected F42 versus current PW2 truthfully; text differences, missing versus empty, ordered list items and image load failures are explicit. URL-only image differences never prove wrong image. All fields display inline in original order; each block has only one technical JSON disclosure retaining PW1 source content. Filtering preserves original block numbering. Header attention button switches live iframe to filtered block view and exposes active state; disabling restores all blocks. Generic long report/CSP banners are absent. Real authenticated browser opens comparison without saving QC or image checks. | [x] AUTO | `src/__tests__/unit/qa/f40-block-comparison.test.tsx`, `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-14 | Unit | High | Selecting a non-home PW2 page retains its exact mapped URL and the unchanged PW1 homepage URL. Homepage limitation is hidden by default in the accessible comparison-information disclosure and readable when opened. QC menu and attention-filter transitions continue to work. | [x] AUTO | `src/__tests__/unit/qa/f40-block-comparison.test.tsx` |
+| TC-F40-MIG-LIVE-15 | Unit | Critical | Literal text including null, exponent notation, long digits and quotes is preserved exactly. Missing list positions remain distinct from intentional empty values. Control-character image URLs cannot normalize into local network requests. Per-item nested text/link differences highlight only changed items and ignore migration metadata IDs. Regressions fail on the pre-fix component. | [x] AUTO | `src/__tests__/unit/qa/f40-block-comparison.test.tsx` |
+| TC-F40-MIG-LIVE-03 | E2E | High | Empty search returns an empty catalog rather than demo data; malformed pagination is rejected. | [x] AUTO | `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-04 | E2E | Critical | Tester saves a versioned manual QC verdict and note. Stale evidence rejects a write; stale reviews are unverified. QC Pass requires every declared website check. Non-admin cannot save reviews. | [x] AUTO | `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-05 | Unit/E2E | High | Image fields resolve safe public media metadata and show source/destination thumbnails, alt and dimensions; slide indexes are retained, missing media is explicit, technical JSON remains expandable and available images can be enlarged. Unsafe image protocols are rejected. | [x] AUTO | `src/__tests__/unit/qa/f40-website-migration.test.ts`, `tests/f40-website-migration.spec.ts` |
+| TC-F40-MIG-LIVE-06 | Unit/E2E | Critical | Automatic image checking certifies identical SHA-256 or all decoded pixels, treats resized/similar images as review, detects different/corrupt image content, uses the durable cache, rejects stale evidence/arbitrary URLs, and runs through the real browser flow. | [x] AUTO | `src/__tests__/unit/qa/f40-website-migration.test.ts`, `tests/f40-website-migration.spec.ts` |
+
+### Live dashboard F42: cách đọc trạng thái
+
+Run LIVE-16 PostgreSQL regressions against a configured local database: `node --require ./scripts/seed-preload.cjs --import tsx src/__tests__/integration/f40-catalog-scope.ts`. The script enforces a local host and `pg_temp` search path, exercises production SQL, and rolls back its temporary fixtures; it does not mutate persistent application tables.
+
+Màn hình mặc định `/studio/qa/migration-diff` chỉ đọc migration ledger F42. `?demo=1` là prototype/snapshot và không dùng để duyệt migration thật.
+
+Tổng website chỉ gồm nguồn đã đăng ký trong phạm vi source/target F42 được xác minh; không đại diện toàn bộ PW1. Nguồn chưa có website PW2 vẫn hiện trong danh sách, nhưng không có link PW2 hay thao tác so sánh/QC. Thiếu hoặc mâu thuẫn bằng chứng định danh/phạm vi phải báo không khả dụng, không suy đoán số lượng.
+
+| Hiển thị | Nguồn dữ liệu | Ý nghĩa vận hành |
+|---|---|---|
+| Migration | `pw1_migration_stores.status`; nguồn đăng ký chưa có generation là chưa bắt đầu | Tiến trình tạo website; `completed` là migration thành công dù audit có lỗi, không phải audit Pass hay QC Pass. |
+| Publish | `sites.status` | Website PW2 đã `published` hay vẫn `draft`. |
+| Audit | `pw1_migration_qa_audits` và thời điểm cập nhật site/page | `not-checked`, `historical`, `stale` hoặc finding đều cần xử lý; không tự kết luận trang giống nhau. |
+| QC hiện tại | `pw1_migration_qa_reviews` khớp evidence version | Chỉ `QC Pass`, `Cần xem lại` hoặc `P0` do tester lưu; review cũ trở thành `Chưa QC`. |
+| PW1 homepage | URL trong evidence F42 | Chỉ là URL homepage đã lưu. Khung iframe có thể trắng do nguồn timeout/chặn iframe; mở link tab mới để kiểm tra, không coi đó là lỗi migrate. |
+
+Inspector mở ở **Tổng quan** trước. Tester chỉ mở **So sánh trực quan**, **Nội dung & mapping** hoặc **Audit & media** khi cần; image check bắt đầu khi mở tab nội dung/audit, không tự chạy khi mới mở store.
+
+Automatic media checks start when the inspector opens and update the **Kết quả** cell of each corresponding image field, alongside the PW1/PW2 thumbnails. There is no separate image-results table. Checks are read-only. Four pairs per request, two workers, bounded downloads and raster decode keep each request below the 60-second route ceiling under normal operation. Source downloads allow HTTPS DigitalOcean Spaces assets only, reject redirects and private DNS addresses; other source hosts remain unverified. Destination bytes come from the configured S3 SDK or local media directory, resolving only migration-owned media for this store. Cache keys include algorithm/source URL/media ID/media revision/destination URL; successful results expire after 24 hours, unavailable download results after five minutes, and **Kiểm tra lại ảnh** explicitly refreshes source content that might change at the same URL. Similarity is normalized-pixel RMSE guidance, not a calibrated identity score or automatic QC verdict. Alt/dimension mismatches remain separate review signals. Checks do not certify crop/layout or all animation frames unless file bytes match.
+
+The default migration screen keeps F40's overview, status filters, search, pagination and **So Sánh** entry point while reading real website migration evidence. The inspector separates side-by-side websites, source content/mapping/settings, persisted audit findings, and manual QC. Prototype heuristic scores are not measured parity; real mode uses available field evidence. Missing comparable data displays **0% with an explicit no-data explanation**, while the backend measurement stays null. Progressbar colors do not certify automatic website Pass. Manual QC verdicts remain separate from automatic classification. Each review stores the reviewer, note, declared checks, input hash, committed attempt and evidence revision; changed migration/site/pages/audit invalidate its applicability. Reviews certify website scope only, not full commerce reconciliation or automatic cutover. Old prototype tabs remain explicitly accessible in demo mode.
+
+Manual image confirmation appears in each image result cell: **Xác nhận thủ công: ảnh đúng** records the authenticated reviewer and time for that store/evidence version/page/component/field/image path. **Huỷ xác nhận ảnh** removes it. Changing the evidence version makes old confirmations inactive. Automated checks and metadata warnings remain visible; a confirmation does not imply store QC Pass. TC-F40-MIG-LIVE-06 also verifies confirmation, persistence across inspector tabs and cancellation in the real browser.
+
+
+| Test case | Type | Priority | Acceptance | Automation | File |
+| --- | --- | --- | --- | --- | --- |
+| TC-F40-MIG-WEB-RATE-01 | Unit | Critical | Website percentage uses matched/total website fields including unresolved fields, respects scoped manual image confirmation, and keeps absent evidence nullable. | [x] AUTO | `src/__tests__/unit/qa/website-comparison-summary.test.ts` |
+| TC-F40-MIG-WEB-RATE-02 | E2E | Critical | Real migrated website has nonzero content percentage without requiring BE field evidence; overview agrees with API content counts. | [x] AUTO | `tests/f40-website-migration.spec.ts` |

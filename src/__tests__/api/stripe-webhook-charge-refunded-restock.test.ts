@@ -50,6 +50,7 @@ vi.mock('@/lib/discounts/release-discount-redemption', () => ({
 }))
 
 import { handleChargeRefunded } from '@/app/api/webhooks/stripe/handlers/charge-refunded'
+import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import type { Payload } from 'payload'
 
 // ─── Fixtures ──────────────────────────────────────────────────────────
@@ -255,5 +256,31 @@ describe('handleChargeRefunded — discount slot release [TC-F33-09]', () => {
             expect.objectContaining({ orderId: '12345' }),
             expect.stringContaining('already refunded'),
         )
+    })
+})
+
+// ─── TC-F32.104: Stripe Dashboard refund email money lines (GH-2240) ────
+describe('handleChargeRefunded — refund email lines [TC-F32.104]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockDrizzleExecute.mockReset()
+        mockDrizzleExecute.mockResolvedValue({ rows: [{ id: '12345' }] })
+        mockRestockItem.mockResolvedValue({ productId: 'prod-1', restocked: 2 })
+        mockFindByID.mockResolvedValue({ stripeAccountId: 'acct_test' })
+        mockFind.mockResolvedValue({
+            docs: [{
+                ...BASE_ORDER,
+                items: [{ product: 'prod-1', productName: 'Cement', quantity: 2, unitPrice: 27 }],
+                subtotal: 54, shippingFee: 8, discountAmount: 500, discountCode: 'QATEST5', total: 57,
+            }],
+        })
+    })
+
+    it('[TC-F32.104] passes unit price × quantity and the discount in RM to the template', async () => {
+        await handleChargeRefunded(makePayload(), BASE_EVENT as any)
+
+        const data = vi.mocked(orderRefundedEmail).mock.calls[0][0]
+        expect(data.items[0]).toMatchObject({ quantity: 2, unitPrice: 27, lineTotal: 54 })
+        expect(data).toMatchObject({ subtotal: 54, shippingFee: 8, discountAmount: 5, discountCode: 'QATEST5', total: 57 })
     })
 })

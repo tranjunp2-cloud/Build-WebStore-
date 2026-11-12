@@ -231,7 +231,7 @@ Tạo branch: feature/FXX-mô-tả
   ↓
 Code theo AC + design trong issue
   ↓
-Chạy local: npm run lint && npm run typecheck && npm run test && npm run build
+Chạy local: npm run verify   (husky pre-push cũng tự chạy)
   ↓
 Push + tạo PR vào staging (title: feat(FXX): [US-FXX-YY] mô tả)
   ↓
@@ -392,16 +392,27 @@ PM chỉnh spec → assign lại UIUX+BA → review lại
 
 #### 5.1 CI flow — thứ tự bước và giữ CI xanh
 
-Workflow file: [.github/workflows/ci.yml](.github/workflows/ci.yml). Chạy trên mọi **push** và **pull_request** vào nhánh `main`, `staging`.
+Workflow file: [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
-| Bước | Lệnh | Ghi chú |
-|------|------|--------|
-| 1 | `npm run lint` | ESLint (next lint) — chỉ **errors** fail; warnings in ra nhưng không fail. |
-| 2 | `npm run typecheck` | `tsc --noEmit` — kiểm tra type toàn bộ `src/`. |
-| 3 | `npm run test` | `vitest run` — unit test. |
-| 4 | `npm run build` | Next.js build (script đã gắn `NODE_OPTIONS='--require ./node-polyfill.js'` để tránh lỗi khi collect page data). |
+**PR vào `staging` / `main`** — job `changes` đọc các file PR sửa rồi chỉ chạy phần liên quan:
 
-**Giữ CI xanh:** Trước khi push hoặc tạo PR, chạy local lần lượt: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`. Chỉ push khi cả 4 bước pass. Nếu CI fail, sửa trên branch (fix lint/type/test/build) rồi push lại.
+| Job | Chạy khi | Lệnh / ghi chú |
+|-----|----------|----------------|
+| Quality | PR sửa code web | migrations + env manifests + Payload import cycles + `npm run lint` (ESLint — chỉ **errors** fail) + `npm run typecheck` |
+| Test | PR sửa code web — chạy **song song** với Quality | PR vào `staging`: spec liên quan file đã sửa (`vitest run --changed`) + ~55 spec đọc file / chạy script (locale JSON, `scripts/db-setup.js`, `vercel.json`, workflow…). PR vào `main`, hoặc đổi `package.json` / lockfile / `tsconfig` / `vitest.config` / `.nvmrc` / helper test dùng chung / `ci.yml` / `unit-tests.yml`, hoặc xoá / đổi tên file code: **full suite + coverage** |
+| AI Platform | PR sửa `services/ai-platform` hoặc `packages/agent-core|ai-contracts` | typecheck + test + build |
+
+PR chỉ sửa docs, plans, `.claude/`, file `.md` hay workflow khác (không phải `ci.yml`) thì không chạy job nặng nào.
+
+**Sau khi merge vào `staging`** — `ci.yml` deploy (chỉ project có thay đổi, theo đúng thứ tự push). Song song: `staging-full-tests.yml` chạy **full test suite** (không chặn deploy, fail thì báo Lark). `e2e-staging.yml` (trigger `push: staging`, không đổi) chờ bản deploy mới rồi chạy E2E.
+
+Build Next.js không chạy trên PR — `npm run build` chỉ là bước kiểm tra local; deploy job build bằng `vercel build`.
+
+**Giữ CI xanh:** git hook (husky) chạy cùng các bước CI ngay trên máy:
+- `pre-commit` (~1–5 s): oxlint trên file `.ts/.tsx` đang stage; chặn `package.json` đổi dependencies mà không stage `package-lock.json`; chặn `pnpm-lock.yaml` / `yarn.lock`.
+- `pre-push` = `npm run verify` (~20 s – 4 phút tùy số file test liên quan): check migrations + env manifests + Payload import cycles → oxlint (`lint:fast`; CI chạy ESLint đầy đủ) → typecheck → test liên quan tới phần sửa so với `origin/staging` (2 worker). PR chỉ sửa docs thì bỏ qua typecheck + test.
+
+Không dùng `--no-verify`. Hook fail → sửa rồi commit/push lại. `npm run build` và full test suite không chạy trong hook (CI chạy full suite cho PR vào `main` và sau merge).
 
 ---
 

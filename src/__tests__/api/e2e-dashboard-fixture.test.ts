@@ -37,6 +37,7 @@ import {
 } from 'payload'
 import { POST } from '@/app/api/e2e/dashboard-fixture/route'
 import { Products } from '@/collections/Products'
+import { DEFAULT_DASHBOARD_BLOCKS } from '@/lib/dashboard-utils'
 
 const publishGateHook = Products.hooks!.beforeChange![1] as CollectionBeforeChangeHook
 const productAfterChangeHook = Products.hooks!.afterChange![0] as CollectionAfterChangeHook
@@ -436,7 +437,7 @@ describe('[TC-F03.78] POST /api/e2e/dashboard-fixture shipping state', () => {
             collection: 'tenants',
             data: {
                 settings: {
-                    dashboardPreferences: ['onboarding', 'glance', 'traffic', 'seo'],
+                    dashboardPreferences: DEFAULT_DASHBOARD_BLOCKS,
                     allowedWebsites: 3,
                 },
             },

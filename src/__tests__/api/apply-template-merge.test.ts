@@ -2,6 +2,19 @@ import { describe, it, expect } from 'vitest'
 import { mergeUserContent, type MergeResult } from '@/lib/ai/merge-user-content'
 
 describe('mergeUserContent', () => {
+    it.each(['navigation', 'footer'])('[TC-F07.039] preserves embedded translations for %s', (blockType) => {
+        const localeContent = { en: { logoText: 'My brand' }, ms: { logoText: 'Jenama saya' } }
+        const existing = { blockType, logoText: 'My brand', _localeContent: localeContent,
+            primaryLocale: 'en', secondaryLocale: 'ms', showLanguageSwitcher: true }
+
+        const [result] = mergeUserContent(
+            [{ blockType, variant: 'centered', logoText: 'Template', _localeContent: { ms: { logoText: 'Template MS' } } }],
+            [existing],
+        )
+
+        expect(result).toMatchObject({ ...existing, variant: 'centered' })
+        expect(result._localeContent).toEqual(localeContent)
+    })
     it('preserves user content fields while applying template structural fields', () => {
         const templateBlocks = [
             { blockType: 'hero', variant: 'split-left', headline: 'Template Title', subheadline: 'Template Sub' },
@@ -17,6 +30,20 @@ describe('mergeUserContent', () => {
             variant: 'split-left',          // structural → from template
             headline: 'My Custom Title',     // content → from user
             subheadline: 'My Custom Sub',    // content → from user
+        })
+    })
+
+    it('preserves the existing top-level block ID when a block is matched', () => {
+        const result = mergeUserContent(
+            [{ id: 'template-block-id', blockType: 'hero', variant: 'split-left', headline: 'Template' }],
+            [{ id: '64f123456789abcdef123456', blockType: 'hero', variant: 'centered', headline: 'User' }],
+        )
+
+        expect(result[0]).toMatchObject({
+            id: '64f123456789abcdef123456',
+            blockType: 'hero',
+            variant: 'split-left',
+            headline: 'User',
         })
     })
 
@@ -70,19 +97,36 @@ describe('mergeUserContent', () => {
         expect(result[0]!.body).toBe('User body text')     // content → from user
     })
 
-    it('skips empty/null user content fields (uses template defaults)', () => {
+    it('preserves explicitly empty/null user content instead of restoring template copy', () => {
         const templateBlocks = [
-            { blockType: 'contact', headline: 'Contact Us', email: 'template@example.com', phone: '+60123456789' },
+            {
+                blockType: 'contact',
+                headline: 'Contact Us',
+                email: 'template@example.com',
+                phone: '+60123456789',
+                formFields: [{ fieldName: 'name', label: 'Name', fieldType: 'text' }],
+            },
         ]
         const existingBlocks = [
-            { blockType: 'contact', headline: '', email: null, phone: '+60999888777' },
+            { blockType: 'contact', headline: '', email: null, phone: '+60999888777', formFields: [] },
         ]
 
         const result = mergeUserContent(templateBlocks, existingBlocks)
 
-        expect(result[0]!.headline).toBe('Contact Us')       // user was empty → template default
-        expect(result[0]!.email).toBe('template@example.com') // user was null → template default
-        expect(result[0]!.phone).toBe('+60999888777')         // user had value → preserved
+        expect(result[0]!.headline).toBe('')
+        expect(result[0]!.email).toBeNull()
+        expect(result[0]!.phone).toBe('+60999888777')
+        expect(result[0]!.formFields).toEqual([])
+    })
+
+    it('uses template copy only when the matched user block does not own the field', () => {
+        const result = mergeUserContent(
+            [{ blockType: 'contact', headline: 'Contact Us', phone: '+60123456789' }],
+            [{ blockType: 'contact', phone: '+60999888777' }],
+        )
+
+        expect(result[0]!.headline).toBe('Contact Us')
+        expect(result[0]!.phone).toBe('+60999888777')
     })
 
     it('preserves array content fields (features, testimonials, faqs)', () => {
@@ -102,6 +146,54 @@ describe('mergeUserContent', () => {
         expect(result[0]!.layout).toBe('grid-3')             // structural → template
         expect(result[0]!.headline).toBe('My Features')      // content → user
         expect(result[0]!.features).toEqual(userFeatures)     // content array → user
+    })
+
+    it('preserves persisted gallery media and captions while dropping invalid template URLs', () => {
+        const templateBlocks = [
+            {
+                blockType: 'gallery',
+                variant: 'carousel',
+                layout: 'grid',
+                headline: 'Template gallery',
+                images: [{ image: 'https://template.example/image.jpg', caption: 'Template image' }],
+            },
+        ]
+        const existingBlocks = [
+            {
+                blockType: 'gallery',
+                variant: 'lightbox',
+                layout: 'masonry',
+                sectionLabel: 'Selected work',
+                headline: 'Our work',
+                images: [
+                    { id: 'row-1', image: 501, caption: 'Finished kitchen' },
+                    { id: 'row-2', image: { id: 502, url: '/media/second.jpg' }, caption: 'Team at work' },
+                    { id: 'row-caption', caption: 'More work coming soon' },
+                    { id: 'row-3', image: 'https://invalid.example/image.jpg', caption: 'Do not retain' },
+                ],
+            },
+        ]
+
+        const result = mergeUserContent(templateBlocks, existingBlocks)
+
+        expect(result[0]!.variant).toBe('carousel')
+        expect(result[0]!.layout).toBe('grid')
+        expect(result[0]!.sectionLabel).toBe('Selected work')
+        expect(result[0]!.headline).toBe('Our work')
+        expect(result[0]!.images).toEqual([
+            { image: 501, caption: 'Finished kitchen' },
+            { image: 502, caption: 'Team at work' },
+            { caption: 'More work coming soon' },
+        ])
+    })
+
+    it('preserves an intentionally empty gallery instead of using template images', () => {
+        const result = mergeUserContent(
+            [{ blockType: 'gallery', layout: 'grid', images: [{ image: 700, caption: 'Template image' }] }],
+            [{ blockType: 'gallery', layout: 'masonry', images: [] }],
+        )
+
+        expect(result[0]!.images).toEqual([])
     })
 
     it('handles template blocks with more types than existing blocks', () => {
@@ -219,7 +311,7 @@ describe('mergeUserContent with returnDetails', () => {
         expect(result.unmatchedUserBlocks).toHaveLength(0)
     })
 
-    it('simulates full apply-template flow: unmatched blocks inserted before footer', () => {
+    it('keeps unmatched source blocks separate from the template-shaped merged layout', () => {
         const existingBlocks = [
             { blockType: 'navigation', style: 'fixed', logoText: 'Store' },
             { blockType: 'hero', variant: 'centered', headline: 'Welcome' },
@@ -234,26 +326,17 @@ describe('mergeUserContent with returnDetails', () => {
             { blockType: 'footer', logoText: 'Template' },
         ]
 
-        const { mergedBlocks: merged, unmatchedUserBlocks } = mergeUserContent(
+        const { mergedBlocks, unmatchedUserBlocks } = mergeUserContent(
             templateBlocks, existingBlocks, { returnDetails: true },
         ) as MergeResult
 
-        // Simulate what apply-template API does: insert unmatched before footer
-        const footerIdx = merged.findIndex(b => b.blockType === 'footer')
-        if (footerIdx !== -1 && unmatchedUserBlocks.length > 0) {
-            merged.splice(footerIdx, 0, ...unmatchedUserBlocks)
-        }
-
-        // Final layout should contain CTA before footer
-        const blockTypes = merged.map(b => b.blockType)
+        const blockTypes = mergedBlocks.map(b => b.blockType)
         expect(blockTypes).toEqual([
-            'navigation', 'hero', 'about',  // from template
-            'cta',                            // unmatched user block preserved
-            'footer',                         // footer always last
+            'navigation', 'hero', 'about', 'footer',
         ])
 
-        // CTA data fully preserved
-        const cta = merged.find(b => b.blockType === 'cta')
+        const cta = unmatchedUserBlocks.find(b => b.blockType === 'cta')
+        expect(cta).toBeDefined()
         expect(cta!.headline).toBe('My CTA')
         expect(cta!.ctaLabel).toBe('Click')
     })

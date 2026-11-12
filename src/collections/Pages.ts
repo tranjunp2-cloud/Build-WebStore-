@@ -1,6 +1,9 @@
-import type { Block, CollectionConfig, CollectionAfterChangeHook } from 'payload'
-import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
+import type { Access, Block, CollectionConfig, CollectionAfterChangeHook, PayloadRequest, Where } from 'payload'
+import type { queueSEOAutoGeneration as QueueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import { revalidatePageAfterChange, revalidatePageAfterDelete } from '../lib/cache/revalidate-storefront'
+
+// Loaded on use: it imports the Payload config, which imports this collection (a static import is a cycle that breaks production builds).
+const queueSEOAutoGeneration: typeof QueueSEOAutoGeneration = async (...args) => (await import('../lib/ai/seo-queue')).queueSEOAutoGeneration(...args)
 // Block definitions — each block is a section of a page
 const HeroBlock = {
     slug: 'hero',
@@ -25,6 +28,9 @@ const HeroBlock = {
                 { label: 'Split Video', value: 'split-video' },
             ],
         },
+        // Ordered slide content is JSON, preserving per-slide copy/CTA and resolved image URLs.
+        { name: 'slides', type: 'json' },
+        { name: 'sourceLayout', type: 'json' },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
@@ -441,18 +447,28 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
     const isPublishingUpdate = operation === 'update' && doc._status === 'published' && previousDoc?._status !== 'published'
     const isPublishingCreate = operation === 'create' && doc._status === 'published'
 
-    // Wait until it becomes published and seo title is empty
-    if ((isPublishingUpdate || isPublishingCreate) && !doc.seo?.title) {
-        const siteId = typeof doc.site === 'object' ? doc.site.id : doc.site
+    // Once it becomes published, fill whichever SEO field is still empty (the queue never overwrites merchant input)
+    if ((isPublishingUpdate || isPublishingCreate) && (!doc.seo?.title?.trim() || !doc.seo?.description?.trim())) {
+        const siteId = doc.site && typeof doc.site === 'object' ? doc.site.id : doc.site
 
         // Guard: req.payload may be unavailable when called from custom API routes
         if (!req?.payload) return
 
-        // Check if auto meta generation is enabled for this site
-        try {
-            const site = await req.payload.findByID({ collection: 'sites', id: siteId, depth: 0 })
-            if (site.seo?.autoMetaEnabled === false) return
-        } catch { /* proceed if can't check */ }
+        // Check if auto meta generation is enabled for this site. `req` keeps the read on this
+        // save's transaction connection (no second pool connection while the first is held);
+        // `disableErrors` returns null for a missing site instead of throwing, which would roll the
+        // save back.
+        if (siteId != null) {
+            const hadTransaction = Boolean(req.transactionID)
+            try {
+                const site = await req.payload.findByID({ collection: 'sites', id: siteId, depth: 0, overrideAccess: true, disableErrors: true, req })
+                if (site?.seo?.autoMetaEnabled === false) return
+            } catch (err) {
+                // Payload rolled the save's transaction back: the page row is gone, so do not report success.
+                if (hadTransaction && !req.transactionID) throw err
+                /* proceed if can't check */
+            }
+        }
 
         // Collect text content for context (very basic extraction)
         let textContext = ''
@@ -462,7 +478,7 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
         }
 
         // Trigger background generation
-        queueSEOAutoGeneration('pages', doc.id, siteId, doc.title, textContext)
+        queueSEOAutoGeneration('pages', doc.id, siteId, doc.title, textContext, req.user)
     }
 }
 
@@ -777,6 +793,7 @@ const BlogListBlock = {
     slug: 'blog-list',
     labels: { singular: 'Blog List', plural: 'Blog Lists' },
     fields: [
+        { name: 'showCategoryFilter', type: 'checkbox', defaultValue: false },
         {
             name: 'variant', type: 'select', defaultValue: 'cards',
             options: [
@@ -798,6 +815,7 @@ const ProductsGridBlock = {
     slug: 'products-grid',
     labels: { singular: 'Products Grid', plural: 'Products Grids' },
     fields: [
+        { name: 'filterControls', type: 'json', validate: (value: unknown) => value == null || (typeof value === 'object' && !Array.isArray(value) && ['category', 'price', 'search', 'attributes'].every(key => typeof (value as Record<string, unknown>)[key] === 'boolean')) || 'Expected category, price, search and attributes booleans' },
         {
             name: 'variant', type: 'select', defaultValue: 'grid-3',
             options: [
@@ -810,6 +828,11 @@ const ProductsGridBlock = {
         { name: 'subheadline', type: 'textarea' },
         { name: 'limit', type: 'number', defaultValue: 6 },
         { name: 'category', type: 'text' },
+        { name: 'selectionMode', type: 'select', defaultValue: 'all', options: [
+            { label: 'All products', value: 'all' }, { label: 'Selected products', value: 'fixed' }, { label: 'Random products', value: 'random' },
+        ] },
+        { name: 'selectedProductIds', type: 'json', defaultValue: [], validate: (value: unknown) => value == null || (Array.isArray(value) && value.every(id => typeof id === 'string' && /^[1-9]\d*$/.test(id))) || 'Expected an array of product IDs' },
+        { name: 'includeOutOfStock', type: 'checkbox', defaultValue: true },
         { name: 'showCategoryFilter', type: 'checkbox', defaultValue: false },
     ],
 }
@@ -827,12 +850,38 @@ const ProductsFeaturedBlock = {
         },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
+        // the section's own pictures: shown while no product is on sale (instead of sample
+        // pictures) and for a product without a photo
+        {
+            name: 'images',
+            type: 'array',
+            fields: [
+                { name: 'image', type: 'upload', relationTo: 'media', required: false },
+                { name: 'caption', type: 'text' },
+            ],
+        },
+    ],
+}
+
+const RichTextBlock = {
+    slug: 'rich-text', labels: { singular: 'Rich Text', plural: 'Rich Text' },
+    fields: [
+        { name: 'html', type: 'code', admin: { language: 'html' } },
+        { name: 'sourceComponentId', type: 'text' },
+        { name: 'paddingY', type: 'number', defaultValue: 64 },
+    ],
+}
+const ContentCardsBlock = {
+    slug: 'content-cards', labels: { singular: 'Content Cards', plural: 'Content Cards' },
+    fields: [
+        { name: 'variant', type: 'text' }, { name: 'headline', type: 'text' },
+        { name: 'sourceComponentId', type: 'text' }, { name: 'sourceContent', type: 'json' },
     ],
 }
 
 const CustomHtmlBlock = {
     slug: 'custom-html',
-    labels: { singular: 'Custom HTML', plural: 'Custom HTML Blocks' },
+    labels: { singular: 'Rich text', plural: 'Rich text Blocks' },
     fields: [
         { name: 'html', type: 'code', required: true, admin: { language: 'html' } },
     ],
@@ -878,6 +927,10 @@ const CarouselBlock = {
                 { label: 'Testimonials', value: 'testimonials' },
             ],
         },
+        { name: 'aspectRatio', type: 'number', min: 0.2, max: 10 },
+        { name: 'imageFit', type: 'select', options: ['cover', 'contain', 'scale-down'] },
+        { name: 'maxImageWidth', type: 'number', min: 1, max: 10000 },
+        { name: 'slidesPerView', type: 'number', min: 1, max: 6 },
         { name: 'headline', type: 'text' },
         { name: 'autoplay', type: 'checkbox', defaultValue: true },
         { name: 'interval', type: 'number', defaultValue: 5000 },
@@ -1516,8 +1569,33 @@ const GalleryMasonryBlock = {
     ],
 }
 
+const isSuperAdminReq = (req: PayloadRequest) => Boolean(req.user?.roles?.includes('super-admin'))
+
+/**
+ * Pages had no access block, so Payload's default (any logged-in user) let any account read, edit and delete every
+ * shop's pages and drafts over REST (TC-PERF-133). Reads are scoped to the member's tenants through the page's
+ * site; writes go through the editor routes (Local API, own tenant checks), so REST writes are super-admin only.
+ */
+const pagesOfMemberTenants = (path: 'site.tenant' | 'version.site.tenant'): Access => ({ req }) => {
+    if (!req.user) return false
+    if (isSuperAdminReq(req)) return true
+    const tenantIds = (req.user.tenants ?? [])
+        .map((t: { tenant?: unknown }) => (t.tenant && typeof t.tenant === 'object' ? (t.tenant as { id: unknown }).id : t.tenant))
+        .filter(Boolean)
+    if (tenantIds.length === 0) return false
+    return { [path]: { in: tenantIds } } as Where
+}
+const superAdminOnly: Access = ({ req }) => isSuperAdminReq(req)
+
 export const Pages: CollectionConfig = {
     slug: 'pages',
+    access: {
+        read: pagesOfMemberTenants('site.tenant'),
+        readVersions: pagesOfMemberTenants('version.site.tenant'),
+        create: superAdminOnly,
+        update: superAdminOnly,
+        delete: superAdminOnly,
+    },
     hooks: {
         afterChange: [afterChangeHook, revalidatePageAfterChange],
         afterDelete: [revalidatePageAfterDelete],
@@ -1594,6 +1672,8 @@ export const Pages: CollectionConfig = {
                 ProductsGridBlock,
                 ProductsFeaturedBlock,
                 CustomHtmlBlock,
+                RichTextBlock,
+                ContentCardsBlock,
                 ServiceCardsBlock,
                 CarouselBlock,
                 StepProcessBlock,

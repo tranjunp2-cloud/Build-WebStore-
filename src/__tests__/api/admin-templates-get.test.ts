@@ -25,7 +25,7 @@ vi.mock('payload', () => ({
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('@/lib/admin/api-utils', () => ({
-    withSuperAdmin: (handler: any) => async (req: any, ctx: any) => handler(req, ctx),
+    withSuperAdmin: (handler: any) => async (req: any, ctx: any) => handler(req, { ...ctx, user: { roles: ['super-admin'] } }), withStudioPermission: (_permission: string, handler: never) => ((handler: any) => async (req: any, ctx: any) => handler(req, ctx))(handler), withStudioSeat: (handler: any) => async (req: any, ctx: any) => handler(req, { ...ctx, user: { roles: ['super-admin'] } }), studioForbidden: () => new Response(null, { status: 403 }),
     UpdateTemplateSchema: { safeParse: (data: any) => ({ success: true, data }) },
 }))
 

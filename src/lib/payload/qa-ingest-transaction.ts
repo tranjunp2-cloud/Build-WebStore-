@@ -1,5 +1,5 @@
-import crypto from "crypto";
 import type { Payload, PayloadRequest } from "payload";
+import { registerTransactionSession } from "./transaction-session";
 
 type TransactionRequest = Pick<PayloadRequest, "transactionID">;
 type TransactionSessionDb = { execute: (query: unknown) => Promise<unknown> };
@@ -23,12 +23,13 @@ export async function withQaIngestTransaction<T>(
   if (!db.drizzle?.transaction)
     throw new Error("Database transactions are unavailable");
   return db.drizzle.transaction(async (transaction) => {
-    const transactionID = crypto.randomUUID();
-    db.sessions[transactionID] = { db: transaction };
+    const session = registerTransactionSession(db, transaction);
     try {
-      return await operation({ transactionID });
+      const result = await operation(session.req);
+      session.assertActive();
+      return result;
     } finally {
-      delete db.sessions[transactionID];
+      session.release();
     }
   }, db.transactionOptions);
 }

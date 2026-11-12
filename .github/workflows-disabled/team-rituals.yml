@@ -18,17 +18,17 @@ jobs:
   sprint-start:
     name: 'Ritual: Sprint Start'
     if: github.event.schedule == '0 1 * * 1' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: read
       pull-requests: read
       contents: read
     steps:
       - name: Checkout (for composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Gather sprint overview
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: overview
         with:
           script: |
@@ -95,10 +95,10 @@ jobs:
   daily-standup:
     name: 'Ritual: Daily Standup'
     if: github.event.schedule == '0 2 * * 2-5'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout (for composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Send standup reminder
         uses: ./.github/actions/lark-notify
@@ -122,17 +122,17 @@ jobs:
   sprint-review:
     name: 'Ritual: Sprint Review'
     if: github.event.schedule == '0 8 * * 5'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: read
       pull-requests: read
       contents: read
     steps:
       - name: Checkout (for composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Gather week summary
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: summary
         with:
           script: |

@@ -6,7 +6,7 @@ import { Metadata } from 'next'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Help Center | EchPrime',
+  title: 'Help Center',
   description: 'Learn how to use your online store management system.'
 }
 

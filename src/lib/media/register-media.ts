@@ -37,20 +37,22 @@ export async function findRegisteredMedia(
 // Register a Payload `media` row for a file ALREADY uploaded to S3 (GH-1284
 // direct upload). Spike 260715 proved payload.create rejects a file-less doc
 // ("No files were uploaded."), so we INSERT the row directly — the media
-// upload collection has no `prefix`, no image sizes, and no tenant column, so a
-// flat filename + core fields is a complete record. `url` is virtual (generated
+// upload collection has no `prefix` and no image sizes, so a flat filename + core
+// fields + the uploader's tenant (TC-PERF-146) is a complete record. `url` is virtual (generated
 // on read via generateFileURL), so we never store it. Direct image registration
 // validates magic bytes from S3 before calling this helper.
 export async function registerUploadedMedia(
     payload: BasePayload,
-    { alt, filename, mimeType, filesize }: { alt: string; filename: string; mimeType: string; filesize: number },
+    { alt, filename, mimeType, filesize, tenantId = null }: {
+        alt: string; filename: string; mimeType: string; filesize: number; tenantId?: number | string | null
+    },
 ): Promise<RegisteredMedia> {
     const pool = getMediaPool(payload)
     const inserted = await pool.query(
-        `INSERT INTO media (alt, filename, mime_type, filesize, updated_at, created_at)
-         VALUES ($1, $2, $3, $4, now(), now())
+        `INSERT INTO media (alt, filename, mime_type, filesize, tenant_id, private, updated_at, created_at)
+         VALUES ($1, $2, $3, $4, $5, false, now(), now())
          RETURNING id`,
-        [alt, filename, mimeType, filesize],
+        [alt, filename, mimeType, filesize, tenantId],
     )
     const id = inserted.rows[0].id as number
     // Read back through Payload so the virtual `url` is generated consistently.

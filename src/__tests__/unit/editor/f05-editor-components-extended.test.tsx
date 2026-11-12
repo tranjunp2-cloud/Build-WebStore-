@@ -3,6 +3,7 @@
  * Coverage Map (QA Doc Traceability):
  *   TC-F05.22  → SaveStatusIndicator shows correct status icons
  *   TC-F05.24  → UnpublishModal renders confirmation dialog
+ *   TC-F05-10-15 → UnpublishModal needs the acknowledge checkbox (reset on every open)
  *   TC-F05.53  → PageManagerPanel slugifyPageTitle normalizes unicode
  *   TC-F05.55  → Editor sandbox — iframe sandbox attribute
  *   TC-F05.60  → Editor utility: findStringFieldPath + updateValueAtPath
@@ -30,7 +31,7 @@ vi.mock('@/i18n', () => ({
             dashboard: { overview: {} },
             editor: {
                 unpublish: { title: 'Unpublish', confirm: 'Confirm', cancel: 'Cancel', description: 'Are you sure?' },
-                unpublishModal: { title: 'Unpublish Site', warningTitle: 'Warning', warningDesc: 'Site will go offline', ownerAccessTitle: 'Owner access', ownerAccessDesc: 'Only you can see', cancel: 'Cancel', confirm: 'Confirm Unpublish', processing: 'Processing...' },
+                unpublishModal: { title: 'Unpublish Site', warningTitle: 'Warning', warningDesc: 'Site will go offline', ownerAccessTitle: 'Owner access', ownerAccessDesc: 'Only you can see', seoTitle: 'SEO', seoDesc: 'Ads may be affected', acknowledge: 'I understand customers cannot visit', cancel: 'Cancel', confirm: 'Confirm Unpublish', confirmTitle: 'Unpublish Site', warningVisitorsDesc: 'Site will go offline', cancelBtn: 'Cancel', confirmBtn: 'Confirm Unpublish', processing: 'Processing...' },
                 saveStatus: { saving: 'Saving...', saved: 'Saved', savedAgo: 'Saved {timeAgo}', notSaved: 'Not saved', draftSaving: 'Draft saving in 3s...' },
             },
         },
@@ -172,8 +173,38 @@ describe('UnpublishModal', () => {
                 isPublishing={false}
             />
         )
+        fireEvent.click(screen.getByLabelText(/I understand customers/))
         fireEvent.click(screen.getByText('Confirm Unpublish'))
         expect(onUnpublish).toHaveBeenCalledOnce()
+    })
+
+    it('[TC-F05-10-15] confirm is disabled until the checkbox is ticked, and never calls onUnpublish before', () => {
+        const onUnpublish = vi.fn()
+        render(<UnpublishModal isOpen onOpenChange={() => {}} onUnpublish={onUnpublish} isPublishing={false} />)
+        const confirm = screen.getByText('Confirm Unpublish') as HTMLButtonElement
+        expect(confirm.disabled).toBe(true)
+        fireEvent.click(confirm)
+        expect(onUnpublish).not.toHaveBeenCalled()
+        fireEvent.click(screen.getByLabelText(/I understand customers/))
+        expect(confirm.disabled).toBe(false)
+    })
+
+    it('[TC-F05-10-15] checkbox is un-ticked every time the modal is re-opened', () => {
+        const props = { onOpenChange: () => {}, onUnpublish: () => {}, isPublishing: false }
+        const { rerender } = render(<UnpublishModal isOpen {...props} />)
+        fireEvent.click(screen.getByLabelText(/I understand customers/))
+        expect((screen.getByLabelText(/I understand customers/) as HTMLInputElement).checked).toBe(true)
+        rerender(<UnpublishModal isOpen={false} {...props} />)
+        rerender(<UnpublishModal isOpen {...props} />)
+        expect((screen.getByLabelText(/I understand customers/) as HTMLInputElement).checked).toBe(false)
+    })
+
+    it('[TC-F05-10-15] Cancel closes the modal without calling onUnpublish', () => {
+        const onUnpublish = vi.fn()
+        const onOpenChange = vi.fn()
+        render(<UnpublishModal isOpen onOpenChange={onOpenChange} onUnpublish={onUnpublish} isPublishing={false} />)
+        fireEvent.click(screen.getByText('Cancel'))
+        expect(onUnpublish).not.toHaveBeenCalled()
     })
 
     it('disables button when isPublishing', () => {

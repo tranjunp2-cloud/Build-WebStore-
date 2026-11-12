@@ -107,7 +107,7 @@ SO THAT tôi mua hàng và seller nhận được đơn
 | FR-07 | Guest checkout — không cần auth | US-F09-03 | P0 | |
 | FR-08 | SST 6% auto-calculated on subtotal | US-F09-03 | P0 | MY market |
 | FR-09 | Shipping: West MY = RM 8, East MY (Sabah/Sarawak) = RM 15. Rate source = hybrid (flat OR EasyParcel real-time per tenant setting — see F14-shipping). | US-F09-03 | P0 | MY market |
-| FR-10 | Place Order → order created, order number ORD-XXXXXXXX | US-F09-03 | P0 | |
+| FR-10 | Place Order → order created, order number `ORD-<ts36>-<16 hex>` (64-bit CSPRNG) | US-F09-03 | P0 | |
 | FR-11 | Cart preserved nếu payment fail | US-F09-03 | P0 | |
 | FR-12 | Confirmation page: order number, items, total. `Continue Shopping` returns to storefront home: `/sites/[slug]` for path-based storefronts, `/` for custom domains. Persistent route `/sites/[slug]/orders/[id]?token=...` (v2.2 — bookmark-able + share-able). | US-F09-04 | P0 | |
 | **FR-12.1** | **[v2.2] Confirmation page COD variant:** Headline "Order Received!" + delivery expectations + tracking placeholder. | US-F09-04 | P0 | D-09 unified template |
@@ -238,7 +238,7 @@ THEN  cart drawer slides in from right
 GIVEN khách có items trong cart và điền đủ thông tin giao hàng
 WHEN  click "Place Order"
 THEN  order created với status='pending'
-  AND order number generated (format: ORD-XXXXXXXX)
+  AND order number generated (format: ORD-<ts36>-<16 hex>, 64-bit random)
   AND success → /order/:id/confirm
   AND SST (6%) calculated on subtotal
 ```

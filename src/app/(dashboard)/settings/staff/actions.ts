@@ -54,7 +54,7 @@ export async function inviteStaffAction(data: InviteStaffData) {
     }
 }
 
-export async function updateStaff(userId: string, name: string, role: string, permissions?: string[]) {
+export async function updateStaff(userId: string, role: string, permissions?: string[]) {
     try {
         const tenantId = await getCurrentTenantId();
         const token = await getAuthToken();
@@ -64,7 +64,7 @@ export async function updateStaff(userId: string, name: string, role: string, pe
         const res = await fetch(`${serverUrl}/api/users/update-staff`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `JWT ${token}` },
-            body: JSON.stringify({ userId, tenantId, name, role, permissions })
+            body: JSON.stringify({ userId, tenantId, role, permissions })
         });
 
         const data = await res.json();

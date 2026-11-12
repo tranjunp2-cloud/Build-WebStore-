@@ -20,6 +20,16 @@ export interface ContactFromSellerData {
     locale?: EmailLocale
 }
 
+/** Exact inverse of escapeHtml: the Subject header is plain text, so entities must not leak into it (GH-2157). */
+function unescapeHtml(s: string): string {
+    return s
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#x27;/g, "'")
+        .replace(/&amp;/g, '&')
+}
+
 function escapeHtml(s: string): string {
     return s
         .replace(/&/g, '&amp;')
@@ -145,5 +155,6 @@ export function contactFromSellerEmail(
 </body>
 </html>`
 
-    return { subject, html }
+    // `subject` stays HTML-escaped for the <title> above; the header gets the plain-text form.
+    return { subject: unescapeHtml(subject), html }
 }

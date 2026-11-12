@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { exchangeOAuthCode, verifyOAuthState } from '@/lib/payment/stripe'
+import { isMerchantAccessSession } from '@/lib/support/merchant-access-session'
 
 /**
  * GET /api/stripe/connect/callback?code=xxx&state=tenantId
@@ -24,6 +25,11 @@ export async function GET(request: Request) {
 
     if (error || !code || !tenantId) {
         console.error('[Stripe OAuth Callback] Missing params, error, or invalid state:', { error, code: !!code, tenantId: !!tenantId })
+        return NextResponse.redirect(`${paymentsUrl}?stripe=refresh`)
+    }
+
+    // A merchant-access session never changes where the merchant is paid (TC-F15.39)
+    if (isMerchantAccessSession(request)) {
         return NextResponse.redirect(`${paymentsUrl}?stripe=refresh`)
     }
 

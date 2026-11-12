@@ -119,7 +119,7 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
 }
 
 export async function POST(req: NextRequest) {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(req)
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

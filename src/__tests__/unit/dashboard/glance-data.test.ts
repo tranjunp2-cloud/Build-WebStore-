@@ -79,38 +79,31 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
         expect(mocks.execute).not.toHaveBeenCalled()
     })
 
-    it('uses equal UTC bounds for Views, Leads, and Engagement counts', async () => {
+    it('[TC-PERF-057] reads views, leads and engagement for both windows in one statement with equal UTC bounds', async () => {
         // Arrange — default empty query responses
 
         // Act
         await getGlanceData('7d', { user: authorizedUser })
 
         // Assert
-        expect(mocks.count).toHaveBeenCalledTimes(6)
-        const countCalls = mocks.count.mock.calls.map(call => call[0])
-        const currentBounds = {
-            greater_than_equal: '2026-07-21T00:00:00.000Z',
-            less_than: '2026-07-28T00:00:00.000Z',
-        }
-        const previousBounds = {
-            greater_than_equal: '2026-07-14T00:00:00.000Z',
-            less_than: '2026-07-21T00:00:00.000Z',
-        }
-        expect(countCalls.map(call => call.where.createdAt)).toEqual([
-            currentBounds, previousBounds,
-            currentBounds, previousBounds,
-            currentBounds, previousBounds,
-        ])
-        expect(countCalls.map(call => call.where.tenant)).toEqual(
-            Array.from({ length: 6 }, () => ({ equals: 'tenant-a' })),
-        )
-        expect(countCalls.map(call => call.where.event)).toEqual([
-            { equals: 'pageview' },
-            { equals: 'pageview' },
-            { equals: 'click' },
-            { equals: 'click' },
-            { in: ['add_to_cart', 'checkout'] },
-            { in: ['add_to_cart', 'checkout'] },
+        expect(mocks.count).not.toHaveBeenCalled()
+        expect(mocks.execute).toHaveBeenCalledTimes(2)
+        const analytics = mocks.execute.mock.calls[0][0] as CapturedSql
+        const text = sqlText(analytics)
+        expect(text).toContain('FROM analytics')
+        expect(text).toContain("event IN ('pageview', 'click', 'add_to_cart', 'checkout')")
+        expect(text).toContain("COUNT(*) FILTER (WHERE event = 'pageview')")
+        expect(text).toContain("COUNT(*) FILTER (WHERE event = 'click')")
+        expect(text).toContain("COUNT(*) FILTER (WHERE event IN ('add_to_cart', 'checkout'))")
+        expect(text).toContain('created_at AT TIME ZONE ?')
+        expect(text).toContain('GROUP BY day, is_current')
+        // previous start .. current end, the current-window flag at the current start
+        expect(analytics.values).toEqual([
+            'UTC',
+            '2026-07-21T00:00:00.000Z',
+            'tenant-a',
+            '2026-07-14T00:00:00.000Z',
+            '2026-07-28T00:00:00.000Z',
         ])
     })
     it('uses UTC in every SQL series and enforces completed MYR created-at Revenue', async () => {
@@ -120,15 +113,15 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
         await getGlanceData('7d', { user: authorizedUser })
 
         // Assert
-        expect(mocks.execute).toHaveBeenCalledTimes(4)
+        expect(mocks.execute).toHaveBeenCalledTimes(2)
         const queries = mocks.execute.mock.calls.map(call => call[0] as CapturedSql)
         queries.forEach((query) => {
             expect(sqlText(query)).toContain('created_at AT TIME ZONE ?')
-            expect(sqlText(query)).toContain("GROUP BY 1")
+            expect(sqlText(query)).toContain('GROUP BY')
             expect(query.values.filter(value => value === "UTC")).toHaveLength(1)
             expect(query.values).toContain('tenant-a')
         })
-        const revenueQuery = queries[3]
+        const revenueQuery = queries[1]
         const revenueSql = sqlText(revenueQuery)
         expect(revenueSql).toContain("status = 'completed'")
         expect(revenueSql).toContain("COALESCE(currency, 'MYR') = 'MYR'")
@@ -154,24 +147,22 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
         const result = await getGlanceData('today', { user: unauthorizedUser })
 
         // Assert
-        expect(mocks.execute).toHaveBeenCalledTimes(3)
+        expect(mocks.execute).toHaveBeenCalledTimes(1)
         expect(mocks.execute.mock.calls.map(call => sqlText(call[0] as CapturedSql)).join(' ')).not.toContain('FROM orders')
         expect(result.stats.revenue).toEqual({ value: 0, delta: 0, currency: true })
         expect(result.sparks.revenue).toEqual([0])
     })
     it('derives current total, comparison, and zero-filled series from one Revenue aggregate', async () => {
-        // Arrange
-        mocks.count
-            .mockResolvedValueOnce({ totalDocs: 10 })
-            .mockResolvedValueOnce({ totalDocs: 5 })
-            .mockResolvedValueOnce({ totalDocs: 20 })
-            .mockResolvedValueOnce({ totalDocs: 10 })
-            .mockResolvedValueOnce({ totalDocs: 0 })
-            .mockResolvedValueOnce({ totalDocs: 0 })
+        // Arrange — analytics rows per (day, window); revenue per day across both windows
         mocks.execute
-            .mockResolvedValueOnce({ rows: [{ date_str: '2026-07-21', count: '3' }] })
-            .mockResolvedValueOnce({ rows: [{ date_str: '2026-07-22', count: '4' }] })
-            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({
+                rows: [
+                    { date_str: '2026-07-21', is_current: true, views: '3', leads: '0', engage: '0' },
+                    { date_str: '2026-07-22', is_current: true, views: '7', leads: '4', engage: '0' },
+                    { date_str: '2026-07-23', is_current: true, views: '0', leads: '16', engage: '0' },
+                    { date_str: '2026-07-15', is_current: false, views: '5', leads: '10', engage: '0' },
+                ],
+            })
             .mockResolvedValueOnce({
                 rows: [
                     { date_str: '2026-07-19', count: '25.25' },
@@ -191,24 +182,20 @@ describe('[TC-F03.05] getGlanceData UTC and Revenue contract', () => {
         expect(result.stats.engage).toEqual({ value: 0, delta: 0 })
         expect(result.stats.revenue.value).toBeCloseTo(150.25)
         expect(result.stats.revenue.delta).toBeCloseTo(((150.25 - 25.25) / 25.25) * 100)
-        expect(result.sparks.views).toEqual([3, 0, 0, 0, 0, 0, 0])
-        expect(result.sparks.leads).toEqual([0, 4, 0, 0, 0, 0, 0])
+        expect(result.sparks.views).toEqual([3, 7, 0, 0, 0, 0, 0])
+        expect(result.sparks.leads).toEqual([0, 4, 16, 0, 0, 0, 0])
         expect(result.sparks.revenue).toEqual([100.1, 0, 0, 0, 0, 0, 50.15])
     })
 
     it('keeps aggregated values and percentage deltas finite for extreme finite inputs', async () => {
         // Arrange — each operand is finite, but IEEE-754 arithmetic overflows.
-        mocks.count
-            .mockResolvedValueOnce({ totalDocs: 1e308 })
-            .mockResolvedValueOnce({ totalDocs: 1e-308 })
-            .mockResolvedValueOnce({ totalDocs: 0 })
-            .mockResolvedValueOnce({ totalDocs: 0 })
-            .mockResolvedValueOnce({ totalDocs: 0 })
-            .mockResolvedValueOnce({ totalDocs: 0 })
         mocks.execute
-            .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({
+                rows: [
+                    { date_str: '2026-07-21', is_current: true, views: 1e308, leads: 0, engage: 0 },
+                    { date_str: '2026-07-15', is_current: false, views: 1e-308, leads: 0, engage: 0 },
+                ],
+            })
             .mockResolvedValueOnce({
                 rows: [
                     { date_str: '2026-07-20', count: 1e-308 },

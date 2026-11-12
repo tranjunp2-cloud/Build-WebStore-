@@ -26,9 +26,7 @@ const appendTimelineHook: CollectionBeforeChangeHook = ({ data, originalDoc }) =
                 data: { from: originalDoc.status, to: data.status },
                 at: now,
             })
-            if (data.status === 'fixed' || data.status === 'wont-fix') {
-                data.resolvedAt = now
-            }
+            data.resolvedAt = data.status === 'done' ? now : null
         }
         if (data.assignedTo !== undefined && data.assignedTo !== originalDoc.assignedTo) {
             timeline.push({
@@ -111,12 +109,14 @@ export const TemplateIssues: CollectionConfig = {
             type: 'select',
             required: true,
             index: true,
-            defaultValue: 'open',
+            defaultValue: 'backlog',
             options: [
-                { label: 'Open', value: 'open' },
-                { label: 'In Review', value: 'in-review' },
-                { label: 'Fixed', value: 'fixed' },
-                { label: "Won't Fix", value: 'wont-fix' },
+                { label: 'Backlog', value: 'backlog' },
+                { label: 'Reopen', value: 'reopen' },
+                { label: 'Dev đang xử lý', value: 'in_progress' },
+                { label: 'Dev đã sửa', value: 'dev_fixed' },
+                { label: 'QA Testing', value: 'testing' },
+                { label: 'Done — trả về User Generations để test lại', value: 'done' },
             ],
         },
         {
@@ -129,6 +129,7 @@ export const TemplateIssues: CollectionConfig = {
                 { label: 'Generation', value: 'generation' },
                 { label: 'Block', value: 'block' },
                 { label: 'Runtime', value: 'runtime' },
+                { label: 'Manual report', value: 'manual' },
             ],
         },
         {
@@ -137,6 +138,13 @@ export const TemplateIssues: CollectionConfig = {
             required: true,
             index: true,
             admin: { description: 'Template id / Generation id / Block slug / Runtime provider key (polymorphic soft FK).' },
+        },
+        {
+            name: 'dedupeKey',
+            type: 'text',
+            unique: true,
+            index: true,
+            admin: { readOnly: true, description: 'Server-owned idempotency key for internally promoted incidents. Null for manually-created issues.' },
         },
         {
             name: 'reportedBy',
@@ -149,6 +157,17 @@ export const TemplateIssues: CollectionConfig = {
             type: 'relationship',
             relationTo: 'users',
             admin: { description: 'Assignee (optional).' },
+        },
+        {
+            name: 'assignmentTarget',
+            type: 'select',
+            required: true,
+            defaultValue: 'unassigned',
+            options: [
+                { label: 'Chưa phân công', value: 'unassigned' },
+                { label: 'DEV', value: 'dev' },
+            ],
+            admin: { description: 'Nhóm xử lý ticket; không gán cho một tài khoản cá nhân.' },
         },
         {
             name: 'comments',

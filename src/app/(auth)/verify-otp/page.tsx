@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
+import { OTP_EXPIRY_END_KEY, OTP_RESEND_END_KEY, parseOtpSendFailure, retryAfterMinutes } from '@/lib/auth/login-otp-cooldown'
 
 const OTP_LENGTH = 6
 const RESEND_COOLDOWN_S = 60
@@ -31,20 +32,20 @@ function VerifyOTPContent() {
     // Hydrate timers from sessionStorage on mount (survives F5)
     useEffect(() => {
         setIsMounted(true)
-        const resendEnd = sessionStorage.getItem('otp_resend_end')
+        const resendEnd = sessionStorage.getItem(OTP_RESEND_END_KEY)
         if (resendEnd) {
             const remaining = Math.ceil((Number(resendEnd) - Date.now()) / 1000)
             setResendCooldown(remaining > 0 ? remaining : 0)
         } else {
-            sessionStorage.setItem('otp_resend_end', String(Date.now() + RESEND_COOLDOWN_S * 1000))
+            sessionStorage.setItem(OTP_RESEND_END_KEY, String(Date.now() + RESEND_COOLDOWN_S * 1000))
         }
 
-        const expiryEnd = sessionStorage.getItem('otp_expiry_end')
+        const expiryEnd = sessionStorage.getItem(OTP_EXPIRY_END_KEY)
         if (expiryEnd) {
             const remaining = Math.ceil((Number(expiryEnd) - Date.now()) / 1000)
             setCountdown(remaining > 0 ? remaining : 0)
         } else {
-            sessionStorage.setItem('otp_expiry_end', String(Date.now() + COUNTDOWN_INITIAL_S * 1000))
+            sessionStorage.setItem(OTP_EXPIRY_END_KEY, String(Date.now() + COUNTDOWN_INITIAL_S * 1000))
         }
     }, [])
 
@@ -184,14 +185,28 @@ function VerifyOTPContent() {
 
             if (!res.ok) {
                 const data = await res.json().catch(() => null)
-                const message = data?.errors?.[0]?.message || t.auth.otp.resendFailed
-                toast.error(message)
+                const failure = parseOtpSendFailure(res.status, data)
+                if (failure.kind === 'failed') {
+                    toast.error(t.auth.otp.resendFailed)
+                    return
+                }
+                // Cooldown / send limit: wait out the server's retryAfter, translated (TC-PERF-181)
+                sessionStorage.setItem(OTP_RESEND_END_KEY, String(Date.now() + failure.retryAfter * 1000))
+                setResendCooldown(failure.retryAfter)
+                if (failure.kind === 'rateLimited') {
+                    const minutes = String(retryAfterMinutes(failure.retryAfter))
+                    if (failure.expiresIn) {
+                        toast.warning(t.auth.otpRateLimitedTitle, { description: t.auth.otpRateLimitedDesc.replace('{minutes}', minutes) })
+                    } else {
+                        toast.error(t.auth.errors.otpRateLimited.replace('{minutes}', minutes))
+                    }
+                }
                 return
             }
 
             toast.success(t.auth.otp.newCodeSent, { description: t.auth.otp.newCodeDesc })
-            sessionStorage.setItem('otp_resend_end', String(Date.now() + RESEND_COOLDOWN_S * 1000))
-            sessionStorage.setItem('otp_expiry_end', String(Date.now() + COUNTDOWN_INITIAL_S * 1000))
+            sessionStorage.setItem(OTP_RESEND_END_KEY, String(Date.now() + RESEND_COOLDOWN_S * 1000))
+            sessionStorage.setItem(OTP_EXPIRY_END_KEY, String(Date.now() + COUNTDOWN_INITIAL_S * 1000))
             setResendCooldown(RESEND_COOLDOWN_S)
             setCountdown(COUNTDOWN_INITIAL_S)
             setOtp(Array(OTP_LENGTH).fill(''))

@@ -121,6 +121,15 @@ describe('[TC-F02-RTOKEN] POST /api/auth/refresh-token', () => {
         expect(res.data.error).toBe('Invalid or expired token')
     })
 
+    it('TC-F15.36: never renews a support session opened through a merchant access link', async () => {
+        vi.mocked(jwtVerify).mockResolvedValueOnce({
+            payload: { id: 3185, email: 'owner@example.com', mfa_verified: true, impersonated_by: 7 },
+        } as any)
+        const res = await POST(makeReq() as any) as any
+        expect(res.status).toBe(401)
+        expect(mockPayload.find).not.toHaveBeenCalled()
+    })
+
     // ── User lookup ────────────────────────────────────────────────────────────
 
     it('TC-F02-RTOKEN-04: returns 403 when user not found in DB', async () => {
@@ -153,14 +162,18 @@ describe('[TC-F02-RTOKEN] POST /api/auth/refresh-token', () => {
         expect(signedPayload.mfa_verified).toBe(true)
     })
 
-    it('TC-F02-RTOKEN-07: defaults mfa_verified to true when claim absent in original token', async () => {
-        // Legacy token issued before mfa_verified was added — undefined ?? true → true
+    it('TC-F02-RTOKEN-07 / TC-PERF-143: refuses a token without mfa_verified (never upgrades it to an OTP session)', async () => {
+        // Arrange — a raw-secret token with no OTP proof (getCurrentUser refuses it too)
         vi.mocked(jwtVerify).mockResolvedValueOnce({
             payload: { id: 42, email: 'user@example.com' },
         } as any)
-        await POST(makeReq() as any)
-        const signedPayload = vi.mocked(SignJWT).mock.calls[0][0] as Record<string, unknown>
-        expect(signedPayload.mfa_verified).toBe(true)
+
+        // Act
+        const res = await POST(makeReq() as any) as any
+
+        // Assert
+        expect(res.status).toBe(401)
+        expect(vi.mocked(SignJWT)).not.toHaveBeenCalled()
     })
 
     // ── Happy path ─────────────────────────────────────────────────────────────

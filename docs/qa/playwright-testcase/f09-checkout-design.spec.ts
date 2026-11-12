@@ -231,6 +231,23 @@ async function runMobile375pxLayout(page: Page) {
     expect(noOverflow).toBe(true)
 }
 
+async function runMobile320pxLayout(page: Page) {
+    await page.setViewportSize({ width: 320, height: 700 })
+    await gotoCheckout(page)
+    const metrics = await page.evaluate(() => ({
+        innerWidth: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        formWidth: document.querySelector('.ck-form')?.getBoundingClientRect().width ?? 0,
+    }))
+    expect(metrics.innerWidth).toBe(320)
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.innerWidth)
+    expect(metrics.formWidth).toBeLessThanOrEqual(320)
+    const apply = page.locator('.ck-dc-apply').first()
+    await expect(apply).toBeVisible()
+    const box = await apply.boundingBox()
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+}
+
 // ─── Runtime check map ──────────────────────────────────────────────────────
 
 const runtimeChecks: Record<string, RuntimeCheck> = {
@@ -279,5 +296,9 @@ test.describe('F09 Checkout — Live Browser Flows (staging-gated)', () => {
 
     test('TC-F09.204 — Mobile 375px no horizontal overflow', async ({ page }) => {
         await runMobile375pxLayout(page)
+    })
+
+    test('TC-F09.287 — Mobile 320px no overflow/zoom-out, promo >= 44px', async ({ page }) => {
+        await runMobile320pxLayout(page)
     })
 })

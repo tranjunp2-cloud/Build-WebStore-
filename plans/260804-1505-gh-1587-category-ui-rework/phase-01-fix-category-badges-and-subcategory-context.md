@@ -9,10 +9,10 @@ effort: 3h
 ## Context Links
 
 - Issue: `https://github.com/primeproduction/ech-prime-web-v2/issues/1587#issuecomment-5030223972`
-- QA report: `/home/liam/data/ech-prime-web-v2/.gstack/qa-reports/qa-report-localhost-2026-08-04.md`
-- Badge screenshot: `/home/liam/data/ech-prime-web-v2/.gstack/qa-reports/screenshots/gh1587-category-badges.png`
-- Modal screenshot: `/home/liam/data/ech-prime-web-v2/.gstack/qa-reports/screenshots/gh1587-add-subcategory-modal.png`
-- Previous UX phase: `/home/liam/data/ech-prime-web-v2/plans/260710-1625-f08-category-integrity/phase-05b-category-modal-ux.md`
+- QA report: `./.gstack/qa-reports/qa-report-localhost-2026-08-04.md`
+- Badge screenshot: `./.gstack/qa-reports/screenshots/gh1587-category-badges.png`
+- Modal screenshot: `./.gstack/qa-reports/screenshots/gh1587-add-subcategory-modal.png`
+- Previous UX phase: `./plans/260710-1625-f08-category-integrity/phase-05b-category-modal-ux.md`
 
 ## Overview
 
@@ -20,9 +20,9 @@ Make the existing per-level color mapping authoritative across themes, then comp
 
 ## Key Insights
 
-- `/home/liam/data/ech-prime-web-v2/src/components/ui/badge.tsx` adds `dark:text-gray-300` for `variant="outline"`. It wins over Category Manager's non-important level text class, making every dark-mode badge gray.
-- `/home/liam/data/ech-prime-web-v2/src/app/(dashboard)/products/categories/components/CategoryManager.tsx` already knows whether the modal came from row `+`, preselects the parent, disables Parent, computes hierarchy levels, and hides `+` at L3.
-- `/home/liam/data/ech-prime-web-v2/src/i18n/index.tsx` already exposes `ti(template, vars)` for multi-placeholder interpolation. Do not add a duplicate formatter.
+- `./src/components/ui/badge.tsx` adds `dark:text-gray-300` for `variant="outline"`. It wins over Category Manager's non-important level text class, making every dark-mode badge gray.
+- `./src/app/(dashboard)/products/categories/components/CategoryManager.tsx` already knows whether the modal came from row `+`, preselects the parent, disables Parent, computes hierarchy levels, and hides `+` at L3.
+- `./src/i18n/index.tsx` already exposes `ti(template, vars)` for multi-placeholder interpolation. Do not add a duplicate formatter.
 
 ## Requirements
 
@@ -54,23 +54,23 @@ Make the existing per-level color mapping authoritative across themes, then comp
 
 ### Modify
 
-- `/home/liam/data/ech-prime-web-v2/src/app/(dashboard)/products/categories/components/CategoryManager.tsx`
+- `./src/app/(dashboard)/products/categories/components/CategoryManager.tsx`
   - Consume `ti` from `useI18n`.
   - Make the L1/L2/L3 text classes authoritative in both themes.
   - Derive parent/current/new level context.
   - Add the information banner and locked-parent helper.
-- `/home/liam/data/ech-prime-web-v2/src/i18n/locales/en.json`
+- `./src/i18n/locales/en.json`
   - Add `dashboard.products.categories.form.subcategoryContext`.
   - Add `dashboard.products.categories.form.parentLockedHelp`.
-- `/home/liam/data/ech-prime-web-v2/src/i18n/locales/ms.json`
+- `./src/i18n/locales/ms.json`
   - Add equivalent Malay keys with identical placeholders.
 
 ### Must Not Modify
 
-- `/home/liam/data/ech-prime-web-v2/src/components/ui/badge.tsx`
-- `/home/liam/data/ech-prime-web-v2/src/app/(dashboard)/products/categories/actions.ts`
-- `/home/liam/data/ech-prime-web-v2/src/collections/Categories.ts`
-- `/home/liam/data/ech-prime-web-v2/scripts/db-setup.js`
+- `./src/components/ui/badge.tsx`
+- `./src/app/(dashboard)/products/categories/actions.ts`
+- `./src/collections/Categories.ts`
+- `./scripts/db-setup.js`
 
 ## Implementation Steps
 

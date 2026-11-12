@@ -16,6 +16,7 @@ import {
     getCategoryPublishedPostCountAction,
 } from '../actions'
 import { useI18n } from '@/i18n'
+import { BLOG_CATEGORY_DUPLICATE_CODE } from '@/lib/blog/blog-category-codes'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -76,7 +77,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
         try {
             const res = await createBlogCategoryAction({ name: newName.trim() })
             if (res?.error) {
-                toast.error(t.dashboard.blog.categoryModal.toastCreateFail)
+                toast.error(res.code === BLOG_CATEGORY_DUPLICATE_CODE ? t.dashboard.blog.categoryModal.toastDuplicate : t.dashboard.blog.categoryModal.toastCreateFail)
                 return
             }
             toast.success(t.dashboard.blog.categoryModal.toastCreateSuccess)
@@ -102,7 +103,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
         try {
             const res = await updateBlogCategoryAction(editingId, { name: editName.trim() })
             if (res?.error) {
-                toast.error(t.dashboard.blog.categoryModal.toastUpdateFail)
+                toast.error(res.code === BLOG_CATEGORY_DUPLICATE_CODE ? t.dashboard.blog.categoryModal.toastDuplicate : t.dashboard.blog.categoryModal.toastUpdateFail)
                 return
             }
             toast.success(t.dashboard.blog.categoryModal.toastUpdateSuccess)

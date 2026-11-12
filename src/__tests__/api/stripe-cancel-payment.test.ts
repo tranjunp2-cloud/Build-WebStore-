@@ -33,6 +33,7 @@ vi.mock('@/lib/discounts/release-discount-redemption', () => ({
 }))
 
 import { POST } from '@/app/api/orders/[id]/cancel-payment/route'
+import { verifyOrderViewToken } from '@/lib/orders/order-view-token'
 import { verifyConfirmToken } from '@/lib/orders/upload-token'
 import { verifyOrderToken } from '@/lib/auth/order-token'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
@@ -78,6 +79,7 @@ const ORDER_MIXED = {
 
 beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv('PAYLOAD_SECRET', 'test-payload-secret')
     mockCookieGet.mockReturnValue(undefined)
     mockVerifyConfirmToken.mockReturnValue(false)
     mockVerifyOrderToken.mockResolvedValue({ ok: false } as any)
@@ -105,6 +107,26 @@ describe('POST /api/orders/[id]/cancel-payment [TC-F13.07]', () => {
         // F33: the CAS winner releases the order's redeemed discount slot
         expect(mockReleaseDiscount).toHaveBeenCalledOnce()
         expect(mockReleaseDiscount).toHaveBeenCalledWith(expect.anything(), 78)
+    })
+
+    it('[TC-PERF-177] swaps the confirm cookie for a short-lived view cookie so the buyer still sees their details on the tracking page', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValueOnce(AWAITING_ORDER)
+        mockCookieGet.mockReturnValue({ value: 'valid-ct' })
+        mockVerifyConfirmToken.mockReturnValue(true)
+        mockExecute.mockResolvedValueOnce({ rows: [{ id: 78 }] })
+
+        // Act
+        const res = await POST(mockRequest(), ctx('78')) as import('next/server').NextResponse
+
+        // Assert: ct_ cleared, ov_ valid for this order only
+        expect(res.cookies.get('ct_78')?.value).toBe('')
+        const view = res.cookies.get('ov_78')
+        expect(view?.httpOnly).toBe(true)
+        expect(view?.maxAge).toBe(24 * 60 * 60)
+        expect(verifyOrderViewToken(view?.value, 78, 'ORD-ABC123')).toBe(true)
+        expect(verifyOrderViewToken(view?.value, 78, 'ORD-OTHER')).toBe(false)
+        expect(verifyOrderViewToken(view?.value, 79, 'ORD-ABC123')).toBe(false)
     })
 
     it('[TC-F13.07] cancels with a valid magic-link token when no cookie', async () => {

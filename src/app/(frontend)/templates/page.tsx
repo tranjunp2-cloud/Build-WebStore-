@@ -70,8 +70,17 @@ export default function TemplatesPage() {
             } else if (res.status === 401) {
                 toast.error('Please login first to use templates')
                 router.push('/login')
+            } else if (res.status === 409) {
+                // GH-2154: the account already has a website (or one is being generated).
+                // Stay on the page so the message is readable; the action takes the owner to their site.
+                const dashboardHref = data.error?.code === 'GENERATION_IN_PROGRESS' ? '/dashboard?ai_status=generating' : '/dashboard'
+                toast.info(data.error?.message || 'This account already has a website.', {
+                    duration: 10_000,
+                    action: { label: 'Go to dashboard', onClick: () => router.push(dashboardHref) },
+                })
             } else {
-                toast.error(data.error || `Failed to apply template (${res.status})`)
+                const message = typeof data.error === 'string' ? data.error : data.error?.message
+                toast.error(message || `Failed to apply template (${res.status})`)
             }
         } catch {
             toast.error('Network error — failed to apply template')

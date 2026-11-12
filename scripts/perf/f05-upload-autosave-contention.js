@@ -104,7 +104,8 @@ export function setup() {
 export default function ({ token }) {
   // Both routes currently authenticate via the Payload cookie, rather than the
   // Authorization header, so use the same cookie shape as the browser client.
-  const headers = { Cookie: `payload-token=${token}` }
+  // A cookie-authenticated write also needs the same-host Origin a browser sends (TC-PERF-162).
+  const headers = { Cookie: `payload-token=${token}`, Origin: BASE_URL }
   const file = http.file(IMAGE_BYTES, `gh-1640-vu-${__VU}-iter-${__ITER}.png`, 'image/png')
   const uploadBody = { file, alt: `GH-1640 VU ${__VU} iteration ${__ITER}` }
   const autosaveBody = JSON.stringify({

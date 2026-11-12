@@ -2,11 +2,11 @@
  * PATCH /api/admin/blocks/[slug]/variants/[variantId]
  * Upsert override metadata for a specific block variant.
  * [variantId] is the variant name string (e.g. "centered"), not a numeric DB id.
- * Super-admin only. Validates slug against registry whitelist.
+ * Needs block.edit. Validates slug against registry whitelist.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission } from '@/lib/admin/api-utils'
 import { getBlockBySlug, getRegistrySlugs } from '@/lib/admin/block-registry-reader'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -21,7 +21,7 @@ const PatchVariantSchema = z.object({
 type RouteContext = { params: Promise<{ slug: string; variantId: string }> }
 
 export const PATCH = async (req: NextRequest, ctx: RouteContext) => {
-    return withSuperAdmin(async () => {
+    return withStudioPermission('block.edit', async () => {
         const { slug, variantId } = await ctx.params
 
         // Registry whitelist check

@@ -21,6 +21,7 @@ import { CancelOrderModal } from './CancelOrderModal'
 import { getMobileOrderActions } from './mobile-order-actions'
 import type { CreateLabelFlowHandle } from './detail/create-label-flow'
 import { useI18n } from '@/i18n'
+import { useInvalidateOrders, useOrderDetailQuery } from './orders-queries'
 
 // ── Status badge mapping ──────────────────────────────────────────────────────
 type StatusCls = 'ok' | 'blue' | 'warn' | 'danger'
@@ -41,23 +42,23 @@ interface RawOrder {
     selfDeliveryCourier?: string | null
 }
 
-function formatCreatedDate(iso?: string | null): string {
+const DATE_LOCALES = { en: 'en-GB', ms: 'ms-MY' } as const
+
+function formatCreatedDate(iso: string | null | undefined, locale: keyof typeof DATE_LOCALES): string {
     if (!iso) return '—'
     const d = new Date(iso)
+    const tag = DATE_LOCALES[locale] ?? 'en-GB'
     return (
-        d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
+        d.toLocaleDateString(tag, { day: 'numeric', month: 'short', year: 'numeric' }) +
         ' · ' +
-        d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        d.toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit', hour12: false })
     )
 }
 
 // ── Main view ────────────────────────────────────────────────────────────────
 export function OrderDetailView({ orderId }: { orderId: string }) {
     const router = useRouter()
-    const { t, ti } = useI18n()
-    const [order, setOrder] = useState<OrderDetail | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [notFound, setNotFound] = useState(false)
+    const { t, ti, locale } = useI18n()
     const [mobileActionLoading, setMobileActionLoading] = useState(false)
     const [mobileCancelOpen, setMobileCancelOpen] = useState(false)
     const [mobileActionBarHeight, setMobileActionBarHeight] = useState(0)
@@ -67,28 +68,27 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
     // slow silent refetch can't re-toast the same transition on the next 20s tick.
     const cancelToastedForRef = useRef<string | null>(null)
 
-    // `silent` = poll-triggered refresh: update the card in place without flipping the
-    // full-page loading spinner (avoids a flash every time the background poll re-pulls).
-    const fetchOrder = useCallback(async (opts?: { silent?: boolean }) => {
-        if (!opts?.silent) setLoading(true)
-        if (!opts?.silent) setNotFound(false)
-        try {
-            const res = await fetch(`/api/orders/${orderId}?depth=2`)
-            // Only a user/mount fetch may tear the page down to "not found". A transient 404
-            // on a silent background poll (replica lag / session blip) must NOT destroy an open,
-            // valid order view — next tick self-heals.
-            if (res.status === 404) { if (!opts?.silent) setNotFound(true); return }
-            if (!res.ok) throw new Error('fetch_failed')
-            const result = await res.json()
-            setOrder(result.data || result)
-        } catch {
-            if (!opts?.silent) toast.error(t.dashboard.orders.toast.loadFailed)
-        } finally {
-            if (!opts?.silent) setLoading(false)
-        }
-    }, [orderId, t.dashboard.orders.toast.loadFailed])
+    // The order (cached per id). A write re-reads it in place through the dashboard's query invalidation;
+    // child cards take it as props, their own forms (reject reason, weight...) stay as typed.
+    const orderQuery = useOrderDetailQuery<OrderDetail>(orderId)
+    const loaded = orderQuery.data
+    const order = loaded && 'order' in loaded ? loaded.order : null
+    const notFound = Boolean(loaded && 'notFound' in loaded)
+    const loading = orderQuery.isPending
+    const invalidateOrders = useInvalidateOrders()
 
-    useEffect(() => { fetchOrder() }, [fetchOrder])
+    // Only the first read may say "could not load"; a failed background re-read keeps the order on screen.
+    const loadFailed = orderQuery.isLoadingError
+    useEffect(() => {
+        if (loadFailed) toast.error(t.dashboard.orders.toast.loadFailed)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loadFailed])
+
+    /** re-read this order in place (no spinner); `everywhere`: a write from this page also made the lists stale */
+    const fetchOrder = useCallback((opts?: { everywhere?: boolean }) => {
+        if (opts?.everywhere) return void invalidateOrders()
+        void orderQuery.refetch()
+    }, [invalidateOrders, orderQuery.refetch])
 
     const mobileActions = getMobileOrderActions(order?.status ?? '')
 
@@ -145,7 +145,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                     cancelToastedForRef.current = data.updatedAt
                     toast.info(t.dashboard.orders.toast.shipmentCancelledOnEp)
                 }
-                fetchOrder({ silent: true })
+                fetchOrder()
             } catch {
                 // transient network/DB blip — the next tick retries
             }
@@ -169,7 +169,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                 throw new Error(data?.error?.message ?? 'Failed to confirm order')
             }
             toast.success(t.dashboard.orders.fulfillment.orderConfirmed)
-            fetchOrder()
+            fetchOrder({ everywhere: true })
             router.refresh()
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : t.dashboard.orders.fulfillment.confirmFailed)
@@ -192,7 +192,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
             }
             toast.success(t.dashboard.orders.toast.updated)
             setMobileCancelOpen(false)
-            fetchOrder()
+            fetchOrder({ everywhere: true })
             router.refresh()
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : t.dashboard.orders.toast.updateFailed)
@@ -271,7 +271,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
             <div className="od-page-head">
                 <button className="od-back" onClick={handleBack}>
                     <ArrowLeft />
-                    Orders
+                    {d.backToOrdersShort}
                 </button>
                 <div className="od-title-row">
                     <h1>{d.title}</h1>
@@ -282,7 +282,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                     </span>
                     <span className="od-date">
                         <Calendar />
-                        Created {formatCreatedDate(raw.createdAt)}
+                        {ti(d.createdOn, { date: formatCreatedDate(raw.createdAt, locale) })}
                     </span>
                 </div>
             </div>
@@ -308,10 +308,10 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                          */}
                         <FulfillmentZone
                             order={order as unknown as FulfillmentOrder}
-                            onUpdate={() => { fetchOrder(); router.refresh() }}
+                            onUpdate={() => { fetchOrder({ everywhere: true }); router.refresh() }}
                             // Label creation reconciles silently (no page reload): the success
                             // card shows optimistically and the async AWB fills in via polling.
-                            onLabelCreated={() => { fetchOrder({ silent: true }) }}
+                            onLabelCreated={() => { fetchOrder({ everywhere: true }) }}
                             mobileShippingActionRef={mobileShippingActionRef}
                             hideMobileConfirmAction={mobileActions.includes('confirm')}
                         />
@@ -351,7 +351,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                             order.paymentStatus === 'paid') && (
                         <ManualPaymentVerificationBlock
                             order={order}
-                            onUpdate={() => { fetchOrder(); router.refresh() }}
+                            onUpdate={() => { fetchOrder({ everywhere: true }); router.refresh() }}
                         />
                     )}
 
@@ -369,7 +369,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                                 shippingTrackingStatus: raw.shippingTrackingStatus ?? null,
                                 selfDeliveryCourier: raw.selfDeliveryCourier ?? null,
                             }}
-                            onUpdate={() => { fetchOrder(); router.refresh() }}
+                            onUpdate={() => { fetchOrder({ everywhere: true }); router.refresh() }}
                         />
                     </div>
                 </div>

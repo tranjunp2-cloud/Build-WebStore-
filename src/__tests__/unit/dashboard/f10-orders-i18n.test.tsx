@@ -66,6 +66,7 @@ vi.mock('next/image', () => ({
 
 // ── Imports after mocks ──────────────────────────────────────────────────
 import { OrdersMetrics } from '@/app/(dashboard)/orders/_components/OrdersMetrics'
+import { DashboardQueryProvider, resetQueryCache } from '../../helpers/query-provider'
 import { OrdersActionBar } from '@/app/(dashboard)/orders/_components/OrdersActionBar'
 import { CancelOrderModal } from '@/app/(dashboard)/orders/_components/CancelOrderModal'
 
@@ -224,6 +225,7 @@ describe('TC-F10.i18n.03 — MS Translations Differ From EN', () => {
 // ═══════════════════════════════════════════════════════════════════════
 describe('TC-F10.i18n.04 — OrdersMetrics renders i18n labels (EN)', () => {
     beforeEach(() => {
+        resetQueryCache()
         currentMockLocale = 'en'
         currentMockOrders = enOrders
         // Mock the fetch call that OrdersMetrics makes internally
@@ -241,7 +243,7 @@ describe('TC-F10.i18n.04 — OrdersMetrics renders i18n labels (EN)', () => {
     })
 
     it('renders all seven metric labels from EN locale', () => {
-        render(<OrdersMetrics />)
+        render(<DashboardQueryProvider><OrdersMetrics /></DashboardQueryProvider>)
 
         // 7 boxes in lifecycle order: pending, confirmed, readyToShip, shipped, completed, cancelled, refunded
         // confirmed uses o.status.confirmed; refunded uses o.status.refunded (no metrics key for these)

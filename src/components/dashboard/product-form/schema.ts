@@ -1,8 +1,13 @@
-  import { z } from 'zod'
+import { z } from 'zod'
+import { allowsProductImages } from '@/lib/products/image-limit'
+import { attributesChanged, DUPLICATE_ATTRIBUTE_MESSAGE, findDuplicateAttributeIndexes } from '@/lib/products/attribute-names'
 
-type ProductFormI18n = { dashboard?: { products?: { form?: { errors?: Record<string, string> } } } };
+/** Most values one variant option (tier) may hold; the form blocks "Add values" at this count. */
+export const MAX_OPTIONS_PER_TIER = 30
 
-export const getProductFormSchema = (t: ProductFormI18n) => {
+type ProductFormI18n = { dashboard?: { products?: { form?: { errors?: Record<string, string>; attributes?: { errorDuplicate?: string } } } } };
+
+export const getProductFormSchema = (t: ProductFormI18n, previousImages: readonly { id: string | number }[] = [], baseline?: { isEdit?: boolean; attributes?: readonly { key: string; value: string }[] }) => {
     const errorT = t?.dashboard?.products?.form?.errors || {};
 
     const skuVariantSchema = z.object({
@@ -25,7 +30,7 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
     return z.object({
         name: z.string().trim().min(3, errorT.nameMin || 'Product name must be at least 3 characters').max(120, errorT.nameMax || 'Product name must not exceed 120 characters'),
         categoryIds: z.array(z.union([z.string(), z.number()])).min(1, errorT.categoryRequired || 'Product must belong to at least one category'),
-        images: z.array(z.object({ id: z.union([z.string(), z.number()]), url: z.string(), alt: z.string().optional() })).max(5, errorT.imagesMax || 'Maximum 5 images allowed'),
+        images: z.array(z.object({ id: z.union([z.string(), z.number()]), url: z.string(), alt: z.string().optional() })).refine(images => allowsProductImages(images.map(image => image.id), previousImages.map(image => image.id)), errorT.imagesMax || 'Maximum 5 images allowed'),
         
         hasVariants: z.boolean().default(false),
         
@@ -33,14 +38,14 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
         basePrice: z.preprocess((v) => v === '' ? undefined : v, z.coerce.number().min(0, errorT.priceMin || 'Price must be 0 or greater').max(100000000, errorT.priceMax || 'Price is too large').optional()),
         compareAtPrice: z.preprocess((v) => v === '' ? undefined : v, z.coerce.number().min(0, errorT.priceMin || 'Compare at price must be 0 or greater').max(100000000, errorT.priceMax || 'Price is too large').optional()),
         baseInventory: z.preprocess((v) => v === '' ? undefined : v, z.coerce.number().min(0, errorT.stockMin || 'Stock cannot be negative').max(1000000, errorT.stockMax || 'Stock is too large').optional()),
-        baseSku: z.string().trim().max(50, errorT.skuLong || 'SKU must not exceed 50 characters').optional(),
+        baseSku: z.string().trim().max(50, errorT.baseSkuLong || 'SKU must not exceed 50 characters').optional(),
         
         // Variant mode
         tiers: z.array(z.object({
             id: z.string(),
             name: z.string().trim().max(50, errorT.tierNameLong || 'Option name is too long'),
             options: z.array(z.string().trim().max(50, errorT.optionLong || 'Option is too long'))
-                .max(30, errorT.optionMax || 'Maximum 30 options per tier'),
+                .max(MAX_OPTIONS_PER_TIER, errorT.optionMax || 'Maximum 30 options per tier'),
         }))
         .max(2, errorT.maxTiers || 'Maximum 2 tiers allowed')
         .superRefine((tiers, ctx) => {
@@ -116,7 +121,12 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
         attributes: z.array(z.object({
             key: z.string().trim().min(1, errorT.attrKeyRequired || 'Attribute name is required').max(100, errorT.attrKeyLong || 'Attribute name is too long'),
             value: z.string().trim().min(1, errorT.attrValueRequired || 'Attribute value is required').max(500, errorT.attrValueLong || 'Attribute value is too long'),
-        })).max(20, errorT.attrMax || 'Maximum 20 attributes allowed').optional(),
+        })).max(20, errorT.attrMax || 'Maximum 20 attributes allowed').superRefine((attributes, ctx) => {
+            if (baseline?.isEdit && !attributesChanged(attributes, baseline.attributes)) return;
+            findDuplicateAttributeIndexes(attributes).forEach(index => {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, path: [index, 'key'], message: t?.dashboard?.products?.form?.attributes?.errorDuplicate || DUPLICATE_ATTRIBUTE_MESSAGE });
+            });
+        }).optional(),
     }).superRefine((data, ctx) => {
         // Weight required in BOTH modes — single top-level shipping-calc field, not part of the
         // variant matrix. Mirrors src/lib/products/publish-guard.ts (GH-1458 Active-toggle gate).

@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react'
 import { X } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { SETTINGS_ADD_BUTTON_COLORS } from './settings-add-button-class'
 import { Input } from '@/components/ui/input'
 import { BlockImageEditor } from './BlockImageEditor'
 import type { LogoCloudConfig, LogoItem } from '@/blocks/logo-cloud/config'
@@ -150,7 +152,7 @@ export default function LogoCloudSettings({ block, blockIndex, onBlockUpdate }: 
                 type="button"
                 disabled={count >= maxCount}
                 onClick={handleAdd}
-                className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-30"
+                className={cn('mt-2 w-full rounded-lg py-1.5 text-xs transition-colors disabled:opacity-30', SETTINGS_ADD_BUTTON_COLORS)}
             >
                 + Add Logo ({count}/{maxCount})
             </button>

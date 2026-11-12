@@ -4,6 +4,7 @@ import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { passwordChangeSchema } from '@/lib/profile/schemas'
 import { blockOwner, type UserLike } from '@/lib/profile/role-guard'
+import { IMPERSONATION_FORBIDDEN, isMerchantAccessSession } from '@/lib/support/merchant-access-session'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { passwordChangedEmail } from '@/lib/email/templates'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
@@ -13,9 +14,14 @@ export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
     try {
-        const user = await getCurrentUser()
+        const user = await getCurrentUser(req)
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        // Support acting as the merchant must never change their credentials (TC-F15.40)
+        if (isMerchantAccessSession(req)) {
+            return NextResponse.json({ error: IMPERSONATION_FORBIDDEN }, { status: 403 })
         }
 
         const guard = blockOwner(user as UserLike)

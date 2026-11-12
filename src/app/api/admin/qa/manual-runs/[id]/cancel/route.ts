@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
 import config from "@payload-config";
 import { z } from "zod";
-import { withSuperAdmin } from "@/lib/admin/api-utils";
+import { withStudioPermission } from "@/lib/admin/api-utils";
 import { cancelTargetedSmokeWorkflow, githubAppConfigFromEnv } from "@/lib/admin/qa/github-targeted-smoke";
 import { withQaTargetedDispatchTransaction } from "@/lib/payload/qa-targeted-dispatch-transaction";
 
@@ -32,7 +32,7 @@ async function readBoundedBody(req: NextRequest, maxBytes = 2_000): Promise<stri
   return new TextDecoder().decode(body);
 }
 
-export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
+export const POST = withStudioPermission('qa.run', async (req: NextRequest, { params }) => {
   const id = Number(params?.id);
   const contentLength = Number(req.headers.get("content-length") ?? "0");
   if (Number.isFinite(contentLength) && contentLength > 2_000)
@@ -64,7 +64,8 @@ export const POST = withSuperAdmin(async (req: NextRequest, { params }) => {
       ...options,
     })) as { id: number; status?: string; workflowRunId?: string };
     status = dispatch.status;
-    if (dispatch.status === "queued") {
+    if (dispatch.status !== "queued" && dispatch.status !== "dispatched" && dispatch.status !== "cancel_requested") return;
+    if (dispatch.status === "queued" || !dispatch.workflowRunId) {
       await payload.update({
         collection: "qa_smoke_dispatches",
         id,

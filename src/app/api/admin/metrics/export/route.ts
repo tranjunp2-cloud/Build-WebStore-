@@ -7,7 +7,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission } from '@/lib/admin/api-utils'
 import { checkRateLimit } from '@/lib/admin/api-utils'
 import {
   getAvgQualityScore,
@@ -44,7 +44,7 @@ function parseRange(sp: URLSearchParams): { from: Date; to: Date } {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
-export const GET = withSuperAdmin(async (req: NextRequest) => {
+export const GET = withStudioPermission('data.export', async (req: NextRequest) => {
   // Rate limit: 5/min per IP
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'unknown'
   if (!checkRateLimit(`export:${ip}`, 5)) {

@@ -11,6 +11,8 @@ export type RateValidationMessages = {
     errorNegative: string
     errorTooHigh: string
     errorFormat: string
+    /** Shown when value is below minSen (e.g. threshold 0). Falls back to errorNegative. */
+    errorTooLow?: string
     warnFree?: string
 }
 
@@ -59,7 +61,7 @@ export function validateRate(
     }
 
     if (senRounded < minSen) {
-        return { error: messages.errorNegative }
+        return { error: messages.errorTooLow ?? messages.errorNegative }
     }
 
     const decimals = normalized.split('.')[1]?.length ?? 0

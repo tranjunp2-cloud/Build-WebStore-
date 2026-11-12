@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
+import { getPayload, type User } from 'payload'
 import config from '@payload-config'
 import { sql } from 'drizzle-orm'
 import { withAuth } from '@/lib/auth'
+import { jsonWithEtag } from '@/lib/api/json-etag'
 import { extractTenantId } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { createDiscountSchema } from '@/lib/validations/discounts'
+import { createDiscountAs, DiscountServiceError, type DiscountWriteData } from '@/lib/discounts/discount-service'
+import { canAccessArea } from '@/lib/insights/area-access'
+
+type CreateBody = DiscountWriteData & { code: string; type: 'percentage' | 'fixed'; value: number }
 
 const ALLOWED_SORT_FIELDS = new Set(['code', 'type', 'value', 'usageCount', 'expiresAt', 'createdAt', 'status'])
 
@@ -31,60 +36,72 @@ export const GET = withAuth(async (user, request) => {
 
         const where: any = {}
 
+        // At-limit ids of the caller's own workspaces only (the same tenants collection access lets them read; all
+        // for a super-admin). This scanned every tenant's discounts and grew the not_in / in list with the whole
+        // platform (TC-PERF-075).
+        const atLimitIds = async (): Promise<number[]> => {
+            const isSuperAdmin = Boolean((user as { roles?: string[] }).roles?.includes('super-admin'))
+            const tenantIds = ((user as { tenants?: Array<{ tenant: unknown }> }).tenants ?? [])
+                .map((t) => (t.tenant && typeof t.tenant === 'object' ? (t.tenant as { id?: unknown }).id : t.tenant))
+                .map(Number)
+                .filter((id) => Number.isSafeInteger(id))
+            if (!isSuperAdmin && tenantIds.length === 0) return []
+            const tenantFilter = isSuperAdmin
+                ? sql``
+                : sql` AND tenant_id IN (${sql.join(tenantIds.map((id) => sql`${id}`), sql`, `)})`
+            const db = payload.db as unknown as { drizzle: { execute: (q: unknown) => Promise<{ rows: Array<{ id: number }> }> } }
+            const res = await db.drizzle.execute(sql`
+                SELECT id FROM discounts
+                WHERE status = 'active'
+                  AND usage_limit IS NOT NULL
+                  AND usage_count >= usage_limit${tenantFilter}
+            `)
+            return (res.rows ?? []).map((r) => Number(r.id))
+        }
+
         // Effective status filter — badge shows 2 states (Active/Inactive) based on
         // effective lifecycle, not raw DB status. Used-up discounts keep DB status='active'
         // (Option B: capacity can reopen on slot release) but display as Inactive.
         // We resolve the filter→badge contradiction here by fetching at-limit IDs via
         // raw SQL and excluding/including them in the Payload query so totalDocs is exact.
+        const and: any[] = []
         if (status === 'active') {
             // Active = DB active AND NOT at-limit (used-up displays as Inactive)
-            where.status = { equals: 'active' }
+            and.push({ status: { equals: 'active' } })
             try {
-                const db = payload.db as unknown as { drizzle: { execute: (q: unknown) => Promise<{ rows: Array<{ id: number }> }> } }
-                const atLimitRes = await db.drizzle.execute(sql`
-                    SELECT id FROM discounts
-                    WHERE status = 'active'
-                      AND usage_limit IS NOT NULL
-                      AND usage_count >= usage_limit
-                `)
-                const atLimitIds = (atLimitRes.rows ?? []).map((r) => Number(r.id))
-                if (atLimitIds.length > 0) where.id = { not_in: atLimitIds }
+                const ids = await atLimitIds()
+                if (ids.length > 0) and.push({ id: { not_in: ids } })
             } catch {
                 // Fall back to plain status filter — better than a 500
             }
         } else if (status === 'inactive') {
             // Inactive = DB inactive OR at-limit (used-up, DB active but effectively Inactive)
             try {
-                const db = payload.db as unknown as { drizzle: { execute: (q: unknown) => Promise<{ rows: Array<{ id: number }> }> } }
-                const atLimitRes = await db.drizzle.execute(sql`
-                    SELECT id FROM discounts
-                    WHERE status = 'active'
-                      AND usage_limit IS NOT NULL
-                      AND usage_count >= usage_limit
-                `)
-                const atLimitIds = (atLimitRes.rows ?? []).map((r) => Number(r.id))
-                if (atLimitIds.length > 0) {
-                    where.or = [{ status: { equals: 'inactive' } }, { id: { in: atLimitIds } }]
-                } else {
-                    where.status = { equals: 'inactive' }
-                }
+                const ids = await atLimitIds()
+                and.push(ids.length > 0
+                    ? { or: [{ status: { equals: 'inactive' } }, { id: { in: ids } }] }
+                    : { status: { equals: 'inactive' } })
             } catch {
-                where.status = { equals: 'inactive' }
+                and.push({ status: { equals: 'inactive' } })
             }
         } else if (status && status !== 'all') {
-            where.status = { equals: status }
+            and.push({ status: { equals: status } })
         }
 
         if (type && type !== 'all') {
-            where.type = { equals: type }
+            and.push({ type: { equals: type } })
         }
 
+        // its own `or`, next to the inactive one (it used to overwrite it, dropping the status filter)
         if (search) {
-            where.or = [
-                { code: { contains: search } },
-                { description: { contains: search } },
-            ]
+            and.push({
+                or: [
+                    { code: { contains: search } },
+                    { description: { contains: search } },
+                ],
+            })
         }
+        if (and.length > 0) where.and = and
 
         const result = await payload.find({
             collection: 'discounts',
@@ -97,7 +114,7 @@ export const GET = withAuth(async (user, request) => {
             overrideAccess: false,
         })
 
-        return NextResponse.json({ ...result, success: true })
+        return jsonWithEtag({ ...result, success: true }, request)
     } catch (error: any) {
         console.error('[Discounts List Error]', error)
         return NextResponse.json(
@@ -124,32 +141,37 @@ export const POST = withAuth(async (user, request) => {
                 { status: 403 },
             )
         }
-        // Payload postgres adapter uses integer IDs — coerce string → number
-        const tenantIdForPayload: string | number = /^\d+$/.test(tenantId) ? parseInt(tenantId, 10) : tenantId
-
-        const payload = await getPayload({ config })
+        // Discounts belong to the Orders permission (the sidebar entry's `permissionId`): a custom role without it
+        // (e.g. products only) can not create codes, same rule as the copilot's discount tools.
+        if (!canAccessArea(user, tenantId, 'orders')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Your role cannot manage discounts' } },
+                { status: 403 },
+            )
+        }
 
         let discount
         try {
-            discount = await payload.create({
-                collection: 'discounts',
-                data: {
-                    ...data!,
-                    tenant: tenantIdForPayload,
-                    usageCount: 0,
-                },
-                // overrideAccess: true — tenant is extracted from the authenticated user (not from the
-                // client request), so collection-level auth is already enforced by withAuth + extractTenantId.
-                // Using false here triggers Payload's relationship read-check against the tenants collection,
-                // which has restricted read access and incorrectly rejects valid tenant IDs.
-                overrideAccess: true,
-            })
+            // The tenant is the authenticated user's (never the client's): the shared service forces it, sets
+            // usageCount to 0 and writes with overrideAccess (see lib/discounts/discount-service).
+            // strictTenant: the create runs with access off, so a body site must be one of this tenant's — another
+            // tenant's site id would scope the discount to that shop (TC-PERF-136).
+            discount = await createDiscountAs(
+                { user: user as unknown as User, tenantId, strictTenant: true },
+                { ...(data as CreateBody), site: data!.site === '' ? null : (data!.site ?? null) },
+            )
         } catch (err: any) {
             // Unique constraint on (tenant_id, upper(code)) → 409
-            if (err?.message?.includes('duplicate') || err?.message?.includes('unique') || err?.code === '23505') {
+            if (err instanceof DiscountServiceError && err.code === 'DUPLICATE_CODE') {
                 return NextResponse.json(
-                    { success: false, error: { code: 'DUPLICATE_CODE', message: 'This code is already in use for your tenant. Try a different code or append a number.' } },
+                    { success: false, error: { code: 'DUPLICATE_CODE', message: err.message } },
                     { status: 409 },
+                )
+            }
+            if (err instanceof DiscountServiceError && err.code === 'SITE_NOT_FOUND') {
+                return NextResponse.json(
+                    { success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid site' } },
+                    { status: 400 },
                 )
             }
             throw err

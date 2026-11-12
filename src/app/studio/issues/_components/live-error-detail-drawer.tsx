@@ -5,6 +5,7 @@ import { ExternalLink, RefreshCw } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { CreateIssueModal } from '@/app/studio/_components/modals/create-issue-modal'
+import { useStudioCan } from '@/app/studio/_components/studio-permissions-context'
 import { SeverityPill } from './severity-pill'
 import type { IssueRecord, LiveError, LiveErrorFrame, RuntimePromotionInput } from './issue-types'
 
@@ -73,6 +74,7 @@ export function LiveErrorDetailDrawer({
     const [detailFetchedAt, setDetailFetchedAt] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
     const [detailError, setDetailError] = useState<string | null>(null)
+    const canPromote = useStudioCan()('issue.work')
     const [showPromotion, setShowPromotion] = useState(false)
     const [retryToken, setRetryToken] = useState(0)
 
@@ -322,14 +324,16 @@ export function LiveErrorDetailDrawer({
                             ) : (
                                 <span />
                             )}
-                            <Button
-                                type="button"
-                                className="min-h-11"
-                                onClick={() => setShowPromotion(true)}
-                                disabled={!promotion}
-                            >
-                                Create Tracked Issue
-                            </Button>
+                            {canPromote && (
+                                <Button
+                                    type="button"
+                                    className="min-h-11"
+                                    onClick={() => setShowPromotion(true)}
+                                    disabled={!promotion}
+                                >
+                                    Create Tracked Issue
+                                </Button>
+                            )}
                             {displayed.source === 'vercel' && (
                                 <p className="max-w-sm text-xs leading-5 text-[var(--text-3)]">
                                     Vercel promotion is blocked until a stable server refetch contract passes the live delivery gate.
@@ -340,7 +344,7 @@ export function LiveErrorDetailDrawer({
                 </DialogContent>
             </Dialog>
 
-            {showPromotion && promotion && (
+            {showPromotion && canPromote && promotion && (
                 <CreateIssueModal
                     runtimePromotion={promotion}
                     onClose={() => setShowPromotion(false)}

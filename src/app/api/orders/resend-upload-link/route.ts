@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateUploadToken } from '@/lib/orders/upload-token'
+import { allowOutboundEmail, requestIp } from '@/lib/email/outbound-email-limits'
 import { resendUploadLinkEmail } from '@/lib/email/templates/resend-upload-link'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 
@@ -50,6 +51,14 @@ export async function POST(req: Request) {
     }
     // Reject obviously invalid orderNumber early (anti-DoS, anti-enumeration)
     if (orderNumber.length > 50 || !/^ORD-/.test(orderNumber)) {
+        return NextResponse.json({ success: true })
+    }
+
+    // Fail-closed limits per buyer address and per IP before any lookup; a limited request gets the same
+    // `{ success: true }` (no enumeration) and no email (TC-PERF-159).
+    const ip = requestIp(req.headers)
+    if (!(await allowOutboundEmail(`upload-link:${email}`, 3, 60 * 60_000))
+        || (ip && !(await allowOutboundEmail(`upload-link-ip:${ip}`, 10, 60 * 60_000)))) {
         return NextResponse.json({ success: true })
     }
 

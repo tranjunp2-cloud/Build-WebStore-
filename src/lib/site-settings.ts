@@ -73,8 +73,9 @@ export function mergeFooterSocialsWithSite<T extends { socials?: Array<{ platfor
     return {
         ...block,
         logoText: block.logoText || site?.name || '',
-        logo: (block as Record<string, unknown>).logo || (site?.branding?.logo ? { url: site.branding.logo, alt: site?.name || 'Logo' } : undefined),
-        socials,
+        // A stored media id (number) has no url; fall back to the site's branding logo like the navigation does
+        logo: (block as { logo?: { url?: string } }).logo?.url ? (block as Record<string, unknown>).logo : (site?.branding?.logo ? { url: site.branding.logo, alt: site?.name || 'Logo' } : undefined),
+        socials: socials.filter(social => Boolean(social.url?.trim())),
     }
 }
 

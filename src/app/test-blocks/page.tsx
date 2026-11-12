@@ -6,7 +6,8 @@ import { I18nProvider } from '@/i18n'
 // pulls in isomorphic-dompurify/jsdom that fails in Docker standalone builds.
 export const dynamic = 'force-dynamic'
 
-export default function TestBlocksPage() {
+export default async function TestBlocksPage({ searchParams }: { searchParams: Promise<{ quickView?: string }> }) {
+    const quickView = (await searchParams).quickView === '1'
     const site = {
         id: 1,
         name: 'Test Blocks',
@@ -25,9 +26,9 @@ export default function TestBlocksPage() {
     const page = {
         layout: [
             {
-                blockType: 'products-grid',
-                headline: 'Products Grid Filters Harness',
-                variant: 'grid-3',
+                blockType: quickView ? 'product-quick-view' : 'products-grid',
+                headline: quickView ? 'Product Quick View Harness' : 'Products Grid Filters Harness',
+                variant: quickView ? 'grid' : 'grid-3',
                 limit: 6,
                 showCategoryFilter: true,
             }

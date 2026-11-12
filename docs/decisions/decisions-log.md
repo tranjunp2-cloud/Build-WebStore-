@@ -293,3 +293,89 @@
 | **Impact** | **Docs:** [brief.md](../plans/reports/260703-ep-cod-proof/brief.md) (primary evidence); [F36 PRD §8](../prd/F36-easyparcel-delivery.md) bảng R1–R5; [F10 PRD §20.2](../prd/F10-orders-management.md) shared COD constraints + AC hard-gate; F19 PRD; [F36 design](../design/F36-easyparcel-delivery-design.md) checkout COD gating UI (disabled + helper text theo lý do R1/R2/R3, fee disclosure R5); stories AC-4b. Dòng "COD = West-MY-only" trong PD-020 hết hiệu lực. **Code (rework 2026-07-06):** `cod-block.ts` (East hardcode) → thay bằng `cod-eligibility.ts` (R1/R2/R3 từ live rates); `get-rates.ts` extract `codMinSen` + enforce min/max khi auto-pick; checkout server hard-reject `COD_NOT_ELIGIBLE` khi không courier nào đủ điều kiện; storefront probe eligibility ngay khi đủ địa chỉ (`codProbeSen`) và khi COD vi phạm → hiện error hướng dẫn buyer đổi địa chỉ/giá trị đơn + chặn Place Order (**không tự đổi payment method của buyer** — UX decision 2026-07-06); create-label re-validate live trước submit; order-detail state `cod-blocked` chuyển từ static East check → live check. |
 | **Status** | ✅ Decided 2026-07-03 (Domin, sandbox-verified) — Docs synced 2026-07-03 · Code rework 2026-07-06. Còn treo: param `cod_amount` (flat) vs `feature.cod` (nested, per official docs) cần verify EP support trước go-live COD; xác nhận auto-complete khi delivered. |
 
+---
+
+## PD-022 — F23 Owner Avatar Source of Truth and SSO Synchronization
+
+| | |
+|---|---|
+| **Date** | 2026-09-08 |
+| **Decision** | Store Owner avatar dùng **SSO làm authoritative source**; Staff avatar tiếp tục được PWv2 quản lý local. Owner không upload/override avatar tại PWv2. |
+| **Issue** | [#1723](https://github.com/primeproduction/ech-prime-web-v2/issues/1723) — Owner avatar updated on SSO is not synchronized to PWv2 |
+| **Options** | 1. Giữ avatar Owner độc lập tại PWv2; 2. Đồng bộ Owner avatar từ SSO, Staff giữ local |
+| **Chosen** | **Option 2 — Role-based source of truth.** Webhook update/delete là primary trigger; SSO Profile API reconciliation khi successful login là fallback; PWv2 lưu cached copy theo approved SSO permission. Caching permission là hard prerequisite; nếu SSO không cho phép cache, Product phải quyết định lại solution. |
+| **Behavior** | Target propagation p95 ≤ 5 phút. Immutable identity preflight chạy trước avatar backfill; missing/duplicate/ambiguous mapping bị skip/quarantine/report và không fallback email. Existing Owner được one-time backfill và login reconciliation cho account bị bỏ sót. Backfill thay legacy Owner-local avatar bằng confirmed SSO state. State chuẩn hóa thành `PRESENT`, `ABSENT`, `UNKNOWN`; chỉ authenticated `ABSENT` mới purge stored/derived/CDN copies theo retention limit và dùng initials. `UNKNOWN` hoặc transient failure giữ last-known avatar. |
+| **Rationale** | Owner identity đã do SSO quản lý và PWv2 Owner Profile là Read-only. Dùng cùng source of truth loại bỏ thao tác lặp, giải quyết avatar không nhất quán và tránh runtime dependency vào SSO trên mọi page render. Staff là local account nên giữ local avatar flow hiện tại. |
+| **Supersedes** | F23 PRD v1.2 BR-23-02 `Avatar Independence` và wording cũ của US-F23-01 cho phép Owner upload local avatar. |
+| **Dependency** | Written SSO Integration Contract phải xác nhận immutable identity/preflight, avatar field/format, `PRESENT`/`ABSENT`/`UNKNOWN` semantics, webhook/Profile API, authentication, caching permission, purge retention, retry/rate limit, SLA capability, backfill access và Staging fixtures. |
+| **Status** | ✅ Product behavior decided — ⏳ Development blocked by SSO Contract and cross-team reviews |
+
+---
+
+## PD-023 — F43 Billplz: Paid-After-Cancel Policy — 3-Layer (Prevent / Detect / Manual Refund)
+
+| | |
+|---|---|
+| **Date** | 2026-10-05 |
+| **Decision** | Khi Billplz callback báo `paid=true` trên order đã `cancelled`: order **giữ cancelled**, emit `PAID_AFTER_CANCEL` + alert seller, refund tay (v1). KHÔNG auto-revive order. |
+| **Options** | 1. Alert only + refund tay; 2. Auto-revive order → trừ kho lại; 3. Revive nếu còn hàng, alert nếu hết |
+| **Chosen** | **Option 1 — 3-layer.** L1 Prevent: `deleteBill` trên mọi pending→cancelled path (bills sống 30d vs order expiry 24h). L2 Detect: `PAID_AFTER_CANCEL` error log + seller alert khi payment lọt qua. L3 Resolve: order giữ cancelled; seller refund tay v1 (email `team@billplz.com` / chuyển khoản — giống COD/bank-transfer bookkeeping hiện tại); semi-auto qua Payment Order API là stretch US-F43-06. |
+| **Rationale** | **Cancelled là quyết định business, không hệ thống lớn nào hồi sinh order đã huỷ** (Shopee/Lazada kill payment link; Stripe session tự expire 24h). Billplz là anomaly: bill sống 30d + docs chính thức ghi "deleted bill reappears once paid" → lỗ hổng provider không đóng được, chỉ mitigate. Auto-revive = override quyết định cancel + rủi ro oversell (restock đã chạy, hàng có thể đã bán) + seller-cancelled phải được tôn trọng tuyệt đối. **Auto-refund không tồn tại cho FPX**: push-payment non-reversible ở network level (Billplz docs), Billplz không lưu bank details người trả → refund bắt buộc disbursement + buyer cung cấp số TK. |
+| **Impact** | **Code:** `voidBillplzBill` shared helper trên 3 cancel paths (expiry cron, buyer cancel-payment, seller pending-cancel); webhook dispatch paid-on-cancelled → `PAID_AFTER_CANCEL` + alert; refund route → 422 `BILLPLZ_MANUAL_REFUND`. **Docs:** `plans/261005-1427-billplz-payment/` phase-04, phase-05; stories US-F43-04/05/06. |
+| **Status** | ⚠️ Dev-decided (validated with owner 2026-10-05) — **pending BA confirm** |
+
+---
+
+## PD-024 — F43 Billplz: Connect Method — Manual Keys v1, OAuth Deferred (Blocked on Partner Access)
+
+| | |
+|---|---|
+| **Date** | 2026-10-05 |
+| **Decision** | Seller connect Billplz qua **3 manual keys** (API Secret + Collection ID + X Signature Key) trong Settings → Payments. OAuth Connect là stretch phase (US-F43-07), **blocked** chờ Billplz cấp partner credentials. |
+| **Options** | 1. Manual keys v1, OAuth sau khi có credentials; 2. Block toàn bộ feature chờ OAuth approval |
+| **Chosen** | **Option 1.** Manual keys cho hosted payment flow chạy được ngay; OAuth chỉ ảnh hưởng UX connect, không ảnh hưởng payment flow. Client đã thiết kế `BillplzAuth` union `{basic|bearer}` — nâng cấp OAuth sau chỉ là call-site change. |
+| **Rationale** | Billplz OAuth là **partner-only** (docs public không mô tả; endpoints Doorkeeper quan sát được trên dashboard domain nhưng client_id/secret, scopes, token→credential contract chưa public). Chờ OAuth approval chặn toàn bộ feature mà không có lý do business — Stripe Connect tương đương cũng có manual fallback. |
+| **Impact** | **Outreach:** email `team@billplz.com` xin partner access + confirm contract (credentials, scopes, credential retrieval endpoint, refresh semantics). **Code:** US-F43-07 build skeleton (state nonce+TTL+single-use — không clone eternal `HMAC(tenantId)` của Stripe) sau cờ `BILLPLZ_CLIENT_ID`; credential adapter chỉ implement sau khi contract confirmed. **Docs:** `plans/261005-1427-billplz-payment/phase-07-oauth.md`; issue #1918 label `blocked`. |
+| **Status** | ⚠️ Dev-decided (validated with owner 2026-10-05) — **pending BA confirm**; implementation blocked pending Billplz response |
+
+---
+
+## PD-025 — F44 Feedback: Success Toast thay Success Screen, bỏ dòng Store
+
+| | |
+|---|---|
+| **Date** | 2026-10-30 |
+| **Decision** | Gửi feedback thành công → **đóng form + hiện toast** "Feedback sent" (kèm câu báo thông báo qua chuông trong Web Store). Bỏ màn thành công + nút Close. Bỏ dòng "Store: {tên cửa hàng}" khỏi header form. Mô tả form đổi theo Figma ("…help us improve the Web Store."). |
+| **Options** | 1. Giữ màn thành công trong modal; 2. Toast only |
+| **Chosen** | **Option 2.** Theo Figma (frames 07/09/13) + yêu cầu owner. |
+| **Rationale** | Toast nhẹ hơn, không bắt user bấm thêm nút Close; tên cửa hàng không cần trên UI vì server tự gắn context. |
+| **Impact** | **Code:** `feedback-dialog.tsx` (toast + đóng form), xoá `feedback-success-view.tsx`; logic submit/context không đổi. **Docs:** US-F44-01 AC-2, Additional Criteria; TC-F44-05. **Issue:** #2136. Nhãn trên Lark Base giữ nguyên ("Products & stock", "Discounts"). |
+| **Status** | ⚠️ Dev-decided (validated with owner 2026-10-30) — **pending BA confirm** |
+
+---
+
+## PD-026 — F42 PW1 export: stale expired Store status → active; multi-default slug from bound domain
+
+| | |
+|---|---|
+| **Date** | 2026-11-02 |
+| **Decision** | (A) Store `status=2` với owner đã gia hạn rõ ràng (owner active, không ban, `expired_at` > asOf, main subscription active) → tenant `active`, không còn `TENANT_LIFECYCLE_CONFLICT`. (B) Store có ≠1 default domain nhưng có `sourceDomainBindings` → slug lấy từ domain đã bind (domain không có số `-2`). Chỉ áp dụng dưới `gracefulTenantResolution`. |
+| **Options** | A: giữ suspended / tự kích hoạt khi owner active / chỉ kích hoạt khi có bằng chứng gia hạn tường minh. B: giữ `store-<id>` / slug từ domain bind. |
+| **Chosen** | A: bằng chứng gia hạn tường minh. B: slug từ domain bind. |
+| **Rationale** | PW1 renew API (`UserController.php:496-500`) không reset `stores.status`; 96/96 Store status=2 trong CSV 281026 đều owner active, `expired_at` > asOf, subscription active, nhưng bị suspended (= ban trên PW2). Store 1329/1327 có 2 domain mặc định (gốc và `-2`) và bị slug `store-<id>` dù `sites[].domain` đã chọn domain gốc. |
+| **Impact** | **Code:** `identity-site.ts`, `tenant-slug-from-domain.ts`, `diagnostics.ts`. **Docs:** addendum `docs/migration/pw1-stale-expired-status-and-bound-slug-20261102.md` (master mapping doc không sửa vì hash pin; contract bump sau phải gộp). **QA:** TC-F42-EXP-115/116, TC-F42-EXP-108. Issue #2179 items 1-3, 7. Không redirect cho `store-1329`/`store-1327` (chưa từng chia sẻ). |
+| **Status** | ✅ Approved by PM/BA 2026-11-02 |
+
+---
+
+## PD-027 — #2179: store hết hạn bị khoá như bị ban lúc migration → sửa tay sau #6, không đổi exporter
+
+| | |
+|---|---|
+| **Date** | 2026-11-03 |
+| **Decision** | 5 store PW1 hết hạn nhưng không bị ban (796, 1240, 1322, 1337, 1683) bị migration đặt tenant + membership `suspended` (= ban trên PW2). Sửa tay trên Payload admin prod (super-admin): tenant `active` + COD, membership owner `active`, site COD. Chỉ làm **sau** khi #6 (503 cho store bị ban hoặc hết hạn) lên prod. 4 tài khoản test Prime bỏ qua. |
+| **Options** | (1) Rule C trong exporter + chạy lại delta. (2) Sửa tay trên admin. |
+| **Chosen** | (2) Sửa tay. |
+| **Rationale** | Delta prod đã chạy xong và không chạy lại, nên đổi exporter không có tác dụng. Admin đủ quyền sửa cả 3 chỗ. Sau #6, store vẫn đóng tới khi merchant gia hạn qua SSO `renew`, rồi tự mở lại. Làm trước #6 thì store hết hạn mở web và nhận đơn COD. |
+| **Impact** | **Docs:** `docs/migration/pw1-expired-owner-manual-reactivation-2179.md` (danh sách + các bước + cách kiểm tra/hoàn tác). **Code:** không (Rule C bỏ). **QA:** TC-F09.286. Ghi kết quả vào issue #2179. |
+| **Status** | ⏳ Chờ PM/BA xác nhận |

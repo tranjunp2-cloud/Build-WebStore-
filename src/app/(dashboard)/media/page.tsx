@@ -6,6 +6,7 @@ import { Upload, ImageIcon, Search, Trash2, Copy, Check, RefreshCw, Film, FileTe
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
 
 type MediaDoc = {
     id: string
@@ -21,6 +22,8 @@ type MediaDoc = {
     }
     createdAt: string
     aiGenerated?: boolean
+    /** From /api/media/library: false for legacy files the site uses but this shop may not delete (TC-PERF-187). */
+    canDelete?: boolean
 }
 
 function formatFileSize(bytes: number): string {
@@ -46,24 +49,32 @@ export default function MediaLibraryPage() {
     const [copiedId, setCopiedId] = useState<string | null>(null)
     const [selectedMedia, setSelectedMedia] = useState<MediaDoc | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const latestLoad = useRef(0)
 
     useEffect(() => {
         loadMedia()
     }, [])
 
-    const loadMedia = async () => {
-        setIsLoading(true)
+    // `silent`: the assistant added pictures — swap the list in place (grid, scroll, search and open preview stay)
+    const loadMedia = async (silent = false) => {
+        const load = ++latestLoad.current
+        if (!silent) setIsLoading(true)
         try {
-            const res = await fetch('/api/media?sort=-createdAt&limit=200', { credentials: 'include' })
+            // This workspace's files only (no other shop's, no private receipts) — TC-PERF-168
+            const res = await fetch('/api/media/library', { credentials: 'include', cache: 'no-store' })
             if (!res.ok) throw new Error(`Server returned ${res.status}`)
             const data = await res.json()
-            setMedia(data.docs || [])
-        } catch {
-            toast.error(ml.loadFailed)
+            if (load === latestLoad.current) setMedia(data.docs || [])
+        } catch (error) {
+            if (load !== latestLoad.current) return
+            if (silent) console.error('[Media Library] refresh failed', error)
+            else toast.error(ml.loadFailed)
         } finally {
-            setIsLoading(false)
+            if (load === latestLoad.current) setIsLoading(false)
         }
     }
+
+    useAgentChanges({ kinds: ['media'] }, () => { void loadMedia(true) })
 
     const handleUpload = async (files: FileList | null) => {
         if (!files || files.length === 0) return
@@ -72,19 +83,20 @@ export default function MediaLibraryPage() {
         let successCount = 0
         for (const file of Array.from(files)) {
             try {
+                // App upload route (session + OTP, same-site), not Payload REST: Payload only accepts its own tokens,
+                // so the post-OTP session got 403 there (GH-2187). The route creates the row as this user, so the
+                // file lands in this shop (tenant) through the storage adapter — TC-PERF-190.
                 const formData = new FormData()
                 formData.append('file', file)
-                formData.append('_payload', JSON.stringify({ alt: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ') }))
+                formData.append('alt', file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '))
 
-                const res = await fetch('/api/media', {
+                const res = await fetch('/api/media/upload', {
                     method: 'POST',
                     credentials: 'include',
                     body: formData,
                 })
 
                 if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
-                const doc = await res.json()
-                setMedia(prev => [doc.doc || doc, ...prev])
                 successCount++
             } catch {
                 toast.error(ti(ml.uploadFailed, { name: file.name }))
@@ -93,6 +105,8 @@ export default function MediaLibraryPage() {
 
         if (successCount > 0) {
             toast.success(ti(ml.uploadedCount, { count: successCount }))
+            // Reload rather than splice in the upload response: the library rows carry `canDelete`
+            await loadMedia(true)
         }
         setIsUploading(false)
         if (fileInputRef.current) fileInputRef.current.value = ''
@@ -100,7 +114,8 @@ export default function MediaLibraryPage() {
 
     const handleDelete = async (id: string) => {
         try {
-            const res = await fetch(`/api/media/${id}`, { method: 'DELETE', credentials: 'include' })
+            // App route on the session, not Payload REST (GH-2187) — own-tenant files only (TC-PERF-191)
+            const res = await fetch(`/api/media/library/${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'include' })
             if (!res.ok) throw new Error('Delete failed')
             setMedia(prev => prev.filter(m => m.id !== id))
             setSelectedMedia(null)
@@ -324,13 +339,28 @@ export default function MediaLibraryPage() {
                                     {copiedId === selectedMedia.id ? <Check className="h-3 w-3 text-[hsl(var(--success))]" /> : <Copy className="h-3 w-3" />}
                                     {copiedId === selectedMedia.id ? ml.copied : ml.copyUrl}
                                 </button>
-                                <button
-                                    onClick={() => handleDelete(selectedMedia.id)}
-                                    className="flex items-center justify-center gap-1.5 rounded-lg bg-[hsl(var(--destructive)/0.1)] px-3 py-2.5 text-xs font-medium text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)] transition-colors"
-                                >
-                                    <Trash2 className="h-3 w-3" /> {ml.delete}
-                                </button>
+                                {selectedMedia.canDelete === false ? (
+                                    <button
+                                        type="button"
+                                        aria-disabled="true"
+                                        aria-describedby="media-delete-locked"
+                                        title={ml.deleteLocked}
+                                        className="flex cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-white/5 px-3 py-2.5 text-xs font-medium text-gray-500"
+                                    >
+                                        <Trash2 className="h-3 w-3" /> {ml.delete}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => handleDelete(selectedMedia.id)}
+                                        className="flex items-center justify-center gap-1.5 rounded-lg bg-[hsl(var(--destructive)/0.1)] px-3 py-2.5 text-xs font-medium text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)] transition-colors"
+                                    >
+                                        <Trash2 className="h-3 w-3" /> {ml.delete}
+                                    </button>
+                                )}
                             </div>
+                            {selectedMedia.canDelete === false && (
+                                <p id="media-delete-locked" className="text-xs text-gray-500">{ml.deleteLocked}</p>
+                            )}
                         </div>
                     </div>
                 </div>

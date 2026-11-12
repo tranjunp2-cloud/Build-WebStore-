@@ -167,6 +167,7 @@ import * as actions from '@/app/(dashboard)/blog/actions'
 // BlogListPage uses Radix Tooltip; in the app the dashboard layout supplies the
 // TooltipProvider, so the unit test wraps the page to mirror production.
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { DashboardQueryProvider, resetQueryCache } from '../../helpers/query-provider'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const mockPost = (overrides: Partial<any> = {}) => ({
@@ -202,6 +203,7 @@ const mockListSuccess = (posts: any[] = [], meta: Partial<any> = {}) => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe('[TC-F17-01-01] Blog list empty state renders "No blog posts yet"', () => {
     beforeEach(() => {
+        resetQueryCache()
         vi.clearAllMocks()
         vi.mocked(actions.getBlogCategoriesAction).mockResolvedValue([])
         mockListSuccess([])
@@ -214,7 +216,7 @@ describe('[TC-F17-01-01] Blog list empty state renders "No blog posts yet"', () 
     it('shows empty state heading when there are no posts and no active filters', async () => {
         // Arrange + Act
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Assert
@@ -226,7 +228,7 @@ describe('[TC-F17-01-01] Blog list empty state renders "No blog posts yet"', () 
     it('shows "Create Post" CTA button in empty state', async () => {
         // Arrange + Act
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Assert
@@ -241,6 +243,7 @@ describe('[TC-F17-01-01] Blog list empty state renders "No blog posts yet"', () 
 // ═══════════════════════════════════════════════════════════════════════════
 describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewport (Blocker)', () => {
     beforeEach(() => {
+        resetQueryCache()
         vi.clearAllMocks()
         vi.mocked(actions.getBlogCategoriesAction).mockResolvedValue([])
     })
@@ -255,7 +258,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Assert — mobile card list is present in the DOM
@@ -273,7 +276,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Assert
@@ -297,7 +300,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Assert
@@ -313,7 +316,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Assert
@@ -332,7 +335,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 
         // Act
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // The global empty state only shows when search = '' AND statusFilter = ''
@@ -352,6 +355,7 @@ describe('[TC-F17-01-05] Blog list — Mobile Card Stack renders on small viewpo
 // ═══════════════════════════════════════════════════════════════════════════
 describe('[TC-F17-01-04] Blog list page — Header and Create Post button', () => {
     beforeEach(() => {
+        resetQueryCache()
         vi.clearAllMocks()
         vi.mocked(actions.getBlogCategoriesAction).mockResolvedValue([])
         mockListSuccess([mockPost()])
@@ -364,7 +368,7 @@ describe('[TC-F17-01-04] Blog list page — Header and Create Post button', () =
     it('renders the page title "Blogs"', async () => {
         // Arrange + Act
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Assert
@@ -376,7 +380,7 @@ describe('[TC-F17-01-04] Blog list page — Header and Create Post button', () =
     it('renders the Create Post button', async () => {
         // Arrange + Act
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Assert
@@ -392,7 +396,7 @@ describe('[TC-F17-01-04] Blog list page — Header and Create Post button', () =
         vi.mocked(useRouter).mockReturnValue({ push: pushMock, refresh: vi.fn() } as any)
 
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Act
@@ -411,6 +415,7 @@ describe('[TC-F17-01-04] Blog list page — Header and Create Post button', () =
 // ═══════════════════════════════════════════════════════════════════════════
 describe('[TC-F17-01-12] Bulk action bar appears when posts are selected', () => {
     beforeEach(() => {
+        resetQueryCache()
         vi.clearAllMocks()
         vi.mocked(actions.getBlogCategoriesAction).mockResolvedValue([])
         mockListSuccess([mockPost(), mockPost({ id: 'post-2', title: 'Second Post' })])
@@ -423,7 +428,7 @@ describe('[TC-F17-01-12] Bulk action bar appears when posts are selected', () =>
     it('shows bulk action bar (Publish + Delete buttons) when at least one post is checked', async () => {
         // Arrange
         await act(async () => {
-            render(<TooltipProvider><BlogListPage /></TooltipProvider>)
+            render(<DashboardQueryProvider><TooltipProvider><BlogListPage /></TooltipProvider></DashboardQueryProvider>)
         })
 
         // Wait for posts to render

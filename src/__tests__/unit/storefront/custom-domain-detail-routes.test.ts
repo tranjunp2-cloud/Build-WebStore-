@@ -19,6 +19,10 @@ vi.mock('next/headers', () => ({
     cookies: vi.fn(() => Promise.resolve({ get: () => undefined })),
 }))
 
+// #2179: store availability has its own tests (store-unavailable.test.ts); available unless a test says otherwise.
+vi.mock('@/lib/storefront/cached-store-availability', () => ({ storefrontUnavailableFor: vi.fn(async () => null) }))
+
+import { storefrontUnavailableFor } from '@/lib/storefront/cached-store-availability'
 import { generateMetadata as generateProductMetadata } from '@/app/sites/[slug]/products/[productSlug]/page'
 import { generateMetadata as generateBlogMetadata } from '@/app/sites/[slug]/blog/[blogSlug]/page'
 
@@ -43,6 +47,24 @@ describe('[TC-F37-03-52] custom-domain product and blog detail routes', () => {
     beforeEach(() => {
         testState.find.mockReset()
         testState.hostname = 'mycafe.example'
+    })
+
+    it('[TC-F09.281] unavailable store: product and blog metadata are noindex and never name the store or item', async () => {
+        // Arrange
+        vi.mocked(storefrontUnavailableFor)
+            .mockResolvedValueOnce({ unavailable: true, locale: 'ms' })
+            .mockResolvedValueOnce({ unavailable: true, locale: 'ms' })
+
+        // Act
+        const product = await generateProductMetadata({ params: Promise.resolve({ slug: 'custom', productSlug: 'coffee' }) } as never)
+        const blog = await generateBlogMetadata({ params: Promise.resolve({ slug: 'custom', blogSlug: 'news' }) } as never)
+
+        // Assert
+        for (const meta of [product, blog]) {
+            expect(meta.robots).toMatchObject({ index: false, follow: false })
+            expect(meta.title).toBe('Kedai ini tidak tersedia buat sementara waktu.')
+        }
+        expect(testState.find).not.toHaveBeenCalled()
     })
 
     it('resolves advertised product and blog URLs through the active custom domain', async () => {

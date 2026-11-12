@@ -15,14 +15,16 @@ export interface CheckoutForm {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+export const MAX_CUSTOMER_EMAIL_LENGTH = 254
 
 // Matches Malaysian mobile only (01X-XXXXXXX/XXXXXXXX) with optional +60 prefix, separators allowed
-const MY_PHONE_REGEX = /^(\+?60[\s-]?|0)(1[0-9])[\s-]?\d{3,4}[\s-]?\d{4}$/
+export const MY_PHONE_REGEX = /^(\+?60[\s-]?|0)(1[0-9])[\s-]?\d{3,4}[\s-]?\d{4}$/
 
 /** Validates email format; returns null if valid, error string if invalid. Empty string → null (required checked separately). */
 export function validateEmail(email: string): string | null {
     const v = email.trim()
     if (!v) return null
+    if (v.length > MAX_CUSTOMER_EMAIL_LENGTH) return `Email must not exceed ${MAX_CUSTOMER_EMAIL_LENGTH} characters`
     if (!EMAIL_REGEX.test(v)) return 'Invalid email format'
     return null
 }
@@ -39,15 +41,12 @@ export function validateCheckoutForm(form: CheckoutForm): { valid: boolean; erro
     const errors: string[] = []
     if (!form.name.trim()) errors.push('Name is required')
     if (!form.email.trim()) errors.push('Email is required')
-    if (form.email && !EMAIL_REGEX.test(form.email)) errors.push('Invalid email format')
+    const emailError = validateEmail(form.email)
+    if (emailError) errors.push(emailError)
     if (!form.phone.trim()) errors.push('Phone number is required')
     else if (!MY_PHONE_REGEX.test(form.phone.trim())) errors.push('Invalid phone format')
     if (!form.line1.trim()) errors.push('Address line 1 is required')
     return { valid: errors.length === 0, errors }
-}
-
-export function generateOrderNumber(): string {
-    return `ORD-${Date.now().toString(36).toUpperCase()}`
 }
 
 export const PROOF_ACCEPTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']

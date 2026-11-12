@@ -62,6 +62,8 @@ function buildMockResponse(overrides: Partial<{
             },
         },
         text: vi.fn().mockResolvedValue(html),
+        // the scraper reads the body as a stream (byte cap while it arrives)
+        body: new Response(html).body,
     }
 }
 

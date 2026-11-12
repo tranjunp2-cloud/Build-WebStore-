@@ -190,8 +190,10 @@ test.describe('Dashboard', () => {
 
         // "Store Config" must be gone
         await expect(page.locator('text=Store Config')).toHaveCount(0)
-        // "Settings" nav button must be present in sidebar
-        await expect(page.getByRole('button', { name: /^Settings$/i }).first()).toBeVisible()
+        // "Settings" must be present in the sidebar. The flat nav renders it as a static section
+        // header above the settings links (no accordion button since the sidebar redesign).
+        const mainNav = page.getByRole('navigation', { name: 'Main navigation' }).first()
+        await expect(mainNav.getByText(/^Settings$/i)).toBeVisible()
     })
 
     test('sidebar navigation links work', async ({ page }) => {

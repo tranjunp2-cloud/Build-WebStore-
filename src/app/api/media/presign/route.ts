@@ -16,7 +16,7 @@ const VIDEO_MIMES = new Set(['video/mp4', 'video/webm'])
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!isS3Configured()) {
         return NextResponse.json(

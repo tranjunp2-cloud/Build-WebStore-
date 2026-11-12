@@ -43,10 +43,12 @@ vi.mock('@/components/dashboard/revamp/traffic-performance', () => ({
 }))
 
 import { TrafficPerformanceClient } from '@/components/dashboard/revamp/traffic-performance-client'
+import { DashboardQueryProvider, resetQueryCache } from '../../helpers/query-provider'
 
 describe('TrafficPerformanceClient', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        resetQueryCache()
         mocks.getBrowserViewerTimeZone.mockReturnValue('Asia/Ho_Chi_Minh')
         mocks.getTrafficDataAction.mockResolvedValue({
             total: 1,
@@ -59,7 +61,7 @@ describe('TrafficPerformanceClient', () => {
 
     it('[TC-GH1720] requests Traffic after hydration using the browser timezone', async () => {
         // Arrange & Act
-        render(<TrafficPerformanceClient period="today" />)
+        render(<TrafficPerformanceClient period="today" />, { wrapper: DashboardQueryProvider })
 
         // Assert
         expect(screen.getByText('Loading traffic...')).toBeInTheDocument()
@@ -74,7 +76,7 @@ describe('TrafficPerformanceClient', () => {
 
     it('[TC-GH1720] reloads Traffic with the same viewer timezone when period changes', async () => {
         // Arrange
-        const { rerender } = render(<TrafficPerformanceClient period="7d" />)
+        const { rerender } = render(<TrafficPerformanceClient period="7d" />, { wrapper: DashboardQueryProvider })
         await screen.findByTestId('traffic-data')
 
         // Act

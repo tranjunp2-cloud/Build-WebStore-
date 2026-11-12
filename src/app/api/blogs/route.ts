@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { SAFE_RELATION_POPULATE } from '@/lib/payload/safe-populate'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { createBlogSchema } from '@/lib/validations/blog'
@@ -67,6 +68,7 @@ export const GET = withAuth(async (user, req) => {
             page,
             limit,
             depth: 1, // Populate category and author
+            populate: SAFE_RELATION_POPULATE,
         })
 
         return NextResponse.json({
@@ -150,6 +152,8 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
             },
             user,
             overrideAccess: false,
+            depth: 1,
+            populate: SAFE_RELATION_POPULATE, // same reply shape as GET, no whole tenant / site rows (TC-PERF-129)
         })
 
         return NextResponse.json({ success: true, data: blog }, { status: 201 })

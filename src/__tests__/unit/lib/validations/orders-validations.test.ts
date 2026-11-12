@@ -1,10 +1,42 @@
 import { describe, it, expect } from 'vitest'
 import {
     orderCreateSchema,
+    stripeCheckoutSchema,
+    xenditCheckoutSchema,
     orderStatusUpdateSchema,
     orderCancelSchema,
     orderBulkUpdateSchema,
 } from '@/lib/validations/orders'
+
+describe('[TC-F13.132] checkout schemas reject customer email over 254 characters', () => {
+    const base = {
+        siteId: 1,
+        items: [{ productId: 1, quantity: 1 }],
+        customer: {
+            name: 'Buyer',
+            email: '',
+            phone: '0123456789',
+            address: { line1: '1 Jalan Test', state: 'Selangor' },
+        },
+        paymentMethod: 'cod',
+    }
+
+    for (const [name, schema] of [
+        ['COD', orderCreateSchema],
+        ['Stripe', stripeCheckoutSchema],
+        ['Xendit', xenditCheckoutSchema],
+    ] as const) {
+        it(`${name} accepts 254 characters and rejects 255`, () => {
+            // Arrange
+            const allowed = `${'a'.repeat(242)}@example.com`
+            const tooLong = `${'a'.repeat(243)}@example.com`
+
+            // Act / Assert
+            expect(schema.safeParse({ ...base, customer: { ...base.customer, email: allowed } }).success).toBe(true)
+            expect(schema.safeParse({ ...base, customer: { ...base.customer, email: tooLong } }).success).toBe(false)
+        })
+    }
+})
 
 // ─── TC-F10.09: Invalid order state transitions ──────────────────────
 // ─── TC-F10.13: Payment proof for QR banking ─────────────────────────

@@ -11,6 +11,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { PATCH } from '@/app/api/sites/[siteId]/save/route'
 import { NextRequest } from 'next/server'
+import {
+    lockTenantSiteRows,
+    withTenantRowLock,
+} from '@/lib/payload/tenant-row-lock'
 
 vi.mock('@payload-config', () => ({ default: {} }))
 
@@ -24,7 +28,7 @@ vi.mock('@/lib/auth', () => ({
     getCurrentUser: vi.fn().mockResolvedValue({
         id: 'user-1',
         email: 'owner@example.com',
-        tenants: [{ tenant: 'tenant-1' }],
+        tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }],
     }),
 }))
 
@@ -52,6 +56,17 @@ vi.mock('@/lib/ai/media-injector', () => ({
 
 vi.mock('@/lib/block-normalization', () => ({
     normalizeBlocksForPersistence: vi.fn((blocks: unknown[]) => blocks),
+}))
+
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    TenantSiteLockError: class TenantSiteLockError extends Error {},
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: unknown,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'save-transaction' })),
+    lockTenantSiteRows: vi.fn().mockResolvedValue(undefined),
+    executeTenantTransaction: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
@@ -97,6 +112,7 @@ describe('PATCH /api/sites/[siteId]/save — draft page resolution (BUG-724)', (
         // Arrange — site owned by tenant-1, page is draft-only (_status:'draft')
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })  // site lookup
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })  // locked site re-check
             .mockResolvedValueOnce({ id: '42', site: 1, _status: 'draft', layout: [] })  // page lookup with draft:true
 
         const blocks = [{ blockType: 'hero', headline: 'New text' }]
@@ -109,14 +125,29 @@ describe('PATCH /api/sites/[siteId]/save — draft page resolution (BUG-724)', (
             collection: 'pages',
             id: '42',
             draft: true,
+            req: { transactionID: 'save-transaction' },
         }))
 
-        // Verify update targets the correct page (42), not the homepage
+        // Verify the tenant mutex, site lock, read, and write all share one transaction.
+        expect(withTenantRowLock).toHaveBeenCalledWith(
+            expect.anything(),
+            'tenant-1',
+            expect.any(Function),
+        )
+        expect(lockTenantSiteRows).toHaveBeenCalledWith(
+            expect.anything(),
+            'tenant-1',
+            [1],
+            { transactionID: 'save-transaction' },
+        )
+
+        // Verify update targets the correct page (42), not the homepage.
         expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'pages',
             id: '42',
             data: expect.objectContaining({ layout: blocks }),
             draft: true,
+            req: { transactionID: 'save-transaction' },
         }))
 
         // Homepage fallback must NOT be called
@@ -127,6 +158,7 @@ describe('PATCH /api/sites/[siteId]/save — draft page resolution (BUG-724)', (
         // Arrange — site found, but page lookup returns null (page does not exist)
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })  // site lookup
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })  // locked site re-check
             .mockResolvedValueOnce(null)  // page not found
 
         const blocks = [{ blockType: 'hero', headline: 'Lost edit' }]
@@ -146,6 +178,7 @@ describe('PATCH /api/sites/[siteId]/save — draft page resolution (BUG-724)', (
         // Arrange — page exists but belongs to siteId=2, not siteId=1
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })  // site lookup
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })  // locked site re-check
             .mockResolvedValueOnce({ id: '42', site: 2, _status: 'draft', layout: [] })  // page for different site
 
         const blocks = [{ blockType: 'hero', headline: 'Attacker edit' }]
@@ -166,6 +199,7 @@ describe('PATCH /api/sites/[siteId]/save — draft page resolution (BUG-724)', (
         // GH-1621 journal "Correction"). Draft saves must persist blocks verbatim;
         // sanitization only happens once, right before Publish.
         mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
             .mockResolvedValueOnce({ id: '42', site: 1, _status: 'draft', layout: [] })
 

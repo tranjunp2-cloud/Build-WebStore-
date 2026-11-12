@@ -6,6 +6,7 @@ import { useI18n } from '@/i18n'
 import { RankBadge, CustomerAvatar } from './customers-shared-ui'
 import { Badge } from '@/components/ui/badge'
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
+import { formatRelativeDate } from '../_lib/relative-time'
 
 /** Tablet/mobile (<lg) card list for the shop-customers table.
  *  Desktop (>=lg) keeps the original <Table>; this view avoids the
@@ -17,16 +18,6 @@ type Props = {
     onRowClick: (id: number) => void
     /** Same pagination node rendered under the desktop table. */
     footer?: ReactNode
-}
-
-// Mirrors the helper in customers-list-table.tsx (kept local — 6 lines, avoids cross-file export).
-function relativeDate(iso: string, today: string, yesterday: string): string {
-    const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
-    if (d === 0) return today
-    if (d === 1) return yesterday
-    if (d < 30) return `${d}d ago`
-    if (d < 365) return `${Math.floor(d / 30)}mo ago`
-    return `${Math.floor(d / 365)}y ago`
 }
 
 function SkeletonCard() {
@@ -92,7 +83,7 @@ export function CustomersListCards({ records, loading, onRowClick, footer }: Pro
                             <span className="tabular-nums" style={{ color: 'var(--dash-text)' }}>{c.orderCount}</span>
                         </span>
                         <span className="shrink-0">
-                            {c.latestOrderAt ? relativeDate(c.latestOrderAt, tb.today, tb.yesterday) : '—'}
+                            {c.latestOrderAt ? formatRelativeDate(c.latestOrderAt, tb) : '—'}
                         </span>
                     </div>
                 </div>

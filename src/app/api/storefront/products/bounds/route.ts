@@ -1,3 +1,6 @@
+import { ListingSelectionSchema } from '@/lib/products/listing-selection'
+import { isCachedSiteUnavailable } from '@/lib/storefront/cached-store-availability'
+import { getCategoryDescendantIds } from '@/lib/products/category-descendants'
 import { NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
@@ -41,7 +44,17 @@ export async function GET(req: Request) {
             return NextResponse.json({ minPrice: 0, maxPrice: 0, attributes: [] })
         }
 
+        const parsed = ListingSelectionSchema.safeParse({
+            mode: url.searchParams.get('selectionMode') ?? undefined,
+            ids: url.searchParams.getAll('productId'),
+            category: url.searchParams.get('fixedCategoryId') ?? undefined,
+            includeOutOfStock: url.searchParams.get('includeOutOfStock') ?? undefined,
+        })
+        if (!parsed.success) return NextResponse.json({ error: 'Invalid product scope' }, { status: 400 })
+        const selection = parsed.data
         const payload = await getPayload({ config })
+        // #2179: banned or expired store answers like an unknown one (no reason given)
+        if (await isCachedSiteUnavailable(siteIdNum)) return NextResponse.json({ minPrice: 0, maxPrice: 0, attributes: [] })
 
         const where: Where = {
             and: [
@@ -51,7 +64,25 @@ export async function GET(req: Request) {
             ],
         }
 
+        if (selection.category) {
+            const ids = await getCategoryDescendantIds(payload, siteIdNum, [Number(selection.category)])
+            if (!ids) return NextResponse.json({ minPrice: 0, maxPrice: 0, attributes: [] })
+            ;(where.and as Where[]).push({ category: { in: ids } })
+        }
+        if (selection.mode === 'fixed') {
+            if (!selection.ids.length) return NextResponse.json({ minPrice: 0, maxPrice: 0, attributes: [] })
+            ;(where.and as Where[]).push({ id: { in: selection.ids.map(Number) } })
+        }
+        if (selection.includeOutOfStock === 'false') {
+            ;(where.and as Where[]).push({ or: [
+                { and: [{ hasVariants: { not_equals: true } }, { inventory: { greater_than: 0 } }] },
+                { and: [{ hasVariants: { equals: true } }, { 'variants.stock': { greater_than: 0 } }] },
+            ] })
+        }
+
         const allProducts = await findAllPayloadDocs<{
+            category?: number | string | { id: number | string } | null
+            currency?: string | null
             price?: number | null
             attributes?: AttributeRow[] | null
         }>(payload, {
@@ -59,7 +90,7 @@ export async function GET(req: Request) {
             where,
             depth: 0,
             overrideAccess: true,
-            select: { price: true, attributes: true },
+            select: { price: true, attributes: true, currency: true, category: true },
         }, 1000)
 
         let minPrice = 0
@@ -92,7 +123,8 @@ export async function GET(req: Request) {
                 values: Array.from(values).sort(),
             }))
 
-        return NextResponse.json({ minPrice, maxPrice, attributes })
+        const categoryIds = [...new Set(allProducts.flatMap(product => product.category ? [String(typeof product.category === 'object' ? product.category.id : product.category)] : []))]
+        return NextResponse.json({ minPrice, maxPrice, attributes, categoryIds, currency: allProducts.find(product => product.currency)?.currency ?? undefined })
     } catch (error) {
         console.error('[Storefront Products Bounds API]', error)
         return NextResponse.json({ minPrice: 0, maxPrice: 0, attributes: [] }, { status: 500 })

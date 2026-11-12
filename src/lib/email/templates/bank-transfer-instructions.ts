@@ -10,6 +10,8 @@ import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
 import type { EmailTemplateConfig } from '../types'
+import { formatDate } from './shared/email-utils'
+import { SHOP_TIME_ZONE } from '@/lib/reports/shop-time'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -74,22 +76,12 @@ function formatPrice(amount: number, currency: string, locale: EmailLocale): str
     return `${currency} ${amount.toFixed(2)}`
 }
 
-function formatDate(iso: string, locale: EmailLocale): string {
-    try {
-        return new Date(iso).toLocaleString(locale === 'ms' ? 'en-MY' : 'en-GB', {
-            weekday: 'long', year: 'numeric', month: 'long',
-            day: 'numeric', hour: '2-digit', minute: '2-digit',
-        })
-    } catch {
-        return iso
-    }
-}
-
 function formatDeadline(iso: string): string {
     try {
         return new Date(iso).toLocaleString('en-MY', {
             weekday: 'long', year: 'numeric', month: 'long',
             day: 'numeric', hour: '2-digit', minute: '2-digit',
+            timeZone: SHOP_TIME_ZONE,
             timeZoneName: 'short',
         })
     } catch {

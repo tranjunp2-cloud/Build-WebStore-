@@ -1,7 +1,9 @@
-import React, { KeyboardEvent } from 'react';
+import React, { KeyboardEvent, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, PlayCircle } from 'lucide-react';
 import DOMPurify from 'isomorphic-dompurify';
+import { QnAVideo } from './QnAVideo';
+import { formatVideoDuration, type QnAVideoMedia } from './qna-video-media';
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
     // Check if the element is an anchor tag with target="_blank"
@@ -16,6 +18,10 @@ interface QnAAccordionProps {
     isOpen: boolean;
     onToggle: () => void;
     isLast?: boolean;
+    /** Optional tutorial video shown under the answer (#2464) */
+    video?: QnAVideoMedia;
+    /** Accessible name of the ▶ marker next to a question that has a video */
+    videoBadgeLabel?: string;
 }
 
 /**
@@ -27,7 +33,13 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
     isOpen,
     onToggle,
     isLast = false,
+    video,
+    videoBadgeLabel,
 }) => {
+    // A video file that can't load is dropped together with its ▶ marker; the text answer stays
+    const [videoUnavailable, setVideoUnavailable] = useState(false);
+    const shownVideo = videoUnavailable ? undefined : video;
+
     const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -48,9 +60,23 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
                 className="flex items-center justify-between w-full px-5 py-4 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] hover:bg-[hsl(var(--secondary))] transition-colors"
                 style={{ userSelect: 'none' }}
             >
-                <div className="min-w-0 break-words text-[14px] font-semibold text-white pr-4">
+                <div className="min-w-0 flex-1 break-words text-[14px] font-semibold text-white pr-4">
                     {question}
                 </div>
+                {/* Video marker sits in a fixed right-hand column (before the chevron) so every row lines up;
+                    the duration is dropped on narrow screens to leave room for wrapping questions. */}
+                {shownVideo && (
+                    <span
+                        role="img"
+                        aria-label={videoBadgeLabel ? `${videoBadgeLabel} · ${formatVideoDuration(shownVideo.duration)}` : undefined}
+                        aria-hidden={videoBadgeLabel ? undefined : true}
+                        data-testid="qna-video-badge"
+                        className="mr-3 inline-flex shrink-0 items-center gap-1 rounded-full bg-[hsl(var(--primary)/0.12)] p-1 text-[hsl(var(--primary))] sm:px-2 sm:py-0.5"
+                    >
+                        <PlayCircle className="w-3.5 h-3.5" aria-hidden />
+                        <span className="hidden text-[12px] font-semibold tabular-nums sm:inline" aria-hidden>{formatVideoDuration(shownVideo.duration)}</span>
+                    </span>
+                )}
                 <div
                     className={`shrink-0 transition-transform duration-250 ease-in-out text-[hsl(var(--muted-foreground))] ${isOpen ? 'rotate-180' : 'rotate-0'
                         }`}
@@ -77,6 +103,11 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
                                 }) 
                             }}
                         />
+                        {shownVideo && (
+                            <div className="px-5 pb-5 -mt-1">
+                                <QnAVideo video={shownVideo} question={question} onUnavailable={() => setVideoUnavailable(true)} />
+                            </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>

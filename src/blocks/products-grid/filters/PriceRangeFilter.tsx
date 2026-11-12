@@ -6,6 +6,7 @@ import type { ProductFilterBounds } from '../filter-types'
 import { FILTER_CARD_CLASS_NAME, FILTER_CARD_STYLE } from './card-style'
 
 interface PriceRangeFilterProps {
+    pricePrefix?: string
     activeMinPrice: string | null
     activeMaxPrice: string | null
     bounds: ProductFilterBounds
@@ -22,6 +23,7 @@ function clamp(value: number, lower: number, upper: number) {
 }
 
 export function PriceRangeFilter({
+    pricePrefix = '',
     activeMinPrice,
     activeMaxPrice,
     bounds,
@@ -79,10 +81,10 @@ export function PriceRangeFilter({
             </div>
 
             <div className="space-y-5">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
                     <span className="text-[15px] leading-6 text-[var(--text-secondary)]">Your range:</span>
-                    <span className="text-[15px] font-extrabold leading-6 text-[var(--text-primary)]">
-                        ${rangeValues.min} - ${rangeValues.max}
+                    <span className="whitespace-nowrap text-[15px] font-extrabold leading-6 text-[var(--text-primary)]">
+                        {pricePrefix}{rangeValues.min} - {pricePrefix}{rangeValues.max}
                     </span>
                 </div>
 

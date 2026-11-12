@@ -8,7 +8,7 @@
  * with the Phase 4 order route tests once those routes are implemented.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // ── Top-level mocks ────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ vi.mock('payload', () => ({
 const mockUser = {
     id: 'user-123',
     email: 'owner@example.com',
-    tenants: [{ tenant: { id: 'tenant-abc' }, role: 'owner' }],
+    tenants: [{ tenant: { id: 'tenant-abc' }, role: 'owner', status: 'active' }],
 }
 
 vi.mock('@/lib/auth', () => ({
@@ -43,6 +43,49 @@ import { POST as createDiscount, GET as listDiscounts } from '@/app/api/v1/disco
 import { getPayload } from 'payload'
 
 const mockGetPayload = vi.mocked(getPayload)
+
+// ── TC-AICP-260: Create needs the Orders permission (the sidebar permission of Discounts) ─────────────
+describe('POST /api/v1/discounts — TC-AICP-260: role check', () => {
+    const post = () =>
+        createDiscount(new NextRequest('http://localhost/api/v1/discounts', {
+            method: 'POST',
+            body: JSON.stringify({ code: 'ROLE10', type: 'percentage', value: 10 }),
+            headers: { 'Content-Type': 'application/json' },
+        }))
+    const original = mockUser.tenants
+    let mockCreate: any
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockCreate = vi.fn().mockResolvedValue({ id: 'disc-9', tenant: 'tenant-abc', code: 'ROLE10', usageCount: 0 })
+        mockGetPayload.mockResolvedValue({ create: mockCreate } as any)
+    })
+    afterEach(() => {
+        mockUser.tenants = original
+    })
+
+    it('refuses a custom role without Orders (e.g. products only) and writes nothing', async () => {
+        mockUser.tenants = [{ tenant: { id: 'tenant-abc' }, role: 'custom', status: 'active', permissions: ['products'] }] as never
+
+        const res = await post()
+
+        expect(res.status).toBe(403)
+        expect((await res.json()).error.code).toBe('FORBIDDEN')
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('lets the owner, an editor and a custom role holding Orders create a code', async () => {
+        for (const member of [
+            { tenant: { id: 'tenant-abc' }, role: 'owner', status: 'active' },
+            { tenant: { id: 'tenant-abc' }, role: 'editor', status: 'active' },
+            { tenant: { id: 'tenant-abc' }, role: 'custom', status: 'active', permissions: ['orders'] },
+        ]) {
+            mockUser.tenants = [member] as never
+            expect((await post()).status).toBe(201)
+        }
+        expect(mockCreate).toHaveBeenCalledTimes(3)
+    })
+})
 
 // ── TC-F33-10: Create discount forces tenant + zeros usage ──────────────────
 describe('POST /api/v1/discounts — TC-F33-10: Create discount', () => {
@@ -451,6 +494,29 @@ describe('POST /api/v1/discounts — TC-F33-12: Duplicate code rejection', () =>
         } as any)
     })
 
+    it('[TC-F33-01-06] returns 409 for the real Payload ValidationError shape (generic message, unique only in data.errors)', async () => {
+        // Arrange — shape reproduced against real Postgres: POST UAT50 then uat50
+        const err = Object.assign(new Error('The following field is invalid: '), {
+            name: 'ValidationError',
+            data: { collection: 'discounts', errors: [{ message: 'Value must be unique', path: null, tableName: 'discounts' }] },
+        })
+        mockCreate.mockRejectedValueOnce(err)
+        const req = new NextRequest('http://localhost/api/v1/discounts', {
+            method: 'POST',
+            body: JSON.stringify({ code: 'uat50', type: 'percentage', value: 10 }),
+            headers: { 'Content-Type': 'application/json' },
+        })
+
+        // Act
+        const response = await createDiscount(req)
+        const data = await response.json()
+
+        // Assert
+        expect(response.status).toBe(409)
+        expect(data.error.code).toBe('DUPLICATE_CODE')
+        expect(data.error.message).toContain('already in use for your tenant')
+    })
+
     it('returns 409 with DUPLICATE_CODE when code exists for tenant', async () => {
         // Arrange
         const requestBody = {
@@ -539,5 +605,109 @@ describe('POST /api/v1/discounts — TC-F33-12: Duplicate code rejection', () =>
         // Assert
         expect(response.status).toBe(409)
         expect(data.error.code).toBe('DUPLICATE_CODE')
+    })
+})
+
+// ── TC-PERF-075: effective-status filter reads only the caller's workspaces; search keeps the status filter ──
+describe('GET /api/v1/discounts — TC-PERF-075: scoped at-limit ids', () => {
+    const list = (query: string) => listDiscounts(new NextRequest(`http://localhost/api/v1/discounts?${query}`), undefined as never)
+    let find: ReturnType<typeof vi.fn>
+    let execute: ReturnType<typeof vi.fn>
+    const sqlText = (query: { queryChunks?: unknown[] }) => JSON.stringify(query)
+
+    const originalTenants = mockUser.tenants
+    beforeEach(() => {
+        // integer tenant ids, as in the database (the at-limit query compares tenant_id)
+        mockUser.tenants = [{ tenant: { id: 42 as never }, role: 'owner', status: 'active' }]
+        find = vi.fn().mockResolvedValue({ docs: [], totalDocs: 0, page: 1 })
+        execute = vi.fn().mockResolvedValue({ rows: [{ id: 11 }] })
+        mockGetPayload.mockResolvedValue({ find, db: { drizzle: { execute } } } as never)
+    })
+    afterEach(() => {
+        mockUser.tenants = originalTenants
+    })
+
+    it('limits the at-limit id query to the caller\'s tenants', async () => {
+        // Act
+        await list('status=active')
+
+        // Assert
+        expect(execute).toHaveBeenCalledTimes(1)
+        expect(sqlText(execute.mock.calls[0][0])).toContain('tenant_id IN (')
+        expect(find.mock.calls[0][0].where).toEqual({ and: [{ status: { equals: 'active' } }, { id: { not_in: [11] } }] })
+    })
+
+    it('keeps the inactive filter when searching (the search used to overwrite it)', async () => {
+        // Act
+        await list('status=inactive&search=RAYA')
+
+        // Assert
+        expect(find.mock.calls[0][0].where).toEqual({
+            and: [
+                { or: [{ status: { equals: 'inactive' } }, { id: { in: [11] } }] },
+                { or: [{ code: { contains: 'RAYA' } }, { description: { contains: 'RAYA' } }] },
+            ],
+        })
+    })
+
+    it('sends a weak ETag and 304s an unchanged list (TC-PERF-080)', async () => {
+        // Arrange
+        const first = await list('page=1')
+
+        // Act
+        const second = await listDiscounts(new NextRequest('http://localhost/api/v1/discounts?page=1', { headers: { 'if-none-match': first.headers.get('ETag')! } }), undefined as never)
+
+        // Assert
+        expect(first.headers.get('ETag')).toMatch(/^W\//)
+        expect(second.status).toBe(304)
+    })
+})
+
+// ── TC-PERF-136: the create reply keeps relations as ids; a foreign site is refused ──
+describe('POST /api/v1/discounts — TC-PERF-136: no tenant rows, no foreign site', () => {
+    let mockCreate: any
+    let mockFindByID: any
+    const post = (body: Record<string, unknown>) => createDiscount(new NextRequest('http://localhost/api/v1/discounts', {
+        method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' },
+    }))
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockCreate = vi.fn().mockResolvedValue({ id: 'disc-1', tenant: 'tenant-abc', code: 'SAVE5' })
+        mockFindByID = vi.fn()
+        mockGetPayload.mockResolvedValue({ create: mockCreate, find: vi.fn(), findByID: mockFindByID } as any)
+    })
+
+    it('creates at depth 0, so the reply never carries the tenant row (payment secrets)', async () => {
+        // Act
+        const res = await post({ code: 'SAVE5', type: 'fixed', value: 5 })
+
+        // Assert
+        expect(res.status).toBe(201)
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ depth: 0 }))
+    })
+
+    it('refuses a site of another tenant without creating anything', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue({ id: 9, tenant: 'tenant-other' })
+
+        // Act
+        const res = await post({ code: 'SAVE5', type: 'fixed', value: 5, site: 9 })
+
+        // Assert
+        expect(res.status).toBe(400)
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('accepts a site of the caller\'s tenant', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue({ id: 3, tenant: { id: 'tenant-abc' } })
+
+        // Act
+        const res = await post({ code: 'SAVE5', type: 'fixed', value: 5, site: 3 })
+
+        // Assert
+        expect(res.status).toBe(201)
+        expect(mockCreate).toHaveBeenCalledTimes(1)
     })
 })

@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isSiteDocTenantUnavailable } from '@/lib/storefront/store-availability'
 import { z } from 'zod'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
+import { notifyContactLead } from '@/lib/contact/notify-contact-lead'
 
 /**
  * Plan 260415 contact-bugfix — public POST endpoint cho contact form submissions.
  * Copy pattern từ /api/subscribe: zod validate → rate limit per-site+IP → lookup site
- * → honeypot check → create submission → optional email notify qua AWS SES
- * (fire-and-forget giống OTP pattern, không block response).
+ * → honeypot check → create submission → notify owner (email F32 + chuông LEAD_NEW)
+ * sau response qua runAfterResponse, không block response.
  *
  * Rate limit (GH-1464): per-site+IP 5/5phút là defense chính (tránh 1 site/IP làm cạn
  * quota của site khác — bug gốc GH-1464). Site hợp lệ luôn có siteId đúng (lấy từ config
@@ -69,7 +72,8 @@ export async function POST(req: NextRequest) {
     // (fail open) rather than sharing a bucket — deliberate, same trust boundary for
     // both layers (x-real-ip/x-forwarded-for are Vercel-infra-set, not client-omittable).
     if (rawIp) {
-        const siteRateCheck = await checkRateLimit(`contact-submit:${siteIdNum}:${rawIp}`, 5, 5 * 60 * 1000)
+        // fail-closed: each accepted submission emails the shop owner (TC-PERF-159)
+        const siteRateCheck = await checkRateLimit(`contact-submit:${siteIdNum}:${rawIp}`, 5, 5 * 60 * 1000, { failClosed: true })
         if (!siteRateCheck.allowed) {
             console.warn('[Contact Submit] rate-limited', {
                 type: 'site',
@@ -120,6 +124,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid site' }, { status: 400 })
         }
 
+        // #2179: banned or expired store answers like an unknown one (no reason given)
+        if (await isSiteDocTenantUnavailable(payload, site)) {
+            return NextResponse.json({ error: 'Invalid site' }, { status: 400 })
+        }
+
         // Create submission
         const submission = await payload.create({
             collection: 'contact-submissions',
@@ -136,25 +145,27 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        // Fire-and-forget email notify tới admin email site (nếu có).
-        // Không await — không block response kể cả email fail.
-        const siteName = (site.name as string) || 'Your site'
-        const ownerEmail =
-            (site.ownerEmail as string) ||
-            (typeof site.tenant === 'object' && site.tenant !== null
-                ? ((site.tenant as Record<string, unknown>).email as string)
-                : undefined)
-
-        if (ownerEmail) {
-            payload
-                .sendEmail({
-                    to: ownerEmail,
-                    subject: `New contact form submission on ${siteName}`,
-                    text: `You received a new message from ${name} <${email}>${phone ? ` (${phone})` : ''}:${subject ? `\nSubject: ${subject}` : ''}\n\n${message}\n\n--\nView in admin: /admin/collections/contact-submissions/${submission.id}`,
-                })
-                .catch((err) => {
-                    console.error('[Contact Submit] email notify failed:', err instanceof Error ? err.message : String(err))
-                })
+        // Owner email + bell run after the response (never block / fail the submit — BR-CS-06).
+        // GH-2157: recipients are the tenant's active owners; `site.ownerEmail`/`tenant.email` never existed.
+        const tenantRef = site.tenant as { id?: string | number } | string | number | null | undefined
+        const tenantId = typeof tenantRef === 'object' && tenantRef !== null ? tenantRef.id : tenantRef
+        if (tenantId == null) {
+            console.warn('[Contact Submit] site has no tenant, owner not notified', { siteId: siteIdNum })
+        } else {
+            const siteName = (site.name as string) || 'Your site'
+            const locale = site.locale === 'ms' ? 'ms' : 'en'
+            runAfterResponse('Contact lead notify', () =>
+                notifyContactLead(payload, {
+                    tenantId,
+                    submissionId: submission.id,
+                    siteName,
+                    locale,
+                    name,
+                    email,
+                    phone: phone || undefined,
+                    message,
+                }),
+            )
         }
 
         return NextResponse.json({ success: true })

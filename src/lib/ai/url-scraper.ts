@@ -5,14 +5,18 @@
  *            → extractMetadata (OGS) → extractMainContent (Readability)
  *            → extractStructure (cheerio) → preprocessForAI
  *
- * Security:  SSRF prevention via DNS resolve + private IP blocklist.
+ * Security:  SSRF prevention via DNS resolve + private IP blocklist. EVERY resolved address
+ *            (v4 + v6) must be public, and the socket is pinned to the vetted addresses so a
+ *            second (rebinding) DNS answer can never reach the connection.
  */
 
 import dns from 'dns/promises'
+import { Agent } from 'undici'
 import * as cheerio from 'cheerio'
 import ogs from 'open-graph-scraper'
 import { Readability } from '@mozilla/readability'
 import { JSDOM } from 'jsdom'
+import { FetchGuardError, readBodyCapped } from './fetch-capped'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -56,9 +60,13 @@ const BLOCKED_IP_RANGES = [
     /^192\.168\./,
     /^169\.254\./,
     /^0\./,
+    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, // carrier-grade NAT 100.64/10
     /^::1$/,
-    /^fc00:/i,
-    /^fe80:/i,
+    /^::$/,
+    /^f[cd][0-9a-f]{2}:/i, // unique local fc00::/7
+    /^fe[89ab][0-9a-f]:/i, // link-local fe80::/10
+    // IPv4-mapped IPv6 (dotted or hex form): public sites never resolve to these
+    /^::ffff:/i,
 ]
 
 // ── URL Validation ───────────────────────────────────────────────────────
@@ -86,35 +94,95 @@ export function validateUrl(input: string): URL {
 
 // ── SSRF Prevention ──────────────────────────────────────────────────────
 
-export async function resolveAndValidate(hostname: string): Promise<void> {
-    let address: string
+export type ResolvedAddress = { address: string; family: number }
+
+/**
+ * Resolves ALL A/AAAA records and throws unless every one is public. Checking only the first
+ * address lets a multi-record answer smuggle an internal address in behind a public one.
+ */
+export async function resolvePublicAddresses(hostname: string): Promise<ResolvedAddress[]> {
+    let addresses: ResolvedAddress[]
     try {
-        const result = await dns.lookup(hostname)
-        address = result.address
+        const result = await dns.lookup(hostname, { all: true })
+        addresses = (Array.isArray(result) ? result : [result]).map((r) => ({ address: r.address, family: r.family }))
     } catch {
         throw new Error(`Could not resolve hostname: ${hostname}`)
     }
+    if (addresses.length === 0) throw new Error(`Could not resolve hostname: ${hostname}`)
 
-    if (BLOCKED_IP_RANGES.some((r) => r.test(address))) {
+    if (addresses.some(({ address }) => BLOCKED_IP_RANGES.some((r) => r.test(address)))) {
         throw new Error('URL resolves to a blocked IP range')
     }
+    return addresses
+}
+
+export async function resolveAndValidate(hostname: string): Promise<void> {
+    await resolvePublicAddresses(hostname)
+}
+
+type LookupCallback = (err: Error | null, address: string | ResolvedAddress[], family?: number) => void
+
+/**
+ * undici dispatcher whose sockets can only connect to the already-vetted addresses. The hostname
+ * is never re-resolved, which closes the DNS-rebinding window between check and connect.
+ */
+export function createPinnedAgent(addresses: ResolvedAddress[]): Agent {
+    return new Agent({
+        connect: {
+            lookup: (_hostname: string, options: { all?: boolean; family?: number | string }, cb: LookupCallback) => {
+                const wanted = options?.family === 4 || options?.family === 6 ? options.family : null
+                const usable = wanted ? addresses.filter((a) => a.family === wanted) : addresses
+                const pool = usable.length > 0 ? usable : addresses
+                if (options?.all) cb(null, pool)
+                else cb(null, pool[0]!.address, pool[0]!.family)
+            },
+        },
+    })
 }
 
 // ── Fetch with Safeguards ────────────────────────────────────────────────
 
-export async function fetchWithSafeguards(url: URL): Promise<string> {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-
-    try {
-        const response = await fetch(url.href, {
-            signal: controller.signal,
-            redirect: 'follow',
+/**
+ * Follows redirects by hand so every hop is checked (protocol, port,
+ * credentials, resolved address) BEFORE a request is sent to it — `redirect:
+ * 'follow'` would already have called an internal host by the time the final
+ * URL could be checked.
+ */
+async function fetchPublicPage(url: URL, signal: AbortSignal, agents: Agent[]): Promise<Response> {
+    let current = url
+    for (let hop = 0; ; hop++) {
+        if (hop > 0) validateUrl(current.href)
+        // Vet every address, then pin the socket to exactly those — no second DNS answer is ever used.
+        const agent = createPinnedAgent(await resolvePublicAddresses(current.hostname))
+        agents.push(agent)
+        const response = await fetch(current.href, {
+            signal,
+            redirect: 'manual',
             headers: {
                 'User-Agent': 'ECHPrimeBot/1.0 (website-analyzer)',
                 Accept: 'text/html,application/xhtml+xml',
+                // ask for an uncompressed page; a server that compresses anyway is still capped on the decoded bytes
+                'Accept-Encoding': 'identity',
             },
-        })
+            // undici `dispatcher` is not part of the DOM RequestInit type
+            dispatcher: agent,
+        } as RequestInit)
+        const location = response.status >= 300 && response.status < 400 ? response.headers.get('location') : null
+        if (!location) return response
+        // drop the redirect body so its socket is released before the next hop
+        await response.body?.cancel().catch(() => undefined)
+        if (hop >= MAX_REDIRECTS) throw new Error('Too many redirects')
+        current = new URL(location, current)
+    }
+}
+
+export async function fetchWithSafeguards(url: URL): Promise<string> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    const agents: Agent[] = []
+
+    try {
+        const response = await fetchPublicPage(url, controller.signal, agents)
 
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -125,15 +193,16 @@ export async function fetchWithSafeguards(url: URL): Promise<string> {
             throw new Error('URL does not point to a web page (non-HTML content)')
         }
 
-        const contentLength = response.headers.get('content-length')
-        if (contentLength && parseInt(contentLength, 10) > MAX_RESPONSE_BYTES) {
-            throw new Error('Response too large (exceeds 5 MB)')
+        // counted on the decoded bytes while they arrive (a tiny compressed body can inflate to gigabytes), so the
+        // request is aborted past 5 MB instead of buffering everything first
+        let bytes: Uint8Array
+        try {
+            bytes = await readBodyCapped(response, MAX_RESPONSE_BYTES, () => controller.abort())
+        } catch (error) {
+            if (error instanceof FetchGuardError && error.code === 'TOO_LARGE') throw new Error('Response too large (exceeds 5 MB)')
+            throw error
         }
-
-        const html = await response.text()
-        if (html.length > MAX_RESPONSE_BYTES) {
-            throw new Error('Response too large (exceeds 5 MB)')
-        }
+        const html = new TextDecoder().decode(bytes)
 
         // Validate final URL after redirects (SSRF: redirect to private IP)
         const finalUrl = response.url || url.href
@@ -150,6 +219,7 @@ export async function fetchWithSafeguards(url: URL): Promise<string> {
         throw error
     } finally {
         clearTimeout(timeout)
+        for (const agent of agents) void agent.close().catch(() => undefined)
     }
 }
 
@@ -428,10 +498,7 @@ export async function scrapeUrl(urlString: string): Promise<ScrapeResult> {
     // Step 1: Validate URL
     const url = validateUrl(urlString)
 
-    // Step 2: SSRF check
-    await resolveAndValidate(url.hostname)
-
-    // Step 3: Fetch with safeguards
+    // Step 2-3: SSRF check (all addresses, pinned connection) + fetch with safeguards
     const html = await fetchWithSafeguards(url)
 
     // Step 4: Extract metadata

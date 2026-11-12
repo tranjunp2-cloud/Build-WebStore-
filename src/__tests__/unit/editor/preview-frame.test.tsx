@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
+import { toast } from 'sonner'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
+
+vi.mock('sonner', () => ({
+    toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn(), info: vi.fn() }),
+}))
 
 // Mutable store state so individual tests can swap performSave with a controllable
 // (deferred) promise to assert behaviour while a save is still in flight (GH-1367 Bug 3).
@@ -108,6 +113,30 @@ describe('PreviewFrame', () => {
         // Assert
         await waitFor(() => {
             expect(onManualSave).toHaveBeenCalledWith('footer')
+        })
+    })
+
+    it('TC-F11.01: routes a history step request from the iframe to the editor shell', async () => {
+        // Arrange
+        const onHistoryStep = vi.fn()
+        render(<PreviewFrame {...defaultProps} onHistoryStep={onHistoryStep} />)
+
+        // Act
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                data: { type: 'HISTORY_STEP_REQUEST', direction: 'undo' },
+                origin: window.location.origin,
+            }))
+            window.dispatchEvent(new MessageEvent('message', {
+                data: { type: 'HISTORY_STEP_REQUEST', direction: 'bogus' },
+                origin: window.location.origin,
+            }))
+        })
+
+        // Assert
+        await waitFor(() => {
+            expect(onHistoryStep).toHaveBeenCalledTimes(1)
+            expect(onHistoryStep).toHaveBeenCalledWith('undo')
         })
     })
 
@@ -305,5 +334,59 @@ describe('PreviewFrame', () => {
 
             resolveSave?.()
         })
+    })
+})
+
+describe('PreviewFrame inline edit outcome (GH-2084)', () => {
+    const props: PreviewFrameProps = { siteId: 'site-123', pageId: null, iframeKey: 1, isLoading: false, viewport: 'desktop', selectedBlock: null }
+    const send = (data: Record<string, unknown>) => act(() => {
+        window.dispatchEvent(new MessageEvent('message', { data, origin: window.location.origin }))
+    })
+    const typeAndStop = (rerender: (ui: React.ReactElement) => void, searchKey: string, newHtml: string) => {
+        send({ type: 'TEXT_EDITING_STARTED', blockIndex: 0, blockType: 'hero', originalText: searchKey, rect: { top: 0, left: 0, width: 10, height: 10 } })
+        send({ type: 'TEXT_EDITED', blockIndex: 0, searchKey, oldHtml: searchKey, newHtml })
+        rerender(<PreviewFrame {...props} />)
+        send({ type: 'TEXT_EDITING_STOPPED' })
+        act(() => { vi.advanceTimersByTime(200) })
+    }
+
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.mocked(toast.error).mockClear()
+        mockStoreState.blocks = [{ blockType: 'hero', headline: 'Old title' }]
+        mockStoreState.performSave = vi.fn(() => Promise.resolve())
+        mockStoreState.updateBlock = vi.fn((index: number, next: unknown) => {
+            mockStoreState.blocks = mockStoreState.blocks.map((b, i) => (i === index ? next : b))
+        })
+    })
+    afterEach(() => {
+        vi.runOnlyPendingTimers()
+        vi.useRealTimers()
+    })
+
+    it('TC-F12.18: retyping the whole text (new text does not contain the old) is saved, not reported as unmapped', () => {
+        // Arrange
+        const { rerender } = render(<PreviewFrame {...props} />)
+
+        // Act — the store already holds the new text when TEXT_EDITING_STOPPED re-applies the payload
+        typeAndStop(rerender, 'Old title', 'Brand new')
+
+        // Assert
+        expect(mockStoreState.blocks[0]).toMatchObject({ headline: 'Brand new' })
+        expect(toast.error).not.toHaveBeenCalled()
+        expect(mockStoreState.performSave).toHaveBeenCalled()
+    })
+
+    it('TC-F12.18: text that matches no field is reported and not saved', () => {
+        // Arrange
+        const { rerender } = render(<PreviewFrame {...props} />)
+
+        // Act — the canvas shows text the store does not have
+        typeAndStop(rerender, 'Text only on canvas', 'Edited')
+
+        // Assert
+        expect(mockStoreState.updateBlock).not.toHaveBeenCalled()
+        expect(toast.error).toHaveBeenCalledWith('Inline edit failed')
+        expect(mockStoreState.performSave).not.toHaveBeenCalled()
     })
 })

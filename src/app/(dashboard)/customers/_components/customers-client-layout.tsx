@@ -1,12 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { CustomersListToolbar } from './customers-list-toolbar'
 import { CustomersListTable } from './customers-list-table'
 import { getShopCustomersAction, exportShopCustomersCsvAction } from '../actions'
+import { queryKeys } from '@/hooks/queries/query-keys'
+import { useKeptData } from '@/hooks/queries/use-kept-data'
+import { useQueryScope } from '@/providers/query-provider'
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
 import type { RankFilter, DateFilter } from './customers-list-toolbar'
 import type { SortKey } from '../_lib/shop-customer-record'
@@ -70,8 +74,6 @@ export function ShopCustomersClientLayout() {
     const { t, ti } = useI18n()
     const c = t.dashboard.shopCustomers
 
-    const [records, setRecords]     = useState<ShopCustomerRecord[]>([])
-    const [total, setTotal]         = useState(0)
     const [page, setPage]           = useState(1)
     const [limit, setLimit]         = useState(10)
     const [search, setSearch]       = useState('')
@@ -81,47 +83,34 @@ export function ShopCustomersClientLayout() {
     const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('desc')
     const [customFrom, setCustomFrom] = useState('')
     const [customTo, setCustomTo]     = useState('')
-    const [loading, setLoading]     = useState(true)
     const [exporting, setExporting] = useState(false)
 
-    // genRef tracks the "generation" of the latest fetch. Each load() call increments it;
-    // a resolved response is discarded if its generation no longer matches the current one.
-    // Using a ref (not state) avoids extra renders and dep-array churn on load.
-    const genRef = useRef(0)
-
-    // Extract translation string so useCallback dep-array can capture it
-    // (c is stable per locale, but ESLint cannot verify property access on outer objects)
-    const loadFailedMsg = c.loadFailed
-
-    const load = useCallback(async () => {
-        const gen = ++genRef.current
-        setLoading(true)
-        try {
+    // One cached query per filter/sort/page set. The date range is worked out when the request is made (a rolling
+    // "last 7 days" ends now). A write elsewhere refetches the page on screen in place (the dashboard's query
+    // invalidation): rows stay, and a failed background refetch keeps them without a toast.
+    const scope = useQueryScope()
+    const params = { search, rank: rankFilter, dateFilter, customFrom, customTo, page, limit, sortBy, sortDir }
+    const query = useQuery({
+        queryKey: queryKeys.customers.list(scope, params),
+        queryFn: () => {
             const { dateFrom, dateTo } = toDateRange(dateFilter, customFrom, customTo)
-            const res = await getShopCustomersAction({
-                search: search || undefined,
-                rank: rankFilter,
-                dateFrom,
-                dateTo,
-                page,
-                limit,
-                sortBy,
-                sortDir,
-            })
-            // Discard stale responses — only the latest fetch wins
-            if (gen !== genRef.current) return
-            setRecords(res.data)
-            setTotal(res.meta.total)
-        } catch {
-            if (gen !== genRef.current) return
-            toast.error(loadFailedMsg)
-        } finally {
-            // Only the latest call clears the loading spinner
-            if (gen === genRef.current) setLoading(false)
-        }
-    }, [search, rankFilter, dateFilter, customFrom, customTo, page, limit, sortBy, sortDir, loadFailedMsg])
+            return getShopCustomersAction({ search: search || undefined, rank: rankFilter, dateFrom, dateTo, page, limit, sortBy, sortDir })
+        },
+        placeholderData: keepPreviousData,
+    })
+    const shown = useKeptData(query.data)
+    const records: ShopCustomerRecord[] = shown?.data ?? []
+    const total = shown?.meta.total ?? 0
+    const loading = query.isPending || query.isPlaceholderData
 
-    useEffect(() => { load() }, [load])
+    const loadFailedMsg = c.loadFailed
+    const { errorUpdatedAt, isRefetchError, error } = query
+    useEffect(() => {
+        if (!errorUpdatedAt) return
+        if (isRefetchError) console.error('[Customers refresh]', error)
+        else toast.error(loadFailedMsg)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [errorUpdatedAt])
 
     // Stable handler refs via useCallback([], []) — state setters have stable identity per React.
     // Prevents child re-renders and debounce reset on every parent render.

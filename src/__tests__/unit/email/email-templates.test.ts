@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { orderStatusEmail } from '@/lib/email/templates/order-status'
@@ -37,6 +37,22 @@ describe('welcomeEmail', () => {
     it('includes custom dashboard URL', () => {
         const result = welcomeEmail({ ...baseData, dashboardUrl: 'https://custom.url/dash' })
         expect(result.html).toContain('https://custom.url/dash')
+    })
+
+    describe('default dashboard URL', () => {
+        afterEach(() => vi.unstubAllEnvs())
+
+        it('derives from NEXT_PUBLIC_SERVER_URL without a double slash', () => {
+            vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://web.example.test/')
+            const result = welcomeEmail(baseData)
+            expect(result.html).toContain('https://web.example.test/dashboard')
+            expect(result.html).not.toContain('primeweb.app')
+        })
+
+        it('falls back to localhost when NEXT_PUBLIC_SERVER_URL is unset', () => {
+            vi.stubEnv('NEXT_PUBLIC_SERVER_URL', '')
+            expect(welcomeEmail(baseData).html).toContain('http://localhost:3000/dashboard')
+        })
     })
 })
 

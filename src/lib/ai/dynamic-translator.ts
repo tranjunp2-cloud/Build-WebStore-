@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import { completeComposed, currentAiActor } from '@/lib/ai-platform/actor-scope'
 
 interface TranslatorInput {
     industry?: string
@@ -10,11 +10,11 @@ interface TranslatorInput {
  * product) to its accurate English equivalent — the phrase a stock-photo site
  * would tag the SAME subject with. Preserves count + order (N terms in → N
  * phrases out), and does NOT generalize a specific dish into a generic scene.
- * Uses gpt-4o-mini. Returns null on failure so the caller falls back to raw.
+ * Runs the AI platform task `i18n.translate-image-terms`. Returns null on failure
+ * (or outside a site-generation run) so the caller falls back to raw.
  */
 export async function translateToEnglishKeywords(input: TranslatorInput): Promise<string[] | null> {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
+    if (!currentAiActor()) return null
 
     const terms = (input.products ?? []).map((t) => t.trim()).filter(Boolean)
     if (terms.length === 0) return null
@@ -34,23 +34,20 @@ ${terms.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 Return ONLY a JSON array of exactly ${terms.length} strings in the same order. No markdown, no explanation.`
 
     try {
-        const openai = new OpenAI({ apiKey: key })
-
         const controller = new AbortController()
-        // 8-second timeout — generous enough for gpt-4o-mini under load while
+        // 8-second timeout — generous enough for the fast tier under load while
         // still bounding the total gen time well within maxDuration (300s).
         const timeoutId = setTimeout(() => controller.abort(), 8000)
 
         try {
-            const response = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
-                messages: [{ role: 'user', content: prompt }],
+            const response = await completeComposed('i18n.translate-image-terms', {
+                user: prompt,
                 // ~12 tokens per short phrase + JSON punctuation; scales with count.
-                max_tokens: Math.min(160, 40 + terms.length * 30),
+                maxOutputTokens: Math.min(160, 40 + terms.length * 30),
                 temperature: 0.1,
             }, { signal: controller.signal })
 
-            const content = response.choices[0]?.message?.content?.trim()
+            const content = response.content.trim()
             if (!content) return null
 
             let parsed: string[]

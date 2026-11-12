@@ -1,8 +1,9 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
 import config from "@payload-config";
 import { z } from "zod";
-import { withSuperAdmin } from "@/lib/admin/api-utils";
+import { withStudioPermission } from "@/lib/admin/api-utils";
 import {
   getManualRunPreflight,
   manualRunRequestDigest,
@@ -10,6 +11,7 @@ import {
   validateManualIdempotencyKey,
 } from "@/lib/admin/qa/manual-runs";
 import { resolveManualQaPack } from "@/lib/admin/qa/targeted-smoke-registry";
+import { executeLocalDevRun, simulateLocalTestRun } from "@/lib/admin/qa/dev-test-runner";
 import { claimTargetedSmokeDispatch, blockTargetedSmokeDispatch, TargetedSmokeDispatchConflictError } from "@/lib/admin/qa/targeted-smoke-dispatch";
 import { dispatchTargetedSmokeWorkflow, githubAppConfigFromEnv, GitHubWorkflowDispatchRejectedError } from "@/lib/admin/qa/github-targeted-smoke";
 import { withQaTargetedDispatchTransaction } from "@/lib/payload/qa-targeted-dispatch-transaction";
@@ -19,7 +21,7 @@ export const maxDuration = 60;
 
 const RequestSchema = z.object({
   targetId: z.string().regex(/^[a-z][a-z0-9-]*$/),
-  profile: z.enum(["smoke", "regression"]),
+  profile: z.enum(["smoke", "regression", "user_flow", "impact", "security"]),
   pullRequest: z.number().int().positive().optional(),
   commitSha: z.string().regex(/^[a-f0-9]{7,64}$/i).optional(),
   idempotencyKey: z.string().min(16).max(100),
@@ -61,7 +63,7 @@ function isUniqueViolation(error: unknown): boolean {
   return false;
 }
 
-export const POST = withSuperAdmin(async (req: NextRequest, { user }) => {
+export const POST = withStudioPermission('qa.run', async (req: NextRequest, { user }) => {
   const contentLength = Number(req.headers.get("content-length") ?? "0");
   if (Number.isFinite(contentLength) && contentLength > 10_000)
     return NextResponse.json({ error: "Manual-run request too large" }, { status: 413 });
@@ -154,8 +156,33 @@ export const POST = withSuperAdmin(async (req: NextRequest, { user }) => {
       return NextResponse.json({ data: { id: outcome.dispatch.id, status: transitionStatus ?? "queued" } }, { status: 202 });
     // Local QA tests must prove the full browser confirmation and durable
     // ledger transition without ever dispatching an external Actions workflow.
-    if (process.env.NODE_ENV === "development")
-      return NextResponse.json({ data: { id: outcome.dispatch.id, status: "dispatched", packId: resolved.pack.packId, packVersion: resolved.pack.packVersion } }, { status: 202 });
+    if (process.env.NODE_ENV === "development") {
+      const testCases = resolved.profile?.testCases ?? resolved.pack.testCases;
+      simulateLocalTestRun(payload, {
+        dispatchId: outcome.dispatch.id,
+        targetId: parsed.data.targetId,
+        suite: "targeted-smoke",
+        profile: parsed.data.profile === "smoke" ? "manual-smoke" : "manual-regression",
+        runner: resolved.pack.runner ?? "smoke",
+        testCases,
+        testCaseIds: testCases.map((tc) => tc.id),
+        pullRequest: preflight.context.pullRequest,
+        commitSha: preflight.context.commitSha,
+        durationMs: 420,
+      });
+
+      return NextResponse.json(
+        {
+          data: {
+            id: outcome.dispatch.id,
+            status: "dispatched",
+            packId: resolved.pack.packId,
+            packVersion: resolved.pack.packVersion,
+          },
+        },
+        { status: 202 },
+      );
+    }
     if (!github) throw new Error("GitHub App configuration disappeared during dispatch");
     await dispatchTargetedSmokeWorkflow(github, {
       dispatchId: String(outcome.dispatch.id),

@@ -65,7 +65,7 @@ type CartStore = {
     legacyCartCleared: boolean
 
     activateSiteCart: (siteId: string, siteSlug: string) => void
-    addItem: (item: Omit<CartItem, 'quantity' | 'unavailable'>) => void
+    addItem: (item: Omit<CartItem, 'quantity' | 'unavailable'>, quantity?: number) => void
     removeItem: (productId: string, variantName?: string) => void
     updateQuantity: (productId: string, quantity: number, variantName?: string) => void
     clearCart: () => void
@@ -182,22 +182,24 @@ export const useCartStore = create<CartStore>((set, get) => ({
         })
     },
 
-    addItem: (item) => {
+    addItem: (item, quantity = 1) => {
         const current = get()
         const existing = current.items.find(candidate => sameLine(candidate, item))
         const maxQty = item.inventory != null ? item.inventory : Infinity
+        // GH-2100: PDP quantity picker — invalid/non-positive amounts fall back to 1
+        const addQty = Number.isFinite(quantity) && quantity >= 1 ? Math.floor(quantity) : 1
         let newItems: CartItem[]
 
         if (existing) {
             if (existing.quantity >= maxQty) return
             newItems = current.items.map(candidate =>
                 sameLine(candidate, item)
-                    ? { ...candidate, ...item, quantity: Math.min(candidate.quantity + 1, maxQty), unavailable: false }
+                    ? { ...candidate, ...item, quantity: Math.min(candidate.quantity + addQty, maxQty), unavailable: false }
                     : candidate
             )
         } else {
             if (maxQty <= 0) return
-            newItems = [...current.items, { ...item, quantity: 1, unavailable: false }]
+            newItems = [...current.items, { ...item, quantity: Math.min(addQty, maxQty), unavailable: false }]
         }
 
         saveCart(current.siteId, newItems)

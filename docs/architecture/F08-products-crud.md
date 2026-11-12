@@ -69,7 +69,7 @@ ProductsFeature
 | GET | `/api/products` | List products (paginated, filtered) |
 | POST | `/api/products` | Create product |
 | PATCH | `/api/products/[id]` | Update product |
-| DELETE | `/api/products/[id]` | Soft delete |
+| DELETE | `/api/products/[id]` | Hard delete — chỉ super-admin; tenant-owner nhận 403 (GH-1520). Xóa mềm = update `deletedAt` qua Dashboard action |
 | POST | `/api/ai/product-description` | AI generate description used by the current product form |
 
 ## 4. AI Description Flow

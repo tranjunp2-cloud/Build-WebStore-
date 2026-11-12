@@ -28,15 +28,21 @@ const REPO_ROOT = process.cwd()
 export type RubricVersion = 'v1' | 'v1.1' | 'v1.2' | 'v1.3'
 export const DEFAULT_RUBRIC_VERSION: RubricVersion = 'v1.3'
 
-const RUBRIC_FILES: Record<RubricVersion, string> = {
-    v1: 'scripts/test-harness/rubric/rubric-v1.json',
-    'v1.1': 'scripts/test-harness/rubric/rubric-v1.1.json',
-    'v1.2': 'scripts/test-harness/rubric/rubric-v1.2.json',
-    'v1.3': 'scripts/test-harness/rubric/rubric-v1.3.json',
-}
+const RUBRIC_VERSIONS: readonly RubricVersion[] = ['v1', 'v1.1', 'v1.2', 'v1.3']
 
+/**
+ * Absolute path of a rubric definition file.
+ *
+ * The path is a literal folder + `rubric-${version}.json` on purpose: bundlers
+ * (Turbopack/nft) turn it into the bounded glob
+ * `scripts/test-harness/rubric/rubric-*.json`. A value looked up from a map
+ * (`RUBRIC_FILES[version]`) is opaque to them and made Turbopack trace the
+ * whole project into every function importing this module (e.g.
+ * /api/admin/templates/bulk), risking Vercel's 250 MB function limit.
+ */
 export function rubricPath(version: RubricVersion = DEFAULT_RUBRIC_VERSION): string {
-    return path.resolve(REPO_ROOT, RUBRIC_FILES[version])
+    if (!RUBRIC_VERSIONS.includes(version)) throw new Error(`Unknown rubric version: ${String(version)}`)
+    return path.join(REPO_ROOT, 'scripts/test-harness/rubric', `rubric-${version}.json`)
 }
 
 export function reportPath(version: RubricVersion = DEFAULT_RUBRIC_VERSION): string {

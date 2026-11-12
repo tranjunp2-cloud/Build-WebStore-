@@ -14,6 +14,8 @@ import { StripeConnectedBar } from './StripeConnectedBar';
 import { XenditConnectBlock } from './XenditConnectBlock';
 import { XenditConnectedBar } from './XenditConnectedBar';
 import { PaymentMethodCard } from './PaymentMethodCard';
+import { XENDIT_ENABLED } from '@/lib/payment/xendit-visibility';
+import { SaveBarLift } from '@/components/agent/save-bar-lift'
 
 type Media = {
     id: string | number;
@@ -96,6 +98,9 @@ export function PaymentsFormClient({
     const [accountHolderName, setAccountHolderName] = useState('');
     const [bankName, setBankName] = useState('');
     const [accountNumber, setAccountNumber] = useState('');
+    // Members who aren't owner / admin can't read or change the payout account (TC-PERF-175).
+    const [bankHidden, setBankHidden] = useState(false);
+    const [maskedAccountNumber, setMaskedAccountNumber] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isConnecting, setIsConnecting] = useState(false);
     // Stripe Connect states
@@ -191,6 +196,10 @@ export function PaymentsFormClient({
                 const holderName = (d.account_holder_name as string) || '';
                 const bank = (d.bank_name as string) || '';
                 const acctNum = (d.account_number as string) || '';
+                const hidden = (d as { bankHidden?: unknown }).bankHidden === true;
+                const masked = (d as { account_number_masked?: unknown }).account_number_masked;
+                setBankHidden(hidden);
+                setMaskedAccountNumber(hidden && typeof masked === 'string' ? masked : null);
                 const card = d.payment_card ?? initialCardEnabled;
                 const fpx = d.payment_fpx ?? initialFpxEnabled;
 
@@ -438,6 +447,8 @@ export function PaymentsFormClient({
     };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        // The payment QR is owner / admin only, like the bank account (TC-PERF-179).
+        if (bankHidden) return;
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 2 * 1024 * 1024) { toast.error(t.payments.imageTooLarge); return; }
@@ -466,6 +477,7 @@ export function PaymentsFormClient({
     };
 
     const handleRemoveImage = () => {
+        if (bankHidden) return;
         setQrImageId(null); setQrPreviewUrl(null); setQrFileName(null); setPaymentQr(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -485,7 +497,8 @@ export function PaymentsFormClient({
     }, []);
 
     const validateBankTransfer = (): { accountHolderName?: string; accountNumber?: string } => {
-        if (!paymentQr) return {};
+        // Hidden bank fields are the owner's to fill in; the server keeps them as they are.
+        if (!paymentQr || bankHidden) return {};
         const errs: { accountHolderName?: string; accountNumber?: string } = {};
         if (!accountHolderName.trim()) errs.accountHolderName = pt.errAccountHolderRequired;
         const acctTrimmed = accountNumber.trim();
@@ -559,10 +572,12 @@ export function PaymentsFormClient({
             if (paymentQr !== serverPaymentValues.paymentQr) updates.payment_qr = paymentQr;
             if (cardEnabled !== serverPaymentValues.cardEnabled) updates.payment_card = cardEnabled;
             if (fpxEnabled !== serverPaymentValues.fpxEnabled) updates.payment_fpx = fpxEnabled;
-            if ((qrImageId ?? null) !== (serverPaymentValues.qrImageId ?? null)) updates.qr_image = qrImageId;
-            if (accountHolderName !== serverPaymentValues.accountHolderName) updates.account_holder_name = accountHolderName || null;
-            if (bankName !== serverPaymentValues.bankName) updates.bank_name = bankName || null;
-            if (accountNumber !== serverPaymentValues.accountNumber) updates.account_number = accountNumber || null;
+            if (!bankHidden) {
+                if ((qrImageId ?? null) !== (serverPaymentValues.qrImageId ?? null)) updates.qr_image = qrImageId;
+                if (accountHolderName !== serverPaymentValues.accountHolderName) updates.account_holder_name = accountHolderName || null;
+                if (bankName !== serverPaymentValues.bankName) updates.bank_name = bankName || null;
+                if (accountNumber !== serverPaymentValues.accountNumber) updates.account_number = accountNumber || null;
+            }
 
             const res = await updatePaymentSettings(updates);
             if (res.success) {
@@ -600,6 +615,7 @@ export function PaymentsFormClient({
                 setAccountHolderName(savedSnapshot.accountHolderName);
                 setBankName(savedSnapshot.bankName);
                 setAccountNumber(savedSnapshot.accountNumber);
+                if (saved.bankHidden) setMaskedAccountNumber(saved.account_number_masked ?? null);
                 setServerPaymentValues(savedSnapshot);
                 toast.success(pt.successSave);
             } else {
@@ -760,29 +776,31 @@ export function PaymentsFormClient({
                 )}
             </section>
 
-            {/* ─── Xendit (F34) ─── */}
-            <section className="space-y-[14px]">
-                <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
-                    <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
-                        {pt.xenditSectionTitle}
-                    </h2>
-                    <span className="ml-auto text-[12px] text-slate-500">{pt.xenditPoweredBy}</span>
-                </div>
+            {/* ─── Xendit (F34) — temporarily hidden, see xendit-visibility.ts ─── */}
+            {XENDIT_ENABLED && (
+                <section className="space-y-[14px]">
+                    <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
+                        <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
+                        <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
+                            {pt.xenditSectionTitle}
+                        </h2>
+                        <span className="ml-auto text-[12px] text-slate-500">{pt.xenditPoweredBy}</span>
+                    </div>
 
-                {xenditIsConnected ? (
-                    <XenditConnectedBar
-                        accountId={null}
-                        tenantId={tenantId ?? ''}
-                        onDisconnect={handleXenditDisconnect}
-                    />
-                ) : (
-                    <XenditConnectBlock
-                        tenantId={tenantId}
-                        onSaveKeys={handleSaveXenditKeys}
-                    />
-                )}
-            </section>
+                    {xenditIsConnected ? (
+                        <XenditConnectedBar
+                            accountId={null}
+                            tenantId={tenantId ?? ''}
+                            onDisconnect={handleXenditDisconnect}
+                        />
+                    ) : (
+                        <XenditConnectBlock
+                            tenantId={tenantId}
+                            onSaveKeys={handleSaveXenditKeys}
+                        />
+                    )}
+                </section>
+            )}
 
             {/* ─── Manual Methods ─── */}
             <section className="space-y-[14px]">
@@ -822,6 +840,16 @@ export function PaymentsFormClient({
                             <div ref={bankTransferFormRef} className="mt-[18px] pt-[18px]" style={{ borderTop: '1px dashed var(--dash-border)' }}>
                                 <label className="block text-[13px] font-semibold text-slate-300 mb-[10px]">{pt.qrCodeLabel}</label>
 
+                                {bankHidden && (
+                                    <p
+                                        data-testid="payout-owner-only-note"
+                                        className="flex items-center gap-[6px] text-[12px] text-slate-400 mb-[10px]"
+                                    >
+                                        <Shield className="w-[12px] h-[12px] shrink-0" />
+                                        <span>{pt.payoutOwnerOnlyNote}</span>
+                                    </p>
+                                )}
+
                                 {qrPreviewUrl ? (
                                     <div className="flex items-center gap-[16px] p-[14px] rounded-[12px] border border-white/[0.08] bg-[#0d1525]">
                                         {/* QR thumb */}
@@ -841,7 +869,7 @@ export function PaymentsFormClient({
                                             </p>
                                             <p className="font-mono text-[12px] text-slate-400 m-0">{pt.qrUploadedMeta}</p>
                                         </div>
-                                        <div className="flex gap-[6px] shrink-0">
+                                        {!bankHidden && <div className="flex gap-[6px] shrink-0">
                                             <button
                                                 type="button"
                                                 onClick={handleRemoveImage}
@@ -850,9 +878,9 @@ export function PaymentsFormClient({
                                             >
                                                 <Trash2 className="w-[14px] h-[14px]" />
                                             </button>
-                                        </div>
+                                        </div>}
                                     </div>
-                                ) : (
+                                ) : bankHidden ? null : (
                                     <div
                                         onClick={() => fileInputRef.current?.click()}
                                         className="flex flex-col items-center justify-center text-center rounded-[12px] cursor-pointer transition-all group"
@@ -879,7 +907,9 @@ export function PaymentsFormClient({
                                     </div>
                                 )}
 
-                                <input type="file" accept="image/png, image/jpeg" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
+                                {!bankHidden && (
+                                    <input type="file" accept="image/png, image/jpeg" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
+                                )}
 
                                 {/* Account holder name */}
                                 <div className="flex flex-col gap-[6px] mt-[16px]">
@@ -899,9 +929,11 @@ export function PaymentsFormClient({
                                         <input
                                             ref={firstBankInputRef}
                                             type="text"
-                                            value={accountHolderName}
+                                            value={bankHidden ? '' : accountHolderName}
                                             onChange={e => handleAccountHolderNameChange(e.target.value)}
-                                            placeholder={pt.accountHolderNamePlaceholder}
+                                            placeholder={bankHidden ? '••••' : pt.accountHolderNamePlaceholder}
+                                            readOnly={bankHidden}
+                                            disabled={bankHidden}
                                             className="flex-1 bg-transparent border-none outline-none px-[12px] h-12 text-[14px] text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                         />
                                     </div>
@@ -927,9 +959,11 @@ export function PaymentsFormClient({
                                         >
                                             <input
                                                 type="text"
-                                                value={bankName}
+                                                value={bankHidden ? '' : bankName}
                                                 onChange={e => handleBankNameChange(e.target.value)}
-                                                placeholder="e.g. Maybank Berhad"
+                                                placeholder={bankHidden ? '••••' : 'e.g. Maybank Berhad'}
+                                                readOnly={bankHidden}
+                                                disabled={bankHidden}
                                                 className="flex-1 bg-transparent border-none outline-none px-[12px] h-12 text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600"
                                             />
                                         </div>
@@ -954,9 +988,12 @@ export function PaymentsFormClient({
                                             </div>
                                             <input
                                                 type="text"
-                                                value={accountNumber}
+                                                value={bankHidden ? (maskedAccountNumber ?? '') : accountNumber}
                                                 onChange={e => handleAccountNumberChange(e.target.value)}
-                                                placeholder="5141 2287 ••••"
+                                                placeholder={bankHidden ? '••••' : '5141 2287 ••••'}
+                                                readOnly={bankHidden}
+                                                disabled={bankHidden}
+                                                data-testid="payout-account-number"
                                                 className="flex-1 bg-transparent border-none outline-none px-[12px] h-12 text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                             />
                                         </div>
@@ -982,9 +1019,11 @@ export function PaymentsFormClient({
                 left edge with the content column (sidebar + p-8 gutter) at lg+. */}
             {isDirty && (
             <div
+                data-save-bar=""
                 className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"
                 style={{ background: 'var(--save-bar-bg)', boxShadow: 'var(--save-bar-shadow)' }}
             >
+                <SaveBarLift />
                 <div className="flex items-center gap-2 text-[13px]">
                     {isDirty ? (
                         <>

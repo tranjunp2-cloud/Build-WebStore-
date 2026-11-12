@@ -1,11 +1,26 @@
 import { REST_DELETE, REST_GET, REST_PATCH, REST_POST } from '@payloadcms/next/routes'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
+import { getPayload } from 'payload'
+import { refusePreOtpPayloadToken } from '@/lib/auth/payload-rest-otp-guard'
 
 export const maxDuration = 60
 
-export const GET = REST_GET(config)
-export const DELETE = REST_DELETE(config)
+type RestHandler = (req: NextRequest, args: { params: Promise<{ slug: string[] }> }) => Promise<Response>
+
+/**
+ * The password step's Payload token (issued before the OTP) is refused here for everyone but super-admins,
+ * except on the login / OTP / password-reset endpoints (TC-PERF-142).
+ */
+function requireOtp(handler: RestHandler): RestHandler {
+    return async (req, args) => {
+        const refused = await refusePreOtpPayloadToken(req, () => getPayload({ config }))
+        return refused ?? handler(req, args)
+    }
+}
+
+export const GET = requireOtp(REST_GET(config) as RestHandler)
+export const DELETE = requireOtp(REST_DELETE(config) as RestHandler)
 
 /**
  * Wrapper for POST/PATCH: convert multipart/form-data → application/json.
@@ -23,7 +38,10 @@ function wrapWithFormDataFix(handler: (req: NextRequest, args: { params: Promise
 
         if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
             try {
-                const formData = await req.formData()
+                // Read a clone: when there is nothing to convert (e.g. Payload's
+                // X-Payload-HTTP-Method-Override GET with a urlencoded query body),
+                // the original request must reach Payload with its body unread.
+                const formData = await req.clone().formData()
                 const payloadField = formData.get('_payload')
 
                 // If _payload exists and no file uploads → convert to JSON request
@@ -47,7 +65,7 @@ function wrapWithFormDataFix(handler: (req: NextRequest, args: { params: Promise
             } catch {
                 // formData() failed — try raw body fallback
                 try {
-                    const text = await req.text()
+                    const text = await req.clone().text()
                     const match = text.match(new RegExp('"_payload"\\s*\\n\\n(.+?)(?:\\n--|$)', 's'))
                     if (match) {
                         const jsonBody = match[1].trim()
@@ -75,5 +93,5 @@ function wrapWithFormDataFix(handler: (req: NextRequest, args: { params: Promise
 const payloadPost = REST_POST(config)
 const payloadPatch = REST_PATCH(config)
 
-export const POST = wrapWithFormDataFix(payloadPost as (req: NextRequest, args: { params: Promise<{ slug: string[] }> }) => Promise<Response>)
-export const PATCH = wrapWithFormDataFix(payloadPatch as (req: NextRequest, args: { params: Promise<{ slug: string[] }> }) => Promise<Response>)
+export const POST = requireOtp(wrapWithFormDataFix(payloadPost as RestHandler))
+export const PATCH = requireOtp(wrapWithFormDataFix(payloadPatch as RestHandler))

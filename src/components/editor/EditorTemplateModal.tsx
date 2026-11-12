@@ -1,14 +1,23 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, X, AlertTriangle } from 'lucide-react'
-import { TableSearch } from '@/components/ui/table-search'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { Loader2, X, AlertTriangle, Search, Sparkles, SearchX, LayoutTemplate } from 'lucide-react'
 import { toast } from 'sonner'
 import { TemplateCard, type Template } from '@/components/frontend/TemplateCard'
 import { TemplatePreviewModal } from '@/components/frontend/TemplatePreviewModal'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
-import { resolveApiError } from '@/lib/ui/resolve-api-error'
+import { useApplyTemplate, useTemplateList, useTemplateSearch, useTemplateForSwap, type AppliedTemplateState } from '@/hooks/use-template-queries'
+import {
+    templateSearchFormSchema,
+    type TemplateSearchFormValues,
+    type TemplateSearchRequest,
+} from '@/lib/validations/template-search'
+import { detectTemplateSearchLocale } from '@/lib/templates/natural-language-search'
 
 const CATEGORY_KEYS = [
     'all', 'restaurant', 'ecommerce', 'beauty', 'tech', 'health',
@@ -24,32 +33,85 @@ const CATEGORY_VALUES: Record<string, string> = {
     blog: 'blog', travel: 'travel',
 }
 
+const EMPTY_TEMPLATES: Template[] = []
+
 export interface TemplateApplyResult {
     templateName: string
     siteId: string | number
     unmatchedBlocks?: string[]
+    appliedState?: AppliedTemplateState
+    draftVersion?: string
 }
 
 interface EditorTemplateModalProps {
     isOpen: boolean
     onClose: () => void
     siteId: string
+    pageId?: string | null
     onBeforeApply?: () => Promise<void>
-    onApplied: (result: TemplateApplyResult) => void
+    onApplyPending?: () => void
+    onApplyStarted?: (template: Omit<Template, 'defaultTheme'> & { defaultTheme?: Record<string, unknown> | null }) => void
+    onApplyFailed?: () => void
+    onApplied: (result: TemplateApplyResult) => void | Promise<void>
 }
 
-export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, onApplied }: EditorTemplateModalProps) {
-    const { t } = useI18n()
+function TemplateGridSkeleton() {
+    return (
+        <div
+            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+            data-testid="template-loading-state"
+            aria-label="Loading templates"
+        >
+            {Array.from({ length: 3 }, (_, index) => (
+                <div key={index} className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+                    <Skeleton className="h-64 w-full rounded-none" />
+                    <div className="space-y-3 p-5">
+                        <Skeleton className="h-4 w-2/3" />
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-1/2" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+export function EditorTemplateModal({ isOpen, onClose, siteId, pageId, onBeforeApply, onApplyPending, onApplyStarted, onApplyFailed, onApplied }: EditorTemplateModalProps) {
+    const { t, locale } = useI18n()
     const tt = t.editor.template
     const sub = t.common.subscriptionErrors
     const categories = CATEGORY_KEYS.map(key => ({ value: CATEGORY_VALUES[key], label: tt[key] }))
-    const [templates, setTemplates] = useState<Template[]>([])
-    const [isLoading, setIsLoading] = useState(true)
-    const [debouncedSearch, setDebouncedSearch] = useState('')
+    const [submittedSearch, setSubmittedSearch] = useState<TemplateSearchRequest | null>(null)
     const [activeCategory, setActiveCategory] = useState('all')
     const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null)
-    const [isApplying, setIsApplying] = useState<string | null>(null)
     const [confirmTemplate, setConfirmTemplate] = useState<Template | null>(null)
+    const detailQuery = useTemplateForSwap(isOpen && confirmTemplate && !confirmTemplate.swapData ? confirmTemplate.id : null)
+    const preparedTemplate = confirmTemplate?.swapData ? confirmTemplate : detailQuery.data
+    const isPreparing = Boolean(confirmTemplate && !preparedTemplate)
+    const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null)
+    const applyGuardRef = useRef(false)
+    const {
+        register,
+        handleSubmit,
+        reset,
+        watch,
+        formState: { errors },
+    } = useForm<TemplateSearchFormValues>({
+        resolver: zodResolver(templateSearchFormSchema),
+        defaultValues: { query: '' },
+    })
+    const inputQuery = watch('query')
+    const listQuery = useTemplateList(isOpen)
+    const searchQuery = useTemplateSearch(submittedSearch, isOpen)
+    const { mutateAsync: applyTemplate } = useApplyTemplate(sub)
+    const templates = listQuery.data ?? EMPTY_TEMPLATES
+    const searchResults = submittedSearch ? (searchQuery.data ?? EMPTY_TEMPLATES) : null
+    const displayedTemplates = searchResults ?? templates
+    const activeRequest = submittedSearch ? searchQuery : listQuery
+    const isLoading = submittedSearch ? searchQuery.isPending : listQuery.isPending
+    const isSearching = submittedSearch !== null && searchQuery.isFetching
+    const activeError = activeRequest.error
+    const isApplying = applyingTemplateId
 
     // Hover preview state (desktop only)
     const [hoverPreview, setHoverPreview] = useState<{ template: Template; rect: DOMRect } | null>(null)
@@ -62,25 +124,25 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
         }
     }, [])
 
-    // Fetch templates on mount
     useEffect(() => {
-        if (!isOpen) return
-        setIsLoading(true)
-        fetch('/api/templates/list?limit=100', { credentials: 'include' })
-            .then((res) => {
-                if (!res.ok) throw new Error(`Server returned ${res.status}`)
-                return res.json()
-            })
-            .then((data) => {
-                const docs = data.docs || data.results || []
-                setTemplates(Array.isArray(docs) ? docs : [])
-            })
-            .catch((err) => {
-                console.error('[EditorTemplateModal] Load error:', err)
-                toast.error(tt.loadError)
-            })
-            .finally(() => setIsLoading(false))
-    }, [isOpen])
+        if (isOpen) return
+        reset({ query: '' })
+        setSubmittedSearch(null)
+        setActiveCategory('all')
+        setHoverPreview(null)
+    }, [isOpen, reset])
+
+    useEffect(() => {
+        if (!activeError) return
+        console.error('[EditorTemplateModal] Template request failed:', activeError)
+        toast.error(tt.loadError)
+    }, [activeError, tt.loadError])
+
+    useEffect(() => {
+        const error = detailQuery.error
+        if (!error || ('status' in error && error.status === 401)) return
+        toast.error(tt.loadError)
+    }, [detailQuery.error, tt.loadError])
 
     // Close on Escape
     useEffect(() => {
@@ -96,69 +158,78 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
         return () => document.removeEventListener('keydown', handler)
     }, [isOpen, onClose, previewTemplate, confirmTemplate])
 
-    // Filter templates using debounced search + category match on name, description, and category
-    const filtered = templates.filter((t) => {
-        const matchesCategory = activeCategory === 'all' || t.category?.includes(activeCategory)
-        const q = debouncedSearch.toLowerCase()
-        const matchesSearch =
-            !q ||
-            t.name.toLowerCase().includes(q) ||
-            t.description?.toLowerCase().includes(q) ||
-            t.category?.some((cat) => cat.toLowerCase().includes(q))
-        return matchesCategory && matchesSearch
+    const filtered = displayedTemplates.filter((template) => {
+        return activeCategory === 'all' || template.category?.includes(activeCategory)
     })
+
+    const handleSearch = useCallback((values: TemplateSearchFormValues) => {
+        setActiveCategory('all')
+        setHoverPreview(null)
+        setSubmittedSearch({
+            query: values.query,
+            locale: detectTemplateSearchLocale(values.query, locale),
+        })
+    }, [locale])
+
+    const clearSearch = useCallback(() => {
+        reset({ query: '' })
+        setSubmittedSearch(null)
+        setActiveCategory('all')
+    }, [reset])
 
     const handleUseTemplate = useCallback(
         (templateId: string) => {
-            const template = templates.find((t) => t.id === templateId)
+            const template = (searchResults ?? templates).find((t) => t.id === templateId)
             if (template) {
                 setPreviewTemplate(null)
+                setHoverPreview(null)
                 setConfirmTemplate(template)
             }
         },
-        [templates],
+        [searchResults, templates],
     )
 
     const handleConfirmApply = useCallback(async () => {
-        if (!confirmTemplate) return
-        setIsApplying(confirmTemplate.id)
+        if (!confirmTemplate || !preparedTemplate || applyGuardRef.current) return
+        const templateToApply = preparedTemplate
+        applyGuardRef.current = true
+        setApplyingTemplateId(templateToApply.id)
 
         try {
+            onApplyPending?.()
             // Save unsaved changes before applying template.
             // onBeforeApply throws with 'PRE_SAVE_FAILED' sentinel if save fails;
             // the caller (handleSave) already toasted the error, so we silently abort.
             if (onBeforeApply) await onBeforeApply()
+            onApplyStarted?.(templateToApply.swapData ? {
+                ...templateToApply,
+                ...templateToApply.swapData,
+                defaultTheme: templateToApply.swapData.defaultTheme ?? null,
+            } : templateToApply)
 
-            const res = await fetch('/api/ai/apply-template', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ templateId: confirmTemplate.id, siteId }),
-            })
-
-            if (!res.ok) {
-                const data = await res.json().catch(() => null)
-                throw new Error(resolveApiError(data, `Server returned ${res.status}`, sub))
-            }
-
-            const data = await res.json().catch(() => ({}))
+            const data = await applyTemplate({ templateId: templateToApply.id, siteId, pageId: pageId || undefined })
             setConfirmTemplate(null)
-            onApplied({
-                templateName: confirmTemplate.name,
+            await onApplied({
+                templateName: templateToApply.name,
                 siteId: data.siteId ?? siteId,
                 unmatchedBlocks: data.unmatchedBlocks,
+                appliedState: data.appliedState,
+                draftVersion: data.draftVersion,
             })
         } catch (err) {
+            onApplyFailed?.()
+            if (err instanceof Error && 'status' in err && err.status === 401) return
             const message = err instanceof Error ? err.message : tt.applyFailed
             // PRE_SAVE_FAILED: save already showed an error toast — don't duplicate
             if (message !== 'PRE_SAVE_FAILED') {
                 toast.error(tt.applyFailed, { description: message })
             }
-            setConfirmTemplate(null)
+            // Retain confirmation for Retry after restoring the editor snapshot.
         } finally {
-            setIsApplying(null)
+            applyGuardRef.current = false
+            setApplyingTemplateId(null)
         }
-    }, [confirmTemplate, siteId, onApplied, sub, tt])
+    }, [applyTemplate, confirmTemplate, preparedTemplate, onApplied, onBeforeApply, onApplyPending, onApplyStarted, onApplyFailed, siteId, pageId, tt.applyFailed])
 
     // Hover preview handlers (desktop)
     const handleCardMouseEnter = useCallback((template: Template, e: React.MouseEvent) => {
@@ -179,34 +250,74 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
     return (
         <>
             {/* Main modal */}
-            <div className="fixed inset-0 z-[90] flex items-center justify-center" onClick={onClose}>
+            <div className="fixed inset-0 z-[90] flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
                 <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
                 <div
-                    className="relative flex h-[90vh] w-[95vw] max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--editor-bg)]"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="editor-template-modal-title"
+                    data-testid="editor-template-modal"
+                    className="relative flex h-[calc(100dvh-1rem)] max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--editor-bg)] sm:h-[90vh]"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-                        <h2 className="text-lg font-bold text-white">{tt.title}</h2>
+                    <div className="flex items-center justify-between border-b border-white/10 px-4 py-4 sm:px-6">
+                        <h2 id="editor-template-modal-title" className="text-lg font-bold text-white">{tt.title}</h2>
                         <button
+                            type="button"
                             onClick={onClose}
                             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                            aria-label={tt.close}
                         >
                             <X className="h-5 w-5" />
                         </button>
                     </div>
 
                     {/* Filters */}
-                    <div className="flex flex-col gap-3 border-b border-white/5 px-6 py-3 sm:flex-row sm:flex-wrap sm:items-center">
-                        {/* Shared search box (design-system) — 300ms debounce handled internally */}
-                        <TableSearch
-                            value={debouncedSearch}
-                            onSearch={setDebouncedSearch}
-                            placeholder={tt.searchPlaceholder}
-                            debounceMs={300}
-                            className="min-w-0 max-w-none w-full"
-                        />
+                    <div className="flex flex-col gap-3 border-b border-white/5 px-4 py-3 sm:px-6">
+                        <form className="flex w-full items-start gap-2" onSubmit={handleSubmit(handleSearch)} noValidate>
+                            <div className="min-w-0 flex-1">
+                                <div className="relative">
+                                    <Sparkles aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-blue-300" />
+                                    <Input
+                                        {...register('query')}
+                                        type="text"
+                                        placeholder={tt.searchPlaceholder}
+                                        autoComplete="off"
+                                        className="h-10 pl-9 pr-10 text-[13px]"
+                                        aria-label={tt.searchPlaceholder}
+                                        aria-invalid={Boolean(errors.query)}
+                                        aria-describedby={errors.query ? 'template-search-error' : undefined}
+                                    />
+                                    {inputQuery && (
+                                        <button
+                                            type="button"
+                                            onClick={clearSearch}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                                            aria-label={tt.clearSearch}
+                                            title={tt.clearSearch}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                {errors.query && (
+                                    <p id="template-search-error" className="mt-1 text-xs text-red-400" role="alert">
+                                        {errors.query.message}
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isSearching || !inputQuery?.trim()}
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                aria-label={tt.searchAction}
+                                title={tt.searchAction}
+                            >
+                                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                            </button>
+                        </form>
                         <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide sm:flex-wrap sm:pb-0">
                             {categories.map((cat) => (
                                 <button
@@ -226,35 +337,72 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
                     </div>
 
                     {/* Results info */}
-                    {!isLoading && templates.length > 0 && (
-                        <div className="px-6 pt-3 text-xs text-gray-500">
-                            {tt.showingCount.replace('{filtered}', String(filtered.length)).replace('{total}', String(templates.length))}
+                    {!isLoading && !activeError && displayedTemplates.length > 0 && (
+                        <div className="px-4 pt-3 text-xs text-gray-500 sm:px-6">
+                            {tt.showingCount.replace('{filtered}', String(filtered.length)).replace('{total}', String(displayedTemplates.length))}
                         </div>
                     )}
 
                     {/* Grid */}
-                    <div className="flex-1 overflow-y-auto p-6">
-                        {isLoading ? (
-                            <div className="flex h-40 flex-col items-center justify-center gap-2">
-                                <Loader2 className="h-6 w-6 animate-spin text-white/30" />
-                                <span className="text-xs text-gray-600">{tt.loading}</span>
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                        {confirmTemplate ? null : isLoading || isSearching ? (
+                            <TemplateGridSkeleton />
+                        ) : activeError ? (
+                            <div className="flex min-h-52 flex-col items-center justify-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-5 text-center" data-testid="template-error-state" role="alert">
+                                <AlertTriangle className="h-8 w-8 text-red-400" aria-hidden="true" />
+                                <div>
+                                    <h3 className="font-semibold text-red-100">{tt.errorTitle}</h3>
+                                    <p className="mt-1 text-sm text-red-200/70">{activeError.message || tt.loadError}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => void activeRequest.refetch()}
+                                    disabled={activeRequest.isFetching}
+                                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-50"
+                                >
+                                    {activeRequest.isFetching && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                                    {tt.retry}
+                                </button>
                             </div>
-                        ) : templates.length === 0 ? (
-                            <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-gray-500">
-                                <p>{tt.noTemplates}</p>
-                                <p className="text-xs text-gray-600">
-                                    {tt.seedHint}
-                                </p>
+                        ) : searchResults === null && templates.length === 0 ? (
+                            <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-center text-gray-400" data-testid="template-list-empty">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
+                                    <LayoutTemplate className="h-6 w-6" aria-hidden="true" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-white">{tt.noTemplates}</h3>
+                                    <p className="mt-1 text-sm text-gray-500">{tt.noTemplatesDescription}</p>
+                                </div>
+                                <button type="button" onClick={() => void listQuery.refetch()} disabled={listQuery.isFetching} className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">
+                                    {listQuery.isFetching && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                                    {tt.retry}
+                                </button>
                             </div>
                         ) : filtered.length === 0 ? (
-                            <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-                                {tt.noMatch}
+                            <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-center text-gray-400" data-testid="template-search-empty">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
+                                    <SearchX className="h-6 w-6" aria-hidden="true" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-white">
+                                        {submittedSearch?.locale === 'vi' ? tt.noMatchVi : tt.noMatch}
+                                    </h3>
+                                    <p className="mt-1 text-sm text-gray-500">{tt.noMatchDescription}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={submittedSearch ? clearSearch : () => setActiveCategory('all')}
+                                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+                                >
+                                    {submittedSearch ? tt.clearSearch : tt.clearFilters}
+                                </button>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                                 {filtered.map((template) => (
                                     <div
                                         key={template.id}
+                                        data-testid="template-card-wrapper"
                                         role="button"
                                         tabIndex={0}
                                         onKeyDown={(e) => {
@@ -279,7 +427,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
             </div>
 
             {/* Hover preview tooltip (desktop only) */}
-            {hoverPreview && (
+            {hoverPreview && !confirmTemplate && (
                 <div
                     className="fixed z-[100] hidden lg:block rounded-xl border border-white/10 bg-[var(--editor-bg)] p-3 shadow-2xl w-[420px]"
                     style={{
@@ -312,13 +460,15 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
 
             {/* Confirmation dialog */}
             {confirmTemplate && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center">
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
                     <div
                         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                         onClick={() => !isApplying && setConfirmTemplate(null)}
                     />
                     <div
-                        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[var(--editor-bg)] p-6"
+                        role="alertdialog"
+                        aria-modal="true"
+                        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[var(--editor-bg)] p-5 sm:p-6"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="mb-4 flex items-center gap-3">
@@ -334,6 +484,20 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
                                 </p>
                             </div>
                         </div>
+                        {isPreparing && (detailQuery.isError ? (
+                            <div role="alert" className="mb-4 text-sm text-red-400">
+                                <p>{detailQuery.error.message || tt.loadError}</p>
+                                <button type="button" onClick={() => void detailQuery.refetch()} disabled={detailQuery.isFetching}
+                                    className="mt-2 rounded-lg bg-red-500/15 px-3 py-2 font-semibold disabled:opacity-50">
+                                    {tt.retry}
+                                </button>
+                            </div>
+                        ) : (
+                            <div role="status" aria-label={tt.loading} className="mb-4 space-y-2">
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-2/3" />
+                            </div>
+                        ))}
                         <div className="flex justify-end gap-3">
                             <button
                                 onClick={() => setConfirmTemplate(null)}
@@ -344,7 +508,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
                             </button>
                             <button
                                 onClick={handleConfirmApply}
-                                disabled={!!isApplying}
+                                disabled={!!isApplying || isPreparing}
                                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
                             >
                                 {isApplying ? (

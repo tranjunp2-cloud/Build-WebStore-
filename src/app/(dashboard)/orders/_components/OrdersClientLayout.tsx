@@ -8,6 +8,7 @@ import { OrdersMetrics } from './OrdersMetrics'
 import { OrdersActionBar } from './OrdersActionBar'
 import { OrdersTable, Order } from './OrdersTable'
 import { AwaitingVerificationChip } from './AwaitingVerificationChip'
+import { useInvalidateOrders } from './orders-queries'
 
 // ─── ORDERS CLIENT LAYOUT ───
 // Table spans full width; clicking a row navigates to /orders/[id] (full-page route).
@@ -28,16 +29,16 @@ export function OrdersClientLayout() {
         }
     }, [searchParams, router])
 
-    // Refresh the orders table/metrics (client) AND re-render server components so the
+    // The orders table/metrics (cached queries) are stale; server components re-render so the
     // sidebar pending-orders badge updates without a manual reload (server hook busts its cache).
+    const invalidateOrders = useInvalidateOrders()
     function refreshAfterMutation() {
-        setRefreshCounter(prev => prev + 1)
+        void invalidateOrders()
         router.refresh()
     }
 
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
     const [currentOrders, setCurrentOrders] = useState<Order[]>([])
-    const [refreshCounter, setRefreshCounter] = useState(0)
     const [silentRefreshTrigger, setSilentRefreshTrigger] = useState(0)
     const [isConfirming, setIsConfirming] = useState(false)
 
@@ -108,7 +109,7 @@ export function OrdersClientLayout() {
                 </p>
             </div>
 
-            <OrdersMetrics refreshCounter={refreshCounter} />
+            <OrdersMetrics activeStatus={statusFilter} onSelectStatus={setStatusFilter} />
             <AwaitingVerificationChip />
             <OrdersActionBar
                 pendingCount={pendingCount}
@@ -116,6 +117,7 @@ export function OrdersClientLayout() {
                 isConfirming={isConfirming}
                 search={searchQuery}
                 onSearch={setSearchQuery}
+                statusFilter={statusFilter}
                 onFilterStatus={setStatusFilter}
                 onFilterDate={setDateFilter}
                 onFilterPaymentMethod={setPaymentMethodFilter}
@@ -125,7 +127,6 @@ export function OrdersClientLayout() {
                 selectedRows={selectedRows}
                 onSelectionChange={setSelectedRows}
                 onOrdersLoaded={setCurrentOrders}
-                refreshCounter={refreshCounter}
                 silentRefreshTrigger={silentRefreshTrigger}
                 searchQuery={debouncedSearch}
                 statusFilter={statusFilter}

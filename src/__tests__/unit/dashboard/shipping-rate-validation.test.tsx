@@ -1,6 +1,6 @@
 /**
  * Shipping Rate Validation Tests — F14
- * TC coverage: TC-F14.21–F14.38
+ * TC coverage: TC-F14.21–F14.41, TC-F14.160–F14.161
  * Covers: validateRate (13 edge cases), parseRateRm, validateCrossField, component wiring
  */
 
@@ -153,6 +153,12 @@ describe('validateRate [TC-F14.21..F14.33]', () => {
     it('[TC-F14.33] sub-cent 0.001 with minSen=1 → rounds to 0 → errorNegative', () => {
         expect(validateRate('0.001', { ...OPTS, minSen: 1 })).toEqual({ error: 'Cannot be negative' })
     })
+
+    it('[TC-F14.160] below minSen with errorTooLow → errorTooLow, not errorNegative (#2285)', () => {
+        const opts = { ...OPTS, minSen: 1, messages: { ...MSGS, errorTooLow: 'Threshold must be RM 0.01 – RM 100,000' } }
+        expect(validateRate('0', opts)).toEqual({ error: 'Threshold must be RM 0.01 – RM 100,000' })
+        expect(validateRate('0.00', opts)).toEqual({ error: 'Threshold must be RM 0.01 – RM 100,000' })
+    })
 })
 
 // ── parseRateRm ────────────────────────────────────────────────────────────
@@ -281,5 +287,15 @@ describe('ShippingSettingsClient [TC-F14.34..F14.39]', () => {
         expect(input).toHaveValue('0.00')
         expect(screen.queryByRole('alert')).toBeNull()
         expect(input).not.toHaveAttribute('aria-invalid')
+    })
+
+    it('[TC-F14.161] free threshold 0 → shows freeError range message, not "negative" (#2285)', () => {
+        renderClient()
+        const input = screen.getByPlaceholderText('100.00')
+        fireEvent.change(input, { target: { value: '0' } })
+        fireEvent.blur(input)
+        expect(screen.getByRole('alert')).toHaveTextContent('Threshold must be RM 0.01 – RM 100,000')
+        expect(screen.queryByText('Cannot be negative')).toBeNull()
+        expect(input).toHaveAttribute('aria-invalid', 'true')
     })
 })

@@ -8,8 +8,10 @@ import { blockRegistry } from '@/blocks/registry'
 // ─── TC-F01.08: Block registry for AI generation ─────────────────────
 
 describe('Block Types & Base Schemas [TC-F04]', () => {
-    it('BLOCK_TYPES has all 50 registered types', () => {
-        expect(BLOCK_TYPES.length).toBe(50)
+    it('BLOCK_TYPES matches the registry without duplicate types', () => {
+        expect([...BLOCK_TYPES].sort()).toEqual(blockRegistry.getBlockTypes().sort())
+        expect(new Set(BLOCK_TYPES).size).toBe(BLOCK_TYPES.length)
+        expect(BLOCK_TYPES).toEqual(expect.arrayContaining(['rich-text', 'content-cards']))
         expect(BLOCK_TYPES).toContain('hero')
         expect(BLOCK_TYPES).toContain('navigation')
         expect(BLOCK_TYPES).toContain('contact')

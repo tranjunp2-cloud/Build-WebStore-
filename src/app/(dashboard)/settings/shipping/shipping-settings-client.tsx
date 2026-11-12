@@ -121,8 +121,8 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig, in
         errorFormat: s.errorFormat,
         warnFree: s.warnFree,
     }
-    // Free threshold has a different max (RM 100,000) so its too-high message uses freeError
-    const freeMsgs = { ...msgs, errorTooHigh: s.freeError }
+    // Free threshold range is RM 0.01–100,000, so both out-of-range cases use freeError (#2285)
+    const freeMsgs = { ...msgs, errorTooHigh: s.freeError, errorTooLow: s.freeError }
 
     const runCrossField = (w: string, e: string, fa: string) => {
         const { warning } = validateCrossField(w, e, fa, freeEnabled, { warnThresholdBelowRate: s.warnThresholdBelowRate })

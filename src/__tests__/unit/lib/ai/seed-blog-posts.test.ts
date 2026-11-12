@@ -104,8 +104,17 @@ beforeEach(() => {
     vi.clearAllMocks()
 })
 
-describe('TC-F08-BS.01 — seeds 3 published posts for new tenant', () => {
-    it('creates 3 blog records with published status and prefixed slug', async () => {
+describe('TC-F08-BS.01 — seeds 3 draft posts for new tenant (TC-AIAUD-036: published with the site, #2103 A4)', () => {
+    it('TC-AIAUD-143: every seeded post carries the explicit aiSeeded marker (not just a slug prefix)', async () => {
+        const payload = makePayload(0)
+        await seedBlogPosts(payload, 42, 99, 'restaurant', 'TestBiz', 7)
+
+        const calls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
+        expect(calls).toHaveLength(3)
+        for (const [arg] of calls) expect(arg.data.aiSeeded).toBe(true)
+    })
+
+    it('creates 3 blog records with draft status and prefixed slug', async () => {
         const payload = makePayload(0)
         const result = await seedBlogPosts(payload, 42, 99, 'restaurant', 'TestBiz', 7)
 
@@ -113,7 +122,8 @@ describe('TC-F08-BS.01 — seeds 3 published posts for new tenant', () => {
         expect(payload.create).toHaveBeenCalledTimes(3)
 
         const firstCall = (payload.create as ReturnType<typeof vi.fn>).mock.calls[0][0]
-        expect(firstCall.data.status).toBe('published')
+        expect(firstCall.data.status).toBe('draft')
+        expect(firstCall.data.publishedAt).toBeUndefined()
         expect(firstCall.data.slug).toMatch(/^42-/)
         expect(firstCall.data.tenant).toBe(42)
         expect(firstCall.data.author).toBe(7)
@@ -795,5 +805,24 @@ describe('TC-F08-BS.26 — generated website blogs preserve the target locale', 
             expect(arg.data.content).not.toContain('What to consider')
             expect(arg.data.content).not.toContain('Next steps')
         }
+    })
+})
+
+describe('TC-AICP-351 — a trashed post still holds its slug', () => {
+    it('[TC-AICP-351] the slug check includes the trash, so a restored post never gets a twin slug', async () => {
+        // Arrange: Payload leaves trashed docs out of `find` unless `trash: true` is passed
+        const payload = makePayload(0)
+        vi.mocked(payload.find).mockImplementation((async (args: { collection: string; where?: { slug?: { equals?: string } }; trash?: boolean }) => {
+            const trashedTaken = args.collection === 'blogs' && args.where?.slug?.equals === '42-ai-post-1'
+            return trashedTaken && args.trash === true ? { docs: [{ id: 5, deletedAt: '2026-10-20T00:00:00Z' }], totalDocs: 1 } : { docs: [], totalDocs: 0 }
+        }) as never)
+
+        // Act
+        await seedBlogPosts(payload, 42, 99, 'restaurant', 'TestBiz', 7)
+
+        // Assert
+        const slugs = (payload.create as ReturnType<typeof vi.fn>).mock.calls.map(([args]) => args.data.slug)
+        expect(slugs[0]).toMatch(/^42-ai-post-1-[a-z0-9]{1,6}$/)
+        expect(slugs.slice(1)).toEqual(['42-ai-post-2', '42-ai-post-3'])
     })
 })

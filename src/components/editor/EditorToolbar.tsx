@@ -1,40 +1,32 @@
 'use client'
 
 import React from 'react'
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
     AlertTriangle,
-    ChevronDown,
-    Check,
-    Copy,
-    ExternalLink,
-    EyeOff,
     FilePenLine,
     FileWarning,
     FileText,
-    Globe,
     Home,
     LayoutGrid,
-    Loader2,
     Menu,
     Monitor,
     PanelLeftClose,
     PanelLeftOpen,
     PanelRightClose,
     PanelRightOpen,
-    RefreshCw,
     ShoppingBag,
     Smartphone,
-    SquareArrowOutUpRight,
     Palette,
     PanelLeft,
     Redo2,
-    Rocket,
     Undo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { ToolbarPublishControls, resolvePublishAwareSaveLabel } from './toolbar-publish-controls'
+import { AiUsageChip } from '@/components/ai-quota/AiUsageChip'
+import { SHOW_AI_LEVEL } from '@/components/ai-quota/quota-format'
 import { useI18n } from '@/i18n'
 import type { PageData } from '@/store/editorStore'
 import { useWorkspaceStore, type WorkspacePreset } from '@/store/workspaceStore'
@@ -198,11 +190,14 @@ interface EditorToolbarProps {
     publishSuccess: boolean
     canUndo: boolean
     canRedo: boolean
+    /** the step Undo / Redo would take, for the tooltip ("AI: Change hero headline") */
+    undoStepLabel?: string
+    redoStepLabel?: string
     viewport: 'desktop' | 'mobile'
     compact?: boolean
-    /** Phase 04: shared with the compact Tools-sheet AI-chat panel (Phase 03) — drives the
-     * "Processing…" save-status label and disables Publish/Update while an AI edit is in flight. */
-    aiRunning?: boolean
+    /** A template is being applied — drives the "Processing…" save-status label and
+     * disables Publish/Update until it lands. */
+    busy?: boolean
     onOpenMenu: () => void
     onOpenTemplates?: () => void
     onPageSelected: (pageId: string) => void
@@ -211,8 +206,6 @@ interface EditorToolbarProps {
     onSave: () => void
     onPublish: () => void
     onRepublish?: () => void
-    onUnpublish?: () => void
-    onViewLive?: () => void
     onCopyLink?: () => void
     siteUrl?: string | null
     wasPublished?: boolean
@@ -239,9 +232,11 @@ export function EditorToolbar({
     publishSuccess,
     canUndo,
     canRedo,
+    undoStepLabel,
+    redoStepLabel,
     viewport,
     compact = false,
-    aiRunning = false,
+    busy = false,
     onOpenMenu,
     onOpenTemplates,
     onPageSelected,
@@ -250,8 +245,6 @@ export function EditorToolbar({
     onSave,
     onPublish,
     onRepublish,
-    onUnpublish,
-    onViewLive,
     onCopyLink,
     siteUrl,
     wasPublished,
@@ -261,7 +254,7 @@ export function EditorToolbar({
 }: EditorToolbarProps) {
     const { t } = useI18n()
     const et = t.editor.toolbar
-    const [statusNow, setStatusNow] = React.useState(() => Date.now())
+    const [statusNow, setStatusNow] = React.useState(() => lastSavedAt ?? 0)
 
     React.useEffect(() => {
         setStatusNow(Date.now())
@@ -273,12 +266,20 @@ export function EditorToolbar({
         return () => window.clearTimeout(timer)
     }, [lastSavedAt])
 
-    const saveStatusLabel = et[deriveSaveStatus({
+    const saveStatus = deriveSaveStatus({
         isSaving,
         hasUnsavedChanges,
         lastSavedAt,
         now: statusNow,
-    })]
+    })
+    const publishState = derivePublishState({ isPublished, isPublishing, hasUnsavedChanges, hasUnpublishedChanges })
+    // Live sites: say whether the saved draft is on the real website yet (US-F05-10).
+    const saveStatusLabel = resolvePublishAwareSaveLabel({
+        saveStatus,
+        publishState,
+        labels: et,
+        fallback: et[saveStatus],
+    })
 
     // F26-04: Preview/Publish disabled while translation or save in flight so users can't
     // open a tab against stale DB state. Once everything settles, buttons re-enable.
@@ -288,7 +289,6 @@ export function EditorToolbar({
         : (isSaving || hasUnsavedChanges)
             ? 'Saving changes… Preview will be available when complete.'
             : et.preview
-    const vm = t.editor.viewLiveMenu
     const mt = t.editor.maintenance
     const selectablePages = pages.filter(page => !page.deletedAt)
     const currentPage = selectablePages.find(page => page.id === currentPageId) ?? null
@@ -348,8 +348,8 @@ export function EditorToolbar({
                     <div className="mx-1 h-4 w-px shrink-0 bg-white/[0.06]" />
 
                     <div className="flex min-w-0 items-center gap-1">
-                        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', aiRunning ? 'animate-pulse bg-blue-400' : isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
-                        <span className="truncate text-[11px] text-slate-400 min-[768px]:text-xs">{aiRunning ? processingLabel : saveStatusLabel}</span>
+                        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', busy ? 'animate-pulse bg-blue-400' : isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
+                        <span className="truncate text-[11px] text-slate-400 min-[768px]:text-xs">{busy ? processingLabel : saveStatusLabel}</span>
                     </div>
                 </div>
 
@@ -359,7 +359,7 @@ export function EditorToolbar({
                         color — not in F05). Phase 06: tablet has room to spare, so re-surface a
                         compact version ≥768 only (phone stays exactly as Phase 04 left it). */}
                     {(() => {
-                        const ps = derivePublishState({ isPublished, isPublishing, hasUnsavedChanges, hasUnpublishedChanges })
+                        const ps = publishState
                         const tabletBadge: Record<PublishState, { label: string; cls: string }> = {
                             draft: { label: et.draft, cls: 'bg-white/[0.06] text-slate-400' },
                             publishing: { label: et.publishing, cls: 'bg-blue-500/15 text-blue-400 animate-pulse' },
@@ -375,114 +375,22 @@ export function EditorToolbar({
                         )
                     })()}
 
-                    {previewDisabled ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            disabled
-                            title={previewDisabledTitle}
-                            className="h-8 w-8 rounded-lg text-slate-500 cursor-not-allowed opacity-50 min-[768px]:h-11 min-[768px]:w-11"
-                        >
-                            <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-                        </Button>
-                    ) : (
-                        <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-lg text-slate-300 hover:bg-white/[0.06] hover:text-white min-[768px]:h-11 min-[768px]:w-11">
-                            <a
-                                href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={et.preview}
-                            >
-                                <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-                            </a>
-                        </Button>
-                    )}
-
-                    {isPublished && siteUrl ? (
-                        <>
-                        {(hasUnsavedChanges || hasUnpublishedChanges) && (
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={onRepublish}
-                                disabled={isPublishing || isSaving || aiRunning}
-                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4"
-                            >
-                                {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>}
-                            </Button>
-                        )}
-                        {/* Phase 04 (audit #15-18): View-Live dropdown ported from the desktop
-                            branch — Open Website / Copy Link / Unpublish (→ UnpublishModal).
-                            Phone (2026-07-03, chị): header too tight to show Update + Live at
-                            once — hide Live while dirty so only Update shows; tablet keeps both
-                            (has room). */}
-                        <DropdownMenu.Root>
-                            <DropdownMenu.Trigger asChild>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    className={cn(
-                                        'h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4',
-                                        (hasUnsavedChanges || hasUnpublishedChanges) && 'hidden min-[768px]:inline-flex',
-                                    )}
-                                >
-                                    <Globe className="h-3.5 w-3.5" />
-                                    {et.live}
-                                    <ChevronDown className="ml-1 h-3 w-3" />
-                                </Button>
-                            </DropdownMenu.Trigger>
-                            <DropdownMenu.Portal>
-                                <DropdownMenu.Content
-                                    className="editor-portal z-50 min-w-[180px] rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] p-1.5 shadow-2xl"
-                                    sideOffset={8}
-                                    align="end"
-                                >
-                                    <DropdownMenu.Item
-                                        onSelect={onViewLive}
-                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--editor-text)] outline-none hover:bg-[var(--editor-overlay-hover)] focus:bg-[var(--editor-overlay-hover)]"
-                                    >
-                                        <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
-                                        {vm.openWebsite}
-                                    </DropdownMenu.Item>
-                                    <DropdownMenu.Item
-                                        onSelect={onCopyLink}
-                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--editor-text)] outline-none hover:bg-[var(--editor-overlay-hover)] focus:bg-[var(--editor-overlay-hover)]"
-                                    >
-                                        <Copy className="h-3.5 w-3.5 text-slate-400" />
-                                        {vm.copyLink}
-                                    </DropdownMenu.Item>
-                                    <DropdownMenu.Separator className="my-1 h-px bg-[var(--editor-border)]" />
-                                    <DropdownMenu.Item
-                                        onSelect={onUnpublish}
-                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-red-400 outline-none hover:bg-red-500/10 focus:bg-red-500/10"
-                                    >
-                                        <EyeOff className="h-3.5 w-3.5" />
-                                        {vm.unpublish}
-                                    </DropdownMenu.Item>
-                                </DropdownMenu.Content>
-                            </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
-                        </>
-                    ) : (
-                        <Button
-                            type="button"
-                            size="sm"
-                            onClick={onPublish}
-                            disabled={isPublishing || publishSuccess || aiRunning}
-                            className={cn(
-                                'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4',
-                                publishSuccess && 'from-emerald-500 to-emerald-400',
-                            )}
-                        >
-                            {isPublishing ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : publishSuccess ? (
-                                <><Check className="h-3.5 w-3.5" /> {et.live}</>
-                            ) : (
-                                <><Rocket className="h-3.5 w-3.5" /> {et.publish}</>
-                            )}
-                        </Button>
-                    )}
+                <ToolbarPublishControls
+                    variant="compact"
+                    publishState={publishState}
+                    siteId={siteId}
+                    currentPageId={currentPageId}
+                    siteUrl={siteUrl}
+                    previewDisabled={previewDisabled}
+                    previewDisabledTitle={previewDisabledTitle}
+                    isPublishing={isPublishing}
+                    isSaving={isSaving}
+                    busy={busy}
+                    publishSuccess={publishSuccess}
+                    onPublish={onPublish}
+                    onRepublish={onRepublish}
+                    onCopyLink={onCopyLink}
+                />
 
                 </div>
             </header>
@@ -541,7 +449,7 @@ export function EditorToolbar({
                     onClick={onUndo}
                     disabled={!canUndo}
                     className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[var(--editor-text)] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
-                    title={et.undoShortcut}
+                    title={canUndo && undoStepLabel ? et.undoStepTooltip.replace('{label}', undoStepLabel) : et.undoShortcut}
                 >
                     <Undo2 className="h-4 w-4 shrink-0" />
                     <span className="hidden lg:inline">{et.undo}</span>
@@ -552,7 +460,7 @@ export function EditorToolbar({
                     onClick={onRedo}
                     disabled={!canRedo}
                     className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[var(--editor-text)] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
-                    title={et.redoShortcut}
+                    title={canRedo && redoStepLabel ? et.redoStepTooltip.replace('{label}', redoStepLabel) : et.redoShortcut}
                 >
                     <Redo2 className="h-4 w-4 shrink-0" />
                     <span className="hidden lg:inline">{et.redo}</span>
@@ -608,6 +516,7 @@ export function EditorToolbar({
 
             {/* RIGHT: status + actions. Text collapses at tier 1 (< 1366px). */}
             <div className="flex shrink-0 items-center gap-2.5">
+                {SHOW_AI_LEVEL && <AiUsageChip variant="editor" />}
                 <div
                     className="inline-flex shrink-0 items-center gap-0 text-[11px] transition-all min-[1366px]:gap-1.5"
                     title={saveStatusLabel}
@@ -619,7 +528,7 @@ export function EditorToolbar({
                 <div className="hidden h-4 w-px shrink-0 bg-white/[0.08] min-[1366px]:block" />
 
                 {(() => {
-                    const ps = derivePublishState({ isPublished, isPublishing, hasUnsavedChanges, hasUnpublishedChanges })
+                    const ps = publishState
                     const badgeConfig: Record<PublishState, { label: string; cls: string; dot?: string }> = {
                         draft: { label: et.draft, cls: 'bg-white/[0.06] text-slate-400' },
                         publishing: { label: et.publishing, cls: 'bg-blue-500/15 text-blue-400 animate-pulse', dot: 'bg-blue-400' },
@@ -642,116 +551,22 @@ export function EditorToolbar({
                     )
                 })()}
 
-                {previewDisabled ? (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled
-                        title={previewDisabledTitle}
-                        className="h-8 shrink-0 rounded-lg border border-white/[0.08] px-2 text-[11px] font-medium text-slate-500 cursor-not-allowed opacity-50 min-[1366px]:px-3"
-                    >
-                        <SquareArrowOutUpRight className="h-3.5 w-3.5 shrink-0" />
-                        <span className="hidden min-[1366px]:inline">{et.preview}</span>
-                    </Button>
-                ) : (
-                    <Button variant="ghost" size="sm" asChild className="h-8 shrink-0 rounded-lg border border-white/[0.08] px-2 text-[11px] font-medium text-slate-300 transition-all hover:bg-white/[0.06] hover:text-white min-[1366px]:px-3">
-                        <a
-                            href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={et.preview}
-                        >
-                            <SquareArrowOutUpRight className="h-3.5 w-3.5 shrink-0" />
-                            <span className="hidden min-[1366px]:inline">{et.preview}</span>
-                        </a>
-                    </Button>
-                )}
-
-                {isPublished && siteUrl ? (
-                    <>
-                        {/* Re-publish / Update button (AC-2: visible when has unsaved or unpublished changes) */}
-                        {(hasUnsavedChanges || hasUnpublishedChanges) && (
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={onRepublish}
-                                disabled={isPublishing || isSaving || aiRunning}
-                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95"
-                            >
-                                {isPublishing ? (
-                                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {et.updating}</>
-                                ) : (
-                                    <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>
-                                )}
-                            </Button>
-                        )}
-
-                        {/* View Live dropdown (AC-1: persistent link access) */}
-                        <DropdownMenu.Root>
-                            <DropdownMenu.Trigger asChild>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    className="h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-emerald-500/15 hover:shadow-emerald-500/25 hover:opacity-95"
-                                >
-                                    <Globe className="h-3.5 w-3.5" />
-                                    {et.viewLive}
-                                    <ChevronDown className="ml-1 h-3 w-3" />
-                                </Button>
-                            </DropdownMenu.Trigger>
-                            <DropdownMenu.Portal>
-                                <DropdownMenu.Content
-                                    className="editor-portal z-50 min-w-[180px] rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] p-1.5 shadow-2xl"
-                                    sideOffset={8}
-                                    align="end"
-                                >
-                                    <DropdownMenu.Item
-                                        onSelect={onViewLive}
-                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--editor-text)] outline-none hover:bg-[var(--editor-overlay-hover)] focus:bg-[var(--editor-overlay-hover)]"
-                                    >
-                                        <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
-                                        {vm.openWebsite}
-                                    </DropdownMenu.Item>
-                                    <DropdownMenu.Item
-                                        onSelect={onCopyLink}
-                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--editor-text)] outline-none hover:bg-[var(--editor-overlay-hover)] focus:bg-[var(--editor-overlay-hover)]"
-                                    >
-                                        <Copy className="h-3.5 w-3.5 text-slate-400" />
-                                        {vm.copyLink}
-                                    </DropdownMenu.Item>
-                                    <DropdownMenu.Separator className="my-1 h-px bg-[var(--editor-border)]" />
-                                    <DropdownMenu.Item
-                                        onSelect={onUnpublish}
-                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-red-400 outline-none hover:bg-red-500/10 focus:bg-red-500/10"
-                                    >
-                                        <EyeOff className="h-3.5 w-3.5" />
-                                        {vm.unpublish}
-                                    </DropdownMenu.Item>
-                                </DropdownMenu.Content>
-                            </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
-                    </>
-                ) : (
-                    /* Draft state: Publish button */
-                    <Button
-                        type="button"
-                        size="sm"
-                        onClick={onPublish}
-                        disabled={isPublishing || publishSuccess || aiRunning}
-                        className={cn(
-                            'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-4 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95',
-                            publishSuccess && 'from-emerald-500 to-emerald-400',
-                        )}
-                    >
-                        {isPublishing ? (
-                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {et.publishing}</>
-                        ) : publishSuccess ? (
-                            <><Check className="h-3.5 w-3.5" /> {et.published}</>
-                        ) : (
-                            <><Rocket className="h-3.5 w-3.5" /> {et.publish}</>
-                        )}
-                    </Button>
-                )}
+                <ToolbarPublishControls
+                    variant="desktop"
+                    publishState={publishState}
+                    siteId={siteId}
+                    currentPageId={currentPageId}
+                    siteUrl={siteUrl}
+                    previewDisabled={previewDisabled}
+                    previewDisabledTitle={previewDisabledTitle}
+                    isPublishing={isPublishing}
+                    isSaving={isSaving}
+                    busy={busy}
+                    publishSuccess={publishSuccess}
+                    onPublish={onPublish}
+                    onRepublish={onRepublish}
+                    onCopyLink={onCopyLink}
+                />
             </div>
 
         </header>

@@ -61,9 +61,20 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-02-12** | `US-02/AC4` | `Flow` | Ẩn/Hiện trang (Hide/Unhide) | 1. Dùng Toggle để ẩn trang. | - Trường `isVisible` thay đổi.<br>- Người dùng ngoài truy cập trang nhận lỗi 404. | Blocker | [x] |
 | **TC-F05-02-13** | `GH-864/menu-link` | `Logic` | `collectMenuPageIds` — liên kết trang-menu | 1. Gọi `collectMenuPageIds(links, pages)` với các trường hợp: rỗng, homepage, slug khớp, external link, children lồng nhau, trùng slug. | - Set trả về đúng page ID.<br>- Homepage luôn được include.<br>- External link không match.<br>- Slug normalize (/) đúng. | High | [x] |
 | **TC-F05-02-14** | `GH-864/panel-ux` | `UX` | Page Library — đổi tên, micro-copy, badge Live/Draft | 1. Mở Page Library panel. | - Title hiển thị "Page Library".<br>- Micro-copy mô tả biên tập nội bộ hiện ngay dưới tiêu đề.<br>- Không có ô tìm kiếm.<br>- Trang published + site published → badge "Live"; trang draft hoặc site chưa publish → badge "Draft". | High | [x] |
-| **TC-F05-02-15** | `GH-864/badge` | `Logic` | Badge Live/Draft đúng với 4 kịch bản page × site status | 1. Test badge với: (a) page published + site published → Live; (b) page draft + site published → Draft; (c) page published + site draft/unpublished → Draft; (d) page hidden (`isVisible=false`) → Draft. | - Mỗi kịch bản trả về badge đúng.<br>- Badge không phụ thuộc vào menu-linkage (điều kiện `inMenu` đã bỏ theo GH-864). | High | [x] |
+| **TC-F05-02-15** | `GH-864/badge` | `Logic` | Badge Live/Draft đúng với 4 kịch bản page × site status | 1. Test badge với: (a) page published + site published → Live; (b) page draft + site published → Draft; (c) page published + site draft/unpublished → Draft; (d) page hidden (`isVisible=false`) → badge "Hidden" (xám; thắng Live/Draft — #1984). | - Mỗi kịch bản trả về badge đúng (live + không có trong menu → thêm nhãn phụ "No Link").<br>- Badge không phụ thuộc vào menu-linkage (điều kiện `inMenu` đã bỏ theo GH-864). | High | [x] |
 | **TC-F05-02-16** | `GH-864/coach` | `UX` | EditorCoachMarks — 2-bước overlay cho first-time user | 1. Xóa localStorage flag. Mở Editor. | - Sau delay, Step 1 popup hiển thị tại Page Library anchor; không có nút "Back" ở bước 1.<br>- Nhấn "Next" → Step 2 tại Menu Settings anchor; có nút "Back" và "Done".<br>- Nhấn "Back" ở bước 2 → quay về bước 1 (không ghi flag).<br>- Nhấn "Done" → đóng overlay, ghi flag localStorage.<br>- ESC và click backdrop KHÔNG đóng overlay (GH-864).<br>- Lần sau mở lại → không hiển thị lại.<br>- Nút Next/Done: chữ **trắng** trên nền teal ở CẢ light + dark mode (GH-1584 — allow-list `bg-[hsl(var(--primary))].text-white` trong globals.css; test 16h pin combo class trên cùng element).<br>- (GH-1607) Trên mobile/tablet: overlay cũng hiển thị 2 bước, tooltip nằm PHÍA TRÊN vùng highlight, không đè border spotlight, mở đúng tab (Pages/Settings→Menu) trong bottom sheet.<br>- (GH-1607) Viewport thấp (landscape phone): tooltip tự giới hạn max-height theo khoảng trống phía trên anchor (scroll nội bộ nếu nội dung dài) thay vì tràn đè lên spotlight; trường hợp cực hẹp có sàn tối thiểu để tooltip không bị co lại không đọc được.<br>- (GH-1607) Step 1 phải tự hiện sau delay ngay cả trên mobile/tablet (không cần tương tác gì trước) — regression trước đó: do `isCompactLayout` là `false` ở lần render đầu (trước khi `matchMedia` đồng bộ), callback mở step 1 "đông cứng" giá trị cũ nên sheet Tools không mở, overlay không hiện gì cả.<br>- (GH-1607) Trên mobile/tablet, nhấn "Done" ở bước 2 phải tự đóng luôn bottom Tools sheet (Settings→Menu), không để sheet mở treo che 2/3 màn hình.<br>- (GH-1607) Xoay tablet giữa chừng tour (băng qua ngưỡng 1280px desktop↔compact) → overlay tự reset sạch và show lại từ Step 1 ở layout mới, không bị kẹt/lệch vị trí theo layout cũ.<br>- (GH-1607) Step 2 trên mobile/tablet: bottom sheet Settings→Menu tự scroll (vừa đủ, không quá tay) để cả form navigation links hiện trọn trong khung nhìn trước khi tooltip định vị — tooltip bám PHÍA TRÊN vùng highlight giống hệt cách step 1 hiển thị, không còn định vị lệch/rơi ngoài màn hình do anchor còn bị che dưới fold.<br>- (GH-1607) Chuyển từ Step 1 sang Step 2 (nhấn "Next") trên mobile/tablet: không được có 1 nhịp overlay/spotlight hiện sai vị trí (đè lên vùng cũ) trước khi snap đúng vào Step 2 — overlay phải biến mất gọn rồi hiện lại đúng chỗ, không "nháy" sai.<br>- (GH-1607) Nút Next/Done/Back luôn bấm được, kể cả khi nội dung mô tả dài hoặc màn hình rất thấp (viewport thấp nhất) — nút không bao giờ bị cuộn khuất bên trong tooltip. | High | [x] |
 | **TC-F05-02-17** | `GH-1222/list-limit` | `Bound` | Danh sách trả về >10 trang (không bị Payload default limit cắt) | 1. Site có >10 trang.<br>2. Gọi `GET /api/sites/:id/pages`. | - API trả về đầy đủ tất cả trang (vd 15 trang), không cắt còn 10.<br>- `payload.find` cho pages được gọi với `limit: 0`. | High | [x] |
+| **TC-F05-02-18** | `GH-1984/card` | `UX` | Page card — icon action cùng hàng tên | 1. Mở tab Pages. | - Mỗi card: tên + badge + 2 icon (eye/eye-off, trash) cùng hàng; không còn nút chữ Visible/Delete.<br>- Home: 2 icon disabled kèm tooltip "homepage can't be hidden/deleted".<br>- Icon có `aria-label`. | High | [x] |
+| **TC-F05-02-19** | `GH-1984/add` | `UX` | Add new page ở cuối danh sách | 1. Bấm "Add new page" (nút dashed).<br>2. Gõ tên.<br>3. Esc. | - Nút nằm sau card cuối; form inline có label PAGE NAME + preview `URL: /slug`.<br>- Esc đóng form; Enter tạo.<br>- Empty state (không có trang) vẫn có nút Add new page. | High | [x] |
+| **TC-F05-02-20** | `GH-1984/dup` | `Logic` | Báo trùng tên/slug + slug rỗng ngay trong form | 1. Nhập tên trùng trang có sẵn (cùng tên, cùng slug, "Home", khác hoa/thường), hoặc `!!!`. | - Hiện lỗi inline; nút "Create page" disabled; không gọi API.<br>- 409 từ server vẫn toast "slug already exists" (fallback). | High | [x] |
+| **TC-F05-02-21** | `GH-1984/delete` | `UX` | Xác nhận xoá inline trong card | 1. Bấm trash trên 1 card.<br>2. Esc / Cancel.<br>3. Bấm trash → Delete. | - Hộp đỏ hiện trong card, focus ở Cancel; Esc/Cancel đóng, không gọi API.<br>- Delete → soft delete (PATCH `deletedAt`) + toast "Page “{tên}” deleted" kèm nút Undo 5s. | High | [x] |
+| **TC-F05-02-22** | `GH-1984/current` | `UX` | Card đang chọn | 1. Chọn 1 trang. | - Badge "Editing", viền/nền teal + vạch trái.<br>- Nút nhỏ "Edit with AI chat" chỉ ở card đang chọn; bấm → chuyển tab AI Chat (desktop) / mở sheet chat (mobile). | Medium | [x] |
+| **TC-F05-02-23** | `GH-1984/404` | `UX` | Custom 404 ghim ở đáy panel | 1. Bấm "Custom 404 page".<br>2. Bấm "Edit 404 page". | - Footer có viền trên, chevron xoay khi mở; trang 404 không nằm trong danh sách thường.<br>- Chọn đúng trang 404; khi đang sửa 404 nút đổi thành "Editing 404 page". | Medium | [x] |
+| **TC-F05-02-24** | `GH-1984/visibility` | `Logic` | Ẩn/hiện trang bằng icon eye | 1. Bấm eye trên trang đang hiện → ẩn.<br>2. Bấm lại (eye-off) → hiện. | - PATCH `isVisible` đúng; optimistic + rollback khi lỗi.<br>- Toast có tên trang: "{tên} hidden from your website" / "{tên} is now visible" (icon check + viền teal); badge đổi Hidden ↔ trạng thái cũ. | Medium | [x] |
+| **TC-F05-02-25** | `GH-1984/select` | `UX` | Bấm vào bất kỳ đâu trên card để chọn trang | 1. Bấm vào dòng path/ngày của trang khác.<br>2. Bấm icon eye/trash.<br>3. Bấm thân card đang chọn. | - Bước 1 chọn trang đó.<br>- Bước 2 không làm chọn trang (chỉ chạy action của icon).<br>- Bước 3 không làm gì. | Medium | [x] |
+| **TC-F05-02-26** | `GH-1984/layout` | `UX` | Thứ tự trên hàng tiêu đề card | 1. Mở tab Pages, quan sát 1 card thường. | - Thứ tự: tên → badge trạng thái → (khoảng trống) → icon eye, trash sát phải.<br>- Light theme: card tách khỏi nền, chữ badge đọc rõ. | Medium | [x] |
+| **TC-F05-02-27** | `GH-1984/name-literal` | `Bound` | Tên trang chứa `$&` hiển thị nguyên văn trong xác nhận xoá và toast | 1. Đổi tên 1 trang thành `Sale $& more`.<br>2. Bấm trash → Delete. | - Câu xác nhận và toast hiển thị đúng `Sale $& more` (không bị thay `{name}`/ký tự đặc biệt). | Low | [x] |
+| **TC-F05-02-28** | `slug/reserved` | `Neg` | Tạo trang có slug hệ thống `/checkout` hoặc `/orders` | 1. Mở tab Pages → Add new page.<br>2. Nhập tên "Checkout" (hoặc "Orders").<br>3. Gọi thẳng `POST /api/sites/{id}/pages` hoặc `PATCH .../pages/{pageId}` (site chưa publish) với slug `checkout` hoặc `orders`. | - Form báo lỗi "URL này được hệ thống sử dụng" và không cho tạo.<br>- API trả 400, không tạo page. Tên như "Checkout info" vẫn tạo được. | High | [ ] |
 
 ---
 
@@ -129,6 +140,8 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-06-13** | `US-06/AC2` | `UI` | Image Toolbar hiển thị khi click ảnh | 1. Click vào một hình ảnh trên Preview iframe. | - Toolbar nhỏ xuất hiện với 2 nút: [Thay ảnh] và [✨ Sinh ảnh AI].<br>- Click ra ngoài → Toolbar biến mất. | Blocker | [ ] |
 | **TC-F05-06-14** | `US-06/AC2` | `State` | Loading khi upload ảnh thay thế | 1. Click [Thay ảnh].<br>2. Chọn file ảnh 5MB. | - Spinner hiển thị trên vùng ảnh trong lúc upload.<br>- Nút [Thay ảnh] disabled.<br>- Sau upload: ảnh mới render, layout không vỡ, status "Saved". | High | [ ] |
 | **TC-F05-06-15** | `US-06/Cancel` | `Recov` | ESC hủy giữa chừng Edit WYSIWYG | 1. Đang edit text, đã thay đổi nội dung.<br>2. Nhấn phím ESC. | - Thoát contentEditable.<br>- Text quay về nội dung gốc (discard changes).<br>- Không tạo entry Undo History.<br>- Không trigger auto-save. | High | [ ] |
+| **TC-F05-06-16** | `US-06/AC1` | `Func` | Cỡ chữ inline trên vùng chọn ra đúng px (GH-2089) | 1. Hero → double-click tiêu đề, bôi đen vài chữ.<br>2. Nhập 28 vào ô cỡ chữ → Enter (và thử +/−).<br>3. Inspect phần tử. | - Phần chọn có `font-size: 28px`, không còn `xxx-large`/`<font>`.<br>- Không bôi đen: cả khối đổi 28px.<br>- Thẻ diff AI không hiện span HTML thô. | Medium | [x] AUTO |
+| **TC-F05-06-17** | `US-06/AC1` | `Func` | Gõ cỡ chữ + Enter chỉ áp 1 lần, không lan ra cả khối (GH-2089) | 1. Hero → double-click tiêu đề, bôi đen vài chữ.<br>2. Nhập 28 vào ô cỡ chữ → Enter.<br>3. Inspect `<p>`/tiêu đề.<br>4. Click vào ô cỡ chữ rồi click ra ngoài không đổi số.<br>5. Chọn span 28px trong khối 20px, nhập 20 → Enter; rồi áp 28 cho hai vùng chọn liên tiếp. | - Chỉ span phần chọn có `font-size: 28px`; thẻ khối cha không có `font-size`.<br>- Blur không đổi giá trị không áp lại cỡ chữ.<br>- Enter luôn áp cho vùng chọn hiện tại, kể cả khi trùng cỡ khối cha hoặc lần áp trước (span 28 → 20 ra 20px; hai vùng liên tiếp cùng 28 đều áp). Unit: TC-F05-06-17a..e. | Medium | [x] AUTO |
 
 ---
 
@@ -177,22 +190,27 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ---
 
-### US-10: Publish & Unpublish Flow (Live & Maintenance) (12 Cases)
+### US-10: Publish & Unpublish Flow (Live & Maintenance) (17 Cases)
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | **TC-F05-10-01** | `US-10/AC1` | `Flow` | Publish site lên subdomain | 1. Nhấn Publish trên Editor toolbar.<br>2. Đợi quá trình deploy hoàn tất. | - Site live trên subdomain trong vòng 30 giây.<br>- DNS trỏ đúng. | Blocker | [x] |
 | **TC-F05-10-02** | `US-10/AC2` | `Flow` | Re-Publish sau khi sửa nội dung | 1. Sửa text trên site đã live.<br>2. Nhấn Re-Publish. | - Nội dung mới được cập nhật trên tất cả endpoint.<br>- Cache được xóa. | High | [x] |
-| **TC-F05-10-03** | `US-10/AC3` | `Flow` | Unpublish → chuyển Maintenance mode | 1. Nhấn Unpublish site. | - Truy cập site trả về `503 Service Unavailable`.<br>- Hiển thị trang "Đang bảo trì". | Blocker | [x] |
+| **TC-F05-10-03** | `US-10/AC3` | `Flow` | Unpublish → chuyển Maintenance mode | 1. Vào **Cài đặt → Domains → Trạng thái website**, nhấn "Unpublish website", tick checkbox xác nhận rồi nhấn "Confirm unpublish" (Editor không còn nút Unpublish — US-F05-10). | - Truy cập site trả về `503 Service Unavailable`.<br>- Hiển thị trang "Đang bảo trì". | Blocker | [x] |
 | **TC-F05-10-04** | `US-10/Err` | `Net` | Mất mạng giữa chừng khi Deploy | 1. Cắt kết nối mạng trong khi đang Publish. | - Timeout sau 30 giây.<br>- Hiển thị alert "Lỗi đồng bộ hệ thống".<br>- Site không bị trạng thái nửa vời. | Blocker | [ ] |
 | **TC-F05-10-05** | `US-10/Race` | `Race` | Double-click nút Publish | 1. Nhấn nút Publish hai lần liên tiếp nhanh. | - Nút Disabled ngay sau lần click đầu.<br>- Chỉ gọi 1 deploy request. | Blocker | [x] |
-| **TC-F05-10-06** | `US-10/UI` | `UI` | Hiển thị badge Live và link mở site | 1. Publish site thành công.<br>2. Quan sát UI trên Editor. | - Badge "Live" màu xanh hiển thị.<br>- Nút "Mở Web" mở site trong tab mới. | Medium | [ ] |
+| **TC-F05-10-06** | `US-10/UI` | `UI` | Hiển thị badge Live và link mở site | 1. Publish site thành công.<br>2. Quan sát UI trên Editor. | - Badge "Live" màu xanh hiển thị.<br>- Khi đã đồng bộ, link `● tên-miền ↗` mở site trong tab mới; khi có thay đổi chưa đẩy lên thì icon `↗` cạnh nút "Update live" mở bản live (không còn dropdown "View live"). | Medium | [ ] |
 | **TC-F05-10-07** | `US-10/AC1` | `UI` | Pre-publish Checklist trước khi Publish | 1. Click nút "Publish" trên Editor toolbar. | - Modal Pre-publish Checklist hiện: ✅ Có trang Home, ⚠️ SEO score.<br>- Thiếu trang Home → ❌ chặn Publish.<br>- Nếu đủ điều kiện → nút "Publish ngay" active. | Blocker | [ ] |
 | **TC-F05-10-08** | `US-10/AC1` | `UX` | Toast thành công sau Publish | 1. Publish site thành công. | - Toast "🎉 Website đã live!" hiển thị kèm link subdomain.<br>- Click link mở subdomain trong tab mới.<br>- Toast tự ẩn sau 5–8 giây. | High | [ ] |
 | **TC-F05-10-09** | `US-10/AC2` | `API` | Sitemap tự động cập nhật sau Re-Publish | 1. Publish site → sửa nội dung → Re-Publish.<br>2. Truy cập `/sitemap.xml`. | - File sitemap.xml cập nhật URLs mới nhất.<br>- Timestamp `lastmod` thay đổi.<br>- Tất cả published pages có trong sitemap. | High | [ ] |
-| **TC-F05-10-10** | `US-10/AC3` | `API` | HTTP 503 khi Maintenance Mode | 1. Unpublish site.<br>2. Truy cập subdomain từ browser/curl. | - Response trả về **HTTP 503 Service Unavailable**.<br>- Trang "Đang bảo trì" hiển thị. | Blocker | [ ] |
+| **TC-F05-10-10** | `US-10/AC3` | `API` | HTTP 503 khi Maintenance Mode | 1. Unpublish site (từ Cài đặt → Domains).<br>2. Truy cập subdomain từ browser/curl. | - Response trả về **HTTP 503 Service Unavailable**.<br>- Trang "Đang bảo trì" hiển thị. | Blocker | [ ] |
 | **TC-F05-10-11** | `US-10/AC4` | `Flow` | Owner vào /editor khi site đang Maintenance | 1. Unpublish site.<br>2. Owner truy cập `/editor/:siteId`. | - Editor load và preview bình thường.<br>- Owner thấy đầy đủ canvas, sidebar, AI Chat.<br>- Không bị redirect ra trang Maintenance. | High | [ ] |
-| **TC-F05-10-12** | `US-10/AC4` | `UI` | Notification "Website đang Tạm Ẩn" khi Maintenance | 1. Unpublish site.<br>2. Owner mở Editor. | - Header hiển thị banner màu vàng "Website đang trong trạng thái Tạm Ẩn".<br>- Badge chuyển từ "Live" (xanh) về "Draft" (xám/cam). | High | [ ] |
+| **TC-F05-10-12** | `US-10/AC4` | `UI` | Notification "Website đang Tạm Ẩn" khi Maintenance | 1. Unpublish site (từ Cài đặt → Domains).<br>2. Owner mở Editor. | - Header hiển thị banner màu vàng "Website đang trong trạng thái Tạm Ẩn".<br>- Badge chuyển từ "Live" (xanh) về "Draft" (xám/cam). | High | [ ] |
+| **TC-F05-10-13** | `US-10/AC2-4` | `UI` | Toolbar Editor: đúng 1 nút chính theo trạng thái | 1. Site nháp: quan sát toolbar.<br>2. Site live, sửa nội dung: quan sát.<br>3. Bấm "Update live".<br>4. Khi đã đồng bộ: quan sát. | - Nháp: `Preview` + `Publish`.<br>- Live có thay đổi: `Preview` (mắt) + `Update live` + icon `↗`; nhãn "Draft saved · Not live yet".<br>- Đồng bộ: KHÔNG Preview, không nút chính; `● tên-miền ↗` (tab mới) + Copy link; nhãn "Saved · Live". | Blocker | [x] |
+| **TC-F05-10-14** | `US-10/AC1` | `UI` | Editor không còn Unpublish / dropdown View live | 1. Mở Editor ở desktop, tablet, mobile với site live.<br>2. Kiểm tra toolbar và mọi menu. | - Không có tuỳ chọn Unpublish, không có dropdown "View live" ở mọi kích thước. | Blocker | [x] |
+| **TC-F05-10-15** | `US-10/AC6` | `UI` | Modal gỡ xuất bản bắt buộc tick checkbox | 1. Mở modal Unpublish.<br>2. Quan sát nút xác nhận.<br>3. Tick checkbox, Huỷ, mở lại. | - Nút "Confirm unpublish" disabled đến khi tick.<br>- Huỷ đóng modal, website không đổi, không gọi API.<br>- Mở lại: checkbox đã bỏ tick. | Blocker | [x] |
+| **TC-F05-10-16** | `US-10/AC5,7,9` | `UI` | Card "Trạng thái website" ở Cài đặt → Domains | 1. Mở `/settings/domains` với site live.<br>2. Unpublish.<br>3. Mở với user chỉ có quyền `settings` (không `builder`).<br>4. Unpublish ở tab 1 rồi ở tab 2. | - Live: badge, URL, nút viền đỏ + mô tả.<br>- Sau gỡ: "Under maintenance" + nút Mở Editor; storefront 503.<br>- User không có `builder`: thấy trạng thái, không thấy nút Unpublish.<br>- Tab 2: toast lỗi 409 và card tự cập nhật. | Blocker | [x] |
+| **TC-F05-10-17** | `US-10/Flow` | `E2E` | Publish → Update live → Unpublish từ Cài đặt → Publish lại | 1. Publish site.<br>2. Sửa, Update live.<br>3. Cài đặt → Domains → Unpublish (tick checkbox).<br>4. Mở Editor, Publish lại. | - Mỗi bước đúng trạng thái toolbar/card như TC-13..16; Editor hiện banner bảo trì sau bước 3. | High | [ ] |
 
 ---
 
@@ -388,6 +406,67 @@ QA found 7 interaction bugs on the real Editor's mobile/compact view (`/editor/[
 - **Code review caveat worth internalizing:** an initial fix attempt for Bug 6 (a `hero-media-overlay.tsx` CSS change) passed `tsc` and all jsdom tests including TC-GH1557-05-02, yet was a real regression in an actual browser — jsdom doesn't do layout/hit-testing, so a synthetic-fixture test (`<img data-image-index>` with no overlay sibling) couldn't have caught an actual DOM element physically covering another. Caught by adversarial code review reasoning about real component markup, not by any test. Reverted; see `phase-05-image-click-race.md`'s "Code Review" section for the full story.
 
 ---
+
+### Rich text block: drop from library, click target, display name (4 Cases)
+
+| TC-ID | Layer | Description | Assertion |
+|-------|-------|-------------|-----------|
+| **TC-F05-RT-01** | Unit | Drop `custom-html` from the block library | Block gets starter `html`, caller-provided `html` wins |
+| **TC-F05-RT-02** | Unit | Empty Rich text block in the editor iframe | Click target has `min-height: 3rem`; none on published page |
+| **TC-F05-RT-03** | Unit | Delete dialog / tooltip / toast for Rich text | Shows "Rich text", not "Custom Html" / "custom-html" |
+| **TC-F05-RT-04** | Unit | `getBlockDisplayName` for other block types | Dashes replaced by spaces |
+
+### GH-2107: Block Settings sidebar — block icon, spacing slider, variant chips (16 Cases)
+
+Sidebar phải, tab **Block** / **Menu** / **Global**. Header dùng lucide icon như panel Components; 4 section "Layout & Spacing" (block thường, announcement-bar, feature-comparison, pricing) dùng chung `BlockSpacingControls`; 5 nhóm chip (block variant, header/footer style, color mode, WhatsApp position) dùng chung `VariantChip` (màu primary teal).
+
+| TC-ID | Layer | Description | Assertion | Test file |
+|-------|-------|-------------|-----------|-----------|
+| **TC-GH2107-01** | Unit | Header tab Block cho `hero` | Icon lucide `panel-top`, không có emoji từ `meta.icon` | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-02** | Unit | Header cho block chưa có icon riêng | Fallback icon `puzzle` (giống panel Components) | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-03** | Unit | `VariantChip` active | `type="button"`, `aria-pressed="true"`, token primary, không còn class `blue-*` | `settings-variant-chip.test.tsx` |
+| **TC-GH2107-04** | Unit | `VariantChip` idle + click | `aria-pressed="false"`, hover `--editor-overlay-hover`, gọi `onClick` | `settings-variant-chip.test.tsx` |
+| **TC-GH2107-05** | Unit | Chip variant của block trong SettingsPanel | Trạng thái pressed đúng; click gọi `onBlockFieldChange(idx, 'variant', v)` | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-06** | Unit | Kéo slider rồi thả chuột | Lưu 1 lần; blur sau đó không lưu lặp | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-07** | Unit | Chỉnh slider bằng phím mũi tên | Lưu khi key up | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-08** | Unit | Focus rồi blur, không đổi giá trị | Không lưu | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-09** | Unit | Phần tô màu (fill) | `--fill-ratio` theo giá trị (36 → 0.3) | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-10** | Unit | Label spacing locale `ms` | "Susun atur & jarak", "Jarak atas", "Jarak bawah" | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-11** | Unit | Pricing / Feature comparison / Announcement bar | Đúng 1 section spacing; lưu `blockSpacing` giữ key cũ | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-12** | Unit | Announcement bar chưa có `blockSpacing` | Slider mặc định theo `paddingY` (logic cũ giữ nguyên) | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-13** | Manual | Light + dark: header icon, slider (Hero, Pricing, Feature comparison, Announcement bar), chip (Block / Menu / Global) | Slider có fill teal, track nhìn rõ ở cả 2 mode; chip active teal, hover thấy được, có focus ring | — |
+| **TC-GH2107-14** | Unit | Giá trị đã lưu đổi từ bên ngoài (undo / đổi block), kéo lại mà không focus (Safari) | Vẫn lưu — so với giá trị thật trên block, không dùng giá trị slider tự nhớ | `settings-block-spacing-controls.test.tsx` |
+| **TC-GH2107-15** | Unit | Chip vị trí WhatsApp, locale `ms` | Nhãn "↘ Kanan" / "↙ Kiri" (i18n), không còn "Right" / "Left" cố định | `settings-panel-block-settings-gh2107.test.tsx` |
+| **TC-GH2107-16** | Unit | Announcement bar chưa có `blockSpacing`, `paddingY` đổi 12 → 20 | Slider đồng bộ lại theo giá trị mới (20) | `settings-panel-block-settings-gh2107.test.tsx` |
+
+### GH-2246: Công tắc Breadcrumb hiện BẬT nhưng web live không có breadcrumb (store cũ chưa có config)
+
+Mặc định khi chưa có `headerBlock.breadcrumbConfig` là **TẮT** ở cả Editor và web live (helper chung `src/lib/site-renderer/breadcrumb-config.ts`). Mã QC: D3-03 (TC-EDIT-012, TC-EDIT-068).
+
+| TC-ID | Layer | Tình huống | Kết quả mong đợi | File test |
+|-------|-------|-----------|------------------|-----------|
+| **TC-GH2246-01** | Unit | Chưa có config (undefined/null) | Công tắc TẮT | `breadcrumb-config.test.ts` |
+| **TC-GH2246-02** | Unit | Config cũ thiếu `showOnAllPages` | Vẫn BẬT (giữ hành vi site đang chạy) | `breadcrumb-config.test.ts` |
+| **TC-GH2246-03** | Unit | `showOnAllPages` false / null / true | TẮT / TẮT / BẬT | `breadcrumb-config.test.ts` |
+| **TC-GH2246-04** | Unit | Store cũ chỉ sửa Home label | Lưu `showOnAllPages:false`, không tự bật | `breadcrumb-config.test.ts` |
+| **TC-GH2246-05** | Unit | Store cũ bật công tắc | Lưu `showOnAllPages:true` | `breadcrumb-config.test.ts` |
+| **TC-GH2246-06** | Unit | Config có sẵn, sửa 1 ô | Giữ trạng thái + các ô khác | `breadcrumb-config.test.ts` |
+| **TC-GH2246-07** | Unit | Renderer, site không có config | Không vẽ breadcrumb | `breadcrumb-nav-offset.test.tsx` |
+| **TC-GH2246-08** | Unit | Renderer, `showOnAllPages` false / true | Ẩn / hiện breadcrumb | `breadcrumb-nav-offset.test.tsx` |
+| **TC-GH2246-09** | Manual | Store cũ (chưa sửa breadcrumb): mở Editor → Menu → Breadcrumb settings | Công tắc TẮT; web live không breadcrumb; bật + Publish → `/about-us` có breadcrumb | QC verify trên store cũ |
+
+**Đổi test cũ:** `navigation/settings-panel-variant-picker.test.tsx` (TC-NAV-08) chuyển từ kiểm tra class `bg-blue-500/10` sang `aria-pressed` — hành vi không đổi, chỉ đổi màu.
+
+### GH-2115 — Bỏ màu xanh dương cố định còn sót trong sidebar Block settings
+
+| TC-ID | Layer | Description | Assertion | Test file |
+|-------|-------|-------------|-----------|-----------|
+| **TC-GH2115-01** | Unit | `SettingsPanel.tsx`, `LogoCloudSettings.tsx`, `PortfolioGridSettings.tsx` | Không còn class `blue-*` (dropdown mã nước, ô hex màu, khung upload logo footer, viền color picker, toggle + ô link của announcement bar, nút "+ Add", chip "show label" cart widget) | `settings-panel-no-hardcoded-blue-gh2115.test.tsx` |
+| **TC-GH2115-02** | Unit | Nút "+ Add testimonial" | Nền `hsl(var(--primary)/0.1)`, chữ `--editor-text` ở light và primary ở dark (như `VariantChip`) | `settings-panel-no-hardcoded-blue-gh2115.test.tsx` |
+| **TC-GH2115-03** | Manual | Light + dark: các control trên (Footer, Announcement bar, Testimonials/Features/Pricing/Menu "+ Add", Logo cloud, Portfolio grid, Cart widget, dropdown mã nước) | Màu teal thay xanh dương; chữ trên nền teal nhạt đọc rõ ở light mode | — |
+| **TC-GH2115-04** | Unit | Dropdown mã nước của WhatsApp button, mục đang chọn | `aria-current`, nền `hsl(var(--primary)/0.1)` + `font-medium`, hover giữ tint primary `/0.15` (không đổi sang `hover:bg-white/5`) (light mode vẫn phân biệt được với mục khác) | `settings-panel-no-hardcoded-blue-gh2115.test.tsx` |
+
+Ngoài phạm vi (giữ nguyên, theo dõi riêng): `blue-*` trong Breadcrumb/BlockImage/Logo/Favicon/OG editor, nav multilingual panel, `PlanFields`; gradient `from-blue-500 to-teal-400` của Pricing/Feature comparison là accent có chủ ý.
 
 ## 4. Hành Trình E2E UAT Flow
 

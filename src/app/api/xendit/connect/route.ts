@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { createManagedAccount, getOnboardingUrl } from '@/lib/payment/xendit'
 import { XenditError, xenditFetch } from '@/lib/payment/xendit-client'
+import { guardPayoutConnect } from '@/lib/payment/payout-connect-guard'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 
 /**
@@ -33,6 +34,9 @@ export const POST = withAuth(async (user, request) => {
                 { status: 403 },
             )
         }
+
+        const blocked = guardPayoutConnect(request, user, tenantId)
+        if (blocked) return blocked
 
         const payload = await getPayload({ config })
         const tenant = await payload.findByID({

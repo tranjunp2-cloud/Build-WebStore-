@@ -114,6 +114,33 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 | **TC-F02.41** | `Load` | Hệ thống chịu 50 user đăng nhập đồng thời | 1. Cấu hình K6 với 50 Virtual Users gọi `POST /api/users/login` đồng thời.<br>2. Chạy script, ghi lại kết quả. | - P95 response trong ngưỡng chấp nhận.<br>- Error rate < 0.5%.<br>- Không xảy ra DB Pool Dead-Lock. | Khẩn |
 | **TC-F02.42** | `Sec` | Rate Limit endpoint Quên Mật Khẩu chống spam | 1. Chạy script gửi 40 request liên tiếp tới endpoint Quên MK với cùng 1 email.<br>2. Quan sát response từ request vượt ngưỡng. | - Server trả `HTTP 429 Too Many Requests`.<br>- IP/tài khoản bị khóa tạm thời. | Medium |
 | **TC-F02.43** | `Reg` | send-otp không lỗi 500 với multi-tenant user có null permissions (GH-905) | 1. Tạo staff user thuộc 2 tenant.<br>2. Insert null vào `users_tenants_permissions.value` cho tenant thứ 2 qua psql.<br>3. Gọi `POST /api/users/send-otp` với email của staff. | - Response `200` với `{ message: "If the email exists..." }`.<br>- Không có log `[Users] send-otp error` trong server console. | Blocker |
+| **TC-F02.44** | `Func` | Login đúng trong 60s sau lần gửi OTP trước (GH-2053) | 1. Đăng nhập đúng → sang `/verify-otp`.<br>2. Quay lại `/login` trong 60s, đăng nhập đúng lần nữa. | - `send-otp` trả 429 `OTP_COOLDOWN` + `retryAfter`.<br>- Không hiện "Connection problem"; tự chuyển sang `/verify-otp` với toast "mã đã gửi".<br>- Countdown resend/expiry khớp OTP cũ. | High |
+| **TC-F02.45** | `Func` | Tài khoản bị khóa hiện đúng thông báo khóa (GH-2053) | 1. Nhập đúng email, sai mật khẩu 5 lần.<br>2. Nhập đúng mật khẩu. | - API `423` `ACCOUNT_LOCKED` (lần sai thứ 5 và các lần sau trong 15 phút).<br>- Hiện câu `auth.errors.accountLocked` ("Too many unsuccessful sign-in attempts. Please try again in 15 minutes or reset your password.").<br>- Không chuyển sang `/verify-otp`. | High |
+| **TC-F02.46** | `Reg` | Sai mật khẩu < 5 lần vẫn báo sai thông tin (GH-2053) | 1. Nhập đúng email, sai mật khẩu 1-4 lần. | - `401 Login failed`; hiện "Incorrect email or password. Please try again." (không nhắc khóa); nút Sign In trở lại bình thường. | Medium |
+| **TC-F02.47** | `Func` | Component test: trang login chuyển `/verify-otp` khi `send-otp` 429 `OTP_COOLDOWN` (GH-2053) | Unit `login-page-otp-lockout.test.tsx`: mock fetch login 200 → send-otp 429. | - `router.replace('/verify-otp?email=…')`; toast info; không toast lỗi.<br>- sessionStorage `otp_resend_end` / `otp_expiry_end` được seed theo `retryAfter` / `expiresIn`. | High |
+| **TC-F02.48** | `Func` | Component test: login 423 `ACCOUNT_LOCKED` hiện câu khóa, không refocus password (GH-2053) | Unit `login-page-otp-lockout.test.tsx`: mock fetch login 423. | - Toast `auth.errors.accountLocked`, không phải `incorrect`.<br>- Không gọi `send-otp`, không chuyển trang. | High |
+| **TC-F02.49** | `Func` | Unit: đổi mật khẩu qua `payload.update` gỡ khóa đăng nhập (GH-2053) | Unit `clear-login-lock-on-password-change.test.ts`: beforeChange `update` có `password`. | - Data trả về thêm `loginAttempts: 0`, `lockUntil: null`; các field khác giữ nguyên. | High |
+| **TC-F02.50** | `Reg` | Unit: update không đổi mật khẩu không đụng tới khóa (GH-2053) | Unit: beforeChange `update` không có/rỗng `password`; `create` có `password`. | - Data trả về giữ nguyên, không có `lockUntil`. | Medium |
+| **TC-F02.51** | `Func` | Unit: reset mật khẩu qua email thành công gỡ khóa (GH-2053) | Unit: afterOperation `resetPassword` có `result.user.id`. | - `db.updateOne` gọi 1 lần với `{ loginAttempts: 0, lockUntil: null }`; trả nguyên `result`. | High |
+| **TC-F02.52** | `Reg` | Unit: các operation khác không gỡ khóa (GH-2053) | Unit: afterOperation `login` / `update` / `forgotPassword`, hoặc `resetPassword` không có user. | - Không gọi `db.updateOne`. | Medium |
+| **TC-F02.53** | `Func` | Unit: gỡ khóa lỗi không làm hỏng việc reset (GH-2053) | Unit: afterOperation `resetPassword`, `db.updateOne` reject. | - Ghi `logger.error`; vẫn trả `result` (reset thành công). | Medium |
+| **TC-F02.54** | `Reg` | Unit: Users collection đăng ký 2 hook gỡ khóa (GH-2053) | Unit: đọc `Users.hooks`. | - `beforeChange` chứa `clearLoginLockOnPasswordUpdate`; `afterOperation` chứa `clearLoginLockAfterPasswordReset`. | High |
+| **TC-F02.55** | `Func` | Bị khóa → quên mật khẩu → đặt lại → đăng nhập được ngay (GH-2053) | 1. Sai mật khẩu 5 lần (thấy câu khóa).<br>2. Forgot password → mở link trong email → đặt mật khẩu mới.<br>3. Đăng nhập bằng mật khẩu mới. | - Không còn `423`; chuyển sang bước OTP.<br>- `psql`: `lock_until IS NULL`, `login_attempts = 0`. | Blocker |
+| **TC-F02.56** | `Func` | Bị khóa → super-admin reset qua SSO → đăng nhập được ngay (GH-2053) | 1. Khóa tài khoản (sai 5 lần).<br>2. `PUT /api/v1/sso/reset-password` (super-admin).<br>3. Đăng nhập bằng mật khẩu mới. | - Đăng nhập thành công ngay. | High |
+| **TC-F02.57** | `Sec` | Link reset sai/hết hạn không gỡ khóa (GH-2053) | 1. Khóa tài khoản.<br>2. Đặt lại mật khẩu bằng token sai hoặc hết hạn. | - Báo link hết hạn; tài khoản vẫn bị khóa (`lock_until` không đổi). | High |
+| **TC-F02.58** | `Reg` | Không đổi mật khẩu thì vẫn khóa đủ 15 phút (GH-2053) | 1. Khóa tài khoản.<br>2. Đăng nhập lại trong 15 phút (không reset). | - Vẫn `423` + câu khóa cho tới khi hết 15 phút. | Medium |
+| **TC-F02.59** | `Func` | Unit: super-admin đổi mật khẩu cũng cập nhật `keyString` (GH-2045) | Unit `sync-key-string-on-password-update.test.ts`: beforeChange `update` có `password`, không có `keyString`, `req.user` là super-admin. | - `keyString` giải mã ra đúng mật khẩu mới; các field khác giữ nguyên. | High |
+| **TC-F02.60** | `Sec` | Unit: bỏ `keyString` client gửi kèm (GH-2045) | Unit `sync-key-string-on-password-update.test.ts`: super-admin `update` có `password` + `keyString: "forged"`. | - `keyString` dựng lại từ mật khẩu mới; giá trị client gửi bị bỏ. | High |
+| **TC-F02.61** | `Func` | Unit: lỗi mã hóa không chặn đổi mật khẩu (GH-2045) | Unit: thiếu `SSO_ENCRYPTION_KEY`. | - Ghi `logger.error`; data trả về giữ `password`, không có `keyString`. | High |
+| **TC-F02.62** | `Reg` | Unit: Users collection đăng ký hook `syncKeyStringOnPasswordUpdate` (GH-2045) | Unit: đọc `Users.hooks.beforeChange`. | - Chứa `syncKeyStringOnPasswordUpdate`. | High |
+| **TC-F02.63** | `Func` | Super-admin đổi mật khẩu owner trong `/admin` → `keyString` khớp mật khẩu mới (GH-2045) | 1. `/admin/collections/users/<id>` → Change password → lưu.<br>2. Owner đăng nhập bằng mật khẩu mới.<br>3. Gọi chức năng cần SSO token của owner. | - Đăng nhập được; `psql`: `key_string` đã đổi; chức năng SSO không lỗi xác thực. | High |
+| **TC-F02.64** | `Reg` | Unit: không có mật khẩu hoặc `create` thì không ghi `keyString` (GH-2045) | Unit: `update` không có/rỗng `password`; `create` có `password`. | - Không thêm `keyString`. | Medium |
+| **TC-F02.65** | `Sec` | Unit: người gọi không phải super-admin thì không ghi `keyString` (GH-2045) | Unit: owner tự `update` mật khẩu; `req.user = null` (server ghi, như mời lại staff). | - Không thêm `keyString`. | High |
+| **TC-F02.66** | `Reg` | Unit: mời lại staff không truyền `req`/`user` khi đặt mật khẩu tạm (GH-2045) | Unit `invite-staff-keystring-guard.test.ts`: super-admin là owner tenant, `POST /invite-staff` với user đã tồn tại. | - `payload.update` đặt mật khẩu tạm không có `req`, `user`, `keyString`; chạy hook với tham số đó không sinh `keyString` → `keyString` cũ giữ nguyên. | High |
+| **TC-F02.67** | `Func` | Login: password tối thiểu 6 ký tự (GH-2269) | 1. `/login`, nhập email + password 5 ký tự → Sign in.<br>2. Nhập password 6 ký tự → Sign in.<br>Unit `login-page-password-min-length.test.tsx`. | - 5 ký tự: lỗi inline "Password must be at least 6 characters", không gọi `/api/users/login`.<br>- 6 ký tự: gửi `POST /api/users/login`. | High |
+| **TC-F02.68** | `Func` | Unit: quy tắc password dùng chung (GH-2269) | Unit `password-rules.test.ts`: `PASSWORD_MIN_LENGTH`, `getPasswordStrength`. | - `PASSWORD_MIN_LENGTH = 6`.<br>- Điểm độ dài tính từ 6 ký tự; mỗi tiêu chí (độ dài, chữ hoa, số, ký tự đặc biệt) +1. | Medium |
+| **TC-F02.69** | `Sec` | Reset password: server chặn password < 6 ký tự (GH-2269) | 1. Lấy link reset hợp lệ.<br>2. Gọi thẳng `POST /api/users/reset-password { token, password: "Ab1!x" }`.<br>3. Gọi lại với password 6 ký tự.<br>Unit `enforce-reset-password-min-length.test.ts`. | - Bước 2: `400` "Password must be at least 6 characters"; mật khẩu không đổi, token vẫn dùng được.<br>- Bước 3: reset thành công.<br>- `create`/`update` (SSO, PW1, admin) không bị chặn. | High |
+| **TC-F02.70** | `Reg` | Unit: Users collection đăng ký hook chặn reset password ngắn (GH-2269) | Unit: đọc `Users.hooks.beforeOperation`. | - Có `enforceResetPasswordMinLength`. | Medium |
 
 ---
 
@@ -160,6 +187,16 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 | **TC-F02-RTOKEN-06** | `Unit` | Preserve mfa_verified:true từ token gốc | SignJWT được gọi với `mfa_verified: true` khi token gốc có claim này. | High |
 | **TC-F02-RTOKEN-07** | `Unit` | Mặc định mfa_verified=true khi claim vắng mặt | Token cũ (chưa có claim) → SignJWT vẫn nhận `mfa_verified: true`. | High |
 | **TC-F02-RTOKEN-08** | `Unit` | Happy path → 200, set httpOnly cookie | Trả `{ ok: true }`, cookie `payload-token` được set với `httpOnly: true`. | Blocker |
+---
+
+## 3.9. Không ghi Sites / Customers vào shop khác — (GH-2137)
+
+> Unit tests: `src/__tests__/security/tenant-field-cross-shop-write.test.ts`. Các mục khác của GH-2137 (Payload `/admin` chỉ super-admin, khoá `roles` khi đăng ký, Pages + versions, SEO meta jobs, token trước OTP) thuộc PR #1996 (TC-PERF-133, 142, 150).
+
+| ID | Loại | Tiêu Đề | Kết Quả Mong Đợi | Ưu Tiên |
+|:---|:---|:---|:---|:---:|
+| **TC-F02.52** | `Sec` | Sites / Customers: field `tenant` chỉ nhận shop của user | `POST /api/sites` hoặc `/api/customers` với `tenant` của shop khác → 400; `PATCH` bản ghi của mình với `tenant` khác → giữ tenant cũ. Super-admin ghi được mọi shop. | Blocker |
+
 ---
 
 ## 4. End-to-End User Flow (Acceptance Test)

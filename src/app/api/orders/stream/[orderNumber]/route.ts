@@ -1,6 +1,7 @@
 import { getPayload } from 'payload'
 import type { Where } from 'payload'
 import config from '@payload-config'
+import { normalizeOrderNumber } from '@/lib/orders/normalize-order-number'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -56,7 +57,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ orderNumber: string }> },
 ) {
-    const { orderNumber } = await params
+    const { orderNumber: rawOrderNumber } = await params
+    const orderNumber = normalizeOrderNumber(rawOrderNumber)
     const { searchParams } = new URL(request.url)
     const slug = searchParams.get('slug')
 

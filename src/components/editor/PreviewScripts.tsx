@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect } from 'react'
+import { parseFontSizePx, patchFontSizeMarkers } from '@/components/editor/preview-font-size'
+import { type CanvasRevealHint, clearRevealRing, findRevealElement, scrollRevealIntoView, showRevealRing } from '@/lib/editor/reveal/canvas-reveal'
 
 const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 
@@ -36,13 +38,24 @@ export function PreviewScripts() {
         // Only whatsapp-button and cartWidget suppress BLOCK_HOVERED — socialWidget hover is intentionally allowed
         const noHoverHintBlockTypes = new Set(['whatsapp-button', 'cartWidget'])
         // Blocks whose images come from external product catalog — image editing not supported
-        const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
+        // Rich text owns image selection/replacement through its inline editor.
+        const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid', 'custom-html', 'rich-text'])
+        // ...except a section's own pictures inside them (Featured Products while no product is on sale)
+        const isReadOnlyImage = (el: Element, blockType: string) => imageReadOnlyBlockTypes.has(blockType) && !el.hasAttribute('data-section-picture')
         // Mobile/tablet compact chrome (PreviewFrame sets ?compact=1 when disableDragDrop is
         // on) — inline WYSIWYG text editing is desktop-only per F05-v2; text on mobile/tablet
         // is edited via the block-settings sheet's fields instead. Image edit stays enabled.
         const isCompactPreview = new URLSearchParams(window.location.search).get('compact') === '1'
 
         let hoveredEl: HTMLElement | null = null
+        let lastLocateToken: string | null = null
+        /** A page section by index, or the menu / footer by type. */
+        const locateSection = (index?: number, blockType?: string): HTMLElement | null =>
+            (blockType
+                ? document.querySelector(`[data-block-type="${CSS.escape(blockType)}"]`)
+                : typeof index === 'number' && index >= 0
+                    ? document.querySelector(`[data-block-index="${index}"]:not([data-block-type="navigation"]):not([data-block-type="footer"])`)
+                    : null) as HTMLElement | null
         let hoverTimer: number | null = null
         let hoveredBlock: Element | null = null
 
@@ -122,7 +135,7 @@ export function PreviewScripts() {
                 // parent-frame IMAGE_HOVERED hint so it doesn't compete with the overlay button.
                 if (imgEl.closest('[data-media-overlay]')) return
                 const imgBlockType = blockContainer.getAttribute('data-block-type') || ''
-                if (!imageReadOnlyBlockTypes.has(imgBlockType)) {
+                if (!isReadOnlyImage(imgEl, imgBlockType)) {
                     if (hoverTimer) clearTimeout(hoverTimer)
                     hoverTimer = window.setTimeout(() => {
                         const rect = imgEl.getBoundingClientRect()
@@ -406,6 +419,7 @@ export function PreviewScripts() {
                 blockType: blockContainer.getAttribute('data-block-type') || '',
                 originalText: currentEditingEl.innerText?.trim() || '',
                 scrollY: window.scrollY,
+                shiftKey: e.shiftKey,
             }, parentOrigin)
             // Immediately push correct font/size/color state for the newly activated element
             postSelectionState()
@@ -449,6 +463,22 @@ export function PreviewScripts() {
                 }
                 window.parent.postMessage({ type: 'MANUAL_SAVE_REQUEST', source: 'iframe' }, parentOrigin)
                 return
+            }
+
+            // GH-2247: keydown in the iframe never bubbles to the parent window, so forward
+            // Undo/Redo shortcuts. Skip while typing (native browser undo — TC-F11.19).
+            if (e.metaKey || e.ctrlKey) {
+                const k = e.key.toLowerCase()
+                const direction = k === 'z' ? (e.shiftKey ? 'redo' : 'undo') : k === 'y' ? 'redo' : null
+                if (direction) {
+                    const target = e.target as Element | null
+                    const isTyping = !!currentEditingEl
+                        || !!target?.closest?.('input, textarea, select, [contenteditable="true"]')
+                    if (isTyping) return
+                    e.preventDefault()
+                    window.parent.postMessage({ type: 'HISTORY_STEP_REQUEST', direction, source: 'iframe' }, parentOrigin)
+                    return
+                }
             }
 
             if (!currentEditingEl) return
@@ -579,7 +609,7 @@ export function PreviewScripts() {
                 if (!blockContainer) return null
                 const blockType = blockContainer.getAttribute('data-block-type')
                 if (blockType && excludedBlockTypes.includes(blockType)) return null
-                if (blockType && imageReadOnlyBlockTypes.has(blockType)) return null
+                if (blockType && isReadOnlyImage(el, blockType)) return null
                 return { blockContainer, blockType }
             }
 
@@ -609,6 +639,7 @@ export function PreviewScripts() {
                     window.parent.postMessage({
                         type: 'BLOCK_CONTAINER_CLICKED',
                         blockIndex,
+                        shiftKey: e.shiftKey,
                         layout: {
                             top: clickTop, left: rect.left,
                             width: rect.width, height: rect.height - clickTopDelta,
@@ -686,7 +717,8 @@ export function PreviewScripts() {
                     blockIndex,
                     blockType,
                     imageIndex,
-                    totalImagesInBlock
+                    totalImagesInBlock,
+                    shiftKey: e.shiftKey,
                 }, parentOrigin)
             }
         }
@@ -964,26 +996,28 @@ export function PreviewScripts() {
                     const hasSelection = sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
                     
                     if (hasSelection) {
-                        document.execCommand('styleWithCSS', false, 'true')
                         // For fontName, standard execCommand works fine with any string
                         if (cmd === 'fontName') {
+                            document.execCommand('styleWithCSS', false, 'true')
                             document.execCommand('fontName', false, val)
+                            document.execCommand('styleWithCSS', false, 'false')
                         } else {
-                            // execCommand('fontSize') strictly accepts 1-7. We use an unused size marker (7), then patch it natively.
-                            document.execCommand('fontSize', false, '7')
-                            currentEditingEl.querySelectorAll('font[size="7"], [style*="font-size: -webkit-xxx-large"]').forEach(el => {
-                                el.removeAttribute('size')
-                                ;(el as HTMLElement).style.fontSize = `${parseFloat(val)}px`
-                            })
+                            // execCommand('fontSize') strictly accepts 1-7. Use marker size 7
+                            // (as <font size=7>, no styleWithCSS), then rewrite markers to real px.
+                            const px = parseFontSizePx(val)
+                            if (px !== null) {
+                                document.execCommand('styleWithCSS', false, 'false')
+                                document.execCommand('fontSize', false, '7')
+                                patchFontSizeMarkers(currentEditingEl, px, sel?.rangeCount ? sel.getRangeAt(0) : null)
+                            }
                         }
-                        document.execCommand('styleWithCSS', false, 'false')
                     } else {
                         // Apply to entire element block if no specific selection
                         if (cmd === 'fontName') {
                             currentEditingEl.style.fontFamily = val
                         } else {
-                            const px = parseFloat(val)
-                            if (!isNaN(px) && px > 0) currentEditingEl.style.fontSize = `${px}px`
+                            const px = parseFontSizePx(val)
+                            if (px !== null) currentEditingEl.style.fontSize = `${px}px`
                         }
                     }
 
@@ -1172,6 +1206,30 @@ export function PreviewScripts() {
                         el.style.boxShadow = 'inset 0 0 0 2px #3b82f6'
                     }
                 }
+            }
+            // A copilot change shown on the canvas: scroll to the section (or menu / footer) and
+            // outline it for a moment. The editor sends it a few times while a page loads; the
+            // token makes only the first one that finds the element act.
+            // `hint` narrows it to the element inside (the button, the picture: lib/editor/reveal), `label`
+            // tags it ("AI changed · Hero · Button 1").
+            if (e.data?.type === 'AI_LOCATE') {
+                const { token, index, blockType, hint, label } = e.data as { token?: string; index?: number; blockType?: string; hint?: CanvasRevealHint; label?: string }
+                if (!token || token === lastLocateToken) return
+                const section = locateSection(index, blockType)
+                if (!section) return
+                lastLocateToken = token
+                const target = findRevealElement(section, hint ?? {})
+                scrollRevealIntoView(target)
+                showRevealRing(target, { label })
+                return
+            }
+            // A chat chip under the pointer: outline its element, no scroll, no tag; no index clears it.
+            if (e.data?.type === 'AI_HIGHLIGHT') {
+                const { index, hint } = e.data as { index?: number; hint?: CanvasRevealHint }
+                const section = typeof index === 'number' ? locateSection(index) : null
+                if (!section) return clearRevealRing()
+                showRevealRing(findRevealElement(section, hint ?? {}), { quiet: true, holdMs: Infinity })
+                return
             }
             if (e.data?.type === 'SCROLL_TO_BLOCK') {
                 const idx = e.data.index

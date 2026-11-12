@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
+import { generateOrderNumber } from '@/lib/orders/generate-order-number'
 import { getPayload } from 'payload'
+import { isTenantUnavailable } from '@/lib/storefront/store-availability'
 import config from '@payload-config'
 import { xenditCheckoutSchema } from '@/lib/validations/orders'
 import { createInvoice } from '@/lib/payment/xendit'
 import { XenditError } from '@/lib/payment/xendit-client'
+import { XENDIT_ENABLED } from '@/lib/payment/xendit-visibility'
 import { buildOrderItems } from '../stripe-checkout/build-order-items'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
@@ -46,6 +49,11 @@ function setCookieToken(res: NextResponse, orderId: string | number, orderNumber
  * Returns { type: 'redirect', sessionUrl: invoice_url }.
  */
 export async function POST(request: NextRequest) {
+    // GH-2132: temporarily disabled — reject before touching the body or DB
+    if (!XENDIT_ENABLED) {
+        return NextResponse.json({ success: false, error: { code: 'PAYMENT_METHOD_DISABLED', message: 'Xendit is not available for this store' } }, { status: 422 })
+    }
+
     const rawBody = await request.json().catch(() => null)
     if (!rawBody) {
         return NextResponse.json({ success: false, error: { code: 'INVALID_BODY', message: 'Request body is required' } }, { status: 400 })
@@ -73,7 +81,8 @@ export async function POST(request: NextRequest) {
 
         const tenantTyped = tenant as unknown as XenditTenantDoc
 
-        if (tenantTyped.status === 'suspended') {
+        // #2179: suspended (banned) or lapsed main subscription → no payment
+        if (await isTenantUnavailable(payload, { id: tenantId, status: tenantTyped.status })) {
             return NextResponse.json({ success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } }, { status: 403 })
         }
         if (!tenantTyped.xenditSecretKey) {
@@ -125,7 +134,7 @@ export async function POST(request: NextRequest) {
         const shippingFee = bestRate.priceSen / 100
         const tax = 0
         const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
-        const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
+        const orderNumber = generateOrderNumber()
         const magicLinkSecret = randomBytes(32).toString('hex')
 
         if (total <= 0) {

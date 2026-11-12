@@ -1,10 +1,12 @@
-import type { CollectionConfig, AccessResult } from 'payload'
+import type { CollectionConfig, AccessResult, FieldAccess } from 'payload'
 
 /**
  * F16-07 — Push Subscriptions Collection
  * Stores Web Push API subscription endpoints per user per tenant.
  * Each browser/device gets a unique subscription.
  */
+const superAdminField: FieldAccess = ({ req }) => Boolean(req.user?.roles?.includes('super-admin'))
+
 export const PushSubscriptions: CollectionConfig = {
   slug: 'push-subscriptions',
   hooks: {
@@ -53,6 +55,9 @@ export const PushSubscriptions: CollectionConfig = {
       relationTo: 'users',
       required: true,
       index: true,
+      // Set from the session on create; a PATCH re-pointing it would deliver another member's pushes to this
+      // browser (TC-PERF-134).
+      access: { update: superAdminField },
     },
     {
       name: 'tenant',
@@ -60,6 +65,9 @@ export const PushSubscriptions: CollectionConfig = {
       relationTo: 'tenants',
       required: true,
       index: true,
+      // Set from the session on create; a PATCH re-pointing it would deliver another member's pushes to this
+      // browser (TC-PERF-134).
+      access: { update: superAdminField },
     },
     {
       name: 'endpoint',

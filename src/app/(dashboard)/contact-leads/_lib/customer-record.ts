@@ -12,6 +12,15 @@ export interface CustomerRecord {
     status: CustomerStatus
     siteId: number | null
     createdAt: string
+    /** Emails the shop sent to this person from this message (contact-form only), oldest first. */
+    replies?: SentReply[]
+}
+
+export interface SentReply {
+    subject: string
+    body: string
+    sentAt: string
+    sentBy: string | null
 }
 
 export const CS_DB_TO_DISPLAY: Record<string, CustomerStatus> = {
@@ -54,7 +63,17 @@ export function mapContactSubmission(doc: Record<string, unknown>): CustomerReco
         status: CS_DB_TO_DISPLAY[(doc.status as string) ?? 'new'] ?? 'new',
         siteId: resolveSiteId(doc.site),
         createdAt: doc.createdAt as string,
+        replies: mapReplies(doc.replies),
     }
+}
+
+function mapReplies(raw: unknown): SentReply[] {
+    if (!Array.isArray(raw)) return []
+    return raw.flatMap((r) => {
+        const row = (r ?? {}) as Record<string, unknown>
+        if (typeof row.subject !== 'string' || typeof row.body !== 'string' || !row.sentAt) return []
+        return [{ subject: row.subject, body: row.body, sentAt: String(row.sentAt), sentBy: typeof row.sentBy === 'string' ? row.sentBy : null }]
+    })
 }
 
 export function mapSubscriber(doc: Record<string, unknown>): CustomerRecord {

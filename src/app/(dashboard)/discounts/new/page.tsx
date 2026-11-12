@@ -9,7 +9,7 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { DiscountForm } from '../_components/discount-form'
 
-export const metadata: Metadata = { title: 'New Discount | Web Store' }
+export const metadata: Metadata = { title: 'New Discount' }
 
 export default async function NewDiscountPage() {
     const user = await getCurrentUser()

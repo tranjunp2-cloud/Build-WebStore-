@@ -43,11 +43,18 @@ export async function POST(req: NextRequest) {
         const secretKey = new TextEncoder().encode(secret);
 
         let userId: string | number | undefined;
-        let origMfaVerified = true;
         try {
             const { payload } = await jwtVerify(rawToken, secretKey, { algorithms: ['HS256'] });
             userId = payload.id as string | number | undefined;
-            origMfaVerified = Boolean(payload.mfa_verified ?? true);
+            // Only an OTP / SSO session is renewed: a token without the proof never becomes one (TC-PERF-143).
+            if (payload.mfa_verified !== true) {
+                return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
+            }
+            // A support session opened through a merchant access link ends at its own expiry (4h); renewing it
+            // would turn it into a 24h merchant session without the record of who is acting (TC-F15.36).
+            if (payload.impersonated_by !== undefined) {
+                return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
+            }
         } catch {
             // Covers: expired, invalid signature, malformed
             return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
@@ -105,7 +112,7 @@ export async function POST(req: NextRequest) {
             id: user.id,
             email: user.email,
             collection: 'users',
-            mfa_verified: origMfaVerified,
+            mfa_verified: true,
         })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt(now)

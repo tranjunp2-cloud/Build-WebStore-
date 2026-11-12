@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { STOREFRONT_POPULATE } from '@/lib/cache/tenant'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { generateUploadToken, verifyConfirmToken } from '@/lib/orders/upload-token'
 import ConfirmClient, { type ConfirmOrder } from './ConfirmClient'
@@ -40,6 +41,7 @@ export default async function OrderConfirmPage({
         collection: 'sites',
         where: { tenant: { equals: tenant.id } },
         limit: 1,
+        populate: STOREFRONT_POPULATE,
         overrideAccess: true,
         depth: 1,
     })

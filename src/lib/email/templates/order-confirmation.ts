@@ -9,7 +9,7 @@
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
-import { xenditChannelLabel } from './shared/email-utils'
+import { formatDate, xenditChannelLabel } from './shared/email-utils'
 import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
@@ -69,17 +69,6 @@ function escapeHtml(s: string): string {
 function formatPrice(amount: number, currency: string, locale: EmailLocale): string {
     if (currency === 'MYR') return locale === 'ms' ? `RM${amount.toFixed(2)}` : `MYR ${amount.toFixed(2)}`
     return `${currency} ${amount.toFixed(2)}`
-}
-
-function formatDate(iso: string, locale: EmailLocale): string {
-    try {
-        return new Date(iso).toLocaleString(locale === 'ms' ? 'en-MY' : 'en-GB', {
-            weekday: 'long', year: 'numeric', month: 'long',
-            day: 'numeric', hour: '2-digit', minute: '2-digit',
-        })
-    } catch {
-        return iso
-    }
 }
 
 function buildAddress(addr: OrderConfirmationData['customerAddress']): string {

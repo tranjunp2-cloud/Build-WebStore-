@@ -5,6 +5,8 @@ import { notFound, redirect } from 'next/navigation'
 import PreviewPage from '@/app/(preview)/preview/[siteId]/page'
 import { getPayload } from 'payload'
 import { getCurrentUser } from '@/lib/auth'
+import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
+import { STOREFRONT_POPULATE } from '@/lib/cache/tenant'
 
 // ── Mocks ──────────────────────────────────────────────────────────
 
@@ -99,6 +101,38 @@ describe('PreviewPage — Security & Authorization', () => {
 
         // Assert
         expect(screen.getByText('Access Denied')).toBeInTheDocument()
+    })
+
+    it('allows access to preview for super-admin even if site tenant does not match user tenants', async () => {
+        // Arrange
+        mockedGetCurrentUser.mockResolvedValue({
+            id: 'admin-user',
+            roles: ['super-admin'],
+            tenants: [], // Super admin has platform-wide access
+        } as Partial<PlatformUser> as PlatformUser)
+
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+            id: siteId,
+            tenant: 'tenant-other',
+        })
+        .mockResolvedValueOnce({
+            id: 'page-456',
+            site: siteId,
+            layout: [],
+        })
+
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({
+            docs: [],
+        })
+
+        // Act
+        const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        render(Component as React.ReactElement)
+
+        // Assert
+        expect(screen.queryByText('Access Denied')).not.toBeInTheDocument()
+        expect(screen.getByTestId('site-renderer')).toBeInTheDocument()
     })
 
     // ── TC-F05-SEC-03: Authorized Access ──────────────────────────────
@@ -338,5 +372,43 @@ describe('[TC-F01-GH770] PreviewPage — builder parameter handling', () => {
 
         // Assert — Access denied should still be enforced
         expect(screen.getByText('Access Denied')).toBeInTheDocument()
+    })
+})
+
+describe('[TC-PERF-126] PreviewPage — tenant secrets never reach the preview payload', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('reads site and pages with the storefront populate and trims page.site.tenant', async () => {
+        // Arrange
+        vi.mocked(getCurrentUser).mockResolvedValue({
+            id: 'user-1',
+            tenants: [{ tenant: { id: 1 }, role: 'owner' }],
+        } as Partial<PlatformUser> as PlatformUser)
+        const fullTenant = { id: 1, name: 'Kedai', slug: 'kedai', status: 'active', xenditSecretKey: 'LEAKCANARY' }
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce({ id: 'site-1', tenant: { id: 1, name: 'Kedai', slug: 'kedai' } })
+            .mockResolvedValueOnce({ id: 'page-1', site: { id: 'site-1', tenant: fullTenant }, layout: [] })
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({ docs: [] })
+
+        // Act
+        const Component = await PreviewPage({
+            params: Promise.resolve({ siteId: 'site-1' }),
+            searchParams: Promise.resolve({ pageId: 'page-1' }),
+        })
+        render(Component as React.ReactElement)
+
+        // Assert
+        for (const [args] of (mockPayload.findByID as ReturnType<typeof vi.fn>).mock.calls) {
+            expect(args).toEqual(expect.objectContaining({ populate: STOREFRONT_POPULATE }))
+        }
+        for (const [args] of (mockPayload.find as ReturnType<typeof vi.fn>).mock.calls) {
+            if (args.collection === 'pages') expect(args).toEqual(expect.objectContaining({ populate: STOREFRONT_POPULATE }))
+        }
+        const props = vi.mocked(SiteRenderer).mock.calls[0][0] as { page: { site: { tenant: Record<string, unknown> } } }
+        expect(props.page.site.tenant).not.toHaveProperty('xenditSecretKey')
+        expect(props.page.site.tenant).toEqual(expect.objectContaining({ id: 1, slug: 'kedai' }))
     })
 })

@@ -16,9 +16,11 @@ interface Props {
     section: Section
     isSelected: boolean
     dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>
+    /** False hides reorder, hide, duplicate and delete. */
+    canEdit?: boolean
 }
 
-export function SectionCard({ section, isSelected, dragHandleProps }: Props) {
+export function SectionCard({ section, isSelected, dragHandleProps, canEdit = true }: Props) {
     const { select, duplicateSection, deleteSection, patchSection } = useBuilderStore()
     const blockMeta = getBlockBySlug(section.blockType)
     const icon      = blockMeta?.icon ?? '📦'
@@ -40,14 +42,16 @@ export function SectionCard({ section, isSelected, dragHandleProps }: Props) {
             {/* Hover overlay handle bar */}
             <div className="b-sec-handle">
                 {/* Drag grip */}
-                <button
-                    type="button"
-                    className="b-drag-grip"
-                    aria-label="Drag to reorder"
-                    {...dragHandleProps}
-                >
-                    ⋮⋮
-                </button>
+                {canEdit && (
+                    <button
+                        type="button"
+                        className="b-drag-grip"
+                        aria-label="Drag to reorder"
+                        {...dragHandleProps}
+                    >
+                        ⋮⋮
+                    </button>
+                )}
 
                 {/* Type pill */}
                 <span className="b-sec-type">
@@ -65,7 +69,7 @@ export function SectionCard({ section, isSelected, dragHandleProps }: Props) {
                 </span>
 
                 {/* Actions */}
-                <div className="b-sec-actions">
+                {canEdit && <div className="b-sec-actions">
                     <button
                         type="button"
                         title={isVisible ? 'Hide section' : 'Show section'}
@@ -93,7 +97,7 @@ export function SectionCard({ section, isSelected, dragHandleProps }: Props) {
                     >
                         <Trash2 size={12} />
                     </button>
-                </div>
+                </div>}
             </div>
 
             {/* Section body — abstract placeholder (no live render in MVP) */}

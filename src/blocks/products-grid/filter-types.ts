@@ -4,6 +4,8 @@ export interface ProductItem {
     name: string
     price: string
     priceRaw: number
+    /** variant prices differ: the card reads "From <price>" */
+    priceFrom?: boolean
     currency: string
     inventory: number
     compareAtPrice?: number
@@ -31,6 +33,8 @@ export interface AttributeFilter {
 }
 
 export interface ProductFilterBounds {
+    currency?: string
+    categoryIds?: string[]
     minPrice: number
     maxPrice: number
     attributes: AttributeFilter[]

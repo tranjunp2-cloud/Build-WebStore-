@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { useStudioCan } from '../../_components/studio-permissions-context'
 import type { PackDoc } from '../page'
 
 type Props = {
@@ -20,6 +21,9 @@ type Props = {
 }
 
 export function PackDetailDrawer({ pack, onClose, onUpdated, onDeleted }: Props) {
+    const can = useStudioCan()
+    const canEditPack = can('pack.edit')
+    const canDeletePack = can('pack.delete')
     const [saving, setSaving] = useState(false)
     const [deleting, setDeleting] = useState(false)
     const [editName, setEditName] = useState(pack.name)
@@ -72,7 +76,7 @@ export function PackDetailDrawer({ pack, onClose, onUpdated, onDeleted }: Props)
 
             <Tabs defaultValue="overview" className="pk-drawer-tabs">
                 <TabsList className="pk-drawer-tablist">
-                    {['overview', 'templates', 'edit'].map((t) => (
+                    {['overview', 'templates', ...(canEditPack || canDeletePack ? ['edit'] : [])].map((t) => (
                         <TabsTrigger key={t} value={t} className="pk-drawer-tab">
                             {t.charAt(0).toUpperCase() + t.slice(1)}
                         </TabsTrigger>
@@ -132,20 +136,24 @@ export function PackDetailDrawer({ pack, onClose, onUpdated, onDeleted }: Props)
                 <TabsContent value="edit" className="pk-drawer-body pk-drawer-body-edit">
                     <div className="pk-drawer-field">
                         <Label htmlFor="edit-name">Name</Label>
-                        <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                        <Input id="edit-name" value={editName} readOnly={!canEditPack} onChange={(e) => setEditName(e.target.value)} />
                     </div>
                     <div className="pk-drawer-field">
                         <Label htmlFor="edit-desc">Description</Label>
-                        <Textarea id="edit-desc" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={4} />
+                        <Textarea id="edit-desc" value={editDesc} readOnly={!canEditPack} onChange={(e) => setEditDesc(e.target.value)} rows={4} />
                     </div>
                     <div className="pk-drawer-edit-actions">
-                        <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || !editName.trim()}>
-                            {saving ? 'Saving…' : 'Save'}
-                        </button>
-                        <button className="btn btn-danger btn-sm" onClick={handleDelete} disabled={deleting}>
-                            <Trash2 size={13} />
-                            {deleting ? 'Deleting…' : 'Delete'}
-                        </button>
+                        {canEditPack && (
+                            <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || !editName.trim()}>
+                                {saving ? 'Saving…' : 'Save'}
+                            </button>
+                        )}
+                        {canDeletePack && (
+                            <button className="btn btn-danger btn-sm" onClick={handleDelete} disabled={deleting}>
+                                <Trash2 size={13} />
+                                {deleting ? 'Deleting…' : 'Delete'}
+                            </button>
+                        )}
                     </div>
                 </TabsContent>
             </Tabs>

@@ -49,8 +49,12 @@ export const OT_CSS = `
 .ot-payment-chip.paid .dot{background:var(--tl);}
 .ot-payment-chip.pending{background:var(--amb1);border-color:#f1d693;color:var(--ambfg);}
 .ot-payment-chip.pending .dot{background:var(--ambfg);animation:otDotPulse 1.6s ease-in-out infinite;}
-.ot-payment-chip.failed{background:#fef2f2;border-color:#fca5a5;color:#b91c1c;}
-.ot-payment-chip.failed .dot{background:#ef4444;}
+.ot-payment-chip.failed,.ot-payment-chip.cancelled{background:#fef2f2;border-color:#fca5a5;color:#b91c1c;}
+.ot-payment-chip.failed .dot,.ot-payment-chip.cancelled .dot{background:#ef4444;}
+.ot-payment-chip.refunded{background:#f5f3ff;border-color:#c4b5fd;color:#6d28d9;}
+.ot-payment-chip.refunded .dot{background:#7c3aed;}
+.ot-payment-chip.neutral{background:#f3f4f6;border-color:#d1d5db;color:#4b5563;}
+.ot-payment-chip.neutral .dot{background:#9ca3af;}
 @keyframes otDotPulse{0%,100%{box-shadow:0 0 0 0 rgba(138,92,10,.50);}50%{box-shadow:0 0 0 5px rgba(138,92,10,0);}}
 .ot-oh-meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--f3);}
 .ot-oh-meta>span{display:inline-flex;align-items:center;gap:6px;}
@@ -215,8 +219,6 @@ export const OT_CSS = `
 .ot-addr-phone{font-family:var(--mf);font-size:12px;color:var(--f3);margin-bottom:6px;}
 .ot-addr-lines{font-size:12.5px;color:var(--f2);line-height:1.55;}
 .ot-addr-lines em{font-style:normal;color:var(--f3);}
-.ot-addr-tag{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--tl5);border:1px solid var(--tl2);color:var(--tl7);align-self:flex-start;}
-.ot-addr-tag svg{width:11px;height:11px;}
 
 .ot-support-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 12px;border-radius:9px;font-size:12.5px;font-weight:700;border:1px solid var(--tl2);background:var(--card);color:var(--tl7);transition:all 140ms ease;white-space:nowrap;cursor:pointer;width:100%;}
 .ot-support-btn:hover{background:var(--tl5);border-color:var(--tl);}

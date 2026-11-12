@@ -212,15 +212,16 @@ describe('buildBlockFromLibrary — Plan 07 biz threading', () => {
   })
 
   describe('backward compatibility', () => {
-    it('canned-only path (no userBiz) behaves identically to legacy calls', () => {
-      const before = buildBlockFromLibrary('hero', 'restaurant', { seed: 42 }) as Record<string, unknown>
-      const after = buildBlockFromLibrary('hero', 'restaurant', { seed: 42, userBiz: {} }) as Record<string, unknown>
-      // Empty userBiz should NOT change the output.
-      expect(before.headline).toBe(after.headline)
-      expect(before.subheadline).toBe(after.subheadline)
+    it('gallery path (no userBiz) keeps the library sample; a merchant with no data never gets its identity (#2103 A1)', () => {
+      const gallery = buildBlockFromLibrary('hero', 'restaurant', { seed: 42 }) as Record<string, unknown>
+      const merchant = buildBlockFromLibrary('hero', 'restaurant', { seed: 42, userBiz: {} }) as Record<string, unknown>
+      // Gallery/preview callers still show the sample business.
+      expect(String(gallery.headline)).toContain('Siti Nasi Kandar')
+      // A real merchant (userBiz present, even empty) never sees the sample's name or description.
+      expect(`${merchant.headline} ${merchant.subheadline}`).not.toContain('Siti Nasi Kandar')
     })
 
-    it('testimonials + faq stay canned regardless of userBiz', () => {
+    it('testimonials is one invitation card and faq is skipped without facts, regardless of userBiz (#2103 A1)', () => {
       const testimonials = buildBlockFromLibrary('testimonials', 'restaurant', {
         seed: 42,
         userBiz: buildUserBiz(),
@@ -228,10 +229,10 @@ describe('buildBlockFromLibrary — Plan 07 biz threading', () => {
       const faq = buildBlockFromLibrary('faq', 'restaurant', {
         seed: 42,
         userBiz: buildUserBiz(),
-      }) as Record<string, unknown>
+      })
 
-      expect((testimonials.testimonials as unknown[])?.length).toBeGreaterThan(0)
-      expect((faq.faqs as unknown[])?.length).toBeGreaterThan(0)
+      expect((testimonials.testimonials as unknown[])?.length).toBe(1)
+      expect(faq).toBeNull()
     })
   })
 })

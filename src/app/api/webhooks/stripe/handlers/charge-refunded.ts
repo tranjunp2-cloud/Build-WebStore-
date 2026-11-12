@@ -7,6 +7,7 @@ import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 import { restockItem } from '../../../orders/lib/stock-utils'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
+import { refundEmailOrderLines } from '@/lib/orders/refund-email-order-lines'
 
 /**
  * Handles charge.refunded Stripe webhook event.
@@ -119,16 +120,7 @@ export async function handleChargeRefunded(
         customerEmail: order.customerEmail,
         customerPhone: order.customerPhone ?? null,
         customerAddress: order.shippingAddress ?? null,
-        items: (order.items ?? []).map((item: any) => ({
-            name: item.productName ?? item.name ?? '',
-            variant: item.variant ?? null,
-            quantity: item.quantity ?? 1,
-            unitPrice: item.unitPrice ?? 0,
-            lineTotal: item.lineTotal ?? 0,
-        })),
-        subtotal: order.subtotal ?? 0,
-        shippingFee: order.shippingFee ?? 0,
-        total: order.total ?? 0,
+        ...refundEmailOrderLines(order),
         refundAmount: (charge.amount_refunded ?? 0) / 100,
         paymentMethod: order.paymentMethod ?? 'stripe',
         orderDate: order.createdAt,

@@ -1295,6 +1295,135 @@ html[data-period-pending="1"] .dash-revamp .stream {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   TO DO (what needs attention) — row pattern mirrors PENDING ORDERS
+   ═══════════════════════════════════════════════════════════════════ */
+.dash-revamp .td-card {
+  overflow: hidden;
+}
+
+.dash-revamp .td-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-revamp .td-group + .td-group {
+  border-top: 1px solid var(--dr-line-2);
+}
+
+/* one label per group (Now / Waiting on you / This week): priority without a badge on every row */
+.dash-revamp .td-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 18px 4px;
+  color: var(--dr-ink-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dash-revamp .td-group-head span {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.dash-revamp .td-row {
+  display: grid;
+  grid-template-areas: "ico main actions";
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--dr-line-2);
+}
+
+.dash-revamp .td-list .td-row:last-child {
+  border-bottom: none;
+}
+
+.dash-revamp .td-ico {
+  grid-area: ico;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--dr-surface-2, rgba(255, 255, 255, 0.04));
+  color: var(--dr-ink-2);
+}
+
+.dash-revamp .td-ico svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dash-revamp .td-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dash-revamp .td-title {
+  color: var(--dr-ink-1);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dash-revamp .td-detail {
+  color: var(--dr-ink-3);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+/* the reason a task is urgent: coloured text inside the line, never a pill */
+.dash-revamp .td-fact[data-tone="late"] {
+  color: var(--dr-danger-fg);
+}
+
+.dash-revamp .td-fact[data-tone="near"] {
+  color: var(--dr-warning-fg);
+}
+
+.dash-revamp .td-actions {
+  grid-area: actions;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dash-revamp .td-more {
+  padding: 10px 18px 12px;
+  color: var(--dr-ink-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .dash-revamp .td-row {
+    grid-template-areas:
+      "ico main"
+      ". actions";
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 8px 12px;
+    padding: 12px 14px;
+  }
+
+  .dash-revamp .td-actions {
+    justify-self: start;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    SEO CARD / GAUGE
    ═══════════════════════════════════════════════════════════════════ */
 .dash-revamp .seo-card {

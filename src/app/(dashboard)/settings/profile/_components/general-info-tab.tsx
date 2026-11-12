@@ -85,7 +85,7 @@ export function GeneralInfoTab({ user, onUserUpdate }: Props) {
                         </Label>
                         <Input {...register('firstName')} />
                         {formState.errors.firstName && (
-                            <p className="text-xs text-destructive">{formState.errors.firstName.message}</p>
+                            <p className="text-xs text-destructive">{t.profile.errors.nameLength}</p>
                         )}
                     </div>
                     <div className="flex flex-col gap-2">
@@ -93,6 +93,9 @@ export function GeneralInfoTab({ user, onUserUpdate }: Props) {
                             {t.profile.general.lastName}
                         </Label>
                         <Input {...register('lastName')} />
+                        {formState.errors.lastName && (
+                            <p className="text-xs text-destructive">{t.profile.errors.nameLength}</p>
+                        )}
                     </div>
                 </div>
 

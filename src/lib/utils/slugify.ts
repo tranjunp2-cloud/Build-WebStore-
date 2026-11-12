@@ -1,25 +1,6 @@
-import type { Payload } from 'payload'
-import { pinyin } from 'pinyin-pro'
+import type { Payload, PayloadRequest } from 'payload'
 import transliterateSlug from 'slugify'
-import { toRomaji } from 'wanakana'
-
-function romanizeCjk(value: string): string {
-    return value.replace(
-        /[\u3040-\u309F]+|[\u30A0-\u30FF]+|[\u3400-\u4DBF\u4E00-\u9FFF]+/gu,
-        (run) => ` ${/[\u3040-\u30FF]/u.test(run)
-            ? toRomaji(run).replace(/([aeiou])\1+/gi, '$1')
-            : pinyin(run, { toneType: 'none', type: 'array' }).join(' ')} `,
-    )
-}
-
-function stableSlugSuffix(value: string): string {
-    let hash = 2166136261
-    for (const char of value.normalize('NFKC')) {
-        hash ^= char.codePointAt(0) ?? 0
-        hash = Math.imul(hash, 16777619)
-    }
-    return (hash >>> 0).toString(36).padStart(7, '0').slice(0, 7)
-}
+import { romanizeCjk, stableSlugSuffix } from './slug-romanize'
 
 /**
  * Convert business name to DNS-safe slug.
@@ -50,12 +31,14 @@ export async function ensureUniqueSlug(
     baseSlug: string,
     userId?: number | string,
     maxRetries = 5,
+    req?: Pick<PayloadRequest, 'transactionID'>,
 ): Promise<string> {
     let candidate = baseSlug
 
     for (let i = 0; i <= maxRetries; i++) {
         const existing = await payload.find({
             collection: 'tenants',
+            req,
             where: { slug: { equals: candidate } },
             limit: 1,
         })

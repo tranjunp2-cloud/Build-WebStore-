@@ -29,6 +29,16 @@ function findContactBlock(result: GenerationResult): Record<string, unknown> | u
   return topBlocks.find((b) => b.blockType === 'contact')
 }
 
+/** Every contact block across home + sub-pages (home padding can inject one too). */
+function allContactBlocks(result: GenerationResult): Array<Record<string, unknown>> {
+  type Page = { blocks?: Array<Record<string, unknown>> }
+  const pages = (result.pages ?? []) as unknown as Page[]
+  return [
+    ...pages.flatMap((p) => (p.blocks ?? []).filter((b) => b.blockType === 'contact')),
+    ...((result.blocks ?? []) as unknown as Array<Record<string, unknown>>).filter((b) => b.blockType === 'contact'),
+  ]
+}
+
 function ramenShopInfo(overrides: Partial<BusinessInfoInput> = {}): BusinessInfoInput {
   return {
     businessName: 'Ramen Ichiban',
@@ -68,7 +78,7 @@ describe('TC-F01-W.02 — buildContact user-first override', () => {
     expect(contact?.address).toBe('123 Jalan Bukit Bintang, 55100 KL')
   })
 
-  it('falls back to canned contact when user fields are empty', () => {
+  it('leaves contact empty on every page when user fields are empty (no canned sample leak)', () => {
     const info: BusinessInfoInput = {
       businessName: 'Solo Cafe',
       industry: 'restaurant',
@@ -77,13 +87,14 @@ describe('TC-F01-W.02 — buildContact user-first override', () => {
       // no phone/email/address
     }
     const result = composeFallbackResult('cafe', 42, 'en', info)
-    const contact = findContactBlock(result)
+    const contacts = allContactBlocks(result)
 
-    // Canned content kicks in — must be non-empty strings (some @, some digits).
-    expect(contact?.phone).toBeTruthy()
-    expect(typeof contact?.email).toBe('string')
-    expect((contact?.email as string).length).toBeGreaterThan(0)
-    expect((contact?.address as string).length).toBeGreaterThan(0)
+    expect(contacts.length).toBeGreaterThan(0)
+    for (const c of contacts) {
+      expect(c.phone || '').toBe('')
+      expect(c.email || '').toBe('')
+      expect(c.address || '').toBe('')
+    }
   })
 
   it('legacy string overload still works (backward compat)', () => {

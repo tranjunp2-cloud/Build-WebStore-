@@ -55,7 +55,7 @@ async function clearCollection(
  * - Resets user flags (has_seen_ai_wizard, otp)
  * - User redirects to /onboarding after reset
  */
-export async function POST() {
+export async function POST(req: Request) {
     try {
         // Double guard: server-side staging check
         assertStaging()
@@ -70,7 +70,7 @@ export async function POST() {
         const payload = await getPayload({ config })
 
         // Auth check
-        const user = await getCurrentUser()
+        const user = await getCurrentUser(req)
 
         if (!user) {
             return NextResponse.json(

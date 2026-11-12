@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { requireStudioAccess } from '@/lib/admin/auth-guard'
 import { BuilderShell } from './_components/builder-shell'
 import type { Section } from '@/lib/admin/builder-store'
 
@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function BuilderEditPage({ params }: PageProps) {
-    await requireSuperAdmin()
+    await requireStudioAccess()
     const { id } = await params
 
     const payload = await getPayload({ config })

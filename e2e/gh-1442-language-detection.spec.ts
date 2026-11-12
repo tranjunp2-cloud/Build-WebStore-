@@ -32,6 +32,10 @@ async function arrangeBuilder(page: Page): Promise<Record<string, unknown>[]> {
     })
 
     await page.goto('/builder/new')
+    // GH-2154: an account that already owns a site is redirected away from the builder.
+    if (new URL(page.url()).pathname.startsWith('/dashboard')) {
+        test.skip(true, 'GH-2154: account already owns a site; needs a no-site e2e account')
+    }
     return requests
 }
 

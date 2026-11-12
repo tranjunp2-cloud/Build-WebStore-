@@ -36,12 +36,20 @@ vi.mock('next/navigation', () => ({
     usePathname: () => '/editor/test-site-id',
 }))
 
+vi.mock('@tanstack/react-query', () => ({
+    queryOptions: (options: unknown) => options,
+    useQueryClient: () => ({
+        fetchQuery: ({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<unknown> }) =>
+            queryFn({ signal: new AbortController().signal }),
+    }),
+}))
+
 vi.mock('@/lib/analytics/track-event', () => ({
     trackEvent: vi.fn(),
 }))
 
-vi.mock('next/font/google', () => ({
-    Inter: () => ({
+vi.mock('next/font/local', () => ({
+    default: () => ({
         style: {
             fontFamily: 'Inter',
         },
@@ -65,6 +73,8 @@ vi.mock('@/i18n', () => ({
                     publishSuccess: 'Website đã live!',
                     publishSuccessDomain: 'Live at {domain}',
                     publishFailed: 'Publish thất bại',
+                    publishNeedsFix: 'Điền mục này trước khi publish',
+                    publishShowField: 'Xem',
                     saveSuccess: 'Đã lưu thành công!',
                     manualSaveSuccess: 'Saved!',
                     saveFailed: 'Lưu thất bại',
@@ -99,8 +109,21 @@ vi.mock('@/i18n', () => ({
     I18nProvider: ({ children }: any) => children,
 }))
 
+const previewFrameHarness = vi.hoisted(() => ({
+    messages: [] as Array<{ type: string; [key: string]: unknown }>,
+}))
+
 // Mock out heavy child components so we can focus on EditorPage's publish/save flows
-vi.mock('@/components/editor/PreviewFrame', () => ({ PreviewFrame: () => <div data-testid="preview-frame" /> }))
+vi.mock('@/components/editor/PreviewFrame', () => ({
+    PreviewFrame: (props: {
+        onHandleReady?: (handle: { sendToIframe: (message: { type: string; [key: string]: unknown }) => void }) => void
+    }) => {
+        props.onHandleReady?.({
+            sendToIframe: message => previewFrameHarness.messages.push(message),
+        })
+        return <div data-testid="preview-frame" />
+    },
+}))
 vi.mock('@/components/editor/EditorSidebar', () => ({ 
     EditorSidebar: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar">{children}</div> 
 }))
@@ -110,6 +133,7 @@ type EditorToolbarHarnessProps = {
     onSave: () => void
     onPublish: () => void
     onRepublish: () => void
+    onRedo: () => void
     onPageSelected: (pageId: string) => Promise<void>
 }
 
@@ -125,6 +149,7 @@ vi.mock('@/components/editor/EditorToolbar', () => ({
                 <button data-testid="save-btn" onClick={props.onSave} disabled={props.isSaving}>Save</button>
                 <button data-testid="publish-btn" onClick={props.onPublish}>Publish</button>
                 <button data-testid="republish-btn" onClick={props.onRepublish}>Update</button>
+                <button data-testid="redo-btn" onClick={props.onRedo}>Redo</button>
             </div>
         )
     },
@@ -210,6 +235,7 @@ beforeEach(() => {
     settingsPanelHarness.siteId = 'test-site-id'
     settingsPanelHarness.searchParams = ''
     editorToolbarHarness.latestProps = null
+    previewFrameHarness.messages = []
     
     Object.defineProperty(window, 'matchMedia', {
         writable: true,
@@ -269,6 +295,44 @@ beforeEach(() => {
 })
 
 describe('Publish and Save Flows (TC-F05)', () => {
+
+
+    it('keeps a redone template behind the save guard and fully syncs the preview', async () => {
+        const redo = vi.fn(() => {
+            useEditorStore.setState({
+                blocks: [{ id: 'hero-new', blockType: 'hero', headline: 'Redone hero' }],
+                headerBlock: { blockType: 'navigation', logoText: 'Redone header' },
+                footerBlock: { blockType: 'footer', copyrightText: 'Redone footer' },
+                globalBlocks: {
+                    cartWidget: { blockType: 'cartWidget', label: 'Cart' },
+                    whatsappButton: null,
+                    socialWidget: null,
+                },
+            })
+            // Redo reports the step it crossed
+            return { label: 'Apply template: Editorial', themeChanged: false, canvasTyped: false }
+        })
+        useEditorStore.setState({
+            autoSaveEnabled: true,
+            canRedo: () => true,
+            redoLabel: () => 'Apply template: Editorial',
+            redo,
+        })
+
+        render(<EditorPage />)
+        await waitFor(() => expect(screen.getByTestId('redo-btn')).toBeInTheDocument())
+        previewFrameHarness.messages = []
+        fireEvent.click(screen.getByTestId('redo-btn'))
+
+        expect(redo).toHaveBeenCalledOnce()
+        expect(useEditorStore.getState().autoSaveEnabled).toBe(false)
+        expect(previewFrameHarness.messages.map(message => message.type)).toEqual(expect.arrayContaining([
+            'UPDATE_FULL_LAYOUT',
+            'UPDATE_GLOBAL_BLOCKS',
+            'UPDATE_HEADER_BLOCK',
+            'UPDATE_FOOTER_BLOCK',
+        ]))
+    })
 
 
 afterEach(() => {
@@ -989,8 +1053,8 @@ afterEach(() => {
             expect(result).toBe(true)
         })
         expect(saveBodies).toEqual([
-            { contactInfo: { email: failedEmail } },
-            { contactInfo: { phone: nextPhone } },
+            { contactInfo: { email: failedEmail }, saveId: expect.any(String) },
+            { contactInfo: { phone: nextPhone }, saveId: expect.any(String) },
         ])
         expect(settingsPanelHarness.latestProps?.site?.contactInfo).toEqual({
             phone: nextPhone,
@@ -1086,8 +1150,8 @@ afterEach(() => {
             expect(result).toBe(true)
         })
         expect(saveBodies).toEqual([
-            { contactInfo: { email: 'first@example.com' } },
-            { contactInfo: { phone: '+60 12-222 2222' } },
+            { contactInfo: { email: 'first@example.com' }, saveId: expect.any(String) },
+            { contactInfo: { phone: '+60 12-222 2222' }, saveId: expect.any(String) },
         ])
     })
 
@@ -1261,7 +1325,7 @@ afterEach(() => {
         expect(failedResult).toBe(false)
         expect(retryResult).toBe(true)
         expect(saveBodies).toEqual([
-            { contactInfo: { email: 'second@example.com' } },
+            { contactInfo: { email: 'second@example.com' }, saveId: expect.any(String) },
         ])
     })
 
@@ -1312,6 +1376,39 @@ afterEach(() => {
         // The Unpublish action is now inside the dropdown menu (separated from Publish).
         // Testing the dropdown interaction requires Radix Portal rendering which is complex in JSDOM.
         // The unpublish API call itself is tested in src/__tests__/api/publish.test.ts
+    })
+
+    it('TC-F05.24: cancels the publish success flash timer when the editor unmounts', async () => {
+        // Arrange: record the "Published" flash timers (3s) and spy on clearTimeout
+        const realSetTimeout = window.setTimeout.bind(window)
+        const flashTimerIds: number[] = []
+        const setTimeoutSpy = vi.spyOn(window, 'setTimeout').mockImplementation(((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+            const id = realSetTimeout(handler, delay, ...args)
+            if (delay === 3000) flashTimerIds.push(id)
+            return id
+        }) as typeof window.setTimeout)
+        const clearSpy = vi.spyOn(window, 'clearTimeout')
+        try {
+            ;(global.fetch as any).mockImplementation((url: string | URL) => {
+                if (url.toString().includes('/publish')) return Promise.resolve({ ok: true, json: async () => ({ data: { url: 'https://coffee-shop.primeweb.app', domain: 'coffee-shop.primeweb.app' } }) })
+                return Promise.resolve({ ok: true, json: async () => ({}) })
+            })
+            const { unmount } = render(<EditorPage />)
+            await waitFor(() => expect(screen.getByTestId('toolbar')).toBeInTheDocument())
+            fireEvent.click(screen.getByTestId('publish-btn'))
+            fireEvent.click(await screen.findByRole('button', { name: /Publish now/i }))
+            await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Website đã live!'), expect.any(Object)))
+
+            // Act
+            unmount()
+
+            // Assert: the pending flash reset never outlives the editor
+            expect(flashTimerIds.length).toBeGreaterThan(0)
+            expect(flashTimerIds.some(id => clearSpy.mock.calls.some(call => call[0] === id))).toBe(true)
+        } finally {
+            setTimeoutSpy.mockRestore()
+            clearSpy.mockRestore()
+        }
     })
 
     it('[GH-1640] saves a revision created while publish is flushing before publishing', async () => {
@@ -2111,8 +2208,9 @@ afterEach(() => {
             await setupAndClickPublish()
 
             await waitFor(() => {
+                // a field to fill is a fix, not a retry [TC-AIWB-66]
                 expect(toast.error).toHaveBeenCalledWith(
-                    'Publish thất bại',
+                    'Điền mục này trước khi publish',
                     expect.objectContaining({ description: 'WhatsApp Phone Number: This field is required' })
                 )
             })
@@ -2139,8 +2237,9 @@ afterEach(() => {
             await setupAndClickPublish()
 
             await waitFor(() => {
+                // a field to fill is a fix, not a retry [TC-AIWB-66]
                 expect(toast.error).toHaveBeenCalledWith(
-                    'Publish thất bại',
+                    'Điền mục này trước khi publish',
                     expect.objectContaining({ description: 'About Us → Portfolio → Project 5 → title: This field is required.' })
                 )
             })

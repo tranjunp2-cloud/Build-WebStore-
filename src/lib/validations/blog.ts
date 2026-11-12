@@ -34,11 +34,12 @@ export const updateBlogSchema = z.object({
 // --- Blog Category Schemas ---
 
 export const createCategorySchema = z.object({
-    name: z.string().min(1, 'Category name is required').max(100),
+    // trim first: a name of only spaces has no slug and must not reach the database (GH-2317)
+    name: z.string().trim().min(1, 'Category name is required').max(100),
 })
 
 export const updateCategorySchema = z.object({
-    name: z.string().min(1).max(100).optional(),
+    name: z.string().trim().min(1).max(100).optional(),
 })
 
 // Type exports

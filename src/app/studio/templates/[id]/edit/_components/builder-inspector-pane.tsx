@@ -38,10 +38,11 @@ function InspectorEmpty() {
 
 // ── Variant tab ───────────────────────────────────────────────────────────────
 
-function VariantTab({ variants, currentVariant, onSelect }: {
+function VariantTab({ variants, currentVariant, onSelect, canEdit }: {
     variants: string[]
     currentVariant: string
     onSelect: (v: string) => void
+    canEdit: boolean
 }) {
     return (
         <>
@@ -55,8 +56,8 @@ function VariantTab({ variants, currentVariant, onSelect }: {
                         role="button"
                         tabIndex={0}
                         className={'b-variant-card' + (currentVariant === v ? ' active' : '')}
-                        onClick={() => onSelect(v)}
-                        onKeyDown={(e) => e.key === 'Enter' && onSelect(v)}
+                        onClick={canEdit ? () => onSelect(v) : undefined}
+                        onKeyDown={canEdit ? (e) => e.key === 'Enter' && onSelect(v) : undefined}
                     >
                         <div className="b-variant-preview" />
                         <div className="b-variant-name">{v}</div>
@@ -74,9 +75,10 @@ function VariantTab({ variants, currentVariant, onSelect }: {
 
 // ── Settings tab ──────────────────────────────────────────────────────────────
 
-function SettingsTab({ visible, onToggleVisible }: {
+function SettingsTab({ visible, onToggleVisible, canEdit }: {
     visible: boolean
     onToggleVisible: () => void
+    canEdit: boolean
 }) {
     return (
         <>
@@ -91,8 +93,8 @@ function SettingsTab({ visible, onToggleVisible }: {
                             tabIndex={0}
                             className={'b-switch' + (visible ? ' on' : '')}
                             style={{ marginLeft: 'auto' }}
-                            onClick={onToggleVisible}
-                            onKeyDown={(e) => e.key === 'Enter' && onToggleVisible()}
+                            onClick={canEdit ? onToggleVisible : undefined}
+                            onKeyDown={canEdit ? (e) => e.key === 'Enter' && onToggleVisible() : undefined}
                         />
                     </div>
                 </div>
@@ -131,9 +133,10 @@ type AiTabProps = {
     aiVisible: boolean
     templateId: number
     existingOverride: BlockPromptOverride | null
+    canEdit: boolean
 }
 
-function AiTab({ blockSlug, aiVisible, templateId, existingOverride }: AiTabProps) {
+function AiTab({ blockSlug, aiVisible, templateId, existingOverride, canEdit }: AiTabProps) {
     const { setBlockPromptOverride } = useBuilderStore()
     const [expanded, setExpanded] = useState(existingOverride !== null)
     const [promptValue, setPromptValue] = useState(existingOverride?.prompt ?? '')
@@ -253,12 +256,13 @@ function AiTab({ blockSlug, aiVisible, templateId, existingOverride }: AiTabProp
                             placeholder={`e.g. "Generate hero for a B2B SaaS product — focus on ROI and efficiency…"`}
                             value={promptValue}
                             maxLength={4000}
+                            readOnly={!canEdit}
                             onChange={(e) => setPromptValue(e.target.value)}
                         />
                         <div style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'right' }}>
                             {promptValue.length}/4000
                         </div>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {canEdit && <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                             <button
                                 className="b-btn"
                                 style={{ height: 28, padding: '0 12px', fontSize: 11 }}
@@ -282,7 +286,7 @@ function AiTab({ blockSlug, aiVisible, templateId, existingOverride }: AiTabProp
                                     {saveMsg}
                                 </span>
                             )}
-                        </div>
+                        </div>}
                         {liveOverride?.updatedAt && (
                             <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
                                 Last saved:{' '}
@@ -302,9 +306,11 @@ function AiTab({ blockSlug, aiVisible, templateId, existingOverride }: AiTabProp
 interface BuilderInspectorPaneProps {
     onOpenBlockDetail?: (slug: string) => void
     templateId?: number
+    /** False makes every field, variant, visibility switch and prompt override read-only. */
+    canEdit?: boolean
 }
 
-export function BuilderInspectorPane({ onOpenBlockDetail, templateId }: BuilderInspectorPaneProps = {}) {
+export function BuilderInspectorPane({ onOpenBlockDetail, templateId, canEdit = true }: BuilderInspectorPaneProps = {}) {
     const [tab, setTab] = useState<Tab>('content')
     const [collapsed, setCollapsed] = useState(false)
     const { sections, selectedId, updateSelected, blockPromptOverrides, templateId: storeTemplateId } = useBuilderStore()
@@ -471,6 +477,7 @@ export function BuilderInspectorPane({ onOpenBlockDetail, templateId }: BuilderI
                                         spec={spec}
                                         value={section.config[spec.name]}
                                         onChange={(val) => updateSelected({ [spec.name]: val })}
+                                        readOnly={!canEdit}
                                     />
                                 ))}
                             </div>
@@ -498,12 +505,14 @@ export function BuilderInspectorPane({ onOpenBlockDetail, templateId }: BuilderI
                         variants={blockMeta.variants}
                         currentVariant={section.config['variant'] as string ?? blockMeta.defaultVariant}
                         onSelect={(v) => updateSelected({ variant: v })}
+                        canEdit={canEdit}
                     />
                 )}
 
                 {/* ── Settings tab ── */}
                 {tab === 'settings' && (
                     <SettingsTab
+                        canEdit={canEdit}
                         visible={section.config['visible'] !== false}
                         onToggleVisible={() =>
                             updateSelected({ visible: !(section.config['visible'] !== false) })
@@ -518,6 +527,7 @@ export function BuilderInspectorPane({ onOpenBlockDetail, templateId }: BuilderI
                         aiVisible={blockMeta.aiVisible}
                         templateId={resolvedTemplateId}
                         existingOverride={blockPromptOverrides[section.blockType] ?? null}
+                        canEdit={canEdit}
                     />
                 )}
             </div>

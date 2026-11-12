@@ -192,12 +192,16 @@ export function generateBreadcrumbSchema(
 
     const pageName = getOptionalString(currentPage.name) || getOptionalString(currentPage.slug) || ''
     const pageSlug = getOptionalString(currentPage.slug) || ''
-    if (pageName && pageSlug !== 'home') {
+    // GH-2100: homepage slug may be '/' (encoded '/%2F') — treat '', '/', 'home' as the root
+    const isRootSlug = pageSlug === '' || pageSlug === 'home' || /^\/+$/.test(pageSlug)
+    if (pageName && !isRootSlug) {
+        // Encode per segment so nested slugs keep their '/' separators
+        const path = pageSlug.split('/').filter(Boolean).map(encodeURIComponent).join('/')
         items.push({
             '@type': 'ListItem',
             position: 2,
             name: pageName,
-            item: `${baseUrl}/${encodeURIComponent(pageSlug)}`,
+            item: `${baseUrl}/${path}`,
         })
     }
 
@@ -390,14 +394,16 @@ export function generatePageSchemas({ blocks, site, page, isHomepage }: PageSche
     const artifact = isHomepage ? generateSchemaGenerationArtifact(site) : null
 
     try {
-        // BreadcrumbList — every page
+        // BreadcrumbList — non-homepage pages (a homepage trail is just "Home", GH-2100)
         const safeBlocks = Array.isArray(blocks)
             ? (blocks as unknown[]).filter(isBlockData)
             : []
 
         const siteDomain = getOptionalString(site?.domain)
-        const breadcrumb = generateSafely('Breadcrumb', () => generateBreadcrumbSchema(null, page, normalizeHttpUrl(siteDomain) || ''))
-        if (breadcrumb) schemas.push(breadcrumb)
+        if (!isHomepage) {
+            const breadcrumb = generateSafely('Breadcrumb', () => generateBreadcrumbSchema(null, page, normalizeHttpUrl(siteDomain) || ''))
+            if (breadcrumb) schemas.push(breadcrumb)
+        }
 
         // Organization + WebSite — homepage only
         if (isHomepage) {

@@ -39,14 +39,8 @@ export function validateCategoryContent(content: CategoryContent): {
       `Need at least 4 businesses, got ${content.businesses.length}`
     )
   }
-  if (content.testimonials.length < 3) {
-    errors.push(
-      `Need at least 3 testimonials, got ${content.testimonials.length}`
-    )
-  }
-  if (content.faqItems.length < 3) {
-    errors.push(`Need at least 3 FAQ items, got ${content.faqItems.length}`)
-  }
+  // #2103 A1: testimonials / faqItems are intentionally empty — those blocks are built from
+  // the merchant's own facts, never from the library. No minimum is enforced for them.
 
   // Check locale
   if (content.locale !== 'en-MY') {

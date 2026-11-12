@@ -86,7 +86,7 @@ describe('GET /api/orders/[id] [TC-F10]', () => {
     })
 
     it('returns order details', async () => {
-        mockFindByID.mockResolvedValue({ id: 'order-1', orderNumber: 'ORD-001', status: 'pending' })
+        mockFindByID.mockResolvedValue({ id: 'order-1', tenant: 'tenant-1', orderNumber: 'ORD-001', status: 'pending' })
 
         const req = new Request('http://localhost')
         const res = await GET(req, ctx as any)

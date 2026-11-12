@@ -214,6 +214,8 @@ describe('Category Deduplication (TC-F08-05-05)', () => {
                 data: { name: 'Shirts', parent: 456, tenant: 'tenant-456' },
                 user: mockCurrentUser,
                 overrideAccess: false,
+                depth: 1,
+                populate: { tenants: { name: true, slug: true }, sites: { name: true } },
             })
             expect(result).toEqual({ id: 'new-cat-123', name: 'Shirts' })
         })

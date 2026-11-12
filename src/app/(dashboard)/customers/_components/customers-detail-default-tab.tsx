@@ -185,13 +185,14 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                 {/* Stats card */}
                 <div className="rounded-[14px] overflow-hidden" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
                     {[
-                        { k: cd.statTotalOrder,    v: String(original.orderCount) },
-                        { k: cd.statTotalSpending, v: fmtCurrency(original.lifetime) },
-                        { k: cd.statCompleteRate,  v: `${original.completedRate}%` },
-                        { k: cd.statFailedRate,    v: `${original.failedRate}%` },
-                    ].map(({ k, v }, i) => (
+                        { k: cd.statTotalOrder,    v: String(original.orderCount), hint: undefined },
+                        { k: cd.statTotalSpending, v: fmtCurrency(original.lifetime), hint: cd.statTotalSpendingHint },
+                        { k: cd.statCompleteRate,  v: `${original.completedRate}%`, hint: cd.statRateHint },
+                        { k: cd.statFailedRate,    v: `${original.failedRate}%`, hint: cd.statRateHint },
+                    ].map(({ k, v, hint }, i) => (
                         <div
                             key={k}
+                            title={hint}
                             className="flex flex-col gap-1 px-4 py-3"
                             style={{ borderTop: i > 0 ? '1px solid var(--cus-border-subtle)' : undefined }}
                         >
@@ -208,11 +209,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                         {cd.autoLinkTitle}
                     </h3>
                     <p style={{ margin: 0, fontSize: 12, color: 'var(--cus-text-faint)', lineHeight: 1.6 }}>
-                        {cd.autoLinkBody.split('{hook}')[0]}
-                        <code className="font-mono px-1 py-0.5 rounded-[3px]" style={{ fontSize: 11, background: 'var(--cus-code-bg)', color: 'var(--cus-code-fg)', border: '1px solid var(--cus-code-border)' }}>
-                            autoLinkCustomer
-                        </code>
-                        {cd.autoLinkBody.split('{hook}')[1] ?? ''}
+                        {cd.autoLinkBody}
                     </p>
                 </div>
             </div>

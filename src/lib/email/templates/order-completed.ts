@@ -7,6 +7,7 @@ import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
 import type { EmailTemplateConfig } from '../types'
+import { formatDate } from './shared/email-utils'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -39,6 +40,9 @@ export interface OrderCompletedData {
     shippingFee: number
     total: number
     paymentMethod: string
+    /** When the buyer placed the order (ISO) */
+    orderDate: string
+    /** When the order was marked completed (ISO) */
     completedDate: string
     orderPageUrl: string
     currency: string
@@ -59,17 +63,6 @@ function escapeHtml(s: string): string {
 function formatPrice(amount: number, currency: string, locale: EmailLocale): string {
     if (currency === 'MYR') return locale === 'ms' ? `RM${amount.toFixed(2)}` : `MYR ${amount.toFixed(2)}`
     return `${currency} ${amount.toFixed(2)}`
-}
-
-function formatDate(iso: string, locale: EmailLocale): string {
-    try {
-        return new Date(iso).toLocaleString(locale === 'ms' ? 'en-MY' : 'en-GB', {
-            weekday: 'long', year: 'numeric', month: 'long',
-            day: 'numeric', hour: '2-digit', minute: '2-digit',
-        })
-    } catch {
-        return iso
-    }
 }
 
 function buildAddress(addr: OrderCompletedData['customerAddress']): string {
@@ -225,7 +218,7 @@ export function orderCompletedEmail(data: OrderCompletedData, config?: EmailTemp
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
                 <tr>
                   <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderDate}</td>
-                  <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.completedDate, locale)}</td>
+                  <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.orderDate, locale)}</td>
                 </tr>
               </table>
             </td>

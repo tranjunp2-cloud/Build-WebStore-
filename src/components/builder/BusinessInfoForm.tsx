@@ -3,14 +3,17 @@
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Pencil, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { BuilderField } from '@/components/builder/fields/BuilderField'
 import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
 import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
 import { BuilderSubmitButton } from '@/components/builder/fields/BuilderSubmitButton'
 import { BuilderTextInput } from '@/components/builder/fields/BuilderTextInput'
 import { BuilderTextarea } from '@/components/builder/fields/BuilderTextarea'
-import { BuilderPromoCard } from '@/components/builder/onboarding/BuilderPromoCard'
+import { BuilderBlueprintPreview } from '@/components/builder/onboarding/BuilderBlueprintPreview'
+import type { BlueprintField } from '@/components/builder/onboarding/builder-blueprint-styles'
+import { getIndustryIcon } from '@/components/builder/fields/industry-icons'
+import { getPreviewSiteHost } from '@/components/builder/builder-site-host'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
 import { useI18n } from '@/i18n'
@@ -40,7 +43,6 @@ type ExtractionResult = {
     confidence: 'high' | 'medium' | 'low'
 }
 
-const BUILDER_TEXTAREA_BADGE_URL = '/assets/builder/builder-textarea-badge.svg'
 const BUILDER_TEXTAREA_HINT_ICON_URL = '/assets/builder/builder-hint-icon.svg'
 
 interface BusinessInfoFormProps {
@@ -50,6 +52,27 @@ interface BusinessInfoFormProps {
     isGenerating?: boolean
     initialValues?: Partial<BusinessInfo> | null
 }
+
+/**
+ * The form has no optional facts fields (#2176: matches the approved prototype #2042), so values an
+ * older draft may still carry (how customers buy, areas served, shop facts) never leave the form.
+ */
+function withoutOptionalFacts(info: BusinessInfo): BusinessInfo {
+    const { buyingMethods: _buying, serviceArea: _area, shopFacts: _facts, ...rest } = info
+    return rest
+}
+
+/** How many real items of a list the extraction found on the page. */
+function countExtracted(referenceContent: Record<string, unknown> | undefined, key: string): number {
+    const list = referenceContent?.[key]
+    return Array.isArray(list) ? list.length : 0
+}
+
+type ValidatedField = 'businessName' | 'industry' | 'products' | 'shortDescription'
+
+// On-screen order: the first invalid field in this list gets focus when Generate is clicked.
+const VALIDATED_FIELDS: ValidatedField[] = ['businessName', 'industry', 'products', 'shortDescription']
+const MIN_TEXT_LENGTH = 3
 
 const DEFAULT_FORM: BusinessInfo = {
     businessName: '',
@@ -69,12 +92,22 @@ export default function BusinessInfoForm({
     const setBusinessInfo = useBuilderStore((s) => s.setBusinessInfo)
     const setBusinessInfoDraft = useBuilderStore((s) => s.setBusinessInfoDraft)
     const setContentBrief = useBuilderStore((s) => s.setContentBrief)
-    const { t } = useI18n()
+    const { t, ti } = useI18n()
+
+    const industryLabel = (value: string) => {
+        const i18nLabels = (t.onboarding.form as Record<string, unknown>).industryOptions as Record<string, string> | undefined
+        return i18nLabels?.[value] || industryOptions.find((option) => option.value === value)?.label || value
+    }
 
     const [form, setForm] = useState<BusinessInfo>({ ...DEFAULT_FORM, ...initialValues })
     const [errors, setErrors] = useState<Record<string, string>>({})
     const [industryOptions, setIndustryOptions] = useState<IndustryOption[]>([])
     const [isLoadingIndustries, setIsLoadingIndustries] = useState(true)
+    // Drives the live blueprint on the right: focused field glows, hovered industry previews.
+    const [focusedField, setFocusedField] = useState<BlueprintField | null>(null)
+    // Only a real mouse hovering the industry grid previews an option (see previewIndustry below).
+    const [hoveredIndustry, setHoveredIndustry] = useState<string | null>(null)
+    const blurField = () => setFocusedField(null)
 
     // Slug picker state (F23)
     const [chosenSlug, setChosenSlug] = useState('')
@@ -87,7 +120,9 @@ export default function BusinessInfoForm({
         setSlugAvailable(available)
     }, [])
 
-    // URL extraction state
+    // URL extraction state. Hidden on purpose (5fac488e9, #1357, #2176): nothing switches `inputMode` to 'url', so the
+    // import section below (`urlInputSection`, `handleSwitchToManual`, ExtractionReview) is kept but never rendered.
+    // To bring the link import back, render a tab that calls setInputMode('url') and show `urlInputSection` for it.
     const [inputMode, setInputMode] = useState<'manual' | 'url'>('manual')
     const [urlValue, setUrlValue] = useState('')
     const [urlExtracting, setUrlExtracting] = useState(false)
@@ -96,12 +131,54 @@ export default function BusinessInfoForm({
     const [showReview, setShowReview] = useState(false)
     const abortControllerRef = useRef<AbortController | null>(null)
 
-    const isFormReady =
-        form.businessName.trim().length >= 3 &&
-        form.industry.trim().length > 0 &&
-        form.shortDescription.trim().length >= 3 &&
-        form.products.trim().length >= 3 &&
-        slugAvailable // true by default; only false if user entered an unavailable slug
+    const formRef = useRef<HTMLFormElement>(null)
+
+    // Empty or spaces only → the field's "required" message; 1–2 characters → the min-length message.
+    const getFieldError = (field: ValidatedField, value: string): string | undefined => {
+        const messages = t.onboarding.form.errors
+        const trimmed = value.trim()
+        if (!trimmed) return messages[field]
+        if (field !== 'industry' && trimmed.length < MIN_TEXT_LENGTH) return messages.minLength.replace('{count}', String(MIN_TEXT_LENGTH))
+        return undefined
+    }
+
+    const setFieldError = (field: ValidatedField, value: string) => {
+        const message = getFieldError(field, value)
+        setErrors((current) => {
+            if (current[field] === message) return current
+            const next = { ...current }
+            if (message) next[field] = message
+            else delete next[field]
+            return next
+        })
+    }
+
+    // Leaving a text field shows its error right away (#2159).
+    const handleTextBlur = (field: ValidatedField, value: string) => {
+        blurField()
+        setFieldError(field, value)
+    }
+
+    // While typing, only a field that already shows an error is re-checked, so it clears once fixed.
+    const handleTextChange = (field: ValidatedField, value: string) => {
+        setForm((current) => ({ ...current, [field]: value }))
+        if (errors[field]) setFieldError(field, value)
+        // SlugPicker unmounts below the minimum, so its last answer no longer applies. Without this reset a
+        // stale "taken" could block Generate with no message once the picker skips its first check again.
+        if (field === 'businessName' && value.trim().length < MIN_TEXT_LENGTH) {
+            setSlugAvailable(true)
+            setChosenSlug('')
+        }
+    }
+
+    const focusField = (field: ValidatedField | 'slug') => {
+        const wrapper = formRef.current?.querySelector<HTMLElement>(`[data-field="${field}"]`)
+        if (!wrapper) return
+        // Text fields carry data-field themselves; the industry grid and slug picker wrap their controls.
+        const control = wrapper.matches('input, textarea') ? wrapper : wrapper.querySelector<HTMLElement>('input, button')
+        if (control) control.focus()
+        else wrapper.scrollIntoView?.({ block: 'center' }) // e.g. industry options not loaded
+    }
 
     useEffect(() => {
         let isMounted = true
@@ -145,6 +222,8 @@ export default function BusinessInfoForm({
             ...DEFAULT_FORM,
             ...initialValues,
         })
+        // New values (e.g. a recovered draft) — drop messages that described the old ones.
+        setErrors({})
     }, [
         initialValues?.businessName,
         initialValues?.shortDescription,
@@ -153,16 +232,17 @@ export default function BusinessInfoForm({
         initialValues?.language,
     ])
 
-    const validate = (): boolean => {
+    /** Shows every field error at once; returns the first invalid field (on-screen order), or null. */
+    const validate = (): ValidatedField | null => {
         const nextErrors: Record<string, string> = {}
 
-        if (form.businessName.trim().length < 3) nextErrors.businessName = t.onboarding.form.errors.businessName
-        if (!form.industry) nextErrors.industry = t.onboarding.form.errors.industry
-        if (form.shortDescription.trim().length < 3) nextErrors.shortDescription = t.onboarding.form.errors.shortDescription
-        if (form.products.trim().length < 3) nextErrors.products = t.onboarding.form.errors.products
+        for (const field of VALIDATED_FIELDS) {
+            const message = getFieldError(field, form[field])
+            if (message) nextErrors[field] = message
+        }
 
         setErrors(nextErrors)
-        return Object.keys(nextErrors).length === 0
+        return VALIDATED_FIELDS.find((field) => nextErrors[field]) ?? null
     }
 
     const handleSubmit = (e: FormEvent) => {
@@ -171,13 +251,24 @@ export default function BusinessInfoForm({
     }
 
     const submitForm = () => {
-        if (!validate() || isGenerating) return
+        if (isGenerating) return
 
-        const payload: BusinessInfo = {
+        const firstInvalid = validate()
+        if (firstInvalid) {
+            focusField(firstInvalid)
+            return
+        }
+        // A taken/invalid slug: SlugPicker shows its own message — bring it into view.
+        if (!slugAvailable) {
+            focusField('slug')
+            return
+        }
+
+        const payload: BusinessInfo = withoutOptionalFacts({
             ...form,
             ...(extractionResult ? { businessUrl: urlValue, source: 'url' as const } : { source: 'form' as const }),
             ...(chosenSlug ? { slug: chosenSlug } : {}),
-        }
+        })
 
         if (onSubmit) {
             onSubmit(payload)
@@ -374,22 +465,9 @@ export default function BusinessInfoForm({
 
     // ── Render ───────────────────────────────────────────────────────────
 
-    const toggleTabs = (
-        <div className="mb-6 flex" role="tablist" aria-label="Input method selection">
-            <button
-                role="tab"
-                aria-selected={true}
-                className="flex-1 px-4 py-3 text-sm font-medium transition-colors rounded-2xl bg-blue-500/15 text-blue-400 font-semibold"
-                type="button"
-            >
-                <span className="inline-flex items-center justify-center gap-2">
-                    <Pencil className="h-4 w-4 shrink-0" aria-hidden />
-                    {t.onboarding.form.tabManual}
-                </span>
-            </button>
-        </div>
-    )
-
+    // No input-method tabs: the URL import tab stays hidden (5fac488e9, #1357) and a lone
+    // "Describe business" tab did nothing, so the form starts at the first field (#2176).
+    // Kept for the hidden link import (see `inputMode`): defined, not rendered.
     const urlInputSection = (
         <div id="panel-url" role="tabpanel" aria-labelledby="tab-url">
             <BuilderField label={t.onboarding.form.urlLabel} required>
@@ -457,14 +535,16 @@ export default function BusinessInfoForm({
                             shortDescription: extractionResult.shortDescription || '',
                             products: extractionResult.products || '',
                         }}
+                        faqCount={countExtracted(extractionResult.referenceContent, 'faqItems')}
+                        testimonialCount={countExtracted(extractionResult.referenceContent, 'testimonials')}
                         onApply={(data) => {
-                            const payload: BusinessInfo = {
+                            const payload: BusinessInfo = withoutOptionalFacts({
                                 ...form,
                                 ...data,
                                 businessUrl: urlValue,
                                 source: 'url',
                                 ...(chosenSlug ? { slug: chosenSlug } : {}),
-                            }
+                            })
                             setShowReview(false)
                             if (onSubmit) {
                                 onSubmit(payload)
@@ -508,7 +588,8 @@ export default function BusinessInfoForm({
 
     const formFields = (
         <div>
-            <form onSubmit={handleSubmit}>
+            {/* focus moving anywhere in the form (Tab, a field, a card) ends an industry hover preview */}
+            <form onFocusCapture={() => setHoveredIndustry(null)} onSubmit={handleSubmit} ref={formRef}>
                 <div className="flex flex-col gap-6">
                     {errorMessage ? (
                         <div className="rounded-2xl border border-[rgba(248,113,113,0.35)] bg-[rgba(127,29,29,0.18)] px-4 py-3 text-sm text-[#fecaca]">
@@ -516,7 +597,7 @@ export default function BusinessInfoForm({
                             {onRetry ? (
                                 <button
                                     className="mt-3 text-sm font-semibold text-white transition-colors hover:text-[#bfdbfe]"
-                                    onClick={() => onRetry(form)}
+                                    onClick={() => onRetry(withoutOptionalFacts(form))}
                                     type="button"
                                 >
                                     {t.onboarding.form.retryWithCurrent}
@@ -534,7 +615,10 @@ export default function BusinessInfoForm({
                     >
                         <BuilderTextInput
                             invalid={!!errors.businessName}
-                            onChange={(e) => setForm((current) => ({ ...current, businessName: e.target.value }))}
+                            data-field="businessName"
+                            onBlur={(e) => handleTextBlur('businessName', e.target.value)}
+                            onChange={(e) => handleTextChange('businessName', e.target.value)}
+                            onFocus={() => setFocusedField('businessName')}
                             placeholder={t.onboarding.form.businessNamePlaceholder}
                             type="text"
                             value={form.businessName}
@@ -542,12 +626,14 @@ export default function BusinessInfoForm({
                     </BuilderField>
 
                     {/* F23: Slug picker — auto-generate from business name */}
-                    {form.businessName.trim().length >= 3 && (
-                        <SlugPicker
-                            businessName={form.businessName}
-                            onSlugChange={handleSlugChange}
-                            skipInitialCheck={!!initialValues?.businessName}
-                        />
+                    {form.businessName.trim().length >= MIN_TEXT_LENGTH && (
+                        <div data-field="slug">
+                            <SlugPicker
+                                businessName={form.businessName}
+                                onSlugChange={handleSlugChange}
+                                skipInitialCheck={!!initialValues?.businessName}
+                            />
+                        </div>
                     )}
 
                     <BuilderField
@@ -555,21 +641,28 @@ export default function BusinessInfoForm({
                         label={t.onboarding.form.industry}
                         required
                     >
-                        <BuilderOptionGrid>
-                            {industryOptions.map((option) => {
-                                const i18nLabels = (t.onboarding.form as Record<string, unknown>).industryOptions as Record<string, string> | undefined
-                                const translatedLabel = i18nLabels?.[option.value] || option.label
-                                return (
+                        <div data-field="industry">
+                            <BuilderOptionGrid onPointerLeave={() => setHoveredIndustry(null)}>
+                                {industryOptions.map((option) => (
                                     <BuilderOptionCard
-                                        icon={option.icon}
+                                        icon={getIndustryIcon(option.value)}
                                         key={option.value}
-                                        label={translatedLabel}
-                                        onClick={() => setForm((current) => ({ ...current, industry: option.value }))}
+                                        label={industryLabel(option.value)}
+                                        onClick={() => {
+                                            setForm((current) => ({ ...current, industry: option.value }))
+                                            setFieldError('industry', option.value)
+                                            setHoveredIndustry(null)
+                                        }}
+                                        // touch/pen taps fire emulated hover that never clears — only a mouse previews
+                                        onPointerEnter={(event) => {
+                                            if (event.pointerType === 'mouse') setHoveredIndustry(option.value)
+                                        }}
+                                        onPointerLeave={() => setHoveredIndustry((current) => (current === option.value ? null : current))}
                                         selected={form.industry === option.value}
                                     />
-                                )
-                            })}
-                        </BuilderOptionGrid>
+                                ))}
+                            </BuilderOptionGrid>
+                        </div>
                         {isLoadingIndustries ? (
                             <p className="text-xs text-[#94a3b8]">{t.onboarding.form.loadingIndustries}</p>
                         ) : null}
@@ -587,13 +680,11 @@ export default function BusinessInfoForm({
                         required
                     >
                         <BuilderTextarea
-                            adornment={(
-                                <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
-                                    <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
-                                </div>
-                            )}
                             invalid={!!errors.products}
-                            onChange={(e) => setForm((current) => ({ ...current, products: e.target.value }))}
+                            data-field="products"
+                            onBlur={(e) => handleTextBlur('products', e.target.value)}
+                            onChange={(e) => handleTextChange('products', e.target.value)}
+                            onFocus={() => setFocusedField('products')}
                             placeholder={t.onboarding.form.productsPlaceholder}
                             rows={3}
                             value={form.products}
@@ -612,13 +703,11 @@ export default function BusinessInfoForm({
                         required
                     >
                         <BuilderTextarea
-                            adornment={(
-                                <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
-                                    <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
-                                </div>
-                            )}
                             invalid={!!errors.shortDescription}
-                            onChange={(e) => setForm((current) => ({ ...current, shortDescription: e.target.value }))}
+                            data-field="shortDescription"
+                            onBlur={(e) => handleTextBlur('shortDescription', e.target.value)}
+                            onChange={(e) => handleTextChange('shortDescription', e.target.value)}
+                            onFocus={() => setFocusedField('shortDescription')}
                             placeholder={t.onboarding.form.shortDescriptionPlaceholder}
                             rows={3}
                             value={form.shortDescription}
@@ -631,14 +720,14 @@ export default function BusinessInfoForm({
 
     const leftBody = (
         <>
-            {toggleTabs}
             {formFields}
         </>
     )
 
     const leftFooter = (
         <BuilderSubmitButton
-            disabled={!isFormReady || isGenerating}
+            // Clickable while invalid on purpose: a click shows every field error (US-F01-05 AC-2, #2159).
+            disabled={isGenerating}
             loading={isGenerating}
             onClick={submitForm}
             type="button"
@@ -647,21 +736,39 @@ export default function BusinessInfoForm({
         </BuilderSubmitButton>
     )
 
+    // A mouse over the grid previews that industry in the blueprint; otherwise (touch, pointer elsewhere,
+    // after a click or a focus change) the selection shows — never a stale hover (#2103 A6).
+    const previewIndustry = hoveredIndustry && hoveredIndustry !== form.industry ? hoveredIndustry : form.industry
+    const siteHost = getPreviewSiteHost(form.businessName, chosenSlug)
+
     const rightPane = (
-        <BuilderPromoCard
+        <BuilderBlueprintPreview
+            businessName={form.businessName}
+            caption={t.onboarding.form.blueprintCaption}
+            countLabel={(count) => ti(t.onboarding.form.blueprintCount, { count })}
             description={t.onboarding.form.promoDescription}
-            steps={[
-                { id: 1, label: t.onboarding.form.promoStep1, active: true },
-                { id: 2, label: t.onboarding.form.promoStep2 },
-                { id: 3, label: t.onboarding.form.promoStep3 },
-            ]}
+            errors={errors}
+            focus={focusedField}
+            industry={form.industry}
+            industryHovered={!!hoveredIndustry && hoveredIndustry !== form.industry}
+            industryIcon={getIndustryIcon(previewIndustry)}
+            industryLabel={previewIndustry ? industryLabel(previewIndustry) : t.onboarding.form.industry}
+            labels={{
+                businessName: t.onboarding.form.businessName,
+                products: t.onboarding.form.products,
+                shortDescription: t.onboarding.form.shortDescription,
+            }}
+            products={form.products}
+            readyCaption={t.onboarding.form.blueprintReady}
+            shortDescription={form.shortDescription}
+            siteHost={siteHost}
+            steps={[t.onboarding.form.promoStep1, t.onboarding.form.promoStep2, t.onboarding.form.promoStep3]}
             title={t.onboarding.form.promoTitle}
         />
     )
 
     return (
         <BuilderStepScreen
-            description={t.onboarding.step1Description}
             leftBody={leftBody}
             leftFooter={leftFooter}
             right={rightPane}

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { notFound } from 'next/navigation'
 import TenantSitePage, { generateMetadata } from '@/app/sites/[slug]/[[...path]]/page'
+import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
 
 // Mock next utilities
 vi.mock('next/navigation', () => ({
@@ -26,6 +27,7 @@ let mockSite: Record<string, unknown> | null = null
 let mockTenant: Record<string, unknown> | null = null
 let mockUser: Record<string, unknown> | null = null
 let mockPage: Record<string, unknown> | null = null
+let mockSub: Record<string, unknown> | null = null
 
 vi.mock('@/lib/auth', () => ({
     getCurrentUser: vi.fn().mockImplementation(async () => mockUser)
@@ -47,6 +49,9 @@ vi.mock('payload', () => {
                 if (collection === 'pages') {
                     return { docs: mockPage ? [mockPage] : [] }
                 }
+                if (collection === 'plan-subscriptions') {
+                    return { docs: mockSub ? [mockSub] : [] }
+                }
                 return { docs: [] }
             }),
         })
@@ -66,6 +71,37 @@ describe('TenantSitePage', () => {
         mockSite = { id: 'site-1', status: 'published' }
         mockPage = { id: 'page-1', slug: '/' }
         mockUser = null
+        mockSub = null
+    })
+
+    it('[TC-F09.281] banned store renders the unavailable page, even for the owner', async () => {
+        // Arrange
+        mockTenant = { id: 'tenant-1', status: 'suspended' }
+        mockSite = { id: 'site-1', status: 'published', name: 'Kedai Rahsia', headerBlock: { primaryLocale: 'ms' } }
+        mockUser = { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] }
+
+        // Act
+        const result = await TenantSitePage({ params: Promise.resolve({ slug: 'my-site' }), searchParams: Promise.resolve({}) })
+
+        // Assert
+        expect(result.type).toBe(MaintenancePage)
+        expect(result.props).toEqual({ variant: 'unavailable', locale: 'ms' })
+    })
+
+    it('[TC-F09.281] lapsed main subscription: unavailable page + noindex metadata without the store name', async () => {
+        // Arrange
+        mockTenant = { id: 'tenant-1', status: 'active' }
+        mockSite = { id: 'site-1', status: 'published', name: 'Kedai Rahsia' }
+        mockSub = { status: 'active', endsAt: '2020-01-01T00:00:00.000Z' }
+        const params = Promise.resolve({ slug: 'my-site' })
+
+        // Act
+        const meta = await generateMetadata({ params, searchParams: Promise.resolve({}) } as never)
+        const result = await TenantSitePage({ params, searchParams: Promise.resolve({}) })
+
+        // Assert
+        expect(meta).toEqual({ title: 'This store is temporarily unavailable.', robots: { index: false, follow: false } })
+        expect(result.props.variant).toBe('unavailable')
     })
 
     it('returns notFound when site is draft and user is not authenticated (Visitor)', async () => {

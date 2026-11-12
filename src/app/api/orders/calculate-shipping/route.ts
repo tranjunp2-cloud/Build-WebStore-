@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { isSiteDocTenantUnavailable } from '@/lib/storefront/store-availability'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import {
@@ -66,6 +67,10 @@ export async function POST(request: Request) {
         const site = await payload.findByID({ collection: 'sites', id: siteId, overrideAccess: true }).catch(() => null)
         if (!site) {
             return badRequest('NOT_FOUND', 'Site not found', 404)
+        }
+        // #2179: banned or expired store takes no orders — never quote with its courier token
+        if (await isSiteDocTenantUnavailable(payload, site)) {
+            return badRequest('STORE_UNAVAILABLE', 'Store is not available', 403)
         }
 
         const shippingConfig = (site as any).shippingConfig ?? null

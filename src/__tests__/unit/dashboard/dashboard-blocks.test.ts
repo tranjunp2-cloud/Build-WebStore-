@@ -12,6 +12,14 @@ import {
 } from '@/lib/dashboard-utils'
 
 describe('normalizeDashboardBlocks', () => {
+    it.each([{}, { widgets: ['orders'] }, 'seo', 1, true])('[TC-F42-IMP-PREFS] defaults safely for non-array JSON: %j', raw => {
+        // Arrange / Act
+        const result = normalizeDashboardBlocks(raw)
+        // Assert
+        expect(result).toEqual(DEFAULT_DASHBOARD_BLOCKS)
+        expect(result).not.toBe(DEFAULT_DASHBOARD_BLOCKS)
+    })
+
     it('returns defaults for null/empty input', () => {
         expect(normalizeDashboardBlocks(null)).toEqual(DEFAULT_DASHBOARD_BLOCKS)
         expect(normalizeDashboardBlocks(undefined)).toEqual(DEFAULT_DASHBOARD_BLOCKS)
@@ -64,6 +72,19 @@ describe('buildCustomizeRows', () => {
     it('honours saved order of visible blocks within the schema frame', () => {
         const rows = buildCustomizeRows(['glance', 'onboarding', 'traffic', 'seo'])
         expect(rows.filter(r => r.visible).map(r => r.id)).toEqual(['glance', 'onboarding', 'traffic', 'seo'])
+    })
+
+    it('[TC-AICP-191] has no Issues (To do) block any more: issues live in the assistant\'s dock', () => {
+        const rows = buildCustomizeRows(DEFAULT_DASHBOARD_BLOCKS)
+
+        expect(DEFAULT_DASHBOARD_BLOCKS).toEqual(['onboarding', 'glance', 'traffic', 'seo'])
+        expect(rows.find(r => r.id === ('todo' as never))).toBeUndefined()
+    })
+
+    it('[TC-AICP-191] drops the old block from a saved layout and keeps the rest as saved', () => {
+        expect(normalizeDashboardBlocks(['glance', 'seo'])).toEqual(['glance', 'seo'])
+        expect(normalizeDashboardBlocks(['glance', 'todo', 'seo'])).toEqual(['glance', 'seo'])
+        expect(normalizeDashboardBlocks(['todo'])).toEqual(DEFAULT_DASHBOARD_BLOCKS)
     })
 
     it('[TC-F03.73] keeps the orders block available without Soon, hidden by default', () => {

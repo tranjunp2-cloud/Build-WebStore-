@@ -1,88 +1,281 @@
-/**
- * GET /api/admin/generations — paginated list with filters
- *
- * Query params:
- *   status    running|success|failed
- *   endpoint  text (partial match)
- *   category  text (partial match)
- *   dateFrom  ISO date string
- *   dateTo    ISO date string
- *   userId    number
- *   search    text (searches endpoint + category)
- *   page      number (default 1)
- *   limit     number (default 50, max 100)
- */
+/** Safe, keyset-paginated Super Admin generation queue. Never returns raw Payload docs. */
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
+import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
+import { z } from 'zod'
 import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { resolveGenerationPriority, serializeAdminGeneration, type GenerationListSource, type GenerationPriority } from '@/lib/ai/generation-recovery-policy'
+import type { GenerationOverview } from '@/app/studio/generations/_components/generation-types'
+
+const Query = z.object({
+    view: z.enum(['needs_attention', 'all']).default('needs_attention'),
+    status: z.enum(['running', 'success', 'failed', 'all']).default('all'),
+    recoveryStatus: z.enum(['none', 'eligible', 'retrying', 'exhausted', 'ticket_required', 'ticket_created', 'ticket_verification_required', 'operator_verifying', 'operator_resolved', 'stale_running', 'all']).default('all'),
+    search: z.string().trim().max(120).default(''), userId: z.string().trim().max(100).default(''), siteId: z.string().trim().max(100).default(''),
+    dateFrom: z.string().datetime().optional(), dateTo: z.string().datetime().optional(),
+    cursor: z.string().max(500).optional(), limit: z.coerce.number().int().min(1).max(100).default(50),
+})
+
+type QueryInput = z.infer<typeof Query>
+// `ai-generation-records.id` is the Payload/Postgres integer primary key. Keep
+// it numeric in the cursor too: lexicographic comparisons make `"9"` sort
+// after `"10"`, which can silently skip records sharing a createdAt value.
+type Cursor = { v: 1; filter: string; asOf: string; bucket: number; createdAt: string; id: number }
+type Bucket = { priority: GenerationPriority; where: Where }
+const MAX_RELATION_SEARCH_IDS = 50
+
+class SearchTooBroadError extends Error {}
+
+const ATTENTION_BUCKETS: Bucket[] = [
+    {
+        priority: 'cannot_recover',
+        where: {
+            or: [
+                { recoveryStatus: { equals: 'ticket_required' } },
+                // A ticket in Done has been returned to the operator for a
+                // verification pass, so it must remain visible in the default
+                // Needs Attention queue rather than only in the all-history view.
+                { recoveryStatus: { equals: 'ticket_verification_required' } },
+                { recoveryStatus: { equals: 'operator_verifying' } },
+                { and: [{ recoveryStatus: { equals: 'exhausted' } }, { outcome: { in: ['succeeded', 'cancelled'] } }] },
+                { and: [{ recoveryStatus: { equals: 'exhausted' } }, { outcome: { exists: false } }] },
+            ],
+        },
+    },
+    { priority: 'retryable', where: { recoveryStatus: { equals: 'eligible' } } },
+    { priority: 'retry_failed', where: { and: [{ recoveryStatus: { equals: 'exhausted' } }, { outcome: { in: ['failed', 'partial_failed'] } }] } },
+    { priority: 'retrying', where: { recoveryStatus: { equals: 'retrying' } } },
+    { priority: 'stale_running', where: { recoveryStatus: { equals: 'stale_running' } } },
+]
+
+function combineWhere(...parts: Array<Where | undefined>): Where {
+    const present: Where[] = []
+    for (const part of parts) if (part && Object.keys(part).length > 0) present.push(part)
+    return present.length === 1 ? present[0] : { and: present }
+}
+
+function filterFingerprint(q: QueryInput) {
+    // A cursor is valid only for the exact normalized filter set that produced it.
+    // Hashing avoids reflecting operational search/user/site identifiers in the token.
+    return createHash('sha256').update(JSON.stringify({
+        view: q.view, status: q.status, recoveryStatus: q.recoveryStatus,
+        search: q.search, userId: q.userId, siteId: q.siteId,
+        dateFrom: q.dateFrom ?? null, dateTo: q.dateTo ?? null,
+    })).digest('base64url')
+}
+
+function parseCursor(raw: string | undefined, fingerprint: string): Cursor | undefined {
+    if (!raw) return undefined
+    try {
+        const token = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Partial<Cursor>
+        if (token.v !== 1 || token.filter !== fingerprint || typeof token.bucket !== 'number' || !Number.isInteger(token.bucket) || token.bucket < 0 || token.bucket >= ATTENTION_BUCKETS.length || typeof token.id !== 'number' || !Number.isSafeInteger(token.id) || token.id < 1 || typeof token.createdAt !== 'string' || typeof token.asOf !== 'string' || Number.isNaN(Date.parse(token.createdAt)) || Number.isNaN(Date.parse(token.asOf))) throw new Error('invalid cursor')
+        return token as Cursor
+    } catch { return undefined }
+}
+
+function createCursor(cursor: Omit<Cursor, 'v'>) {
+    return Buffer.from(JSON.stringify({ v: 1, ...cursor })).toString('base64url')
+}
+
+async function findRelationIds(payload: Awaited<ReturnType<typeof getPayload>>, collection: 'users' | 'sites', where: Where) {
+    // Resolve relationship labels in two bounded, indexed queries. Generation
+    // records only store relationship IDs, so filtering `user.email`/`site.name`
+    // directly is adapter-dependent and can silently return no rows on Postgres.
+    // Fetch one extra record to prove that every returned ID is represented.
+    // A broad relation match must be rejected explicitly rather than silently
+    // truncating records and making valid generation runs disappear from search.
+    const result = await payload.find({ collection, where, depth: 0, limit: MAX_RELATION_SEARCH_IDS + 1, pagination: false, overrideAccess: true })
+    if (result.docs.length > MAX_RELATION_SEARCH_IDS) throw new SearchTooBroadError()
+    return result.docs.map((doc) => String(doc.id))
+}
+
+async function baseWhere(q: QueryInput, asOf: string, payload: Awaited<ReturnType<typeof getPayload>>): Promise<Where> {
+    // This is an operations view for websites submitted/generated by users.
+    // Internal AI helpers such as `generate-meta` are captured too, but must
+    // never become standalone "Unknown" website generations in this queue.
+    // Recovery children retain the same endpoint as their parent, so they stay
+    // visible with their lineage.
+    const clauses: Where[] = [{ createdAt: { less_than_equal: asOf } }, { endpoint: { equals: 'site-generator' } }]
+    if (q.status !== 'all') clauses.push({ status: { equals: q.status } })
+    if (q.recoveryStatus !== 'all') clauses.push({ recoveryStatus: { equals: q.recoveryStatus } })
+    if (q.userId) clauses.push({ user: { equals: q.userId } })
+    if (q.siteId) clauses.push({ site: { equals: q.siteId } })
+    if (q.dateFrom || q.dateTo) clauses.push({ createdAt: { ...(q.dateFrom ? { greater_than_equal: q.dateFrom } : {}), ...(q.dateTo ? { less_than_equal: q.dateTo } : {}) } })
+    if (q.search) {
+        const numericId = Number(q.search)
+        const searchClauses: Where[] = [{ traceId: { like: q.search } }, { endpoint: { like: q.search } }, { category: { like: q.search } }]
+        const [userIds, siteIds] = await Promise.all([
+            findRelationIds(payload, 'users', { or: [{ email: { like: q.search } }, { firstName: { like: q.search } }, { lastName: { like: q.search } }] }),
+            findRelationIds(payload, 'sites', { name: { like: q.search } }),
+        ])
+        if (userIds.length) searchClauses.push({ user: { in: userIds } })
+        if (siteIds.length) searchClauses.push({ site: { in: siteIds } })
+        if (Number.isSafeInteger(numericId) && numericId > 0 && String(numericId) === q.search) searchClauses.unshift({ id: { equals: numericId } })
+        clauses.push({ or: searchClauses })
+    }
+    return combineWhere(...clauses)
+}
+
+function afterCursor(cursor: Cursor): Where {
+    return {
+        or: [
+            { createdAt: { less_than: cursor.createdAt } },
+            { and: [{ createdAt: { equals: cursor.createdAt } }, { id: { less_than: cursor.id } }] },
+        ],
+    }
+}
+
+function isAfterCursor(source: Pick<GenerationListSource, 'id' | 'createdAt'>, cursor: Cursor) {
+    const createdAt = Date.parse(source.createdAt)
+    const anchor = Date.parse(cursor.createdAt)
+    const id = typeof source.id === 'number' ? source.id : Number(source.id)
+    // A non-numeric id cannot exist for this collection in Postgres. Treat an
+    // unexpected adapter/mock value as ineligible rather than weakening the
+    // keyset boundary with a string comparison.
+    return Number.isSafeInteger(id) && (createdAt < anchor || (createdAt === anchor && id < cursor.id))
+}
+
+async function countMatching(payload: Awaited<ReturnType<typeof getPayload>>, where: Where) {
+    // `count` is a bounded DB aggregate (not an in-memory document scan). The
+    // fallback keeps adapter-mocked unit tests compatible with Payload's local API.
+    if (typeof payload.count !== 'function') return undefined
+    const result = await payload.count({ collection: 'ai-generation-records', where })
+    return result.totalDocs
+}
+
+async function getGlobalOverview(
+    payload: Awaited<ReturnType<typeof getPayload>>,
+    fallbackSources?: GenerationListSource[],
+): Promise<GenerationOverview> {
+    if (typeof payload.count !== 'function') {
+        const sources = fallbackSources ?? []
+        const cannotRecover = sources.filter((s) => resolveGenerationPriority(s) === 'cannot_recover').length
+        const retryFailed = sources.filter((s) => resolveGenerationPriority(s) === 'retry_failed').length
+        const retryable = sources.filter((s) => resolveGenerationPriority(s) === 'retryable').length
+        const retrying = sources.filter((s) => resolveGenerationPriority(s) === 'retrying').length
+        const stale = sources.filter((s) => resolveGenerationPriority(s) === 'stale_running').length
+        const succeeded = sources.filter((s) => s.outcome === 'succeeded').length
+        const running = sources.filter((s) => s.lifecycle === 'running').length
+        return {
+            total: sources.length,
+            needsAttention: cannotRecover + retryFailed + retryable + retrying + stale,
+            retryable,
+            retrying,
+            ticketRequired: cannotRecover + retryFailed,
+            succeeded,
+            running,
+        }
+    }
+
+    const base: Where = { endpoint: { equals: 'site-generator' } }
+
+    const [
+        total,
+        succeeded,
+        running,
+        retryable,
+        retrying,
+        cannotRecover,
+        retryFailed,
+        staleRunning,
+    ] = await Promise.all([
+        countMatching(payload, base),
+        countMatching(payload, combineWhere(base, { outcome: { equals: 'succeeded' } })),
+        countMatching(payload, combineWhere(base, { lifecycle: { equals: 'running' } })),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[1].where)),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[3].where)),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[0].where)),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[2].where)),
+        countMatching(payload, combineWhere(base, ATTENTION_BUCKETS[4].where)),
+    ])
+
+    const safe = (v?: number) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+    const cr = safe(cannotRecover)
+    const rf = safe(retryFailed)
+    const ret = safe(retryable)
+    const retying = safe(retrying)
+    const sr = safe(staleRunning)
+
+    return {
+        total: safe(total),
+        needsAttention: cr + rf + ret + retying + sr,
+        retryable: ret,
+        retrying: retying,
+        ticketRequired: cr + rf,
+        succeeded: safe(succeeded),
+        running: safe(running),
+    }
+}
 
 export const GET = withSuperAdmin(async (req: NextRequest) => {
-    const sp = req.nextUrl.searchParams
-
-    const page = Math.max(1, Number(sp.get('page') ?? 1))
-    const limit = Math.min(100, Math.max(10, Number(sp.get('limit') ?? 50)))
-    const status = sp.get('status') ?? ''
-    const endpoint = sp.get('endpoint') ?? ''
-    const category = sp.get('category') ?? ''
-    const dateFrom = sp.get('dateFrom') ?? ''
-    const dateTo = sp.get('dateTo') ?? ''
-    const userId = sp.get('userId') ?? ''
-    const search = sp.get('search') ?? ''
-
-    const where: Where = {}
-
-    if (status && status !== 'all') {
-        where.status = { equals: status }
-    }
-
-    if (endpoint) {
-        where.endpoint = { like: endpoint }
-    }
-
-    if (category) {
-        where.category = { like: category }
-    }
-
-    if (userId) {
-        where.user = { equals: Number(userId) }
-    }
-
-    if (dateFrom || dateTo) {
-        where.createdAt = {}
-        if (dateFrom) (where.createdAt as Record<string, unknown>).greater_than_equal = dateFrom
-        if (dateTo) (where.createdAt as Record<string, unknown>).less_than_equal = dateTo
-    }
-
-    if (search) {
-        where.or = [
-            { endpoint: { like: search } },
-            { category: { like: search } },
-        ]
-    }
-
+    const parsed = Query.safeParse(Object.fromEntries(req.nextUrl.searchParams))
+    if (!parsed.success) return NextResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'Bộ lọc không hợp lệ.' } }, { status: 400 })
+    const q = parsed.data
+    const fingerprint = filterFingerprint(q)
+    const cursor = parseCursor(q.cursor, fingerprint)
+    if (q.cursor && !cursor) return NextResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'Cursor không hợp lệ.' } }, { status: 400 })
+    const asOf = cursor?.asOf ?? new Date().toISOString()
     const payload = await getPayload({ config })
+    let filters: Where
+    try {
+        filters = await baseWhere(q, asOf, payload)
+    } catch (error) {
+        if (error instanceof SearchTooBroadError) {
+            return NextResponse.json({ error: { code: 'SEARCH_TOO_BROAD', message: 'Có quá nhiều user hoặc website khớp. Hãy nhập từ khóa cụ thể hơn.' } }, { status: 400 })
+        }
+        throw error
+    }
 
-    const result = await payload.find({
-        collection: 'ai-generation-records',
-        where,
-        sort: '-createdAt',
-        page,
-        limit,
-        depth: 1,
-    })
+    if (q.view === 'all') {
+        const result = await payload.find({
+            collection: 'ai-generation-records', where: combineWhere(filters, cursor ? afterCursor(cursor) : undefined),
+            sort: '-createdAt,-id', page: 1, limit: q.limit + 1, depth: 1,
+        })
+        const sources = (result.docs as unknown as GenerationListSource[])
+            .filter((source) => !cursor || isAfterCursor(source, cursor))
+        const pageSources = sources.slice(0, q.limit)
+        const last = pageSources.at(-1)
+        const nextCursor = sources.length > q.limit && last
+            ? createCursor({ filter: fingerprint, asOf, bucket: 0, createdAt: last.createdAt, id: Number(last.id) })
+            : null
+        const totalDocs = await countMatching(payload, filters) ?? result.totalDocs
+        const overview = await getGlobalOverview(payload, sources)
+        return NextResponse.json({ items: pageSources.map(serializeAdminGeneration), nextCursor, meta: { totalDocs, limit: q.limit, hasNextPage: nextCursor !== null, hasPrevPage: Boolean(cursor) }, overview })
+    }
 
-    return NextResponse.json({
-        data: result.docs,
-        meta: {
-            totalDocs: result.totalDocs,
-            totalPages: result.totalPages,
-            page: result.page,
-            limit: result.limit,
-            hasNextPage: result.hasNextPage,
-            hasPrevPage: result.hasPrevPage,
-        },
-    })
+    // Priority is an explicit DB state, not a UI inference. Query at most five
+    // indexed buckets and stop as soon as the page plus its look-ahead is full.
+    const startBucket = cursor?.bucket ?? 0
+    const collected: Array<{ source: GenerationListSource; bucket: number }> = []
+    for (let bucket = startBucket; bucket < ATTENTION_BUCKETS.length && collected.length < q.limit + 1; bucket += 1) {
+        const isCursorBucket = Boolean(cursor && bucket === cursor.bucket)
+        const remaining = q.limit + 1 - collected.length
+        const result = await payload.find({
+            collection: 'ai-generation-records',
+            where: combineWhere(filters, ATTENTION_BUCKETS[bucket].where, isCursorBucket && cursor ? afterCursor(cursor) : undefined),
+            sort: '-createdAt,-id', page: 1, limit: remaining, depth: 1,
+        })
+        // The predicate is authoritative. This narrow guard makes a stale/mock
+        // adapter response unable to move an item into the wrong priority bucket.
+        for (const source of result.docs as unknown as GenerationListSource[]) {
+            if (isCursorBucket && cursor && !isAfterCursor(source, cursor)) continue
+            if (resolveGenerationPriority(source) === ATTENTION_BUCKETS[bucket].priority) collected.push({ source, bucket })
+            if (collected.length === q.limit + 1) break
+        }
+    }
+    const pageSources = collected.slice(0, q.limit)
+    const last = pageSources.at(-1)
+    const nextCursor = collected.length > q.limit && last
+        ? createCursor({ filter: fingerprint, asOf, bucket: last.bucket, createdAt: last.source.createdAt, id: Number(last.source.id) })
+        : null
+    const totalCounts = await Promise.all(ATTENTION_BUCKETS.map((bucket) => countMatching(payload, combineWhere(filters, bucket.where))))
+    const totalDocs = totalCounts.every((count): count is number => typeof count === 'number')
+        ? totalCounts.reduce((sum, count) => sum + count, 0)
+        : pageSources.length + (nextCursor ? 1 : 0)
+    const overview = await getGlobalOverview(payload, pageSources.map(({ source }) => source))
+    return NextResponse.json({ items: pageSources.map(({ source }) => serializeAdminGeneration(source)), nextCursor, meta: { totalDocs, limit: q.limit, hasNextPage: nextCursor !== null, hasPrevPage: Boolean(cursor) }, overview })
 })

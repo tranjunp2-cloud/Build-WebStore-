@@ -274,6 +274,14 @@ describe('[TC-F17-05-01] CategoryModal — Create new category', () => {
 
         // Assert
         expect(actions.createBlogCategoryAction).toHaveBeenCalledWith({ name: 'Tech Tips' })
+
+        // handleCreate reloads categories without awaiting it; wait for that reload
+        // inside act so it never sets state after jsdom is torn down.
+        await waitFor(() => expect(actions.getBlogCategoriesAction).toHaveBeenCalledTimes(2))
+        const reload = vi.mocked(actions.getBlogCategoriesAction).mock.results[1]?.value
+        await act(async () => {
+            await reload
+        })
     })
 
     it('does not call createBlogCategoryAction when name is only whitespace', async () => {
@@ -407,6 +415,10 @@ describe('[TC-F17-05-03] CategoryModal — Empty name validation', () => {
         // Assert — during loading, animate-pulse skeleton is rendered
         const skeleton = document.querySelector('.animate-pulse')
         expect(skeleton).not.toBeNull()
+
+        // Let the delayed load finish inside this test: otherwise its setLoading(false)
+        // can fire after the file's jsdom teardown ("window is not defined").
+        await waitFor(() => expect(document.querySelector('.animate-pulse')).toBeNull())
     })
 
     it('"No categories yet" renders when list is empty after loading', async () => {

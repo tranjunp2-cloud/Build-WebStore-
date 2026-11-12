@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, User, ShoppingBag, UndoDot, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,29 +9,23 @@ import { useI18n } from '@/i18n'
 import { CustomerAvatar, RankBadge } from './customers-shared-ui'
 import { CustomersDetailDefaultTab } from './customers-detail-default-tab'
 import { CustomersDetailOrdersTab } from './customers-detail-orders-tab'
-import { updateShopCustomerAction } from '../actions'
+import { getShopCustomerDetailAction, updateShopCustomerAction } from '../actions'
+import { useAgentRecordSync } from '@/lib/agent-changes/use-agent-record-sync'
+import { AgentChangedNotice, SaveConflictNotice } from '@/components/agent/agent-changed-notice'
+import { useSaveVersion } from '@/lib/save-version/use-save-version'
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
+import { SaveBarLift } from '@/components/agent/save-bar-lift'
+import { useInvalidateDomain } from '@/hooks/queries/use-invalidate-domain'
+import { formatRelativeTime } from '../_lib/relative-time'
 
 type Tab = 'default' | 'orders'
 export type EditableFields = Pick<ShopCustomerRecord, 'name' | 'rank' | 'notes'>
 
 type Props = { customer: ShopCustomerRecord }
 
-function relativeTime(iso: string, justNow: string): string {
-    const d = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-    if (d < 1) return justNow
-    if (d < 60) return `${d}m ago`
-    const h = Math.floor(d / 60)
-    if (h < 24) return `${h}h ago`
-    const days = Math.floor(h / 24)
-    if (days < 30) return `${days}d ago`
-    const months = Math.floor(days / 30)
-    if (months < 12) return `${months}mo ago`
-    return `${Math.floor(months / 12)}y ago`
-}
-
 export function CustomersDetail({ customer }: Props) {
     const router = useRouter()
+    const invalidateDomain = useInvalidateDomain()
     const { t } = useI18n()
     const cd = t.dashboard.shopCustomers.detail
     const [draft, setDraft]       = useState<ShopCustomerRecord>(customer)
@@ -39,11 +33,28 @@ export function CustomersDetail({ customer }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('default')
     const [saving, setSaving]     = useState(false)
     const [errors, setErrors]     = useState<Record<string, string>>({})
+    // the customer's updatedAt as loaded: sent with each save so a newer change is never written over
+    const version = useSaveVersion(customer.updatedAt)
+    const setVersion = version.set
 
     const dirty = useMemo(
         () => JSON.stringify(draft) !== JSON.stringify(original),
         [draft, original],
     )
+
+    // The assistant changed this customer: read it again and replace both copies (draft + saved)
+    const reload = useCallback(async () => {
+        try {
+            const fresh: ShopCustomerRecord = await getShopCustomerDetailAction(customer.id)
+            setOriginal(fresh)
+            setDraft(fresh)
+            setErrors({})
+            setVersion(fresh.updatedAt)
+        } catch (err) {
+            console.error('[Customer reload]', err)
+        }
+    }, [customer.id, setVersion])
+    const sync = useAgentRecordSync({ kind: 'store_customer', id: String(customer.id), dirty, reload })
 
     function handleChange(updates: Partial<EditableFields>) {
         setDraft(prev => ({ ...prev, ...updates }))
@@ -68,11 +79,15 @@ export function CustomersDetail({ customer }: Props) {
         if (!validate()) return
         setSaving(true)
         try {
-            await updateShopCustomerAction(draft.id, {
+            const saved = await updateShopCustomerAction(draft.id, {
                 name: draft.name,
                 rank: draft.rank,
                 notes: draft.notes,
-            })
+            }, version.current())
+            if (version.refused(saved)) return
+            version.set(saved.updatedAt)
+            // the customers list is cached: its row (name, rank) is stale now
+            void invalidateDomain('customers')
             toast.success(cd.saved)
             router.push('/customers')
         } catch {
@@ -116,10 +131,14 @@ export function CustomersDetail({ customer }: Props) {
                             </code>
                         </span>
                         <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--cus-dot-sep)', flexShrink: 0, display: 'inline-block' }} />
-                        <span>{cd.updated} {relativeTime(original.updatedAt, cd.relJustNow)}</span>
+                        <span>{cd.updated} {formatRelativeTime(original.updatedAt, cd)}</span>
                     </div>
                 </div>
             </div>
+
+            {version.conflicted
+                ? <SaveConflictNotice record="customer" onLoadLatest={sync.reloadNow} onSaveAnyway={() => { version.overwrite(); void handleSave() }} />
+                : sync.stale && <AgentChangedNotice record="customer" onReload={sync.reloadNow} onKeep={sync.keepMine} />}
 
             {/* Dirty bar — synced with discount-form-header style */}
             {dirty && (
@@ -196,9 +215,11 @@ export function CustomersDetail({ customer }: Props) {
                 (sidebar + p-8 gutter) at lg+. */}
             {activeTab === 'default' && dirty && (
                 <div
+                    data-save-bar=""
                     className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-solid border-[hsl(var(--border))]"
                     style={{ background: 'var(--save-bar-bg)', boxShadow: 'var(--save-bar-shadow)' }}
                 >
+                    <SaveBarLift />
                     <div className="flex items-center gap-2 text-[13px]">
                         <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />
                         <span className="text-amber-600 dark:text-amber-300 font-medium">{cd.unsaved}</span>

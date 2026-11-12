@@ -70,6 +70,14 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 
 import { POST } from '@/app/api/orders/checkout/route'
 import { MAX_CHECKOUT_ITEMS } from '@/lib/validations/orders'
+import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
+// #2179: store availability has its own tests (store-unavailable.test.ts); here a store is unavailable only when suspended.
+vi.mock('@/lib/storefront/store-availability', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/storefront/store-availability')>()),
+    isTenantUnavailable: vi.fn(async (_payload: unknown, tenant: { status?: unknown } | null) => tenant?.status === 'suspended'),
+    isTenantIdUnavailable: vi.fn(async () => false),
+}))
+import { isTenantIdUnavailable, isTenantUnavailable } from '@/lib/storefront/store-availability'
 
 // ─── TC-F10: Order checkout API ──────────────────────────────────────
 
@@ -119,6 +127,75 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
         mockDelete.mockResolvedValue({})
         mockUpdate.mockResolvedValue({})
+    })
+
+    it('[TC-F09.274] suspended tenant + COD returns 403 STORE_UNAVAILABLE and creates no order', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ ...MOCK_TENANT, status: 'suspended' })
+
+        // Act
+        const res = await POST(mockReq(validBody))
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(403)
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('STORE_UNAVAILABLE')
+        expect(mockCreate).not.toHaveBeenCalled()
+        expect(mockDrizzleExecute).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F09.284] active tenant whose main subscription lapsed: 403 STORE_UNAVAILABLE, no order', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        vi.mocked(isTenantUnavailable).mockResolvedValueOnce(true)
+
+        // Act
+        const res = await POST(mockReq(validBody))
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(403)
+        expect(body.error.code).toBe('STORE_UNAVAILABLE')
+        expect(mockCreate).not.toHaveBeenCalled()
+        expect(mockDrizzleExecute).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F09.275] suspended tenant + bank_transfer returns 403 STORE_UNAVAILABLE and creates no order', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ ...MOCK_TENANT, status: 'suspended' })
+
+        // Act
+        const res = await POST(mockReq({ ...validBody, paymentMethod: 'bank_transfer' }))
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(403)
+        expect(body.error.code).toBe('STORE_UNAVAILABLE')
+        expect(mockCreate).not.toHaveBeenCalled()
+        expect(mockDrizzleExecute).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F09.276] suspended guard runs before payment-method check (suspended + COD disabled → 403, not 422)', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ ...MOCK_TENANT, status: 'suspended', payments: { payment_cod: false, payment_qr: false } })
+
+        // Act
+        const res = await POST(mockReq(validBody))
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(403)
+        expect(body.error.code).toBe('STORE_UNAVAILABLE')
+        expect(mockCreate).not.toHaveBeenCalled()
     })
 
     it('creates order with valid input', async () => {
@@ -307,6 +384,49 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         }))
     })
 
+    it('[TC-F32.98] COD checkout with a discount passes the discount line to the seller email', async () => {
+        // Arrange — same valid 50% discount on a COD order as TC-F33-10-07
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 })) // subtotal 100
+            .mockResolvedValueOnce({ // active 50% discount → RM50
+                docs: [{ id: 5, code: 'SAVE50', type: 'percentage', value: 50, status: 'active', usageLimit: null, usageCount: 0, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+                totalDocs: 1,
+            })
+        mockCreate.mockResolvedValue({ id: 42 })
+
+        // Act
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }], discountCode: 'SAVE50' }))
+
+        // Assert — amount in RM (not sen), same values the buyer email gets
+        expect(res.status).toBe(200)
+        expect(vi.mocked(newOrderSellerEmail)).toHaveBeenCalledWith(
+            expect.objectContaining({ discountAmount: 50, discountCode: 'SAVE50' }),
+            undefined,
+        )
+    })
+
+    it('[TC-F32.98] COD checkout without a discount sends no discount to the seller email', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
+        mockCreate.mockResolvedValue({ id: 44 })
+
+        // Act
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }] }))
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(vi.mocked(newOrderSellerEmail)).toHaveBeenCalledWith(
+            expect.objectContaining({ discountAmount: null, discountCode: null }),
+            undefined,
+        )
+    })
+
     it('[TC-F33-10-18 Q9] discount set inactive between apply and place-order → silent reject at commit, no redemption', async () => {
         // Arrange — checkout re-fetches the discount fresh; admin flipped it to inactive after the
         // customer saw the "applied" chip. BR-03: silent reject, order proceeds at full price.
@@ -333,6 +453,20 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         const createData = mockCreate.mock.calls[0][0].data
         expect(createData.discountCode).toBeUndefined()
         expect(createData.discountAmount).toBeUndefined()
+    })
+
+    it('[TC-F09.300] invalid MY phone (123456789) rejected — returns 400 and creates no order', async () => {
+        // Arrange
+        const body = { ...validBody, customer: { ...validBody.customer, phone: '123456789' } }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert
+        expect(res.status).toBe(400)
+        expect(data.error.code).toBe('VALIDATION_ERROR')
+        expect(mockCreate).not.toHaveBeenCalled()
     })
 
     it('[TC-F14.04] empty/invalid state rejected by schema — returns 400', async () => {
@@ -513,6 +647,58 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         expect(createdData.paymentReference).toMatch(/^BT-[A-Z2-9]{6}$/)
         expect(createdData.magicLinkSecret).toBeTruthy()
         expect(createdData.paymentExpiresAt).toBeInstanceOf(Date)
+    })
+
+    it('[TC-F09-2477-03] bank_transfer allowed when tenant payment_qr=true even if site enableQrBanking=false (PW1 store)', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1', paymentConfig: { enableQrBanking: false } })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 50, inventory: 10 }))
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 })
+        mockCreate.mockResolvedValue({ id: 'order-bt-2', orderNumber: 'ORD-BT2', total: 59, currency: 'MYR' })
+
+        // Act
+        const res = await POST(mockReq({ ...validBody, paymentMethod: 'bank_transfer' }))
+        const data = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(data.success).toBe(true)
+        expect(mockCreate).toHaveBeenCalled()
+    })
+
+    it('[TC-F09-2477-04] bank_transfer rejected 422 PAYMENT_METHOD_DISABLED when tenant payment_qr=false', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1', paymentConfig: { enableQrBanking: true } })
+            .mockResolvedValueOnce({ ...MOCK_TENANT, payments: { payment_cod: true, payment_qr: false } })
+
+        // Act
+        const res = await POST(mockReq({ ...validBody, paymentMethod: 'bank_transfer' }))
+        const data = await res.json()
+
+        // Assert
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('PAYMENT_METHOD_DISABLED')
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F09-2477-05] COD still rejected 422 when site enableCod=false even if tenant payment_cod=true', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1', paymentConfig: { enableCod: false } })
+            .mockResolvedValueOnce(MOCK_TENANT)
+
+        // Act
+        const res = await POST(mockReq({ ...validBody, paymentMethod: 'cod' }))
+        const data = await res.json()
+
+        // Assert
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('PAYMENT_METHOD_DISABLED')
+        expect(mockCreate).not.toHaveBeenCalled()
     })
 
     it('[TC-F10-02-03] bank_transfer rejects paymentProofImage at checkout (Zod refine)', async () => {

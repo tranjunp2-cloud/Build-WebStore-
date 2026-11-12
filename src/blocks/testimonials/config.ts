@@ -1,6 +1,13 @@
 import { z } from 'zod'
 import { BaseBlockSchema, ImageRefSchema } from '../types'
 
+/**
+ * Marker kept in a testimonial's `title` (editor-only, never printed): the item is the generated
+ * "Be the first to review" invitation, not a customer review (#2103 A1). Renderers show it
+ * without stars, name or avatar; replacing the card in the editor clears it.
+ */
+export const TESTIMONIAL_INVITE_TITLE = 'Invitation (replace with a real review)'
+
 export type TestimonialItem = { quote: string; name: string; title?: string; company?: string; rating?: number; avatar?: { url: string; alt?: string } }
 export type TestimonialsConfig = { blockType: 'testimonials'; variant?: 'cards' | 'carousel' | 'simple' | 'masonry' | 'spotlight' | 'minimal-quote' | 'avatar-row' | 'video-text' | 'grid' | 'single'; headline?: string; subheadline?: string; testimonials: TestimonialItem[] }
 export const TestimonialsConfigSchema = BaseBlockSchema.extend({

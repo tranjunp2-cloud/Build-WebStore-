@@ -5,7 +5,7 @@
  *   - prompt: null → removes the override for this blockSlug
  *   - prompt: string → upserts override with updatedAt timestamp
  *
- * Guard: withSuperAdmin. Validates blockSlug ∈ block registry.
+ * Needs template.edit and a draft or review template. Validates blockSlug ∈ block registry.
  *
  * Concurrency: uses atomic PostgreSQL jsonb_set / - operator so concurrent
  * PATCH calls on different slugs never silently overwrite each other.
@@ -13,7 +13,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sql } from 'drizzle-orm'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { studioForbidden, withStudioPermission } from '@/lib/admin/api-utils'
+import { canEditTemplateContent } from '@/lib/admin/studio-permissions'
 import { getRegistrySlugs } from '@/lib/admin/block-registry-reader'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -44,7 +45,7 @@ type RouteContext = { params: Promise<{ id: string }> }
 
 export const PATCH = async (req: NextRequest, ctx: RouteContext) => {
     const { id } = await ctx.params
-    return withSuperAdmin(async (_req, { user }) => {
+    return withStudioPermission('template.edit', async (_req, { user }) => {
         // id resolved above from Next.js route context before entering the guard
 
         let body: unknown
@@ -73,7 +74,8 @@ export const PATCH = async (req: NextRequest, ctx: RouteContext) => {
 
         // Verify template exists before touching it
         try {
-            await payload.findByID({ collection: 'templates', id, depth: 0 })
+            const template = await payload.findByID({ collection: 'templates', id, depth: 0 })
+            if (!canEditTemplateContent(user.roles, template.status)) return studioForbidden()
         } catch {
             return NextResponse.json({ error: 'template not found' }, { status: 404 })
         }

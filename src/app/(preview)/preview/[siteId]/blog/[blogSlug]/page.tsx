@@ -3,8 +3,9 @@ import { getPayload } from 'payload'
 import payloadConfig from '@payload-config'
 import Image from 'next/image'
 import Link from 'next/link'
-import DOMPurify from 'isomorphic-dompurify'
+import { renderBlogContent } from '@/lib/blog/render-content'
 import { getCurrentUser } from '@/lib/auth'
+import { STOREFRONT_POPULATE } from '@/lib/cache/tenant'
 import type { PlatformUser } from '@/types/user'
 import { PreviewAccessDenied } from '../../PreviewErrors'
 import { BuilderLinkScripts } from '@/components/editor/PreviewScripts'
@@ -40,17 +41,24 @@ export default async function PreviewBlogDetailPage({ params, searchParams }: Pr
 
     const payload = await getPayload({ config: payloadConfig })
 
-    // 2. Fetch site (depth:2 to populate tenant + header/footer blocks)
-    const site = await payload.findByID({ collection: 'sites', id: siteId, depth: 2 }) as any
+    // 2. Fetch site (depth:2 to populate tenant + header/footer blocks). The tenant keeps its public
+    // fields only, same as the storefront blog post (TC-PERF-126).
+    const site = await payload.findByID({
+        collection: 'sites',
+        id: siteId,
+        depth: 2,
+        populate: STOREFRONT_POPULATE,
+    }) as any
     if (!site) return notFound()
 
-    // 3. Tenant isolation (P0 — copied from main preview page)
+    // 3. Tenant isolation (P0 — super-admin has platform-wide access)
+    const isSuperAdmin = Boolean(user.roles?.includes('super-admin'))
     const userTenants = user.tenants?.map(
         (t: NonNullable<PlatformUser['tenants']>[number]) =>
             typeof t.tenant === 'object' ? t.tenant.id : t.tenant
     ) || []
     const siteTenantId = typeof site.tenant === 'object' ? site.tenant?.id : site.tenant
-    if (!userTenants.includes(siteTenantId)) {
+    if (!isSuperAdmin && !userTenants.includes(siteTenantId)) {
         console.warn('[PreviewBlog] Tenant isolation rejected: siteId=', siteId)
         return <PreviewAccessDenied />
     }
@@ -69,6 +77,7 @@ export default async function PreviewBlogDetailPage({ params, searchParams }: Pr
         draft: true,
         limit: 1,
         depth: 1,
+        populate: STOREFRONT_POPULATE,
     })
     const post = blogsResult.docs[0] as any
     if (!post) return notFound()
@@ -296,7 +305,7 @@ export default async function PreviewBlogDetailPage({ params, searchParams }: Pr
                         prose-code:px-1 prose-code:rounded
                         prose-img:rounded-xl"
                     dangerouslySetInnerHTML={{
-                        __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : ''),
+                        __html: renderBlogContent(post.content),
                     }}
                 />
 

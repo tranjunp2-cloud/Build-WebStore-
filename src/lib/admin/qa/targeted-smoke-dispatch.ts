@@ -8,7 +8,15 @@ export type TargetedSmokeDispatchRequest = {
   commitSha: string;
   environment: "staging";
   requestDigest: string;
-  profile: "targeted-smoke" | "manual-retest" | "manual-smoke" | "manual-regression";
+  profile:
+    | "targeted-smoke"
+    | "manual-retest"
+    | "manual-smoke"
+    | "manual-regression"
+    | "manual-user_flow"
+    | "manual-impact"
+    | "manual-security"
+    | "manual-all-profiles";
   pack: TargetedSmokePack;
   /** Present only for an explicitly requested manual retest. */
   retestNonce?: string;

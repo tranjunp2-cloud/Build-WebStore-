@@ -34,7 +34,9 @@ describe("[TC-F40-07-04] POST manual-run cancellation", () => {
 
   it("keeps an in-flight lease while cancellation awaits reconciliation", async () => {
     // Arrange
-    mocks.findByID.mockResolvedValueOnce({ fixtureKey: "editor", profile: "manual-smoke" }).mockResolvedValueOnce({ id: 42, status: "dispatched" });
+    mocks.findByID
+      .mockResolvedValueOnce({ fixtureKey: "editor", profile: "manual-smoke" })
+      .mockResolvedValueOnce({ id: 42, status: "dispatched", workflowRunId: "123456" });
     // Act
     const response = await POST(new NextRequest("http://localhost/api/admin/qa/manual-runs/42/cancel", { method: "POST", body: JSON.stringify({ reason: "tester stopped it" }) }), { params: { id: "42" } });
     // Assert

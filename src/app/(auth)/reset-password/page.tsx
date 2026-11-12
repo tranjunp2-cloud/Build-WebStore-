@@ -12,11 +12,12 @@ import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useI18n } from '@/i18n'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { PASSWORD_MIN_LENGTH, getPasswordStrength } from '@/lib/auth/password-rules'
 
 function createResetSchema(t: ReturnType<typeof useI18n>['t']) {
     return z
         .object({
-            password: z.string().min(8, t.auth.reset.passwordMin),
+            password: z.string().min(PASSWORD_MIN_LENGTH, t.auth.reset.passwordMin),
             confirmPassword: z.string(),
         })
         .refine((d) => d.password === d.confirmPassword, {
@@ -28,15 +29,6 @@ function createResetSchema(t: ReturnType<typeof useI18n>['t']) {
 type ResetForm = z.infer<ReturnType<typeof createResetSchema>>
 
 const STRENGTH_COLORS = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-emerald-400', 'bg-emerald-500']
-
-function getPasswordStrength(password: string): { score: number; color: string } {
-    let score = 0
-    if (password.length >= 8) score++
-    if (/[A-Z]/.test(password)) score++
-    if (/[0-9]/.test(password)) score++
-    if (/[^A-Za-z0-9]/.test(password)) score++
-    return { score, color: STRENGTH_COLORS[score] }
-}
 
 function ResetPasswordForm() {
     const router = useRouter()
@@ -59,7 +51,10 @@ function ResetPasswordForm() {
     })
 
     const watchPassword = watch('password', '')
-    const strength = useMemo(() => getPasswordStrength(watchPassword), [watchPassword])
+    const strength = useMemo(() => {
+        const score = getPasswordStrength(watchPassword)
+        return { score, color: STRENGTH_COLORS[score] }
+    }, [watchPassword])
     const strengthLabels = useMemo(() => [
         t.auth.reset.strengthTooWeak,
         t.auth.reset.strengthWeak,
@@ -286,7 +281,7 @@ function ResetPasswordForm() {
                 {/* Requirements */}
                 <div className="space-y-1.5" style={{ marginTop: 20 }}>
                     {[
-                        { test: watchPassword.length >= 8, label: t.auth.reset.reqLength },
+                        { test: watchPassword.length >= PASSWORD_MIN_LENGTH, label: t.auth.reset.reqLength },
                         { test: /[A-Z]/.test(watchPassword), label: t.auth.reset.reqUpper },
                         { test: /[0-9]/.test(watchPassword), label: t.auth.reset.reqNumber },
                     ].map(({ test, label }) => (

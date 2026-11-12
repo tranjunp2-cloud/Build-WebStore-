@@ -12,6 +12,7 @@ import { GradientHero } from './variants/gradient'
 import { ParallaxHero } from './variants/parallax'
 import { SlideshowHero } from './variants/slideshow'
 import { SplitVideoHero } from './variants/split-video'
+import { SourceLayoutHero } from './variants/source-layout'
 import { VideoHero } from './variants/video'
 
 const VARIANT_MAP: Record<string, React.ComponentType<BlockProps<HeroConfig>>> = {
@@ -30,6 +31,9 @@ const VARIANT_MAP: Record<string, React.ComponentType<BlockProps<HeroConfig>>> =
 }
 
 export function HeroBlock(props: BlockProps<HeroConfig>) {
+    // Explicit PW2 variants take precedence: sourceLayout also stores slideshow
+    // playback settings and must not switch the block to the legacy renderer.
+    if (props.block.sourceLayout && !props.block.variant) return <SourceLayoutHero {...props} />
     const variant = props.block.variant || 'centered'
     const Component = VARIANT_MAP[variant] || VARIANT_MAP['centered']
     return <Component {...props} />

@@ -80,6 +80,9 @@ export function PricingTableBlock({ block }: BlockProps<PricingTableConfig>) {
 
     const isHorizontal = variant === 'horizontal'
 
+    // No plans = nothing to show (no empty header + billing toggle over a blank grid)
+    if (plans.length === 0) return null
+
     return (
         <PricingTableSection>
             <div className="text-center max-w-2xl mx-auto mb-12">

@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 import type { Metadata } from 'next'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { requireStudioAccess } from '@/lib/admin/auth-guard'
 import { TemplatesListClient } from '../templates/_components/templates-list-client'
 
 export const metadata: Metadata = { title: 'Drafts' }
@@ -20,7 +20,7 @@ function first(v: string | string[] | undefined): string {
 }
 
 export default async function DraftsPage({ searchParams }: PageProps) {
-    await requireSuperAdmin()
+    await requireStudioAccess()
 
     const sp = await searchParams
     const sort = first(sp.sort) || '-updatedAt'

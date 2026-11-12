@@ -55,6 +55,10 @@ export async function POST(req: NextRequest) {
         const customerId = rawPayload.customer_id_number || ''
         const serviceId = rawPayload.service_id || ''
         const orderId = rawPayload.unifi_order_id || ''
+        // GH-1723: immutable SSO users.id (optional — older SSO builds do not send it)
+        const ssoUserId = Number.isInteger(rawPayload.sso_user_id) && rawPayload.sso_user_id > 0
+            ? rawPayload.sso_user_id as number
+            : undefined
 
         // Name: v1 gửi `name` (full), v2 gửi `first_name` + `last_name`
         let firstName = rawPayload.first_name || ''
@@ -105,6 +109,23 @@ export async function POST(req: NextRequest) {
             )
         }
 
+        // GH-1723: the SSO id may already be bound (e.g. by avatar sync) — check before creating the tenant
+        if (ssoUserId) {
+            const boundBySsoId = await payload.find({
+                collection: 'users',
+                where: { ssoUserId: { equals: ssoUserId } },
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+            })
+            if (boundBySsoId.docs.length > 0) {
+                return NextResponse.json(
+                    { message: 'User already provisioned' },
+                    { status: 409 },
+                )
+            }
+        }
+
         // ── 5. Map pack_code → plan ──
         const planCode = getPlanCode(packCode, subscriptionType)
 
@@ -146,30 +167,55 @@ export async function POST(req: NextRequest) {
         })
 
         // ── 8. Create User (with password from SSO) ──
-        const newUser = await payload.create({
-            collection: 'users',
-            overrideAccess: true,
-            data: {
-                email,
-                password, // SSO provides password → user can login immediately
-                firstName,
-                lastName,
-                phone,
-                roles: ['tenant-owner'],
-                tenants: [
-                    {
-                        tenant: newTenant.id,
-                        role: 'owner',
-                    },
-                ],
-                ...(customerId && { customerIdNumber: String(customerId) }),
-                migrationStatus: 'migrated',
-                ...(keyString && { keyString }),
-                // Audit trail: payload.create() local API has no req.user; set explicitly
-                createdBy: callerUser.id,
-                updatedBy: callerUser.id,
-            },
-        })
+        let newUser
+        try {
+            newUser = await payload.create({
+                collection: 'users',
+                overrideAccess: true,
+                data: {
+                    email,
+                    password, // SSO provides password → user can login immediately
+                    firstName,
+                    lastName,
+                    phone,
+                    roles: ['tenant-owner'],
+                    tenants: [
+                        {
+                            tenant: newTenant.id,
+                            role: 'owner',
+                        },
+                    ],
+                    ...(customerId && { customerIdNumber: String(customerId) }),
+                    ...(ssoUserId && { ssoUserId }),
+                    migrationStatus: 'migrated',
+                    ...(keyString && { keyString }),
+                    // Audit trail: payload.create() local API has no req.user; set explicitly
+                    createdBy: callerUser.id,
+                    updatedBy: callerUser.id,
+                },
+            })
+        } catch (err) {
+            // GH-1723: a concurrent request bound the same sso_user_id between the pre-check and this
+            // create (unique index) → drop the tenant created above and answer 409 like the pre-check.
+            if (ssoUserId) {
+                // A failing lookup must not hide the original create error → treat it as "no race"
+                const raced = await payload.find({
+                    collection: 'users',
+                    where: { ssoUserId: { equals: ssoUserId } },
+                    limit: 1,
+                    depth: 0,
+                    overrideAccess: true,
+                }).catch(() => ({ docs: [] as unknown[] }))
+                if (raced.docs.length > 0) {
+                    await payload.delete({ collection: 'tenants', id: newTenant.id, overrideAccess: true }).catch((cleanupErr) => {
+                        // Orphan tenant: leave a trace so it can be cleaned up by hand
+                        console.error(`[SSO Provisioning] could not remove tenant ${newTenant.id} after the sso_user_id race:`, cleanupErr)
+                    })
+                    return NextResponse.json({ message: 'User already provisioned' }, { status: 409 })
+                }
+            }
+            throw err
+        }
 
         // ── 9. Create PlanSubscription (non-blocking — failure does not abort provision) ──
         const startsAt = startDate

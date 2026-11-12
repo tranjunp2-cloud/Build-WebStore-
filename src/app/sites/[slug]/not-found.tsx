@@ -2,8 +2,10 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { withPublicSiteTenant, STOREFRONT_POPULATE } from '@/lib/cache/tenant'
 import { SiteRenderer, type SiteRendererProps, type NavPage } from '@/components/site-renderer/SiteRenderer'
 import { getServerI18n } from '@/i18n/server'
+import { toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +55,7 @@ export default async function NotFound() {
             ],
         },
         limit: 1,
+        populate: STOREFRONT_POPULATE,
     })
     const site = sitesResult.docs[0]
     if (!site) return <Fallback404 />
@@ -76,7 +79,7 @@ export default async function NotFound() {
         depth: 3,
         draft: false,
     })
-    const page404 = pagesResult.docs[0]
+    const page404 = withPublicSiteTenant(pagesResult.docs[0])
 
     const navigationPages = await payload.find({
         collection: 'pages',
@@ -88,13 +91,14 @@ export default async function NotFound() {
 
     // If 404 page exists WITH actual layout content, render it via SiteRenderer
     const layout = (page404 as Record<string, unknown> | undefined)?.layout as unknown[] | undefined
-    const siteWithSlug = { ...site, tenantSlug } as SiteRendererProps['site']
+    const siteWithSlug = toPublicSite({ ...site, tenantSlug }) as SiteRendererProps['site']
+    const navPages = toPublicDoc(navigationPages.docs) as unknown as NavPage[]
 
     if (page404 && Array.isArray(layout) && layout.length > 0) {
         return <SiteRenderer
             site={siteWithSlug}
-            page={page404 as SiteRendererProps['page']}
-            pages={navigationPages.docs as unknown as NavPage[]}
+            page={toPublicDoc(page404) as SiteRendererProps['page']}
+            pages={navPages}
         />
     }
 
@@ -111,7 +115,7 @@ export default async function NotFound() {
                     { blockType: 'hero', variant: 'centered', headline: '404', subheadline: 'Page Not Found — The page you are looking for does not exist or has been moved.' },
                 ],
             } as SiteRendererProps['page']}
-            pages={navigationPages.docs as unknown as NavPage[]}
+            pages={navPages}
         />
     )
 }

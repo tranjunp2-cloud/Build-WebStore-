@@ -9,7 +9,9 @@ import { Toaster } from '@/components/ui/sonner'
 import { TenantAccessWatcher } from '@/components/dashboard/TenantAccessWatcher'
 import { UserAvatarProvider } from '@/providers/UserAvatarContext'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
+import { AgentRefresh } from '@/lib/agent-changes/agent-refresh'
 import { shouldShowNoWebsiteGuard } from './dashboard-guard-paths'
+import { BADGE_ENTITY_KINDS, countsMayChange } from './sidebar-badge-refresh'
 
 type CMSLayoutClientProps = {
     userName: string
@@ -25,10 +27,12 @@ type CMSLayoutClientProps = {
     badgeCounts?: Partial<Record<SidebarBadgeKey, number>>
     /** Whether current tenant has a usable website (GH-1392). Default true → fail-open. */
     hasWebsite?: boolean
+    /** Current tenant name, resolved server-side; shown in the header feedback report. */
+    storeName?: string
     children: React.ReactNode
 }
 
-export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUrl = null, currentUserRole = 'viewer', userPermissions = [], isSuperAdmin = false, isProduction = false, badgeCounts, hasWebsite = true, children }: CMSLayoutClientProps) {
+export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUrl = null, currentUserRole = 'viewer', userPermissions = [], isSuperAdmin = false, isProduction = false, badgeCounts, hasWebsite = true, storeName, children }: CMSLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     // Collapse state lifted here so TopHeader (« button), Sidebar (mini mode) and <main>
     // (padding) react together. Init false on SSR; localStorage is read post-mount and
@@ -79,6 +83,8 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                 className={cn('dash-shell dash-shell-root min-h-screen bg-dash-bg flex flex-col', collapsed && 'dash-sidebar-mini')}
             >
                 <TenantAccessWatcher />
+                {/* The layout computes the badge counts on the server: render it again when the assistant changes one. */}
+                <AgentRefresh kinds={BADGE_ENTITY_KINDS} when={countsMayChange} />
                 <TopHeader
                     userName={userName}
                     userInitial={userInitial}
@@ -88,6 +94,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                     collapsed={collapsed}
                     onToggleCollapsed={toggleCollapsed}
                     animateCollapse={hydrated}
+                    storeName={storeName}
                 />
                 <div className="flex flex-1 pt-[56px]">
                     <DashboardSidebar
@@ -113,7 +120,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                             collapsed ? 'lg:pl-[64px]' : 'lg:pl-[246px] 2xl:pl-[250px]'
                         )}
                     >
-                        <div className="p-4 sm:p-6 md:p-8">
+                        <div className="dash-content-gutter p-4 sm:p-6 md:p-8">
                             {showNoWebsiteGuard ? <DashboardEmptyState /> : children}
                         </div>
                     </main>

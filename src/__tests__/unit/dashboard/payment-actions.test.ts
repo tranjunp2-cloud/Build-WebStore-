@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia } from '@/app/(dashboard)/settings/payments/actions';
-import { getCurrentTenantId } from '@/lib/auth';
+import { getCurrentTenantId, getCurrentUser } from '@/lib/auth';
 import { getPayload } from 'payload';
 
 // --- Arrange: Mocks ---
+vi.mock('next/headers', () => ({ headers: async () => new Headers() })) // no merchant-access cookie in these tests
 vi.mock('@/lib/auth', () => ({
     getCurrentTenantId: vi.fn(),
+    getCurrentUser: vi.fn(),
 }));
 
 vi.mock('@/lib/payload/tenant-row-lock', () => ({
@@ -62,9 +64,42 @@ describe('Payment Actions', () => {
             expect(result.error).toMatch(/Unauthorized/);
         });
 
+        const member = (role: string, status = 'active') => ({ id: 9, roles: [], tenants: [{ tenant: 'tenant-123', role, status }] });
+        const bankPayments = { payment_cod: true, bank_name: 'Maybank', account_holder_name: 'Kedai Sdn Bhd', account_number: '1234567890' };
+
+        it.each(['owner', 'admin'])('[TC-PERF-151] gives an active %s the payout bank account', async (role) => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentUser).mockResolvedValue(member(role) as never);
+            mockPayloadContext.findByID.mockResolvedValue({ payments: bankPayments });
+
+            // Act
+            const result = await getPaymentSettings();
+
+            // Assert
+            expect(result.payments).toEqual(bankPayments);
+        });
+
+        it.each([['viewer', 'active'], ['editor', 'active'], ['owner', 'pending']])(
+            '[TC-PERF-151] hides the payout bank account from a %s (%s)',
+            async (role, status) => {
+                // Arrange
+                vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+                vi.mocked(getCurrentUser).mockResolvedValue(member(role, status) as never);
+                mockPayloadContext.findByID.mockResolvedValue({ payments: bankPayments });
+
+                // Act
+                const result = await getPaymentSettings();
+
+                // Assert
+                expect(result.payments).toEqual({ payment_cod: true, bankHidden: true, account_number_masked: '•••• 7890' });
+            },
+        );
+
         it('should return payments config on success', async () => {
             // Arrange
             vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentUser).mockResolvedValue(member('owner') as never);
             mockPayloadContext.findByID.mockResolvedValue({
                 payments: { payment_cod: true },
             });
@@ -96,6 +131,121 @@ describe('Payment Actions', () => {
     });
 
     describe('updatePaymentSettings', () => {
+        const member = (role: string) => ({ id: 9, roles: [], tenants: [{ tenant: 'tenant-123', role, status: 'active' }] });
+        const bankPayments = { bank_name: 'Maybank', account_holder_name: 'Kedai Sdn Bhd', account_number: '1234567890' };
+
+        beforeEach(() => {
+            vi.mocked(getCurrentUser).mockResolvedValue(member('owner') as never);
+        });
+
+        it.each(['editor', 'viewer', 'custom'])('[TC-PERF-176] refuses a payout account change from a %s', async (role) => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentUser).mockResolvedValue(member(role) as never);
+
+            // Act
+            const result = await updatePaymentSettings({ payment_cod: true, account_number: '999999999' });
+
+            // Assert
+            expect(result.success).toBe(false);
+            expect(mockPayloadContext.update).not.toHaveBeenCalled();
+        });
+
+        it('[TC-PERF-176] lets an editor toggle COD and keeps the payout account out of the reply', async () => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentUser).mockResolvedValue(member('editor') as never);
+            mockPayloadContext.findByID.mockResolvedValue({ payments: { payment_qr: true, qr_image: 4, ...bankPayments } });
+            mockPayloadContext.update.mockResolvedValue({
+                payments: { payment_cod: true, payment_qr: true, payment_card: false, payment_fpx: false, qr_image: 4, ...bankPayments },
+            });
+
+            // Act
+            const result = await updatePaymentSettings({ payment_cod: true });
+
+            // Assert
+            expect(mockPayloadContext.update).toHaveBeenCalledWith(expect.objectContaining({ data: { payments: { payment_cod: true } } }));
+            expect(result).toEqual({
+                success: true,
+                payments: {
+                    payment_cod: true,
+                    payment_qr: true,
+                    payment_card: false,
+                    payment_fpx: false,
+                    qr_image: 4,
+                    account_holder_name: null,
+                    bank_name: null,
+                    account_number: null,
+                    bankHidden: true,
+                    account_number_masked: '•••• 7890',
+                },
+            });
+            expect(JSON.stringify(result)).not.toContain('Kedai');
+        });
+
+        it.each([
+            ['editor', 4242],
+            ['viewer', 4242],
+            ['editor', null],
+        ])('[TC-PERF-179] refuses a payment QR change (%s, qr_image=%s) from a member who is not owner / admin', async (role, qrImage) => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentUser).mockResolvedValue(member(role) as never);
+            mockPayloadContext.findByID.mockResolvedValue({ id: 4242, alt: 'qr-tenant-123' });
+
+            // Act
+            const result = await updatePaymentSettings({ qr_image: qrImage });
+
+            // Assert
+            expect(result).toEqual({ success: false, error: 'Only the shop owner or an admin can change bank details and the payment QR.' });
+            expect(mockPayloadContext.update).not.toHaveBeenCalled();
+        });
+
+        it.each(['owner', 'admin'])('[TC-PERF-179] lets an active %s replace the payment QR', async (role) => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentUser).mockResolvedValue(member(role) as never);
+            mockPayloadContext.findByID
+                .mockResolvedValueOnce({ id: 4242, alt: 'qr-tenant-123' })
+                .mockResolvedValueOnce({ payments: { payment_qr: true, qr_image: 4, ...bankPayments } });
+            mockPayloadContext.update.mockResolvedValue({ payments: { payment_qr: true, qr_image: 4242, ...bankPayments } });
+
+            // Act
+            const result = await updatePaymentSettings({ qr_image: 4242 });
+
+            // Assert
+            expect(result.success).toBe(true);
+            expect(mockPayloadContext.update).toHaveBeenCalledWith(expect.objectContaining({ data: { payments: { qr_image: 4242 } } }));
+        });
+
+        it('[TC-PERF-176] an editor cannot turn bank transfer on before the owner saved a payout account', async () => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentUser).mockResolvedValue(member('editor') as never);
+            mockPayloadContext.findByID.mockResolvedValue({ payments: { payment_cod: true, qr_image: 4 } });
+
+            // Act
+            const result = await updatePaymentSettings({ payment_qr: true });
+
+            // Assert
+            expect(result.success).toBe(false);
+            expect(mockPayloadContext.update).not.toHaveBeenCalled();
+        });
+
+        it('[TC-PERF-176] an owner still changes the payout account and gets it back', async () => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            mockPayloadContext.findByID.mockResolvedValue({ payments: { payment_cod: true } });
+            mockPayloadContext.update.mockResolvedValue({ payments: { payment_cod: true, ...bankPayments } });
+
+            // Act
+            const result = await updatePaymentSettings({ ...bankPayments });
+
+            // Assert
+            expect(mockPayloadContext.update).toHaveBeenCalledWith(expect.objectContaining({ data: { payments: bankPayments } }));
+            expect(result.success && result.payments).toEqual(expect.objectContaining(bankPayments));
+        });
+
         it('should return unauthorized error if no session tenant', async () => {
             // Arrange
             vi.mocked(getCurrentTenantId).mockResolvedValue(null);
@@ -234,6 +384,27 @@ describe('Payment Actions', () => {
     });
 
     describe('uploadQrMedia', () => {
+        const member = (role: string) => ({ id: 9, roles: [], tenants: [{ tenant: 'tenant-123', role, status: 'active' }] });
+
+        beforeEach(() => {
+            vi.mocked(getCurrentUser).mockResolvedValue(member('owner') as never);
+        });
+
+        it.each(['editor', 'viewer'])('[TC-PERF-179] refuses a QR upload from a %s', async (role) => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentUser).mockResolvedValue(member(role) as never);
+            const formData = new FormData();
+            formData.append('file', new File(['binary-content'], 'qr.png', { type: 'image/png' }));
+
+            // Act
+            const result = await uploadQrMedia(formData);
+
+            // Assert
+            expect(result).toEqual({ success: false, error: 'Only the shop owner or an admin can change bank details and the payment QR.' });
+            expect(mockPayloadContext.create).not.toHaveBeenCalled();
+        });
+
         it('should return unauthorized error if no session tenant', async () => {
             // Arrange
             vi.mocked(getCurrentTenantId).mockResolvedValue(null);

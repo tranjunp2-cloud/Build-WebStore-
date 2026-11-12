@@ -15,7 +15,7 @@ import { isReservedSlug, validateSlugFormat } from '@/lib/utils/reserved-slugs'
  * - Saves old slug to previousSlugs with 30-day expiry
  */
 export async function PATCH(req: NextRequest) {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(req)
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

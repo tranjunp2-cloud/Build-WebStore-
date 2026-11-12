@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { isUsableSite, getTenantSiteState } from '@/lib/dashboard/get-tenant-site-state'
+import { isUsableSite, getTenantSiteState, findDashboardSites } from '@/lib/dashboard/get-tenant-site-state'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // [TC-1392-SITE-01] — isUsableSite predicate (generationStatus variants)
@@ -101,11 +101,11 @@ describe('getTenantSiteState', () => {
         const result = await getTenantSiteState(mockPayload as any, 'tenant-1')
 
         expect(result).toEqual({ hasUsableSite: true })
-        expect(mockPayload.find).toHaveBeenCalledWith({
+        expect(mockPayload.find).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'sites',
             where: { tenant: { equals: 'tenant-1' } },
-            limit: 5,
-        })
+            limit: 100,
+        }))
     })
 
     it('returns hasUsableSite=true when tenant has a site with no generationStatus', async () => {
@@ -217,18 +217,54 @@ describe('getTenantSiteState', () => {
                         equals: 'tenant-abc',
                     }),
                 }),
-                limit: 5,
+                limit: 100,
             }),
         )
     })
 
-    it('uses limit=5 for query (safety margin for extra sites)', async () => {
+    it('caps the read at 100 sites (plan-bounded; 1 expected) without a COUNT', async () => {
         mockPayload.find.mockResolvedValue({ docs: [] })
 
         await getTenantSiteState(mockPayload as any, 'tenant-1')
 
         expect(mockPayload.find).toHaveBeenCalledWith(
-            expect.objectContaining({ limit: 5 }),
+            expect.objectContaining({ limit: 100, pagination: false }),
         )
     })
 })
+
+describe('findDashboardSites / shared rows [TC-PERF-055]', () => {
+    it('reads a tenant\'s sites as one statement: depth 0, no COUNT, the onboarding columns only', async () => {
+        // Arrange
+        const find = vi.fn().mockResolvedValue({ docs: [{ id: 1, generationStatus: 'completed' }] })
+
+        // Act
+        const rows = await findDashboardSites({ find } as any, 42)
+
+        // Assert
+        expect(rows).toEqual([{ id: 1, generationStatus: 'completed' }])
+        expect(find).toHaveBeenCalledWith({
+            collection: 'sites',
+            where: { tenant: { equals: 42 } },
+            sort: '-createdAt',
+            limit: 100,
+            pagination: false,
+            depth: 0,
+            overrideAccess: true,
+            select: { status: true, generationStatus: true, themeCustomized: true, shippingConfig: { shippingSetupConfirmed: true } },
+        })
+    })
+
+    it('uses rows the request already read instead of querying again', async () => {
+        // Arrange
+        const find = vi.fn()
+
+        // Act
+        const state = await getTenantSiteState({ find } as any, '42', Promise.resolve([{ id: 1, generationStatus: 'failed' }, { id: 2, generationStatus: 'none' }]))
+
+        // Assert
+        expect(state).toEqual({ hasUsableSite: true })
+        expect(find).not.toHaveBeenCalled()
+    })
+})
+

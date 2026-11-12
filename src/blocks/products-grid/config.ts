@@ -18,6 +18,10 @@ export const ProductsGridConfigSchema = BaseBlockSchema.extend({
         .max(PRODUCTS_GRID_LIMIT.max)
         .default(PRODUCTS_GRID_LIMIT.default),
     category: z.string().optional(),
+    selectionMode: z.enum(['all', 'fixed', 'random']).default('all'),
+    selectedProductIds: z.array(z.string().regex(/^[1-9]\d*$/)).default([]),
+    includeOutOfStock: z.boolean().default(true),
+    filterControls: z.object({ category: z.boolean(), price: z.boolean(), search: z.boolean(), attributes: z.boolean() }).optional(),
     showCategoryFilter: z.boolean().default(false),
 })
 

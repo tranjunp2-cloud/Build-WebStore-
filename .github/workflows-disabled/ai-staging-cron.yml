@@ -1,0 +1,77 @@
+# AI staging cron — calls the AI scheduled routes on staging.
+#
+# Vercel Cron fires on production deployments only; staging deploys with --target=staging, so the AI routes in
+# vercel.json "crons" never run there: copilot changes whose record the AI platform missed stay pending, stopped
+# runs are never closed, and shop automations never fire.
+#
+# Setup (until then every run exits 0 with a notice):
+#   secrets.STAGING_CRON_SECRET     = CRON_SECRET of staging prime-web AND staging ai-platform (same value)
+#   vars.STAGING_APP_URL            = https://<staging prime-web host>          (no trailing slash)
+#   vars.STAGING_AI_PLATFORM_URL    = https://<staging ai-platform host>        (optional; skipped when empty)
+# GitHub runs `schedule` from the default branch only: it starts once this file is on main.
+name: AI Staging Cron
+
+on:
+  schedule:
+    # AI apply receipts, AI run / thread sweep
+    - cron: '*/10 * * * *'
+    # shop automations (production: 01:00–03:00 UTC, resumable), once a day
+    - cron: '15 1 * * *'
+  workflow_dispatch:
+    inputs:
+      routes:
+        description: 'Which routes to call'
+        type: choice
+        options: [frequent, daily, all]
+        default: frequent
+
+concurrency:
+  group: ai-staging-cron-${{ (github.event.schedule == '15 1 * * *' || inputs.routes == 'daily') && 'daily' || inputs.routes || 'frequent' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cron:
+    # HTTP calls only: a hosted runner bills a full minute per run, so this uses the light self-hosted pool.
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - name: Call AI cron routes
+        env:
+          CRON_SECRET: ${{ secrets.STAGING_CRON_SECRET }}
+          APP_URL: ${{ vars.STAGING_APP_URL }}
+          AI_PLATFORM_URL: ${{ vars.STAGING_AI_PLATFORM_URL }}
+          SCHEDULE: ${{ github.event.schedule }}
+          ROUTES: ${{ inputs.routes }}
+        run: |
+          if [ -z "$CRON_SECRET" ] || [ -z "$APP_URL" ]; then
+            echo "::notice::STAGING_CRON_SECRET / STAGING_APP_URL not set — nothing to call."
+            exit 0
+          fi
+          if [ "$SCHEDULE" = "15 1 * * *" ]; then KIND=daily; else KIND="${ROUTES:-frequent}"; fi
+          APP_URL="${APP_URL%/}"
+          AI_PLATFORM_URL="${AI_PLATFORM_URL%/}"
+          failed=0
+          call() {
+            code=$(curl -sS -o /tmp/out.json -w '%{http_code}' --max-time 300 -H "Authorization: Bearer $CRON_SECRET" "$1" || echo 000)
+            echo "$1 -> $code $(head -c 300 /tmp/out.json 2>/dev/null)"
+            case "$code" in 2*) ;; *) failed=1 ;; esac
+          }
+          if [ "$KIND" = "frequent" ] || [ "$KIND" = "all" ]; then
+            # copilot changes applied / undone here whose record the AI platform missed
+            call "$APP_URL/api/cron/ai-receipts"
+            # AI platform usage ledger → Payload ai-usage-logs
+            call "$APP_URL/api/cron/ai-usage-sync"
+            if [ -n "$AI_PLATFORM_URL" ]; then
+              # retention + closes runs a stopped function left "running"
+              call "$AI_PLATFORM_URL/internal/cron/thread-retention"
+            else
+              echo "::notice::vars.STAGING_AI_PLATFORM_URL empty — ai-platform thread-retention skipped."
+            fi
+          fi
+          if [ "$KIND" = "daily" ] || [ "$KIND" = "all" ]; then
+            call "$APP_URL/api/cron/shop-automations"
+          fi
+          exit $failed

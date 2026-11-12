@@ -102,7 +102,7 @@ The flex column with `flex-1` on main stretches content to fill available space,
                                                     │
                                                     ├── Validate products exist + active
                                                     ├── Calculate: subtotal + SST (6%) = total
-                                                    ├── Generate orderNumber: ORD-{base36 timestamp}
+                                                    ├── Generate orderNumber: ORD-{base36 timestamp}-{16 hex CSPRNG} (src/lib/orders/generate-order-number.ts)
                                                     ├── Decrement product inventory
                                                     ├── Create Order in Payload CMS
                                                     ├── sendEmail() (order confirmation)

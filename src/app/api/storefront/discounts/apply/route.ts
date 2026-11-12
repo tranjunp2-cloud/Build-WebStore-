@@ -6,6 +6,7 @@
  * Never trust the discountSen returned here as an authoritative amount.
  */
 import { NextResponse } from 'next/server'
+import { isTenantUnavailable } from '@/lib/storefront/store-availability'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
@@ -53,11 +54,12 @@ export async function POST(req: Request) {
             where: { slug: { equals: siteSlug } },
             limit: 1,
             depth: 0,
-            select: { id: true },
+            select: { id: true, status: true },
             overrideAccess: true,
         })
         const tenant = tenantResult.docs[0]
-        if (!tenant) {
+        // #2179: banned or expired store answers like an unknown one (no reason given)
+        if (!tenant || await isTenantUnavailable(payload, tenant)) {
             // Silent reject — don't reveal whether tenant exists
             return NextResponse.json({ ok: false })
         }

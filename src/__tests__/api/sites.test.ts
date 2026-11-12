@@ -10,7 +10,7 @@ import { checkRateLimit } from '@/lib/rateLimit'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => {
-    const user = { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] }
+    const user = { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }] }
     return {
         // vi.mock factory runs before imports — types unavailable, use unknown
         withAuth: vi.fn().mockImplementation((handler: unknown) => {
@@ -27,6 +27,17 @@ vi.mock('@/lib/rateLimit', () => ({
     checkTwoTierRateLimit: vi.fn().mockResolvedValue({
         allowed: true, remaining: 59, resetAt: Date.now() + 60_000,
     }),
+}))
+
+vi.mock('@/lib/payload/tenant-row-lock', () => ({
+    TenantSiteLockError: class TenantSiteLockError extends Error {},
+    withTenantRowLock: vi.fn(async (
+        _payload: unknown,
+        _tenantId: unknown,
+        operation: (req: { transactionID: string }) => Promise<unknown>,
+    ) => operation({ transactionID: 'save-transaction' })),
+    lockTenantSiteRows: vi.fn().mockResolvedValue(undefined),
+    executeTenantTransaction: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
 // Mock cookies từ next/headers
@@ -49,7 +60,7 @@ vi.mock('payload', () => {
                 const token = headers.get('Authorization')
                 // Nếu header auth hợp lệ (mocked ở trên) -> Cho phép user đi tiếp
                 if (token === 'JWT mock-valid-token') {
-                    return { user: { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] } }
+                    return { user: { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }] } }
                 }
                 return { user: null }
             }),
@@ -142,7 +153,7 @@ describe('Sites APIs', () => {
             const payload = await getPayload({ config: {} as any })
             expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
                 collection: 'sites',
-                id: '123',
+                id: 123,
                 data: expect.objectContaining({
                     locale: 'ms',
                     shippingConfig: { westRate: 1000, eastRate: 2000, freeAbove: 5000 }
@@ -263,7 +274,7 @@ describe('Sites APIs', () => {
             expect(res.status).toBe(200)
             expect(update).toHaveBeenCalledTimes(1)
             expect(update).toHaveBeenCalledWith(expect.objectContaining({
-                collection: 'sites', id: '123',
+                collection: 'sites', id: 123,
                 data: expect.objectContaining({
                     localBusiness: expect.objectContaining({ businessCategory: 'foodEstablishment', schemaSubtype: 'Bakery', city: 'Petaling Jaya', priceRange: '$$' }),
                 }),
@@ -300,7 +311,7 @@ describe('Sites APIs', () => {
             expect(res.status).toBe(200)
             expect(update).toHaveBeenCalledWith(expect.objectContaining({
                 collection: 'sites',
-                id: '123',
+                id: 123,
                 data: expect.objectContaining({
                     localBusiness: expect.objectContaining({
                         priceRange: '$$',
@@ -355,7 +366,7 @@ describe('Sites APIs', () => {
         it('returns 404 if site is not found when publishing', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
+                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }] } }),
                 findByID: vi.fn().mockResolvedValue(null) // Mock Not found
             })
 
@@ -367,7 +378,7 @@ describe('Sites APIs', () => {
         it('returns 200 and successfully publishes the site', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
+                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }] } }),
                 findByID: vi.fn().mockResolvedValue({ id: '123', status: 'draft', tenant: 'tenant-1' }),
                 find: vi.fn().mockResolvedValue({ docs: [{ id: 'page-1', layout: [] }], hasNextPage: false }),
                 update: vi.fn().mockResolvedValue({ id: '123', status: 'published', publishedAt: new Date().toISOString() })
@@ -384,7 +395,7 @@ describe('Sites APIs', () => {
         it('returns 200 and successfully unpublishes the site', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
+                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }] } }),
                 findByID: vi.fn().mockResolvedValue({ id: '123', status: 'published', tenant: 'tenant-1' }),
                 update: vi.fn().mockResolvedValue({ id: '123', status: 'draft' })
             })
@@ -443,8 +454,8 @@ describe('Sites APIs', () => {
         })
 
         it('returns user.role field in editor-data response', async () => {
-            // Default mock user has tenants: [{ tenant: 'tenant-1' }] without explicit role
-            // → role resolves to 'viewer' fallback (tenant match exists but role undefined)
+            // Default mock user is an active owner of tenant-1 (tenants: [{ tenant: 'tenant-1', role: 'owner', status: 'active' }])
+            // → editor-data returns that membership role as a string
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
                 findByID: vi.fn().mockResolvedValue({

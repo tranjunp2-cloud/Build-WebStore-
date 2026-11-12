@@ -71,6 +71,7 @@ async function resolvedStagingContext(
   requested?: ManualRunContext,
 ): Promise<ManualRunContext | undefined> {
   const currentSha = process.env.VERCEL_GIT_COMMIT_SHA;
+
   if (
     requested &&
     currentSha &&
@@ -78,6 +79,7 @@ async function resolvedStagingContext(
     !requested.commitSha.toLowerCase().startsWith(currentSha.toLowerCase())
   )
     return undefined;
+
   const where: Where | undefined = requested
     ? {
         and: [
@@ -93,39 +95,75 @@ async function resolvedStagingContext(
           ],
         }
       : undefined;
-  if (!where) return undefined;
-  const result = await payload.find({
-    collection: "qa_test_runs",
-    where,
-    sort: "-finishedAt",
-    limit: 20,
-    depth: 0,
-    overrideAccess: true,
-  });
-  const matchingRun = result.docs.find((doc) => {
-    const run = doc as { pullRequest?: unknown; commitSha?: unknown };
-    const pullRequest = run?.pullRequest;
-    const commitSha = run?.commitSha;
-    if (!Number.isSafeInteger(pullRequest) || typeof commitSha !== "string")
-      return false;
-    if (requested) {
-      if (pullRequest !== requested.pullRequest) return false;
-      const rSha = requested.commitSha.toLowerCase();
-      const dSha = commitSha.toLowerCase();
-      return rSha === dSha || dSha.startsWith(rSha) || rSha.startsWith(dSha);
-    }
-    return true;
-  }) as { pullRequest?: unknown; commitSha?: unknown } | undefined;
 
-  if (!matchingRun) return undefined;
-  const pullRequest = matchingRun.pullRequest;
-  const commitSha = matchingRun.commitSha;
-  if (!Number.isSafeInteger(pullRequest) || typeof commitSha !== "string")
+  if (where) {
+    const result = await payload.find({
+      collection: "qa_test_runs",
+      where,
+      sort: "-finishedAt",
+      limit: 20,
+      depth: 0,
+      overrideAccess: true,
+    });
+
+    const matchingRun = result.docs.find((doc) => {
+      const run = doc as { pullRequest?: unknown; commitSha?: unknown };
+      const pullRequest = run?.pullRequest;
+      const commitSha = run?.commitSha;
+      if (!Number.isSafeInteger(pullRequest) || typeof commitSha !== "string")
+        return false;
+      if (requested) {
+        if (pullRequest !== requested.pullRequest) return false;
+        const rSha = requested.commitSha.toLowerCase();
+        const dSha = commitSha.toLowerCase();
+        return rSha === dSha || dSha.startsWith(rSha) || rSha.startsWith(dSha);
+      }
+      return true;
+    }) as { pullRequest?: unknown; commitSha?: unknown } | undefined;
+
+    if (matchingRun) {
+      const pullRequest = matchingRun.pullRequest;
+      const commitSha = matchingRun.commitSha;
+      if (Number.isSafeInteger(pullRequest) && typeof commitSha === "string") {
+        return {
+          pullRequest: pullRequest as number,
+          commitSha: commitSha as string,
+        };
+      }
+    }
+  }
+
+  // Fallback 1: If user explicitly requested PR and SHA, verify against deployment SHA or development mode
+  if (requested) {
+    if (currentSha) {
+      const cSha = currentSha.toLowerCase();
+      const rSha = requested.commitSha.toLowerCase();
+      if (cSha === rSha || cSha.startsWith(rSha) || rSha.startsWith(cSha)) {
+        return {
+          pullRequest: requested.pullRequest,
+          commitSha: requested.commitSha,
+        };
+      }
+      return undefined;
+    }
+    if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+      return {
+        pullRequest: requested.pullRequest,
+        commitSha: requested.commitSha,
+      };
+    }
     return undefined;
-  return {
-    pullRequest: pullRequest as number,
-    commitSha: commitSha as string,
-  };
+  }
+
+  // Fallback 2: In development environment, supply local test context
+  if (process.env.NODE_ENV === "development") {
+    return {
+      pullRequest: 0,
+      commitSha: currentSha || "dev-local-commit-sha",
+    };
+  }
+
+  return undefined;
 }
 
 export async function getManualRunPreflight(
@@ -140,7 +178,7 @@ export async function getManualRunPreflight(
   const certification = target ? getTargetQaCoverage(target.id) : undefined;
   const availableProfiles = target?.active
     ? getManualQaProfileAvailability(target.id)
-    : { smoke: false, regression: false };
+    : { smoke: false, regression: false, user_flow: false, impact: false, security: false };
   const reasons: ManualRunPreflight["reasons"] = [];
   if (!target || !target.active)
     reasons.push({

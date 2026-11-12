@@ -150,7 +150,7 @@ THEN the endpoint returns 429 "Too many submissions"
 
 ## US-F25-CS-04: Owner gets notified per lead (non-blocking)
 
-**Wave Backfill** | **P1** | **S** | **Status:** Done ✅ (as-built; HTML template pending F32)
+**Wave Backfill** | **P1** | **S** | **Status:** Done ✅ (GH-2157: recipients fixed, F32 template + bell added)
 
 ### Story
 
@@ -165,17 +165,18 @@ So that I can respond quickly without watching the admin panel
 #### AC-1: Fire-and-forget notification
 
 ```gherkin
-GIVEN a valid submission for a site with an ownerEmail (or tenant.email)
+GIVEN a valid submission for a site whose tenant has an active owner
 WHEN the submission is created
-THEN payload.sendEmail is invoked to the resolved owner address
-  AND the email is NOT awaited on the response path
+THEN payload.sendEmail is invoked for each active owner (contact-from-seller template)
+  AND a LEAD_NEW bell notification is created for each owner
+  AND both run after the response, never awaited on it
   AND a send failure does NOT change the 200 { success: true } response
 ```
 
 #### AC-2: No recipient → skip
 
 ```gherkin
-GIVEN a site with neither ownerEmail nor tenant.email
+GIVEN a tenant with no active owner (or a site with no tenant)
 WHEN a submission is created
 THEN no email is attempted
   AND the submission is still persisted and 200 returned
@@ -183,8 +184,9 @@ THEN no email is attempted
 
 ### Additional Criteria
 
-- [ ] Owner resolution order: `site.ownerEmail` → `site.tenant.email` → skip
-- [ ] ⚠️ Email body is currently inline plain-text; HTML template tracked in F32 (`contact-seller-notification`)
+- [x] Owner resolution: users with tenant role `owner` + status `active` (`site.ownerEmail` / `tenant.email` never existed)
+- [x] Email uses the F32 `contact-from-seller` template; skipped when the tenant disabled it
+- [ ] ⚠️ Template has no row for the lead `subject`
 - [ ] ⚠️ No buyer confirmation email today (F32 `contact-buyer-confirmation`)
 
 ### Market Notes

@@ -7,14 +7,14 @@ export const dynamic = 'force-dynamic'
 import type { Metadata } from 'next'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { requireStudioAccess } from '@/lib/admin/auth-guard'
 import { CategorySplitPane } from './_components/category-split-pane'
 import type { CategoryDNA } from '@/lib/admin/dna-compliance'
 
 export const metadata: Metadata = { title: 'Category DNA' }
 
 export default async function CategoriesPage() {
-    await requireSuperAdmin()
+    await requireStudioAccess()
 
     const payload = await getPayload({ config })
     const result = await payload.find({

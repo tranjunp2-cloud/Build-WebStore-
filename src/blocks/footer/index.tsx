@@ -1,7 +1,8 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { EyeOff } from 'lucide-react'
+import Image from 'next/image'
+import { EyeOff, Mail, MapPin, Phone } from 'lucide-react'
 
 import type { BlockProps } from '../types'
 import type { FooterConfig } from './config'
@@ -70,9 +71,9 @@ const BRAND_LOGO_TEXT_SIZE = {
 } as const
 
 const BRAND_LOGO_IMG_SIZE = {
-    sm: 'h-6',
-    md: 'h-8',
-    lg: 'h-8',
+    sm: 'h-12 sm:h-14',
+    md: 'h-14 sm:h-16',
+    lg: 'h-14 sm:h-16',
 } as const
 
 function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoProps) {
@@ -82,7 +83,7 @@ function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoPro
         <div className={`font-bold ${textCls} font-heading ${className}`.trim()}>
             {logo?.url ? (
                 /* Plan 260415 Lỗi 8F — alt fallback tốt hơn cho WCAG 1.1.1 */
-                <img src={logo.url} alt={logoText ? `${logoText} logo` : 'Company logo'} className={`${imgCls} w-auto`} />
+                <img src={logo.url} alt={logoText ? `${logoText} logo` : 'Company logo'} className={`${imgCls} w-auto max-w-[min(100%,280px)] object-contain`} />
             ) : (
                 <span style={{
                     background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), ${FOOTER_BRAND_GRADIENT_STOP}))`,
@@ -94,6 +95,26 @@ function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoPro
                 </span>
             )}
         </div>
+    )
+}
+
+/** Site contact details (address, phone, email) with icons, shown under the brand by the dark-gradient variant. */
+function FooterContactInfo({ contact, className = '' }: { contact?: { address?: string | null; phone?: string | null; email?: string | null } | null; className?: string }) {
+    const rows = [
+        { key: 'address', Icon: MapPin, text: contact?.address?.trim(), href: undefined },
+        { key: 'phone', Icon: Phone, text: contact?.phone?.trim(), href: contact?.phone?.trim() ? `tel:${contact.phone.replace(/[^\d+]/g, '')}` : undefined },
+        { key: 'email', Icon: Mail, text: contact?.email?.trim(), href: contact?.email?.trim() ? `mailto:${contact.email.trim()}` : undefined },
+    ].filter(row => row.text)
+    if (rows.length === 0) return null
+    return (
+        <ul data-footer-field="contactInfo" className={`space-y-3 ${className}`.trim()}>
+            {rows.map(({ key, Icon, text, href }) => (
+                <li key={key} className="flex items-start gap-3 opacity-80">
+                    <Icon size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    {href ? <SmartLink href={href} className="hover:opacity-100 transition-opacity"><Body size="small" as="span">{text}</Body></SmartLink> : <Body size="small" as="span">{text}</Body>}
+                </li>
+            ))}
+        </ul>
     )
 }
 
@@ -158,7 +179,8 @@ function FooterSectionTitle({ children, className = '' }: { children: ReactNode;
 
 type LinkColumnProps = {
     title: string
-    links: { label?: string; url?: string; style?: 'internal' | 'external'; _hiddenFromVisitor?: boolean }[]
+    text?: string
+    links: { label?: string; url?: string; imageUrl?: string; style?: 'internal' | 'external'; _hiddenFromVisitor?: boolean }[]
     spacing?: 'tight' | 'default'
 }
 
@@ -166,12 +188,13 @@ type LinkColumnProps = {
  * Plan 260415 Lỗi 12F — opacity-40 fail WCAG contrast. Đổi sang opacity-70
  * (≥4.5:1 ratio trên bg thường). Hover vẫn tăng lên 100%.
  */
-function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
+function LinkColumn({ title, text, links, spacing = 'default' }: LinkColumnProps) {
     const resolveHref = useLocalHref()
     const ulSpacing = spacing === 'tight' ? 'space-y-2.5' : 'space-y-3'
     return (
         <div>
             <FooterSectionTitle>{title}</FooterSectionTitle>
+            {text && <Body size="small" className="whitespace-pre-line opacity-70 mb-3">{text}</Body>}
             <ul className={ulSpacing}>
                 {(links || []).map((link, j) => {
                     const ext = resolveStyle(link) === 'external'
@@ -183,7 +206,7 @@ function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
                                 rel={ext ? 'noopener noreferrer' : undefined}
                                 className="opacity-70 hover:opacity-100 transition-all duration-200 hover:translate-x-1 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                             >
-                                <Body size="small" as="span">{link.label}</Body>
+                                <>{link.imageUrl && <Image src={link.imageUrl} alt="" width={24} height={24} unoptimized className="h-6 w-6 object-contain" />}<Body size="small" as="span">{link.label}</Body></>
                                 {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
                             </SmartLink>
                         </li>
@@ -201,10 +224,13 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     const resolveHref = useLocalHref()
     const mergedBlock = mergeFooterSocialsWithSite(block, site)
     const { logoText, tagline, columns = [], copyrightText, backgroundColor, variant = 'simple' } = mergedBlock
+    // dark-gradient always presents the store: its own tagline, else the site description (plus contact details below)
+    const siteDescription = typeof (site?.seo as { metaDescription?: unknown } | undefined)?.metaDescription === 'string' ? ((site?.seo as { metaDescription: string }).metaDescription).trim() : ''
+    const brandText = tagline || siteDescription
     const footerStyle: React.CSSProperties = backgroundColor ? { backgroundColor } : {}
 
     const copyrightLine = copyrightText
-        ? copyrightText.replace(/\d{4}/, String(new Date().getFullYear()))
+        ? copyrightText
         : `\u00A9 ${new Date().getFullYear()} ${logoText || 'All rights reserved'}`
 
     const socialsArr = (mergedBlock.socials && Array.isArray(mergedBlock.socials) ? mergedBlock.socials : []) as { url?: string; platform?: string; label?: string }[]
@@ -225,7 +251,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                     <div className="text-center">
                         <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4 flex justify-center" />
                         {tagline && (
-                            <Body size="small" data-footer-field="tagline" className="opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
+                            <Body size="small" data-footer-field="tagline" className="whitespace-pre-line opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
                         )}
 
                         {/* Link columns as horizontal lists */}
@@ -239,6 +265,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                         >
                                             {col.title}
                                         </Heading>
+                                        {col.text && <Body size="small" className="whitespace-pre-line opacity-70 mb-3">{col.text}</Body>}
                                         <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
                                             {(col.links || []).map((link, j) => {
                                                 const ext = resolveStyle(link) === 'external'
@@ -250,7 +277,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                                         rel={ext ? 'noopener noreferrer' : undefined}
                                                         className="opacity-70 hover:opacity-100 transition-opacity duration-200 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                                                     >
-                                                        <Body size="small" as="span">{link.label}</Body>
+                                                        <>{link.imageUrl && <Image src={link.imageUrl} alt="" width={24} height={24} unoptimized className="h-6 w-6 object-contain" />}<Body size="small" as="span">{link.label}</Body></>
                                                         {(link as { _hiddenFromVisitor?: boolean })._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
                                                     </SmartLink>
                                                 )
@@ -293,16 +320,17 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                         {/* Logo + tagline */}
                         <div className="lg:max-w-xs">
                             <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-3" />
-                            {tagline && (
-                                <Body size="small" data-footer-field="tagline" className="opacity-40 leading-relaxed">{tagline}</Body>
+                            {brandText && (
+                                <Body size="small" data-footer-field="tagline" className="whitespace-pre-line opacity-70 leading-relaxed">{brandText}</Body>
                             )}
+                            <FooterContactInfo contact={site?.contactInfo} className="mt-5" />
                         </div>
 
                         {/* Link columns center */}
                         {columns.length > 0 && (
                             <div className="flex flex-wrap gap-10">
                                 {columns.map((col, i) => (
-                                    <LinkColumn key={i} title={col.title} links={col.links || []} spacing="tight" />
+                                    <LinkColumn key={i} title={col.title} text={col.text} links={col.links || []} spacing="tight" />
                                 ))}
                             </div>
                         )}
@@ -329,8 +357,8 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     if (variant === 'minimal') {
         // Prefer _filteredNavLinks (injected by SiteRenderer/SiteLayoutShell with hidden pages filtered/marked)
         // over raw site.headerBlock.links to prevent hidden-page links leaking to visitors.
-        const filteredNavLinks = (block as Record<string, unknown>)._filteredNavLinks as { label?: string; url?: string; _hiddenFromVisitor?: boolean }[] | undefined
-        const navHeaderLinks = (filteredNavLinks ?? (site?.headerBlock as Record<string, unknown> | undefined)?.links as { label?: string; url?: string }[] | undefined)?.filter(l => l?.url)
+        const filteredNavLinks = (block as Record<string, unknown>)._filteredNavLinks as { label?: string; url?: string; imageUrl?: string; _hiddenFromVisitor?: boolean }[] | undefined
+        const navHeaderLinks = (filteredNavLinks ?? (site?.headerBlock as Record<string, unknown> | undefined)?.links as { label?: string; url?: string; imageUrl?: string }[] | undefined)?.filter(l => l?.url)
         const firstColLinks = (navHeaderLinks?.length ? navHeaderLinks : columns[0]?.links) || []
 
         return (
@@ -355,7 +383,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                         rel={ext ? 'noopener noreferrer' : undefined}
                                         className="opacity-70 hover:opacity-100 transition-opacity duration-200 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                                     >
-                                        <Body size="small" as="span">{link.label}</Body>
+                                        <>{link.imageUrl && <Image src={link.imageUrl} alt="" width={24} height={24} unoptimized className="h-6 w-6 object-contain" />}<Body size="small" as="span">{link.label}</Body></>
                                         {(link as { _hiddenFromVisitor?: boolean })._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
                                     </SmartLink>
                                     )

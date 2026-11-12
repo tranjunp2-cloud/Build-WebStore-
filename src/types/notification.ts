@@ -8,6 +8,8 @@ export type NotificationType =
     | 'SYSTEM_ALERT'
     | 'PRODUCT_LOW_STOCK'
     | 'BLOG_PUBLISHED'
+    | 'AUTOMATION_REMINDER'
+    | 'LEAD_NEW'
 
 export interface NotificationItem {
     id: string
@@ -23,6 +25,8 @@ export interface NotificationItem {
 export interface NotificationsResponse {
     unreadCount: number
     items: NotificationItem[]
+    /** Present on `offset > 0` pages; when absent the client infers it from the page size. */
+    hasMore?: boolean
 }
 
 export interface MarkReadPayload {

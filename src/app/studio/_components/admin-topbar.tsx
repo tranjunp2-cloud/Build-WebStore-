@@ -27,6 +27,7 @@ import { CreateIssueModal } from './modals/create-issue-modal'
 import { useStudioPreferences, type Theme, type Density, type Accent } from './theme-density-accent-switcher'
 import { NAV_SECTIONS } from './admin-nav-config'
 import type { AdminUser } from '@/lib/admin/auth-guard'
+import { hasStudioPermission } from '@/lib/admin/studio-permissions'
 
 // ── Breadcrumb derivation ─────────────────────────────────────────────────────
 function useCrumbs(pathname: string): string[] {
@@ -165,6 +166,8 @@ export function AdminTopbar({ user }: { user: AdminUser }) {
     const { theme, setTheme, density, setDensity, accent, setAccent } = useStudioPreferences()
     const [tweaksOpen, setTweaksOpen] = useState(false)
     const [showReportIssue, setShowReportIssue] = useState(false)
+    // The topbar sits outside the permissions provider, so it reads the seat list from the user directly.
+    const canReportIssue = hasStudioPermission(user.roles, 'issue.work')
 
     // Derive initials for avatar (max 2 chars)
     const initials = user.name
@@ -222,7 +225,7 @@ export function AdminTopbar({ user }: { user: AdminUser }) {
                     className="icon-btn"
                     aria-label="Notifications (coming soon)"
                     title="Notifications — coming soon"
-                    onClick={() => setShowReportIssue(true)}
+                    onClick={canReportIssue ? () => setShowReportIssue(true) : undefined}
                 >
                     <Bell size={15} />
                     <span className="dot" aria-hidden />
@@ -265,7 +268,7 @@ export function AdminTopbar({ user }: { user: AdminUser }) {
             />
 
             {/* Report issue modal */}
-            {showReportIssue && (
+            {showReportIssue && canReportIssue && (
                 <CreateIssueModal
                     onClose={() => setShowReportIssue(false)}
                     onCreated={() => setShowReportIssue(false)}

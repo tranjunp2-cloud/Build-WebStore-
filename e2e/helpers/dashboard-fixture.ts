@@ -12,6 +12,7 @@ export interface DashboardFixture {
     orderId: string
     orderNumber: string
     orderTotal: number
+    tenantSlug?: string
 }
 
 interface ProvisionOptions {
@@ -48,6 +49,7 @@ function readFixture(responseBody: unknown): DashboardFixture | null {
         orderId: String(orderId),
         orderNumber,
         orderTotal,
+        ...(typeof responseBody.tenantSlug === 'string' ? { tenantSlug: responseBody.tenantSlug } : {}),
     }
 }
 

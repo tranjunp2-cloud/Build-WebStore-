@@ -1,4 +1,29 @@
 {
+  "mascot": {
+    "statusPages": {
+      "notFound": {
+        "title": "Page not found",
+        "description": "The page you're looking for doesn't exist or has been moved.",
+        "cta": "Go to Dashboard"
+      },
+      "forbidden": {
+        "title": "Access denied",
+        "description": "You don't have permission to access this page. Contact your store owner to request access.",
+        "cta": "Go to Dashboard"
+      },
+      "error": {
+        "title": "Something went wrong",
+        "description": "This page hit a problem. Try again — if it keeps happening, reload the page.",
+        "cta": "Try again"
+      },
+      "offline": {
+        "title": "You're offline",
+        "description": "Check your connection, then try again. Nothing you saved is lost.",
+        "cta": "Try again"
+      }
+    },
+    "generationIllustration": "Website creation incomplete"
+  },
   "common": {
     "signIn": "Sign in",
     "signUp": "Sign up",
@@ -14,6 +39,11 @@
     "preview": "Preview",
     "back": "Back",
     "close": "Close",
+    "loadRetry": {
+      "title": "Couldn't load this page",
+      "description": "Something went wrong on our side. Nothing was changed. Try again in a few seconds.",
+      "retry": "Try again"
+    },
     "subscriptionErrors": {
       "featureLocked": "Your plan doesn't include this feature. Upgrade to use it.",
       "subscriptionExpired": "Your subscription has ended. Renew it to keep using this.",
@@ -526,6 +556,25 @@
         "explore": "Explore CMS"
       }
     },
+    "v2Intro": {
+      "badge": "WebStore V2",
+      "title": "Your store has moved to Web Store",
+      "description": "V2 is now the only place to manage your store and receive new data. Your existing data has been moved to your current store.",
+      "getStarted": "Get started",
+      "close": "Close",
+      "videoComingSoon": "Video coming soon",
+      "loadingVideo": "Loading video…",
+      "video": {
+        "play": "Play video",
+        "pause": "Pause",
+        "replay": "Replay",
+        "seek": "Seek",
+        "mute": "Mute",
+        "unmute": "Unmute",
+        "fullScreen": "Full screen",
+        "exitFullScreen": "Exit full screen"
+      }
+    },
     "step1Description": "Share a few basics so AI can build the right website for you.",
     "generating": {
       "title": "Create website with AI",
@@ -533,6 +582,21 @@
       "startingMessage": "Starting to build your website…",
       "creatingTitle": "Creating your website…",
       "creatingSubtitle": "AI is reviewing your business and building your design.",
+      "stageBrief": "Business brief",
+      "stageInsights": "AI insights",
+      "insightStyle": "Style",
+      "insightPalette": "Palette",
+      "insightTypography": "Typography",
+      "styleModern": "Modern & Clean",
+      "styleClassic": "Classic & Elegant",
+      "previewReady": "Preview ready",
+      "captionReading": "Reading your business details",
+      "captionStyle": "Picking a style that fits your brand",
+      "captionPlanning": "Planning your page sections",
+      "captionWriting": "Writing content for {name}",
+      "captionPainting": "Applying colors, fonts and images",
+      "captionAssembling": "Assembling your website preview",
+      "captionFinishing": "Adding final touches",
       "stepAnalyzing": "Reviewing your business info",
       "stepGenerating": "Creating content & design",
       "stepPreparing": "Preparing preview",
@@ -577,6 +641,7 @@
       "copyFailed": "Couldn't copy the link. Try again.",
       "yourWebsite": "Your website",
       "previewPreparing": "Preparing your preview...",
+      "draftBadge": "Draft",
       "savingDraft": "Saving draft...",
       "savedAt": "Saved {time}",
       "saveFailed": "Couldn't save. Try again.",
@@ -585,7 +650,13 @@
       "generated": "generated",
       "generationTime": "{seconds}s",
       "createdSuccessfully": "Website \"{name}\" is ready!",
-      "viewPreviewHint": "See the preview on the right, open the editor to make changes, or publish now."
+      "viewPreviewHint": "See the preview on the right, open the editor to make changes, or publish now.",
+      "placeholdersTitle": "Replace before you publish",
+      "placeholdersHint": "These sections still hold sample content. Swap in your real details in the editor. You can still publish any time.",
+      "placeholdersMore": "+{count} more",
+      "finishShopTitle": "Finish your shop",
+      "finishShopDescription": "Your products have no stock or real photos yet. The assistant will ask you for them.",
+      "finishShopButton": "Finish your shop"
     },
     "form": {
       "businessName": "Business name",
@@ -605,8 +676,11 @@
       "promoStep1": "Enter your business details",
       "promoStep2": "AI creates content and design",
       "promoStep3": "Preview and publish",
+      "blueprintCaption": "AI builds this template from your details",
+      "blueprintReady": "All set — AI is ready to build your website",
+      "blueprintCount": "{count} of 4 details added",
       "industryOptions": {
-        "restaurant": "Restaurant / cafe / F&B",
+        "restaurant": "Restaurant / dine-in",
         "ecommerce": "Shop / fashion / e-commerce",
         "beauty": "Beauty / spa / wellness",
         "tech": "Tech / IT / SaaS",
@@ -616,7 +690,7 @@
         "fitness": "Gym / fitness / yoga",
         "creative": "Portfolio / freelancer / agency",
         "business": "Business / corporate",
-        "fnb": "F&B / cafe / bakery",
+        "fnb": "Café / bakery / desserts",
         "events": "Events / wedding",
         "blog": "Blog / media / magazine",
         "travel": "Travel / tourism"
@@ -625,13 +699,14 @@
         "businessName": "Enter your business name",
         "industry": "Select an industry",
         "shortDescription": "Describe your business",
-        "products": "Describe your products or services"
+        "products": "Describe your products or services",
+        "minLength": "Must be at least {count} characters"
       },
       "tabManual": "Describe business",
-      "tabUrl": "Import from URL",
-      "urlLabel": "Website URL",
+      "tabUrl": "Import from a link",
+      "urlLabel": "Your website, Instagram or Facebook link",
       "urlPlaceholder": "https://your-website.com",
-      "urlHint": "Paste the address of your existing website.",
+      "urlHint": "Paste the address of your website, Instagram or Facebook page. We only read what is public.",
       "extractButton": "Extract",
       "extracting": "Extracting...",
       "analyzingWebsite": "Analyzing website...",
@@ -658,7 +733,38 @@
       "slugAvailable": "Available",
       "slugChecking": "Checking availability…",
       "slugCheckError": "Couldn't check that name. Try again.",
-      "slugHelperText": "You can change this later in Settings > Domains."
+      "slugHelperText": "You can change this later in Settings > Domains.",
+      "optionalLabel": "Optional",
+      "buyingMethodsLabel": "How do customers buy from you?",
+      "buyingMethodsHint": "The site will only mention the ways you pick here.",
+      "buyingMethodOptions": {
+        "delivery": "Delivery",
+        "pickup": "Pickup",
+        "walk_in": "Walk-in",
+        "booking": "Booking",
+        "cod": "Cash on delivery",
+        "online_payment": "Online payment"
+      },
+      "serviceAreaLabel": "Areas you serve",
+      "serviceAreaPlaceholder": "e.g. Klang Valley, Penang island",
+      "shopFactsLabel": "Facts we can say about your shop",
+      "shopFactsPlaceholder": "e.g. Started in 2019. Halal certified (only if you really are). Won Best Cafe 2023.",
+      "shopFactsHint": "Only add what is true. The AI will not invent years, certifications or awards.",
+      "extractionReview": {
+        "title": "Review extracted info",
+        "subtitle": "Edit any fields before applying to your form.",
+        "businessName": "Business name",
+        "industry": "Industry",
+        "description": "Description",
+        "products": "Products / Services",
+        "skip": "Skip & enter manually",
+        "apply": "Apply to form",
+        "realContentTitle": "Real content found",
+        "testimonialsFound": "{count} customer reviews",
+        "faqFound": "{count} FAQ answers",
+        "realContentNote": "These are copied from your page and used on your new site as they are.",
+        "noRealContent": "No customer reviews or FAQ found on that page, so none will be copied."
+      }
     }
   },
   "email": {
@@ -773,6 +879,7 @@
     },
     "refundedOrder": {
       "body": "Your order has been refunded. The money goes back to your original payment method within 5–10 business days.",
+      "refundedAmount": "Refunded",
       "orderStatusRefunded": "Refunded",
       "refundDate": "Refund date",
       "refundNote": "Refund note",
@@ -1049,6 +1156,17 @@
         "undoSuccess": "Batch fix undone",
         "errorTimeout": "The AI fix took too long. Please try again.",
         "errorFailed": "Couldn't finish the AI fix. Please try again.",
+        "errorQuota": "The AI usage limit was reached. Please try again later.",
+        "errorUnavailable": "The AI service isn't available right now. Please try again in a moment.",
+        "errorBusy": "The AI is busy right now. Please try again in a minute.",
+        "partialFailed": "{count} items couldn't be generated: {names} ({reason})",
+        "andMore": "+{count} more",
+        "reasonTimeout": "the AI took too long",
+        "reasonQuota": "AI usage limit reached",
+        "reasonUnavailable": "AI unavailable",
+        "reasonBusy": "the AI is busy",
+        "reasonFailed": "generation failed",
+        "retryFailed": "Retry failed items",
         "undoPartial": "Some fixes could not be undone. The remaining changes are ready to retry."
       },
       "keywordTracker": {
@@ -1223,6 +1341,8 @@
       },
       "pageTitle": "Orders",
       "pageSubtitle": "Manage and track your orders",
+      "noWorkspaceTitle": "No store assigned",
+      "noWorkspaceBody": "Ask an administrator to assign this account to a store to view orders.",
       "metrics": {
         "pending": "Pending",
         "readyToShip": "Ready to ship",
@@ -1301,6 +1421,8 @@
         "notFound": "Order not found",
         "notFoundDesc": "The order {id} does not exist or you do not have access.",
         "backToOrders": "Back to orders",
+        "backToOrdersShort": "Orders",
+        "createdOn": "Created {date}",
         "shippingFulfillment": "Shipping Fulfillment"
       },
       "actions": {
@@ -1712,6 +1834,16 @@
         "aiChatSuggestion2": "Sports set: t-shirt RM 80, shorts RM 60, 20 in stock each",
         "aiChatSuggestion3Label": "+ Bulk cosmetics",
         "aiChatSuggestion3": "Bulk cosmetics: lipstick RM 35, face cream RM 90, 15 in stock each",
+        "askAiLabel": "Describe products to add",
+        "askAiPlaceholder": "Describe products to add, e.g. Leather jacket RM 500, 10 in stock; Baseball cap RM 50…",
+        "askAiPlaceholderShort": "Describe products to add…",
+        "askAiSend": "Ask AI",
+        "askAiTry": "Try:",
+        "askAiFromPhotos": "From photos",
+        "askAiFromPhotosPrompt": "Create a product from the photos I attach.",
+        "askAiExample": "3 summer dresses, RM 120 each",
+        "askAiExamplePrompt": "3 summer dresses, RM 120 each, sizes S–L",
+        "askAiDraftNote": "Saved as drafts for you to review — nothing goes on sale until you approve",
         "aiChatBtn": "Generate Drafts",
         "aiReviewTooltip": "Created by AI — needs review",
         "aiReviewAriaLabel": "AI-created draft pending review"
@@ -1755,7 +1887,7 @@
         "deleteConfirmRestorable": "You can restore this product later.",
         "cancel": "Cancel",
         "confirmDeleteBtn": "Delete product",
-        "deleteWarning": "This permanently deletes the product from your store and can't be undone.",
+        "deleteWarning": "The product will be removed from your store. You can undo this for a few seconds after deleting.",
         "deleting": "Deleting…",
         "toastSaved": "Product saved.",
         "toastDraft": "Saved as draft. Switch to Active to show it on your storefront.",
@@ -1782,6 +1914,7 @@
           "optionMax": "You can add up to 30 options per tier.",
           "uniqueOptions": "Each option must be unique. Remove the duplicates.",
           "skuLong": "SKU is too long. Keep it under 100 characters.",
+          "baseSkuLong": "SKU is too long. Keep it under 50 characters.",
           "priceMin": "Price must be 0 or more.",
           "priceMax": "Price is too large.",
           "stockMin": "Stock must be 0 or more.",
@@ -1861,6 +1994,7 @@
         "productCreated": "Product created.",
         "productUpdated": "Product updated.",
         "failedLoad": "Couldn't load the product. Refresh to try again.",
+        "notFound": "Product not found.",
         "confirmDelete": "Delete this product?",
         "deleteSuccess": "Product deleted",
         "somethingWentWrong": "Something went wrong. Please try saving again.",
@@ -1880,7 +2014,8 @@
           "basePrice": "Price",
           "baseSku": "SKU code",
           "baseInventory": "Inventory",
-          "weight": "Weight"
+          "weight": "Weight",
+          "compareAtPrice": "Compare-at price"
         },
         "sections": {
           "general": "General information",
@@ -1888,6 +2023,7 @@
           "productNamePlaceholder": "Enter product name",
           "category": "Category",
           "images": "Images (up to 5, each under 5MB)",
+          "imagesLegacyHint": "Existing extra images are preserved. You can reorder, edit alt text or remove them. Reduce to fewer than 5 before adding a new image.",
           "imagesAltHint": "Adding Alt text improves SEO and buyer reachability.",
           "variants": "Variants & inventory",
           "hasVariants": "This product has multiple options or variants",
@@ -1913,6 +2049,10 @@
           "masterLockedTooltip": "This product has variants — edit stock/price on each variant row below",
           "removeTierConfirmBtn": "Remove option",
           "removeTierCancelBtn": "Keep option",
+          "disableVariantsConfirmTitle": "Turn off variants?",
+          "disableVariantsConfirmDesc": "Turning this off will delete all variant matrix data. Continue?",
+          "disableVariantsConfirmBtn": "Yes",
+          "disableVariantsCancelBtn": "No",
           "createSkuTable": "Generate variants",
           "optionNameLabel": "Option name",
           "valuesLabel": "Values",
@@ -1941,6 +2081,11 @@
           "metaDescMax": "(max 160 characters)",
           "urlSlug": "URL slug",
           "urlSlugHint": "Leave blank to create one from the title",
+          "aiSuggestion": "AI suggestion",
+          "aiSuggestionNow": "Now",
+          "aiSuggestionEmpty": "(empty)",
+          "aiSuggestionUse": "Use this",
+          "aiSuggestionDiscard": "Discard",
           "color": "Color",
           "size": "Size",
           "attributes": "Extended information (attributes)",
@@ -1960,6 +2105,7 @@
         "parsing": "Reading list...",
         "parseSuccess": "Found {count} products",
         "parseInvalidData": "We couldn't read that list. Try rewriting it more simply.",
+        "partialParse": "We couldn't read {n} of the products: {items}. Add them again in a new list.",
         "parseError": "Something went wrong. Please try again.",
         "aiQuotaExceeded": "The AI is busy right now. Please try again in a few minutes.",
         "aiTimeout": "The AI took too long to respond. Please try again with a shorter list.",
@@ -2064,6 +2210,7 @@
           "saving": "Saving...",
           "optional": "(optional)",
           "errors": {
+            "nameRequired": "Category name is required.",
             "nameDuplicate": "Category name already exists in this level.",
             "slugDuplicate": "This URL slug is already used in your store."
           }
@@ -2162,6 +2309,7 @@
       "fieldEmail": "Email",
       "fieldLatestDate": "Latest date",
       "timelineEntry": "Message",
+      "replySent": "Reply sent",
       "loadDetailsFailed": "Couldn't load these details. Please try again.",
       "sourceBadgeContact": "Contact forms",
       "sourceBadgeNewsletter": "Newsletter subscriptions",
@@ -2210,7 +2358,10 @@
         "filteredTitle": "No customers match your filters",
         "filteredSubtitle": "Try changing your search or filters.",
         "today": "Today",
-        "yesterday": "Yesterday"
+        "yesterday": "Yesterday",
+        "relDays": "{n}d ago",
+        "relMonths": "{n}mo ago",
+        "relYears": "{n}y ago"
       },
       "detail": {
         "tabDefault": "Details",
@@ -2251,10 +2402,17 @@
         "statTotalSpending": "Total spending",
         "statCompleteRate": "Completed rate",
         "statFailedRate": "Failed rate",
+        "statTotalSpendingHint": "Paid or completed orders, excluding cancelled/refunded ones.",
+        "statRateHint": "Calculated on total orders, including orders still in progress.",
         "autoLinkTitle": "Auto-link on",
-        "autoLinkBody": "New orders with this phone number attach to this customer automatically via the {hook} hook.",
+        "autoLinkBody": "New orders with this phone number are added to this customer automatically.",
         "updated": "Updated",
         "relJustNow": "just now",
+        "relMinutes": "{n}m ago",
+        "relHours": "{n}h ago",
+        "relDays": "{n}d ago",
+        "relMonths": "{n}mo ago",
+        "relYears": "{n}y ago",
         "fieldNameRequired": "Enter a name to continue."
       },
       "ordersTab": {
@@ -2353,6 +2511,7 @@
         "accountNumberLabel": "Account number",
         "accountNumberHelper": "Hidden at checkout. Buyers only see the last 4 digits.",
         "qrUploadedMeta": "PNG · uploaded",
+        "payoutOwnerOnlyNote": "Only the shop owner or an admin can change bank details and the payment QR.",
         "statusLocked": "Locked",
         "stripeConnecting": "Taking you to Stripe...",
         "failConnectStripe": "Couldn't start the Stripe connection. Please try again.",
@@ -2605,7 +2764,63 @@
           "topUp": "Top up"
         }
       },
+      "automations": {
+        "title": "Automations",
+        "subtitle": "Every morning (9:00 Malaysia time) the assistant checks your shop and leaves a reminder in the bell. Tap a reminder to fix it together with the assistant.",
+        "ownerOnly": "Only the owner or an admin can change the automations.",
+        "items": {
+          "discounts": { "title": "Discount codes", "desc": "Codes that end within 3 days, or are used up but still switched on." },
+          "stock": { "title": "Stock", "desc": "Live products that are out of stock or running low." },
+          "orders_waiting": { "title": "Orders waiting", "desc": "Orders to confirm, payment proofs to check, and confirmed orders not shipped after a day." },
+          "leads": { "title": "Unanswered messages", "desc": "Contact form messages nobody has answered for two days." },
+          "site_health": { "title": "Website health", "desc": "Broken links, changes not published and pages without a search title. Checked on Mondays." }
+        },
+        "digestTitle": "Email digest",
+        "digestDesc": "One email with everything that needs you, sent to the owner and admins. Off by default.",
+        "frequency": "How often",
+        "daily": "Every day",
+        "weekly": "Mondays only",
+        "quiet": "Quiet by design: at most one reminder per check per day, and one digest email.",
+        "save": "Save",
+        "saving": "Saving...",
+        "saved": "Automations saved.",
+        "saveFirst": "Save your changes first.",
+        "runNow": "Run now",
+        "running": "Checking...",
+        "previewTitle": "What would be sent right now",
+        "previewNote": "Preview only: nothing is sent and no email goes out.",
+        "previewEmpty": "Nothing needs you right now, so no reminder would be sent.",
+        "fix": "Fix with the assistant",
+        "mondayOnly": "Left for Monday: {names}.",
+        "errors": {
+          "unauthorized": "Please sign in again.",
+          "forbidden": "Only the owner or an admin can change the automations.",
+          "invalid": "Those settings are not valid.",
+          "rate_limited": "Too many checks. Try again in a little while.",
+          "failed": "Something went wrong. Please try again."
+        }
+      },
       "emailTemplates": {
+        "preview": {
+          "live": "Live Preview",
+          "desktop": "Desktop",
+          "mobile": "Mobile",
+          "refresh": "Refresh",
+          "subjectLabel": "Subject:",
+          "subjectDefault": "Default subject (type to override)",
+          "unavailable": "Preview unavailable — check console for details",
+          "retry": "Retry",
+          "placeholder": "Preview will appear here",
+          "iframeTitle": "Email preview",
+          "demoTitle": "Demo Data Used In Preview",
+          "demoOrder": "Order #",
+          "demoCustomer": "Customer",
+          "demoTotal": "Total",
+          "demoBrand": "Brand",
+          "demoSupport": "Support email",
+          "footerNote": "Rendered with sample data · won't be sent to real customers",
+          "resetToDefault": "Reset to default"
+        },
         "title": "Email templates",
         "subtitle": "Customize the order and account emails your store sends to buyers and to you. Changes apply to your store only — defaults stay safe and you can revert anytime.",
         "buyerEmails": "Buyer emails",
@@ -2644,6 +2859,7 @@
         "fieldGreeting": "Greeting",
         "fieldCtaLabel": "CTA label",
         "fieldClosing": "Closing",
+        "fieldTooLong": "{field} can be at most {limit} characters",
         "hintCtaLabel": "Button text. Use a strong verb — \"Track order\", \"Confirm\", \"Open inbox\".",
         "unsavedChanges": "Unsaved changes",
         "allChangesSaved": "All changes saved",
@@ -2891,7 +3107,7 @@
         "delete": "Delete post",
         "deleteConfirm": "Delete this blog post? It will be permanently removed and can't be undone.",
         "deleteConfirmTitle": "Delete post",
-        "deleteConfirmDetails": "Delete \"{title}\"? This can't be undone.",
+        "deleteConfirmDetails": "Delete \"{title}\"?",
         "deleteConfirmWarn": "This can't be undone. The post will be permanently removed.",
         "confirmDeleteBtn": "Delete post",
         "deleteSuccess": "\"{title}\" deleted",
@@ -3011,7 +3227,40 @@
         "generateFailed": "Couldn't generate content. Please try again.",
         "noContentGenerated": "No content was generated. Please try again.",
         "authorLoading": "Loading...",
-        "authorFallback": "User"
+        "authorFallback": "User",
+        "aiTab": "AI writer",
+        "settingsTab": "Settings",
+        "aiMarkTag": "AI",
+        "aiUndoPart": "Undo this part",
+        "aiKeepPart": "Keep",
+        "aiDraftTitle": "AI draft in the editor",
+        "aiEditTitle": "AI changes to this post",
+        "aiPendingNote": "nothing is saved until you keep it.",
+        "aiAppliedTitle": "AI changes applied",
+        "aiAppliedNote": "undo any part, or everything.",
+        "aiSavedTitle": "AI draft saved as a draft post",
+        "aiSavedNote": "highlighted parts are from AI; change anything, then save.",
+        "aiKeepAll": "Keep all",
+        "aiDiscard": "Discard",
+        "aiAskChanges": "Ask for changes",
+        "aiUndoAll": "Undo all",
+        "aiDone": "Done",
+        "aiPartTitle": "title",
+        "aiPartContent": "article",
+        "aiPartCover": "cover photo",
+        "aiPartSeo": "SEO",
+        "aiLocked": "Keep or discard the AI draft first",
+        "aiWriting": "AI is writing — the draft lands here",
+        "aiSeoFill": "Write with AI",
+        "aiSeoWriting": "Writing in the post's language…",
+        "aiSeoFilled": "Filled by AI",
+        "aiSeoUndo": "Undo",
+        "aiSeoFailed": "Couldn't write the SEO text. Try again.",
+        "aiSeoNeedsText": "Write a title or some text first",
+        "aiKeepFailed": "Couldn't apply the AI change. Try again.",
+        "aiStale": "This AI change was made from an older version of the post, so nothing was changed.",
+        "aiAskAgain": "Ask again",
+        "aiSaveFirst": "Save your edits first — the AI change was made from the saved post."
       },
       "categoryModal": {
         "title": "Manage categories",
@@ -3031,6 +3280,7 @@
         "toastLoadFail": "Couldn't load categories. Please refresh and try again.",
         "toastCreateSuccess": "Category created",
         "toastCreateFail": "Couldn't create the category. Please try again.",
+        "toastDuplicate": "A category with this name already exists.",
         "toastUpdateSuccess": "Category updated",
         "toastUpdateFail": "Couldn't update the category. Please try again.",
         "toastDeleteSuccess": "Category \"{name}\" deleted",
@@ -3054,6 +3304,7 @@
         "deleting": "Deleting...",
         "toastCreated": "Category \"{name}\" created",
         "toastCreateFail": "Couldn't create the category. Check your connection and try again.",
+        "toastDuplicate": "A category with this name already exists.",
         "toastUpdated": "Category updated",
         "toastUpdateFail": "Couldn't update the category. Try again in a moment.",
         "toastDeleted": "Category \"{name}\" deleted",
@@ -3070,6 +3321,25 @@
       },
       "noMatches": "No posts match your filters",
       "resetFilters": "Reset filters"
+    },
+    "agentChanged": {
+      "product": "The assistant updated this product.",
+      "post": "The assistant updated this post.",
+      "discount": "The assistant updated this discount.",
+      "customer": "The assistant updated this customer.",
+      "template": "The assistant updated this email template.",
+      "reload": "Reload",
+      "keepMine": "Keep mine",
+      "loadLatest": "Load the latest",
+      "saveAnyway": "Save mine anyway (replaces their changes)",
+      "conflict": {
+        "product": "This product was changed after you opened it.",
+        "post": "This post was changed after you opened it.",
+        "discount": "This discount was changed after you opened it.",
+        "customer": "This customer was changed after you opened it.",
+        "template": "This email template was changed after you opened it."
+      },
+      "changedElsewhere": "Changed elsewhere — refreshed"
     },
     "tenantAccessWatcher": {
       "sessionExpiredTitle": "Session expired",
@@ -3281,8 +3551,8 @@
               "other": "{count} items missing meta titles"
             },
             "metaDescription": {
-              "one": "{count} page missing a meta description",
-              "other": "{count} pages missing meta descriptions"
+              "one": "{count} item missing a meta description",
+              "other": "{count} items missing meta descriptions"
             },
             "contentQuality": {
               "one": "{count} page needs content improvements",
@@ -3316,6 +3586,35 @@
           "other": "{count} items"
         }
       },
+      "todo": {
+        "title": "Issues",
+        "subtitle": "What needs your attention right now",
+        "count": {
+          "one": "{count} issue",
+          "other": "{count} issues"
+        },
+        "emptyTitle": "No issues right now",
+        "emptyDesc": "Orders, stock and website checks that need you will show up here.",
+        "unavailableTitle": "Issues are unavailable",
+        "unavailableDesc": "We couldn't load your issues right now. Please try again later.",
+        "askAi": "Ask AI",
+        "askAiLabel": "Ask AI to help with: {title}",
+        "open": "Open",
+        "openLabel": "Open the page for: {title}",
+        "more": "and {count} more",
+        "openChat": "Open chat",
+        "openChatLabel": "Open the chat for: {title}",
+        "group": {
+          "now": "Urgent",
+          "you": "Needs you",
+          "week": "Soon"
+        },
+        "severity": {
+          "high": "Urgent",
+          "medium": "Soon",
+          "low": "Later"
+        }
+      },
       "customize": {
         "button": "Customize",
         "title": "Customize dashboard",
@@ -3331,10 +3630,88 @@
         "moveDown": "Move down",
         "close": "Close",
         "blockOnboarding": "Onboarding checklist",
+        "blockTodo": "Issues",
         "blockGlance": "At-a-glance stats",
         "blockTraffic": "Traffic & performance",
         "blockSeo": "SEO health",
         "blockOrders": "Pending orders"
+      }
+    },
+    "feedback": {
+      "button": "Send feedback",
+      "title": "Send feedback",
+      "description": "Your feedback and bug reports help us improve the Web Store.",
+      "context": {
+        "store": "Store: {store}"
+      },
+      "mismatchNotice": "V1 doesn't show data created after the freeze. Compare data from the same point in time.",
+      "fields": {
+        "type": "Feedback type",
+        "typeOptions": {
+          "problem": "Report a problem",
+          "mismatch": "Data mismatch",
+          "suggestion": "Suggestion"
+        },
+        "area": "Feature",
+        "areaPlaceholder": "Choose features (you can pick more than one)",
+        "areaError": "Please choose at least one feature.",
+        "areaMore": "+{count}",
+        "removeArea": "Remove {name}",
+        "areaSelectAll": "Select all",
+        "areaSheetTitle": "Choose features",
+        "areaClearAll": "Clear all",
+        "areaDone": "Done",
+        "areaDoneCount": "Done ({count})",
+        "areaOptions": {
+          "products": "Products & inventory",
+          "orders": "Orders",
+          "customers": "Customers",
+          "discounts": "Promotions",
+          "design": "Design & pages",
+          "payments": "Payments",
+          "shipping": "Shipping",
+          "domains": "Domains",
+          "account": "Account & staff",
+          "other": "Other"
+        },
+        "details": "Details",
+        "detailsPlaceholder": "What did you do, what did you expect, and what happened instead?",
+        "detailsPlaceholderMismatch": "What's different between V1 and V2? E.g. Order DH-1042 is RM120 in V1 but RM100 in V2.",
+        "detailsError": "Please add some details.",
+        "detailsShortError": "Please write at least 10 characters.",
+        "detailsHelper": "Don't enter passwords, payment details or your customers' personal data.",
+        "optional": "(optional)",
+        "screenshots": "Screenshots",
+        "addScreenshot": "Add image",
+        "screenshotAlt": "Screenshot {n}",
+        "removeScreenshot": "Remove screenshot {n}",
+        "screenshotHelper": "Up to 9 images, PNG or JPG, max 5 MB each.",
+        "screenshotTooLarge": "This image is larger than 5 MB.",
+        "screenshotWrongType": "Only PNG or JPG images are supported.",
+        "screenshotTooMany": "You can add up to 9 images."
+      },
+      "failed": {
+        "title": "Your feedback wasn't sent",
+        "description": "What you entered has been kept. Please try again.",
+        "screenshotTooLarge": "A screenshot is still too large to upload even after compression. Remove it or use a smaller image, then try again."
+      },
+      "rateLimited": "You've sent a lot of feedback in a short time. Please try again in a few minutes.",
+      "sendingNote": "Sending… Please don't send it again.",
+      "actions": {
+        "cancel": "Cancel",
+        "send": "Send feedback",
+        "sending": "Sending…",
+        "close": "Close"
+      },
+      "discard": {
+        "title": "Discard what you've entered?",
+        "description": "Your feedback hasn't been sent.",
+        "keep": "Keep editing",
+        "confirm": "Discard"
+      },
+      "success": {
+        "title": "Feedback sent",
+        "notifyNote": "We'll notify you in Web Store (the bell icon) when there's an update."
       }
     }
   },
@@ -3353,14 +3730,16 @@
     "errors": {
       "emailRequired": "Please enter your email",
       "invalidEmail": "Please enter a valid email",
-      "passwordMinLength": "Password must be at least 8 characters",
+      "passwordMinLength": "Password must be at least 6 characters",
       "timeout": "This is taking too long. Please try again.",
       "incorrect": "Incorrect email or password. Please try again.",
+      "otpSendFailed": "Couldn't send the verification code. Please try again.",
       "connection": "Connection problem. Please check your internet and try again.",
       "serviceAccountUI": "Service accounts can't sign in here. Use a personal account instead.",
       "missingCredentials": "Please enter your email and password",
-      "accountLocked": "Your account is locked after too many failed sign-in attempts. Reset your password or try again later.",
-      "sessionExpired": "Your session has expired. Please sign in again."
+      "accountLocked": "Too many unsuccessful sign-in attempts. Please try again in 15 minutes or reset your password.",
+      "sessionExpired": "Your session has expired. Please sign in again.",
+      "otpRateLimited": "Too many verification codes requested. Please try again in {minutes} min."
     },
     "emailPlaceholder": "you@example.com",
     "passwordPlaceholder": "Enter your password",
@@ -3368,6 +3747,10 @@
     "loading": "Loading...",
     "otpSentTitle": "Verification code sent.",
     "otpSentDesc": "Check your email for the 6-digit code.",
+    "otpAlreadySentTitle": "Verification code already sent.",
+    "otpAlreadySentDesc": "Use the code we emailed you a moment ago.",
+    "otpRateLimitedTitle": "Too many codes requested.",
+    "otpRateLimitedDesc": "Use the code we already emailed you. You can request a new one in {minutes} min.",
     "otpEmailIssue": "Email might be delayed",
     "otpEmailIssueDesc": "Your code was saved, but the email may not arrive. Tap \"Resend code\" on the next screen.",
     "success": {
@@ -3380,7 +3763,7 @@
       "firstName": "First name",
       "lastName": "Last name",
       "confirmPassword": "Confirm password",
-      "reqLength": "At least 8 characters",
+      "reqLength": "At least 6 characters",
       "reqUpper": "One uppercase letter",
       "reqNumber": "One number",
       "submit": "Create account",
@@ -3422,13 +3805,13 @@
       "title": "Reset password",
       "subtitle": "Your new password must be different from your old one",
       "newPassword": "New password",
-      "newPasswordPlaceholder": "Min. 8 characters",
+      "newPasswordPlaceholder": "Min. 6 characters",
       "confirmPassword": "Confirm new password",
       "confirmPlaceholder": "••••••••",
       "submit": "Reset password",
       "submitting": "Resetting password...",
       "backLogin": "Back to sign in",
-      "reqLength": "At least 8 characters",
+      "reqLength": "At least 6 characters",
       "reqUpper": "One uppercase letter",
       "reqNumber": "One number",
       "strengthTooWeak": "Too weak",
@@ -3436,7 +3819,7 @@
       "strengthFair": "Fair",
       "strengthGood": "Good",
       "strengthStrong": "Strong",
-      "passwordMin": "Password must be at least 8 characters",
+      "passwordMin": "Password must be at least 6 characters",
       "passwordMismatch": "Passwords don't match",
       "invalidLink": "Invalid reset link",
       "invalidLinkDesc": "This reset link is invalid or has expired. Request a new one to continue.",
@@ -3521,8 +3904,23 @@
     "overview": {
       "title": "Help center",
       "subtitle": "Learn how to use your website management system.",
-      "welcomeTitle": "Welcome to EchPrime!",
-      "welcomeDesc": "EchPrime helps you build and manage your professional website — from creating sites with AI and writing SEO-optimized blog posts to tracking traffic and engagement. Here's an overview of the main features.",
+      "welcomeTitle": "Welcome to Web Store!",
+      "intro": {
+        "desc": "Web Store helps you build and manage your professional website with AI in minutes.",
+        "lead1": "Watch the 1-minute video to quickly learn how to:",
+        "leadN": "Watch the {n}-minute video to quickly learn how to:",
+        "points": [
+          "Create a website & write SEO-friendly blog posts",
+          "Track traffic and leads automatically",
+          "Connect your own domain in 3 steps"
+        ],
+        "durationChip": "{d} min",
+        "tag": "Overview tour",
+        "title": "Web Store overview tour",
+        "resume": "Resume video",
+        "error": "Couldn’t load the video.",
+        "retry": "Try again"
+      },
       "featuresTitle": "Key features",
       "features": {
         "dashboardTitle": "Dashboard",
@@ -3533,9 +3931,7 @@
         "blogDesc": "Write SEO-friendly blog posts to bring in more customers.",
         "settingsTitle": "Settings",
         "settingsDesc": "Set up your domain and invite admin staff."
-      },
-      "needHelpTitle": "Need more help?",
-      "needHelpDesc": "Can't find the answer? Contact our support team on WhatsApp or by email."
+      }
     },
     "modules": {
       "lazyScreenshot": {
@@ -3697,15 +4093,16 @@
           "steps": [
             {
               "title": "Domain Configuration",
-              "desc": "Go to <strong>\"⚙️ Settings → Domains\"</strong>. Add custom domain, configure DNS (A Record, CNAME), and verify connection.",
+              "desc": "Go to <strong>\"⚙️ Settings → Domains\"</strong>. Add your domain, update 2 DNS records at your domain provider, then verify.",
               "imgTitle": "Domain Settings",
               "guide": [
-                "Go to <strong>\"⚙️ Settings → Domains\"</strong> from the sidebar to open Domain Management.",
-                "Your default subdomain (e.g., <code>yourstore.web-v2.dev.ecommercehub.my</code>) is automatically assigned and connected.",
-                "Click <strong>\"+ Add Custom Domain\"</strong> to connect your own domain (e.g., <code>abccompany.com</code>).",
-                "Configure DNS at your domain registrar: <strong>A Record</strong> → Point to the static IP shown, <strong>CNAME Record</strong> → Point to <code>web-v2.dev.ecommercehub.my</code>.",
-                "Click <strong>\"Verify Connection\"</strong> to check DNS propagation. Status will change from \"Pending Verification\" to \"Connected\".",
-                "Use <strong>\"Select primary domain\"</strong> to set which domain visitors see as the main URL."
+                "Go to <strong>\"⚙️ Settings → Domains\"</strong> from the sidebar.",
+                "Your store already has a free address (e.g. <code>yourstore.web.ecommercehub.unifi.com.my</code>). It works without any setup.",
+                "Click <strong>\"Add custom domain\"</strong> and enter the domain you own, without http:// (e.g. <code>abccompany.com</code>). Add the <strong>www</strong> version too (e.g. <code>www.abccompany.com</code>) so both addresses work.",
+                "Sign in to your domain provider (where you bought the domain, e.g. MSC Hosting, Exabytes, GoDaddy) and open the DNS settings. <strong>Delete any old A or CNAME records</strong> for \"@\" and \"www\" that point to another website.",
+                "Add the 2 records shown in Web Store: <strong>A</strong> · Host <code>@</code> → <code>76.76.21.21</code> and <strong>CNAME</strong> · Host <code>www</code> → <code>cname.vercel-dns.com</code>. Using Cloudflare? Set the proxy to \"DNS only\" (grey cloud).",
+                "Back in Web Store, click <strong>\"Verify connection\"</strong>. DNS changes can take a few minutes to a few hours. When the status shows <strong>\"Connected & secured\"</strong>, your domain is live with SSL (https).",
+                "Click <strong>\"Select primary domain\"</strong> to choose which address visitors see."
               ]
             }
           ]
@@ -3716,6 +4113,10 @@
       "searchPlaceholder": "Search questions...",
       "emptyTitle": "No answers found",
       "emptyDesc": "Try different keywords, or message us on WhatsApp.",
+      "videoBadge": "Has a video guide",
+      "videoGuide": "Video guide",
+      "videoTitle": "Video guide: {question}",
+      "videoUnsupported": "Your browser can't play this video.",
       "categories": {
         "dashboardTitle": "Dashboard",
         "qDashboardMetrics": "What metrics show up on the dashboard?",
@@ -3740,9 +4141,9 @@
         "aBlogSeo": "In the blog editor, scroll to the <strong>\"Search Optimization (SEO)\"</strong> section in the right sidebar. Fill in the <strong>Meta Title</strong> (max 60 characters) and <strong>Meta Description</strong> (max 160 characters). You can also click <strong>\"Generate via AI\"</strong> to create optimized meta tags automatically.",
         "settingsTitle": "Settings",
         "qSettingsDomain": "How do I connect a custom domain?",
-        "aSettingsDomain": "Go to <strong>\"⚙️ Settings → Domains\"</strong>. Click <strong>\"+ Add Custom Domain\"</strong> and enter your domain name (e.g. abccompany.com). Then set up the DNS records at your domain registrar and click <strong>\"Verify Connection\"</strong>.",
+        "aSettingsDomain": "Go to <strong>\"⚙️ Settings → Domains\"</strong>, click <strong>\"Add custom domain\"</strong> and enter your domain (e.g. abccompany.com, and www.abccompany.com). Then update the DNS records at your domain provider and click <strong>\"Verify connection\"</strong>. Once it shows <strong>\"Connected & secured\"</strong>, set it as your primary domain.",
         "qSettingsDns": "How do I set up DNS records?",
-        "aSettingsDns": "After you add your domain, the system shows the DNS records you need:<ul><li><strong>A Record</strong> — Point your domain to the static IP address shown (e.g. 162.159.140.98)</li><li><strong>CNAME Record</strong> — Point to <strong>web-v2.dev.ecommercehub.my</strong></li></ul>DNS changes usually take 15 minutes to 48 hours to take effect, depending on your registrar.",
+        "aSettingsDns": "At your domain provider (e.g. MSC Hosting, Exabytes, GoDaddy), open the DNS settings and:<ul><li><strong>Delete</strong> old A/CNAME records for \"@\" and \"www\" that point to another website.</li><li>Add <strong>A</strong> · Host <strong>@</strong> → <strong>76.76.21.21</strong></li><li>Add <strong>CNAME</strong> · Host <strong>www</strong> → <strong>cname.vercel-dns.com</strong></li></ul>Always copy the exact values shown in <strong>Settings → Domains</strong>. Using Cloudflare? Turn the proxy off (grey cloud). Changes usually take a few minutes to a few hours.",
         "qSettingsStaff": "How do I invite admin staff?",
         "aSettingsStaff": "Go to <strong>\"⚙️ Settings → Staff\"</strong>. Click <strong>\"Invite Staff\"</strong>, enter their email address, and choose a role (Viewer or Manager). They'll get an email invitation to join your workspace."
       }
@@ -3774,6 +4175,10 @@
       "later": "Later"
     },
     "types": {
+      "LEAD_NEW": {
+        "title": "New contact lead",
+        "message": "{name} sent a message via {siteName}"
+      },
       "BLOG_PUBLISHED": {
         "title": "Blog published",
         "message": "{blogTitle} is now published"
@@ -3834,6 +4239,8 @@
       "errorEmailTooLong": "Email is too long. Keep it under 254 characters.",
       "errorSelfInvite": "You can't invite yourself. Enter someone else's email.",
       "errorGeneric": "Something went wrong. Please try again.",
+      "errorAlreadyMember": "This person is already on your team.",
+      "errorOwnerElsewhere": "This email belongs to the owner of another store, so it can't be added as staff.",
       "roles": {
         "label": "Access level",
         "admin": "Manager",
@@ -3885,6 +4292,8 @@
       "staffUpdateFailed": "Couldn't save staff details. Please try again.",
       "inviteSent": "Invite sent.",
       "inviteFailed": "Couldn't send the invite. Check the email and try again.",
+      "inviteLimitReached": "You've reached the staff limit on your plan. Upgrade your plan to invite more staff.",
+      "inviteNotAllowed": "Only the store owner can invite staff.",
       "bulkRemoveFailed": "Couldn't remove staff. Please try again.",
       "permissionRequired": "Pick at least one permission to continue."
     },
@@ -3960,7 +4369,27 @@
     "errorTooLong": "Domain names can be up to 253 characters. Make yours shorter.",
     "errorNoTld": "Add a domain extension, like .com or .my.",
     "errorInvalidChars": "That domain has characters that aren't allowed. Use only letters, numbers, and hyphens.",
-    "errorInvalidFormat": "That doesn't look like a valid domain. Try a format like yourstore.com."
+    "errorInvalidFormat": "That doesn't look like a valid domain. Try a format like yourstore.com.",
+    "websiteStatus": {
+      "title": "Website status",
+      "statusLabel": "Status",
+      "statusLive": "Live",
+      "statusMaintenance": "Under maintenance",
+      "statusDraft": "Draft",
+      "urlLabel": "Website URL",
+      "unpublish": "Unpublish website",
+      "unpublishDesc": "Take your website offline. Visitors will see a maintenance page until you publish again.",
+      "maintenanceDesc": "Your website is under maintenance. Visitors see a maintenance page. Open the editor to publish it again.",
+      "draftDesc": "Your website isn't published yet. Open the editor to publish it.",
+      "openEditor": "Open Editor",
+      "openEditorRepublish": "Open Editor to publish again",
+      "noPermission": "You don't have permission to unpublish this website.",
+      "unpublishSuccess": "Your website is now in maintenance mode",
+      "unpublishFailed": "Couldn't unpublish. Try again.",
+      "alreadyUnpublished": "This website is already unpublished.",
+      "forbidden": "You don't have permission to unpublish this website.",
+      "rateLimited": "Too many attempts. Try again in a moment."
+    }
   },
   "accountSettings": {
     "title": "Settings",
@@ -3982,10 +4411,10 @@
       "title": "Change password",
       "newPassword": "New password",
       "confirmPassword": "Confirm new password",
-      "placeholder": "Use at least 8 characters",
+      "placeholder": "Use at least 6 characters",
       "confirmPlaceholder": "Re-enter your new password",
       "mismatch": "Passwords don't match. Please check and try again.",
-      "tooShort": "Password must be at least 8 characters",
+      "tooShort": "Password must be at least 6 characters",
       "changed": "Your password has been changed",
       "changeFailed": "We couldn't change your password. Please try again.",
       "changeButton": "Change password"
@@ -4018,6 +4447,7 @@
     "uploadedCount": "Uploaded {count} file(s)",
     "fileDeleted": "File deleted",
     "deleteFailed": "Couldn't delete the file. Please try again.",
+    "deleteLocked": "Your site uses this older file. It can't be deleted here.",
     "urlCopied": "URL copied"
   },
   "payments": {
@@ -4037,13 +4467,17 @@
       "dismiss": "Dismiss"
     },
     "compactLayout": {
-      "aiEditing": "AI is editing your design…",
+      "aiEditing": "AI is editing…",
       "openAIChat": "Open AI Chat",
       "openChatAndTools": "Open AI Chat & Tools",
       "moveUp": "Move Up",
       "moveDown": "Move Down",
       "deleteBlock": "Delete Block",
-      "deletedBlock": "Deleted {type}"
+      "deletedBlock": "Deleted {type}",
+      "openTools": "Open Tools",
+      "stopFailed": "Could not stop the AI. Try again.",
+      "busy": "Updating your design…",
+      "stopAI": "Stop AI"
     },
     "toolbar": {
       "publish": "Publish",
@@ -4051,6 +4485,11 @@
       "published": "Published",
       "viewLive": "View live",
       "update": "Update",
+      "updateLive": "Update live",
+      "openLive": "Open live website",
+      "copyLink": "Copy link",
+      "savedDraftNotLive": "Draft saved · Not live yet",
+      "savedLive": "Saved · Live",
       "updating": "Updating…",
       "preview": "Preview",
       "live": "Live",
@@ -4065,6 +4504,8 @@
       "redo": "Redo",
       "undoShortcut": "Undo (Cmd/Ctrl+Z)",
       "redoShortcut": "Redo (Cmd/Ctrl+Shift+Z)",
+      "undoStepTooltip": "Undo: {label} (Ctrl/Cmd+Z)",
+      "redoStepTooltip": "Redo: {label} (Ctrl/Cmd+Shift+Z)",
       "openMenu": "Open menu",
       "desktop": "Desktop",
       "mobile": "Mobile",
@@ -4122,7 +4563,14 @@
       "ownerAccessDesc": "You can still preview and edit in the editor as usual, and republish anytime.",
       "cancel": "Keep website live",
       "confirm": "Turn on maintenance mode",
-      "processing": "Processing…"
+      "processing": "Processing…",
+      "confirmTitle": "Unpublish this website?",
+      "warningVisitorsDesc": "Visitors will see a maintenance page and can't browse or buy.",
+      "cancelBtn": "Cancel",
+      "confirmBtn": "Confirm unpublish",
+      "seoTitle": "Search ranking and ads may be affected",
+      "seoDesc": "Your search (SEO) ranking and any running ad campaigns can be affected while the website is offline.",
+      "acknowledge": "I understand customers won't be able to access the website."
     },
     "viewLiveMenu": {
       "openWebsite": "Open website",
@@ -4139,7 +4587,13 @@
       "viewAction": "View",
       "saveSuccess": "Changes saved",
       "manualSaveSuccess": "Saved!",
-      "saveFailed": "Couldn't save. Try again."
+      "saveFailed": "Couldn't save. Try again.",
+      "publishNeedsFix": "Fill this in before publishing",
+      "publishShowField": "Show",
+      "draftChanged": "This page was changed somewhere else (another tab or an approved AI change). Your latest edits were not saved — reload to continue from the newest version.",
+      "reloadAction": "Reload",
+      "keepMineAction": "Keep my version",
+      "keepMineHint": "Keep my version saves your edits over the other change."
     },
     "maintenance": {
       "banner": "Your website is in maintenance mode. Visitors see a maintenance page instead.",
@@ -4148,33 +4602,26 @@
     "pageManager": {
       "addNewPage": "Add new page",
       "searchPlaceholder": "Search pages by name",
-      "pageNamePlaceholder": "Page name (e.g. Promotions)",
-      "slugPreview": "Slug:",
+      "pageNamePlaceholder": "e.g. Promotions",
       "cancel": "Cancel",
-      "create": "Create",
       "home": "Home",
       "editing": "Editing",
       "editWithAI": "Edit with AI chat",
-      "visible": "Visible",
-      "hidden": "Hidden",
       "delete": "Delete",
-      "pageCreated": "Page created",
-      "pageHidden": "Page hidden",
+      "pageCreated": "Page “{name}” created — add it to Menu to show it",
+      "pageHidden": "{name} hidden from your website",
       "visibilityFailed": "Couldn't change visibility. Please try again.",
       "deleteFailed": "Couldn't delete the page. Please try again.",
       "cannotDeleteLastPage": "You can't delete the last page — your site needs at least one.",
-      "deleteSuccess": "Page deleted. Undo?",
+      "deleteSuccess": "Page “{name}” deleted",
       "undo": "Undo",
-      "restored": "Page restored",
+      "restored": "Page “{name}” restored",
       "restoreFailed": "Couldn't restore the page. Please try again.",
       "hidePage": "Hide page",
       "showPage": "Show page",
       "deletePage": "Delete page",
       "homeProtected": "The homepage can't be deleted",
       "homeHideProtected": "The homepage can't be hidden",
-      "deleteConfirmTitle": "Delete this page?",
-      "deleteConfirmMsg": "Are you sure you want to delete the page",
-      "deleteConfirmDesc": "You can undo this for a few seconds after deleting.",
       "confirmDelete": "Delete",
       "customPage": "Custom 404 page",
       "edit404Page": "Edit 404 page",
@@ -4182,7 +4629,18 @@
       "emptyDesc": "Create your first page to get started.",
       "slugLocked": "The slug locks after you publish, so your SEO and existing links keep working.",
       "statusLive": "Live",
-      "statusDraft": "Draft"
+      "statusDraft": "Draft",
+      "pageNameLabel": "PAGE NAME",
+      "urlPreview": "URL:",
+      "createPage": "Create page",
+      "duplicatePage": "A page with this name or URL already exists",
+      "invalidPageName": "Use at least one letter or number",
+      "reservedPage": "This URL is used by the system. Please choose another page name.",
+      "editing404Page": "Editing 404 page",
+      "deleteInlineConfirm": "Delete “{name}”? You can undo for a few seconds.",
+      "pageShown": "{name} is now visible",
+      "hiddenBadge": "Hidden",
+      "noLinkBadge": "No Link"
     },
     "coachMarks": {
       "step1Title": "Step 1: Create pages here",
@@ -4205,7 +4663,27 @@
       "inputPlaceholder": "Tell AI what to change...",
       "send": "Send",
       "newLine": "new line",
-      "stopAI": "Stop AI"
+      "stopAI": "Stop AI",
+      "agentPageUpdated": "The assistant updated this page",
+      "agentChangeUndone": "Undid: {title}",
+      "themeUndoneLive": "Theme went back on your live site. Redo brings it back.",
+      "themeRedoneLive": "Theme changed on your live site again. Undo takes it back.",
+      "agentPagesUpdated": "The assistant changed several pages",
+      "agentPagesListUpdated": "The assistant updated your pages and menu",
+      "agentNavUpdated": "The assistant changed the menu and footer",
+      "agentLanguagesUpdated": "The assistant changed the website languages",
+      "agentPublished": "Your site is live",
+      "agentThemeUpdated": "The assistant updated your theme",
+      "agentEditsReplaced": "The assistant's change is in. Edits you made while it was being applied were replaced — redo them if you still need them.",
+      "agentSeoUpdated": "The assistant updated this page's SEO",
+      "agentTranslationUpdated": "The assistant translated this page",
+      "agentTranslationShown": "The assistant translated this page — now showing the translation",
+      "agentTranslationNotAdded": "The assistant translated this page into {language}. Add {language} as a second language (Menu → Quick language) to see it on the page.",
+      "agentLocateMissing": "This section shows on the page once you approve the change.",
+      "localeAutoTranslated": "AI translated {count} sections into {language}. Check names and prices before you publish.",
+      "undoTranslation": "Undo translation",
+      "translationUndone": "Translation removed. Those sections show the original text again.",
+      "localeTranslateFailed": "Could not translate {count} parts of the page into {language}. They keep their original text for now. Try again in a moment, or ask the assistant to translate the page."
     },
     "menu": {
       "dashboard": "Dashboard",
@@ -4277,6 +4755,14 @@
         "portfolio-grid": {
           "name": "Portfolio grid",
           "description": "Portfolio showcase grid"
+        },
+        "blog-list": {
+          "name": "Blog list",
+          "description": "Latest blog posts"
+        },
+        "custom-html": {
+          "name": "Rich text",
+          "description": "Your own formatted text or HTML"
         },
         "gallery": {
           "name": "Gallery",
@@ -4465,6 +4951,7 @@
       "address": "Address",
       "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
       "localBusinessInfo": "Local Business Info",
+      "contactUndoInterrupted": "Contact info was not changed: the history moved while saving.",
       "localBusinessSaveUnknownTitle": "Could not confirm whether local business information was saved.",
       "localBusinessSaveUnknownDescription": "Reload the editor before editing local business information again.",
       "localBusinessSaveLockedTitle": "Local business editing is temporarily locked.",
@@ -4625,9 +5112,15 @@
       "selectBlock": "Select a block first",
       "selectBlockMsg": "Select a block in the preview to edit its settings.",
       "variant": "Variant",
+      "layoutSpacing": "Layout & Spacing",
+      "topSpacing": "Top spacing",
+      "bottomSpacing": "Bottom spacing",
       "logoText": "Logo text",
       "headline": "Headline",
       "subheadline": "Subheadline",
+      "videoUrl": "Video URL",
+      "videoUrlPlaceholder": "Paste a YouTube, Vimeo or MP4/WebM link",
+      "videoUrlInvalid": "Enter a valid YouTube, Vimeo or MP4/WebM link",
       "showCategoryFilter": "Show category filter",
       "sectionLabel": "Section label",
       "bodyText": "Body text",
@@ -4668,6 +5161,8 @@
       "visible": "Visible",
       "cartWidget": "Cart widget",
       "whatsappPosition": "Button position",
+      "positionRight": "Right",
+      "positionLeft": "Left",
       "checkoutBehavior": "Checkout behavior",
       "checkoutDesc": "Checkout isn't available in preview, so we'll show a quick message instead. It works normally on your live site.",
       "buttonLabel": "Button label",
@@ -4732,6 +5227,13 @@
       "memberNamePlaceholder": "Member name",
       "memberRolePlaceholder": "Role or title",
       "memberBioPlaceholder": "Short bio",
+      "portfolioConfiguration": "Portfolio configuration",
+      "projectLabel": "Project",
+      "projectTitlePlaceholder": "Project title",
+      "projectCategoryPlaceholder": "Category",
+      "projectDescriptionPlaceholder": "Description",
+      "projectLinkPlaceholder": "Link URL (e.g. /products?categoryId=1)",
+      "addProject": "Add project",
       "pricingManagement": "Plans management",
       "pricingNumberOfPlans": "Number of plans:",
       "pricingPlansMinMax": "(Min: 1 – Max: 3)",
@@ -4819,12 +5321,21 @@
     "template": {
       "title": "Choose a template",
       "searchPlaceholder": "Search templates…",
+      "searchAction": "Search templates",
+      "clearSearch": "Clear search",
       "showingCount": "Showing {filtered} of {total} templates",
       "loading": "Loading templates…",
       "loadError": "Couldn't load templates. Try again.",
+      "errorTitle": "We couldn't load the templates",
+      "retry": "Try again",
+      "close": "Close template chooser",
       "noTemplates": "No templates yet.",
+      "noTemplatesDescription": "Template designs will appear here when they are available.",
       "seedHint": "Run POST /api/templates/seed to create templates.",
       "noMatch": "No templates match this filter.",
+      "noMatchVi": "Không tìm thấy mẫu phù hợp",
+      "noMatchDescription": "Try a different description or browse all templates.",
+      "clearFilters": "Show all templates",
       "applyConfirmTitle": "Apply \"{name}\"?",
       "applyConfirmDesc": "This applies the new template layout and theme. Your text and images are kept where possible.",
       "cancel": "Cancel",
@@ -4832,6 +5343,8 @@
       "applyButton": "Apply template",
       "appliedSuccess": "Template \"{name}\" applied",
       "applyFailed": "Couldn't apply the template. Try again.",
+      "appliedToast": "Template \"{name}\" applied. Press Ctrl+Z to undo.",
+      "unmatchedBlocks": "{count} section(s) ({types}) had no match in the new template and were not transferred. You can restore the previous layout with Undo.",
       "previewTitle": "Preview: {name}",
       "all": "All",
       "restaurant": "Restaurant",
@@ -4899,6 +5412,72 @@
     },
     "menuDrawer": {
       "defaultUserName": "User"
+    },
+    "elementAsk": {
+      "title": "Ask AI",
+      "placeholder": "What should change?",
+      "now": "Now:",
+      "hint": "Enter to send · Esc",
+      "send": "Send to AI chat",
+      "close": "Close",
+      "kinds": {
+        "text": "Text",
+        "button": "Button",
+        "image": "Picture",
+        "section": "Section",
+        "seo": "SEO",
+        "menu": "Menu",
+        "footer": "Footer",
+        "page": "Page"
+      },
+      "suggestions": {
+        "text": [
+          "Shorter",
+          "Friendlier",
+          "Translate to Malay"
+        ],
+        "button": [
+          "Shorter",
+          "Say what happens on click",
+          "Translate to Malay"
+        ],
+        "image": [
+          "Find a better photo",
+          "Generate a new picture",
+          "Write the alt text"
+        ],
+        "section": [
+          "Rewrite this section",
+          "Add pictures",
+          "Translate to Malay"
+        ],
+        "seo": [
+          "Write the title and description",
+          "Shorter",
+          "Translate to Malay"
+        ],
+        "menu": [
+          "Add a menu item",
+          "Reorder the menu"
+        ],
+        "footer": [
+          "Add contact links",
+          "Rewrite the tagline"
+        ],
+        "page": [
+          "Improve this page",
+          "Write the SEO",
+          "Translate to Malay"
+        ]
+      },
+      "walker": {
+        "label": "Changes by the assistant",
+        "prev": "Previous change",
+        "next": "Next change",
+        "done": "Done",
+        "changed": "AI changed",
+        "missing": "Not on the page any more — it may have been removed."
+      }
     }
   },
   "previewPage": {
@@ -4943,18 +5522,24 @@
       "description": "Description",
       "sku": "SKU:",
       "outOfStock": "Out of stock",
+      "soldOut": "Sold out",
       "addToCart": "🛒 Add to cart",
+      "quantity": "Quantity",
       "selectVariant": "Select a variant",
       "allProducts": "All products",
       "priceRange": "Price range",
       "applyFilter": "Apply filters",
       "stockLimitMessage": "You've added all available stock ({cartQty}/{inventory}) to your cart",
-      "stockLimitToast": "Your cart has reached the available stock limit"
+      "stockLimitToast": "Your cart has reached the available stock limit",
+      "variantLabel": "Variant",
+      "fromPrice": "From {price}",
+      "stockLeft": "{count} left"
     },
     "blog": {
       "title": "Blog",
       "latestPosts": "Latest posts from",
       "latestStories": "Latest stories and insights",
+      "readMore": "Read more",
       "noPosts": "No posts yet. Check back soon.",
       "noImage": "No image",
       "backToAll": "← Back to all posts",
@@ -5102,6 +5687,10 @@
       "sendLink": "Send upload link",
       "errorMessage": "Something went wrong. Please try again."
     },
+    "orderTracking": {
+      "total": "Total",
+      "totalPaid": "Total paid"
+    },
     "orderLookup": {
       "title": "Track your order",
       "subtitle": "Enter your order number to check its status",
@@ -5118,6 +5707,34 @@
       "title": "Page not found",
       "backHome": "Back to homepage"
     }
+  },
+  "aiQuota": {
+    "chip": "AI {pct}%",
+    "chipAria": "AI left: {pct}%. Open details",
+    "loading": "Loading AI left",
+    "title": "AI left",
+    "sentenceOk": "Assistant chats and writing tools use it. It fills back up over 24 hours.",
+    "sentenceLow": "Almost out. More comes back at {time}.",
+    "sentenceOut": "Out for today. Back at {time}.",
+    "sentenceOutNoTime": "Out for now. It fills back up over the next hours.",
+    "sentencePaused": "AI is paused for today. It will be back soon.",
+    "tomorrowAt": "tomorrow {time}",
+    "pictures": "Pictures",
+    "picturesLeft": "{n} of {limit} left",
+    "picturesNone": "None left",
+    "picturesUnlimited": "Unlimited",
+    "hint": "Long chats use more than a quick rewrite.",
+    "plan": "{plan} plan",
+    "planNames": { "free": "Free", "starter": "Starter", "standard": "Standard", "professional": "Professional" },
+    "upgrade": "Upgrade plan",
+    "lowLine": "AI is almost out for today ({pct}%)",
+    "moreAt": "more at {time}",
+    "outTitle": "AI is out for today",
+    "outBack": "It's back at {time}.",
+    "outBody": "Your shop and website keep working as usual.",
+    "outBodyEditor": "You can keep editing by hand, nothing is lost.",
+    "placeholder": "Available again at {time}",
+    "placeholderNoTime": "AI is out for now"
   },
   "profile": {
     "title": "My profile",
@@ -5157,7 +5774,7 @@
       "changing": "Changing...",
       "changed": "Password changed",
       "lastLogin": "Last login",
-      "ruleMinLength": "At least 8 characters",
+      "ruleMinLength": "At least 6 characters",
       "ruleUppercase": "One uppercase letter",
       "ruleNumber": "One number"
     },
@@ -5171,8 +5788,9 @@
       "passwordLabel": "Password"
     },
     "errors": {
+      "nameLength": "Enter 2 to 50 characters.",
       "invalidPhone": "Enter a valid phone number",
-      "passwordMinLength": "Password must be at least 8 characters",
+      "passwordMinLength": "Password must be at least 6 characters",
       "passwordUpper": "Add at least one uppercase letter, like A.",
       "passwordLower": "Password must include a lowercase letter",
       "passwordNumber": "Password must include a number",
@@ -5187,5 +5805,386 @@
       "saveFailed": "Couldn't save your profile. Check your connection and try again.",
       "networkError": "Network error. Please try again."
     }
+  },
+  "landingV2": {
+    "nav": {
+      "menu": "Main menu",
+      "items": {
+        "how": "How it works",
+        "features": "Features",
+        "templates": "Templates",
+        "faq": "FAQ"
+      },
+      "lang": "Switch to Bahasa Melayu",
+      "langName": "English",
+      "langLabel": "EN",
+      "signIn": "Sign in",
+      "cta": "Get started free",
+      "toggle": "Toggle menu",
+      "skip": "Skip to content"
+    },
+    "hero": {
+      "eyebrow": "AI-powered website & online store builder",
+      "t1": "Describe your business.",
+      "t2": "AI builds your online store.",
+      "sub": "Web Store turns a few details about your business into a complete, mobile‑ready online store — then runs payments, shipping and every order from one dashboard.",
+      "cta2": "See how it works",
+      "trust": [
+        "English & Bahasa Melayu",
+        "Payments & shipping built in",
+        "56 ready-made templates"
+      ],
+      "soon": "Video coming soon",
+      "seek": "Seek",
+      "video": {
+        "watch": "Watch the intro",
+        "play": "Play video",
+        "pause": "Pause",
+        "replay": "Replay",
+        "mute": "Mute",
+        "unmute": "Unmute",
+        "fullscreen": "Full screen",
+        "exitFullscreen": "Exit full screen"
+      }
+    },
+    "how": {
+      "label": "How it works",
+      "title": "From idea to first order in three steps",
+      "s1t": "Describe your business",
+      "s1d": "Pick your industry, then add your business name, a short description and what you sell.",
+      "mName": "Business name",
+      "mNameV": "Kopi Senja",
+      "industries": [
+        "Restaurant / cafe / F&B",
+        "Shop / fashion / e-commerce",
+        "Beauty / spa / wellness",
+        "Health / dental / clinic"
+      ],
+      "s2t": "AI creates your website",
+      "s2d": "AI writes the copy and lays out every section. Change anything in the visual editor, or just ask the AI.",
+      "mGen": "Creating your website...",
+      "genSteps": [
+        "Reviewing your business info",
+        "Creating content & design",
+        "Preparing preview"
+      ],
+      "s3t": "Publish and start selling",
+      "s3d": "Go live, take card, FPX and DuitNow QR payments, and ship orders with EasyParcel.",
+      "mLive": "Live",
+      "mPay": "Payment received · Order #1042"
+    },
+    "feat": {
+      "label": "Features",
+      "title": "Everything you need to sell online, in one place",
+      "sub": "Build your site, take payments, ship orders and grow — without juggling separate tools.",
+      "aiT": "AI website builder",
+      "aiD": "Answer four questions and get a complete, mobile-ready website written for your business.",
+      "aiInd": "Restaurant / cafe / F&B",
+      "aiBrief": "Specialty coffee and kuih in Bangsar. Dine-in, takeaway and online orders.",
+      "edT": "Visual editor",
+      "edD": "Click any text to edit it, drag blocks to reorder them and undo any change.",
+      "edSample": "Fresh kopi, every morning",
+      "agT": "ECH Agent",
+      "agD": "Each day it lists what needs you and drafts the fix. Nothing changes until you approve.",
+      "agQ1": "3 orders waiting to be confirmed",
+      "agQ1f": "oldest waiting 2 hours",
+      "agQ1go": "Confirm orders",
+      "agQ2": "2 products are running low",
+      "agQ2f": "fewer than 10 left",
+      "agQ2go": "Show the list",
+      "payT": "Local payment methods",
+      "payD": "Card and FPX through Stripe, plus DuitNow QR and cash on delivery.",
+      "payChips": [
+        "Card",
+        "FPX",
+        "DuitNow QR",
+        "COD"
+      ],
+      "payNote": "Funds go straight to your bank account",
+      "shipT": "Shipping with EasyParcel",
+      "shipD": "Choose a courier, book pickup or drop-off and print the label from the order. Or ship it yourself.",
+      "shipM1": "Label ready",
+      "shipM2": "Pickup booked",
+      "ordT": "Orders, customers & discounts",
+      "ordD": "Confirm, fulfil and refund orders, see each customer's history and create discount codes.",
+      "ordRows": [
+        [
+          "#1042",
+          "Paid"
+        ],
+        [
+          "#1041",
+          "To confirm"
+        ],
+        [
+          "#1040",
+          "Shipped"
+        ]
+      ],
+      "ordCode": "RAYA10 · 10% off",
+      "seoT": "SEO health",
+      "seoD": "See how your site is doing on search and what to fix next.",
+      "tplT": "56 templates, 14 industries",
+      "tplD": "Start from a design made for your industry and switch any time.",
+      "langT": "English & Bahasa Melayu",
+      "langD": "Switch your whole dashboard between English and Bahasa Melayu.",
+      "notT": "Real-time notifications",
+      "notD": "Know about new orders, low stock and failed payments the moment they happen.",
+      "notM1": "New order",
+      "notM2": "Low stock alert"
+    },
+    "deep": {
+      "editor": {
+        "label": "AI editor",
+        "title": "Edit like a document. Ask like a chat.",
+        "sub": "Every part of your site is editable in place, and the AI is one click away when you'd rather describe the change.",
+        "points": [
+          "Drag components onto the page, or click to add them",
+          "Edit text in place with a full formatting toolbar",
+          "Choose from 12 hero layouts",
+          "Ask AI to rewrite a section or a single sentence",
+          "Undo and redo anything, preview on desktop and mobile"
+        ]
+      },
+      "agent": {
+        "label": "ECH Agent",
+        "title": "An assistant that knows what your shop needs today",
+        "sub": "ECH Agent reads your orders and stock, then hands you a short to-do list with the fix already drafted.",
+        "points": [
+          "A daily work queue: orders to confirm, products out of stock or running low",
+          "Drafts the change — restock, switch off, confirm — and waits for your click",
+          "Product changes can be undone for 7 days"
+        ]
+      },
+      "sell": {
+        "label": "Sell & ship",
+        "title": "Get paid and ship, all in one place",
+        "sub": "Connect the payment and courier accounts you already use. Orders, customers and discount codes live in the same dashboard.",
+        "points": [
+          "Card and FPX payments through Stripe",
+          "DuitNow QR bank transfer and cash on delivery",
+          "Book EasyParcel couriers and print labels from the order",
+          "Confirm, fulfil and refund orders",
+          "Customer profiles and discount codes"
+        ]
+      },
+      "seo": {
+        "label": "Get found",
+        "title": "Get found on Google",
+        "sub": "Check your SEO health, fix what's missing and publish fresh content with the AI blog writer.",
+        "points": [
+          "An SEO health overview that shows what to fix",
+          "AI writes blog posts, SEO titles and meta descriptions"
+        ]
+      }
+    },
+    "templates": {
+      "label": "Templates",
+      "title": "56 templates for 14 industries",
+      "sub": "Start from a design made for your business. Switch any time — your text and images are kept where possible.",
+      "cta": "Browse all templates",
+      "cats": {
+        "all": "All",
+        "restaurant": "Restaurant",
+        "ecommerce": "E-commerce",
+        "beauty": "Beauty",
+        "tech": "Tech",
+        "health": "Health",
+        "education": "Education",
+        "realestate": "Real estate",
+        "fitness": "Fitness",
+        "creative": "Creative",
+        "business": "Business",
+        "fnb": "Cafe & bakery",
+        "events": "Events",
+        "blog": "Blog",
+        "travel": "Travel"
+      },
+      "prev": "Previous templates",
+      "next": "Next templates"
+    },
+    "faq": {
+      "label": "FAQ",
+      "title": "Frequently asked questions",
+      "sub": "Everything you need to know before you start. Step-by-step guides are in the Help Center once you sign in.",
+      "groups": [
+        {
+          "id": "start",
+          "name": "Getting started",
+          "items": [
+            {
+              "q": "Do I need design or coding skills?",
+              "a": "No. Describe your business and AI builds the website. You then edit it visually — click text to change it, drag blocks to move them."
+            },
+            {
+              "q": "How does the AI build my website?",
+              "a": "Enter your business name, choose your industry and describe what you sell. AI creates a complete website in about 30–60 seconds."
+            },
+            {
+              "q": "Can I edit what the AI creates?",
+              "a": "Yes. Change text, images, sections, colours and fonts in the visual editor, or ask the AI to rewrite any part for you."
+            },
+            {
+              "q": "Will my website work on mobile?",
+              "a": "Yes. Every website is fully responsive, and you can preview desktop and mobile views before you publish."
+            },
+            {
+              "q": "Can I change my template later?",
+              "a": "Yes. Pick any of the 56 templates in the editor. The new layout and theme are applied, and your text and images are kept where possible."
+            },
+            {
+              "q": "How much does it cost?",
+              "a": "You can get started for free — no design or coding skills needed."
+            }
+          ]
+        },
+        {
+          "id": "sell",
+          "name": "Selling & orders",
+          "items": [
+            {
+              "q": "Which payment methods can my customers use?",
+              "a": "Card and FPX through Stripe, plus DuitNow QR bank transfer and cash on delivery. Online payments go straight to your linked bank account."
+            },
+            {
+              "q": "How does shipping work?",
+              "a": "Connect EasyParcel to choose a courier, book pickup or drop-off and print labels from your orders, with tracking for every parcel. You can also ship yourself and add the tracking number."
+            },
+            {
+              "q": "What does ECH Agent do?",
+              "a": "It checks your shop every day and lists what needs attention — orders to confirm, products out of stock or running low. It drafts the change, and nothing is applied until you approve it."
+            },
+            {
+              "q": "Can my team help run the store?",
+              "a": "Yes. Invite staff by email from Settings and give each person the Viewer or Manager role."
+            }
+          ]
+        },
+        {
+          "id": "grow",
+          "name": "Domain & growth",
+          "items": [
+            {
+              "q": "Can I use my own domain?",
+              "a": "Yes. Add your domain in Settings → Domains, then update the DNS records at your domain provider. Changes usually take effect within 15 minutes to 48 hours."
+            },
+            {
+              "q": "How does Web Store help my SEO?",
+              "a": "The SEO health widget scores your site and flags issues such as missing meta titles or unoptimised images. One click lets AI fix them for you."
+            },
+            {
+              "q": "Can AI write blog posts for me?",
+              "a": "Yes. Enter a topic and choose a tone — professional, friendly or persuasive — and AI drafts the title, outline and SEO meta for you."
+            },
+            {
+              "q": "Can I use Web Store in Bahasa Melayu?",
+              "a": "Yes. Switch the dashboard between English and Bahasa Melayu at any time."
+            }
+          ]
+        }
+      ]
+    },
+    "final": {
+      "title": "Ready to open your online store?",
+      "sub": "Start free and let AI build the first version of your store.",
+      "cta": "Get started free"
+    },
+    "footer": {
+      "tagline": "AI website builder and online store for growing businesses.",
+      "rights": "© 2026 Web Store. All rights reserved."
+    },
+    "tour": {
+      "label": "Product tour",
+      "title": "One platform, from first draft to daily sales",
+      "sub": "See how each part of Web Store works together."
+    },
+    "theme": {
+      "toLight": "Switch to light theme",
+      "toDark": "Switch to dark theme"
+    },
+    "mock": {
+      "ship": {
+        "parcel": "Order #1042 · 1.2 kg",
+        "to": "To Petaling Jaya, Selangor"
+      },
+      "ord": {
+        "amounts": [
+          "RM 48.00",
+          "RM 126.50",
+          "RM 32.00"
+        ]
+      },
+      "seo": {
+        "r1": "Page titles & descriptions",
+        "r2": "3 images need alt text",
+        "health": "SEO health"
+      },
+      "lang": {
+        "sample": "Orders",
+        "sampleMs": "Pesanan"
+      },
+      "notif": {
+        "m1": "#1042 · RM 48.00 · FPX",
+        "m2": "Kopi Arabica 250g · 6 left",
+        "now": "Just now",
+        "ago": "5 min ago"
+      },
+      "ed": {
+        "hero": "Hero",
+        "dup": "Duplicate",
+        "ai": "Edit with AI",
+        "ask": "Make the headline warmer",
+        "done": "Headline updated",
+        "from": "Fresh kopi, every morning",
+        "to": "Your morning kopi, made with love",
+        "undo": "Undo",
+        "keep": "Keep",
+        "input": "Ask AI to change anything…",
+        "small": "Specialty coffee & kuih in Bangsar",
+        "btn": "Order now"
+      },
+      "ag": {
+        "cap": "Today's work",
+        "q3": "1 product is out of stock",
+        "q3f": "Kopi Arabica 250g",
+        "q3go": "Restock",
+        "appr": "Waiting for your approval",
+        "item": "Kopi Arabica 250g",
+        "edit": "Edit · inventory",
+        "approve": "Approve",
+        "undo": "Undo for 7 days"
+      },
+      "sell": {
+        "items": "2 items",
+        "paid": "Paid · FPX",
+        "label": "EasyParcel label ready",
+        "l1": "Kopi Senja house blend 250g",
+        "l2": "Kuih lapis box (6 pcs)",
+        "methods": "Payment methods",
+        "stripe": "Card · FPX",
+        "duitnow": "Bank transfer",
+        "cod": "Cash on delivery",
+        "total": "RM 48.00"
+      },
+      "seoD": {
+        "cap": "SEO health",
+        "ok1": "Page titles set on every page",
+        "ok2": "Meta descriptions written",
+        "warn": "3 images need alt text",
+        "blog": "AI blog writer",
+        "topic": "Topic",
+        "topicV": "Best kopi spots in Bangsar",
+        "title": "Generated title",
+        "titleV": "Where Bangsar Gets Its Morning Kopi: A Local's Guide",
+        "gen": "Generate"
+      }
+    }
+  },
+  "merchantAccessBanner": {
+    "viewing": "Viewing as {merchant} (by {actor}) · {hours}h {minutes}m left",
+    "viewingNoTime": "Viewing as {merchant} (by {actor})",
+    "expired": "Session expired",
+    "exit": "Exit",
+    "exitFailed": "Could not sign out. Reload the page and try again."
   }
 }

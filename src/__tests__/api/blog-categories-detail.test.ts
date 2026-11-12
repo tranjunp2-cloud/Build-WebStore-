@@ -52,6 +52,7 @@ describe('PATCH /api/blog-categories/[id] [TC-F17.020b]', () => {
     it('updates category with valid data', async () => {
         // Arrange
         mockFindByID.mockResolvedValue({ id: 'cat-1', tenant: 'tenant-1', name: 'Old' })
+        mockFind.mockResolvedValue({ docs: [{ id: 'cat-1', name: 'Old', slug: 'old' }] }) // only itself: no name clash
         mockUpdate.mockResolvedValue({ id: 'cat-1', name: 'New Name' })
 
         // Act

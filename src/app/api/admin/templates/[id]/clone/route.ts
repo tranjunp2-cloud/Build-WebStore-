@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission } from '@/lib/admin/api-utils'
 import { z } from 'zod'
 
 const CloneBodySchema = z.object({
@@ -18,7 +18,7 @@ const CloneBodySchema = z.object({
 type RouteContext = { params: Promise<{ id: string }> }
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
-    return withSuperAdmin(async () => {
+    return withStudioPermission('template.create', async () => {
         const { id } = await ctx.params
         const body = await req.json().catch(() => ({}))
         const parsed = CloneBodySchema.safeParse(body)

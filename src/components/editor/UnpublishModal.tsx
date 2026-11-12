@@ -1,5 +1,6 @@
 'use client'
 
+import { useId, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { AlertTriangle, Loader2, Globe } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -26,6 +27,14 @@ export function UnpublishModal({
 }: UnpublishModalProps) {
     const { t } = useI18n()
     const et = t.editor.unpublishModal
+    const checkboxId = useId()
+    // US-F05-10: the user must tick this every time the modal opens — never carried over.
+    const [acknowledged, setAcknowledged] = useState(false)
+    const [prevOpen, setPrevOpen] = useState(isOpen)
+    if (prevOpen !== isOpen) {
+        setPrevOpen(isOpen)
+        setAcknowledged(false)
+    }
     return (
         <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
             <AnimatePresence>
@@ -51,11 +60,11 @@ export function UnpublishModal({
                                 <div className={`editor-portal ${inter.className} w-[448px] max-w-[calc(100vw-2rem)] rounded-[16px] border border-[hsl(var(--destructive)/0.15)] bg-[var(--editor-surface)] backdrop-blur-[25px] p-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)]`}>
                                     <Dialog.Title className="text-[20px] font-semibold leading-7 tracking-normal text-[var(--editor-text)]">
                                         <AlertTriangle className="mr-2 inline-block h-5 w-5 align-text-bottom" aria-hidden />
-                                        {et.title}
+                                        {et.confirmTitle}
                                     </Dialog.Title>
 
                                     <Dialog.Description className="sr-only">
-                                        {et.title}
+                                        {et.warningVisitorsDesc}
                                     </Dialog.Description>
 
                                     <div className="mt-4 flex flex-col gap-3">
@@ -67,7 +76,20 @@ export function UnpublishModal({
                                                     {et.warningTitle}
                                                 </p>
                                                 <p className="text-[12px] leading-4 text-[hsl(var(--destructive)/0.7)]">
-                                                    {et.warningDesc}
+                                                    {et.warningVisitorsDesc}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Warning: SEO and ads */}
+                                        <div className="flex min-h-[62px] items-start gap-3 rounded-[12px] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-[13px] pb-px pt-[13px]">
+                                            <AlertTriangle className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[hsl(var(--destructive))]" />
+                                            <div className="min-w-0">
+                                                <p className="text-[14px] font-medium leading-5 text-[hsl(var(--destructive))]">
+                                                    {et.seoTitle}
+                                                </p>
+                                                <p className="text-[12px] leading-4 text-[hsl(var(--destructive)/0.7)]">
+                                                    {et.seoDesc}
                                                 </p>
                                             </div>
                                         </div>
@@ -86,21 +108,35 @@ export function UnpublishModal({
                                         </div>
                                     </div>
 
+                                    <div className="mt-4 flex items-start gap-2.5">
+                                        <input
+                                            id={checkboxId}
+                                            type="checkbox"
+                                            checked={acknowledged}
+                                            onChange={(e) => setAcknowledged(e.target.checked)}
+                                            disabled={isPublishing}
+                                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[hsl(var(--destructive))]"
+                                        />
+                                        <label htmlFor={checkboxId} className="cursor-pointer text-[13px] leading-5 text-[var(--editor-text)]">
+                                            {et.acknowledge}
+                                        </label>
+                                    </div>
+
                                     <div className="mt-6 flex items-start gap-3">
                                         <Dialog.Close asChild>
                                             <button
                                                 type="button"
                                                 className="h-[42px] flex-1 rounded-[12px] border border-[hsl(var(--info)/0.07)] text-[14px] font-medium text-[var(--editor-text)] transition-colors hover:bg-[var(--editor-overlay-hover)]"
                                             >
-                                                {et.cancel}
+                                                {et.cancelBtn}
                                             </button>
                                         </Dialog.Close>
 
                                         <button
                                             type="button"
                                             onClick={onUnpublish}
-                                            disabled={isPublishing}
-                                            className="h-[42px] flex-1 rounded-[12px] bg-[hsl(var(--destructive))] text-[14px] font-semibold text-white shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-95 disabled:opacity-60"
+                                            disabled={isPublishing || !acknowledged}
+                                            className="h-[42px] flex-1 rounded-[12px] bg-[hsl(var(--destructive))] text-[14px] font-semibold text-white shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             {isPublishing ? (
                                                 <span className="inline-flex items-center gap-2">
@@ -108,7 +144,7 @@ export function UnpublishModal({
                                                     {et.processing}
                                                 </span>
                                             ) : (
-                                                et.confirm
+                                                et.confirmBtn
                                             )}
                                         </button>
                                     </div>

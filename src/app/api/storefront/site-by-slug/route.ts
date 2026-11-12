@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { isTenantUnavailable } from '@/lib/storefront/store-availability'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -35,12 +36,13 @@ export async function GET(req: Request) {
             where: { slug: { equals: slug } },
             limit: 1,
             depth: 0,
-            select: { id: true },
+            select: { id: true, status: true },
             overrideAccess: true,
         })
 
         const tenant = tenantResult.docs[0]
-        if (!tenant) {
+        // #2179: banned or expired store answers like an unknown one (no reason given)
+        if (!tenant || await isTenantUnavailable(payload, tenant)) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
@@ -80,7 +82,9 @@ export async function GET(req: Request) {
         const tenantCodEnabled = tenantPayments.payment_cod === true
         const tenantQrEnabled = tenantPayments.payment_qr === true
 
-        // Layer 2 — site-level guard (default true: permissive opt-out)
+        // Layer 2 — site-level guard (default true: permissive opt-out) for card/FPX/COD.
+        // Bank transfer (QR) has no site-level gate: tenant payment_qr alone decides (GH-2477;
+        // site.paymentConfig.enableQrBanking is deprecated — PW1 migration hardcoded it false).
         const siteCardEnabled = paymentConfig.cardEnabled !== false
         const siteFpxEnabled = paymentConfig.fpxEnabled !== false
 
@@ -89,10 +93,7 @@ export async function GET(req: Request) {
             tenantId: tenant.id,
             merchantQrCodeUrl,
             enableCod: tenantCodEnabled && (paymentConfig?.enableCod ?? true),
-            enableQrBanking: tenantQrEnabled && (paymentConfig?.enableQrBanking ?? true),
-            bankName: paymentConfig?.bankName ?? null,
-            bankAccountNo: paymentConfig?.bankAccountNo ?? null,
-            bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
+            enableQrBanking: tenantQrEnabled,
             shippingConfig: (site as any).shippingConfig ?? null,
             theme: (site as any).theme ?? null,
 
@@ -112,7 +113,7 @@ export async function GET(req: Request) {
             stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled),
             hasPaymentMethods: !!(
                 (tenantCodEnabled && (paymentConfig?.enableCod ?? true)) ||
-                (tenantQrEnabled && (paymentConfig?.enableQrBanking ?? true)) ||
+                tenantQrEnabled ||
                 ((tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled))
             ),
         })

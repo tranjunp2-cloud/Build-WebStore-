@@ -173,15 +173,26 @@ describe('updateStaff [TC-F19.20]', () => {
     it('updates staff role and permissions', async () => {
         mockFetchResponse(true, {})
 
-        const result = await updateStaff('user-1', 'Updated Name', 'admin', ['manage_products'])
+        const result = await updateStaff('user-1', 'admin', ['manage_products'])
 
         expect(result.success).toBe(true)
+    })
+
+    // GH-2383: saving permissions must not send a name to /update-staff
+    it('does not send a name in the request body', async () => {
+        mockFetchResponse(true, {})
+
+        await updateStaff('user-1', 'admin', ['manage_products'])
+
+        const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1]?.body as string)
+        expect(body).not.toHaveProperty('name')
+        expect(body).toMatchObject({ userId: 'user-1', role: 'admin' })
     })
 
     it('returns unauthorized when no token', async () => {
         mockCookieGet.mockReturnValue(undefined)
 
-        const result = await updateStaff('user-1', 'Name', 'viewer')
+        const result = await updateStaff('user-1', 'viewer')
 
         expect(result.success).toBe(false)
         expect(result.error).toBe('Unauthorized')

@@ -4,271 +4,95 @@
  * Convention: docs/TEST_CONVENTION.md
  * QA doc: docs/qa/F38-image-provider-multi-source.md
  * GH-1185: LLM-derived keywords for per-site Pixabay image pool
+ *
+ * The model call is the AI platform task `sitegen.image-keywords` (composed prompt via
+ * completeComposed). The platform client is faked; the actor scope is real.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { AiClientError } from '@ech/ai-contracts'
 import { extractImageKeywords, mergeKeywords } from '@/lib/ai/extract-image-keywords'
+import { runWithAiActor } from '@/lib/ai-platform/actor-scope'
 
-// Mock OpenAI at top level
-vi.mock('openai', () => ({
-    default: vi.fn(),
-}))
+const runTask = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/ai-platform/task-client', () => ({ getAiTaskClient: () => ({ runTask }) }))
+
+const ACTOR = { user: { id: 7 }, tenantId: '1', organizationId: 'org_1', role: 'owner' } as never
+const inScope = <T>(run: () => Promise<T>) => runWithAiActor(ACTOR, run)
+const answer = (output: unknown) => ({ taskId: 'sitegen.image-keywords', output, usage: { model: 'test', inputTokens: 10, outputTokens: 5 } })
+const BUSINESS = { businessName: 'Kedai Phở', industry: 'restaurant', products: 'phở bò, gỏi cuốn' }
 
 describe('extract-image-keywords', () => {
     beforeEach(() => {
-        delete process.env.OPENAI_API_KEY
+        vi.stubEnv('AI_PLATFORM_URL', 'http://ai.internal:8300')
+        vi.stubEnv('AI_PLATFORM_CONTEXT_SECRET', 'test-context-secret-at-least-32-characters')
+        runTask.mockReset()
         vi.spyOn(console, 'warn').mockImplementation(() => {})
     })
 
     afterEach(() => {
-        vi.clearAllMocks()
+        vi.unstubAllEnvs()
+        vi.restoreAllMocks()
     })
 
     describe('TC-F38-RAW-18: extractImageKeywords returns keywords', () => {
-        it('extracts 2-4 keywords from business info via gpt-4.1-nano', async () => {
-            // Arrange: mock OpenAI
-            const OpenAI = await import('openai').then((m) => m.default)
-            vi.mocked(OpenAI).mockImplementation(
-                () =>
-                    ({
-                        chat: {
-                            completions: {
-                                create: vi.fn().mockResolvedValue({
-                                    choices: [
-                                        {
-                                            message: {
-                                                content: JSON.stringify({
-                                                    keywords: ['phở bò', 'gỏi cuốn', 'cơm tấm'],
-                                                }),
-                                            },
-                                        },
-                                    ],
-                                }),
-                            },
-                        },
-                    }) as any,
-            )
-            process.env.OPENAI_API_KEY = 'test-key'
+        it('extracts 2-4 keywords from business info via the sitegen.image-keywords task', async () => {
+            runTask.mockResolvedValue(answer({ keywords: ['phở bò', 'gỏi cuốn', 'cơm tấm'] }))
 
-            // Act
-            const result = await extractImageKeywords({
-                businessName: 'Nhà Hàng Phở',
-                industry: 'F&B',
-                shortDescription: 'Nhà hàng phở truyền thống',
-                language: 'vi',
-            })
+            const result = await inScope(() => extractImageKeywords(BUSINESS))
 
-            // Assert: returns keywords, trimmed, < 4 items
             expect(result).toEqual(['phở bò', 'gỏi cuốn', 'cơm tấm'])
-            expect(result.length).toBeLessThanOrEqual(4)
-            expect(result.every((k) => k.trim() === k)).toBe(true)
+            expect(runTask).toHaveBeenCalledWith(
+                'sitegen.image-keywords',
+                expect.objectContaining({
+                    temperature: 0.4,
+                    maxOutputTokens: 120,
+                    user: expect.stringContaining('Business name: Kedai Phở'),
+                }),
+                expect.anything(),
+            )
         })
 
-        it('caps extracted keywords at 4 items even if LLM returns more', async () => {
-            // Arrange
-            const OpenAI = await import('openai').then((m) => m.default)
-            vi.mocked(OpenAI).mockImplementation(
-                () =>
-                    ({
-                        chat: {
-                            completions: {
-                                create: vi.fn().mockResolvedValue({
-                                    choices: [
-                                        {
-                                            message: {
-                                                content: JSON.stringify({
-                                                    keywords: [
-                                                        'phở',
-                                                        'gỏi',
-                                                        'cơm',
-                                                        'bánh',
-                                                        'nước',
-                                                    ],
-                                                }),
-                                            },
-                                        },
-                                    ],
-                                }),
-                            },
-                        },
-                    }) as any,
-            )
-            process.env.OPENAI_API_KEY = 'test-key'
+        it('caps extracted keywords at 4 items and 2 words each even if the model returns more', async () => {
+            runTask.mockResolvedValue(answer({ keywords: ['phở bò nướng hành', 'gỏi', 'cơm', 'bánh', 'chè'] }))
 
-            // Act
-            const result = await extractImageKeywords({
-                businessName: 'Nhà Hàng Phở',
-            })
+            const result = await inScope(() => extractImageKeywords(BUSINESS))
 
-            // Assert
-            expect(result.length).toBeLessThanOrEqual(4)
-            expect(result).toEqual(['phở', 'gỏi', 'cơm', 'bánh'])
+            expect(result).toEqual(['phở bò', 'gỏi', 'cơm', 'bánh'])
         })
     })
 
     describe('TC-F38-RAW-19: graceful fallback on error', () => {
-        it('returns [] when OPENAI_API_KEY missing', async () => {
-            // Arrange: no API key
-            delete process.env.OPENAI_API_KEY
+        it('returns [] without any AI actor in scope, and makes no platform call', async () => {
+            const result = await extractImageKeywords(BUSINESS)
 
-            // Act
-            const result = await extractImageKeywords({
-                businessName: 'Test Business',
-            })
-
-            // Assert
             expect(result).toEqual([])
+            expect(runTask).not.toHaveBeenCalled()
         })
 
-        it('returns [] on OpenAI timeout', async () => {
-            // Arrange
-            const OpenAI = await import('openai').then((m) => m.default)
-            vi.mocked(OpenAI).mockImplementation(
-                () =>
-                    ({
-                        chat: {
-                            completions: {
-                                create: vi.fn().mockRejectedValue(
-                                    new Error('Request timeout after 10000ms'),
-                                ),
-                            },
-                        },
-                    }) as any,
-            )
-            process.env.OPENAI_API_KEY = 'test-key'
+        it('returns [] when the platform times out or is down', async () => {
+            runTask.mockRejectedValue(new AiClientError('The AI took too long to answer.', 504))
 
-            // Act
-            const result = await extractImageKeywords({
-                businessName: 'Test',
-            })
-
-            // Assert
-            expect(result).toEqual([])
-            expect(console.warn).toHaveBeenCalled()
+            expect(await inScope(() => extractImageKeywords(BUSINESS))).toEqual([])
         })
 
-        it('returns [] on malformed JSON from OpenAI', async () => {
-            // Arrange
-            const OpenAI = await import('openai').then((m) => m.default)
-            vi.mocked(OpenAI).mockImplementation(
-                () =>
-                    ({
-                        chat: {
-                            completions: {
-                                create: vi.fn().mockResolvedValue({
-                                    choices: [
-                                        {
-                                            message: {
-                                                content: 'not valid json',
-                                            },
-                                        },
-                                    ],
-                                }),
-                            },
-                        },
-                    }) as any,
-            )
-            process.env.OPENAI_API_KEY = 'test-key'
+        it('returns [] when the answer has no keywords field', async () => {
+            runTask.mockResolvedValue(answer({}))
 
-            // Act
-            const result = await extractImageKeywords({
-                businessName: 'Test',
-            })
-
-            // Assert
-            expect(result).toEqual([])
-        })
-
-        it('returns [] when keywords field is missing from JSON', async () => {
-            // Arrange
-            const OpenAI = await import('openai').then((m) => m.default)
-            vi.mocked(OpenAI).mockImplementation(
-                () =>
-                    ({
-                        chat: {
-                            completions: {
-                                create: vi.fn().mockResolvedValue({
-                                    choices: [
-                                        {
-                                            message: {
-                                                content: JSON.stringify({
-                                                    result: 'phở',
-                                                }),
-                                            },
-                                        },
-                                    ],
-                                }),
-                            },
-                        },
-                    }) as any,
-            )
-            process.env.OPENAI_API_KEY = 'test-key'
-
-            // Act
-            const result = await extractImageKeywords({
-                businessName: 'Test',
-            })
-
-            // Assert
-            expect(result).toEqual([])
+            expect(await inScope(() => extractImageKeywords(BUSINESS))).toEqual([])
         })
 
         it('returns [] when keywords is not an array', async () => {
-            // Arrange
-            const OpenAI = await import('openai').then((m) => m.default)
-            vi.mocked(OpenAI).mockImplementation(
-                () =>
-                    ({
-                        chat: {
-                            completions: {
-                                create: vi.fn().mockResolvedValue({
-                                    choices: [
-                                        {
-                                            message: {
-                                                content: JSON.stringify({
-                                                    keywords: 'not an array',
-                                                }),
-                                            },
-                                        },
-                                    ],
-                                }),
-                            },
-                        },
-                    }) as any,
-            )
-            process.env.OPENAI_API_KEY = 'test-key'
+            runTask.mockResolvedValue(answer({ keywords: 'phở bò' }))
 
-            // Act
-            const result = await extractImageKeywords({
-                businessName: 'Test',
-            })
-
-            // Assert
-            expect(result).toEqual([])
+            expect(await inScope(() => extractImageKeywords(BUSINESS))).toEqual([])
         })
 
-        it('returns [] when all business inputs empty/missing', async () => {
-            // Arrange
-            const OpenAI = await import('openai').then((m) => m.default)
-            vi.mocked(OpenAI).mockImplementation(
-                () =>
-                    ({
-                        chat: {
-                            completions: {
-                                create: vi.fn(),
-                            },
-                        },
-                    }) as any,
-            )
-            process.env.OPENAI_API_KEY = 'test-key'
+        it('returns [] when all business inputs are empty, without calling the platform', async () => {
+            const result = await inScope(() => extractImageKeywords({ businessName: ' ', products: '' }))
 
-            // Act
-            const result = await extractImageKeywords({})
-
-            // Assert
             expect(result).toEqual([])
-            // Should NOT call OpenAI since no content
-            expect(vi.mocked(OpenAI).mock.results[0].value.chat.completions.create).not.toHaveBeenCalled()
+            expect(runTask).not.toHaveBeenCalled()
         })
     })
 

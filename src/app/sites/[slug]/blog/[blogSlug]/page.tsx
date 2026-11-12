@@ -1,4 +1,8 @@
 import { cache } from 'react'
+import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
+import { storefrontUnavailableFor } from '@/lib/storefront/cached-store-availability'
+import { STORE_UNAVAILABLE_COPY } from '@/lib/storefront/store-unavailable'
+import { blogListingPath } from '@/lib/blog/listing-path'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -6,7 +10,7 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
-import DOMPurify from 'isomorphic-dompurify'
+import { renderBlogContent } from '@/lib/blog/render-content'
 import { getServerI18n } from '@/i18n/server'
 import { getSiteBasePath } from '@/lib/site-base-path'
 import { getCurrentUser } from '@/lib/auth'
@@ -17,6 +21,8 @@ import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 import { hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
 import { proseThemeVars } from '@/lib/theme/prose-theme'
+import { withPublicSiteTenants, STOREFRONT_POPULATE } from '@/lib/cache/tenant'
+import { publicAuthorName, toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,6 +62,7 @@ const getSiteAndPost = cache(async function getSiteAndPost(
         },
         sort: 'createdAt',
         limit: 1,
+        populate: STOREFRONT_POPULATE,
     })
     const site = sitesResult.docs[0]
     if (!site) return null
@@ -72,6 +79,7 @@ const getSiteAndPost = cache(async function getSiteAndPost(
         },
         limit: 1,
         depth: 1,
+        populate: STOREFRONT_POPULATE,
     })
     const post = blogsResult.docs[0]
     if (!post) return null
@@ -88,13 +96,16 @@ const getSiteAndPost = cache(async function getSiteAndPost(
         sort: 'createdAt',
     })
 
-    return { tenant, site, post, pages: pagesResult.docs }
+    return { tenant, site, post, pages: withPublicSiteTenants(pagesResult.docs) }
 })
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug, blogSlug } = await params
     const reqHeaders = await headers()
     const tenantHostname = slug === 'custom' ? reqHeaders.get('x-tenant-hostname') : null
+    // #2179: banned or expired store → no post title in <head>
+    const unavailable = await storefrontUnavailableFor(slug, tenantHostname)
+    if (unavailable) return { title: STORE_UNAVAILABLE_COPY[unavailable.locale].title, robots: { index: false, follow: false } }
     const data = await getSiteAndPost(slug, blogSlug, tenantHostname)
     if (!data) return { title: 'Post Not Found' }
 
@@ -112,6 +123,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
         title,
         description,
+        icons: { icon: (data.site.branding as { favicon?: string } | undefined)?.favicon || '/favicon.ico' },
         ...(origin ? { alternates: { canonical: `${origin}/blog/${blogSlug}` } } : {}),
         openGraph: {
             title: (seo?.metaTitle as string) || (data.post.title as string),
@@ -133,12 +145,16 @@ export default async function BlogDetailPage({ params }: Props) {
     const { slug, blogSlug } = await params
     const reqHeaders = await headers()
     const tenantHostname = slug === 'custom' ? reqHeaders.get('x-tenant-hostname') : null
+    const unavailable = await storefrontUnavailableFor(slug, tenantHostname)
+    if (unavailable) return <MaintenancePage variant="unavailable" locale={unavailable.locale} />
     const data = await getSiteAndPost(slug, blogSlug, tenantHostname)
     if (!data) notFound()
 
     const { t } = await getServerI18n()
     const base = await getSiteBasePath(slug)
     const { tenant, site, post, pages } = data
+    const listingPath = blogListingPath(pages as unknown as Parameters<typeof blogListingPath>[0])
+    const listingHref = `${base}${listingPath}` || '/'
 
     const primaryColor = (site.theme as { primaryColor?: string } | undefined)?.primaryColor || '#0ea5e9'
     const thumbnail = typeof post.thumbnail === 'object' && post.thumbnail
@@ -147,10 +163,7 @@ export default async function BlogDetailPage({ params }: Props) {
     const category = typeof post.category === 'object' && post.category
         ? (post.category as Record<string, unknown>).name as string
         : null
-    const author = typeof post.author === 'object' && post.author
-        ? ([(post.author as any).firstName, (post.author as any).lastName].filter(Boolean).join(' '))
-          || ((post.author as Record<string, unknown>).email as string) || null
-        : null
+    const author = publicAuthorName(post.author)
     const publishedAt = post.publishedAt
         ? new Date(post.publishedAt as string).toLocaleDateString('en-US', {
             year: 'numeric', month: 'long', day: 'numeric',
@@ -162,7 +175,7 @@ export default async function BlogDetailPage({ params }: Props) {
         typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
     ) ?? []).includes(String(tenant.id))
 
-    const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
+    const siteWithContext = toPublicSite({ ...site, tenantSlug: slug, siteBasePath: base })
 
     const origin = resolveStorefrontOrigin(tenant as any, { fallbackHostname: tenantHostname, slug })
     const articleJsonLd = origin ? {
@@ -182,7 +195,7 @@ export default async function BlogDetailPage({ params }: Props) {
         '@type': 'BreadcrumbList',
         itemListElement: [
             { '@type': 'ListItem', position: 1, name: 'Home', item: origin },
-            { '@type': 'ListItem', position: 2, name: 'Blog', item: `${origin}/blogs` },
+            { '@type': 'ListItem', position: 2, name: 'Blog', item: `${origin}${listingPath || '/'}` },
             { '@type': 'ListItem', position: 3, name: post.title as string, item: `${origin}/blog/${blogSlug}` },
         ],
     } : null
@@ -190,7 +203,7 @@ export default async function BlogDetailPage({ params }: Props) {
     return (
         <SiteLayoutShell
             site={siteWithContext as SiteRendererProps['site']}
-            pages={pages as unknown as NavPage[]}
+            pages={toPublicDoc(pages) as unknown as NavPage[]}
             isOwner={isOwner}
         >
             <ScrollToTop />
@@ -203,7 +216,7 @@ export default async function BlogDetailPage({ params }: Props) {
                         {t.storefront.products.home}
                     </Link>
                     <span>/</span>
-                    <Link href={`${base}/blog`} className="hover:opacity-100 transition-opacity">
+                    <Link href={listingHref} className="hover:opacity-100 transition-opacity">
                         {t.storefront.blog.title}
                     </Link>
                     <span>/</span>
@@ -255,13 +268,13 @@ export default async function BlogDetailPage({ params }: Props) {
                         prose-code:px-1 prose-code:rounded
                         prose-img:rounded-xl"
                     style={proseThemeVars}
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
+                    dangerouslySetInnerHTML={{ __html: renderBlogContent(post.content) }}
                 />
 
                 {/* Back to Blog */}
                 <div className="mt-12 pt-8 border-t border-current/10">
                     <Link
-                        href={`${base}/blog`}
+                        href={listingHref}
                         className="text-sm font-medium hover:opacity-80 transition-opacity"
                         style={{ color: primaryColor }}
                     >

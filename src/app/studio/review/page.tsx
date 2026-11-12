@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 import type { Metadata } from 'next'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { requireStudioAccess } from '@/lib/admin/auth-guard'
 import { ReviewQueue } from './_components/review-queue'
 import type { ReviewTemplate } from './_components/review-queue'
 
@@ -22,7 +22,7 @@ function first(v: string | string[] | undefined): string {
 }
 
 export default async function ReviewPage({ searchParams }: PageProps) {
-    await requireSuperAdmin()
+    await requireStudioAccess()
 
     const sp = await searchParams
     const page = Math.max(1, Number(first(sp.page) || 1))

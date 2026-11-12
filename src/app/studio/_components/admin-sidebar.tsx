@@ -19,11 +19,12 @@ import { usePathname } from 'next/navigation'
 import {
     LayoutDashboard, BarChart2, FileText, FileEdit, GitPullRequest,
     History, CalendarClock, Archive, Boxes, Package, Zap,
-    Activity, Bug, Tag, FolderOpen, Settings, Layers, ShieldCheck,
+    Activity, Bug, Tag, FolderOpen, Settings, Layers, ShieldCheck, Sparkles, Database, KeyRound,
 } from 'lucide-react'
 import { useStudioPreferences } from './theme-density-accent-switcher'
 import type { SidebarCounts } from './sidebar-counts'
 import type { AdminUser } from '@/lib/admin/auth-guard'
+import { canUseMerchantAccess, isSuperAdmin } from '@/lib/admin/studio-roles'
 
 // ── Icon map ──────────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
@@ -39,11 +40,14 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
     '/studio/packs': Package,
     '/studio/performance': Zap,
     '/studio/generations': Activity,
+    '/studio/migration': Layers,
     '/studio/qa': ShieldCheck,
     '/studio/issues': Bug,
     '/studio/categories': FolderOpen,
     '/studio/tags': Tag,
     '/studio/settings': Settings,
+    '/studio/settings/ai': Settings,
+    '/studio/merchant-access': KeyRound,
 }
 
 // ── Nav structure — mirrors shell.jsx nav array exactly ───────────────────────
@@ -81,11 +85,17 @@ const NAV: NavSection[] = [
         ],
     },
     {
+        section: 'Migration',
+        items: [
+            { href: '/studio/migration', label: 'Website Migration' },
+        ],
+    },
+    {
         section: 'Intelligence',
         items: [
             { href: '/studio/blocks', label: 'Block usage' },
             { href: '/studio/packs', label: 'Content packs' },
-            { href: '/studio/performance', label: 'AI quality' },
+            { href: '/studio/performance', label: 'AI usage' },
         ],
     },
     {
@@ -106,7 +116,8 @@ const NAV: NavSection[] = [
     {
         section: 'Admin',
         items: [
-            { href: '/studio/settings', label: 'Settings', soon: true },
+            { href: '/studio/settings/ai', label: 'Settings' },
+            { href: '/studio/merchant-access', label: 'Merchant CMS access' },
         ],
     },
 ]
@@ -213,7 +224,17 @@ export function AdminSidebar({
 
     // Role label — always "Admin · staging" in prod; derived from user.roles for accuracy
     const envLabel = process.env.NODE_ENV === 'production' ? 'production' : 'staging'
-    const roleLabel = `Admin · ${envLabel}`
+    const seatLabel = isSuperAdmin(user.roles) ? 'Admin' : user.readOnly ? 'Viewer (read-only)' : 'Team'
+    const roleLabel = `${seatLabel} · ${envLabel}`
+    // AI settings stay super-admin-only; a support seat keeps its independent merchant access page.
+    const nav = NAV.map((sec) => sec.section !== 'Admin' ? sec : {
+        ...sec,
+        items: sec.items
+            .filter((item) => item.href === '/studio/merchant-access' ? canUseMerchantAccess(user.roles) : isSuperAdmin(user.roles))
+            .map((item) => item.href === '/studio/merchant-access' && !isSuperAdmin(user.roles)
+                ? { ...item, href: '/support/merchant-access' }
+                : item),
+    }).filter((sec) => sec.items.length > 0)
 
     return (
         <aside
@@ -237,7 +258,7 @@ export function AdminSidebar({
 
             {/* ── Scroll body: nav sections ─── */}
             <div style={{ flex: 1, overflow: 'auto' }} className="scroll-thin">
-                {NAV.map((sec) => (
+                {nav.map((sec) => (
                     <div key={sec.section} className="nav-section">
                         <div className="nav-section-title">{sec.section}</div>
                         {sec.items.map((item) => (

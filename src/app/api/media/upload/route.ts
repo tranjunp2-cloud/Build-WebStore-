@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { checkContentLength, checkUploadSize } from '@/lib/media/upload-limits'
 
 export async function POST(req: NextRequest) {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // GH-1284 — reject over the absolute ceiling from the declared Content-Length

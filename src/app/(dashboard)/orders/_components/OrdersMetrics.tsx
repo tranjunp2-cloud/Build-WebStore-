@@ -1,81 +1,81 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useEffect } from 'react'
 import { Clock, CheckCircle2, Package, Truck, XCircle, RotateCcw } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { useInvalidateOrderMetrics, useOrderMetricsQuery } from './orders-queries'
 
-export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number }) {
+interface OrdersMetricsProps {
+    /** Currently applied status group key ('all' when no status filter). */
+    activeStatus?: string
+    /** Called with a status group key, or 'all' when the active card is clicked again. */
+    onSelectStatus?: (status: string) => void
+}
+
+export function OrdersMetrics({ activeStatus = 'all', onSelectStatus }: OrdersMetricsProps = {}) {
     const { t } = useI18n()
     const o = t.dashboard.orders
-    const [counts, setCounts] = useState({ pending: 0, confirmed: 0, readyToShip: 0, shipped: 0, completed: 0, cancelled: 0, refunded: 0 })
+    const { counts } = useOrderMetricsQuery()
+    const invalidateMetrics = useInvalidateOrderMetrics()
 
-    const fetchMetrics = useCallback(async () => {
-        try {
-            const res = await fetch('/api/orders/metrics')
-            const json = await res.json()
-            if (json.success && json.data) {
-                setCounts(prev => ({ ...prev, ...json.data }))
-            }
-        } catch (err) {
-            console.error('Failed to load metrics:', err)
-        }
-    }, [])
-
-    // Refresh when parent triggers (bulk actions, order updates)
-    useEffect(() => {
-        fetchMetrics()
-    }, [refreshCounter, fetchMetrics])
-
-    // Refresh on real-time order notifications (new order or status update)
+    // Refresh on real-time order notifications (new order or status update). Writes from this screen
+    // invalidate the counts through the query cache.
     useEffect(() => {
         function handleNotification(e: Event) {
             const detail = (e as CustomEvent).detail
             if (detail?.type === 'ORDER_NEW' || detail?.type === 'ORDER_UPDATED') {
-                fetchMetrics()
+                void invalidateMetrics()
             }
         }
         window.addEventListener('notification-toast', handleNotification)
         return () => window.removeEventListener('notification-toast', handleNotification)
-    }, [fetchMetrics])
+    }, [invalidateMetrics])
 
     const metrics = [
         {
+            key: 'pending',
             label: o.metrics.pending,
             value: counts.pending,
             icon: <Clock className="w-5 h-5 text-[hsl(var(--warning))]" />,
             iconBg: 'bg-[hsl(var(--warning)/0.1)]',
         },
         {
+            key: 'confirmed',
             label: o.status.confirmed,
             value: counts.confirmed,
             icon: <CheckCircle2 className="w-5 h-5 text-[hsl(var(--info))]" />,
             iconBg: 'bg-[hsl(var(--info)/0.1)]',
         },
         {
+            key: 'ready_to_ship',
             label: o.metrics.readyToShip,
             value: counts.readyToShip,
             icon: <Package className="w-5 h-5 text-[hsl(var(--info))]" />,
             iconBg: 'bg-[hsl(var(--info)/0.1)]',
         },
         {
+            key: 'shipped',
             label: o.metrics.shipped,
             value: counts.shipped,
             icon: <Truck className="w-5 h-5 text-[hsl(var(--success))]" />,
             iconBg: 'bg-[hsl(var(--success)/0.1)]',
         },
         {
+            key: 'completed',
             label: o.metrics.completed,
             value: counts.completed,
             icon: <CheckCircle2 className="w-5 h-5 text-[hsl(var(--success))]" />,
             iconBg: 'bg-[hsl(var(--success)/0.1)]',
         },
         {
+            key: 'cancelled',
             label: o.metrics.cancelled,
             value: counts.cancelled,
             icon: <XCircle className="w-5 h-5 text-[hsl(var(--destructive))]" />,
             iconBg: 'bg-[hsl(var(--destructive)/0.1)]',
         },
         {
+            key: 'refunded',
             label: o.status.refunded,
             value: counts.refunded,
             icon: <RotateCcw className="w-5 h-5 text-fuchsia-500" />,
@@ -98,10 +98,16 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
         // width, sidebar expanded) still has enough per-card room for the label to fit on one
         // line instead of being cut off.
         <div className="flex overflow-x-auto sidebar-scroll snap-x snap-mandatory gap-3 pb-1 xl:grid xl:grid-cols-7 xl:overflow-visible xl:snap-none xl:pb-0 2xl:gap-[22px] w-full">
-            {metrics.map((item, index) => (
-                <div
-                    key={index}
-                    className="shrink-0 min-w-[130px] snap-start xl:min-w-0 xl:shrink 2xl:h-[84px] bg-dash-surface border border-dash-border rounded-2xl p-2 2xl:p-[17px] flex items-center gap-1.5 2xl:gap-[12px]"
+            {metrics.map((item) => {
+                const isActive = activeStatus === item.key
+                return (
+                <button
+                    type="button"
+                    key={item.key}
+                    data-testid={item.key === 'pending' ? 'orders-metric-pending' : undefined}
+                    aria-pressed={isActive}
+                    onClick={() => onSelectStatus?.(isActive ? 'all' : item.key)}
+                    className={`text-left cursor-pointer transition-colors hover:border-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--info))] ${isActive ? 'border-[hsl(var(--info))] ring-1 ring-[hsl(var(--info))]' : ''} shrink-0 min-w-[130px] snap-start xl:min-w-0 xl:shrink 2xl:h-[84px] bg-dash-surface border border-dash-border rounded-2xl p-2 2xl:p-[17px] flex items-center gap-1.5 2xl:gap-[12px]`}
                 >
                     {/* Icon Container */}
                     <div
@@ -119,8 +125,9 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
                             {item.label}
                         </span>
                     </div>
-                </div>
-            ))}
+                </button>
+                )
+            })}
         </div>
     )
 }

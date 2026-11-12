@@ -25,6 +25,9 @@ vi.mock('next/server', () => ({
 
 vi.mock('@payload-config', () => ({ default: {} }))
 
+const mockRevalidateTag = vi.hoisted(() => vi.fn())
+vi.mock('next/cache', () => ({ revalidateTag: mockRevalidateTag }))
+
 vi.mock('@/lib/auth', () => ({
     getCurrentUser: mockGetCurrentUser,
 }))
@@ -151,5 +154,20 @@ describe('POST /api/v1/sso/ban-user', () => {
         expect(mockPayload.update).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'tenant-b', data: { status: 'suspended' } }),
         )
+    })
+
+    it('[TC-F09.285] busts the tenant storefront cache after each write (status shows at once)', async () => {
+        // Arrange
+        mockGetCurrentUser.mockResolvedValue(SUPER_ADMIN)
+        mockPayload.find.mockResolvedValue({ docs: [{ id: 'u10', email: 'user@example.com', tenants: [{ tenant: { id: 7 } }] }] })
+        mockPayload.update.mockResolvedValue({ id: 7, slug: 'kedai', status: 'suspended', customDomains: [{ domain: 'kedai.my' }] })
+
+        // Act
+        await POST(createRequest(AUTH_HEADER, { email: 'user@example.com' }))
+
+        // Assert
+        const tags = mockRevalidateTag.mock.calls.map((c) => c[0])
+        expect(tags).toEqual(expect.arrayContaining(['tenant-slug:kedai', 'tenant-domain:kedai.my', 'site-by-tenant-7']))
+        expect(mockPayload.update.mock.invocationCallOrder[0]).toBeLessThan(mockRevalidateTag.mock.invocationCallOrder[0])
     })
 })

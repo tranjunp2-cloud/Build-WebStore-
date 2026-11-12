@@ -29,7 +29,21 @@ describe('TC-F30-HMO-015: registerUploadedMedia inserts the row and returns the 
         const [sql, values] = query.mock.calls[0] as [string, unknown[]]
         expect(sql).toMatch(/INSERT INTO media/i)
         expect(sql).toMatch(/alt, filename, mime_type, filesize/i)
-        expect(values).toEqual(['Hero video', 'file.mp4', 'video/mp4', 16_600_000])
+        expect(values).toEqual(['Hero video', 'file.mp4', 'video/mp4', 16_600_000, null])
+    })
+
+    it('[TC-PERF-146] stores the uploader\'s tenant and never marks a direct upload private', async () => {
+        // Arrange
+        const { payload, query } = makePayload(8169)
+
+        // Act
+        await registerUploadedMedia(payload, { alt: 'a', filename: 'u7-x.png', mimeType: 'image/png', filesize: 10, tenantId: 42 })
+
+        // Assert
+        const [sql, values] = query.mock.calls[0] as [string, unknown[]]
+        expect(sql).toMatch(/tenant_id, private/i)
+        expect(sql).toMatch(/\$5, false/)
+        expect(values[4]).toBe(42)
     })
 
     it('reads the inserted row back through Payload and returns { id, url, ... }', async () => {

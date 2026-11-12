@@ -79,6 +79,8 @@ export const QnAPageClient = () => {
                                         isOpen={expandedIds.includes(item.id)}
                                         onToggle={() => toggleAccordion(item.id)}
                                         isLast={index === category.items.length - 1}
+                                        video={item.video}
+                                        videoBadgeLabel={t.help.qna.videoBadge}
                                     />
                                 ))}
                             </div>

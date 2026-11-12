@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import BusinessInfoForm from '../../../components/builder/BusinessInfoForm'
 
@@ -38,17 +38,38 @@ vi.mock('@/i18n', () => ({
                     promoStep1: 'Describe',
                     promoStep2: 'Generate',
                     promoStep3: 'Refine',
+                    blueprintCaption: 'AI builds this template from your details',
+                    blueprintReady: 'All set',
+                    blueprintCount: '{count} of 4 details added',
                     errors: {
                         businessName: 'Please enter your business name',
                         industry: 'Please select an industry',
                         products: 'Please describe your products / services',
                         shortDescription: 'Please describe your business',
+                        minLength: 'Must be at least {count} characters',
                     },
+                    optionalLabel: 'Optional',
+                    buyingMethodsLabel: 'How do customers buy from you?',
+                    buyingMethodsHint: 'Only the ways you pick are mentioned.',
+                    buyingMethodOptions: {
+                        delivery: 'Delivery', pickup: 'Pickup', walk_in: 'Walk-in',
+                        booking: 'Booking', cod: 'Cash on delivery', online_payment: 'Online payment',
+                    },
+                    serviceAreaLabel: 'Areas you serve',
+                    serviceAreaPlaceholder: 'e.g. Klang Valley',
+                    shopFactsLabel: 'Facts we can say about your shop',
+                    shopFactsPlaceholder: 'e.g. Started in 2019',
+                    shopFactsHint: 'Only add what is true.',
+                    tabManual: 'Describe business',
+                    tabUrl: 'Import from a link',
                     errorMessage: 'Generation failed, please try again.',
                     retryWithCurrent: 'Retry with current information',
+                    slugTaken: 'This address is taken',
                 }
             }
-        }
+        },
+        ti: (template: string, vars: Record<string, string | number>) =>
+            template.replace(/\{(\w+)\}/g, (_, key: string) => String(vars[key] ?? '')),
     })
 }))
 
@@ -66,31 +87,16 @@ vi.mock('@/components/builder/fields/BuilderField', () => ({
 }))
 
 vi.mock('@/components/builder/fields/BuilderTextInput', () => ({
-    BuilderTextInput: (props: React.InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) => (
-        <input
-            aria-invalid={props.invalid}
-            data-testid="builder-text-input"
-            onChange={props.onChange}
-            placeholder={props.placeholder}
-            type={props.type}
-            value={props.value}
-        />
+    BuilderTextInput: ({ invalid, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) => (
+        <input {...props} aria-invalid={invalid} data-testid="builder-text-input" />
     ),
 }))
 
 vi.mock('@/components/builder/fields/BuilderTextarea', () => ({
-    BuilderTextarea: (props: {
-        value?: string; onChange?: React.ChangeEventHandler<HTMLTextAreaElement>
-        placeholder?: string; rows?: number; invalid?: boolean; adornment?: React.ReactNode
+    BuilderTextarea: ({ invalid, adornment: _adornment, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
+        invalid?: boolean; adornment?: React.ReactNode
     }) => (
-        <textarea
-            aria-invalid={props.invalid}
-            data-testid="builder-textarea"
-            onChange={props.onChange}
-            placeholder={props.placeholder}
-            rows={props.rows}
-            value={props.value}
-        />
+        <textarea {...props} aria-invalid={invalid} data-testid="builder-textarea" />
     ),
 }))
 
@@ -145,12 +151,6 @@ vi.mock('@/components/builder/onboarding/BuilderStepScreen', () => ({
     ),
 }))
 
-vi.mock('@/components/builder/onboarding/BuilderPromoCard', () => ({
-    BuilderPromoCard: (props: { title: string; description: string }) => (
-        <div data-testid="promo-card">{props.title}</div>
-    ),
-}))
-
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 const MOCK_INDUSTRIES = [
@@ -171,6 +171,15 @@ function mockFetchFailure() {
         ok: false,
     }) as Mock
 }
+
+/** Industries load as usual; the slug check answers with the given availability. */
+function mockFetchWithSlugAvailable(available: boolean) {
+    global.fetch = vi.fn((url: string) => Promise.resolve(url.startsWith('/api/slug/check')
+        ? { ok: true, json: () => Promise.resolve({ available }) }
+        : { ok: true, json: () => Promise.resolve({ docs: MOCK_INDUSTRIES }) })) as Mock
+}
+
+const slugInput = () => screen.getByTestId('left-body').querySelector<HTMLInputElement>('[data-field="slug"] input')!
 
 function fillForm() {
     const inputs = screen.getAllByTestId('builder-text-input')
@@ -227,90 +236,271 @@ describe('BusinessInfoForm Component', () => {
             })
         })
 
-        it('renders promo card in right pane', async () => {
+        it('TC-F01.04: renders live blueprint with 0/4 details in right pane', async () => {
             render(<BusinessInfoForm />)
             await waitFor(() => {
-                expect(screen.getByTestId('promo-card')).toBeInTheDocument()
+                expect(screen.getByRole('img', { name: '0 of 4 details added' })).toBeInTheDocument()
             })
+            expect(screen.getByTestId('right-pane')).toHaveTextContent('AI Builder')
+            expect(screen.getByText('AI builds this template from your details')).toBeInTheDocument()
+        })
+
+        it('TC-F01.04: blueprint fills live as business name is typed', async () => {
+            render(<BusinessInfoForm />)
+            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
+
+            const nameInput = screen.getByTestId('left-body').querySelector('input')!
+            fireEvent.change(nameInput, { target: { value: 'My Coffee Shop' } })
+
+            expect(screen.getByRole('img', { name: '1 of 4 details added' })).toBeInTheDocument()
+            expect(screen.getByTestId('right-pane')).toHaveTextContent('My Coffee Shop')
         })
     })
 
     // ── Validation ───────────────────────────────────────────────────────
 
     describe('Validation', () => {
-        it('shows validation errors when submitting with partial data', async () => {
-            // Fill only businessName so the button becomes "not disabled" via isFormReady
-            // but validation catches missing fields. We need all 4 filled for isFormReady,
-            // so we test via form submit (Enter key on the form) instead of button click.
-            render(<BusinessInfoForm onSubmit={vi.fn()} />)
-            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
+        const REQUIRED_NAME = 'Please enter your business name'
+        const MIN_LENGTH = 'Must be at least 3 characters'
 
-            // Submit the form element directly (bypasses disabled button)
-            const form = screen.getByTestId('left-body').querySelector('form')!
-            fireEvent.submit(form)
+        const field = (testId: string) => within(screen.getByTestId(testId))
+        const nameInput = () => screen.getAllByTestId('builder-text-input')[0]
+        const clickGenerate = () => fireEvent.click(screen.getByTestId('submit-button'))
 
-            await waitFor(() => {
-                expect(screen.getByText('Please enter your business name')).toBeInTheDocument()
-            })
-            expect(screen.getByText('Please select an industry')).toBeInTheDocument()
-            expect(screen.getByText('Please describe your business')).toBeInTheDocument()
-            expect(screen.getByText('Please describe your products / services')).toBeInTheDocument()
-        })
-
-        it('TC-F01.07: enforces minimum 3 characters (excluding spaces) for text fields', async () => {
-            render(<BusinessInfoForm onSubmit={vi.fn()} />)
-            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
-            
+        async function renderLoadedForm(onSubmit = vi.fn()) {
+            render(<BusinessInfoForm onSubmit={onSubmit} />)
             await waitFor(() => expect(screen.getByTestId('option-Food & Beverage')).toBeInTheDocument())
-            fireEvent.click(screen.getByTestId('option-Food & Beverage'))
+            return onSubmit
+        }
 
-            const inputs = screen.getAllByTestId('builder-text-input')
-            const textareas = screen.getAllByTestId('builder-textarea')
-
-            // Case 1: 0 characters (empty)
-            expect(screen.getByTestId('submit-button')).toBeDisabled()
-
-            // Case 2: 2 characters
-            fireEvent.change(inputs[0], { target: { value: 'ab' } })
-            fireEvent.change(textareas[0], { target: { value: 'cd' } })
-            fireEvent.change(textareas[1], { target: { value: 'ef' } })
-            expect(screen.getByTestId('submit-button')).toBeDisabled()
-
-            // Trigger submit manually to see validation errors
-            const form = screen.getByTestId('left-body').querySelector('form')!
-            fireEvent.submit(form)
-            await waitFor(() => {
-                expect(screen.getByText('Please enter your business name')).toBeInTheDocument()
-            })
-
-            // Case 3: 3 valid characters
-            fireEvent.change(inputs[0], { target: { value: 'abc' } })
-            fireEvent.change(textareas[0], { target: { value: 'cde' } })
-            fireEvent.change(textareas[1], { target: { value: 'fgh' } })
+        it('TC-F01.05: clicking Generate on an empty form shows an error at every required field and does not submit', async () => {
+            // Arrange
+            const onSubmit = await renderLoadedForm()
             expect(screen.getByTestId('submit-button')).not.toBeDisabled()
 
-            // Case 4: padding spaces (< 3 actual characters)
-            fireEvent.change(inputs[0], { target: { value: ' a ' } }) // 1 char
-            expect(screen.getByTestId('submit-button')).toBeDisabled()
-        })
+            // Act
+            clickGenerate()
 
-        it('does not call onSubmit when validation fails', async () => {
-            const onSubmit = vi.fn()
-            render(<BusinessInfoForm onSubmit={onSubmit} />)
-            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
-
-            // Submit the form directly to trigger validate()
-            const form = screen.getByTestId('left-body').querySelector('form')!
-            fireEvent.submit(form)
-
+            // Assert
+            expect(field('field-business-name').getByRole('alert')).toHaveTextContent(REQUIRED_NAME)
+            expect(field('field-industry').getByRole('alert')).toHaveTextContent('Please select an industry')
+            expect(field('field-products-/-services').getByRole('alert')).toHaveTextContent('Please describe your products / services')
+            expect(field('field-short-description').getByRole('alert')).toHaveTextContent('Please describe your business')
             expect(onSubmit).not.toHaveBeenCalled()
         })
 
-        it('submit button is disabled when form is incomplete', async () => {
-            render(<BusinessInfoForm />)
-            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
+        it('TC-F01.05: leaving an empty field shows its error, untouched fields stay quiet', async () => {
+            // Arrange
+            await renderLoadedForm()
 
-            expect(screen.getByTestId('submit-button')).toBeDisabled()
+            // Act
+            fireEvent.blur(nameInput())
+
+            // Assert
+            expect(field('field-business-name').getByRole('alert')).toHaveTextContent(REQUIRED_NAME)
+            expect(screen.getAllByRole('alert')).toHaveLength(1)
+        })
+
+        it('TC-F01.68: a name of only spaces shows the required message, not the min-length one', async () => {
+            // Arrange
+            await renderLoadedForm()
+
+            // Act
+            fireEvent.change(nameInput(), { target: { value: '     ' } })
+            fireEvent.blur(nameInput())
+
+            // Assert
+            expect(field('field-business-name').getByRole('alert')).toHaveTextContent(REQUIRED_NAME)
+        })
+
+        it('TC-F01.70: a 2-character name shows "Must be at least 3 characters" on blur, not while typing', async () => {
+            // Arrange
+            await renderLoadedForm()
+
+            // Act + Assert — no message while the field is first being typed
+            fireEvent.change(nameInput(), { target: { value: 'AB' } })
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+            fireEvent.blur(nameInput())
+
+            // Assert
+            expect(field('field-business-name').getByRole('alert')).toHaveTextContent(MIN_LENGTH)
+        })
+
+        it('TC-F01.70: padding spaces do not count toward the 3-character minimum', async () => {
+            // Arrange
+            await renderLoadedForm()
+
+            // Act
+            fireEvent.change(nameInput(), { target: { value: '  ab  ' } })
+            fireEvent.blur(nameInput())
+
+            // Assert
+            expect(field('field-business-name').getByRole('alert')).toHaveTextContent(MIN_LENGTH)
+        })
+
+        it('TC-F01.69: a 3-character name passes on blur', async () => {
+            // Arrange
+            await renderLoadedForm()
+
+            // Act
+            fireEvent.change(nameInput(), { target: { value: 'ABC' } })
+            fireEvent.blur(nameInput())
+
+            // Assert
+            expect(field('field-business-name').queryByRole('alert')).not.toBeInTheDocument()
+        })
+
+        it('TC-F01.70: a shown error updates while typing and clears once the value is valid', async () => {
+            // Arrange
+            await renderLoadedForm()
+            fireEvent.change(nameInput(), { target: { value: 'AB' } })
+            fireEvent.blur(nameInput())
+
+            // Act + Assert — emptied → required, then fixed → no error
+            fireEvent.change(nameInput(), { target: { value: '' } })
+            expect(field('field-business-name').getByRole('alert')).toHaveTextContent(REQUIRED_NAME)
+            fireEvent.change(nameInput(), { target: { value: 'ABC' } })
+            expect(field('field-business-name').queryByRole('alert')).not.toBeInTheDocument()
+        })
+
+        it('TC-F01.72: no industry → error on Generate, cleared when an industry is picked', async () => {
+            // Arrange
+            await renderLoadedForm()
+            fillForm()
+
+            // Act
+            clickGenerate()
+
+            // Assert
+            expect(field('field-industry').getByRole('alert')).toHaveTextContent('Please select an industry')
+            fireEvent.click(screen.getByTestId('option-Food & Beverage'))
+            expect(field('field-industry').queryByRole('alert')).not.toBeInTheDocument()
+        })
+
+        it('TC-F01.74: only the name filled → errors at all the other required fields at once', async () => {
+            // Arrange
+            await renderLoadedForm()
+            fireEvent.change(nameInput(), { target: { value: 'My Coffee Shop' } })
+
+            // Act
+            clickGenerate()
+
+            // Assert
+            expect(field('field-business-name').queryByRole('alert')).not.toBeInTheDocument()
+            expect(field('field-industry').getByRole('alert')).toBeInTheDocument()
+            expect(field('field-products-/-services').getByRole('alert')).toBeInTheDocument()
+            expect(field('field-short-description').getByRole('alert')).toBeInTheDocument()
+        })
+
+        it('TC-F01.68: name changed from "AB" to only spaces after filling the rest → required error, no submit', async () => {
+            // Arrange
+            const onSubmit = await renderLoadedForm()
+            fireEvent.change(nameInput(), { target: { value: 'AB' } })
+            fireEvent.click(screen.getByTestId('option-Food & Beverage'))
+            fillForm()
+            fireEvent.change(nameInput(), { target: { value: '   ' } })
+
+            // Act
+            clickGenerate()
+
+            // Assert
+            expect(field('field-business-name').getByRole('alert')).toHaveTextContent(REQUIRED_NAME)
+            expect(onSubmit).not.toHaveBeenCalled()
+        })
+
+        it('TC-F01.05: Generate on an empty form focuses the business name field', async () => {
+            // Arrange
+            await renderLoadedForm()
+
+            // Act
+            clickGenerate()
+
+            // Assert
+            expect(nameInput()).toHaveFocus()
+        })
+
+        it('TC-F01.05: Generate focuses the first invalid field', async () => {
+            // Arrange
+            await renderLoadedForm()
+            fireEvent.change(nameInput(), { target: { value: 'My Coffee Shop' } })
+
+            // Act
+            clickGenerate()
+
+            // Assert — industry is the first invalid field; its first option card gets focus
+            expect(screen.getByTestId('option-Food & Beverage')).toHaveFocus()
+        })
+
+        it('TC-F01.05: submitting the form with Enter also validates and does not submit', async () => {
+            // Arrange
+            const onSubmit = await renderLoadedForm()
+
+            // Act
+            fireEvent.submit(screen.getByTestId('left-body').querySelector('form')!)
+
+            // Assert
+            expect(field('field-business-name').getByRole('alert')).toHaveTextContent(REQUIRED_NAME)
+            expect(onSubmit).not.toHaveBeenCalled()
+        })
+
+        it('TC-F23-028: a taken slug blocks Generate and focuses the slug field', async () => {
+            // Arrange — the slug check answers "taken"; industries load as usual
+            mockFetchWithSlugAvailable(false)
+            const onSubmit = await renderLoadedForm()
+            fireEvent.click(screen.getByTestId('option-Food & Beverage'))
+            fillForm()
+            expect(await screen.findByText('This address is taken')).toBeInTheDocument()
+
+            // Act
+            clickGenerate()
+
+            // Assert
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+            expect(onSubmit).not.toHaveBeenCalled()
+            expect(slugInput()).toHaveFocus()
+        })
+
+        it('TC-F23-028: clearing the name drops a stale "taken" answer so a recovered draft can still generate', async () => {
+            // Arrange — recovered draft: SlugPicker skips its first check on every mount
+            mockFetchWithSlugAvailable(false)
+            const onSubmit = vi.fn()
+            render(
+                <BusinessInfoForm
+                    initialValues={{ businessName: 'Test Biz', shortDescription: 'A small shop', industry: 'food', products: 'Cakes' }}
+                    onSubmit={onSubmit}
+                />,
+            )
+            await waitFor(() => expect(screen.getByTestId('option-Food & Beverage')).toBeInTheDocument())
+            fireEvent.change(nameInput(), { target: { value: 'Other Name' } })
+            expect(await screen.findByText('This address is taken')).toBeInTheDocument()
+
+            // Act — clear the name (picker unmounts), type a new one (picker remounts, skips its check)
+            fireEvent.change(nameInput(), { target: { value: '' } })
+            fireEvent.change(nameInput(), { target: { value: 'Third Name' } })
+            clickGenerate()
+
+            // Assert
+            expect(onSubmit).toHaveBeenCalledTimes(1)
+            expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('slug')
+        })
+
+        it('TC-F01.13: new initial values (recovered draft) clear old field errors', async () => {
+            // Arrange
+            const { rerender } = render(<BusinessInfoForm onSubmit={vi.fn()} />)
+            await waitFor(() => expect(screen.getByTestId('option-Food & Beverage')).toBeInTheDocument())
+            clickGenerate()
+            expect(screen.getAllByRole('alert').length).toBeGreaterThan(0)
+
+            // Act
+            rerender(
+                <BusinessInfoForm
+                    initialValues={{ businessName: 'Test Biz', shortDescription: 'A small shop', industry: 'food', products: 'Cakes' }}
+                    onSubmit={vi.fn()}
+                />,
+            )
+
+            // Assert
+            await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
         })
     })
 
@@ -504,5 +694,45 @@ describe('BusinessInfoForm Component', () => {
 
             expect(screen.queryByTestId('option-Food & Beverage')).not.toBeInTheDocument()
         })
+    })
+})
+
+// The suite above stubs the field primitives; these render the real ones to check what assistive tech gets.
+describe('Builder field primitives — error accessibility', () => {
+    it('TC-F01.05: BuilderField announces its error with role="alert"', async () => {
+        // Arrange
+        const { BuilderField } = await vi.importActual<typeof import('@/components/builder/fields/BuilderField')>(
+            '@/components/builder/fields/BuilderField',
+        )
+
+        // Act
+        render(<BuilderField error="Enter your business name" label="Business Name">child</BuilderField>)
+
+        // Assert
+        expect(screen.getByRole('alert')).toHaveTextContent('Enter your business name')
+    })
+
+    it('TC-F01.05: invalid text input and textarea expose aria-invalid, valid ones do not', async () => {
+        // Arrange
+        const { BuilderTextInput } = await vi.importActual<typeof import('@/components/builder/fields/BuilderTextInput')>(
+            '@/components/builder/fields/BuilderTextInput',
+        )
+        const { BuilderTextarea } = await vi.importActual<typeof import('@/components/builder/fields/BuilderTextarea')>(
+            '@/components/builder/fields/BuilderTextarea',
+        )
+
+        // Act
+        render(
+            <>
+                <BuilderTextInput aria-label="bad-input" invalid />
+                <BuilderTextarea aria-label="bad-textarea" invalid />
+                <BuilderTextInput aria-label="ok-input" />
+            </>,
+        )
+
+        // Assert
+        expect(screen.getByLabelText('bad-input')).toHaveAttribute('aria-invalid', 'true')
+        expect(screen.getByLabelText('bad-textarea')).toHaveAttribute('aria-invalid', 'true')
+        expect(screen.getByLabelText('ok-input')).not.toHaveAttribute('aria-invalid')
     })
 })

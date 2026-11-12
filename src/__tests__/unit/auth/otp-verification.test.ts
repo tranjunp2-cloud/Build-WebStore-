@@ -1,7 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+/**
+ * OTP send/verify endpoints on the Users collection.
+ * TC-F02.19, TC-F02.40/41/43 — OTP flow; TC-AISEC-110/111 — E2E OTP bypass gate and
+ * account guards as wired into /send-otp and /verify-otp (src/lib/otp/e2e-bypass.ts).
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { SignJWT } from 'jose'
 import { Users } from '../../../collections/Users'
 import { PayloadRequest } from 'payload'
+import { hashOTP } from '@/lib/otp/generate'
 
 // Mock dependencies
 vi.mock('@/lib/email/send', () => ({
@@ -11,6 +17,8 @@ vi.mock('@/lib/email/send', () => ({
 vi.mock('@/lib/otp/generate', () => ({
     generateOTP: vi.fn(() => '123456'),
     hashOTP: vi.fn(() => 'hashed_123456'),
+    OTP_TTL_MS: 5 * 60 * 1000,
+    OTP_RESEND_COOLDOWN_MS: 60 * 1000,
     getOTPExpiry: vi.fn(() => new Date(Date.now() + 5 * 60 * 1000)),
     verifyOTP: vi.fn((otp, hash) => otp === '123456' && hash === 'hashed_123456'),
 }))
@@ -88,6 +96,30 @@ describe('OTP Verification Endpoints', () => {
 
             expect(res.status).toBe(429)
             expect(data.errors[0].message).toContain('Please wait before requesting')
+        })
+
+        // TC-F02.44: 429 carries machine-readable code + remaining seconds for the login page
+        it('returns OTP_COOLDOWN code and retryAfter on cooldown (TC-F02.44)', async () => {
+            // Sent ~10s ago: expiry = now + 5min - 10s → cooldown has ~50s left
+            mockPayload.find.mockResolvedValue({
+                docs: [{
+                    id: 1,
+                    email: 'test@test.com',
+                    otpExpiresAt: new Date(Date.now() + 5 * 60 * 1000 - 10 * 1000).toISOString()
+                }]
+            })
+            const req = createMockRequest({ email: 'test@test.com' })
+
+            const res = await sendOtpHandler!(req) as Response
+            const data = await res.json()
+
+            expect(res.status).toBe(429)
+            expect(data.errors[0].code).toBe('OTP_COOLDOWN')
+            expect(data.errors[0].retryAfter).toBeGreaterThanOrEqual(49)
+            expect(data.errors[0].retryAfter).toBeLessThanOrEqual(51)
+            expect(data.errors[0].expiresIn).toBeGreaterThanOrEqual(289)
+            expect(data.errors[0].expiresIn).toBeLessThanOrEqual(291)
+            expect(res.headers.get('Retry-After')).toBe(String(data.errors[0].retryAfter))
         })
 
         it('generates OTP and updates user', async () => {
@@ -281,13 +313,17 @@ describe('OTP Verification Endpoints', () => {
         beforeEach(() => {
             vi.stubEnv('E2E_TEST_OTP_CODE', TEST_OTP)
             vi.stubEnv('TEST_EMAIL', TEST_EMAIL)
+            // Gate open via the explicit opt-in; no workspace restriction unless a test sets it.
+            vi.stubEnv('APP_ENV', 'staging')
+            vi.stubEnv('E2E_OTP_BYPASS_ENABLED', 'true')
+            vi.stubEnv('E2E_OTP_BYPASS_TENANT_ID', '')
         })
 
         afterEach(() => {
             vi.unstubAllEnvs()
         })
 
-        it('bypasses OTP hash check for matching test email + code in non-production', async () => {
+        it('bypasses OTP hash check for matching test email + code when the bypass is opted in', async () => {
             mockPayload.find.mockResolvedValue({
                 docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }] // no otpHash
             })
@@ -329,6 +365,101 @@ describe('OTP Verification Endpoints', () => {
 
             const res = await verifyOtpHandler!(req) as Response
             expect(res.status).toBe(401)
+        })
+
+        it('TC-AISEC-110 — verify: refuses the fixed code when the env gate is closed (staging, no opt-in)', async () => {
+            // Arrange
+            vi.stubEnv('E2E_OTP_BYPASS_ENABLED', '')
+            mockPayload.find.mockResolvedValue({ docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }] })
+            const req = createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP })
+
+            // Act
+            const res = await verifyOtpHandler!(req) as Response
+            const data = await res.json()
+
+            // Assert — normal OTP flow ran: no stored code → refused
+            expect(res.status).toBe(401)
+            expect(data.errors[0].message).toContain('No verification code found')
+        })
+
+        it('TC-AISEC-110 — verify: APP_ENV=qc-test opens the gate without the opt-in var', async () => {
+            vi.stubEnv('E2E_OTP_BYPASS_ENABLED', '')
+            vi.stubEnv('APP_ENV', 'qc-test')
+            mockPayload.find.mockResolvedValue({ docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }] })
+
+            const res = (await verifyOtpHandler!(createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP }))) as unknown as Response
+
+            expect(res.status).toBe(200)
+        })
+
+        it('TC-AISEC-110 — send: gate closed → a real generated code is stored, not the fixed one', async () => {
+            vi.stubEnv('E2E_OTP_BYPASS_ENABLED', 'false')
+            mockPayload.find.mockResolvedValue({ docs: [{ id: 1, email: TEST_EMAIL }] })
+
+            const res = await sendOtpHandler!(createMockRequest({ email: TEST_EMAIL })) as Response
+
+            expect(res.status).toBe(200)
+            expect(hashOTP).toHaveBeenCalledWith('123456')
+            expect(hashOTP).not.toHaveBeenCalledWith(TEST_OTP)
+        })
+
+        it('TC-AISEC-110 — send: gate open → the fixed code is stored and no email goes out', async () => {
+            mockPayload.find.mockResolvedValue({ docs: [{ id: 1, email: TEST_EMAIL }] })
+
+            const res = await sendOtpHandler!(createMockRequest({ email: TEST_EMAIL })) as Response
+
+            expect(res.status).toBe(200)
+            expect(hashOTP).toHaveBeenCalledWith(TEST_OTP)
+            expect(mockPayload.sendEmail).not.toHaveBeenCalled()
+        })
+
+        it('TC-AISEC-111 — verify: refuses the bypass for a super-admin account', async () => {
+            mockPayload.find.mockResolvedValue({
+                docs: [{ id: 1, email: TEST_EMAIL, roles: ['super-admin'], otpAttempts: 0 }],
+            })
+
+            const res = await verifyOtpHandler!(createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP })) as Response
+
+            expect(res.status).toBe(401)
+        })
+
+        it('TC-AISEC-111 — send: a super-admin gets a real code, not the fixed one', async () => {
+            mockPayload.find.mockResolvedValue({ docs: [{ id: 1, email: TEST_EMAIL, roles: ['super-admin'] }] })
+
+            await sendOtpHandler!(createMockRequest({ email: TEST_EMAIL }))
+
+            expect(hashOTP).not.toHaveBeenCalledWith(TEST_OTP)
+        })
+
+        it('TC-AISEC-111 — verify: refuses when the account is active in a workspace other than the QA one', async () => {
+            vi.stubEnv('E2E_OTP_BYPASS_TENANT_ID', '42')
+            mockPayload.find.mockResolvedValue({
+                docs: [{
+                    id: 1, email: TEST_EMAIL, otpAttempts: 0,
+                    tenants: [
+                        { tenant: 42, role: 'owner', status: 'active', permissions: [] },
+                        { tenant: 7, role: 'editor', status: 'active', permissions: [] },
+                    ],
+                }],
+            })
+
+            const res = await verifyOtpHandler!(createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP })) as Response
+
+            expect(res.status).toBe(401)
+        })
+
+        it('TC-AISEC-111 — verify: allows an account that is only active in the QA workspace', async () => {
+            vi.stubEnv('E2E_OTP_BYPASS_TENANT_ID', '42')
+            mockPayload.find.mockResolvedValue({
+                docs: [{
+                    id: 1, email: TEST_EMAIL, otpAttempts: 0,
+                    tenants: [{ tenant: { id: 42 }, role: 'owner', status: 'active', permissions: [] }],
+                }],
+            })
+
+            const res = (await verifyOtpHandler!(createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP }))) as unknown as Response
+
+            expect(res.status).toBe(200)
         })
     })
 })

@@ -3,6 +3,8 @@ export type GenerationErrorCode =
     | 'FEATURE_LOCKED'
     | 'SUBSCRIPTION_EXPIRED'
     | 'RATE_LIMIT'
+    | 'GENERATION_IN_PROGRESS'
+    | 'SITE_ALREADY_EXISTS'
     | 'CONTENT_UNSAFE'
     | 'VALIDATION_ERROR'
     | 'UNAUTHORIZED'
@@ -10,6 +12,7 @@ export type GenerationErrorCode =
     | 'SERVER_ERROR'
     | 'SERVICE_UNAVAILABLE'
     | 'SSE_DISCONNECT'
+    | 'GENERATION_FAILED'
 
 export type GenerationErrorUIType = 'toast' | 'banner' | 'inline' | 'fullscreen'
 
@@ -49,6 +52,22 @@ const ERROR_MAP: Record<string, GenerationError> = {
         action: { label: 'Upgrade to Pro', type: 'upgrade' },
         retryable: false,
         uiType: 'fullscreen',
+    },
+    '409': {
+        code: 'GENERATION_IN_PROGRESS',
+        messageEN: 'Your website is already being generated. Please wait for it to finish.',
+        messageMS: 'Laman web anda sedang dijana. Sila tunggu sehingga selesai.',
+        action: { label: 'Go to dashboard', type: 'dashboard' },
+        retryable: false,
+        uiType: 'banner',
+    },
+    '409_SITE_ALREADY_EXISTS': {
+        code: 'SITE_ALREADY_EXISTS',
+        messageEN: 'You already have a website. Open it from your dashboard instead of generating a new one.',
+        messageMS: 'Anda sudah mempunyai laman web. Buka dari papan pemuka dan bukannya menjana yang baharu.',
+        action: { label: 'Go to dashboard', type: 'dashboard' },
+        retryable: false,
+        uiType: 'banner',
     },
     '429': {
         code: 'RATE_LIMIT',
@@ -120,6 +139,18 @@ const ERROR_MAP: Record<string, GenerationError> = {
     },
 }
 
+/** Error codes the generation stream sends in its `error` event. */
+const STREAM_ERROR_MAP: Record<string, GenerationError> = {
+    GENERATION_FAILED: {
+        code: 'GENERATION_FAILED',
+        messageEN: "We couldn't finish your website. Your details are saved — please try again.",
+        messageMS: 'Kami belum dapat menyiapkan laman web anda. Maklumat anda telah disimpan — sila cuba lagi.',
+        action: { label: 'Retry', type: 'retry' },
+        retryable: true,
+        uiType: 'banner',
+    },
+}
+
 const DEFAULT_ERROR: GenerationError = {
     code: 'SERVER_ERROR',
     messageEN: 'Something went wrong. Please try again.',
@@ -153,6 +184,15 @@ export function getGenerationError(status: number, errorBody?: unknown): Generat
         }
     }
 
+    // For 409, the body code tells "already generating" from "already has a website"
+    if (status === 409 && typeof errorBody === 'object' && errorBody !== null) {
+        const body = errorBody as Record<string, unknown>
+        const code = typeof body.error === 'object' && body.error !== null
+            ? (body.error as Record<string, unknown>).code
+            : body.code
+        if (code === 'SITE_ALREADY_EXISTS') return ERROR_MAP['409_SITE_ALREADY_EXISTS']
+    }
+
     // For 403, check body to distinguish subscription-expired from feature-locked
     if (status === 403 && typeof errorBody === 'object' && errorBody !== null) {
         const body = errorBody as Record<string, unknown>
@@ -184,4 +224,15 @@ export function formatErrorMessage(
         (result, [key, value]) => result.replace(`{${key}}`, value),
         msg,
     )
+}
+
+/**
+ * Resolve the error the generation stream reported by its `code`. The stream's own `message`
+ * is never shown: the merchant always reads the copy for their UI language.
+ */
+export function getStreamGenerationError(code: unknown): GenerationError {
+    if (typeof code !== 'string') return STREAM_ERROR_MAP.GENERATION_FAILED
+    return STREAM_ERROR_MAP[code]
+        ?? Object.values(ERROR_MAP).find((entry) => entry.code === code)
+        ?? STREAM_ERROR_MAP.GENERATION_FAILED
 }

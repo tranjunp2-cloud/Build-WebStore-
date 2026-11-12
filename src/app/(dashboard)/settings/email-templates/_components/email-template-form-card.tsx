@@ -4,13 +4,19 @@ import { useI18n } from '@/i18n'
 import { LocaleFlag } from '@/components/locale-flag'
 import { EMAIL_TEMPLATE_VARIABLES, EmailTemplateType } from '@/lib/email/types'
 import type { ContentFields } from '../actions'
+import { CONTENT_FIELD_LIMITS } from '../validate-content-fields'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
-const LIMITS = { subject: 200, greeting: 500, ctaLabel: 100, closing: 2000 }
+const LIMITS = CONTENT_FIELD_LIMITS
+
+function hasOverLimit(fields: ContentFields | undefined): boolean {
+    if (!fields) return false
+    return (Object.keys(LIMITS) as (keyof typeof LIMITS)[]).some((k) => (fields[k] ?? '').length > LIMITS[k])
+}
 
 function CharCounter({ len, limit }: { len: number; limit: number }) {
     const cls = len > limit ? 'text-destructive' : len > limit * 0.9 ? 'text-warning' : 'text-slate-500'
@@ -25,12 +31,13 @@ interface FieldRowProps {
     rows?: number
     value: string
     limit: number
+    overLimitMessage?: string
     variables?: string[]
     insertVarLabel?: string
     onChange: (v: string) => void
 }
 
-function FieldRow({ label, required, hint, textarea, rows = 2, value, limit, variables = [], insertVarLabel, onChange }: FieldRowProps) {
+function FieldRow({ label, required, hint, textarea, rows = 2, value, limit, overLimitMessage, variables = [], insertVarLabel, onChange }: FieldRowProps) {
     const len = value.length
     return (
         <div className="space-y-1.5">
@@ -54,6 +61,9 @@ function FieldRow({ label, required, hint, textarea, rows = 2, value, limit, var
                     onChange={(e) => onChange(e.target.value)}
                     className="text-sm"
                 />
+            )}
+            {len > limit && overLimitMessage && (
+                <p role="alert" className="text-xs text-destructive">{overLimitMessage}</p>
             )}
             {hint && <p className="text-xs text-slate-500 dark:text-slate-500">{hint}</p>}
             {variables.length > 0 && (
@@ -105,6 +115,16 @@ export function EmailTemplateFormCard({
     const { t } = useI18n()
     const et = t.dashboard.settings.emailTemplates
     const cur = locale === 'en' ? draft.contentEn : (draft.contentMs ?? {})
+    const overMsg = (name: string, limit: number) => et.fieldTooLong.replace('{field}', name).replace('{limit}', String(limit))
+    const isOverLimit = hasOverLimit(draft.contentEn) || hasOverLimit(draft.contentMs)
+    // Save can be blocked by the locale tab that is not currently shown: name it so the disabled state is explainable.
+    const otherLocale = locale === 'en' ? 'ms' : 'en'
+    const otherFields = otherLocale === 'en' ? draft.contentEn : (draft.contentMs ?? {})
+    const fieldLabels = { subject: et.fieldSubject, greeting: et.fieldGreeting, ctaLabel: et.fieldCtaLabel, closing: et.fieldClosing }
+    const otherOverKey = (Object.keys(LIMITS) as (keyof typeof LIMITS)[]).find((k) => (otherFields?.[k] ?? '').length > LIMITS[k])
+    const otherLocaleMsg = otherOverKey
+        ? overMsg(`${fieldLabels[otherOverKey]} (${otherLocale.toUpperCase()})`, LIMITS[otherOverKey])
+        : null
     const vars = EMAIL_TEMPLATE_VARIABLES[templateType] ?? []
 
     return (
@@ -166,6 +186,7 @@ export function EmailTemplateFormCard({
                 hint={et.hintSubject}
                 value={cur.subject ?? ''}
                 limit={LIMITS.subject}
+                overLimitMessage={overMsg(et.fieldSubject, LIMITS.subject)}
                 onChange={(v) => onFieldChange(locale, 'subject', v)}
             />
 
@@ -177,6 +198,7 @@ export function EmailTemplateFormCard({
                 rows={2}
                 value={cur.greeting ?? ''}
                 limit={LIMITS.greeting}
+                overLimitMessage={overMsg(et.fieldGreeting, LIMITS.greeting)}
                 variables={vars.filter((v) => /name/i.test(v))}
                 insertVarLabel={et.insertVar}
                 onChange={(v) => onFieldChange(locale, 'greeting', v)}
@@ -188,6 +210,7 @@ export function EmailTemplateFormCard({
                 hint={et.hintCtaLabel}
                 value={cur.ctaLabel ?? ''}
                 limit={LIMITS.ctaLabel}
+                overLimitMessage={overMsg(et.fieldCtaLabel, LIMITS.ctaLabel)}
                 onChange={(v) => onFieldChange(locale, 'ctaLabel', v)}
             />
 
@@ -198,10 +221,15 @@ export function EmailTemplateFormCard({
                 rows={3}
                 value={cur.closing ?? ''}
                 limit={LIMITS.closing}
+                overLimitMessage={overMsg(et.fieldClosing, LIMITS.closing)}
                 variables={vars.filter((v) => /brand|support|seller/i.test(v))}
                 insertVarLabel={et.insertVar}
                 onChange={(v) => onFieldChange(locale, 'closing', v)}
             />
+
+            {otherLocaleMsg && (
+                <p role="alert" data-testid="other-locale-limit-error" className="text-xs text-destructive">{otherLocaleMsg}</p>
+            )}
 
             {/* Save footer */}
             <div className="border-t border-slate-100 dark:border-white/[0.06] pt-4 flex items-center justify-between gap-3">
@@ -224,7 +252,7 @@ export function EmailTemplateFormCard({
                     <Button
                         type="button"
                         onClick={onSave}
-                        disabled={!isDirty || isSaving}
+                        disabled={!isDirty || isSaving || isOverLimit}
                         variant="dashPrimary"
                         size="dash"
                         className="text-xs"

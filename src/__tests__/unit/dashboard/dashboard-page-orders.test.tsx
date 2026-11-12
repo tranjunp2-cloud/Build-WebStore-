@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({ getPayload: mocks.getPayload }))
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('@/lib/agent-changes/agent-refresh', () => ({ AgentRefresh: () => null }))
 vi.mock('@/lib/auth', () => ({
     getCurrentUser: mocks.getCurrentUser,
     tenantIdForQuery: mocks.tenantIdForQuery,
@@ -149,6 +150,25 @@ describe('DashboardRoot Pending Orders orchestration', () => {
         vi.restoreAllMocks()
     })
 
+    it('[TC-PERF-056] reads the tenant settings, the tenant\'s sites and the active-products count once each', async () => {
+        // Act
+        await renderDashboard()
+
+        // Assert
+        expect(mocks.findByID).toHaveBeenCalledTimes(1)
+        expect(mocks.findByID).toHaveBeenCalledWith({
+            collection: 'tenants',
+            id: '42',
+            depth: 0,
+            overrideAccess: true,
+            select: { settings: { dashboardPreferences: true }, easyParcelIntegration: { enabled: true } },
+        })
+        expect(mocks.find).toHaveBeenCalledTimes(1)
+        expect(mocks.find.mock.calls[0][0]).toMatchObject({ collection: 'sites', depth: 0, pagination: false })
+        expect(mocks.count).toHaveBeenCalledTimes(1)
+        expect(mocks.count.mock.calls[0][0]).toMatchObject({ collection: 'products' })
+    })
+
     it('[TC-F03.73] skips the query and widget when no tenant is available', async () => {
         // Arrange
         mocks.tenantIdForQuery.mockReturnValue(null)
@@ -164,10 +184,8 @@ describe('DashboardRoot Pending Orders orchestration', () => {
     })
 
     it('[TC-F03.73] skips the query and widget when no usable site exists', async () => {
-        // Arrange
-        mocks.count
-            .mockResolvedValueOnce({ totalDocs: 0 })
-            .mockResolvedValueOnce({ totalDocs: 0 })
+        // Arrange — the tenant has no site rows (the page reads them once, TC-PERF-056)
+        mocks.find.mockResolvedValue({ docs: [] })
 
         // Act
         await renderDashboard()

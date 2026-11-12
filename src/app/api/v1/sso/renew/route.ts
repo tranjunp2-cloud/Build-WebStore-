@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { dateOnly } from '@/lib/subscriptions/plan-subscription'
+import { revalidatePlanSubscription } from '@/lib/cache/revalidate-storefront'
 
 /**
  * PUT /api/v1/sso/renew
@@ -63,6 +64,8 @@ export async function PUT(req: NextRequest) {
     const subs = await payload.find({
       collection: 'plan-subscriptions',
       where: { and: [{ tenant: { equals: tenantId } }, { name: { equals: 'main' } }] },
+      // the latest main row: the one every gate reads (getActivePlanSubscription, storefront availability)
+      sort: '-createdAt',
       limit: 1,
     })
     if (!subs.docs.length) {
@@ -77,6 +80,8 @@ export async function PUT(req: NextRequest) {
       id: subs.docs[0].id,
       data: { endsAt, canceledAt: null, status: 'active' },
     })
+    // #2179: reopen the store now (post-commit; the collection hook fired before the commit)
+    revalidatePlanSubscription(tenantId)
 
     return NextResponse.json({ message: 'Subscription renewed' }, { status: 200 })
   } catch (error) {

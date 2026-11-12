@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ─── Mocks ────────────────────────────────────────────────────────────
 
 const mockGetTenantId = vi.fn()
+vi.mock('next/headers', () => ({ headers: async () => new Headers() })) // no merchant-access cookie in these tests
 vi.mock('@/lib/auth', () => ({
     getCurrentTenantId: () => mockGetTenantId(),
 }))

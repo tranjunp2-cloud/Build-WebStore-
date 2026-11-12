@@ -36,6 +36,8 @@ import {
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { TablePagination, shouldShowTablePagination, useTablePageClamp } from '@/components/ui/table-pagination'
+import { useAgentChanges } from '@/lib/agent-changes/use-agent-changes'
+import { useInvalidateDomain } from '@/hooks/queries/use-invalidate-domain'
 import { getCategoriesAction, saveCategoryAction, deleteCategoryAction, checkCategoryNameAvailable } from '../actions'
 
 // Types
@@ -198,6 +200,8 @@ const levelTextColors = {
 export default function CategoryManager() {
     const { t, ti } = useI18n()
     const router = useRouter()
+    // the products screen caches the category filter (and rows show category names)
+    const invalidateDomain = useInvalidateDomain()
     const nameInputRef = useRef<HTMLInputElement>(null)
 
     // State
@@ -235,6 +239,7 @@ export default function CategoryManager() {
     const [isSaving, setIsSaving] = useState(false)
     // Debounced async name-dedup check — UX-only, backend saveCategoryAction is source of truth
     const [nameError, setNameError] = useState<string | null>(null)
+    const nameRequiredMessage = t.dashboard.products.categories.form.errors?.nameRequired || 'Category name is required.'
 
     useEffect(() => {
         if (!isFormOpen || !formData.name.trim()) {
@@ -268,22 +273,28 @@ export default function CategoryManager() {
     const [isDeleting, setIsDeleting] = useState(false)
 
     // Fetch Categories
-    const fetchCategories = async () => {
+    const fetchRequestId = useRef(0)
+    // `silent`: a refresh in the background (the copilot changed categories) — rows stay, search/page/expanded stay, no toast on failure
+    const fetchCategories = async ({ silent = false }: { silent?: boolean } = {}) => {
+        const requestId = ++fetchRequestId.current
         try {
-            setIsLoading(true)
+            if (!silent) setIsLoading(true)
             const docs = await getCategoriesAction()
+            if (requestId !== fetchRequestId.current) return
             setCategories(docs as Category[] || [])
         } catch (error) {
             console.error(error)
-            toast.error(t.dashboard.products.categories.toast.loadError)
+            if (!silent && requestId === fetchRequestId.current) toast.error(t.dashboard.products.categories.toast.loadError)
         } finally {
-            setIsLoading(false)
+            if (requestId === fetchRequestId.current) setIsLoading(false)
         }
     }
 
     useEffect(() => {
         fetchCategories()
     }, [])
+
+    useAgentChanges({ kinds: ['store_category'] }, () => { void fetchCategories({ silent: true }) })
 
     // Build Tree
     const tree = useMemo(() => {
@@ -384,7 +395,11 @@ export default function CategoryManager() {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!formData.name.trim()) return
+        // Whitespace-only names pass the input's native `required` check, so say why nothing saved (GH-2262).
+        if (!formData.name.trim()) {
+            setNameError(nameRequiredMessage)
+            return
+        }
 
         // Validate cycle Client-Side (UX-only; backend beforeValidate hook is authoritative)
         if (formData.id && isDescendant(formData.parent, formData.id, categories)) {
@@ -429,6 +444,7 @@ export default function CategoryManager() {
             toast.success(msg)
             setIsFormOpen(false)
             fetchCategories()
+            void invalidateDomain('products')
         } catch (error: any) {
             const message = error?.message || ''
             if (message === 'CATEGORY_NAME_DUPLICATE') {
@@ -472,6 +488,7 @@ export default function CategoryManager() {
             toast.success(t.dashboard.products.categories.toast.deleted.replace('{name}', categoryToDelete.name))
             setIsDeleteOpen(false)
             setCategoryToDelete(null)
+            void invalidateDomain('products')
             await fetchCategories()
         } catch (error: any) {
             const message = error?.message || ''
@@ -688,6 +705,7 @@ export default function CategoryManager() {
                             {searchQuery ? (
                                 <TableEmptyState
                                     icon={<SearchX />}
+                                    scene="searchEmpty"
                                     title={t.dashboard?.products?.categories?.table?.noResults || 'No results found'}
                                     subtitle={t.dashboard?.products?.categories?.table?.tryAdjusting || 'Try adjusting your search terms.'}
                                 />
@@ -775,6 +793,9 @@ export default function CategoryManager() {
                                         value={formData.name}
                                         onChange={e => {
                                             const newName = e.target.value;
+                                            // Typing clears the required error at once (Save is disabled while it shows);
+                                            // the duplicate check below still sets its own error after the debounce.
+                                            if (nameError === nameRequiredMessage) setNameError(null);
                                             setFormData(prev => ({
                                                 ...prev,
                                                 name: newName,

@@ -258,3 +258,21 @@ describe('[TC-F08-04-121] category mutation waits', () => {
         expect(nextOperation).toHaveBeenCalledOnce()
     })
 })
+
+describe('[TC-PERF-014] pool acquire timeout reads as busy', () => {
+    it('answers CATEGORY_BUSY_RETRY when pg-pool\'s own 3 s acquire timeout fires first', async () => {
+        // Arrange
+        const pool = {
+            options: { max: 2 },
+            connect: vi.fn().mockRejectedValue(new Error('timeout exceeded when trying to connect')),
+        }
+        const operation = vi.fn()
+
+        // Act
+        const save = withActiveCategoryRowLock({ db: { pool } } as never, 123, 68, operation)
+
+        // Assert
+        await expect(save).rejects.toThrow('CATEGORY_BUSY_RETRY')
+        expect(operation).not.toHaveBeenCalled()
+    })
+})

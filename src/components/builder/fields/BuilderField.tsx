@@ -30,7 +30,8 @@ export function BuilderField({
             </div>
             {children}
             {hint ? <div className="text-xs leading-4 text-[#94a3b8]">{hint}</div> : null}
-            {error ? <p className="text-xs leading-4 text-red-400">{error}</p> : null}
+            {/* role="alert": screen readers announce the message when it appears */}
+            {error ? <p className="text-xs leading-4 text-red-400" role="alert">{error}</p> : null}
         </div>
     )
 }

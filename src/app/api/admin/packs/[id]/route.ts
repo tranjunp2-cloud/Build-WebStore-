@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission, withSuperAdmin } from '@/lib/admin/api-utils'
 
 const UpdatePackSchema = z.object({
     name: z.string().min(1).max(200).optional(),
@@ -38,7 +38,7 @@ export const GET = withSuperAdmin(async (req: NextRequest) => {
     }
 })
 
-export const PATCH = withSuperAdmin(async (req: NextRequest) => {
+export const PATCH = withStudioPermission('pack.edit', async (req: NextRequest) => {
     const id = extractId(req)
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
@@ -64,7 +64,7 @@ export const PATCH = withSuperAdmin(async (req: NextRequest) => {
     }
 })
 
-export const DELETE = withSuperAdmin(async (req: NextRequest) => {
+export const DELETE = withStudioPermission('pack.delete', async (req: NextRequest) => {
     const id = extractId(req)
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 

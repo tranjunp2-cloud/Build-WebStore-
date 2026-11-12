@@ -4,11 +4,11 @@ import {
     validateCheckoutForm,
     validateEmail,
     validatePhone,
-    generateOrderNumber,
     validatePaymentProof,
     PROOF_MAX_SIZE_BYTES,
 } from '@/lib/storefront'
 import { MY_STATES } from '@/lib/shipping'
+import { generateOrderNumber } from '@/lib/orders/generate-order-number'
 
 // ─── TC-F09.23, TC-F09.24: Checkout Form Validation ────────────────────────
 describe('[TC-F09.23/TC-F09.24] Checkout Form Validation (validateCheckoutForm)', () => {
@@ -161,16 +161,16 @@ describe('[TC-F09.31] Order Number Generation (generateOrderNumber)', () => {
             nums.add(generateOrderNumber())
         }
 
-        // Assert — with 10 calls at different timestamps, expect uniqueness
-        expect(nums.size).toBeGreaterThanOrEqual(1)
+        // Assert — 64-bit random suffix → mọi mã đều khác nhau
+        expect(nums.size).toBe(10)
     })
 
-    it('TC-F09.31: format matches ORD- followed by alphanumeric characters', () => {
+    it('TC-F09.31: format matches ORD-<ts36>-<16 hex> (GH-2081)', () => {
         // Act
         const orderNum = generateOrderNumber()
 
-        // Assert — ORD- + base36 encoded timestamp (letters + digits only)
-        expect(orderNum).toMatch(/^ORD-[A-Z0-9]+$/)
+        // Assert — ORD- + base36 timestamp + 16 ký tự hex HOA (64 bit ngẫu nhiên)
+        expect(orderNum).toMatch(/^ORD-[0-9A-Z]+-[0-9A-F]{16}$/)
     })
 })
 
@@ -268,6 +268,17 @@ describe('[TC-F09.24] Email Format Validation (validateEmail)', () => {
         expect(validateEmail('not-an-email')).not.toBeNull()
         expect(validateEmail('abc@.com')).not.toBeNull()
         expect(validateEmail('@nodomain')).not.toBeNull()
+    })
+
+    it('[TC-F13.132] accepts 254 characters and explains when checkout email exceeds that limit', () => {
+        // Arrange
+        const allowed = `${'a'.repeat(242)}@example.com`
+        const tooLong = `${'a'.repeat(243)}@example.com`
+
+        // Act / Assert
+        expect(allowed).toHaveLength(254)
+        expect(validateEmail(allowed)).toBeNull()
+        expect(validateEmail(tooLong)).toBe('Email must not exceed 254 characters')
     })
 })
 

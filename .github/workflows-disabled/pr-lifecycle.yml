@@ -20,8 +20,9 @@ jobs:
   # ──────────────────────────────────────
   pr-opened:
     name: 'PR Opened'
-    if: github.event_name == 'pull_request' && github.event.action == 'opened'
-    runs-on: ubuntu-latest
+    # Dependabot PRs get a read-only token (assign/label calls return 403) — skip them.
+    if: github.event_name == 'pull_request' && github.event.action == 'opened' && github.actor != 'dependabot[bot]'
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
       issues: write
@@ -29,10 +30,10 @@ jobs:
       repository-projects: write
     steps:
       - name: Checkout (for composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Auto-assign author + label + detect type + check issue link
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: size
         with:
           script: |
@@ -249,7 +250,7 @@ jobs:
   pr-review:
     name: 'PR Review'
     if: github.event_name == 'pull_request_review'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
       issues: write
@@ -257,11 +258,11 @@ jobs:
       checks: read
     steps:
       - name: Checkout (for composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Auto-label approved + ready-to-merge
         if: github.event.review.state == 'approved'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const pr = context.payload.pull_request;
@@ -314,7 +315,7 @@ jobs:
 
       - name: Remove approved labels on changes requested
         if: github.event.review.state == 'changes_requested'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const owner = context.repo.owner;
@@ -357,7 +358,7 @@ jobs:
   pr-merged:
     name: 'PR Merged'
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: read
       issues: write
@@ -365,11 +366,11 @@ jobs:
       repository-projects: write
     steps:
       - name: Checkout (for composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Move linked issues to QA Testing
         id: qa_issues
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const pr = context.payload.pull_request;
@@ -573,16 +574,16 @@ jobs:
   stale-pr-check:
     name: 'Stale PR Check'
     if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: read
       contents: read
     steps:
       - name: Checkout (for composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check for stale PRs
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: stale
         with:
           script: |

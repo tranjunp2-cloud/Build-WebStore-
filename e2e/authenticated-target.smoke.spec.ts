@@ -4,6 +4,7 @@ import {
     isAllowedAuthenticatedE2ETarget,
     LIVE_STAGING_E2E_ORIGIN,
     LOCAL_E2E_ORIGIN,
+    LOCAL_E2E_WORKTREE_ORIGIN,
 } from './helpers/authenticated-target'
 
 // ── TC-F37-01-29: Authenticated E2E target allowlist ──────────────────
@@ -12,6 +13,7 @@ test.describe('[TC-F37-01-29] authenticated E2E target allowlist', () => {
         // Arrange
         const allowedTargets = [
             LOCAL_E2E_ORIGIN,
+            LOCAL_E2E_WORKTREE_ORIGIN,
             `${LIVE_STAGING_E2E_ORIGIN}/editor/123`,
         ]
 
@@ -19,7 +21,7 @@ test.describe('[TC-F37-01-29] authenticated E2E target allowlist', () => {
         const results = allowedTargets.map(isAllowedAuthenticatedE2ETarget)
 
         // Assert
-        expect(results).toEqual([true, true])
+        expect(results).toEqual([true, true, true])
     })
 
     test('rejects malformed, production and lookalike targets before authentication', () => {

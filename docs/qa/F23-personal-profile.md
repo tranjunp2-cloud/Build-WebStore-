@@ -1,15 +1,15 @@
 # Test Cases — F23 Personal Profile (Team & Account)
 
-> **Status:** Automated (unit) — backfilled 2026-07-14; tests existed before this doc
+> **Status:** Existing baseline automated; US-F23-05 unit-automated (GH-1723), staging E2E pending
 > **Screen:** Settings → Team & Account (`src/app/(dashboard)/settings/profile/`)
-> **Refs:** PRD `docs/prd/F23-personal-profile.md` · Stories `docs/stories/F23-personal-profile-stories.md` (US-F23-01..04) · GH #1604
+> **Refs:** PRD `docs/prd/F23-personal-profile.md` · Stories `docs/stories/F23-personal-profile-stories.md` (US-F23-01..05) · GH #1604 · GH #1723
 > ⚠️ **Số F23 bị trùng** với `F23-custom-subdomain-slug` (feature khác, PRD/QA riêng). TC-ID của doc này luôn có ngữ cảnh profile.
 
 ---
 
 ## Test Case Matrix
 
-TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác nghĩa giữa 2 file** (đánh dấu ♻ — nợ pre-existing, không renumber để khỏi phá git blame; TC mới PHẢI tra bảng này trước khi lấy số).
+TC-ID scheme hiện hữu: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác nghĩa giữa 2 file** (đánh dấu ♻ — nợ pre-existing, không renumber để khỏi phá git blame). Vì `TC-F23-05-01..09` đã thuộc Role Guard, US-F23-05 mới bắt buộc dùng namespace `TC-F23-SSO-{seq}`.
 
 ### US-F23-01 — Avatar & profile read
 
@@ -33,6 +33,8 @@ TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác 
 | TC-F23-02-04 | `api-users-me.test.ts` | PATCH — success với data hợp lệ | ✓ |
 | **TC-F23-02-05** | `general-info-tab.test.tsx` | Error toast khi submit thất bại (server error / network error) | ✓ |
 | **TC-F23-02-06** | `general-info-tab.test.tsx` | Cancel → reset form về giá trị cũ + ẩn action bar | ✓ |
+| **TC-F23-02-10** | `general-info-tab.test.tsx` | GH-2383: Họ trống + đổi SĐT → vẫn PATCH thành công | ✓ |
+| **TC-F23-02-11** | `general-info-tab.test.tsx` | GH-2383: Họ 51 ký tự → lỗi inline dưới ô Last name (i18n, không chuỗi zod), không gọi API | ✓ |
 | **TC-F23-02-07** | `phone-input.test.tsx` | GH-1604: trigger chọn quốc gia hiện **đúng 1** cờ 🇲🇾 + `+60 MY` | ✓ |
 | **TC-F23-02-08** | `phone-input.test.tsx` | GH-1604: value +84 → đúng 1 cờ 🇻🇳, không lẫn cờ MY | ✓ |
 | **TC-F23-02-09** | `phone-input.test.tsx` | Value không có mã quốc gia → fallback +60, vẫn 1 cờ | ✓ |
@@ -57,12 +59,14 @@ TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác 
 | TC-F23-04-01..12 | `schemas.test.ts` | profilePatchSchema: name bounds, phone format/length/E.164 | ✓ |
 | TC-F23-04-13 ♻ | `schemas.test.ts` | Password hợp lệ pass schema | ✓ |
 | TC-F23-04-13 ♻ | `api-users-me-password.test.ts` | POST password — unauthorized | ✓ |
-| TC-F23-04-14 ♻ | `schemas.test.ts` / `api-users-me-password.test.ts` | Password <8 ký tự / forbidden với owner | ✓ |
+| TC-F23-04-14 ♻ | `schemas.test.ts` / `password-change-form.test.tsx` / `api-users-me-password.test.ts` | Password <6 ký tự (GH-2269) / forbidden với owner | ✓ |
 | TC-F23-04-15 ♻ | `schemas.test.ts` / `api-users-me-password.test.ts` | Thiếu uppercase / bad request password yếu | ✓ |
 | TC-F23-04-16 ♻ | `api-users-me-password.test.ts` | Current password sai → unauthorized (backend) | ✓ |
 | TC-F23-04-16 ♻ | `password-change-form.test.tsx` | Current password sai (401) → inline error, không collapse (component) | ✓ |
 | TC-F23-04-17 ♻ | `schemas.test.ts` / `api-users-me-password.test.ts` | Thiếu digit / success đổi password | ✓ |
 | TC-F23-04-19..23 | `schemas.test.ts` | currentPassword bounds; phone optional/code-only/omitted | ✓ |
+| **TC-F23-04-31** | `schemas.test.ts` | GH-2383: lastName rỗng hợp lệ | ✓ |
+| **TC-F23-04-32** | `schemas.test.ts` | GH-2383: lỗi tên trả key i18n `nameLength` | ✓ |
 | **TC-F23-04-24** | `security-tab.test.tsx` | Card collapsed mặc định: summary line + "Change Password" button, không có form | ✓ |
 | **TC-F23-04-25** | `security-tab.test.tsx` | Click "Change Password" → expand hiện `PasswordChangeForm` | ✓ |
 | **TC-F23-04-26** | `security-tab.test.tsx` | `onDone`/`onCancel` từ form → card collapse lại | ✓ |
@@ -76,6 +80,24 @@ TC-ID scheme: `TC-F23-{US}-{seq}`. ⚠️ Một số seq bị **trùng ID khác 
 | TC-ID | File | Description | AUTO |
 |-------|------|-------------|------|
 | TC-F23-05-01..09 | `role-guard.test.ts` | Owner detection qua tenant role (incl. GH-905 regression), 403 owner, null staff | ✓ |
+
+### US-F23-05 — SSO Owner Avatar Synchronization
+
+> Implemented theo contract `plans/261020-1358-gh-1723-sso-owner-avatar-sync/contract-sso-pw2-avatar-sync.md` (GH-1723). Unit test ở `src/__tests__/unit/{auth,lib,profile}/`; TC cần 2 hệ thống chạy thật → manual trên staging.
+
+| TC-ID | AC Ref | Description | AUTO |
+|---|---|---|---|
+| TC-F23-SSO-01 | AC-05.1 | Backfill Owner có SSO avatar; thay legacy local reference và hiển thị Header/Profile (Owner cũ chưa có `sso_user_id` được bind lần đầu theo email khi `ALLOW_EMAIL_BIND` bật — mặc định từ GH-1979; tắt → 409 `email_bind_disabled`) | ✓ — `sso-avatar-apply-state.test.ts`, `sso-avatar-download.test.ts`, `sso-sync-avatar.test.ts` (unit) + staging manual |
+| TC-F23-SSO-02 | AC-05.1 | Authenticated `ABSENT` khi backfill; retire/purge legacy local media và dùng initials (cùng điều kiện `sso_user_id`/`ALLOW_EMAIL_BIND` như TC-01) | ✓ — `sso-avatar-apply-state.test.ts`, `sso-sync-avatar.test.ts` (unit) + staging manual |
+| TC-F23-SSO-03 | AC-05.2 | Confirmed update đạt propagation p95 ≤ 5 phút | Manual — staging (Phase 05) |
+| TC-F23-SSO-04 | AC-05.3 | Missed webhook được login reconciliation; failure không block login | Manual — staging (SSO `login` trigger) |
+| TC-F23-SSO-05 | AC-05.4 | Authenticated `ABSENT` purge reference, stored object, derivatives/CDN theo retention | ✓ — `sso-avatar-apply-state.test.ts` (Media purge) |
+| TC-F23-SSO-06 | AC-05.5 | `UNKNOWN`/SSO outage giữ last-known avatar và retry/monitor | ✓ — `sso-avatar-apply-state.test.ts`, `sso-avatar-download.test.ts`, `sso-sync-avatar.test.ts` + staging manual |
+| TC-F23-SSO-07 | AC-05.6 | Duplicate/out-of-order event idempotent; event cũ không rollback | ✓ — `sso-avatar-apply-state.test.ts` |
+| TC-F23-SSO-08 | AC-05.7 | Invalid/expired/unsafe resource không persist/render hoặc fetch private network | ✓ — `sso-avatar-download.test.ts`, `sso-avatar-is-public-ip.test.ts` (+ staging manual) |
+| TC-F23-SSO-09 | AC-05.8 | Immutable identity và cross-user/cross-tenant isolation | ✓ — `sso-avatar-resolve-owner.test.ts`, `sso-user-sql.test.ts`, `sso-sync-avatar.test.ts`, `sso-provision.test.ts`, `sso-avatar-apply-state.test.ts` |
+| TC-F23-SSO-10 | AC-05.9 | Owner local mutation bị chặn; Staff avatar flow không regression | ✓ — `api-users-me-avatar.test.ts`, `avatar-field-access.test.ts` |
+| TC-F23-SSO-11 | AC-05.10, AC-05.11 | Identity preflight quarantine (gồm `email_bind_disabled` khi `allowEmailBind=false`) và `PRESENT`/`ABSENT`/`UNKNOWN` semantics | ✓ — `sso-avatar-resolve-owner.test.ts`, `sso-sync-avatar.test.ts` |
 
 ---
 

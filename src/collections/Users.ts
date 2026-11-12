@@ -1,24 +1,98 @@
 import type {
+    FieldAccess,
     CollectionConfig,
     CollectionAfterChangeHook,
     CollectionBeforeChangeHook,
     CollectionBeforeOperationHook,
+    PayloadRequest,
 } from 'payload'
 import { APIError } from 'payload'
+import { isMigrationContext } from '@/lib/migration/pw1-json/runtime'
 import { randomBytes } from 'crypto'
-import { sendEmail } from '@/lib/email/send'
+import type { sendEmail as SendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
 import { staffInvitationEmail } from '@/lib/email/templates/staff-invitation'
 import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
-import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
+import { generateOTP, hashOTP, getOTPExpiry, OTP_TTL_MS, OTP_RESEND_COOLDOWN_MS } from '@/lib/otp/generate'
 import { canBypassOtpForEmail, getQcBypassCode, isValidQcBypass } from '@/lib/otp/qc-bypass'
+import { canUseE2eOtpBypass, getE2eBypassCode, isValidE2eBypass, type E2eBypassUser } from '@/lib/otp/e2e-bypass'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
+import { checkOtpSendEmail, checkOtpSendIp, requestIp, type OtpLimitCheck } from '@/lib/email/outbound-email-limits'
 import { normalizeTenants } from '@/lib/normalize-tenants'
+import { canUpdateAvatarField } from '@/lib/profile/avatar-field-access'
+import { clearLoginLockAfterPasswordReset, clearLoginLockOnPasswordUpdate } from '@/lib/auth/clear-login-lock-on-password-change'
+import { syncKeyStringOnPasswordUpdate } from '@/lib/auth/sync-key-string-on-password-update'
+import { enforceResetPasswordMinLength } from '@/lib/auth/enforce-reset-password-min-length'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
-import { getTemplateConfig } from '@/lib/email/get-template-config'
+import { impersonationForbiddenResponse, isMerchantAccessSession } from '@/lib/support/merchant-access-session'
+import type { getTemplateConfig as GetTemplateConfig } from '@/lib/email/get-template-config'
 import { getActivePlanSubscription, canUseWithinLimit, recordUsage, reduceUsage } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+
+// Loaded on use: both modules import the Payload config, which imports this collection.
+// A static import makes a cycle that breaks production builds (config reads Users before it exists).
+const sendEmail: typeof SendEmail = async (...args) => (await import('@/lib/email/send')).sendEmail(...args)
+const getTemplateConfig: typeof GetTemplateConfig = async (...args) =>
+    (await import('@/lib/email/get-template-config')).getTemplateConfig(...args)
+
+const isSuperAdminField: FieldAccess = ({ req }) => Boolean(req.user?.roles?.includes('super-admin'))
+
+/**
+ * Fields an auth response must never carry. `payload.login` and the Local API reads behind verify-otp skip field read
+ * access, so the raw user doc holds the OTP hash (sha256 of 6 digits: skips the OTP step), the encrypted SSO
+ * password, the password hash/salt, reset tokens and the session list.
+ */
+const PRIVATE_USER_FIELDS = [
+    'otpHash', 'otpExpiresAt', 'otpAttempts', 'keyString', 'sessions', 'hash', 'salt',
+    'resetPasswordToken', 'resetPasswordExpiration', 'loginAttempts', 'lockUntil',
+] as const
+
+const relationId = (value: unknown): unknown =>
+    value && typeof value === 'object' && 'id' in value ? (value as { id: unknown }).id : value
+
+/**
+ * send-otp refused by a send limit. `OTP_RATE_LIMITED` (429) carries `retryAfter` and, when the user's last code can
+ * still be entered, `expiresIn`, so the login page can continue to /verify-otp with that code (TC-PERF-181).
+ */
+function otpLimitedResponse(limit: Extract<OtpLimitCheck, { allowed: false }>, expiresIn?: number): Response {
+    const headers = { 'Retry-After': String(limit.retryAfter) }
+    return Response.json(
+        { errors: [{ message: 'Too many verification codes requested. Please try again later.', code: 'OTP_RATE_LIMITED', retryAfter: limit.retryAfter, ...(expiresIn ? { expiresIn } : {}) }] },
+        { status: 429, headers },
+    )
+}
+
+/** Seconds the user's last code can still be entered (unexpired, attempts left), else undefined. */
+function pendingOtpExpiresIn(doc: object): number | undefined {
+    const user = doc as { otpHash?: unknown; otpExpiresAt?: unknown; otpAttempts?: unknown }
+    if (!user.otpHash || !user.otpExpiresAt || (Number(user.otpAttempts) || 0) >= 5) return undefined
+    const seconds = Math.ceil((new Date(String(user.otpExpiresAt)).getTime() - Date.now()) / 1000)
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined
+}
+
+/**
+ * The login and verify-otp reads run at the default depth, so `tenants[].tenant` holds whole tenant rows (Xendit,
+ * EasyParcel and ECH secrets — a viewer gets the owner's keys) and `createdBy` / `updatedBy` hold whole user rows,
+ * often the caller's own with the fresh OTP hash. Relations go out as the tenant's name and slug, or a bare id.
+ * `onboardingCompleted` (a plain flag) stays: the login page sends an unfinished owner to /onboarding (TC-PERF-180).
+ */
+export function publicUser<T extends object>(user: T): Omit<T, (typeof PRIVATE_USER_FIELDS)[number]> {
+    const copy = { ...user } as Record<string, unknown>
+    for (const field of PRIVATE_USER_FIELDS) delete copy[field]
+    for (const field of ['createdBy', 'updatedBy']) if (field in copy) copy[field] = relationId(copy[field])
+    if (Array.isArray(copy.tenants)) {
+        copy.tenants = copy.tenants.map((membership: Record<string, unknown>) => {
+            const tenant = membership?.tenant
+            if (!tenant || typeof tenant !== 'object') return membership
+            const { id, name, slug, onboardingCompleted } = tenant as { id: unknown; name?: unknown; slug?: unknown; onboardingCompleted?: unknown }
+            const trimmed: Record<string, unknown> = { id, name, slug }
+            if (typeof onboardingCompleted === 'boolean') trimmed.onboardingCompleted = onboardingCompleted
+            return { ...membership, tenant: trimmed }
+        })
+    }
+    return copy as Omit<T, (typeof PRIVATE_USER_FIELDS)[number]>
+}
 
 /**
  * Single source of truth for the `roles` select options — reused by the field
@@ -29,6 +103,15 @@ const USER_ROLE_OPTIONS = [
     { label: 'Tenant Owner', value: 'tenant-owner' },
     { label: 'Editor', value: 'editor' },
     { label: 'Viewer', value: 'viewer' },
+    // Prime team's read-only Studio seat (src/lib/admin/studio-roles.ts): sees every Studio page except AI settings, writes nothing.
+    { label: 'Studio Viewer (read-only)', value: 'studio-viewer' },
+    // Prime team work seats (src/lib/admin/studio-permissions.ts): read Studio, change only their own area.
+    { label: 'Studio Content (templates, blocks)', value: 'studio-content' },
+    { label: 'Studio Reviewer (approve, publish)', value: 'studio-reviewer' },
+    { label: 'Studio QA (tests, migration checks)', value: 'studio-qa' },
+    { label: 'Studio Ops (retries, test runs)', value: 'studio-ops' },
+    // Prime team that builds merchant sites: may open a merchant's CMS via /support/merchant-access, nothing else.
+    { label: 'Support (merchant CMS access)', value: 'support' },
 ]
 const VALID_ROLE_VALUES = new Set(USER_ROLE_OPTIONS.map((o) => o.value))
 // Operators that compare `roles` against an enum value — only these may carry a role
@@ -91,6 +174,8 @@ const rejectInvalidRoleFilter: CollectionBeforeOperationHook = ({ args }) => {
  * Skip if req.user is null — system-level operations (e.g. Payload internal tasks) have no caller.
  */
 const setAuditFields: CollectionBeforeChangeHook = ({ data, operation, req }) => {
+    // Preserve the verified historical actor only for the private local-import capability.
+    if (isMigrationContext(req.context)) return data
     const callerId = req.user?.id ?? null
     if (!callerId) return data
 
@@ -123,6 +208,12 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
     return doc
 }
 
+/**
+ * Roles a support session (merchant access link) may hand out or keep: never `owner` / `admin`, who can reach
+ * payout settings and so would give support a lasting path to the payout account (TC-F15.38).
+ */
+const MERCHANT_ACCESS_ASSIGNABLE_ROLES: ReadonlySet<string> = new Set(['editor', 'viewer', 'custom'])
+
 async function injectUser(req: any) {
     if (req.user) return;
     const authHeader = (typeof req.headers.get === 'function')
@@ -147,11 +238,32 @@ async function injectUser(req: any) {
     }
 }
 
+/**
+ * True when the user exists and is currently locked by Payload's maxLoginAttempts.
+ * Never throws: on any lookup failure we fall back to the generic "Login failed" path.
+ */
+async function isAccountLocked(req: PayloadRequest, email: string): Promise<boolean> {
+    try {
+        const { docs } = await req.payload.find({
+            collection: 'users',
+            where: { email: { equals: email.trim().toLowerCase() } },
+            limit: 1,
+            depth: 0,
+            overrideAccess: true,
+            showHiddenFields: true, // lockUntil is a hidden auth field
+        })
+        const lockUntil = (docs[0] as { lockUntil?: string | Date | null } | undefined)?.lockUntil
+        return !!lockUntil && new Date(lockUntil).getTime() > Date.now()
+    } catch {
+        return false
+    }
+}
+
 export const Users: CollectionConfig = {
     slug: 'users',
     auth: {
         maxLoginAttempts: 5,
-        lockTime: 15 * 60 * 1000, // 15 minutes
+        lockTime: 15 * 60 * 1000, // 15 minutes — keep in sync with i18n auth.errors.accountLocked copy
         forgotPassword: {
             generateEmailHTML: async (args) => {
                 const token = args?.token || ''
@@ -218,9 +330,10 @@ export const Users: CollectionConfig = {
         description: 'Platform users — can be super-admins or tenant members.',
     },
     hooks: {
-        beforeOperation: [rejectInvalidRoleFilter],
-        beforeChange: [setAuditFields],
+        beforeOperation: [rejectInvalidRoleFilter, enforceResetPasswordMinLength],
+        beforeChange: [setAuditFields, clearLoginLockOnPasswordUpdate, syncKeyStringOnPasswordUpdate],
         afterChange: [sendWelcomeEmailHook],
+        afterOperation: [clearLoginLockAfterPasswordReset],
     },
     endpoints: [
         {
@@ -297,7 +410,7 @@ export const Users: CollectionConfig = {
 
                     return Response.json({
                         message: 'Auth Passed',
-                        user: result.user,
+                        user: result.user ? publicUser(result.user) : result.user,
                         token: finalToken,
                         exp: Math.floor(Date.now() / 1000) + 86400,
                     }, {
@@ -308,6 +421,14 @@ export const Users: CollectionConfig = {
 
                 } catch (error: unknown) {
                     console.error('[Users SSO Login Error]:', error)
+                    // Payload fails a locked account the same way as a wrong password, so look
+                    // at lockUntil directly to let the login page show the right message (GH-2053).
+                    if (await isAccountLocked(req, email)) {
+                        return Response.json(
+                            { errors: [{ message: 'Account locked', code: 'ACCOUNT_LOCKED' }] },
+                            { status: 423 },
+                        )
+                    }
                     return Response.json({ errors: [{ message: 'Login failed' }] }, { status: 401 })
                 }
             }
@@ -346,6 +467,10 @@ export const Users: CollectionConfig = {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
 
+                // Merchant-access session: only non-privileged roles (TC-F15.38)
+                const inSession = isMerchantAccessSession(req)
+                if (inSession && !MERCHANT_ACCESS_ASSIGNABLE_ROLES.has(role)) return impersonationForbiddenResponse()
+
                 // Security: Only an owner can invite another owner
                 if (role === 'owner' && requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Only an owner can invite another owner' }] }, { status: 403 })
@@ -367,6 +492,8 @@ export const Users: CollectionConfig = {
                     let tempPassword = ''
 
                     if (targetUser) {
+                        // Re-inviting an existing account resets its password: never from a support session (TC-F15.38)
+                        if (inSession) return impersonationForbiddenResponse()
                         // Check if already in tenant
                         const alreadyInTenant = targetUser.tenants?.find((t: any) =>
                             String(t.tenant?.id ?? t.tenant) === String(tenantId)
@@ -387,7 +514,10 @@ export const Users: CollectionConfig = {
                         // So they can login even if they forgot the old password
                         tempPassword = randomBytes(8).toString('base64url').slice(0, 12)
 
-                        // Add to tenant + reset password
+                        // Add to tenant + reset password.
+                        // Do not pass `req` or `user` here: without them req.user is null, so the temp password
+                        // is not copied into keyString (syncKeyStringOnPasswordUpdate) and SSO calls keep working.
+                        // Guarded by invite-staff-keystring-guard.test.ts (TC-F02.66).
                         const normalizedExisting = normalizeTenants(targetUser.tenants || [])
                         await req.payload.update({
                             collection: 'users',
@@ -500,6 +630,7 @@ export const Users: CollectionConfig = {
                 // Security: Prevent removing if they are the last active owner
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                 const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
+                if (targetTenantRole === 'owner' && isMerchantAccessSession(req)) return impersonationForbiddenResponse()
                 if (targetTenantRole === 'owner') {
                     if (requesterTenant.role !== 'owner') {
                         return Response.json({ errors: [{ message: 'Only an owner can remove another owner' }] }, { status: 403 })
@@ -565,11 +696,12 @@ export const Users: CollectionConfig = {
             method: 'post',
             handler: async (req) => {
                 const body = await req.json?.() ?? {}
-                const { userId, tenantId, name, role, permissions } = body as { userId?: string; tenantId?: string; name?: string; role?: string; permissions?: string[] }
+                // Legacy clients may still send `name`; saving permissions must never rewrite the staff's name (GH-2383).
+                const { userId, tenantId, role, permissions } = body as { userId?: string; tenantId?: string; role?: string; permissions?: string[] }
 
                 await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
-                if (!userId || !tenantId || !role || !name) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
+                if (!userId || !tenantId || !role) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
                 const requesterTenant = req.user.tenants?.find((t: any) =>
                     String(t.tenant?.id ?? t.tenant) === String(tenantId)
@@ -591,6 +723,11 @@ export const Users: CollectionConfig = {
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                 const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
+
+                // Merchant-access session: never touch an owner, never grant owner / admin (TC-F15.38)
+                if (isMerchantAccessSession(req) && (targetTenantRole === 'owner' || !MERCHANT_ACCESS_ASSIGNABLE_ROLES.has(role))) {
+                    return impersonationForbiddenResponse()
+                }
 
                 // Security: Prevent Admin from promoting anyone to Owner
                 if (role === 'owner' && requesterTenant.role !== 'owner') {
@@ -642,7 +779,7 @@ export const Users: CollectionConfig = {
                     }
                 }
 
-                const updateData: Record<string, unknown> = { firstName: name, tenants: normalizedTenants }
+                const updateData: Record<string, unknown> = { tenants: normalizedTenants }
                 if (updatedRoles !== undefined) updateData.roles = updatedRoles
 
                 await req.payload.update({
@@ -703,6 +840,7 @@ export const Users: CollectionConfig = {
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                 const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
+                if (targetTenantRole === 'owner' && isMerchantAccessSession(req)) return impersonationForbiddenResponse()
                 if (targetTenantRole === 'owner') {
                     if (requesterTenant.role !== 'owner') {
                         return Response.json({ errors: [{ message: 'Only an owner can update the status of another owner' }] }, { status: 403 })
@@ -800,6 +938,15 @@ export const Users: CollectionConfig = {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
 
+                // Merchant-access session: refuse the whole batch if any target is an owner (TC-F15.38)
+                if (isMerchantAccessSession(req)) {
+                    for (const userId of userIds) {
+                        const target = await req.payload.findByID({ collection: 'users', id: userId }).catch(() => null)
+                        const membership = target?.tenants?.find((t: TenantMembership) => String(t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === String(tenantId))
+                        if (membership?.role === 'owner') return impersonationForbiddenResponse()
+                    }
+                }
+
                 const bulkRemoveSub = await getActivePlanSubscription(req.payload, tenantId)
 
                 let removedCount = 0;
@@ -861,6 +1008,11 @@ export const Users: CollectionConfig = {
                         )
                     }
 
+                    // Per IP, before the lookup so the answer says nothing about the address; falls back to the
+                    // per-instance counter when Upstash fails (TC-PERF-182).
+                    const ipLimit = await checkOtpSendIp(requestIp(req.headers))
+                    if (!ipLimit.allowed) return otpLimitedResponse(ipLimit)
+
                     // Find user by email
                     const result = await req.payload.find({
                         collection: 'users',
@@ -880,26 +1032,41 @@ export const Users: CollectionConfig = {
                     // Check rate limiting: max 1 OTP per 60 seconds
                     if (user.otpExpiresAt) {
                         const lastExpiry = new Date(user.otpExpiresAt)
-                        const cooldownEnd = new Date(lastExpiry.getTime() - (4 * 60 * 1000)) // 5 min TTL - 4 min = sent 1 min ago
+                        // sentAt = expiry - TTL (TTL is 5 min in prod, 30 min in dev) — never hard-code it here
+                        const cooldownEnd = new Date(lastExpiry.getTime() - OTP_TTL_MS + OTP_RESEND_COOLDOWN_MS)
                         if (Date.now() < cooldownEnd.getTime()) {
+                            // Machine-readable code + remaining seconds so the login page can
+                            // route to /verify-otp (previous OTP is still valid) instead of
+                            // showing a generic error.
+                            const retryAfter = Math.max(1, Math.ceil((cooldownEnd.getTime() - Date.now()) / 1000))
+                            const expiresIn = Math.max(0, Math.ceil((lastExpiry.getTime() - Date.now()) / 1000))
                             return Response.json(
-                                { errors: [{ message: 'Please wait before requesting a new code.' }] },
-                                { status: 429 },
+                                { errors: [{ message: 'Please wait before requesting a new code.', code: 'OTP_COOLDOWN', retryAfter, expiresIn }] },
+                                { status: 429, headers: { 'Retry-After': String(retryAfter) } },
                             )
                         }
                     }
 
                     // Dev/E2E bypass: use magic code instead of generating real OTP
-                    const testOtpCode = process.env.E2E_TEST_OTP_CODE
+                    const testOtpCode = getE2eBypassCode()
                     const isDev = process.env.NODE_ENV === 'development'
-                    const testEmail = process.env.TEST_EMAIL
                     const useDevBypass = isDev && !!testOtpCode
-                    const useE2EBypass = !!(testOtpCode && testEmail && email === testEmail)
+                    // E2E bypass — gated in e2e-bypass.ts (qc-test lane or
+                    // E2E_OTP_BYPASS_ENABLED opt-in, never a super-admin, never an
+                    // account active in a workspace other than E2E_OTP_BYPASS_TENANT_ID).
+                    const useE2EBypass = canUseE2eOtpBypass(email, user as E2eBypassUser)
                     // QC domain bypass — triple-guarded in qc-bypass.ts
                     // (APP_ENV=qc-test + QC_OTP_BYPASS_ENABLED=true + email
                     // ends with QC_OTP_BYPASS_DOMAIN). Skips SES for the
                     // whole @primeweb.local test-account population.
                     const useQcBypass = canBypassOtpForEmail(email)
+
+                    // Per address, counted here only: an existing user, past the cooldown, a code really about to be
+                    // emailed (bypass codes send no mail and keep E2E / QC logins unlimited) — TC-PERF-181/182.
+                    if (!(useDevBypass || useE2EBypass || useQcBypass)) {
+                        const emailLimit = await checkOtpSendEmail(String(email))
+                        if (!emailLimit.allowed) return otpLimitedResponse(emailLimit, pendingOtpExpiresIn(user))
+                    }
 
                     const otp = (useDevBypass || useE2EBypass)
                         ? testOtpCode!
@@ -1017,17 +1184,15 @@ export const Users: CollectionConfig = {
                     )
                 }
 
-                // Dev/E2E OTP bypass — three modes:
+                // Dev/E2E OTP bypass — two modes:
                 // 1. Dev mode: ANY 6-digit OTP passes (NODE_ENV=development only)
-                // 2. Dev + magic code: specific E2E_TEST_OTP_CODE matches
-                // 3. E2E test: specific TEST_EMAIL + E2E_TEST_OTP_CODE (any env)
-                // Security: production MUST NOT set E2E_TEST_OTP_CODE in GitHub Secrets
-                const testOtpCode = process.env.E2E_TEST_OTP_CODE
-                const testEmail = process.env.TEST_EMAIL
+                // 2. E2E test: TEST_EMAIL + E2E_TEST_OTP_CODE, gated in e2e-bypass.ts
+                //    (qc-test lane or E2E_OTP_BYPASS_ENABLED=true, no super-admin,
+                //    no active membership outside E2E_OTP_BYPASS_TENANT_ID)
+                // Security: production MUST NOT set E2E_TEST_OTP_CODE / E2E_OTP_BYPASS_ENABLED
                 const isDev = process.env.NODE_ENV === 'development'
                 const isDevBypass = isDev && /^\d{6}$/.test(otp) // Dev: any 6-digit code passes
-                const isE2EBypass = !!(testOtpCode && testEmail
-                    && email === testEmail && otp === testOtpCode)
+                const isE2EBypass = isValidE2eBypass(email, otp, user as E2eBypassUser)
                 // QC domain bypass — accepts fixed QC_OTP_BYPASS_CODE for any
                 // @primeweb.local (or configured) email when APP_ENV=qc-test
                 // AND QC_OTP_BYPASS_ENABLED=true. Triple-guarded in
@@ -1118,7 +1283,7 @@ export const Users: CollectionConfig = {
                     .sign(secretKey)
 
                 // Sanitize user object for response (remove sensitive fields)
-                const { otpHash: _h, otpExpiresAt: _e, otpAttempts: _a, ...safeUser } = user
+                const safeUser = publicUser(user)
 
                 return new Response(JSON.stringify({
                     message: 'Verification successful',
@@ -1136,16 +1301,23 @@ export const Users: CollectionConfig = {
         },
     ],
     access: {
-        // Allow anyone to register (public create)
-        create: () => true,
+        // No self-registration (PRD F02 §4.3): owners come from SSO provision, staff from the invite endpoint,
+        // test users from the e2e/seed scripts, all through the Local API (overrideAccess). A public REST create
+        // made working accounts for anyone (TC-PERF-150).
+        create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+        // The Payload admin panel (/admin) is the platform team's: tenant users work in the dashboard. A tenant
+        // user's password token must not open the admin panel's server-rendered lists (TC-PERF-142).
+        admin: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
         // Users can read their own data, super-admin can read all
         read: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             return { id: { equals: req.user.id } }
         },
-        // Users can update their own data
+        // REST must not let a merchant-access session change credentials or lasting access.
+        // Dashboard staff actions use the Local API after their own impersonation checks.
         update: ({ req }) => {
+            if (isMerchantAccessSession(req)) return false
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             return { id: { equals: req.user.id } }
@@ -1177,9 +1349,9 @@ export const Users: CollectionConfig = {
             defaultValue: ['tenant-owner'],
             saveToJWT: true, // edge middleware checks role via decoded JWT (no DB call in edge runtime)
             options: USER_ROLE_OPTIONS,
-            access: {
-                update: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
-            },
+            // A request must not pick its own roles: `roles: ["super-admin"]` in a sign-up body made a super-admin
+            // (REST create is super-admin only now too). SSO provision / invites set roles via the Local API.
+            access: { create: isSuperAdminField, update: isSuperAdminField },
         },
         {
             name: 'tenants',
@@ -1188,6 +1360,10 @@ export const Users: CollectionConfig = {
             admin: {
                 description: 'Which tenants this user has access to',
             },
+            // Every tenant check (dashboard, APIs, storefront admin, copilot, appliers) trusts this list, so no request may write it
+            // except a super-admin's. Server flows (SSO provision, staff endpoints, site generation) write it
+            // through the Local API, which field access does not apply to.
+            access: { create: isSuperAdminField, update: isSuperAdminField },
             fields: [
                 {
                     name: 'tenant',
@@ -1239,6 +1415,8 @@ export const Users: CollectionConfig = {
             name: 'avatar',
             type: 'upload',
             relationTo: 'media',
+            // Owner avatar comes from SSO (GH-1723); only Staff/super-admin may change it here.
+            access: { update: canUpdateAvatarField },
         },
         {
             name: 'prefer_lang',
@@ -1280,7 +1458,29 @@ export const Users: CollectionConfig = {
         {
             name: 'customerIdNumber',
             type: 'text',
+            // SSO identity (composite key with email): set by SSO provision through the Local API (TC-PERF-160)
+            access: { create: isSuperAdminField, update: isSuperAdminField },
             admin: { description: 'TM customer ID — composite key with email' },
+        },
+        // ── SSO Owner avatar sync (GH-1723). Server-managed: written only via Local API overrideAccess ──
+        {
+            name: 'ssoUserId',
+            type: 'number',
+            unique: true,
+            access: { create: () => false, update: () => false },
+            admin: { readOnly: true, position: 'sidebar', description: 'Immutable SSO users.id (bound on provision or first avatar sync)' },
+        },
+        {
+            name: 'ssoAvatarKey',
+            type: 'text',
+            access: { create: () => false, update: () => false },
+            admin: { hidden: true, description: 'Last applied SSO avatar file key (idempotency)' },
+        },
+        {
+            name: 'ssoAvatarSyncedAt',
+            type: 'date',
+            access: { create: () => false, update: () => false },
+            admin: { hidden: true, description: 'SSO changed_at of the last applied avatar state (ordering)' },
         },
         // ── Audit trail (hidden from admin) ──
         {
@@ -1288,36 +1488,43 @@ export const Users: CollectionConfig = {
             type: 'relationship',
             relationTo: 'users',
             admin: { hidden: true, description: 'User who created this record (audit trail)' },
-            access: { update: () => false },
+            access: { create: isSuperAdminField, update: () => false },
         },
         {
             name: 'updatedBy',
             type: 'relationship',
             relationTo: 'users',
             admin: { hidden: true, description: 'User who last updated this record (audit trail)' },
+            // System-set by setAuditFields (collection hook, runs after field access) — never from a request (TC-PERF-160)
+            access: { create: isSuperAdminField, update: isSuperAdminField },
         },
-        // ── OTP 2FA fields (hidden from admin) ──
+        // ── OTP 2FA fields (hidden from admin) ── server-managed: send-otp / verify-otp write them through the
+        // Local API. Closed to requests: a readable or writable hash (sha256 of 6 digits) would skip the OTP step.
         {
             name: 'otpHash',
             type: 'text',
             admin: { hidden: true },
+            access: { read: () => false, create: () => false, update: () => false },
         },
         {
             name: 'otpExpiresAt',
             type: 'date',
             admin: { hidden: true },
+            access: { create: () => false, update: () => false },
         },
         {
             name: 'otpAttempts',
             type: 'number',
             defaultValue: 0,
             admin: { hidden: true },
+            access: { create: () => false, update: () => false },
         },
         {
             name: 'keyString',
             type: 'text',
             // Server-managed only — never expose or allow direct writes via REST/GraphQL.
             // Internal writes use overrideAccess:true (provision, reset-password, me/password routes).
+            // Admin-panel password changes fill it via the syncKeyStringOnPasswordUpdate hook.
             // Same pattern as Orders.magicLinkSecret and Tenants.xenditSecretKey.
             access: { read: () => false, update: () => false },
             admin: { hidden: true, description: 'Encrypted SSO password for outbound SSO API calls' },

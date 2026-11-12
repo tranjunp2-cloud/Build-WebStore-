@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission } from '@/lib/admin/api-utils'
 
 const RejectSchema = z.object({
     templateId: z.union([z.string(), z.number()]),
@@ -16,7 +16,7 @@ const RejectSchema = z.object({
     issueDescription: z.string().max(5000).optional(),
 })
 
-export const POST = withSuperAdmin(async (req: NextRequest, ctx) => {
+export const POST = withStudioPermission('template.review', async (req: NextRequest, ctx) => {
     let body: unknown
     try {
         body = await req.json()
@@ -52,14 +52,7 @@ export const POST = withSuperAdmin(async (req: NextRequest, ctx) => {
     }
 
     try {
-        // Set template back to draft
-        const updated = await payload.update({
-            collection: 'templates',
-            id: templateId,
-            data: { status: 'draft' },
-        })
-
-        // Optionally create a linked TemplateIssue
+        // Issue first: if it fails the template stays in review and the reviewer can retry.
         let issue: unknown = null
         if (issueTitle) {
             issue = await payload.create({
@@ -69,12 +62,18 @@ export const POST = withSuperAdmin(async (req: NextRequest, ctx) => {
                     description: issueDescription ?? '',
                     severity: 'medium',
                     category: 'content',
-                    status: 'open',
+                    status: 'backlog',
                     relatedType: 'template',
                     relatedId: String(templateId),
                 },
             })
         }
+
+        const updated = await payload.update({
+            collection: 'templates',
+            id: templateId,
+            data: { status: 'draft' },
+        })
 
         return NextResponse.json({ data: updated, issue })
     } catch (err) {

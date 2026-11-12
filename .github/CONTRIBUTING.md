@@ -231,13 +231,10 @@ feat/F08-01-product-crud  ─→ PR vào staging ─→ CI + review ─→ merge
 ## 4. Trước khi Push
 
 ```bash
-npm run lint          # ESLint
-npm run typecheck     # TypeScript errors
-npm run test          # Unit tests
-npm run build         # Build check
+npm run verify        # = husky pre-push: migrations + env + oxlint + typecheck + test liên quan
 ```
 
-**Tất cả phải pass** trước khi tạo PR.
+Hook `pre-commit` (oxlint file đang stage, lockfile) và `pre-push` (`npm run verify`) tự chạy — không dùng `--no-verify`. Khi đổi nhiều (config, dependency), chạy thêm `npm run test` (full) và `npm run build`.
 
 ---
 

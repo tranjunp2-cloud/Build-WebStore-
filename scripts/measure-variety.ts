@@ -12,7 +12,9 @@
  *   - Dev server on http://localhost:3000 (or PORT env var)
  *   - ALLOW_E2E_TEST_UTILS=true in .env.local (enables /api/e2e/ensure-test-user)
  *   - E2E_TEST_BEARER=local-test-secret-12345 (or .env.local value)
- *   - OPENAI_API_KEY + PIXABAY_API_KEY set so AI happy path runs
+ *   - `next dev` (NODE_ENV=development): the test user signs in through verify-otp, which accepts any
+ *     six-digit code there (scripts/perf/otp-session.ts)
+ *   - AI_PLATFORM_URL + AI_PLATFORM_CONTEXT_SECRET (ai-platform) + PIXABAY_API_KEY set so AI happy path runs
  *
  * Output:
  *   - plans/260414-2253-ai-gen-variety-root-cause/reports/variety-{label}.json
@@ -30,6 +32,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { createOtpSession, type OtpSession } from './perf/otp-session'
 
 const BASE = process.env.MEASURE_BASE ?? `http://localhost:${process.env.PORT ?? 3000}`
 const BEARER = process.env.E2E_SETUP_SECRET ?? ''
@@ -93,7 +96,9 @@ function parseArgs(): { category?: string; runs: number; label: string } {
     return out
 }
 
-async function ensureTestUser(): Promise<string> {
+const TEST_USER_EMAIL = 'measure-variety@primeweb.app'
+
+async function ensureTestUser(): Promise<OtpSession> {
     const res = await fetch(`${BASE}/api/e2e/ensure-test-user`, {
         method: 'POST',
         headers: {
@@ -101,16 +106,16 @@ async function ensureTestUser(): Promise<string> {
             Authorization: `Bearer ${BEARER}`,
         },
         body: JSON.stringify({
-            email: 'measure-variety@primeweb.app',
+            email: TEST_USER_EMAIL,
             password: 'TestPass123!',
         }),
     })
     if (!res.ok) die(`ensure-test-user failed: ${res.status} ${await res.text()}`)
-    const cookie = res.headers.get('set-cookie') ?? ''
-    return cookie
+    // ensure-test-user sets no session; sign in through the OTP step (the password step opens nothing, TC-PERF-142).
+    return createOtpSession(BASE, TEST_USER_EMAIL)
 }
 
-async function generateSite(cookie: string, name: string, category: string): Promise<GenResult> {
+async function generateSite(session: OtpSession, name: string, category: string): Promise<GenResult> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
     try {
@@ -118,7 +123,8 @@ async function generateSite(cookie: string, name: string, category: string): Pro
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Cookie: cookie,
+                Cookie: session.cookie,
+                Origin: session.origin,
             },
             body: JSON.stringify({
                 businessInfo: {
@@ -338,7 +344,7 @@ async function main() {
     console.log(`[measure-variety] Starting runs across ${categories.length} categories, ${args.runs}/cat`)
     console.log(`[measure-variety] Base URL: ${BASE}`)
 
-    const cookie = await ensureTestUser()
+    const session = await ensureTestUser()
     console.log('[measure-variety] Test user ready')
 
     const allResults: Record<string, GenResult[]> = {}
@@ -354,7 +360,7 @@ async function main() {
         for (let i = 0; i < names.length; i++) {
             const name = names[i]!
             process.stdout.write(`  [${i + 1}/${names.length}] ${name}... `)
-            const r = await generateSite(cookie, name, cat)
+            const r = await generateSite(session, name, cat)
             if (r.error) {
                 console.log(`ERROR ${r.error}`)
             } else {

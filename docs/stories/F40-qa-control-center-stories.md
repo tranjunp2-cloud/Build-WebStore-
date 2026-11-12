@@ -1,7 +1,7 @@
 # User Stories: QA Control Center (F40)
 
 > **Feature:** F40 — QA Control Center
-> **Wave:** 8 | **Priority:** P1 | **Ref PRD:** [qa-control-center.md](../prd/qa-control-center.md)
+> **Wave:** 8 | **Priority:** P1 | **Ref PRD:** [F40-qa-control-center.md](../prd/F40-qa-control-center.md)
 > **Owner:** QA Lead Ary – Phạm Thị Thảo Ngân
 > **Scope:** CMS PrimeWeb only. Studio admin is the internal host, never a QA product target.
 
@@ -393,3 +393,140 @@ AND I can cancel only a permitted non-terminal run
 - [ ] API validates target/profile/context and authorizes every dispatch/cancel request.
 - [ ] E2E covers valid preflight, blocked preflight, dispatch and filtered history.
 - [ ] Run tests follow `docs/TEST_CONVENTION.md` and use only `[x] AUTO` cases.
+
+---
+
+## US-F40-09: Dual-Mode Ingestion & Aggregate Reconciliation Dashboard
+
+**Wave 8** | **P1** | **L** | Status: Done (PR #1792) | Relates to #1787
+
+### Story
+
+```
+As a QA Lead
+I want an aggregate reconciliation dashboard for all 2,000 migrated stores
+So that I can monitor overall migration pass rates, filter by template/domain, and identify stores with P0 blockers.
+```
+
+### Acceptance Criteria
+
+#### AC-1: Aggregate Metrics Header
+```gherkin
+GIVEN I navigate to /studio/migration
+WHEN the migration metrics load
+THEN I see Total Stores (2,000), Passed Stores count and percentage, Warning Stores, and Failed Stores count
+AND a real-time progress bar reflecting total cutover readiness.
+```
+
+#### AC-2: Search & Canonical Template Filter
+```gherkin
+GIVEN the stores table on /studio/migration
+WHEN I search by store domain or owner email, or select one of the 9 canonical template codes (FB101, C101, C102, F102, FN101, FN102, FN103, FN104, PA101)
+THEN the table filters stores in real-time matching the query with instant pagination.
+```
+
+---
+
+## US-F40-10: Deep Visual Block Tree, Media & RichText Formatting Audit
+
+**Wave 8** | **P1** | **L** | Status: Done (PR #1793) | Relates to #1788
+
+### Story
+
+```
+As a QA Tester
+I want an in-depth visual block tree navigator and dedicated Media & RichText formatting tabs
+So that I can verify image aspect ratios, detect broken 404 assets, and audit table structures after AST conversion.
+```
+
+### Acceptance Criteria
+
+#### AC-1: Block Tree Navigator & Status Badges
+```gherkin
+GIVEN I open the detail inspection modal for a store
+WHEN viewing the Block Tree sidebar
+THEN every page block (#01, #02...) is listed with its component mapping (PW1 -> PW2) and status badge (Passed / Warning / Failed)
+AND clicking a block smoothly scrolls to that block in the comparison stream.
+```
+
+#### AC-2: Media & RichText Lexical Audit
+```gherkin
+GIVEN a store with embedded images and formatted blog tables
+WHEN switching to 'Soi Ảnh & Link' or 'Soi Chữ & Bảng'
+THEN I can inspect HTTP response status, alt text, pixel dimensions, and detect unflattened table structures.
+```
+
+---
+
+## US-F40-11: Field-by-Field Database Entity Diff Inspector & Fix Recommendations
+
+**Wave 8** | **P1** | **L** | Status: Done (PR #1794) | Relates to #1789
+
+### Story
+
+```
+As a QA Engineer
+I want a 1-to-1 database field reconciliation tab comparing MySQL PW1 with PostgreSQL PW2
+So that I can detect missing product variants, mismatched pricing, broken menu links, and provide exact migration fix code to Devs.
+```
+
+### Acceptance Criteria
+
+#### AC-1: 7-Group Entity Field Filtering
+```gherkin
+GIVEN I switch to the 'Soi CSDL 1-to-1' tab
+WHEN I select an entity group (Products, Variants, Banners, RichText, Menus, Categories, Shop Settings)
+THEN the table shows exact database fields comparing Legacy PW1 Value vs Migrated PW2 Value with Match/Mismatch/Missing status.
+```
+
+#### AC-1a: Page-Scoped Field Breakdown
+```gherkin
+GIVEN I have selected a storefront page tab in the Diff Inspector
+WHEN I view or filter the 'Soi CSDL 1-to-1' grid
+THEN the records and group counts only represent entities rendered on that page
+AND an entity shared by multiple pages remains visible on each of its owning pages.
+```
+
+#### AC-2: Dev Remediation & Migration Script Guidance
+```gherkin
+GIVEN a field with missing data (e.g. missing 1L variant price)
+WHEN expanding the diff row
+THEN an actionable Dev Remediation box is shown containing the exact SQL/Payload migration script to fix the defect.
+```
+
+---
+
+## US-F40-12: Visual & Layout Parity Inspector (Swipe Slider, 375px Mobile & Live Webview)
+
+**Wave 8** | **P1** | **L** | Status: Done (PR #1795) | Relates to #1790
+
+### Story
+
+```
+As a QA Tester
+I want an interactive visual parity inspector with a Split Swipe Slider, 375px Mobile iPhone mockup, and Live Storefront Iframe
+So that I can verify pixel-perfect layout parity and interact with the real live storefront before domain cutover.
+```
+
+### Acceptance Criteria
+
+#### AC-1: Split Swipe Slider Compare
+```gherkin
+GIVEN the visual block comparison stream
+WHEN toggling to 'Kéo Trượt (Swipe Slider)' and dragging the handle (0% to 100%)
+THEN the slider smoothly clips the PW2 Next.js overlay over the PW1 Laravel view in real-time via hardware-accelerated CSS clip-path.
+```
+
+#### AC-2: Responsive Viewport Switcher (Desktop & Mobile 375px)
+```gherkin
+GIVEN the visual parity inspector
+WHEN switching between 'Desktop' and 'Mobile (375px)'
+THEN both browser frames adjust into authentic iPhone shells with dynamic island, speaker notch, and home bar.
+```
+
+#### AC-3: Dual Live Storefront Webview (Iframe)
+```gherkin
+GIVEN I switch to the 'Xem Web Thật (Live Iframe)' tab
+WHEN a store is selected
+THEN dual iframes load the 100% full working HTML/CSS/JS storefront for that template archetype via /api/qa/template-preview/[code].
+```

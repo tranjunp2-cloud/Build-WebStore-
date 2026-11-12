@@ -19,11 +19,23 @@ vi.mock('payload', () => ({
 		findByID: vi.fn().mockResolvedValue({
 			id: 1,
 			name: 'Test Site',
-			ownerEmail: 'owner@example.com',
+			tenant: { id: 7 },
+			locale: 'ms',
 		}),
 		create: vi.fn().mockResolvedValue({ id: 'submission-1' }),
 		sendEmail: vi.fn().mockResolvedValue(true),
 	}),
+}))
+
+const mockNotifyContactLead = vi.fn().mockResolvedValue(undefined)
+vi.mock('@/lib/contact/notify-contact-lead', () => ({
+	notifyContactLead: (...args: unknown[]) => mockNotifyContactLead(...args),
+}))
+
+// #2179 store-availability gate is covered in storefront/store-unavailable.test.ts; here only its effect on the route.
+const mockStoreUnavailable = vi.fn().mockResolvedValue(false)
+vi.mock('@/lib/storefront/store-availability', () => ({
+	isSiteDocTenantUnavailable: (...args: unknown[]) => mockStoreUnavailable(...args),
 }))
 
 // Stateful rate-limit mock: tracks calls per key, allows first 5, blocks 6th+
@@ -97,10 +109,10 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 		// Assert
 		expect(res.status).toBe(200)
 		expect(data.success).toBe(true)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:1.1.1.1', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:1.1.1.1', 5, 5 * 60 * 1000, { failClosed: true }) // TC-PERF-159: fail-closed (emails the owner)
 	})
 
-	it('persists and emails an optional contact subject', async () => {
+	it('persists an optional contact subject', async () => {
 		const payloadModule = await import('payload')
 		const mockPayload = await payloadModule.getPayload({} as never)
 		const req = makeReq(validBody({ subject: 'Website consultation' }), { xff: '1.1.1.2' })
@@ -112,9 +124,55 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 			collection: 'contact-submissions',
 			data: expect.objectContaining({ subject: 'Website consultation' }),
 		}))
-		expect(mockPayload.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
-			text: expect.stringContaining('Subject: Website consultation'),
+	})
+
+	it('TC-F04.CS.17 — GH-2157: notifies via tenant id from site.tenant (no site.ownerEmail)', async () => {
+		mockNotifyContactLead.mockClear()
+		const res = await POST(makeReq(validBody(), { xff: '1.1.1.17' }))
+
+		expect(res.status).toBe(200)
+		await vi.waitFor(() => expect(mockNotifyContactLead).toHaveBeenCalledTimes(1))
+		expect(mockNotifyContactLead).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+			tenantId: 7,
+			submissionId: 'submission-1',
+			siteName: 'Test Site',
+			locale: 'ms',
+			name: 'John Doe',
+			email: 'john@example.com',
 		}))
+	})
+
+	it('TC-F04.CS.18 — GH-2157: site.tenant as raw id still resolves tenantId', async () => {
+		mockNotifyContactLead.mockClear()
+		const payloadModule = await import('payload')
+		const mockPayload = await payloadModule.getPayload({} as never)
+		vi.mocked(mockPayload.findByID).mockResolvedValueOnce({ id: 1, name: 'Raw', tenant: 9 } as never)
+
+		await POST(makeReq(validBody(), { xff: '1.1.1.18' }))
+
+		await vi.waitFor(() => expect(mockNotifyContactLead).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tenantId: 9, locale: 'en' })))
+	})
+
+	it('TC-F04.CS.19 — GH-2157: site without tenant → no notify, still 200 and lead saved', async () => {
+		mockNotifyContactLead.mockClear()
+		const payloadModule = await import('payload')
+		const mockPayload = await payloadModule.getPayload({} as never)
+		vi.mocked(mockPayload.create).mockClear()
+		vi.mocked(mockPayload.findByID).mockResolvedValueOnce({ id: 1, name: 'No tenant' } as never)
+
+		const res = await POST(makeReq(validBody(), { xff: '1.1.1.19' }))
+
+		expect(res.status).toBe(200)
+		expect(mockPayload.create).toHaveBeenCalledTimes(1)
+		expect(mockNotifyContactLead).not.toHaveBeenCalled()
+	})
+
+	it('TC-F04.CS.20 — GH-2157: notify failure never changes the 200 response', async () => {
+		mockNotifyContactLead.mockRejectedValueOnce(new Error('ses down'))
+		const res = await POST(makeReq(validBody(), { xff: '1.1.1.20' }))
+
+		expect(res.status).toBe(200)
+		expect(await res.json()).toEqual({ success: true })
 	})
 
 	it('TC-F04.CS.02 — Same siteId+IP submitted 6× → 6th call returns 429', async () => {
@@ -155,8 +213,8 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 		// Assert
 		expect(siteBRes.status, 'Site B first call should succeed (independent counter)').toBe(200)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:101:3.3.3.3', 5, 5 * 60 * 1000)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:102:3.3.3.3', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:101:3.3.3.3', 5, 5 * 60 * 1000, { failClosed: true }) // TC-PERF-159: fail-closed (emails the owner)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:102:3.3.3.3', 5, 5 * 60 * 1000, { failClosed: true }) // TC-PERF-159: fail-closed (emails the owner)
 	})
 
 	it('TC-F04.CS.04 — Missing x-forwarded-for header → fail open (no rate-limit check)', async () => {
@@ -224,7 +282,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 		// Assert: rate-limit key uses the rightmost (real) IP, never the spoofed leftmost one
 		expect(res.status).toBe(200)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:6.6.6.6', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:6.6.6.6', 5, 5 * 60 * 1000, { failClosed: true }) // TC-PERF-159: fail-closed (emails the owner)
 		expect(checkRateLimit).not.toHaveBeenCalledWith(
 			expect.stringContaining('9.9.9.9'),
 			expect.anything(),
@@ -242,7 +300,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 		// Assert: x-real-ip wins over x-forwarded-for
 		expect(res.status).toBe(200)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:7.1.1.1', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:7.1.1.1', 5, 5 * 60 * 1000, { failClosed: true }) // TC-PERF-159: fail-closed (emails the owner)
 	})
 
 	it('TC-F04.CS.09 — Many distinct VALID siteIds from one IP → no false-positive IP-wide block (200-people/200-sites regression)', async () => {
@@ -357,12 +415,25 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 		// Assert: both requests hit the SAME rate-limit key (canonical numeric form)
 		expect(res1.status).toBe(200)
 		expect(res2.status).toBe(200)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:13.13.13.13', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:13.13.13.13', 5, 5 * 60 * 1000, { failClosed: true }) // TC-PERF-159: fail-closed (emails the owner)
 		expect(checkRateLimit).not.toHaveBeenCalledWith(
 			expect.stringContaining(':01:'),
 			expect.anything(),
 			expect.anything(),
 		)
+	})
+
+	it('TC-F04.CS.31 — GH-2157: banned/expired store → 400, no lead saved, owner not notified', async () => {
+		const payloadModule = await import('payload')
+		const mockPayload = await payloadModule.getPayload({} as never)
+		mockStoreUnavailable.mockResolvedValueOnce(true)
+		mockNotifyContactLead.mockClear()
+
+		const res = await POST(makeReq(validBody(), { xff: '1.1.1.31' }))
+
+		expect(res.status).toBe(400)
+		expect(mockPayload.create).not.toHaveBeenCalled()
+		expect(mockNotifyContactLead).not.toHaveBeenCalled()
 	})
 
 	it('TC-F04.CS.15 — siteId exceeding Postgres int4 range → 400 before rate-limit/DB lookup', async () => {

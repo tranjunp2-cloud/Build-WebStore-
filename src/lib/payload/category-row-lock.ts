@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { isPoolAcquireTimeout } from '@/lib/db/pool-errors'
 
 type LockClient = {
     query: (
@@ -123,6 +124,8 @@ async function connectWithTimeout(pool: LockPool): Promise<LockClient> {
             if (timedOut && stalledPoolCheckouts.get(pool) === connection) {
                 stalledPoolCheckouts.delete(pool)
             }
+            // The pool's own acquire timeout (3 s, pool-options.ts) fires before ours: same meaning, busy.
+            if (isPoolAcquireTimeout(error)) throw new Error(CATEGORY_LOCK_BUSY_ERROR)
             throw error
         }
     )

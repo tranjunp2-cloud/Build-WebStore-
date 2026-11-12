@@ -12,6 +12,8 @@ import { isNotFoundError } from '@/lib/api/is-not-found-error'
 import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { sql } from 'drizzle-orm'
+import { stripPrivateSnapshots } from '@/lib/payload/safe-populate'
+import { isReservedPageSlug } from '@/lib/utils/reserved-page-slugs'
 
 const updatePageSchema = z.object({
     isVisible: z.boolean().optional(),
@@ -130,6 +132,11 @@ export const PATCH = withFeatureGuard('website_builder')(withAuth<RouteContext>(
             normalizedSlug = normalizedSlug.startsWith('/') ? normalizedSlug : `/${normalizedSlug}`
             if (normalizedSlug === '//') normalizedSlug = '/'
 
+            // Same guard as page creation: /checkout is served by a fixed storefront route
+            if (isReservedPageSlug(normalizedSlug)) {
+                return NextResponse.json({ error: 'This slug is reserved and cannot be used.' }, { status: 400 })
+            }
+
             const duplicatePages = await payload.find({
                 collection: 'pages',
                 where: {
@@ -238,7 +245,7 @@ export const PATCH = withFeatureGuard('website_builder')(withAuth<RouteContext>(
             try {
                 const db = payload.db.drizzle as { execute: (q: unknown) => Promise<unknown> }
                 await db.execute(sql`
-                    UPDATE pages SET locale_content = ${JSON.stringify(localeContent)}::jsonb WHERE id = ${pageId}
+                    UPDATE pages SET locale_content = ${JSON.stringify(stripPrivateSnapshots(localeContent))}::jsonb WHERE id = ${pageId}
                 `)
             } catch (lcErr) {
                 console.warn('[PATCH pages] locale_content update failed (non-fatal):', lcErr instanceof Error ? lcErr.message : lcErr)
@@ -258,7 +265,7 @@ export const PATCH = withFeatureGuard('website_builder')(withAuth<RouteContext>(
         // so live site reflects the change immediately
         if (updateData.deletedAt !== undefined || updateData.isVisible !== undefined) {
             try {
-                revalidateTag(`site-${siteId}`)
+                revalidateTag(`site-${siteId}`, { expire: 0 })
             } catch (err) {
                 console.warn(`[Pages] revalidateTag failed for site-${siteId}:`, err instanceof Error ? err.message : err)
             }

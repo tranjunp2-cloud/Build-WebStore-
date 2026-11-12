@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { SAFE_RELATION_POPULATE } from '@/lib/payload/safe-populate'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { profilePatchSchema } from '@/lib/profile/schemas'
@@ -36,6 +37,9 @@ export async function GET(_req: NextRequest) {
             collection: 'users',
             id: user.id,
             depth: 1,
+            // Local API skips field read access: without this the populated memberships carry the whole
+            // tenant row (Xendit / EasyParcel / ECH secrets) and createdBy / updatedBy users (TC-PERF-126).
+            populate: SAFE_RELATION_POPULATE,
         }) as unknown as Record<string, unknown>
 
         const includeSiteStatus = _req.nextUrl.searchParams.get('include') === 'site-status'
@@ -88,7 +92,7 @@ export async function GET(_req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
     try {
-        const user = await getCurrentUser()
+        const user = await getCurrentUser(req)
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

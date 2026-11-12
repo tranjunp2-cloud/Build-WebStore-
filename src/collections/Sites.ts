@@ -13,6 +13,7 @@ import {
 import { sanitizeLegacyOpeningHours } from '../components/editor/local-business/opening-hours-utils'
 import type { CollectionBeforeValidateHook } from 'payload'
 import type { OpeningHourRow } from '../components/editor/local-business/types'
+import { ownTenantFieldAccess } from '../lib/access/tenant-access'
 
 /** PR #1591 code review (Q2): the custom Editor UI (SettingsPanel.tsx) sanitizes
  *  legacy-invalid openingHours rows before every save, but a direct Payload
@@ -103,6 +104,8 @@ export const Sites: CollectionConfig = {
             required: true,
             index: true,
             admin: { description: 'The tenant/store this site belongs to' },
+            // GH-2137: only the user's own workspace can be written here (create into / move to another shop).
+            access: { create: ownTenantFieldAccess, update: ownTenantFieldAccess },
         },
         {
             name: 'name',
@@ -545,6 +548,7 @@ export const Sites: CollectionConfig = {
                     type: 'checkbox',
                     label: 'Enable QR Banking',
                     defaultValue: true,
+                    admin: { description: 'Deprecated — ignored. Bank transfer is controlled in Settings → Payments.' },
                 },
                 {
                     name: 'bankName',

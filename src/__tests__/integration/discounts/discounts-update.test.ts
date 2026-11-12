@@ -252,4 +252,25 @@ describe('PUT /api/v1/discounts/[id] — TC-F33-02-03: Protected field stripping
         expect(response.status).toBe(409)
         expect(responseData.error.code).toBe('DUPLICATE_CODE')
     })
+
+    it('[TC-F33-02-05] returns 409 DUPLICATE_CODE for the real Payload ValidationError shape', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValueOnce({ id: 'disc-5', code: 'A2', type: 'percentage', value: 10, tenant: 'tenant-abc' })
+        mockUpdate.mockRejectedValueOnce(
+            Object.assign(new Error('The following field is invalid: '), { data: { errors: [{ message: 'Value must be unique' }] } }),
+        )
+        const req = new NextRequest('http://localhost/api/v1/discounts/disc-5', {
+            method: 'PUT',
+            body: JSON.stringify({ code: 'A1', type: 'percentage', value: 5 }),
+            headers: { 'Content-Type': 'application/json' },
+        })
+
+        // Act
+        const response = await PUT(req as any, { params: Promise.resolve({ id: 'disc-5' }) })
+        const responseData = await response.json()
+
+        // Assert
+        expect(response.status).toBe(409)
+        expect(responseData.error.code).toBe('DUPLICATE_CODE')
+    })
 })

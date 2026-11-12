@@ -20,6 +20,8 @@ import type { FieldMeta } from '@/lib/admin/block-schema-registry'
 interface Props {
     slug: string
     onAddToTemplate: (blockType: string) => void
+    /** False hides the add button for seats that cannot change this template. */
+    canAdd?: boolean
     onBack: () => void
 }
 
@@ -95,7 +97,7 @@ function toBlockDetailData(api: BlockApiResponse): BlockDetailData {
     }
 }
 
-export function BuilderBlockDetailOverlay({ slug, onAddToTemplate, onBack }: Props) {
+export function BuilderBlockDetailOverlay({ slug, onAddToTemplate, canAdd = true, onBack }: Props) {
     // Registry lookup is synchronous — use for static block metadata
     const registryBlock = useMemo(() => getBlockBySlug(slug), [slug])
     const [blockData, setBlockData] = useState<BlockDetailData | null>(null)
@@ -210,16 +212,18 @@ export function BuilderBlockDetailOverlay({ slug, onAddToTemplate, onBack }: Pro
                 </div>
 
                 {/* Add to template CTA */}
-                <button
-                    type="button"
-                    className="b-btn primary"
-                    onClick={handleAdd}
-                    disabled={adding}
-                    aria-label={`Add ${displayBlock.name} block to template`}
-                >
-                    <Plus size={12} />
-                    {adding ? 'Adding…' : 'Add to template'}
-                </button>
+                {canAdd && (
+                    <button
+                        type="button"
+                        className="b-btn primary"
+                        onClick={handleAdd}
+                        disabled={adding}
+                        aria-label={`Add ${displayBlock.name} block to template`}
+                    >
+                        <Plus size={12} />
+                        {adding ? 'Adding…' : 'Add to template'}
+                    </button>
+                )}
             </div>
 
             {/* 6-tab body — reuse existing component */}

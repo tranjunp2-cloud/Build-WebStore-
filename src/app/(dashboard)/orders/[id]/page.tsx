@@ -4,7 +4,7 @@ import { OrderDetailView } from '../_components/order-detail-view'
 import '../order-detail.css'
 
 export const metadata: Metadata = {
-    title: 'Order Details | PrimeWeb',
+    title: 'Order Details',
 }
 
 // Auth guard is provided by the parent orders/layout.tsx (requirePermission('orders')).

@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { z } from 'zod'
 import { parseRequest } from '@/lib/validations/helpers'
+import { isMemberOfSiteTenant } from '@/lib/auth/site-tenant-access'
 
 const sitemapSchema = z.object({ siteId: z.string().min(1) })
 
@@ -25,11 +26,17 @@ export const POST = withFeatureGuard('sitemap_robot_configuration')(withAuth(asy
         const payload = await getPayload({ config })
 
         // Get site info
-        const site = await payload.findByID({ collection: 'sites', id: siteId })
+        const site = await payload.findByID({ collection: 'sites', id: siteId, depth: 0 })
         if (!site) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
                 { status: 404 }
+            )
+        }
+        if (!isMemberOfSiteTenant(_user as Parameters<typeof isMemberOfSiteTenant>[0], site)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Forbidden' } },
+                { status: 403 }
             )
         }
 

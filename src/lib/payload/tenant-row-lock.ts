@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import type { Payload, PayloadRequest } from 'payload'
+import { registerTransactionSession } from './transaction-session'
 
 export type TenantTransactionRequest = Pick<PayloadRequest, 'transactionID'>
 type TransactionSessionDb = {
@@ -16,6 +17,46 @@ type TransactionCapableDb = {
     transactionOptions?: unknown
 }
 
+type QueryRowsResult<Row> = {
+    rows: Row[]
+}
+
+export class TenantSiteLockError extends Error {
+    readonly code = 'TENANT_SITE_LOCK_FAILED'
+    readonly missingSiteIds: number[]
+
+    constructor(missingSiteIds: number[]) {
+        super('One or more tenant sites could not be locked')
+        this.name = 'TenantSiteLockError'
+        this.missingSiteIds = missingSiteIds
+    }
+}
+
+function getTransactionSession(
+    payload: Payload,
+    req: TenantTransactionRequest,
+): Promise<TransactionSessionDb> {
+    return Promise.resolve(req.transactionID).then((transactionID) => {
+        if (typeof transactionID !== 'string') {
+            throw new Error('Tenant transaction requires a transaction ID')
+        }
+        const db = payload.db as unknown as TransactionCapableDb
+        const session = db.sessions[transactionID]
+        if (!session) throw new Error('Tenant transaction requires an active transaction')
+        return session.db
+    })
+}
+
+/** Execute raw SQL on the same database session used by Payload Local API writes. */
+export async function executeTenantTransaction<Result>(
+    payload: Payload,
+    req: TenantTransactionRequest,
+    query: unknown,
+): Promise<Result> {
+    const session = await getTransactionSession(payload, req)
+    return session.execute(query) as Promise<Result>
+}
+
 /** Serialize mutations that must read and update the same tenant consistently. */
 export async function withTenantRowLock<T>(
     payload: Payload,
@@ -29,14 +70,15 @@ export async function withTenantRowLock<T>(
     // callback transaction directly preserves commit failures while the temporary session
     // lets Payload Local API operations participate through req.transactionID.
     return db.drizzle.transaction(async (transaction) => {
-        const transactionID = crypto.randomUUID()
-        db.sessions[transactionID] = { db: transaction }
+        const session = registerTransactionSession(db, transaction)
 
         try {
             await transaction.execute(sql`SELECT id FROM tenants WHERE id = ${tenantId} FOR UPDATE`)
-            return await operation({ transactionID })
+            const result = await operation(session.req)
+            session.assertActive()
+            return result
         } finally {
-            delete db.sessions[transactionID]
+            session.release()
         }
     }, db.transactionOptions)
 }
@@ -51,18 +93,17 @@ export async function lockTenantSiteRows(
     if (siteIds.length < 1 || siteIds.some(id => !Number.isSafeInteger(id) || id < 1)) {
         throw new Error('Tenant site lock requires positive integer site IDs')
     }
-    const db = payload.db as unknown as TransactionCapableDb
     const siteIdArray = '{' + siteIds.join(',') + '}'
-    const transactionID = await req.transactionID
-    if (typeof transactionID !== 'string') {
-        throw new Error('Tenant site lock requires a transaction ID')
-    }
-    const session = db.sessions[transactionID]
-    if (!session) throw new Error('Tenant site lock requires an active transaction')
-    await session.db.execute(
+    const result = await executeTenantTransaction<QueryRowsResult<{ id: number }>>(
+        payload,
+        req,
         sql`SELECT id FROM sites
             WHERE tenant_id = ${tenantId}
               AND id = ANY(${siteIdArray}::integer[])
             FOR UPDATE`,
     )
+
+    const lockedIds = new Set(result.rows.map(row => Number(row.id)))
+    const missingSiteIds = siteIds.filter(id => !lockedIds.has(id))
+    if (missingSiteIds.length > 0) throw new TenantSiteLockError(missingSiteIds)
 }

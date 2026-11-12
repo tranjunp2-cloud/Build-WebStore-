@@ -2,13 +2,15 @@
  * GET  /api/admin/issues — paginated list with filters
  * POST /api/admin/issues — create new issue
  *
- * Super-admin only. Polymorphic relatedId validated on create.
+ * Reads for any Studio seat; create needs issue.work. Polymorphic relatedId validated on create.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { studioForbidden, withStudioPermission, withSuperAdmin } from '@/lib/admin/api-utils'
+import { canSetIssueStatus } from '@/lib/admin/studio-permissions'
+import { isSuperAdmin } from '@/lib/admin/studio-roles'
 import {
     LiveErrorProviderError,
     type LiveError,
@@ -17,18 +19,22 @@ import { fetchProviderEvidence } from '@/lib/admin/live-errors/fetch-provider-ev
 import {
     getRuntimeRelatedId,
 } from '@/lib/admin/live-errors/provider-key'
+import { SAFE_RELATION_POPULATE as ISSUE_POPULATE } from '@/lib/payload/safe-populate' // people as name / email, never user rows (TC-PERF-137)
 
 const LIMIT = 50
 
-const StandardIssueSchema = z.object({
+const ManualIssueSchema = z.object({
     title: z.string().min(1).max(300),
     description: z.string().max(10000).optional(),
     severity: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
-    category: z.enum(['accessibility', 'performance', 'content', 'ui', 'ai-quality', 'other']),
+    status: z.enum(['backlog', 'reopen', 'in_progress', 'dev_fixed', 'testing', 'done']).default('backlog'),
+    assignmentTarget: z.enum(['unassigned', 'dev']).default('unassigned'),
+    reportedBy: z.union([z.string(), z.number()]).optional(),
+}).strict()
+
+const LinkedIssueSchema = ManualIssueSchema.extend({
     relatedType: z.enum(['template', 'generation', 'block']),
     relatedId: z.string().min(1),
-    assignedTo: z.union([z.string(), z.number()]).optional(),
-    reportedBy: z.union([z.string(), z.number()]).optional(),
 })
 
 const RuntimeIssueSchema = z.object({
@@ -42,10 +48,10 @@ const RuntimeIssueSchema = z.object({
     severity: z.enum(['critical', 'high', 'medium', 'low']).optional(),
 })
 
-const CreateIssueSchema = z.discriminatedUnion('relatedType', [
-    StandardIssueSchema,
-    RuntimeIssueSchema,
-])
+// The discriminator must be considered before the manual shape. Zod strips
+// unknown object keys by default, so putting ManualIssueSchema first would
+// silently turn a linked generation ticket into an unrelated manual ticket.
+const CreateIssueSchema = z.union([RuntimeIssueSchema, LinkedIssueSchema, ManualIssueSchema])
 
 function formatRuntimeDescription(error: LiveError, related: LiveError | null): string {
     const evidence = [
@@ -103,7 +109,7 @@ async function findRuntimeIssue(
     relatedId: string,
 ) {
     const result = await payload.find({
-        collection: 'template-issues',
+        collection: 'template-issues', populate: ISSUE_POPULATE,
         where: {
             and: [
                 { relatedType: { equals: 'runtime' } },
@@ -157,14 +163,14 @@ export const GET = withSuperAdmin(async (req) => {
     if (severity) where.severity = { equals: severity }
     if (status) where.status = { equals: status }
     if (category) where.category = { equals: category }
-    if (assignee) where['assignedTo.id'] = { equals: assignee }
+    if (assignee === 'dev' || assignee === 'unassigned') where.assignmentTarget = { equals: assignee }
     if (relatedType) where.relatedType = { equals: relatedType }
     if (relatedId) where.relatedId = { equals: relatedId }
     if (search) where.title = { contains: search }
 
     const payload = await getPayload({ config })
     const result = await payload.find({
-        collection: 'template-issues',
+        collection: 'template-issues', populate: ISSUE_POPULATE,
         where,
         page,
         limit: LIMIT,
@@ -175,16 +181,19 @@ export const GET = withSuperAdmin(async (req) => {
     return NextResponse.json({ data: result.docs, meta: { total: result.totalDocs, page, limit: LIMIT, pages: result.totalPages } })
 })
 
-export const POST = withSuperAdmin(async (req) => {
+export const POST = withStudioPermission('issue.work', async (req, { user }) => {
     const body = await req.json().catch(() => null)
     const parsed = CreateIssueSchema.safeParse(body)
     if (!parsed.success) {
         return NextResponse.json({ error: 'Validation error', details: parsed.error.flatten() }, { status: 422 })
     }
 
+    // A new issue starts from backlog, so filing one already closed needs the same right as closing one.
+    if ('status' in parsed.data && !canSetIssueStatus(user.roles, 'backlog', parsed.data.status)) return studioForbidden()
+
     const payload = await getPayload({ config })
 
-    if (parsed.data.relatedType === 'runtime') {
+    if ('relatedType' in parsed.data && parsed.data.relatedType === 'runtime') {
         let primaryResult
         try {
             primaryResult = await fetchProviderEvidence(
@@ -211,13 +220,13 @@ export const POST = withSuperAdmin(async (req) => {
 
         try {
             const doc = await payload.create({
-                collection: 'template-issues',
+                collection: 'template-issues', populate: ISSUE_POPULATE,
                 data: {
                     title: parsed.data.title ?? `${primary.source}: ${primary.message}`.slice(0, 300),
                     description: formatRuntimeDescription(primary, null),
                     severity: parsed.data.severity ?? primary.severity,
                     category: 'other',
-                    status: 'open',
+                    status: 'backlog',
                     relatedType: 'runtime',
                     relatedId: runtimeRelatedId,
                 },
@@ -231,27 +240,50 @@ export const POST = withSuperAdmin(async (req) => {
         }
     }
 
-    // Soft-validate relatedId exists
-    const valid = await validateRelatedId(payload, parsed.data.relatedType, parsed.data.relatedId)
-    if (!valid) {
-        return NextResponse.json(
-            { error: `relatedId "${parsed.data.relatedId}" not found for type "${parsed.data.relatedType}"` },
-            { status: 422 },
-        )
+    // Only a super-admin files on someone else's behalf; a team seat is recorded as itself.
+    const reportedBy = isSuperAdmin(user.roles) ? parsed.data.reportedBy : user.id
+
+    if ('relatedType' in parsed.data) {
+        const valid = await validateRelatedId(payload, parsed.data.relatedType, parsed.data.relatedId)
+        if (!valid) {
+            return NextResponse.json(
+                { error: `relatedId "${parsed.data.relatedId}" not found for type "${parsed.data.relatedType}"` },
+                { status: 422 },
+            )
+        }
+        const linkedDoc = await payload.create({
+            collection: 'template-issues', populate: ISSUE_POPULATE,
+            data: {
+                title: parsed.data.title,
+                description: parsed.data.description,
+                severity: parsed.data.severity,
+                category: 'other',
+                status: parsed.data.status,
+                relatedType: parsed.data.relatedType,
+                relatedId: parsed.data.relatedId,
+                assignmentTarget: parsed.data.assignmentTarget,
+                ...(reportedBy ? { reportedBy } : {}),
+            },
+        })
+        return NextResponse.json({ data: linkedDoc }, { status: 201 })
     }
 
+    const manual = parsed.data
     const doc = await payload.create({
-        collection: 'template-issues',
+        collection: 'template-issues', populate: ISSUE_POPULATE,
         data: {
-            title: parsed.data.title,
-            description: parsed.data.description,
-            severity: parsed.data.severity,
-            category: parsed.data.category,
-            status: 'open',
-            relatedType: parsed.data.relatedType,
-            relatedId: parsed.data.relatedId,
-            ...(parsed.data.assignedTo ? { assignedTo: parsed.data.assignedTo } : {}),
-            ...(parsed.data.reportedBy ? { reportedBy: parsed.data.reportedBy } : {}),
+            title: manual.title,
+            description: manual.description,
+            severity: manual.severity,
+            category: 'other',
+            status: manual.status,
+            // A manually reported bug may not yet be tied to a specific
+            // template/generation. Keep a stable internal relation so the
+            // collection's audit and filtering contracts remain intact.
+            relatedType: 'manual',
+            relatedId: `manual-${crypto.randomUUID()}`,
+            assignmentTarget: manual.assignmentTarget,
+            ...(reportedBy ? { reportedBy } : {}),
         },
     })
 

@@ -27,17 +27,17 @@ type LocalBusinessSnapshot = Record<string, unknown> & {
     country?: string | null
 }
 
-type RawSiteSnapshot = {
+/** The site as the editor loads it: `headerBlock` is the pending header, else the live one. */
+type EditorSiteSnapshot = {
     id: string | number
     name: string
     contactInfo?: ContactInfoSnapshot | null
     localBusiness?: LocalBusinessSnapshot | null
-    pendingHeaderBlock?: Record<string, unknown> | null
+    headerBlock?: Record<string, unknown> | null
 }
 
-type SitesResponse = {
-    docs: RawSiteSnapshot[]
-    totalDocs: number
+type CurrentUserResponse = {
+    sites?: Array<{ id: string | number }>
 }
 
 type RestorableSiteSnapshot = {
@@ -53,9 +53,8 @@ let siteId: string | undefined
 let restorePayload: RestorableSiteSnapshot | undefined
 let expectedSiteSnapshot: RestorableSiteSnapshot | undefined
 let authenticatedRequest: APIRequestContext | undefined
-let rawPayloadRequest: APIRequestContext | undefined
 
-function restorableSiteSnapshot(site: RawSiteSnapshot): RestorableSiteSnapshot {
+function restorableSiteSnapshot(site: EditorSiteSnapshot): RestorableSiteSnapshot {
     return {
         siteName: site.name,
         contactInfo: {
@@ -69,8 +68,16 @@ function restorableSiteSnapshot(site: RawSiteSnapshot): RestorableSiteSnapshot {
             postcode: site.localBusiness?.postcode ?? null,
             country: site.localBusiness?.country ?? null,
         },
-        headerBlock: site.pendingHeaderBlock ?? null,
+        headerBlock: site.headerBlock ?? null,
     }
+}
+
+async function readEditorSite(request: APIRequestContext, id: string): Promise<EditorSiteSnapshot> {
+    const response = await request.get(`/api/sites/${id}/editor-data`)
+    if (!response.ok()) {
+        throw new Error(`F37 fixture lookup failed: ${response.status()} ${await response.text()}`)
+    }
+    return (await response.json() as { site: EditorSiteSnapshot }).site
 }
 
 function recordExpectedSiteMutation(body: Record<string, unknown>) {
@@ -169,45 +176,28 @@ test.describe.serial('[US-F37-01] Minimal Business Data browser regression', () 
         if (typeof baseURL !== 'string' || !storageState) {
             throw new Error('F37 E2E requires configured baseURL and authenticated storageState.')
         }
-        const email = process.env.TEST_EMAIL
-        const password = process.env.TEST_PASSWORD
-        if (!email || !password) {
-            throw new Error('F37 E2E requires TEST_EMAIL and TEST_PASSWORD for fixture snapshots.')
-        }
-
+        // Fixture reads and the restore use the saved OTP session on the app routes the editor itself calls.
+        // Payload REST (/api/sites) refuses a tenant user's password-step token (TC-PERF-142) and never
+        // accepted the OTP session. Its Origin header comes from the config (cookie writes, TC-PERF-162).
         authenticatedRequest = await playwright.request.newContext({ baseURL, storageState })
-        // The OTP flow replaces Payload's standard JWT with an MFA JWT understood by
-        // application routes, but not by Payload's generated REST collection routes.
-        // Use a separate standard login only for lossless fixture reads; all mutations
-        // still go through the authenticated application save route.
-        rawPayloadRequest = await playwright.request.newContext({ baseURL })
-        const loginResponse = await rawPayloadRequest.post('/api/users/login', {
-            data: { email, password },
-        })
-        if (!loginResponse.ok()) {
-            throw new Error(`F37 fixture login failed: ${await loginResponse.text()}`)
+        const meResponse = await authenticatedRequest.get('/api/users/me?include=site-status')
+        if (!meResponse.ok()) {
+            throw new Error(`F37 tenant-site lookup failed: ${await meResponse.text()}`)
+        }
+        // users/me lists at most two sites of the active workspaces: two means "more than one".
+        const sites = (await meResponse.json() as CurrentUserResponse).sites ?? []
+        if (sites.length !== 1) {
+            throw new Error(`F37 E2E requires exactly one tenant-owned site; found ${sites.length}.`)
         }
 
-        const sitesResponse = await rawPayloadRequest.get('/api/sites?limit=2&depth=0')
-        if (!sitesResponse.ok()) {
-            throw new Error(`F37 tenant-site lookup failed: ${await sitesResponse.text()}`)
-        }
-        const sites = await sitesResponse.json() as SitesResponse
-        if (sites.totalDocs !== 1 || sites.docs.length !== 1) {
-            throw new Error(`F37 E2E requires exactly one tenant-owned site; found ${sites.totalDocs}.`)
-        }
-
-        const rawSite = sites.docs[0]
+        siteId = String(sites[0].id)
+        const rawSite = await readEditorSite(authenticatedRequest, siteId)
         const openingHours = rawSite.localBusiness?.openingHours
         if (Array.isArray(openingHours) && openingHours.length > 0) {
             throw new Error(
                 'F37 E2E requires the reserved site to have empty openingHours; '
                 + 'address saves re-submit localBusiness and must not rewrite F37-02 row metadata.',
             )
-        }
-        siteId = String(rawSite.id)
-        if (!Object.prototype.hasOwnProperty.call(rawSite, 'pendingHeaderBlock')) {
-            throw new Error('F37 raw fixture response must expose pendingHeaderBlock for lossless teardown.')
         }
 
         const rawRestorePayload = restorableSiteSnapshot(rawSite)
@@ -231,37 +221,30 @@ test.describe.serial('[US-F37-01] Minimal Business Data browser regression', () 
         try {
             if (
                 !authenticatedRequest
-                || !rawPayloadRequest
                 || !siteId
                 || !restorePayload
                 || !expectedSiteSnapshot
             ) return
-            const currentRawResponse = await rawPayloadRequest.get(`/api/sites/${siteId}?depth=0`)
-            if (!currentRawResponse.ok()) {
-                throw new Error(`Pre-restore fixture lookup failed: ${await currentRawResponse.text()}`)
-            }
-            const currentRawSite = await currentRawResponse.json() as RawSiteSnapshot
+            const currentSite = await readEditorSite(authenticatedRequest, siteId)
             expect(
-                restorableSiteSnapshot(currentRawSite),
+                restorableSiteSnapshot(currentSite),
                 'F37 fixture changed outside this test run; refusing to overwrite concurrent edits.',
             ).toEqual(expectedSiteSnapshot)
 
+            // The editor view cannot tell "no pending header" from the live one, so the header goes back only
+            // when this run changed it; an untouched header is never rewritten into a pending copy.
+            const { headerBlock, ...restoreWithoutHeader } = restorePayload
+            const headerChanged = JSON.stringify(expectedSiteSnapshot.headerBlock) !== JSON.stringify(headerBlock)
             const response = await authenticatedRequest.patch(`/api/sites/${siteId}/save`, {
-                data: restorePayload,
+                data: headerChanged ? restorePayload : restoreWithoutHeader,
             })
             expect(response.ok(), `Fixture restore failed: ${await response.text()}`).toBeTruthy()
 
-            const restoredRawResponse = await rawPayloadRequest.get(`/api/sites/${siteId}?depth=0`)
-            if (!restoredRawResponse.ok()) {
-                throw new Error(`Raw fixture verification failed: ${await restoredRawResponse.text()}`)
-            }
-            const restoredRawSite = await restoredRawResponse.json() as RawSiteSnapshot
-            expect(restorableSiteSnapshot(restoredRawSite)).toEqual(restorePayload)
+            const restoredSite = await readEditorSite(authenticatedRequest, siteId)
+            expect(restorableSiteSnapshot(restoredSite)).toEqual(restorePayload)
         } finally {
             await authenticatedRequest?.dispose()
             authenticatedRequest = undefined
-            await rawPayloadRequest?.dispose()
-            rawPayloadRequest = undefined
         }
     })
 

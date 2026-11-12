@@ -419,3 +419,25 @@ test.describe('Product Grid QA rework browser regressions', () => {
         expect(drawerOverflow).toBeLessThanOrEqual(0)
     })
 })
+
+test.describe('GH-2378 Quick View summary browser regression', () => {
+    for (const shortDescription of ['', 'Merchant short description']) {
+        test(`[TC-F09-2378-09] ${shortDescription ? 'short description stays preferred' : 'description-only product shows API summary'}`, async ({ page }) => {
+            // Arrange — keep the browser fetch/map/modal path real; API summary is covered by TC-06.
+            const summary = shortDescription || 'Plain text from the CMS full description.'
+            await page.route('**/api/storefront/products?**', async (route) => {
+                expect(new URL(route.request().url()).searchParams.get('summary')).toBe('1')
+                await route.fulfill({ json: { docs: [{
+                    ...createProductDoc(2378, 'Summary Tee'), shortDescription, summary,
+                }] } })
+            })
+
+            // Act
+            await page.goto('/test-blocks?quickView=1')
+            await page.getByRole('button', { name: 'Quick View' }).click()
+
+            // Assert
+            await expect(page.getByRole('dialog', { name: 'Quick view: Summary Tee' }).getByText(summary, { exact: true })).toBeVisible()
+        })
+    }
+})

@@ -73,6 +73,24 @@ Vet can toan bo AC cua F20, dac biet: Bao mat truy cap (Auth/401), tuong tac Acc
 | **TC-F20-02-11** | `[BVA]` | Tim kiem voi o trong / chi dau cach | 1. Nhap toan bo khoang trang vao o search.<br>2. Nhan Enter. | - Hien thi toan bo Q&A (khong filter).<br>- Khong goi API voi query rong. | Medium | [ ] |
 | **TC-F20-02-12** | `[Edge]` | Tim kiem voi ky tu Unicode, Emoji | 1. Nhap emoji hoac ky tu Trung/Han vao o search. | - Server decode UTF-8 dung, khong crash.<br>- Tra ve ket qua hop le hoac Empty State. | High | [ ] |
 
+
+#### Nhom 2C — Video huong dan trong Q&A (GitHub #2464)
+
+> Moi cau Q&A co 0 hoac 1 video (`QNA_VIDEOS` trong `src/components/help/qna-video-media.ts`). Video MP4 720p tu host o `/videos/help-qna/` (ten file co hash), 1 ban thuyet minh tieng Anh + phu de in san dung chung cho EN/MS.
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F20-02-13** | `[Positive]` | Mo cau co video | 1. Mo `/help/qna`.<br>2. Mo mot cau co video. | - Video hien duoi text tra loi, co poster + nhan "Video guide · m:ss".<br>- Khong tu phat; bam Play thi chay. | High | [x] |
+| **TC-F20-02-14** | `[Negative]` | Mo cau khong co video | 1. Mo mot cau khong co video. | - Hien thi nhu cu, khong co khung video trong, khong co icon ▶. | Medium | [x] |
+| **TC-F20-02-15** | `[Perf]` | Khong tai video khi chua mo cau nao | 1. Mo `/help/qna`, DevTools › Network loc `help-qna`.<br>2. Chua mo cau nao, roi mo 1 cau. | - Chua mo: khong co request toi `/videos/help-qna/`.<br>- Mo cau: chi tai poster; file MP4 chi tai khi bam Play (`preload="none"`). | High | [x] |
+| **TC-F20-02-16** | `[Positive]` | Tua + toan man hinh | 1. Phat video.<br>2. Tua thanh tien do, bam toan man hinh. | - Dung dieu khien goc cua trinh duyet: play/pause, tua, am luong, toan man hinh. | Medium | [ ] |
+| **TC-F20-02-17** | `[Responsive]` | Co gian dung ti le | 1. Xem o mobile 390px va desktop 1440px. | - Khung 16:9, rong toi da 720px, khong cuon ngang. | High | [ ] |
+| **TC-F20-02-18** | `[i18n]` | Nhan video da dich | 1. Doi ngon ngu EN ↔ MS. | - "Video guide" / "Panduan video", aria-label va icon ▶ deu theo ngon ngu.<br>- Video dung chung 1 ban (thuyet minh EN + phu de). | Medium | [x] |
+| **TC-F20-02-19** | `[Positive]` | Tim kiem van ra cau co video | 1. Tim tu khoa cua cau co video (vd "domain").<br>2. Mo cau. | - Cau van xuat hien, mo ra co video. | Medium | [x] |
+| **TC-F20-02-20** | `[UI State]` | Light / dark mode | 1. Xem khung video o ca 2 theme. | - Khung video, vien va nhan hien dung o ca 2 theme. | Low | [ ] |
+| **TC-F20-02-21** | `[Negative]` | Video loi khong vo layout | 1. DevTools › Block request URL video.<br>2. Mo cau, bam Play. | - File khong tai duoc: khung video va icon ▶ cung an; text tra loi van hien day du, khong vo layout.<br>- Mat mang khi dang xem: giu trinh phat (khong mat vi tri dang xem). | High | [x] |
+| **TC-F20-02-22** | `[State]` | Chi 1 video phat tai 1 thoi diem | 1. Mo 2 cau co video, phat video A.<br>2. Phat video B. | - Video A tu dung khi B bat dau. | Low | [x] |
+
 ---
 
 ### US-F20-03: Huong Dan Module Co Hinh Minh Hoa
@@ -122,6 +140,21 @@ Vet can toan bo AC cua F20, dac biet: Bao mat truy cap (Auth/401), tuong tac Acc
 | **TC-F20-05-01** | `[Positive]` | Chuyen sang BM: Label va Q&A cung doi ngon ngu | 1. CMS dang o ngon ngu EN.<br>2. Chuyen sang BM.<br>3. Mo Help Center. | - Tieu de nav, Q&A, nhan nut deu hien Bahasa Melayu.<br>- Khong co chuoi raw key nhu `help.title.welcome`. | Blocker | [ ] |
 | **TC-F20-05-02** | `[Edge]` | Fallback EN khi khoa dich BM bi thieu | 1. Xoa khoa BM cua muc "Q&A" khoi file `bm.json`.<br>2. Chuyen sang BM. | - He thong hien text tieng Anh fallback.<br>- Khong hien raw key, khong trang trang. | Blocker | [ ] |
 | **TC-F20-05-03** | `[Negative]` | Khong hien raw i18n key bat ky trong moi truong nao | 1. Kiem tra toan bo text tren Help Center o ca 2 ngon ngu. | - Khong ton tai chuoi dang `help.x.y` hien ra tren UI.<br>- Moi key deu co chuoi dich tuong ung. | High | [ ] |
+
+#### Nhom 5B — Video gioi thieu xem lai + anh Module Guides V2 (GitHub #2065)
+
+> Thiet ke: Claude Design `PrimeWebV2 UI Prototype` → `design_handoff_help_center_video/README.md` (Split Hero v2). Dung chung `V2IntroVideo` + `V2_INTRO_MEDIA` voi popup onboarding.
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F20-05-04** | `[Regression]` | Popup onboarding van chi hien lan dau | 1. User moi vao Dashboard → dong popup (X / backdrop / Esc / Get started).<br>2. Reload Dashboard. | - Popup khong tu hien lai (`has_seen_ai_wizard`).<br>- Xem video trong Help Center khong lam popup hien lai. | High | [x] (TC-F06.09/21) |
+| **TC-F20-05-05** | `[Positive]` | Overview hien khoi Welcome chia 2 cot + video | 1. Mo `/help` (viewport ≥ 1280px), roi thu nho < 1280px. | - ≥ 1280: chu trai 55% / video phai 45%.<br>- < 1280: xep chong, video max 640px.<br>- Video dung nguon 1080p/720p + poster cua onboarding. | High | [x] |
+| **TC-F20-05-06** | `[UI State]` | Trang thai cho: thumbnail + Play + 2 chip, khong co thanh dieu khien | 1. Mo `/help` lan dau. | - Thumbnail mo, nut Play kinh mo co vong pulse, chip thoi luong + "Overview tour".<br>- Khong co thanh dieu khien; thanh chi hien khi dang phat. | Medium | [x] |
+| **TC-F20-05-07** | `[A11y]` | Phim tat khi khung video dang focus | 1. Tab vao khung video.<br>2. Nhan Space/Enter/K, ←/→, M, F. | - Space/Enter/K phat–dung; ←/→ tua 5s; M tat/bat tieng; F toan man hinh.<br>- aria-label theo trang thai (Play / Resume / Replay video: …). | Medium | [x] |
+| **TC-F20-05-08** | `[State]` | Nho tien do xem (localStorage `pw-help-intro-video`) | 1. Phat video, dung o giua.<br>2. Roi Help Center roi quay lai.<br>3. Xem het video, reload. | - Quay lai: hien vach tien do, bam Play xem tiep tu cho dung.<br>- Xem het: hien Replay, khong con pulse. | Medium | [x] |
+| **TC-F20-05-09** | `[Edge]` | Tu dung khi cuon khoi man hinh / chuyen tab | 1. Phat video.<br>2. Cuon cho khung con < 25% tren man hinh.<br>3. Phat lai roi chuyen tab Q&A. | - Video tu dung o ca 2 truong hop. | Medium | [x] |
+| **TC-F20-05-10** | `[Negative]` | Loi tai video → thong bao + Try again | 1. Chan request `/videos/*` (DevTools).<br>2. Mo `/help`. | - Hien "Couldn't load the video." + nut Try again; bam Try again tai lai video. | Medium | [x] |
+| **TC-F20-05-11** | `[Positive]` | Anh Module Guides la giao dien V2, WebP, dung kich thuoc | 1. Mo `/help/modules`, xem tung module. | - 5 anh AI Website Builder (buoc 1,2,3,4,6) la giao dien V2 theo prototype.<br>- File `.webp`, `width`/`height` khop anh that (khong meo khung). | High | [x] |
 
 ---
 

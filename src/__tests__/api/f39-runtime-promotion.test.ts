@@ -119,11 +119,12 @@ describe('[TC-F39-AC12,15] POST /api/admin/issues runtime promotion', () => {
         expect(mocks.fetchProviderEvidence).toHaveBeenCalledWith('sentry', '9001')
         expect(mocks.create).toHaveBeenCalledWith({
             collection: 'template-issues',
+            populate: expect.objectContaining({ users: { firstName: true, lastName: true, email: true } }),
             data: expect.objectContaining({
                 title: 'sentry: Server-authoritative failure',
                 severity: 'high',
                 category: 'other',
-                status: 'open',
+                status: 'backlog',
                 relatedType: 'runtime',
                 relatedId: 'sentry:9001',
                 description: expect.stringContaining('Server-authoritative failure'),

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
     Bold, Italic, Underline, Strikethrough,
     AlignLeft, AlignCenter, AlignRight, AlignJustify,
@@ -10,6 +10,8 @@ import { useI18n } from '@/i18n'
 
 interface RichTextToolbarProps {
     onCommand: (command: string, value?: string) => void
+    /** Ask AI (the copilot chat) on the text being edited; hidden without the copilot */
+    canAskAI?: boolean
     activeState?: Record<string, unknown>
 }
 
@@ -18,7 +20,7 @@ const PRESET_COLORS = [
     '#22C55E', '#3B82F6', '#8B5CF6', '#EC4899', '#6B7280',
 ]
 
-export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbarProps) {
+export function RichTextToolbar({ onCommand, activeState = {}, canAskAI = false }: RichTextToolbarProps) {
     const { t } = useI18n()
     const rt = t.editor.richText
     const isActive = (cmd: string) => Boolean(activeState[cmd])
@@ -34,6 +36,8 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
     const [showListMenu, setShowListMenu] = useState(false)
     const [fontSize, setFontSize] = useState(16)
     const [fontSizeRaw, setFontSizeRaw] = useState('16')
+    // Ô đã được gõ sửa chưa commit — blur không sửa gì thì không áp lại cỡ chữ cũ
+    const fontSizeDirtyRef = useRef(false)
 
     const applyColor = (hex: string) => {
         setActiveColor(hex)
@@ -48,6 +52,7 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
 
     const commitFontSize = (raw: string) => {
         const v = Math.max(8, Math.min(96, parseInt(raw, 10) || fontSize))
+        fontSizeDirtyRef.current = false
         setFontSize(v)
         setFontSizeRaw(String(v))
         onCommand('fontSize', String(v))
@@ -117,11 +122,12 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
                     value={fontSizeRaw}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={(e) => (e.target as HTMLInputElement).select()}
-                    onChange={(e) => setFontSizeRaw(e.target.value)}
-                    onBlur={(e) => commitFontSize(e.target.value)}
+                    onChange={(e) => { fontSizeDirtyRef.current = true; setFontSizeRaw(e.target.value) }}
+                    // Enter đã commit và xóa dirty; blur chỉ commit khi người dùng gõ mà chưa Enter (GH-2089)
+                    onBlur={(e) => { if (fontSizeDirtyRef.current) commitFontSize(e.target.value) }}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') { e.preventDefault(); commitFontSize((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).blur() }
-                        if (e.key === 'Escape') { setFontSizeRaw(String(fontSize)); (e.target as HTMLInputElement).blur() }
+                        if (e.key === 'Escape') { fontSizeDirtyRef.current = false; setFontSizeRaw(String(fontSize)); (e.target as HTMLInputElement).blur() }
                     }}
                     className="h-7 w-9 border-x border-gray-700 bg-gray-800 text-center text-xs text-gray-200 outline-none"
                 />
@@ -308,14 +314,18 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
                 )}
             </div>
 
-            {/* AI Edit */}
-            <button
-                className="p-1.5 rounded transition-colors text-amber-500 hover:bg-amber-500/20"
-                onClick={(e) => { e.preventDefault(); onCommand('aiEdit') }}
-                title="Edit with AI"
-            >
-                <Sparkles className="w-4 h-4" />
-            </button>
+            {/* Ask AI → the copilot chat */}
+            {canAskAI && (
+                <button
+                    type="button"
+                    className="p-1.5 rounded transition-colors text-teal-300 hover:bg-teal-400/15"
+                    onClick={(e) => { e.preventDefault(); onCommand('aiEdit') }}
+                    title="Ask AI"
+                    aria-label="Ask AI"
+                >
+                    <Sparkles className="w-4 h-4" />
+                </button>
+            )}
         </div>
     )
 }

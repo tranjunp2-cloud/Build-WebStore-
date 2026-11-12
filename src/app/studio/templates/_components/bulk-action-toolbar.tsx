@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { Rocket, Clock, Archive, Trash2, X, Star } from 'lucide-react'
 import { ScheduleTemplateModal } from '../../_components/modals/schedule-template-modal'
+import { useStudioCan } from '../../_components/studio-permissions-context'
 
 const BULK_RESCORE_MAX = 20
 
@@ -40,6 +41,12 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
     }
 
     const busy = loading !== null
+    const can = useStudioCan()
+    const canReview = can('template.review')
+    // The server skips rows the user may not archive, so editors still get the archive/delete buttons.
+    const canArchiveOrDelete = canReview || can('template.edit')
+    const canScore = can('template.score')
+    const hasMidGroup = canReview || canArchiveOrDelete || canScore
 
     return (
         <>
@@ -48,8 +55,10 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
                 <span className="count">{count}</span>
                 <span style={{ color: 'var(--text-3)' }}>selected</span>
 
-                <div className="divider" />
+                {hasMidGroup && <div className="divider" />}
 
+                {canReview && (
+                    <>
                 <button
                     className="btn-float"
                     disabled={busy}
@@ -66,7 +75,10 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
                 >
                     <Clock size={13} /> Schedule
                 </button>
+                    </>
+                )}
 
+                {canArchiveOrDelete && (
                 <button
                     className="btn-float"
                     disabled={busy}
@@ -75,7 +87,9 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
                     <Archive size={13} />
                     {loading === 'archive' ? 'Archiving…' : 'Archive'}
                 </button>
+                )}
 
+                {canScore && (
                 <button
                     className="btn-float"
                     disabled={busy}
@@ -85,7 +99,10 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
                     <Star size={13} />
                     {loading === 're-score' ? 'Scoring…' : 'Re-score'}
                 </button>
+                )}
 
+                {canArchiveOrDelete && (
+                    <>
                 <div className="divider" />
 
                 <button
@@ -95,6 +112,8 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
                 >
                     <Trash2 size={13} />
                 </button>
+                    </>
+                )}
 
                 <button
                     className="btn-float"
@@ -105,7 +124,7 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
                 </button>
             </div>
 
-            {showSchedule && (
+            {showSchedule && canReview && (
                 <ScheduleTemplateModal
                     template={null}
                     onClose={() => setShowSchedule(false)}

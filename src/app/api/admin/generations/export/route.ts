@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission } from '@/lib/admin/api-utils'
 
 function escapeCell(val: unknown): string {
     const str = val === null || val === undefined ? '' : String(val)
@@ -42,7 +42,7 @@ const CSV_HEADERS = [
     'errorLog',
 ]
 
-export const GET = withSuperAdmin(async (req: NextRequest) => {
+export const GET = withStudioPermission('data.export', async (req: NextRequest) => {
     const sp = req.nextUrl.searchParams
 
     const status = sp.get('status') ?? ''

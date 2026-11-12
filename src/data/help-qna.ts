@@ -1,10 +1,13 @@
 import { BarChart3, Rocket, PenLine, Settings, type LucideIcon } from 'lucide-react';
 import { Translations } from '@/i18n';
+import { QNA_VIDEOS, type QnAVideoMedia } from '@/components/help/qna-video-media';
 
 export interface QnAItem {
     id: string;
     question: string;
     answer: string;
+    /** Tutorial video under the answer; absent = text only (#2464) */
+    video?: QnAVideoMedia;
 }
 
 export interface QnACategory {
@@ -14,7 +17,7 @@ export interface QnACategory {
     items: QnAItem[];
 }
 
-export const getQnAData = (t: Translations): QnACategory[] => [
+const buildQnAData = (t: Translations): QnACategory[] => [
     {
         id: 'dashboard',
         title: t.help.qna.categories.dashboardTitle,
@@ -104,3 +107,10 @@ export const getQnAData = (t: Translations): QnACategory[] => [
         ]
     }
 ];
+
+/** Q&A content for the current locale, with each question's tutorial video attached when one exists. */
+export const getQnAData = (t: Translations): QnACategory[] =>
+    buildQnAData(t).map(category => ({
+        ...category,
+        items: category.items.map(item => (QNA_VIDEOS[item.id] ? { ...item, video: QNA_VIDEOS[item.id] } : item)),
+    }));

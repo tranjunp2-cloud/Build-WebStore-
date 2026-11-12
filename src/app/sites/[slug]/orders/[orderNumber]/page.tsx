@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { STOREFRONT_POPULATE } from '@/lib/cache/tenant'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { verifyOrderToken } from '@/lib/auth/order-token'
 import OrderTrackingClient from './OrderTrackingClient'
@@ -9,6 +10,10 @@ import { OT_CSS } from './order-tracking-styles'
 import ResendUploadLinkForm from './ResendUploadLinkForm'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+import { cookies } from 'next/headers'
+import { maskBuyerContact } from '@/lib/orders/mask-buyer-contact'
+import { isOrderBuyerBrowser } from '@/lib/orders/order-view-token'
+import { normalizeOrderNumber } from '@/lib/orders/normalize-order-number'
 
 const UPLOAD_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
 
@@ -22,7 +27,8 @@ export default async function OrderTrackingPage({
     params: Promise<{ slug: string; orderNumber: string }>
     searchParams: Promise<{ token?: string }>
 }) {
-    const [{ slug, orderNumber }, sp] = await Promise.all([params, searchParams])
+    const [{ slug, orderNumber: rawOrderNumber }, sp] = await Promise.all([params, searchParams])
+    const orderNumber = normalizeOrderNumber(rawOrderNumber)
     const token = sp.token ?? ''
     const payload = await getPayload({ config })
 
@@ -46,6 +52,7 @@ export default async function OrderTrackingPage({
         collection: 'sites',
         where: { tenant: { equals: tenant.id } },
         limit: 1,
+        populate: STOREFRONT_POPULATE,
         overrideAccess: true,
         depth: 1,
     })
@@ -174,13 +181,19 @@ export default async function OrderTrackingPage({
         },
     }
 
+    // Name, phone and street address only for the buyer's own browser: the confirm cookie set at checkout, or
+    // the short-lived view cookie it is swapped for when the buyer leaves the confirm page (TC-PERF-177).
+    const cookieStore = await cookies()
+    const isBuyer = isOrderBuyerBrowser((name) => cookieStore.get(name)?.value, order)
+    const shownOrder = isBuyer ? sanitizedOrder : maskBuyerContact(sanitizedOrder)
+
     return (
         <>
             {/* Browser Back from Stripe (retry-payment flow) → confirm page Payment Failed (no flash) */}
             <StripeBackRedirectScript />
             {fontLinks}
             <style dangerouslySetInnerHTML={{ __html: OT_CSS }} />
-            <OrderTrackingClient order={sanitizedOrder} slug={slug} />
+            <OrderTrackingClient order={shownOrder} slug={slug} />
         </>
     )
 }

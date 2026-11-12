@@ -22,31 +22,6 @@ import type { BuilderPreviewMode } from '../../../components/builder/BuilderPrev
 // ── Mocks ────────────────────────────────────────────────────────────────
 
 vi.mock('@/components/builder/BuilderPreviewPrimitives', () => ({
-    BuilderPreviewModeToggle: ({
-        mode,
-        onChange,
-    }: {
-        mode: string
-        onChange: (mode: string) => void
-    }) => (
-        <div data-testid="preview-mode-toggle">
-            <button
-                data-testid="toggle-desktop"
-                onClick={() => onChange('desktop')}
-                type="button"
-            >
-                Desktop
-            </button>
-            <button
-                data-testid="toggle-mobile"
-                onClick={() => onChange('mobile')}
-                type="button"
-            >
-                Mobile
-            </button>
-            <span data-testid="current-mode">{mode}</span>
-        </div>
-    ),
     BuilderPreviewSurface: ({
         children,
         mode,
@@ -143,6 +118,16 @@ describe('BuilderCompletionView', () => {
             expect(
                 screen.getByText(/See the preview.*open the editor.*publish now/i),
             ).toBeInTheDocument()
+        })
+    })
+
+    // ── TC-F01.12: Draft badge on the "is ready!" card ───────────────────
+    describe('Draft badge (TC-F01.12)', () => {
+        it('renders the Draft badge with the localized label next to the ready message', () => {
+            renderCompletion()
+            const badge = screen.getByTestId('completion-draft-badge')
+            expect(badge).toHaveTextContent(en.onboarding.completion.draftBadge)
+            expect(badge).toHaveClass('bg-yellow-500/20', 'text-yellow-400')
         })
     })
 
@@ -258,6 +243,15 @@ describe('BuilderCompletionView', () => {
             const btn = screen.getByRole('button', { name: /View Full Preview/i })
             fireEvent.click(btn)
             expect(onOpenPreview).toHaveBeenCalledTimes(1)
+        })
+
+        it('slides the toggle thumb to the mobile slot only in mobile mode', () => {
+            const { rerender } = renderCompletion()
+            expect(screen.getByTestId('preview-mode-thumb')).toHaveClass('translate-x-0')
+            expect(screen.getByTestId('toggle-desktop')).toHaveAttribute('aria-pressed', 'true')
+            rerender(<BuilderCompletionView {...DEFAULT_PROPS} previewMode="mobile" />)
+            expect(screen.getByTestId('preview-mode-thumb')).toHaveClass('translate-x-[104px]')
+            expect(screen.getByTestId('toggle-mobile')).toHaveAttribute('aria-pressed', 'true')
         })
 
         it('passes current previewMode to the preview surface', () => {
@@ -413,5 +407,22 @@ describe('BuilderCompletionView', () => {
             )
             expect(screen.getByText(/\+0s/)).toBeInTheDocument()
         })
+    })
+})
+
+// ── #2176: completion screen matches the approved prototype (#2042) ──────────
+
+describe('BuilderCompletionView — approved prototype only (#2176)', () => {
+    const c = en.onboarding.completion
+
+    it('TC-AIAUD-057: no "Finish your shop" card or button and no "Replace before you publish" list', () => {
+        render(<BuilderCompletionView {...DEFAULT_PROPS} />)
+
+        expect(screen.queryByText(c.finishShopTitle)).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: c.finishShopButton })).not.toBeInTheDocument()
+        expect(screen.queryByText(c.placeholdersTitle)).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: c.openEditor })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: c.publishWebsite })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: new RegExp(c.goToDashboard) })).toBeInTheDocument()
     })
 })

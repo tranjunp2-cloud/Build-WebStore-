@@ -5,6 +5,8 @@ import { AppShell } from '@/components/AppShell'
 import { AuthToaster } from './AuthToaster'
 import { I18nProvider, Locale } from '@/i18n'
 import { ThemeProvider } from '@/providers/theme-provider'
+import { MascotProvider } from '@/mascot'
+import { AuthMascot } from './AuthMascot'
 
 export default async function AuthLayout({
     children,
@@ -25,6 +27,7 @@ export default async function AuthLayout({
         <AppShell>
             <ThemeProvider initialTheme={initialTheme}>
                 <I18nProvider defaultLocale={localeCookie}>
+                <MascotProvider>
                     <div
                         className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8"
                         style={{ background: 'var(--auth-bg)' }}
@@ -45,7 +48,10 @@ export default async function AuthLayout({
                             }}
                         />
 
-                        <div className="relative z-10 w-full max-w-[90vw] sm:max-w-[448px] flex flex-col items-start flex-1" style={{ gap: 28 }}>
+                        {/* desktop: the mascot stands beside the card and reacts to the form */}
+                        <div className="relative z-10 flex w-full items-center justify-center lg:gap-14">
+                        <AuthMascot />
+                        <div className="w-full max-w-[90vw] sm:max-w-[448px] flex flex-col items-start flex-1" style={{ gap: 28 }}>
                             {/* Logo — Figma: 48×48 rounded-2xl with glow + "Web Store" Inter Bold 24 */}
                             <div className="flex justify-center w-full">
                                 <Link href="/" className="group inline-flex items-center gap-3" style={{ textDecoration: 'none' }}>
@@ -83,9 +89,11 @@ export default async function AuthLayout({
                                 © 2026 Web Store. AI-powered website builder for Malaysian SMEs.
                             </p>
                         </div>
+                        </div>
 
                         <AuthToaster />
                     </div>
+                </MascotProvider>
                 </I18nProvider>
             </ThemeProvider>
         </AppShell>

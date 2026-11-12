@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { expect, test } from "@playwright/test";
+import { createSuperAdminContext } from "../e2e/helpers/super-admin-session";
 
 test.describe("F40 QA ingest security boundary", () => {
   test("[TC-F40-02-E2E-01] rejects an unsigned CI summary before persistence", async ({
@@ -90,22 +91,18 @@ test.describe("F40 QA ingest summary", () => {
         "x-qa-signature": `sha256=${signature}`,
       },
     });
-    const adminContext = await browser.newContext();
-    const adminPage = await adminContext.newPage();
-    await adminPage.goto("/admin");
-    const emailInput = adminPage.locator(
-      'input[name="email"], input[id="field-email"]',
-    );
-    await emailInput.fill(adminEmail);
-    await adminPage
-      .locator('input[name="password"], input[id="field-password"]')
-      .fill(adminPassword);
-    await adminPage.locator('button[type="submit"]').click();
-    await adminPage.waitForLoadState("networkidle");
-    const listed = await adminPage.request.get(
+    // A clean super-admin context: the project's storageState is the TEST_EMAIL
+    // tenant-owner, and the old /admin form login raced networkidle, so the
+    // listing went out with that cookie and got 403.
+    const adminContext = await createSuperAdminContext(browser, {
+      email: adminEmail as string,
+      password: adminPassword as string,
+    });
+    const listed = await adminContext.request.get(
       `/api/admin/qa/runs?targetId=${body.targetId}`,
     );
     const result = await listed.json();
+    await adminContext.close();
 
     // Assert
     expect(ingest.ok(), await ingest.text()).toBe(true);

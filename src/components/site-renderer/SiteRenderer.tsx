@@ -1,3 +1,4 @@
+import { migrationAllowsTracking } from '@/lib/migration/pw1-commerce'
 import { blockRegistry } from '@/blocks/registry'
 import { isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
@@ -21,6 +22,8 @@ import { BuilderPreviewProvider } from './BuilderPreviewContext'
 import { HiddenSlugsProvider } from './HiddenSlugsContext'
 import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 import { FloatingContainerProvider } from './FloatingContainerContext'
+import type { BreadcrumbConfig } from '@/lib/site-renderer/breadcrumb-config'
+import { isBreadcrumbEnabled } from '@/lib/site-renderer/breadcrumb-config'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
@@ -111,13 +114,11 @@ function applyGlobalSystemBlocks(
 
     // Inject breadcrumb globally from headerBlock.breadcrumbConfig
     const breadcrumbCfg = (siteHeaderBlock as Record<string, unknown> | null | undefined)?.breadcrumbConfig as
-        { homeLabel?: string; separator?: string; showOnAllPages?: boolean } | undefined
+        BreadcrumbConfig | undefined
     // Only inject breadcrumb when user has explicitly configured it; existing sites without the
     // config key must not get breadcrumb auto-enabled (would surprise published site owners).
     // Treat null same as false — Payload CMS may store unset booleans as null.
-    const showBreadcrumb = breadcrumbCfg !== undefined &&
-        breadcrumbCfg.showOnAllPages !== false &&
-        breadcrumbCfg.showOnAllPages !== null
+    const showBreadcrumb = isBreadcrumbEnabled(breadcrumbCfg)
     // Remove any per-page breadcrumb blocks (legacy manual adds) — breadcrumb is global-only now.
     // DB data is unchanged; only the render is suppressed.
     nextBlocks = nextBlocks.filter(b => b.blockType !== 'breadcrumb')
@@ -185,7 +186,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     }))
     const _preprocessedBlocks = applyGlobalSystemBlocks(pageBlocks, site, pages)
     // Detect cart: true when cartWidget block was injected (site has commerce enabled)
-    const _hasCart = _preprocessedBlocks.some(b => b.blockType === 'cartWidget')
+    const _hasCart = _preprocessedBlocks.some(b => b.blockType === 'cartWidget') && migrationAllowsTracking(site.globalBlocks)
     const rawBlocks = _preprocessedBlocks.map(b => {
         if (b.blockType === 'navigation') {
             return { ...b, _hasCart }
@@ -434,7 +435,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
     // Nav offset: overlay nav variants (transparent, floating) are fixed-position and out of
     // document flow — in the editor their content can hide behind the nav without a paddingTop.
-    // On live sites the overlay is intentional (hero background fills behind nav), so no offset.
+    // On live sites the overlay is intentional on desktop (hero background fills behind nav), so no
+    // offset there; on mobile (<768px) globals.css pushes the first block below the nav (GH-2167,
+    // see applyMobileOverlayOffset).
     // Sticky variants (default, centered, mega) push content down naturally via document flow —
     // adding paddingTop would create a double gap. Sidebar nav is off-canvas (no top bar).
     const GLOBAL_BLOCK_TYPES = ['header', 'navigation', 'footer', 'breadcrumb']
@@ -461,6 +464,14 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         navForOffset != null &&
         OVERLAY_NAV_VARIANTS.has(navVariant) &&
         isEditor &&
+        firstContentBlockIdx >= 0
+    // GH-2167: on live (non-editor) the overlay is still intentional on desktop, but on mobile the
+    // hero headline sits under the fixed nav. Mark the first content block so globals.css can push
+    // it below the nav (<768px only). Editor already has the inline offset above (no double gap).
+    const applyMobileOverlayOffset =
+        navForOffset != null &&
+        OVERLAY_NAV_VARIANTS.has(navVariant) &&
+        !isEditor &&
         firstContentBlockIdx >= 0
 
     // Group floating widgets by their corner position so they stack vertically
@@ -534,13 +545,14 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         const blockVariant = (block as Record<string, unknown>).variant as string | undefined
         const isFloatingBlock = FLOATING_BLOCK_TYPES.has(block.blockType) && blockVariant !== 'inline'
         const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
+        const isFirstContentWithoutPadding = index === firstContentBlockIdx && blockSpacing?.paddingTop === undefined
         const spacingStyle = (isGlobalBlock || isFloatingBlock)
             ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
             : {
                 // GH-1412: nav-offset is only a DEFAULT — when the user has explicitly set
                 // a Top Spacing value (blockSpacing.paddingTop), respect it instead of
                 // silently overriding it with the nav height.
-                paddingTop: applyNavOffset && index === firstContentBlockIdx && blockSpacing?.paddingTop === undefined
+                paddingTop: applyNavOffset && isFirstContentWithoutPadding
                     ? (navVariant === 'floating' ? 'calc(var(--nav-height, 64px) + 1rem)' : 'var(--nav-height, 64px)')
                     : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
                 paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
@@ -592,7 +604,17 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             // footer, breadcrumb) normally return unwrapped; breadcrumb gets
             // wrapped when a fixed-nav offset applies.
             rendered = (
-                <div key={`${block.blockType}-${index}`} style={spacingStyle}>
+                <div
+                    key={`${block.blockType}-${index}`}
+                    data-block-index={index}
+                    data-block-type={block.blockType}
+                    data-mobile-nav-offset={
+                        applyMobileOverlayOffset && isFirstContentWithoutPadding && !isGlobalBlock && !isFloatingBlock
+                            ? navVariant
+                            : undefined
+                    }
+                    style={spacingStyle}
+                >
                     {blockContent}
                 </div>
             )

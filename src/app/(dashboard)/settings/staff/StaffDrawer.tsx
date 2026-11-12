@@ -8,6 +8,8 @@ import { inviteStaffAction, updateStaff } from './actions';
 import type { StaffMember } from './StaffDirectoryClient';
 import { ALLOWED_PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
+import { isPayloadAcceptedEmail } from '@/lib/validations/email-address';
+import { classifyInviteStaffError } from './invite-staff-error';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -79,7 +81,8 @@ export function StaffDrawer({
                 setEmailError(t?.Staff?.drawer?.errorEmailRequired || 'Please enter an email address');
                 return;
             }
-            if (!email.includes('@')) {
+            // GH-2305: same rule as the users collection, so Payload's raw "field is invalid: Email" never shows
+            if (!isPayloadAcceptedEmail(email.trim())) {
                 setEmailError(t?.Staff?.drawer?.errorEmailInvalid || 'Invalid email address');
                 return;
             }
@@ -88,7 +91,7 @@ export function StaffDrawer({
                 return;
             }
             // BUG-F19.10: Block self-invite
-            if (currentUserEmail && email.toLowerCase() === currentUserEmail.toLowerCase()) {
+            if (currentUserEmail && email.trim().toLowerCase() === currentUserEmail.toLowerCase()) {
                 setEmailError(t?.Staff?.drawer?.errorSelfInvite || 'You cannot invite yourself');
                 return;
             }
@@ -103,8 +106,7 @@ export function StaffDrawer({
             try {
                 if (isEditMode) {
                     if (!editData) return;
-                    const displayName = [editData.firstName, editData.lastName].filter(Boolean).join(' ') || '';
-                    const res = await updateStaff(editData.id, displayName, role, role === 'custom' ? selectedFeatures : undefined);
+                    const res = await updateStaff(editData.id, role, role === 'custom' ? selectedFeatures : undefined);
                     if (res.success) {
                         toast.success(t?.Staff?.toast?.staffUpdated || 'Staff updated successfully!');
                         onClose();
@@ -112,9 +114,11 @@ export function StaffDrawer({
                         toast.error(res.error || t?.Staff?.toast?.staffUpdateFailed || 'Failed to update staff');
                     }
                 } else {
+                    // Users are stored lowercase (unique on lower(email)); a mixed-case address must still find them
+                    const inviteEmail = email.trim();
                     const res = await inviteStaffAction({
-                        email: email,
-                        name: email.split('@')[0],
+                        email: inviteEmail.toLowerCase(),
+                        name: inviteEmail.split('@')[0],
                         role: role,
                         permissions: role === 'custom' ? selectedFeatures : undefined
                     });
@@ -122,8 +126,13 @@ export function StaffDrawer({
                         toast.success(t?.Staff?.toast?.inviteSent || 'Invitation sent successfully!');
                         onClose();
                     } else {
-                        // BUG-F19.09 + F19.16: Show error toast for duplicate/invalid email
-                        toast.error(res.error || t?.Staff?.toast?.inviteFailed || 'Failed to send invitation');
+                        // GH-2305: translated copy only — email problems under the field, the rest as a toast
+                        const failure = classifyInviteStaffError(res.error);
+                        if (failure.target === 'email') {
+                            setEmailError(t?.Staff?.drawer?.[failure.key] || t?.Staff?.drawer?.errorEmailInvalid || 'Invalid email address');
+                        } else {
+                            toast.error(t?.Staff?.toast?.[failure.key] || t?.Staff?.toast?.inviteFailed || 'Failed to send invitation');
+                        }
                     }
                 }
             } catch (err: unknown) {

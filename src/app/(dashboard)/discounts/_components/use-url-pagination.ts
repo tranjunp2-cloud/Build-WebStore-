@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 
 /** Allowed page sizes — shared by both discount tabs' rows-per-page dropdown. */
 export const PAGE_SIZES = [10, 25, 50, 100] as const
@@ -9,12 +9,12 @@ export const PAGE_SIZES = [10, 25, 50, 100] as const
 /**
  * Pagination state synced to the URL (`?page=N&limit=M`) so reload / shared links keep the page
  * (Bug #12 AC). Initial page/limit are read from the URL once; thereafter every change is mirrored
- * back via `router.replace` (no history spam, no scroll jump). Other query params are preserved.
+ * back via `history.replaceState` (no history spam, no scroll jump, no server request). Other query params are
+ * preserved.
  *
  * `setPage` is React's raw dispatcher, so callers can use both `setPage(2)` and `setPage(p => p + 1)`.
  */
 export function useUrlPagination(defaultLimit = 10) {
-    const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
 
@@ -35,8 +35,10 @@ export function useUrlPagination(defaultLimit = 10) {
         if (params.get('page') === String(page) && params.get('limit') === String(limit)) return
         params.set('page', String(page))
         params.set('limit', String(limit))
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-    }, [page, limit, pathname, router, searchParams])
+        // The native history API updates the URL (and useSearchParams) without a server round trip: the list is
+        // client data, so router.replace would only re-request the page's server components.
+        window.history.replaceState(null, '', `${pathname}?${params.toString()}`)
+    }, [page, limit, pathname, searchParams])
 
     return { page, setPage, limit, setLimit }
 }

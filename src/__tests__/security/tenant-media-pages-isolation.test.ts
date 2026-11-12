@@ -10,36 +10,45 @@ import {
 } from "../helpers/tenant-test-harness";
 
 describe("[TC-SEC-04] Multi-tenant Media & Blog Isolation", () => {
-  it("restricts Media updates to non-stock source provider files for authenticated users", () => {
+  it("[TC-PERF-144] restricts Media updates to the files of the user's own workspace, stock pictures saved for it included", () => {
     const reqAlpha = createMockTenantReq(USER_ALPHA);
     const reqAnon = createMockTenantReq(null);
 
     const updateAlpha = typeof Media.access?.update === "function" ? Media.access.update({ req: reqAlpha } as any) : undefined;
     const updateAnon = typeof Media.access?.update === "function" ? Media.access.update({ req: reqAnon } as any) : undefined;
 
+    // TC-PERF-144 + TC-AIREL-216: the member's own tenant only (was any shop's media) — including stock pictures
+    // saved for that shop; the shared stock library and legacy rows (no tenant) stay out of reach
     expect(updateAlpha).toEqual({
-      or: [
-        { sourceProvider: { exists: false } },
-        { sourceProvider: { not_in: ["wikimedia", "pixabay"] } },
-      ],
+      tenant: { in: [TENANT_ALPHA.id] },
     });
     expect(updateAnon).toBe(false);
   });
 
-  it("restricts Media deletion to non-stock source provider files", () => {
+  it("[TC-PERF-144] restricts Media deletion to the files of the user's own workspace, stock pictures saved for it included", () => {
     const reqAlpha = createMockTenantReq(USER_ALPHA);
     const reqAnon = createMockTenantReq(null);
 
     const deleteAlpha = typeof Media.access?.delete === "function" ? Media.access.delete({ req: reqAlpha } as any) : undefined;
     const deleteAnon = typeof Media.access?.delete === "function" ? Media.access.delete({ req: reqAnon } as any) : undefined;
 
+    // TC-PERF-144 + TC-AIREL-216: the member's own tenant only (was any shop's media) — including stock pictures
+    // saved for that shop; the shared stock library and legacy rows (no tenant) stay out of reach
     expect(deleteAlpha).toEqual({
-      or: [
-        { sourceProvider: { exists: false } },
-        { sourceProvider: { not_in: ["wikimedia", "pixabay"] } },
-      ],
+      tenant: { in: [TENANT_ALPHA.id] },
     });
     expect(deleteAnon).toBe(false);
+  });
+
+  it("[TC-PERF-144] Media read: public rows for everyone, private rows (receipts) only within the member's tenant", () => {
+    const reqAlpha = createMockTenantReq(USER_ALPHA);
+    const reqAnon = createMockTenantReq(null);
+
+    const readAlpha = typeof Media.access?.read === "function" ? Media.access.read({ req: reqAlpha } as any) : undefined;
+    const readAnon = typeof Media.access?.read === "function" ? Media.access.read({ req: reqAnon } as any) : undefined;
+
+    expect(readAnon).toEqual({ private: { not_equals: true } });
+    expect(readAlpha).toEqual({ or: [{ private: { not_equals: true } }, { tenant: { in: [TENANT_ALPHA.id] } }] });
   });
 
   it("restricts Blog post read queries strictly to the actor's tenant", () => {

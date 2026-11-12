@@ -7,6 +7,8 @@ import {
     revalidateBadgeCountsAfterDelete,
 } from '@/lib/dashboard/revalidate-badge-counts-hook'
 import { releaseDiscountOnDelete } from './orders-hooks/release-discount-on-delete'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
+import { orderActionUrl } from '@/lib/notifications/order-action-url'
 
 /**
  * Valid status transitions for manual orders (COD/QR Banking).
@@ -45,20 +47,29 @@ export const Orders: CollectionConfig = {
                 if (operation !== 'create') return doc
                 // Skip Stripe orders — they're notified via webhook after payment confirms
                 if (doc.stripeSessionId) return doc
-                // Fire-and-forget: notify tenant owners of new order (COD/QR Banking)
-                import('@/lib/notifications/notify-tenant-owners')
-                    .then(({ notifyTenantOwners }) => {
-                        const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
-                        return notifyTenantOwners(req.payload, tenantId, {
-                            type: 'ORDER_NEW',
-                            title: `New Order #${doc.orderNumber} - ${doc.currency || 'MYR'} ${(doc.total ?? 0).toFixed(2)}`,
-                            message: `Order placed by ${doc.customerName}`,
-                            actionUrl: '/orders',
-                            metadata: { orderNumber: doc.orderNumber, currency: doc.currency || 'MYR', total: (doc.total ?? 0).toFixed(2), customerName: doc.customerName },
-                            dedupeKey: `ORDER_NEW:${doc.orderNumber}`,
-                        })
+                // Notify tenant owners of new order (COD/QR Banking) after the response is sent.
+                // Do not capture `req` in the task: it outlives the request/transaction.
+                const payload = req.payload
+                const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+                const orderId = doc.id
+                runAfterResponse('Notification ORDER_NEW', async () => {
+                    // Checkout deletes the order again when discount/stock reservation fails;
+                    // since this runs after the response, skip orders that no longer exist.
+                    const stillExists = await payload.findByID({
+                        collection: 'orders', id: orderId, depth: 0, overrideAccess: true, disableErrors: true,
                     })
-                    .catch((err) => console.error('[Notification] ORDER_NEW hook failed', err))
+                    // A failed rollback delete can leave the row behind as `cancelled`.
+                    if (!stillExists || stillExists.status === 'cancelled') return
+                    const { notifyTenantOwners } = await import('@/lib/notifications/notify-tenant-owners')
+                    await notifyTenantOwners(payload, tenantId, {
+                        type: 'ORDER_NEW',
+                        title: `New Order #${doc.orderNumber} - ${doc.currency || 'MYR'} ${(doc.total ?? 0).toFixed(2)}`,
+                        message: `Order placed by ${doc.customerName}`,
+                        actionUrl: orderActionUrl(orderId),
+                        metadata: { orderNumber: doc.orderNumber, currency: doc.currency || 'MYR', total: (doc.total ?? 0).toFixed(2), customerName: doc.customerName },
+                        dedupeKey: `ORDER_NEW:${doc.orderNumber}`,
+                    })
+                })
                 return doc
             },
             syncCustomerSnapshot,
@@ -127,7 +138,7 @@ export const Orders: CollectionConfig = {
                     name: 'product',
                     type: 'relationship',
                     relationTo: 'products',
-                    required: true,
+                    admin: { description: 'Optional catalog link; historical item snapshots remain valid after a product is removed.' },
                 },
                 {
                     name: 'productName',
@@ -585,6 +596,12 @@ export const Orders: CollectionConfig = {
             name: 'cancelReason',
             type: 'textarea',
             admin: { description: 'Required reason when order is cancelled' },
+        },
+        // --- Refund ---
+        {
+            name: 'refundReason',
+            type: 'textarea',
+            admin: { readOnly: true, description: 'Reason the seller gave when refunding; shown to the buyer in the refund email' },
         },
         // --- Discount ---
         {

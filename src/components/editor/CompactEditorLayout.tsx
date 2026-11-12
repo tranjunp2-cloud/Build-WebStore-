@@ -1,17 +1,20 @@
 'use client'
 
 import { useEffect, useRef, useState, type ComponentProps } from 'react'
-import { ChevronDown, ChevronUp, Loader2, MessageCircle, Square, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Loader2, MessageCircle, Square, Trash2, X, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { blockRegistry } from '@/blocks/registry'
 import { useI18n } from '@/i18n'
 import { PreviewFrame } from './PreviewFrame'
+import { ChangeWalker } from './agent/ChangeWalker'
+import { useEditorAgentEnabled, useEditorAgentRun } from './agent/editor-agent-context'
 import { SettingsPanel, type SettingsTab } from './SettingsPanel'
 import { DeleteBlockConfirm } from './DeleteBlockConfirm'
 import { EditorAdvisoryBanner } from './EditorAdvisoryBanner'
 import { EditorToolsSheet, type ToolsSheetPanelProps, type ToolsSheetTab } from './EditorToolsSheet'
 import { useEditorStore, type BlockData, type PageData, type SiteLocale } from '@/store/editorStore'
 import type { ThemeData } from '@/types/editor'
+import { getBlockDisplayName } from './block-display-name'
 import type { SiteData } from '@/app/(editor)/editor/[siteId]/page'
 
 /**
@@ -74,9 +77,8 @@ export interface CompactEditorLayoutProps {
     onCloseTools: () => void
     onToolsTabChange: (tab: ToolsSheetTab) => void
     toolsPanelProps: ToolsSheetPanelProps
-    // AI processing (F05 screen 2): canvas overlay + bottom bar becomes "■ Stop AI".
-    aiRunning: boolean
-    onStopAI: () => void
+    // A template is being applied: the canvas dims and the bottom bar waits.
+    busy: boolean
 
     // #1472 Part B: dismissible "better on Desktop" advisory banner, sticky above the
     // bottom bar. Same `onCopyLink` reference page.tsx passes to `EditorToolbar` (DRY —
@@ -148,12 +150,30 @@ export function CompactEditorLayout({
     onCloseTools,
     onToolsTabChange,
     toolsPanelProps,
-    aiRunning,
-    onStopAI,
+    busy,
     onCopyLink,
 }: CompactEditorLayoutProps) {
     const { t, ti } = useI18n()
     const cl = t.editor.compactLayout
+    const agentOn = useEditorAgentEnabled()
+    const aiRunning = useEditorAgentRun((s) => agentOn && s.busy)
+    const stopAI = useEditorAgentRun((s) => s.stop)
+    const [stopping, setStopping] = useState(false)
+    useEffect(() => { if (!aiRunning) setStopping(false) }, [aiRunning])
+    // Without the copilot the sheet opens on Components: the labels must not promise an AI chat.
+    const fabLabel = agentOn ? cl.openAIChat : cl.openTools
+    const barLabel = agentOn ? cl.openChatAndTools : cl.openTools
+    const handleStop = async (e: { stopPropagation: () => void }) => {
+        e.stopPropagation()
+        if (!stopAI || stopping) return
+        setStopping(true)
+        try {
+            await stopAI()
+        } catch {
+            toast.error(cl.stopFailed)
+            setStopping(false)
+        }
+    }
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
     const [bannerVisible, setBannerVisible] = useState(false)
     const swipeStartYRef = useRef<number | null>(null)
@@ -234,7 +254,7 @@ export function CompactEditorLayout({
         onCloseMobileSettings()
         // Mirrors the desktop BlockActionBar's delete confirm + undo toast (PreviewFrame.tsx)
         // so both entry points give the same feedback — reuses the store's own undo(), no forked logic.
-        toast.success(ti(cl.deletedBlock, { type: deletedType.replace(/-/g, ' ') }), {
+        toast.success(ti(cl.deletedBlock, { type: getBlockDisplayName(deletedType) }), {
             duration: 5000,
             action: { label: t.editor.aiChat.undo, onClick: () => useEditorStore.getState().undo() },
         })
@@ -247,12 +267,22 @@ export function CompactEditorLayout({
                 (<768) keeps the previous unconstrained full-width canvas untouched. */}
             <div className="relative flex min-h-0 flex-1 flex-col min-[768px]:mx-auto min-[768px]:w-full min-[768px]:max-w-[920px]">
                 <PreviewFrame {...previewFrameProps} onBlockSelect={onBlockSelect} disableDragDrop hideBlockActionBar />
+                {agentOn && <ChangeWalker />}
+
+                {/* The copilot is writing a reply: nothing is applied until the merchant approves, so the canvas
+                    stays usable — a pill says so (the staging chat dimmed the canvas while it edited). */}
+                {aiRunning && !busy && (
+                    <div data-testid="editor-ai-editing" role="status" className="pointer-events-none absolute left-1/2 top-2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[var(--editor-surface)] px-3 py-1 text-xs font-medium text-[var(--editor-text)] shadow-md">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[hsl(var(--primary))]" aria-hidden />
+                        {cl.aiEditing}
+                    </div>
+                )}
 
                 {/* F05 screen 2: AI-processing overlay — canvas dims + spinner while an AI edit is in flight. */}
-                {aiRunning && (
+                {busy && (
                     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[var(--editor-bg)]/70 backdrop-blur-sm">
                         <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--primary))]" aria-hidden />
-                        <p className="text-sm font-medium text-[var(--editor-text)]">{cl.aiEditing}</p>
+                        <p className="text-sm font-medium text-[var(--editor-text)]">{cl.busy}</p>
                     </div>
                 )}
             </div>
@@ -263,12 +293,12 @@ export function CompactEditorLayout({
             {showFab && (
                 <button
                     type="button"
-                    onClick={() => onOpenTools('chat')}
-                    aria-label={cl.openAIChat}
+                    onClick={() => onOpenTools(agentOn ? 'chat' : 'components')}
+                    aria-label={fabLabel}
                     className="fixed right-3.5 z-40 flex h-[50px] w-[50px] items-center justify-center rounded-full bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] text-white shadow-lg shadow-[hsl(var(--primary)/0.35)] transition-transform active:scale-90"
                     style={{ bottom: `calc(${bannerVisible ? FAB_BASE_OFFSET_PX + bannerHeight : FAB_BASE_OFFSET_PX}px + env(safe-area-inset-bottom))` }}
                 >
-                    <MessageCircle className="h-5 w-5" aria-hidden />
+                    {agentOn ? <MessageCircle className="h-5 w-5" aria-hidden /> : <Zap className="h-5 w-5" aria-hidden />}
                 </button>
             )}
 
@@ -281,24 +311,25 @@ export function CompactEditorLayout({
                 <EditorAdvisoryBanner onCopyLink={onCopyLink} onVisibleChange={setBannerVisible} />
             </div>
 
-            {/* F05 bottom bar — tap or swipe-up opens the 4-tab Tools sheet; becomes
-                "■ Stop AI" while an AI edit is running (no undo/redo pill — hidden per F05-v2). */}
+            {/* F05 bottom bar — tap or swipe-up opens the 4-tab Tools sheet; waits while a
+                template is being applied (no undo/redo pill — hidden per F05-v2). */}
             <div
                 role="button"
                 tabIndex={0}
-                aria-label={aiRunning ? t.editor.aiChat.stopAI : cl.openChatAndTools}
+                aria-label={aiRunning ? cl.aiEditing : barLabel}
+                aria-disabled={busy || undefined}
                 data-testid="editor-tools-trigger"
-                onClick={() => (aiRunning ? onStopAI() : onOpenTools())}
+                onClick={() => { if (!busy) onOpenTools() }}
                 onKeyDown={(e) => {
                     if (e.key !== 'Enter' && e.key !== ' ') return
                     e.preventDefault()
-                    aiRunning ? onStopAI() : onOpenTools()
+                    if (!busy) onOpenTools()
                 }}
                 onTouchStart={(e) => { swipeStartYRef.current = e.touches[0]?.clientY ?? null }}
                 onTouchEnd={(e) => {
                     const startY = swipeStartYRef.current
                     swipeStartYRef.current = null
-                    if (aiRunning || startY === null) return
+                    if (busy || startY === null) return
                     const endY = e.changedTouches[0]?.clientY ?? startY
                     if (startY - endY > SWIPE_UP_THRESHOLD) onOpenTools()
                 }}
@@ -307,14 +338,28 @@ export function CompactEditorLayout({
                 <span className="absolute top-1.5 h-1 w-9 rounded-full bg-[var(--editor-text-muted)]" style={{ opacity: 0.35 }} aria-hidden />
                 {aiRunning ? (
                     <>
-                        <Square className="h-3.5 w-3.5 fill-current" aria-hidden /> {t.editor.aiChat.stopAI}
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> {cl.aiEditing}
+                        {stopAI && (
+                            <button
+                                type="button"
+                                data-testid="editor-ai-stop"
+                                onClick={handleStop}
+                                onTouchStart={(e) => e.stopPropagation()}
+                                onTouchEnd={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => e.stopPropagation()}
+                                disabled={stopping}
+                                className="ml-2 flex min-h-[36px] items-center gap-1 rounded-full border border-solid border-[var(--editor-border)] px-3 text-xs font-semibold text-[var(--editor-text)] disabled:opacity-50"
+                            >
+                                <Square className="h-3 w-3 fill-current" aria-hidden /> {cl.stopAI}
+                            </button>
+                        )}
                     </>
                 ) : (
                     <>
-                        <MessageCircle className="h-3.5 w-3.5" aria-hidden /> {cl.openChatAndTools}
-                        <ChevronUp className="h-4 w-4" aria-hidden />
+                        {agentOn ? <MessageCircle className="h-3.5 w-3.5" aria-hidden /> : <Zap className="h-3.5 w-3.5" aria-hidden />} {barLabel}
                     </>
                 )}
+                <ChevronUp className="h-4 w-4" aria-hidden />
             </div>
 
             <EditorToolsSheet

@@ -258,6 +258,17 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.inventory).toBe(8)
     })
 
+    it('TC-F08-04-131: an AI base SKU over 50 characters is replaced by a generated SKU of 50 or fewer; a 50-character SKU is kept', () => {
+        const base = { selected: true, name: 'T-Shirt', price: 39.9, category: 'Fashion', stock: 1 }
+
+        const tooLong = buildSavePayload({ ...base, sku: 'A'.repeat(51) }, null, null)
+        expect(tooLong.sku).not.toBe('A'.repeat(51))
+        expect(String(tooLong.sku).length).toBeGreaterThan(0)
+        expect(String(tooLong.sku).length).toBeLessThanOrEqual(50)
+
+        expect(buildSavePayload({ ...base, sku: 'A'.repeat(50) }, null, null).sku).toBe('A'.repeat(50))
+    })
+
     it('TC-F08-04-59 (adversarial-review follow-up): buildSavePayload itself coerces a non-numeric variant/top-level stock — not just the drawer parse-time path', () => {
         // TC-F08-04-58 (bulk-create-save.test.tsx) only exercises coerceFiniteNumber's parse-time
         // call site (the uniqueMap dedup step) — by the time buildSavePayload runs in that test,

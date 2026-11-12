@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { STOREFRONT_POPULATE } from '@/lib/cache/tenant'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { OT_CSS } from './[orderNumber]/order-tracking-styles'
 import OrderLookupClient from './OrderLookupClient'
@@ -30,6 +31,7 @@ export default async function OrderLookupPage({
         collection: 'sites',
         where: { tenant: { equals: tenant.id } },
         limit: 1,
+        populate: STOREFRONT_POPULATE,
         overrideAccess: true,
         depth: 1,
     })

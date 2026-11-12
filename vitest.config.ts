@@ -6,11 +6,60 @@ import path from 'path'
 export default defineConfig({
     plugins: [react()],
     test: {
-        environment: 'jsdom',
         globals: true,
         setupFiles: ['./src/__tests__/helpers/setup.ts'],
-        include: ['src/__tests__/**/*.{test,spec}.{ts,tsx}'],
+        // CI runners are containers capped with `docker --cpus 2`, but
+        // os.availableParallelism() still reports every host core (8), so
+        // vitest started ~7 workers on 2 CPUs and the CLI-spawning specs hit
+        // the 5s timeout. Size the pool to the quota; override with
+        // VITEST_MAX_WORKERS when a runner gets more CPUs.
+        // The F42 CLI specs spawn a real node process (their execFile allows
+        // 30s); on a shared runner a cold start alone lands at ~5s, so match
+        // the per-test budget to that instead of vitest's 5s default.
+        ...(process.env.CI
+            ? {
+                  minWorkers: 1,
+                  maxWorkers: Number(process.env.VITEST_MAX_WORKERS) || 2,
+                  testTimeout: 30_000,
+              }
+            : {}),
+        // Most specs are plain logic (.ts) and never touch the DOM, yet running
+        // them under jsdom pays a full window bootstrap per file — that made
+        // the unit suite the slowest CI step. Component specs (.tsx) keep
+        // jsdom; a .ts spec that does need the DOM opts in per file with a
+        // `// @vitest-environment jsdom` docblock.
+        projects: [
+            {
+                extends: true,
+                test: {
+                    name: 'node',
+                    environment: 'node',
+                    include: ['src/__tests__/**/*.{test,spec}.ts'],
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    name: 'dom',
+                    environment: 'jsdom',
+                    include: ['src/__tests__/**/*.{test,spec}.tsx'],
+                },
+            },
+        ],
         exclude: ['node_modules', 'e2e'],
+        // A diff touching any of these makes `vitest --changed` / `vitest related` run the whole
+        // suite: they change what every spec runs against, not one module. The first three are
+        // vitest's defaults (setting the option replaces them). CI does not rely on this alone:
+        // ci.yml `changes` already picks the full suite for any diff outside src/**/*.ts(x).
+        forceRerunTriggers: [
+            '**/package.json/**',
+            '**/vitest.config.*/**',
+            '**/vite.config.*/**',
+            '**/package-lock.json/**',
+            '**/tsconfig.json/**',
+            '**/src/__tests__/helpers/**',
+            '**/src/__tests__/mocks/**',
+        ],
         coverage: {
             reporter: ['text', 'json', 'json-summary', 'html'],
             include: ['src/**/*.{ts,tsx}'],

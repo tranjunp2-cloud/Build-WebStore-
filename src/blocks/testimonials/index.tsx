@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
-import type { TestimonialsConfig, TestimonialItem } from './config'
+import { TESTIMONIAL_INVITE_TITLE, type TestimonialsConfig, type TestimonialItem } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import {
     AvatarRing,
@@ -26,7 +26,6 @@ import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 const TESTIMONIALS_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 const TESTIMONIALS_DEFAULT_HEADLINE = 'What Our Clients Say'
-const TESTIMONIALS_DEFAULT_SUBTITLE = 'Genuine reviews from our customers'
 
 type TestimonialsSectionProps = {
     showBlob?: boolean
@@ -229,8 +228,17 @@ function CarouselArrow({ direction, onClick, className = '' }: CarouselArrowProp
     )
 }
 
+/** Drops the generated invitation card whenever at least one real review exists. */
+export function withoutInviteWhenReal(items: TestimonialItem[]): TestimonialItem[] {
+    const real = items.filter((t) => t?.title !== TESTIMONIAL_INVITE_TITLE)
+    return real.length > 0 ? real : items
+}
+
 export function TestimonialsBlock({ block, theme, site }: BlockProps<TestimonialsConfig>) {
-    const { headline, subheadline, testimonials = [] } = block
+    const { headline, subheadline, testimonials: rawTestimonials = [] } = block
+    // The invitation card only stands in for missing reviews: once a real one exists it must never be
+    // printed as a review (every variant), so it is dropped here before any variant renders.
+    const testimonials = withoutInviteWhenReal(rawTestimonials)
     const variant = block.variant || 'cards'
     const category = (site?.siteType as string) || 'business'
     const s3Map = site?.imageLibraryS3 as Record<string, string> | undefined
@@ -241,6 +249,24 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
             console.warn('[testimonials] testimonials array empty — block rendered nothing')
         }
         return null
+    }
+
+    // #2103 A1: the generated invitation card is not a review — no stars, name or avatar.
+    if (testimonials.length === 1 && testimonials[0]?.title === TESTIMONIAL_INVITE_TITLE) {
+        return (
+            <TestimonialsSection showBlob={false}>
+                <TestimonialsHeader headline={headline} />
+                <div
+                    className="mx-auto max-w-xl rounded-2xl p-8 text-center"
+                    style={{
+                        border: '1px solid rgba(var(--brand-primary-rgb), 0.2)',
+                        background: 'rgba(var(--brand-primary-rgb), 0.04)',
+                    }}
+                >
+                    <Body size="lg">{testimonials[0].quote}</Body>
+                </div>
+            </TestimonialsSection>
+        )
     }
 
     // ── masonry variant ───────────────────────────────────────────────────

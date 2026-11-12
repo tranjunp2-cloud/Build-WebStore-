@@ -10,7 +10,7 @@ on:
 jobs:
   collect-and-report:
     name: 'Metrics: Weekly Report'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     permissions:
       issues: read
       pull-requests: read
@@ -18,12 +18,13 @@ jobs:
       actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
+          check-latest: true
 
       - name: Collect metrics
         id: metrics
@@ -52,7 +53,7 @@ jobs:
           echo "completion=$COMPLETION" >> "$GITHUB_OUTPUT"
 
       - name: Upload metrics artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: weekly-metrics-${{ github.run_number }}
           path: metrics.json

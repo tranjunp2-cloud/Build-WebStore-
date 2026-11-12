@@ -22,12 +22,18 @@ type AddToCartButtonProps = {
     variantName?: string | null
     /** When true, button is disabled until a variant is chosen */
     requireVariant?: boolean
+    /** Units to add per click (PDP quantity picker, GH-2100). Defaults to 1. */
+    quantity?: number
     primaryColor: string
     siteSlug: string
     siteId?: string
+    /** 'sticky' = compact variant rendered inside the mobile sticky bar (no bottom margin / stock note) */
+    variant?: 'inline' | 'sticky'
+    /** Sticky bar only: when a variant is required but unselected, click calls this (scroll to selector) instead of being disabled */
+    onSelectVariant?: () => void
 }
 
-export function AddToCartButton({ product, variantName, requireVariant, primaryColor, siteSlug, siteId }: AddToCartButtonProps) {
+export function AddToCartButton({ product, variantName, requireVariant, quantity = 1, primaryColor, siteSlug, siteId, variant = 'inline', onSelectVariant }: AddToCartButtonProps) {
     const { addItem, activateSiteCart, items } = useCartStore()
     const isOwner = useIsOwner()
     const { t, ti } = useI18n()
@@ -37,12 +43,20 @@ export function AddToCartButton({ product, variantName, requireVariant, primaryC
         i => i.productId === product.id && (i.variantName ?? '') === (variantName ?? '')
     )?.quantity ?? 0
     const isAtStockLimit = product.inventory > 0 && cartQty >= product.inventory
+    // Picker is clamped to stock; cart may already hold some — store clamps the rest to inventory
 
     const isOutOfStock = product.inventory <= 0
     const needsVariant = Boolean(requireVariant) && !variantName
-    const isDisabled = isOutOfStock || needsVariant || isAtStockLimit
+    const isSticky = variant === 'sticky'
+    // Sticky bar keeps "Select variant" clickable so it can scroll to the selector
+    const redirectToSelector = isSticky && needsVariant && !isOutOfStock && Boolean(onSelectVariant)
+    const isDisabled = isOutOfStock || (needsVariant && !redirectToSelector) || isAtStockLimit
 
     const handleClick = () => {
+        if (redirectToSelector) {
+            onSelectVariant?.()
+            return
+        }
         if (isDisabled) return
         // GH-960: In editor iframe show preview toast; real cart logic ships in #961.
         if (isInEditorPreview()) {
@@ -64,12 +78,12 @@ export function AddToCartButton({ product, variantName, requireVariant, primaryC
             imageUrl: product.imageUrl,
             inventory: product.inventory,
             variantName: variantName ?? undefined,
-        })
+        }, quantity)
         if (siteId) {
             trackEvent({
                 siteId,
                 event: 'add_to_cart',
-                metadata: { productId: product.id, productSlug: product.slug, price: product.price, variant: variantName },
+                metadata: { productId: product.id, productSlug: product.slug, price: product.price, variant: variantName, quantity },
                 isOwner,
             })
         }
@@ -105,7 +119,7 @@ export function AddToCartButton({ product, variantName, requireVariant, primaryC
                         fontWeight: 600,
                         cursor: isDisabled ? 'not-allowed' : 'pointer',
                         width: '100%',
-                        marginBottom: '24px',
+                        marginBottom: isSticky ? 0 : '24px',
                         opacity: isDisabled ? 0.5 : 1,
                         transition: 'opacity 0.2s',
                     }}
@@ -113,7 +127,7 @@ export function AddToCartButton({ product, variantName, requireVariant, primaryC
                     {label}
                 </button>
             </div>
-            {isAtStockLimit && (
+            {isAtStockLimit && !isSticky && (
                 <p style={{ fontSize: '13px', color: 'var(--text-muted, #999)', marginTop: '-16px', marginBottom: '16px', textAlign: 'center' }}>
                     {ti(t.storefront.products.stockLimitMessage, { cartQty, inventory: product.inventory })}
                 </p>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
 import config from "@payload-config";
-import { withSuperAdmin } from "@/lib/admin/api-utils";
+import { withStudioPermission } from "@/lib/admin/api-utils";
 import { fetchGithubIssueMirrorPage, synchronizeGithubIssueMirrors } from "@/lib/admin/qa/github-issues";
 import { withQaGithubSyncLock } from "@/lib/payload/qa-github-sync-transaction";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /** Sync is manually invokable by a super-admin and safe to retry. */
-export const POST = withSuperAdmin(async (req: NextRequest) => {
+export const POST = withStudioPermission('qa.promote', async (req: NextRequest) => {
   const page = Number(new URL(req.url).searchParams.get("page") ?? "1");
   if (!Number.isSafeInteger(page) || page < 1 || page > 1_000_000)
     return NextResponse.json({ error: "Invalid sync page" }, { status: 422 });

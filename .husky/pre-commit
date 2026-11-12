@@ -20,3 +20,37 @@ if [ -n "$STAGED" ]; then
   echo ""
   exit 1
 fi
+
+# The checks below need node + node_modules. Without them (GUI git client without node on PATH,
+# deps not installed yet) skip with a warning — CI still runs every check.
+if ! command -v node >/dev/null 2>&1 || [ ! -x ./node_modules/.bin/oxlint ]; then
+  echo "⚠️  pre-commit: node or node_modules/.bin/oxlint not found — skipping lint + lockfile checks (run npm install)"
+  exit 0
+fi
+
+# Dependency change without its lockfile → `npm ci` fails on CI (9 failed PR runs in Oct 2026).
+STAGED_ALL=$(git diff --cached --name-only)
+if echo "$STAGED_ALL" | grep -qx "package.json" && ! echo "$STAGED_ALL" | grep -qx "package-lock.json"; then
+  if ! node -e '
+    const { execSync } = require("child_process")
+    const read = (ref) => { try { return JSON.parse(execSync(`git show ${ref}:package.json`, { encoding: "utf8" })) } catch { return {} } }
+    const keys = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies", "overrides"]
+    const pick = (p) => JSON.stringify(keys.map((k) => p[k] || {}))
+    process.exit(pick(read("HEAD")) === pick(read("")) ? 0 : 1)
+  '; then
+    echo ""
+    echo "❌ package.json dependencies changed but package-lock.json is not staged."
+    echo "   Run: npm install && git add package-lock.json"
+    echo ""
+    exit 1
+  fi
+fi
+
+# Lint staged TypeScript with oxlint (~1 s). Full gates run in pre-push (scripts/verify.mjs).
+if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- 'src/*.ts' 'src/*.tsx')" ]; then
+  git diff --cached --name-only --diff-filter=ACMR -z -- 'src/*.ts' 'src/*.tsx' | xargs -0 ./node_modules/.bin/oxlint --quiet || {
+    echo ""
+    echo "❌ oxlint found errors in staged files (see above). Fix them, re-stage, and commit again."
+    exit 1
+  }
+fi

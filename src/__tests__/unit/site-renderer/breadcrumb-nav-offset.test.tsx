@@ -192,3 +192,48 @@ describe('[TC-BUG-HEAD-009-BC] SiteRenderer breadcrumb offset under fixed nav va
         expect(heroWrapper.style.paddingTop).toBe('var(--block-spacing-default)')
     })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [TC-GH2246-07/08] breadcrumb on/off when config missing vs present
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('[TC-GH2246] SiteRenderer breadcrumb default when breadcrumbConfig is missing', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'navigation') return makeTestBlock('navigation')
+            if (type === 'breadcrumb') return makeTestBlock('breadcrumb')
+            if (type === 'hero') return makeTestBlock('hero')
+            return null
+        })
+    })
+
+    const pageWithHero = { layout: [{ blockType: 'hero' }] }
+
+    it('TC-GH2246-07: old store without breadcrumbConfig → no breadcrumb rendered', () => {
+        // Arrange
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'default' } }
+
+        // Act
+        const { container } = render(<SiteRenderer site={site} page={pageWithHero} isEditor={false} />)
+
+        // Assert
+        expect(container.querySelector('[data-testid="block-breadcrumb"]')).toBeNull()
+    })
+
+    it('TC-GH2246-08: config with showOnAllPages=false → no breadcrumb; true → breadcrumb', () => {
+        // Arrange
+        const off = { ...defaultSite, headerBlock: { blockType: 'navigation', breadcrumbConfig: { showOnAllPages: false } } }
+        const on = { ...defaultSite, headerBlock: { blockType: 'navigation', breadcrumbConfig: { showOnAllPages: true } } }
+
+        // Act
+        const offRender = render(<SiteRenderer site={off} page={pageWithHero} isEditor={false} />)
+        const offFound = offRender.container.querySelector('[data-testid="block-breadcrumb"]')
+        offRender.unmount()
+        const onRender = render(<SiteRenderer site={on} page={pageWithHero} isEditor={false} />)
+
+        // Assert
+        expect(offFound).toBeNull()
+        expect(onRender.container.querySelector('[data-testid="block-breadcrumb"]')).not.toBeNull()
+    })
+})

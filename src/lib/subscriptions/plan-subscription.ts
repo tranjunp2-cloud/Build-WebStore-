@@ -59,6 +59,10 @@ export async function getActivePlanSubscription(
     where: { and: [{ tenant: { equals: tenantId } }, { name: { equals: 'main' } }] },
     sort: '-createdAt',
     limit: 1,
+    // Plan gates run on order PATCHes, collection hooks and session checks: one statement, the tenant as an id
+    // (callers read plan / status / dates) — no COUNT, no depth-2 tenant row (TC-PERF-071).
+    pagination: false,
+    depth: 0,
   })
   const sub = result.docs[0]
   if (!sub) return null
@@ -200,7 +204,8 @@ export async function recountStaffUsage(
 }
 
 /** Upserts the 'main' PlanSubscription for a tenant.
- *  On update: clears usage + recounts staff, syncs Tenants.plan tier.
+ *  On update: clears usage + recounts staff only when the plan code changes, so a repeated
+ *  call for the same plan (SSO retry or duplicate sync) keeps usage. Always syncs Tenants.plan tier.
  *  Note: these 3 steps are not wrapped in a DB transaction — partial failure (e.g. clearUsage
  *  succeeds but recountStaffUsage fails) leaves usage at 0 until next plan event. Acceptable
  *  tradeoff for now; revisit if Payload exposes cross-collection transaction API. */
@@ -234,19 +239,26 @@ export async function upsertPlanSubscription(
       overrideAccess: true,
     collection: 'plan-subscriptions',
     where: { and: [{ tenant: { equals: tenantId } }, { name: { equals: 'main' } }] },
+    // the latest main row: the one every gate reads (getActivePlanSubscription, storefront availability)
+    sort: '-createdAt',
     limit: 1,
   })
 
   if (subs.docs.length > 0) {
-    const subId = Number(subs.docs[0].id)
+    const current = subs.docs[0] as { id: string | number; plan?: string | null }
+    const subId = Number(current.id)
+    // plan already encodes pack + TM type; PW1-migrated rows have no packCode, so never compare it
+    const planChanged = current.plan !== updateData.plan
     await payload.update({
         overrideAccess: true,
       collection: 'plan-subscriptions',
       id: subId,
       data: updateData,
     })
-    await clearUsage(payload, subId)
-    await recountStaffUsage(payload, subId, tenantId)
+    if (planChanged) {
+      await clearUsage(payload, subId)
+      await recountStaffUsage(payload, subId, tenantId)
+    }
   } else {
     await payload.create({
     overrideAccess: true,
@@ -286,6 +298,8 @@ export async function getFeatureValue(
       and: [{ planCode: { equals: planCode } }, { featureCode: { equals: featureCode } }],
     },
     limit: 1,
+    pagination: false,
+    depth: 0,
   })
   return ((result.docs[0]?.value as string) ?? null)
 }
@@ -337,6 +351,8 @@ export async function getFeatureSettings(
       and: [{ planCode: { equals: planCode } }, { featureCode: { equals: featureCode } }],
     },
     limit: 1,
+    pagination: false,
+    depth: 0,
   })
   return ((result.docs[0]?.settings as Record<string, unknown> | null) ?? null)
 }

@@ -1,8 +1,17 @@
 import { basename, resolve } from 'path'
 
-import type { AccessArgs, CollectionConfig, PayloadHandler } from 'payload'
+import type { CollectionConfig, FieldAccess, PayloadHandler, PayloadRequest } from 'payload'
 import { APIError } from 'payload'
-import { hasValidImageSignature } from '@/lib/media/image-signature'
+import { hasValidEvidenceVideoSignature, hasValidImageSignature } from '@/lib/media/image-signature'
+import {
+    assignMediaTenant,
+    hidePrivateMediaUrl,
+    isSuperAdmin,
+    mediaReadAccess,
+    mediaWriteAccess,
+    privateMediaUrl,
+    resolveMediaTenant,
+} from '@/lib/media/media-access'
 
 // Plan 260415 fix-500 — custom handler for /api/media/file/[filename] that
 // survives missing-on-disk errors. Payload's default getFileHandler calls
@@ -33,6 +42,28 @@ function mimeFromFilename(filename: string): string {
     return MIME_BY_EXT[ext] ?? 'application/octet-stream'
 }
 
+/**
+ * The private media row stored under `filename`: its id, `null` when the file is not private, `'unknown'` when the
+ * lookup failed (the local file is then served uncacheable; S3 objects of private rows are private anyway).
+ */
+async function findPrivateMediaByFilename(req: PayloadRequest, filename: string): Promise<{ id: number | string } | null | 'unknown'> {
+    try {
+        const found = await req.payload.find({
+            collection: 'media',
+            where: { and: [{ filename: { equals: filename } }, { private: { equals: true } }] },
+            limit: 1,
+            depth: 0,
+            pagination: false,
+            overrideAccess: true,
+            select: { id: true },
+        } as Parameters<PayloadRequest['payload']['find']>[0])
+        const row = found.docs[0] as { id?: number | string } | undefined
+        return row?.id != null ? { id: row.id } : null
+    } catch {
+        return 'unknown'
+    }
+}
+
 const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> => {
     const routeParams = (req as unknown as { routeParams?: { filename?: string } }).routeParams
     const filename = routeParams?.filename
@@ -45,6 +76,9 @@ const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> 
     const localDir = process.env.VERCEL === '1' ? '/tmp/media' : 'public/media'
     // safeFilename declared here so it is accessible in the S3 redirect below (fix TS2552).
     const safeFilename = basename(filename)
+    // Payload's read access already let this user open the file. A private one (payment receipt, TC-PERF-172) must
+    // never be cached by a shared cache, nor sent to its public storage URL (its object ACL is private).
+    const privateRow = await findPrivateMediaByFilename(req, safeFilename)
     try {
         const fs = await import('fs/promises')
         const localPath = resolve(localDir, safeFilename)
@@ -54,14 +88,22 @@ const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> 
             headers: {
                 'Content-Type': mimeFromFilename(safeFilename),
                 'Content-Length': String(data.byteLength),
-                'Cache-Control': 'public, max-age=31536000, immutable',
+                ...(privateRow !== null
+                    ? { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
+                    : { 'Cache-Control': 'public, max-age=31536000, immutable' }),
             },
         })
     } catch {
         /* fall through — not a local file */
     }
 
-    // 2. Redirect to S3 if configured.
+    // 2. A private file is streamed by the member-checked route; anything else redirects to S3 if configured.
+    if (privateRow !== null && privateRow !== 'unknown') {
+        return new Response(null, {
+            status: 302,
+            headers: { Location: privateMediaUrl(privateRow.id), 'Cache-Control': 'private, no-store' },
+        })
+    }
     const bucket = process.env.S3_BUCKET
     const endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.S3_ENDPOINT
     if (bucket && endpoint) {
@@ -72,39 +114,43 @@ const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> 
     return new Response('File not found', { status: 404 })
 }
 
-const STOCK_SOURCE_PROVIDERS = ['wikimedia', 'pixabay'] as const
 const SYSTEM_PROVENANCE_FIELD_ACCESS = {
     create: () => false,
     update: () => false,
 }
 
-function tenantWritableMedia({ req }: AccessArgs) {
-    if (!req.user) return false
-    return {
-        or: [
-            { sourceProvider: { exists: false } },
-            { sourceProvider: { not_in: [...STOCK_SOURCE_PROVIDERS] } },
-        ],
-    }
-}
+/** Ownership fields: requests never move a file to another shop or flip its privacy (super-admin aside). */
+const superAdminOnlyField: FieldAccess = ({ req }) => isSuperAdmin(req.user)
+
+// Staging callers and tests import it from here; the rule lives with the other media access rules.
+export { resolveMediaTenant }
 
 export const Media: CollectionConfig = {
     slug: 'media',
     hooks: {
+        afterRead: [hidePrivateMediaUrl],
         beforeChange: [
+            assignMediaTenant,
             async ({ req }) => {
                 if (!req.file) return
-                // Only validate image uploads — skip PDF/video
+                // Images are always validated. Ticket evidence additionally
+                // permits MP4/WebM, so validate those container headers too
+                // rather than trusting a browser-supplied MIME type.
                 const mime = req.file.mimetype || ''
-                if (!mime.startsWith('image/')) return
+                const validatesImage = mime.startsWith('image/')
+                const validatesEvidenceVideo = mime === 'video/mp4' || mime === 'video/webm'
+                if (!validatesImage && !validatesEvidenceVideo) return
                 try {
-                    // Read 12 bytes to cover WebP signature at offset 8–11
+                    // Twelve bytes cover WebP at offset 8–11 and MP4's ftyp box.
                     const raw = req.file.data instanceof Buffer
                         ? req.file.data.subarray(0, 12)
                         : new Uint8Array(req.file.data as unknown as ArrayBufferLike).slice(0, 12)
                     const head = new Uint8Array(raw)
-                    if (!hasValidImageSignature(head)) {
-                        throw new APIError('Invalid image file — only JPEG, PNG, WebP, and ICO are accepted', 400)
+                    const valid = validatesImage ? hasValidImageSignature(head) : hasValidEvidenceVideoSignature(head, mime)
+                    if (!valid) {
+                        throw new APIError(validatesImage
+                            ? 'Invalid image file — only JPEG, PNG, WebP, and ICO are accepted'
+                            : 'Invalid video file — only valid MP4 and WebM are accepted', 400)
                     }
                 } catch (e) {
                     if (e instanceof APIError) throw e
@@ -139,12 +185,42 @@ export const Media: CollectionConfig = {
         description: 'Media files uploaded by tenant users.',
     },
     access: {
-        read: () => true,
+        // Public except private rows (payment receipts): those only for the media's tenant (TC-PERF-144).
+        read: mediaReadAccess,
         create: ({ req }) => Boolean(req.user),
-        update: tenantWritableMedia,
-        delete: tenantWritableMedia,
+        // Own tenant's media only, super-admin all (any account could change / delete any shop's files).
+        update: mediaWriteAccess,
+        delete: mediaWriteAccess,
     },
     fields: [
+        {
+            // Owner workspace. Nullable on purpose: rows uploaded before this field existed, the shared stock
+            // library and avatars have none. Reads of public files stay public (storefront); the field itself is
+            // only shown to signed-in users.
+            name: 'tenant',
+            type: 'relationship',
+            relationTo: 'tenants',
+            index: true,
+            // Never populated: media is read at depth ≥ 1 all over (page blocks, products, orders), and a populated
+            // tenant row carries the shop's payment / courier secrets. Callers only need the id (TC-PERF-163).
+            maxDepth: 0,
+            // Create is left to the assignMediaTenant hook (a member's own tenant); moving it is super-admin only.
+            access: {
+                read: ({ req }) => Boolean(req.user),
+                update: superAdminOnlyField,
+            },
+            admin: { position: 'sidebar', description: 'Shop that owns this file (none = shared stock / avatar / legacy)' },
+        },
+        {
+            name: 'private',
+            type: 'checkbox',
+            defaultValue: false,
+            access: { create: superAdminOnlyField, update: superAdminOnlyField },
+            admin: {
+                position: 'sidebar',
+                description: 'Payment receipts: only the shop team can open it (served by /api/media/private/{id})',
+            },
+        },
         {
             name: 'alt',
             type: 'text',

@@ -1,8 +1,17 @@
+import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
 export const dynamic = 'force-dynamic'
+
+/** Fails closed when CRON_SECRET is unset ("Bearer undefined" must not pass); constant-time compare. */
+function authorized(header: string | null, secret: string | undefined): boolean {
+    if (!secret || !header) return false
+    const given = Buffer.from(header)
+    const wanted = Buffer.from(`Bearer ${secret}`)
+    return given.length === wanted.length && timingSafeEqual(given, wanted)
+}
 
 /**
  * GET /api/cron/keep-alive
@@ -13,8 +22,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(req: Request) {
     // Verify cron secret (prevent public access)
-    const authHeader = req.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!authorized(req.headers.get('authorization'), process.env.CRON_SECRET)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

@@ -32,19 +32,20 @@ jobs:
   harness:
     name: "Harness: matrix + structural + render"
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'run-harness'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
+          check-latest: true
           cache: 'npm'
 
       - name: Install dependencies
@@ -52,7 +53,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: pw-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
@@ -103,7 +104,7 @@ jobs:
 
       - name: Upload harness artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ai-harness-${{ github.event.pull_request.number || github.run_id }}
           path: |
@@ -114,10 +115,13 @@ jobs:
       - name: Prepare notification info
         if: failure()
         id: notify_info
+        # PR fields come in through env, never inline in the script: a branch name is
+        # attacker-controlled and would otherwise be executed as shell (script injection).
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login || github.actor }}
         run: |
-          BRANCH="${{ github.event.pull_request.head.ref || github.ref_name }}"
-          COMMIT_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
-          AUTHOR="${{ github.event.pull_request.user.login || github.actor }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
           COMMIT_MSG=$(git log --format='%s' -n 1 2>/dev/null | head -c 80 || echo "AI harness run")
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"

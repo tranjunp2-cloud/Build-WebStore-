@@ -8,6 +8,7 @@
 - **Stack:** Next.js 15 + Payload CMS 3 + PostgreSQL + TypeScript
 - **Deploy:** Vercel Pro + Neon PostgreSQL (migrated from DO)
 - **Git flow:** Merge thẳng staging. 1 US = 1 branch = 1 PR vào staging.
+- **Before pushing (agents writing code):** run `npm run verify` — same gates as CI on the diff vs `origin/staging`; the husky `pre-push` hook enforces it.
 
 ## Review Rules (P0 — always flag)
 

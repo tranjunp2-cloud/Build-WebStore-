@@ -6,6 +6,7 @@ import { getDefaultContentFields } from '@/lib/email/template-default-fields'
 import type { ContentFields } from '@/lib/email/template-default-fields'
 import type { EmailTemplateType } from '@/lib/email/types'
 import { EmailTemplatesClient } from './_components/EmailTemplatesClient'
+import { AgentRefresh } from '@/lib/agent-changes/agent-refresh'
 
 export default async function EmailTemplatesPage() {
     const tenantId = await getCurrentTenantId()
@@ -35,11 +36,15 @@ export default async function EmailTemplatesPage() {
         ])
     ) as Record<EmailTemplateType, { contentEn: ContentFields; contentMs: ContentFields }>
 
+    // The assistant edits templates: render this page's rows again once per burst (open editors are kept by the client)
     return (
-        <EmailTemplatesClient
-            tenantId={tenantId ?? undefined}
-            initialRows={rows}
-            defaultsByType={defaultsByType}
-        />
+        <>
+            <AgentRefresh kinds={['email_template']} />
+            <EmailTemplatesClient
+                tenantId={tenantId ?? undefined}
+                initialRows={rows}
+                defaultsByType={defaultsByType}
+            />
+        </>
     )
 }

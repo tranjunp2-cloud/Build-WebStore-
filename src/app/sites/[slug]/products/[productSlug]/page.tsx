@@ -1,4 +1,8 @@
+import { productSummaryText } from '@/lib/products/product-summary-text'
 import { cache } from 'react'
+import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
+import { storefrontUnavailableFor } from '@/lib/storefront/cached-store-availability'
+import { STORE_UNAVAILABLE_COPY } from '@/lib/storefront/store-unavailable'
 import { Check, AlertTriangle, X } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
@@ -8,6 +12,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ProductAddToCartSection } from '@/components/storefront/product-add-to-cart-section'
 import { ProductImageGallery } from '@/components/storefront/ProductImageGallery'
+import { toPublicDoc, toPublicSite } from '@/lib/storefront/public-site-dto'
 import { getCurrentUser } from '@/lib/auth'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { getServerI18n } from '@/i18n/server'
@@ -17,6 +22,9 @@ import type { NavPage, SiteRendererProps } from '@/components/site-renderer/Site
 import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 import { hasActiveCustomDomain, resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
+import { STOREFRONT_POPULATE, withPublicSiteTenants } from '@/lib/cache/tenant'
+import { buildProductOffers } from '@/lib/storefront/variant-price-range'
+import { renderBlogContent } from '@/lib/blog/render-content'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -34,12 +42,17 @@ const getProductData = cache(async function getProductData(
 
     const payload = await getPayload({ config })
 
+    // Uncached on every visit: each read is one statement (no COUNT), related tenants carry only public fields
+    // (STOREFRONT_POPULATE — whole rows put payment/courier secrets into the props of client components)
+    // (TC-PERF-064).
     const tenantsResult = await payload.find({
         collection: 'tenants',
         where: slug === 'custom'
             ? { 'customDomains.domain': { equals: tenantHostname } }
             : { slug: { equals: slug } },
         limit: 1,
+        pagination: false,
+        depth: 0,
     })
     const tenant = tenantsResult.docs[0]
     if (!tenant) return null
@@ -57,6 +70,8 @@ const getProductData = cache(async function getProductData(
         },
         sort: 'createdAt',
         limit: 1,
+        pagination: false,
+        populate: STOREFRONT_POPULATE,
     })
     const site = sitesResult.docs[0]
     if (!site) return null
@@ -71,9 +86,12 @@ const getProductData = cache(async function getProductData(
             ],
         },
         limit: 1,
+        pagination: false,
         depth: 2,
+        populate: STOREFRONT_POPULATE,
     })
     const product = productsResult.docs[0]
+    // a missing product (bots, old links) stops here, before the heavy navigation read
     if (!product) return null
 
     // Fetch nav pages for SiteLayoutShell header/footer URL rewriting
@@ -86,22 +104,27 @@ const getProductData = cache(async function getProductData(
             ],
         },
         limit: 100,
+        pagination: false,
         sort: 'createdAt',
+        populate: STOREFRONT_POPULATE,
     })
 
-    return { tenant, site, product, pages: pagesResult.docs }
+    return { tenant, site, product, pages: withPublicSiteTenants(pagesResult.docs) }
 })
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug, productSlug } = await params
     const reqHeaders = await headers()
     const tenantHostname = slug === 'custom' ? reqHeaders.get('x-tenant-hostname') : null
+    // #2179: banned or expired store → no product name / image in <head>
+    const unavailable = await storefrontUnavailableFor(slug, tenantHostname)
+    if (unavailable) return { title: STORE_UNAVAILABLE_COPY[unavailable.locale].title, robots: { index: false, follow: false } }
     const data = await getProductData(slug, productSlug, tenantHostname)
     if (!data) return { title: 'Not Found' }
 
     const { site, product } = data
     const title = (product as any).seo?.title || `${product.name} — ${site.name}`
-    const description = (product as any).seo?.description || (product as any).shortDescription || `Buy ${product.name} from ${site.name}`
+    const description = (product as any).seo?.description || productSummaryText({ shortDescription: product.shortDescription, description: product.description }) || `Buy ${product.name} from ${site.name}`
     const ogImage = (product as any).images?.[0]?.image?.url
 
     // BUG-F05-020: Resolve canonical URL for product pages
@@ -138,6 +161,8 @@ export default async function ProductDetailPage({ params }: Props) {
     const { slug, productSlug } = await params
     const reqHeaders = await headers()
     const tenantHostname = slug === 'custom' ? reqHeaders.get('x-tenant-hostname') : null
+    const unavailable = await storefrontUnavailableFor(slug, tenantHostname)
+    if (unavailable) return <MaintenancePage variant="unavailable" locale={unavailable.locale} />
     const data = await getProductData(slug, productSlug, tenantHostname)
 
     if (!data) notFound()
@@ -155,6 +180,8 @@ export default async function ProductDetailPage({ params }: Props) {
         inventory: number
         sku?: string
         shortDescription?: string
+        // Rich text saved by the CMS form (Lexical, PW1 HTML in a text node, or a plain AI string)
+        description?: unknown
         category?: { id: string; name: string; breadcrumbs?: string }
         attributes?: Array<{ key: string; value: string }>
         images?: Array<{ image?: { url: string }; alt?: string }>
@@ -177,10 +204,21 @@ export default async function ProductDetailPage({ params }: Props) {
         typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
     ) ?? []).includes(String(tenant.id))
 
-    const images = p.images || []
+    const images = toPublicDoc(p.images || [])
     const hasDiscount = p.compareAtPrice && p.compareAtPrice > p.price
     const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice!) * 100) : 0
     const attributes = p.attributes || []
+    // GH-2207: the form saves only `description`; the short text is kept as a fallback for older products
+    let richDescription = ''
+    try {
+        richDescription = renderBlogContent(p.description)
+    } catch (err) {
+        // odd migrated rich text must not take the whole product page down
+        console.error('[pdp] description render failed', err)
+    }
+    const descriptionHtml = /<img\b/i.test(richDescription) || richDescription.replace(/<[^>]*>|&nbsp;/g, '').trim() ? richDescription : ''
+    // AI sample products store a plain string; keep its line breaks instead of collapsing paragraphs
+    const isPlainTextDescription = typeof p.description === 'string' && !/<[a-z][^>]*>/i.test(p.description)
 
     const additionalProperty = attributes.map((attr: any) => ({
         '@type': 'PropertyValue',
@@ -192,20 +230,16 @@ export default async function ProductDetailPage({ params }: Props) {
         '@context': 'https://schema.org',
         '@type': 'Product',
         name: p.name,
-        description: p.shortDescription || '',
+        description: productSummaryText(p),
         image: images[0]?.image?.url,
         sku: p.sku || undefined,
-        offers: {
-            '@type': 'Offer',
-            price: p.price,
-            priceCurrency: p.currency || 'MYR',
-            availability: p.inventory > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-        },
+        // Variant products: Google reads the variant prices (AggregateOffer), never the base price, which may be 0
+        offers: buildProductOffers(p),
         ...(additionalProperty.length > 0 && { additionalProperty }),
     }
 
     const base = await getSiteBasePath(slug)
-    const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
+    const siteWithContext = toPublicSite({ ...site, tenantSlug: slug, siteBasePath: base })
 
     const origin = resolveStorefrontOrigin(tenant as any, { fallbackHostname: tenantHostname, slug })
     const crumbs = [
@@ -224,7 +258,7 @@ export default async function ProductDetailPage({ params }: Props) {
     return (
         <SiteLayoutShell
             site={siteWithContext as SiteRendererProps['site']}
-            pages={pages as unknown as NavPage[]}
+            pages={toPublicDoc(pages) as unknown as NavPage[]}
             isOwner={isOwner}
             forceCartWidget
         >
@@ -236,7 +270,7 @@ export default async function ProductDetailPage({ params }: Props) {
                 .pd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; padding: 0 32px 64px; max-width: 1200px; margin: 0 auto; }
                 @media (max-width: 768px) {
                     .pd-breadcrumb { padding: 12px 16px; }
-                    .pd-grid { grid-template-columns: 1fr; gap: 24px; padding: 0 16px 48px; }
+                    .pd-grid { grid-template-columns: 1fr; gap: 24px; padding: 0 16px 96px; }
                 }
             `}</style>
 
@@ -356,10 +390,19 @@ export default async function ProductDetailPage({ params }: Props) {
                     )}
 
                     {/* Description */}
-                    {p.shortDescription && (
+                    {(descriptionHtml || p.shortDescription) && (
                         <div style={{ borderTop: '1px solid rgba(var(--brand-primary-rgb), 0.125)', paddingTop: '24px' }}>
                             <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>{t.storefront.products.description}</h3>
-                            <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.7 }}>{p.shortDescription}</p>
+                            {descriptionHtml ? (
+                                <div
+                                    data-testid="product-description"
+                                    className={`break-words [&_*]:max-w-full [&_a]:underline [&_p:not(:last-child)]:mb-3 [&_img]:h-auto [&_ol]:list-decimal [&_ol]:pl-5 [&_table]:block [&_table]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5${isPlainTextDescription ? ' whitespace-pre-line' : ''}`}
+                                    style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.7 }}
+                                    dangerouslySetInnerHTML={{ __html: isPlainTextDescription ? descriptionHtml.trim() : descriptionHtml }}
+                                />
+                            ) : (
+                                <p data-testid="product-description" style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.7 }}>{p.shortDescription}</p>
+                            )}
                         </div>
                     )}
 

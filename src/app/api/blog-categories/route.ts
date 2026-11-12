@@ -5,17 +5,7 @@ import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { createCategorySchema } from '@/lib/validations/blog'
-
-function toSlug(text: string): string {
-    return text
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-}
+import { BLOG_CATEGORY_DUPLICATE_CODE, blogCategoryNameTaken, toBlogCategorySlug } from '@/lib/blog/blog-category-name'
 
 /**
  * GET /api/blog-categories — List categories for current tenant
@@ -38,6 +28,7 @@ export const GET = withAuth(async (user) => {
             where: { tenant: { equals: resolvedTenantId } },
             sort: 'name',
             limit: 100,
+            depth: 0, // the tenant stays an id: a populated tenant row carries its secrets (TC-PERF-129)
         })
 
         return NextResponse.json({ success: true, data: result.docs })
@@ -69,20 +60,11 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
 
         const payload = await getPayload({ config })
 
-        const slug = toSlug(data!.name)
+        const slug = toBlogCategorySlug(data!.name)
 
-        // Check for duplicate slug
-        const existing = await payload.find({
-            collection: 'blog_categories',
-            where: {
-                slug: { equals: slug },
-                tenant: { equals: resolvedTenantId },
-            },
-            limit: 1,
-        })
-        if (existing.docs.length > 0) {
+        if (await blogCategoryNameTaken(payload, { tenantId: resolvedTenantId, name: data!.name })) {
             return NextResponse.json(
-                { success: false, error: { code: 'DUPLICATE_SLUG', details: 'Category with this name already exists' } },
+                { success: false, error: { code: BLOG_CATEGORY_DUPLICATE_CODE, details: 'Category with this name already exists' } },
                 { status: 409 }
             )
         }
@@ -94,6 +76,7 @@ export const POST = withFeatureGuard('content_management')(withAuth(async (user,
                 name: data!.name,
                 slug,
             },
+            depth: 0,
         })
 
         return NextResponse.json({ success: true, data: category }, { status: 201 })

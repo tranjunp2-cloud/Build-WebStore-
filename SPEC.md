@@ -745,7 +745,7 @@ NODE_ENV=development
 NEXT_PUBLIC_SITE_URL=http://localhost:3005
 
 # ─── Database ──────────────────────────────────
-DATABASE_URI=postgresql://webstore:REPLACE_WITH_DB_PASSWORD@postgres:5432/webstore
+DATABASE_URI=postgresql://webstore:webstore@postgres:5432/webstore
 PAYLOAD_SECRET=your-payload-secret-min-32-chars
 
 # ─── AI Services ───────────────────────────────

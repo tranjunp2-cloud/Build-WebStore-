@@ -6,6 +6,13 @@ import '@testing-library/jest-dom/vitest'
 import ProductDetailPage, { generateMetadata } from '../../../app/sites/[slug]/products/[productSlug]/page'
 import { ProductImageGallery } from '../../../components/storefront/ProductImageGallery'
 import { getPayload } from 'payload'
+// #2179: store availability has its own tests (store-unavailable.test.ts); every store is available here.
+vi.mock('@/lib/storefront/cached-store-availability', () => ({
+    isCachedStoreUnavailable: vi.fn(async () => false),
+    storeUnavailableLocaleOf: vi.fn(async () => 'en'),
+    storeUnavailableResponse: vi.fn(async () => null),
+    storefrontUnavailableFor: vi.fn(async () => null),
+}))
 
 // Mock getPayload
 vi.mock('payload', () => ({
@@ -42,6 +49,9 @@ vi.mock('@payload-config', () => ({
 // Mock components
 vi.mock('@/components/storefront/AddToCartButton', () => ({
     AddToCartButton: () => <div data-testid="add-to-cart-button" />
+}))
+vi.mock('@/components/storefront/quantity-stepper', () => ({
+    QuantityStepper: () => <div data-testid="quantity-stepper" />
 }))
 vi.mock('@/components/storefront/ProductVariantSelector', () => ({
     ProductVariantSelector: ({ variants }: { variants: Array<{ name: string; stock: number }> }) => (
@@ -119,6 +129,25 @@ describe('Storefront Product Detail Page (US-F08-06)', () => {
             name: 'Thương hiệu',
             value: 'Prime Local'
         })
+    })
+
+    it('[TC-PERF-064] reads tenant, site, product and navigation one statement each, tenants trimmed to public fields', async () => {
+        // Arrange
+        const payload = await getPayload({} as never)
+        const find = vi.mocked(payload.find)
+        find.mockClear()
+
+        // Act
+        await generateMetadata({ params: Promise.resolve({ slug: 'demo', productSlug: 'ao-thun-test' }) })
+
+        // Assert
+        const calls = find.mock.calls.map(([args]) => args as unknown as Record<string, unknown>)
+        expect(calls.map((args) => args.collection)).toEqual(['tenants', 'sites', 'products', 'pages'])
+        for (const args of calls) expect(args.pagination).toBe(false)
+        expect(calls[0]).toMatchObject({ depth: 0 })
+        for (const args of calls.slice(1)) {
+            expect((args.populate as { tenants: Record<string, boolean> }).tenants).toEqual({ name: true, slug: true, customDomains: true, status: true })
+        }
     })
 
     it('generates correct metadata title with SEO fallback', async () => {

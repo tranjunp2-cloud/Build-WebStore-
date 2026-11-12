@@ -14,6 +14,7 @@ import { TemplatesGridView } from './templates-grid-view'
 import { TemplatesSplitView } from './templates-split-view'
 import { TemplateDrawer } from './template-drawer'
 import { BulkActionToolbar } from './bulk-action-toolbar'
+import { useStudioCan } from '../../_components/studio-permissions-context'
 import { CreateTemplateModal } from '../../_components/modals/create-template-modal'
 import { fetchTemplates, bulkAction } from '@/lib/admin/templates-query'
 import type {
@@ -58,6 +59,7 @@ export function TemplatesListClient({
     const [selected, setSelected] = useState<Set<string | number>>(new Set())
     const [loading, setLoading] = useState(false)
     const [showCreate, setShowCreate] = useState(false)
+    const canCreate = useStudioCan()('template.create')
     const [drawerId, setDrawerId] = useState<string | number | null>(null)
     const [, startTransition] = useTransition()
 
@@ -178,12 +180,16 @@ export function TemplatesListClient({
                     </p>
                 </div>
                 <div className="page-actions">
-                    <button className="btn btn-ghost" style={{ fontSize: 13 }}>
-                        <Upload size={14} /> Import ZIP
-                    </button>
-                    <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-                        <Plus size={14} /> New template
-                    </button>
+                    {canCreate && (
+                        <>
+                            <button className="btn btn-ghost" style={{ fontSize: 13 }}>
+                                <Upload size={14} /> Import ZIP
+                            </button>
+                            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                                <Plus size={14} /> New template
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -279,7 +285,7 @@ export function TemplatesListClient({
             )}
 
             {/* Create modal */}
-            {showCreate && (
+            {showCreate && canCreate && (
                 <CreateTemplateModal
                     onClose={() => setShowCreate(false)}
                     onCreated={handleCreated}

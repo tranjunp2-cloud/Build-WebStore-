@@ -16,10 +16,10 @@ Make PRD v2.6 the reviewable contract before product work is accepted. Resolve s
 
 ## Related files and anchors
 
-- `/home/liam/data/ech-prime-web-v2/docs/prd/F37-local-seo-search-performance.md:207` — authoritative story/AC; `:272` — FR-04..11.
-- `/home/liam/data/ech-prime-web-v2/docs/architecture/F37-local-seo.md:96` — subtype-driven emission; `:188` — Schema 35.
-- `/home/liam/data/ech-prime-web-v2/docs/qa/F37-local-seo.md:118` — current partial status; `:133` — TC-F37-02-29..32.
-- `/home/liam/data/ech-prime-web-v2/docs/stories/F37-local-seo-stories.md:59` — stale FAQ/Schema-40 contract to synchronize.
+- `./docs/prd/F37-local-seo-search-performance.md:207` — authoritative story/AC; `:272` — FR-04..11.
+- `./docs/architecture/F37-local-seo.md:96` — subtype-driven emission; `:188` — Schema 35.
+- `./docs/qa/F37-local-seo.md:118` — current partial status; `:133` — TC-F37-02-29..32.
+- `./docs/stories/F37-local-seo-stories.md:59` — stale FAQ/Schema-40 contract to synchronize.
 - GitHub issue `#1310` — stale AC/FR body; PR `#1677` merge SHA `38d5868e...` is the decision record.
 - PR `#1708` — overlapping US-F37-01 save, validation, Editor, and scorer work; semantic dependency, not contract authority.
 

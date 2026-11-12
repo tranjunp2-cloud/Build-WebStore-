@@ -17,27 +17,32 @@
 import type { BusinessSample, CategoryContent } from './content'
 import { getCategoryContent } from './content'
 import { seededPick } from './seeded-random'
+import { withoutLibraryIdentity } from './library-identity'
 
 /**
  * Hydrate a Partial<BusinessSample> into a full BusinessSample for composer
- * consumption. Seeds across `pack.businesses` so two users in the same
- * category whose partial is missing the same field get different canned
- * baselines (GH-912 — addresses leak of `businesses[0]` phone/address/etc.).
+ * consumption. Identity + contact come from the merchant (or their FACTS) and
+ * otherwise stay empty: the library sample businesses are fictional, so their
+ * name / address / phone / email must never reach a real site (#2103 A1,
+ * supersedes the GH-912 seed rotation, which only hid the leak). Generic
+ * category copy (hero lines, products) still falls back to the library pack.
  */
 function hydrateBiz(partial: Partial<BusinessSample>, category: string, seed: number): BusinessSample {
     const pack = getCategoryContent(category) ?? getCategoryContent('business')
-    const fallback = seededPick(pack?.businesses ?? [], seed)
-    return {
-        name: partial.name ?? fallback?.name ?? 'Our Business',
-        tagline: partial.tagline ?? fallback?.tagline ?? 'Serving you with care',
-        description: partial.description ?? fallback?.description ?? 'Your trusted local business.',
-        address: partial.address ?? fallback?.address ?? 'Kuala Lumpur, Malaysia',
-        phone: partial.phone ?? fallback?.phone ?? '+60 3-0000 0000',
-        email: partial.email ?? fallback?.email ?? 'hello@example.com',
-        heroHeadline: partial.heroHeadline ?? fallback?.heroHeadline ?? 'Welcome',
-        heroSubheadline: partial.heroSubheadline ?? fallback?.heroSubheadline ?? 'Quality service',
-        products: partial.products ?? fallback?.products ?? [],
+    const sample = seededPick(pack?.businesses ?? [], seed)
+    const base: BusinessSample = sample ?? {
+        name: '',
+        tagline: '',
+        description: '',
+        address: '',
+        phone: '',
+        email: '',
+        heroHeadline: 'Welcome',
+        heroSubheadline: 'Quality service',
     }
+    const biz = withoutLibraryIdentity(base, partial)
+    // Composer headings interpolate the name ("Why choose {name}"); keep them readable.
+    return { ...biz, name: biz.name || 'Our Business' }
 }
 import {
     buildHero as composerBuildHero,
@@ -55,6 +60,7 @@ import {
     type LocaleStructuralStrings,
 } from './locale-structural-strings'
 import { detectLanguageFromText } from '@/lib/language-detection'
+import { resolveContactFieldKeys } from '@/lib/contact/contact-field-keys'
 
 function isEnglishFallbackText(value: string): boolean {
     return Boolean(value.trim()) && detectLanguageFromText(value).locale === 'en'
@@ -168,71 +174,27 @@ function normalizeContactLabels(
     const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'contact') return block
-        const usedFieldNames = new Set<string>()
-        const claimUniqueFieldName = (preferredName: string, index: number): string => {
-            if (!usedFieldNames.has(preferredName)) {
-                usedFieldNames.add(preferredName)
-                return preferredName
-            }
-
-            let fallbackName = `field-${index + 1}`
-            let suffix = index + 1
-            while (usedFieldNames.has(fallbackName)) {
-                suffix += 1
-                fallbackName = `field-${suffix}`
-            }
-            usedFieldNames.add(fallbackName)
-            return fallbackName
+        const rawFields = Array.isArray(block.formFields) ? block.formFields : null
+        // GH-2243: shared mapping with the storefront form; custom text names are left alone here.
+        const keys = rawFields
+            ? resolveContactFieldKeys(
+                rawFields.map((f: unknown) => (f && typeof f === 'object' ? (f as Record<string, unknown>) : {})),
+                { mapCustomText: false },
+            )
+            : []
+        const labelFor: Record<string, string | undefined> = {
+            email: localized?.contact.emailLabel ?? i18n.contact.emailLabel,
+            phone: localized?.contact.phoneLabel ?? i18n.contact.phoneLabel,
+            message: localized?.contact.messageLabel ?? i18n.contact.messageLabel,
+            name: localized?.contact.nameLabel ?? i18n.contact.nameLabel,
         }
-        const formFields = Array.isArray(block.formFields)
-            ? block.formFields.map((field: unknown, index: number) => {
+        const formFields = rawFields
+            ? rawFields.map((field: unknown, index: number) => {
                 if (!field || typeof field !== 'object') return field
                 const record = field as Record<string, unknown>
-                const suppliedFieldName = String(record.fieldName ?? '').trim()
-                const fieldName = suppliedFieldName.toLowerCase()
-                const fieldAlias = fieldName.replace(/[-_\s]/g, '')
-                const fieldType = String(record.fieldType ?? record.type ?? '').toLowerCase()
-                const isGenericName = !fieldName || /^field(?:[-_\s]*\d+)?$/.test(fieldName)
-                let semanticName = ['email', 'emailaddress'].includes(fieldAlias) || fieldType === 'email'
-                    ? 'email'
-                    : ['phone', 'phonenumber', 'telephone', 'tel'].includes(fieldAlias)
-                        || fieldType === 'phone'
-                        || fieldType === 'tel'
-                        ? 'phone'
-                        : ['message', 'yourmessage'].includes(fieldAlias) || fieldType === 'textarea'
-                            ? 'message'
-                            : ['name', 'fullname', 'contactname', 'yourname'].includes(fieldAlias)
-                                ? 'name'
-                                : ['subject', 'topic'].includes(fieldAlias)
-                                    ? 'subject'
-                                : null
-
-                if (!semanticName && isGenericName && fieldType === 'text') {
-                    semanticName = usedFieldNames.has('name') ? 'subject' : 'name'
-                }
-
-                if (!semanticName) {
-                    const preservedName = suppliedFieldName || `field-${index + 1}`
-                    return { ...record, fieldName: claimUniqueFieldName(preservedName, index) }
-                }
-
-                const uniqueSemanticName = claimUniqueFieldName(semanticName, index)
-                if (uniqueSemanticName !== semanticName) {
-                    return { ...record, fieldName: uniqueSemanticName }
-                }
-
-                if (semanticName === 'subject') {
-                    return { ...record, fieldName: semanticName }
-                }
-
-                const label = semanticName === 'email'
-                    ? localized?.contact.emailLabel ?? i18n.contact.emailLabel
-                    : semanticName === 'phone'
-                        ? localized?.contact.phoneLabel ?? i18n.contact.phoneLabel
-                        : semanticName === 'message'
-                            ? localized?.contact.messageLabel ?? i18n.contact.messageLabel
-                            : localized?.contact.nameLabel ?? i18n.contact.nameLabel
-                return { ...record, fieldName: semanticName, label }
+                const fieldName = keys[index]!
+                const label = labelFor[fieldName]
+                return label ? { ...record, fieldName, label } : { ...record, fieldName }
             })
             : block.formFields
         return {
@@ -683,9 +645,9 @@ function callComposerBuilder(
         case 'features':
             return composerBuildFeatures(biz, category, language)
         case 'testimonials':
-            return content ? composerBuildTestimonials(content, biz.name, language) : null
+            return composerBuildTestimonials(biz, language)
         case 'faq':
-            return content ? composerBuildFAQ(content, biz.name, language) : null
+            return composerBuildFAQ(biz, language)
         case 'about':
             return composerBuildAbout(biz, language)
         case 'cta':

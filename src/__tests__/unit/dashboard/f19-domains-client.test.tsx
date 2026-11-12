@@ -10,6 +10,10 @@ vi.mock('@/app/(dashboard)/settings/domains/actions', () => ({
     clearPrimaryDomain: vi.fn(),
 }));
 
+// DomainsClient now renders WebsiteStatusCard → UnpublishModal, which loads next/font/google.
+vi.mock('next/font/google', () => ({ Inter: () => ({ className: 'inter' }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
+
 vi.mock('sonner', () => ({
     toast: {
         success: vi.fn(),
@@ -355,6 +359,68 @@ describe('F19 Domain Management (DomainsClient)', () => {
             expect(toast.success).toHaveBeenCalledWith(
                 expect.stringContaining('Domain connected!'),
             );
+        });
+    });
+
+    // jsdom has no layout engine, so these pin the classes that make long domains wrap
+    // (overflow-wrap:anywhere lowers min-content; min-w-0 lets flex parents shrink). Real
+    // no-overflow evidence for #2248 is the 375px browser check in the PR.
+    describe('[TC-F19.85] long domain names wrap on mobile instead of overflowing (#2248)', () => {
+        const LONG_SLUG = 'pc-changed-store-with-a-rather-long-name';
+        const LONG_PENDING = 'shop.my-very-long-brand-name-2026.com.my';
+        const LONG_ACTIVE = 'store.another-very-long-brand-name-2026.com.my';
+
+        // getByRole throws a descriptive "Unable to find an accessible element" error if missing.
+        const h3Of = (text: string): HTMLElement =>
+            screen.getByRole('heading', { level: 3, name: text });
+
+        it('platform subdomain h3 and its flex ancestors can shrink and wrap', () => {
+            render(<DomainsClient tenantId="tenant-1" tenantSlug={LONG_SLUG} customDomains={[]} />);
+
+            const h3 = h3Of(`${LONG_SLUG}.${EXPECTED_PLATFORM_DOMAIN}`);
+            expect(h3.className).toContain('[overflow-wrap:anywhere]');
+            expect(h3.className).toContain('min-w-0');
+            // badge row (flex-wrap) and the column that is a flex item beside "Change subdomain"
+            const wrapRow = h3.parentElement as HTMLElement;
+            expect(wrapRow.className).toContain('flex-wrap');
+            expect(wrapRow.className).toContain('min-w-0');
+            expect((wrapRow.parentElement as HTMLElement).className).toContain('min-w-0');
+        });
+
+        it('pending custom domain h3 wraps', () => {
+            render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={[
+                { domain: LONG_PENDING, status: 'pending', isPrimary: false },
+            ]} />);
+
+            expect(h3Of(LONG_PENDING).className).toContain('[overflow-wrap:anywhere]');
+        });
+
+        it('active custom domain h3 wraps, its column can shrink, Remove button keeps its width', () => {
+            render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={[
+                { domain: LONG_ACTIVE, status: 'active', isPrimary: false },
+            ]} />);
+
+            const h3 = h3Of(LONG_ACTIVE);
+            expect(h3.className).toContain('[overflow-wrap:anywhere]');
+            const column = h3.parentElement as HTMLElement;
+            expect(column.className).toContain('min-w-0');
+            const removeCell = column.nextElementSibling as HTMLElement;
+            expect(removeCell.className).toContain('shrink-0');
+        });
+
+        it('select-primary panel label wraps instead of truncating the TLD', () => {
+            render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={[
+                { domain: LONG_ACTIVE, status: 'active', isPrimary: false },
+            ]} />);
+
+            fireEvent.click(screen.getByRole('button', { name: /Select primary domain/i }));
+
+            const labels = screen.getAllByText(LONG_ACTIVE).filter((el) => el.tagName === 'SPAN');
+            expect(labels.length).toBeGreaterThan(0);
+            for (const label of labels) {
+                expect(label.className).toContain('[overflow-wrap:anywhere]');
+                expect(label.className).not.toContain('truncate');
+            }
         });
     });
 });

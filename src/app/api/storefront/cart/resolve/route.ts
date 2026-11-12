@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { isTenantUnavailable } from '@/lib/storefront/store-availability'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
@@ -115,11 +116,12 @@ export async function POST(req: Request) {
                 : { 'customDomains.domain': { equals: tenantSelector.domain } },
             limit: 1,
             depth: 0,
-            select: { id: true, customDomains: true },
+            select: { id: true, customDomains: true, status: true },
             overrideAccess: true,
         })
         const tenant = tenantResult.docs[0]
-        if (!tenant) return NextResponse.json({ lines: [] })
+        // #2179: banned or expired store answers like an unknown one (no reason given)
+        if (!tenant || await isTenantUnavailable(payload, tenant)) return NextResponse.json({ lines: [] })
         if (tenantSelector.domain) {
             const customDomains = Array.isArray(tenant.customDomains) ? tenant.customDomains : []
             const activeDomain = customDomains.some(domain =>

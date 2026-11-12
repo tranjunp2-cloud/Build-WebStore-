@@ -17,10 +17,12 @@ vi.mock('next/navigation', () => ({
 }))
 
 const mockToastError = vi.fn()
+const mockToastWarning = vi.fn()
 vi.mock('sonner', () => ({
     toast: {
         success: vi.fn(),
         error: (...args: unknown[]) => mockToastError(...args),
+        warning: (...args: unknown[]) => mockToastWarning(...args),
     },
 }))
 
@@ -298,5 +300,46 @@ describe('BulkCreateModal — handleParse error toasts [GH-1599]', () => {
         // Assert
         expect(composingEnterDispatched).toBe(true)
         expect(normalEnterDispatched).toBe(false)
+    })
+
+    it('TC-AIWB-124: a chunk the AI could not read shows the products parsed and a warning naming the left-out words', async () => {
+        // Arrange
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                generationId: TEST_GENERATION_ID,
+                products: [{ name: 'Cotton Shirt', price: 20, stock: 0, variants: [] }],
+                unparsed: ['wool beanie grey RM39', 'yoga mat purple RM99'],
+            }),
+        }) as unknown as typeof fetch
+
+        // Act
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="a long list" />)
+        const nameField = await screen.findByLabelText('Name')
+
+        // Assert
+        expect(nameField).toHaveValue('Cotton Shirt')
+        expect(mockToastWarning).toHaveBeenCalledTimes(1)
+        expect(mockToastWarning).toHaveBeenCalledWith(
+            enLocale.dashboard.products.bulkCreate.partialParse.replace('{n}', '2').replace('{items}', 'wool beanie grey RM39; yoga mat purple RM99'),
+        )
+        expect(mockToastError).not.toHaveBeenCalled()
+    })
+
+    it('TC-AIWB-124: a full answer shows no warning', async () => {
+        // Arrange
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ generationId: TEST_GENERATION_ID, products: [{ name: 'Cotton Shirt', price: 20, stock: 0, variants: [] }] }),
+        }) as unknown as typeof fetch
+
+        // Act
+        render(<BulkCreateModal onClose={vi.fn()} initialPrompt="one shirt" />)
+        await screen.findByLabelText('Name')
+
+        // Assert
+        expect(mockToastWarning).not.toHaveBeenCalled()
     })
 })

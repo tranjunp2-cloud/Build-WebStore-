@@ -58,7 +58,9 @@ vi.mock('@/lib/validations/orders', () => ({
         safeParse: (data: any) => ({ success: true, data }),
     },
 }))
-vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+vi.mock('@/lib/subscriptions/plan-subscription', async (importOriginal) => ({
+    // real isSubscriptionActive: the #2179 availability gate runs unmocked here (TC-F09.284)
+    isSubscriptionActive: (await importOriginal<typeof import('@/lib/subscriptions/plan-subscription')>()).isSubscriptionActive,
     getActivePlanSubscription: vi.fn().mockResolvedValue({
         id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
     }),
@@ -325,6 +327,29 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         // Assert
         expect(res.status).toBe(403)
         expect(body.error.code).toBe('STORE_UNAVAILABLE')
+        expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F09.284] active tenant whose main subscription lapsed: 403 STORE_UNAVAILABLE, no session', async () => {
+        // Arrange — real gate: latest main subscription read through payload.find, endsAt in the past
+        mockFindByID.mockResolvedValueOnce(VALID_SITE).mockResolvedValueOnce(VALID_TENANT)
+        mockFind.mockImplementation(async ({ collection }: { collection: string }) => collection === 'plan-subscriptions'
+            ? { docs: [{ status: 'active', endsAt: '2020-01-01T00:00:00.000Z' }] }
+            : { docs: [] })
+
+        // Act
+        const res = await POST(mockRequest(VALID_REQUEST_BODY))
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(403)
+        expect(body.error.code).toBe('STORE_UNAVAILABLE')
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'plan-subscriptions',
+            where: { and: [{ tenant: { equals: VALID_TENANT.id } }, { name: { equals: 'main' } }] },
+            sort: '-createdAt',
+        }))
+        expect(mockCreate).not.toHaveBeenCalled()
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     })
 
@@ -808,7 +833,9 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
             errorResponse: null,
         })
         // Discount: 50% off, active, for tenant-1
-        mockFind.mockResolvedValueOnce({
+        mockFind
+            .mockResolvedValueOnce({ docs: [] }) // #2179 availability gate: no main subscription
+            .mockResolvedValueOnce({
             docs: [{
                 id: 10,
                 code: 'HALF50',
@@ -916,7 +943,9 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         // mockCreate and mockCreateCheckoutSession NOT called — order/session must not be created
 
         // Mock discount lookup returning exhausted code
-        mockFind.mockResolvedValueOnce({
+        mockFind
+            .mockResolvedValueOnce({ docs: [] }) // #2179 availability gate: no main subscription
+            .mockResolvedValueOnce({
             docs: [{ id: 7, code: 'STRIMELIMIT', type: 'percentage', value: 25, status: 'active', usageLimit: 5, usageCount: 5, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
             totalDocs: 1,
         })
@@ -950,7 +979,9 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
             errorResponse: null,
         })
         // Mock inactive discount
-        mockFind.mockResolvedValueOnce({
+        mockFind
+            .mockResolvedValueOnce({ docs: [] }) // #2179 availability gate: no main subscription
+            .mockResolvedValueOnce({
             docs: [{ id: 8, code: 'INACTIVE', type: 'percentage', value: 50, status: 'inactive', usageLimit: null, usageCount: 0, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
             totalDocs: 1,
         })

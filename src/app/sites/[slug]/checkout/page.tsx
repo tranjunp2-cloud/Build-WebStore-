@@ -4,6 +4,9 @@ import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { CheckoutClient } from './CheckoutClient'
 import { StripeBackRedirectScript } from '@/components/storefront/stripe-back-redirect'
+import { XENDIT_ENABLED } from '@/lib/payment/xendit-visibility'
+import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
+import { storefrontUnavailableFor } from '@/lib/storefront/cached-store-availability'
 
 // Force dynamic — reads request headers (custom domain) and DB at runtime
 export const dynamic = 'force-dynamic'
@@ -23,9 +26,6 @@ type InitialSiteData = {
     merchantQrCodeUrl: string | null
     enableCod: boolean
     enableQrBanking: boolean
-    bankName: string | null
-    bankAccountNo: string | null
-    bankAccountHolder: string | null
     shippingConfig: ShippingConfig | null
     cardEnabled: boolean
     fpxEnabled: boolean
@@ -37,6 +37,9 @@ type InitialSiteData = {
 
 export default async function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params
+    // #2179: banned or expired store → no checkout (the order APIs refuse it too)
+    const unavailable = await storefrontUnavailableFor(slug, slug === 'custom' ? (await headers()).get('x-tenant-hostname') : null)
+    if (unavailable) return <MaintenancePage variant="unavailable" locale={unavailable.locale} />
 
     let initialThemeCSS = ''
     let initialFontHeading = 'Outfit'
@@ -119,7 +122,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
                 const siteFpxEnabled = paymentConfig?.fpxEnabled !== false
 
                 const codEnabled = tenantCodEnabled && (paymentConfig?.enableCod ?? true)
-                const qrEnabled = tenantQrEnabled && (paymentConfig?.enableQrBanking ?? true)
+                // Bank transfer: tenant.payments.payment_qr is the only gate (site.enableQrBanking deprecated, GH-2477)
+                const qrEnabled = tenantQrEnabled
 
                 initialSiteData = {
                     siteId: String(site.id),
@@ -129,22 +133,19 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
                         : null,
                     enableCod: codEnabled,
                     enableQrBanking: qrEnabled,
-                    bankName: paymentConfig?.bankName ?? null,
-                    bankAccountNo: paymentConfig?.bankAccountNo ?? null,
-                    bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
                     shippingConfig: (site as any).shippingConfig ?? null,
                     cardEnabled: tenantCardEnabled && siteCardEnabled,
                     fpxEnabled: tenantFpxEnabled && siteFpxEnabled,
                     stripeConnected: !!((tenantFull as any)?.stripeAccountId),
                     stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled),
-                    xenditConnected: !!((tenantFull as any)?.xenditSecretKey),
+                    xenditConnected: XENDIT_ENABLED && !!((tenantFull as any)?.xenditSecretKey),
                     hasPaymentMethods: !!(
                         codEnabled ||
                         qrEnabled ||
                         // Only count Stripe if it can actually accept payments
                         ((tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled)) ||
                         // Xendit Invoice — connected = ready to accept payments
-                        !!(((tenantFull as any)?.xenditSecretKey))
+                        (XENDIT_ENABLED && !!((tenantFull as any)?.xenditSecretKey))
                     ),
                 }
             }

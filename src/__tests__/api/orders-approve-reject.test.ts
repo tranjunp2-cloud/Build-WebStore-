@@ -289,4 +289,23 @@ describe('Approve/Reject Payment APIs [TC-F10-06]', () => {
         expect(mockUpdate).not.toHaveBeenCalled()
         expect(mockSendEmail).not.toHaveBeenCalled() // no duplicate email on idempotent path
     })
+
+    it('[TC-PERF-135] approve answers with the new state only: no tenant row, magicLinkSecret or verifier user', async () => {
+        // Arrange: the post-CAS re-read runs with access off at depth 2
+        const tenant = { id: 1, slug: 'kedai', name: 'Kedai', xenditSecretKey: 'xnd_secret', easyParcelIntegration: { accessToken: 'ep' } }
+        mockFindByID
+            .mockResolvedValueOnce({ ...baseBTOrder })
+            .mockResolvedValueOnce({ ...baseBTOrder, status: 'confirmed', paymentStatus: 'paid', magicLinkSecret: 'mls',
+                tenant, site: { id: 2, tenant }, paymentVerifiedBy: { id: 3, otpHash: 'f'.repeat(64), keyString: 'enc' } })
+
+        // Act
+        const res = await ApprovePATCH(mockReq(), mockParams('order-1'))
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(Object.keys(body.data).sort()).toEqual(['id', 'paymentStatus', 'status'])
+        expect(JSON.stringify(body)).not.toMatch(/xnd_secret|"ep"|mls|f{64}|"enc"/)
+    })
 })
+

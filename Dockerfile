@@ -1,17 +1,21 @@
 # ── Stage 1: Dependencies ────────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:24.22.1-alpine AS deps
 WORKDIR /app
 ENV HUSKY=0
 COPY package.json package-lock.json* ./
 COPY scripts ./scripts
+# npm workspaces (packages/*) must exist before npm ci
+COPY packages ./packages
 RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
 
 # ── Stage 2: Builder ────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24.22.1-alpine AS builder
 WORKDIR /app
 ENV HUSKY=0
 COPY package.json package-lock.json* ./
 COPY scripts ./scripts
+# npm workspaces (packages/*) must exist before npm ci
+COPY packages ./packages
 RUN npm ci 2>/dev/null || npm install
 
 COPY . .
@@ -30,7 +34,7 @@ ENV NODE_OPTIONS="--require ./node-polyfill.js"
 RUN npm run build
 
 # ── Stage 3: Runner (Production) ────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:24.22.1-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

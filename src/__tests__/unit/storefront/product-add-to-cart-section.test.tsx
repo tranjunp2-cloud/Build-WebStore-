@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
+vi.mock('@/i18n', () => ({ useI18n: () => ({ t: { storefront: { products: { quantity: 'Quantity' } } } }) }))
 import { ProductAddToCartSection } from '@/components/storefront/product-add-to-cart-section'
 
 // Mock AddToCartButton — data-inventory exposes the received inventory prop for TC-F09.237
 vi.mock('@/components/storefront/AddToCartButton', () => ({
-    AddToCartButton: ({ product, variantName, requireVariant }: any) => (
+    AddToCartButton: ({ product, variantName, requireVariant, quantity, variant, onSelectVariant }: any) => (
         <button
-            data-testid="add-to-cart-btn"
+            data-testid={variant === 'sticky' ? 'sticky-add-to-cart-btn' : 'add-to-cart-btn'}
+            data-quantity={quantity}
+            onClick={variant === 'sticky' && requireVariant && !variantName ? onSelectVariant : undefined}
             data-inventory={product?.inventory}
-            disabled={(product?.inventory <= 0) || (requireVariant && !variantName)}
+            disabled={(product?.inventory <= 0) || (variant !== 'sticky' && requireVariant && !variantName)}
             title={variantName ? `Variant: ${variantName}` : 'No variant selected'}
         >
             Add to Cart
@@ -445,5 +448,119 @@ describe('ProductAddToCartSection [TC-F09.64]', () => {
             const btn = queryByTestId('add-to-cart-btn')
             expect(btn).not.toBeDisabled()
         })
+    })
+
+    describe('[TC-F09.293] quantity stepper (GH-2100)', () => {
+        const renderSection = (inventory = 3, extra = {}) =>
+            render(<ProductAddToCartSection product={{ ...mockProduct, inventory, ...extra }} primaryColor="#000" siteSlug="s" siteId="s1" />)
+
+        it('clamps to [1, stock] and passes quantity to AddToCartButton', () => {
+            const { getByTestId } = renderSection(3)
+            const plus = screen.getByRole('button', { name: 'Quantity +' })
+            const minus = screen.getByRole('button', { name: 'Quantity −' })
+            expect(minus).toBeDisabled()
+            fireEvent.click(plus)
+            fireEvent.click(plus)
+            expect(getByTestId('add-to-cart-btn')).toHaveAttribute('data-quantity', '3')
+            expect(plus).toBeDisabled()
+            fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '99' } })
+            expect(getByTestId('add-to-cart-btn')).toHaveAttribute('data-quantity', '3')
+            // Field shows the clamped value immediately, not 99 until blur
+            expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe('3')
+            // Invalid/empty input keeps the last valid quantity; blur restores the field to it
+            const input = screen.getByRole('spinbutton') as HTMLInputElement
+            fireEvent.change(input, { target: { value: '0' } })
+            expect(getByTestId('add-to-cart-btn')).toHaveAttribute('data-quantity', '3')
+            fireEvent.blur(input)
+            expect(input.value).toBe('3')
+        })
+
+        it('lets the field be cleared while typing a new value', () => {
+            const { getByTestId } = renderSection(10)
+            const input = screen.getByRole('spinbutton') as HTMLInputElement
+            fireEvent.change(input, { target: { value: '' } })
+            expect(input.value).toBe('')
+            fireEvent.change(input, { target: { value: '4' } })
+            expect(input.value).toBe('4')
+            expect(getByTestId('add-to-cart-btn')).toHaveAttribute('data-quantity', '4')
+        })
+
+        it('resets to 1 when the variant changes', () => {
+            const { getByTestId } = renderSection(10, { hasVariants: true, variants: mockVariants })
+            fireEvent.click(getByTestId('variant-Red'))
+            fireEvent.click(screen.getByRole('button', { name: 'Quantity +' }))
+            expect(getByTestId('add-to-cart-btn')).toHaveAttribute('data-quantity', '2')
+            fireEvent.click(getByTestId('variant-Blue'))
+            expect(getByTestId('add-to-cart-btn')).toHaveAttribute('data-quantity', '1')
+        })
+
+        it('disables the stepper when out of stock', () => {
+            renderSection(0)
+            expect(screen.getByRole('button', { name: 'Quantity +' })).toBeDisabled()
+        })
+    })
+})
+
+
+describe('[TC-F09.38] mobile sticky add-to-cart bar', () => {
+    let ioCallback: IntersectionObserverCallback | null = null
+
+    beforeEach(() => {
+        ioCallback = null
+        class MockIO {
+            constructor(cb: IntersectionObserverCallback) { ioCallback = cb }
+            observe() {}
+            disconnect() {}
+            unobserve() {}
+        }
+        vi.stubGlobal('IntersectionObserver', MockIO)
+        Element.prototype.scrollIntoView = vi.fn()
+    })
+
+    const setInlineVisible = (isIntersecting: boolean) =>
+        act(() => { ioCallback?.([{ isIntersecting } as IntersectionObserverEntry], {} as IntersectionObserver) })
+
+    const renderSection = (product: any = mockProduct) =>
+        render(<ProductAddToCartSection product={product} primaryColor="#000" siteSlug="s" siteId="s1" />)
+
+    it('hides the bar while the inline button is in the viewport', () => {
+        const { getByTestId } = renderSection()
+        expect(getByTestId('pd-sticky-add-to-cart')).toHaveAttribute('aria-hidden', 'true')
+        expect(getByTestId('pd-sticky-add-to-cart').style.visibility).toBe('hidden')
+    })
+
+    it('shows a fixed-bottom bar with price once the inline button scrolls out', () => {
+        const { getByTestId } = renderSection()
+        setInlineVisible(false)
+        const bar = getByTestId('pd-sticky-add-to-cart')
+        expect(bar).toHaveAttribute('aria-hidden', 'false')
+        expect(bar.style.position).toBe('fixed')
+        expect(bar.style.bottom).toBe('0px')
+        expect(bar).toHaveTextContent('RM 49.90')
+    })
+
+    it('mobile-only: CSS hides the bar at >=768px', () => {
+        const { container } = renderSection()
+        expect(container.querySelector('style')?.textContent).toMatch(/\.pd-sticky-bar\s*{\s*display:\s*none/)
+        expect(container.querySelector('style')?.textContent).toMatch(/max-width:\s*767px/)
+    })
+
+    it('syncs price from the selected variant', () => {
+        const { getByTestId } = renderSection({ ...mockProduct, hasVariants: true, variants: [{ name: 'Big', price: 70, stock: 2 }] })
+        fireEvent.click(getByTestId('variant-Big'))
+        expect(getByTestId('pd-sticky-add-to-cart')).toHaveTextContent('RM 70.00')
+    })
+
+    it('sticky button is disabled when the product is out of stock', () => {
+        const { getByTestId } = renderSection({ ...mockProduct, inventory: 0 })
+        expect(getByTestId('sticky-add-to-cart-btn')).toBeDisabled()
+    })
+
+    it('scrolls to the variant selector when no variant is chosen', () => {
+        const { getByTestId } = renderSection({ ...mockProduct, hasVariants: true, variants: mockVariants })
+        const stickyBtn = getByTestId('sticky-add-to-cart-btn')
+        expect(stickyBtn).not.toBeDisabled()
+        fireEvent.click(stickyBtn)
+        expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1)
     })
 })

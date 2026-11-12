@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { getSidebarBadgeCounts } from '@/lib/dashboard/sidebar-badge-counts'
+import { ORDER_STATUS_GROUPS } from '@/lib/orders/status-groups'
 
 /**
  * TC-F18.10 — Sidebar badge counts (data layer). Verifies getSidebarBadgeCounts is
@@ -50,13 +51,13 @@ describe('getSidebarBadgeCounts (TC-F18.10)', () => {
         expect(result).toEqual({ orders: 5, products: 3, customers: 2, discounts: 16, leads: 12 })
     })
 
-    it('scopes orders by tenant + status=pending, others by tenant, leads by tenant sites', async () => {
+    it('scopes orders by tenant + pending status group, others by tenant, leads by tenant sites', async () => {
         const payload = makePayload({ counts: { orders: 1 }, sites: [{ id: 9 }] })
         await getSidebarBadgeCounts(payload, 't42')
 
-        // Orders badge counts only actionable (pending) orders, not all statuses
+        // Orders badge counts only actionable (pending-group) orders, not all statuses
         const orders = payload.count.mock.calls.find((c) => c[0].collection === 'orders')?.[0]
-        expect(orders?.where).toMatchObject({ tenant: { equals: 't42' }, status: { equals: 'pending' } })
+        expect(orders?.where).toMatchObject({ tenant: { equals: 't42' }, status: { in: ORDER_STATUS_GROUPS.pending } })
 
         // Products badge counts only live (active, not soft-deleted) products
         const products = payload.count.mock.calls.find((c) => c[0].collection === 'products')?.[0]
@@ -71,6 +72,19 @@ describe('getSidebarBadgeCounts (TC-F18.10)', () => {
 
         const contacts = payload.count.mock.calls.find((c) => c[0].collection === 'contact-submissions')?.[0]
         expect(contacts?.where).toMatchObject({ site: { in: [9] } })
+    })
+
+    it('[TC-GH2170-01] orders badge counts the same status group as the Orders page Pending card', async () => {
+        // Arrange — the Pending card (/api/orders/metrics) counts ORDER_STATUS_GROUPS.pending
+        const payload = makePayload({ counts: { orders: 198 } })
+
+        // Act
+        await getSidebarBadgeCounts(payload, 't1')
+
+        // Assert — 'new' (paid, awaiting confirmation) and 'payment_failed' are included, not just 'pending'
+        const orders = payload.count.mock.calls.find((c) => c[0].collection === 'orders')?.[0]
+        expect(orders?.where?.status).toEqual({ in: ORDER_STATUS_GROUPS.pending })
+        expect(ORDER_STATUS_GROUPS.pending).toEqual(expect.arrayContaining(['pending', 'new', 'payment_failed']))
     })
 
     it('degrades a failing count to 0 without breaking the others', async () => {
@@ -96,4 +110,23 @@ describe('getSidebarBadgeCounts (TC-F18.10)', () => {
         const result = await getSidebarBadgeCounts(payload, 't1')
         expect(result.leads).toBe(0)
     })
+
+    it('[TC-PERF-058] reads the tenant\'s site ids as one statement (no COUNT, id column only)', async () => {
+        // Arrange
+        const payload = makePayload({ sites: [{ id: 3 }] })
+
+        // Act
+        await getSidebarBadgeCounts(payload, '42')
+
+        // Assert
+        expect(payload.find).toHaveBeenCalledWith({
+            collection: 'sites',
+            where: { tenant: { equals: '42' } },
+            limit: 100,
+            depth: 0,
+            pagination: false,
+            select: { id: true },
+        })
+    })
 })
+

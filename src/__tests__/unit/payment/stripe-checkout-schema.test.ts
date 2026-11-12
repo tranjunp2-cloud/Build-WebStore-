@@ -78,10 +78,10 @@ describe('stripeCheckoutSchema [TC-F13-VAL]', () => {
         expect(result.success).toBe(false)
     })
 
-    it('allows customer.phone to be omitted', () => {
+    it('rejects omitted customer.phone [TC-F09.301, GH-2208]', () => {
         const { phone: _, ...customerNoPhone } = VALID_BODY.customer
         const result = stripeCheckoutSchema.safeParse({ ...VALID_BODY, customer: customerNoPhone })
-        expect(result.success).toBe(true)
+        expect(result.success).toBe(false)
     })
 
     it('rejects missing siteId', () => {

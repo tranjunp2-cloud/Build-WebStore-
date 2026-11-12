@@ -22,7 +22,7 @@ async function openProductWithEmptyCart(page: Page) {
         }
     })
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await expect(page.getByRole('button', { name: /add to cart/i })).toBeVisible()
+    await expect(page.getByTestId('pd-inline-add-to-cart').getByRole('button', { name: /add to cart/i })).toBeVisible()
 }
 
 function cartBadge(page: Page): Locator {
@@ -82,7 +82,7 @@ test.describe('Cart Drawer browser regression', () => {
         await startDrawerMotionCapture(page)
 
         // Act
-        await page.getByRole('button', { name: /add to cart/i }).click()
+        await page.getByTestId('pd-inline-add-to-cart').getByRole('button', { name: /add to cart/i }).click()
         const drawer = page.getByRole('dialog', { name: /shopping cart/i })
 
         // Assert
@@ -110,7 +110,7 @@ test.describe('Cart Drawer browser regression', () => {
     test('[TC-F09.15/16/21] decrementing quantity 1 removes item and updates subtotal and badge', async ({ page }) => {
         // Arrange
         await openProductWithEmptyCart(page)
-        await page.getByRole('button', { name: /add to cart/i }).click()
+        await page.getByTestId('pd-inline-add-to-cart').getByRole('button', { name: /add to cart/i }).click()
 
         const drawer = page.getByRole('dialog', { name: /shopping cart/i })
         const decreaseButton = drawer.getByRole('button', { name: /decrease quantity for/i })

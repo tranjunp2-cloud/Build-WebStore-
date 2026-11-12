@@ -42,6 +42,27 @@ const metricValue = (value: string | number): number => {
     return finiteNumber(Number(value))
 }
 
+type AnalyticsMetric = 'views' | 'leads' | 'engage'
+interface AnalyticsDayRow { dateStr: string; isCurrent: boolean; views: number; leads: number; engage: number }
+
+/** Rows of the one analytics aggregate: (day, current-window flag) → the three event counts. */
+const analyticsDayRows = (result: unknown): AnalyticsDayRow[] => {
+    const rows = (result as { rows?: unknown[] } | null)?.rows
+    if (!Array.isArray(rows)) return []
+    return rows.flatMap((raw) => {
+        const row = raw as { date_str?: unknown; is_current?: unknown; views?: unknown; leads?: unknown; engage?: unknown } | null
+        if (!row || typeof row.date_str !== 'string') return []
+        const num = (value: unknown) => (typeof value === 'string' || typeof value === 'number' ? metricValue(value) : 0)
+        return [{
+            dateStr: row.date_str,
+            isCurrent: row.is_current === true || row.is_current === 't' || row.is_current === 'true',
+            views: num(row.views),
+            leads: num(row.leads),
+            engage: num(row.engage),
+        }]
+    })
+}
+
 /** Empty-state glance payload (zeroed) — used when there is no tenant/usable site. */
 export function emptyGlanceData(): GlanceData {
     const zero = { value: 0, delta: 0 }
@@ -71,12 +92,6 @@ export async function getGlanceData(period: DashboardPeriodKey, { user }: { user
 
     const payload = await getPayload({ config })
 
-    const countWhere = (event: { equals?: string; in?: string[] }, from: string, to: string) => ({
-        tenant: { equals: tenantId },
-        createdAt: { greater_than_equal: from, less_than: to },
-        event,
-    })
-
     const currentStartISO = currentStart.toISOString()
     const currentEndISO = currentEnd.toISOString()
     const previousStartISO = previousStart.toISOString()
@@ -86,25 +101,27 @@ export async function getGlanceData(period: DashboardPeriodKey, { user }: { user
         ? payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}, 'YYYY-MM-DD') as date_str, SUM(total) as count FROM orders WHERE tenant_id = ${tenantId} AND status = 'completed' AND COALESCE(currency, 'MYR') = 'MYR' AND created_at >= ${previousStartISO} AND created_at < ${currentEndISO} GROUP BY 1`)
         : Promise.resolve({ rows: [] })
 
-    const [
-        viewsRes, prevViewsRes, leadsRes, prevLeadsRes, engageRes, prevEngageRes,
-        viewsSeriesRes, leadsSeriesRes, engageSeriesRes, revenueSeriesRes,
-    ] = await Promise.all([
-        payload.count({ collection: 'analytics', where: countWhere({ equals: 'pageview' }, currentStartISO, currentEndISO) }),
-        payload.count({ collection: 'analytics', where: countWhere({ equals: 'pageview' }, previousStartISO, currentStartISO) }),
-        payload.count({ collection: 'analytics', where: countWhere({ equals: 'click' }, currentStartISO, currentEndISO) }),
-        payload.count({ collection: 'analytics', where: countWhere({ equals: 'click' }, previousStartISO, currentStartISO) }),
-        payload.count({ collection: 'analytics', where: countWhere({ in: ['add_to_cart', 'checkout'] }, currentStartISO, currentEndISO) }),
-        payload.count({ collection: 'analytics', where: countWhere({ in: ['add_to_cart', 'checkout'] }, previousStartISO, currentStartISO) }),
-        payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${currentStartISO} AND created_at < ${currentEndISO} GROUP BY 1`),
-        payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'click' AND created_at >= ${currentStartISO} AND created_at < ${currentEndISO} GROUP BY 1`),
-        payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event IN ('add_to_cart', 'checkout') AND created_at >= ${currentStartISO} AND created_at < ${currentEndISO} GROUP BY 1`),
+    // Views / leads / engagement: totals for both windows and the current window's daily series in ONE statement
+    // over [previousStart, currentEnd), one row per (day, window). This was 6 COUNTs + 3 daily GROUP BYs over the
+    // same rows, 9 pool connections at once per dashboard view (TC-PERF-057).
+    const [analyticsRes, revenueSeriesRes] = await Promise.all([
+        // grouped on date_trunc (cheap per row), formatted once per day; served by analytics_tenant_created_idx
+        payload.db.drizzle.execute(sql`SELECT TO_CHAR(day, 'YYYY-MM-DD') as date_str, is_current, COUNT(*) FILTER (WHERE event = 'pageview') as views, COUNT(*) FILTER (WHERE event = 'click') as leads, COUNT(*) FILTER (WHERE event IN ('add_to_cart', 'checkout')) as engage FROM (SELECT date_trunc('day', created_at AT TIME ZONE ${DASHBOARD_TIME_ZONE}) as day, (created_at >= ${currentStartISO}) as is_current, event FROM analytics WHERE tenant_id = ${tenantId} AND event IN ('pageview', 'click', 'add_to_cart', 'checkout') AND created_at >= ${previousStartISO} AND created_at < ${currentEndISO}) events GROUP BY day, is_current`),
         revenueSeriesPromise(),
     ])
 
-    const views = viewsRes.totalDocs
-    const leads = leadsRes.totalDocs
-    const engage = engageRes.totalDocs
+    const analyticsRows = analyticsDayRows(analyticsRes)
+    const totalOf = (metric: AnalyticsMetric, current: boolean) => finiteNumber(analyticsRows
+        .filter(row => row.isCurrent === current)
+        .reduce((total, row) => total + row[metric], 0))
+    const views = totalOf('views', true)
+    const leads = totalOf('leads', true)
+    const engage = totalOf('engage', true)
+    const analyticsSeries = (metric: AnalyticsMetric): number[] => {
+        const map = new Map<string, number>()
+        analyticsRows.filter(row => row.isCurrent).forEach(row => map.set(row.dateStr, (map.get(row.dateStr) ?? 0) + row[metric]))
+        return dayKeys.map(dayKey => map.get(dayKey) ?? 0)
+    }
     const revenueRows = metricRows(revenueSeriesRes)
     const revenue = finiteNumber(revenueRows
         .filter(row => row.date_str >= currentStartKey)
@@ -122,15 +139,15 @@ export async function getGlanceData(period: DashboardPeriodKey, { user }: { user
     return {
         rangeLabel,
         stats: {
-            views: { value: views, delta: pctChange(views, prevViewsRes.totalDocs) },
-            leads: { value: leads, delta: pctChange(leads, prevLeadsRes.totalDocs) },
-            engage: { value: engage, delta: pctChange(engage, prevEngageRes.totalDocs) },
+            views: { value: views, delta: pctChange(views, totalOf('views', false)) },
+            leads: { value: leads, delta: pctChange(leads, totalOf('leads', false)) },
+            engage: { value: engage, delta: pctChange(engage, totalOf('engage', false)) },
             revenue: { value: revenue, delta: pctChange(revenue, prevRevenue), currency: true },
         },
         sparks: {
-            views: seriesValues(viewsSeriesRes),
-            leads: seriesValues(leadsSeriesRes),
-            engage: seriesValues(engageSeriesRes),
+            views: analyticsSeries('views'),
+            leads: analyticsSeries('leads'),
+            engage: analyticsSeries('engage'),
             revenue: seriesValues(revenueSeriesRes),
         },
     }

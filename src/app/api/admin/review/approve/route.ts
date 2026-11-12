@@ -8,14 +8,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission } from '@/lib/admin/api-utils'
 import type { PlatformUser } from '@/types/user'
 
 const ApproveSchema = z.object({
     templateId: z.union([z.string(), z.number()]),
 })
 
-export const POST = withSuperAdmin(async (req: NextRequest, ctx) => {
+export const POST = withStudioPermission('template.review', async (req: NextRequest, ctx) => {
     let body: unknown
     try {
         body = await req.json()

@@ -28,7 +28,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
         { value: 'other', label: rp.reasons.other },
     ]
 
-    const [reason, setReason] = useState<RejectionReason>('image_blurry')
+    const [reason, setReason] = useState<RejectionReason | null>(null)
     const [detail, setDetail] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [detailError, setDetailError] = useState('')
@@ -42,8 +42,11 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
         return true
     }
 
+    // No reason is preselected: the merchant must pick one explicitly (BR-Payment-07).
+    const canSubmit = reason !== null && !isLoading
+
     const handleSubmit = async () => {
-        if (!validate()) return
+        if (!reason || !validate()) return
         setIsLoading(true)
         try {
             const res = await fetch(`/api/orders/${orderId}/reject-payment`, {
@@ -158,7 +161,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                         type="button"
                         variant="destructive"
                         onClick={handleSubmit}
-                        disabled={isLoading}
+                        disabled={!canSubmit}
                         className="flex-1 h-12 rounded-lg text-[15px]"
                     >
                         {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}

@@ -1,6 +1,9 @@
 import type { CollectionConfig, CollectionAfterChangeHook, FieldHook, CollectionBeforeChangeHook } from 'payload'
 import { APIError } from 'payload'
-import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
+import { validateUniqueAttributeNames } from '@/lib/products/attribute-names-hook'
+import { validateProductImages } from '@/lib/products/image-limit-validation'
+import { MAX_PRODUCT_IMAGES } from '@/lib/products/image-limit'
+import type { queueSEOAutoGeneration as QueueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import slugify from 'slugify'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
@@ -9,10 +12,14 @@ import {
     revalidateBadgeCountsAfterChange,
     revalidateBadgeCountsAfterDelete,
 } from '@/lib/dashboard/revalidate-badge-counts-hook'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
+
+// Loaded on use: it imports the Payload config, which imports this collection (a static import is a cycle that breaks production builds).
+const queueSEOAutoGeneration: typeof QueueSEOAutoGeneration = async (...args) => (await import('../lib/ai/seo-queue')).queueSEOAutoGeneration(...args)
 
 const STABLE_AI_DRAFT_SLUG_PATTERN = /-ai-[a-f0-9]{32}$/
 
-const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc, data, req }) => {
+export const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc, data, req, operation }) => {
     // If client supplied a value, use it (or slugify it)
     let baseSlug = ''
     if (typeof value === 'string' && value.trim().length > 0) {
@@ -34,6 +41,12 @@ const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc,
         return baseSlug
     }
 
+    const relation = req.user && !req.user.roles?.includes('super-admin')
+        ? (originalDoc?.tenant ?? req.user.tenants?.[0]?.tenant)
+        : (data?.tenant ?? originalDoc?.tenant ?? (operation === 'create' ? req.user?.tenants?.[0]?.tenant : undefined))
+    const tenantId = typeof relation === 'object' ? relation?.id : relation
+    if (!tenantId) return baseSlug // Required tenant validation rejects unresolved ownership.
+
     let slug = baseSlug
     let count = 1
     let isUnique = false
@@ -41,9 +54,11 @@ const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc,
     // Check uniqueness (BR-03: Duplicate product name cho phép, slug auto-increments)
     while (!isUnique) {
         const existing = await req.payload.find({
+            req,
             collection: 'products',
             where: {
                 slug: { equals: slug },
+                tenant: { equals: tenantId },
                 ...(originalDoc?.id ? { id: { not_equals: originalDoc.id } } : {})
             },
             limit: 1,
@@ -73,18 +88,38 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
             .catch((err) => console.error('[Products] SSO step 3 import failed:', err))
     }
 
-    // Wait until it becomes active and seo title is empty
-    if ((isPublishingUpdate || isActiveCreate) && !doc.seo?.title) {
+    // Once it becomes active, fill whichever SEO field is still empty (the queue never overwrites merchant input)
+    if ((isPublishingUpdate || isActiveCreate) && (!doc.seo?.title?.trim() || !doc.seo?.description?.trim())) {
         const siteId = doc.site && typeof doc.site === 'object' ? doc.site.id : doc.site
 
-        // Check if auto meta generation is enabled for this site
-        try {
-            const site = await req.payload.findByID({ collection: 'sites', id: siteId, depth: 0 })
-            if (site.seo?.autoMetaEnabled === false) return
-        } catch { /* proceed if can't check */ }
+        // Check if auto meta generation is enabled for this site. `req` keeps the read on this
+        // save's transaction connection (no second pool connection while the first is held);
+        // `disableErrors` returns null for a missing site instead of throwing, which would roll the
+        // save back.
+        if (siteId != null) {
+            const hadTransaction = Boolean(req.transactionID)
+            try {
+                const site = await req.payload.findByID({ collection: 'sites', id: siteId, depth: 0, overrideAccess: true, disableErrors: true, req })
+                if (site?.seo?.autoMetaEnabled === false) return
+            } catch (err) {
+                // Payload rolled the save's transaction back: the product row is gone, so do not report success.
+                if (hadTransaction && !req.transactionID) throw err
+                /* proceed if can't check */
+            }
+        }
 
         // Trigger background generation
-        queueSEOAutoGeneration('products', doc.id, siteId, doc.name, doc.shortDescription)
+        // Products made with the CMS form have no shortDescription: use the description text.
+        // Lazy import keeps DOMPurify out of config load. Awaited on purpose: the queue must be
+        // called while the request is still open (it schedules the work with `after()`).
+        let summary: string | undefined = doc.shortDescription
+        try {
+            const { productSummaryText } = await import('@/lib/products/product-summary-text')
+            summary = productSummaryText(doc) || doc.shortDescription
+        } catch {
+            console.warn('[Products] SEO summary fallback failed', { productId: doc.id })
+        }
+        queueSEOAutoGeneration('products', doc.id, siteId, doc.name, summary, req.user)
     }
 }
 
@@ -97,18 +132,18 @@ export const lowStockHook: CollectionAfterChangeHook = async ({ doc, previousDoc
 
     // Only notify when crossing threshold downward (anti-spam)
     if (prevInventory >= LOW_STOCK_THRESHOLD && currInventory < LOW_STOCK_THRESHOLD && currInventory >= 0) {
-        import('@/lib/notifications/notify-tenant-owners')
-            .then(({ notifyTenantOwners }) => {
-                const tenantId = doc.tenant && typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
-                return notifyTenantOwners(req.payload, tenantId, {
-                    type: 'PRODUCT_LOW_STOCK',
-                    title: 'Low Stock Alert',
-                    message: `${doc.name} is running low (${currInventory} units left)`,
-                    actionUrl: '/products',
-                    metadata: { productName: doc.name, quantity: String(currInventory) },
-                })
+        const payload = req.payload
+        const tenantId = doc.tenant && typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+        runAfterResponse('Notification PRODUCT_LOW_STOCK', async () => {
+            const { notifyTenantOwners } = await import('@/lib/notifications/notify-tenant-owners')
+            await notifyTenantOwners(payload, tenantId, {
+                type: 'PRODUCT_LOW_STOCK',
+                title: 'Low Stock Alert',
+                message: `${doc.name} is running low (${currInventory} units left)`,
+                actionUrl: '/products',
+                metadata: { productName: doc.name, quantity: String(currInventory) },
             })
-            .catch((err) => console.error('[Notification] PRODUCT_LOW_STOCK hook failed', err))
+        })
     }
     return doc
 }
@@ -140,6 +175,9 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
                 collection: 'sites',
                 where: { id: { equals: data.site }, tenant: { equals: safeTenantId } },
                 limit: 1,
+                depth: 0,
+                overrideAccess: true,
+                req, // same connection as the save's transaction
             })
             data.site = siteCheck.docs.length > 0 ? data.site : originalSiteId
         } else if (originalSiteId != null) {
@@ -160,7 +198,10 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
             const siteRes = await req.payload.find({
                 collection: 'sites',
                 where: { tenant: { equals: data.tenant } },
-                limit: 1
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+                req, // same connection as the save's transaction
             })
             if (siteRes.docs.length > 0) {
                 data.site = siteRes.docs[0].id
@@ -270,7 +311,9 @@ function getTenantIds(user: unknown): (string | number)[] {
 
 export const Products: CollectionConfig = {
     slug: 'products',
+    indexes: [{ fields: ['tenant', 'slug'], unique: true }],
     hooks: {
+        beforeValidate: [validateUniqueAttributeNames],
         beforeChange: [beforeChangeHook, publishGateHook],
         afterChange: [afterChangeHook, lowStockHook, revalidateBadgeCountsAfterChange],
         afterDelete: [revalidateBadgeCountsAfterDelete],
@@ -316,19 +359,9 @@ export const Products: CollectionConfig = {
             } catch { return false }
             return { tenant: { in: tenantIds } }
         },
-        delete: async ({ req }) => {
-            if (!req.user) return false
-            if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = getTenantIds(req.user)
-            if (tenantIds.length === 0) return false
-            const tenantId = tenantIds[0]
-            try {
-                const sub = await getActivePlanSubscription(req.payload, tenantId)
-                if (!sub) return false
-                if (!(await canUse(req.payload, sub.plan as PlanCode, 'product_management'))) return false
-            } catch { return false }
-            return { tenant: { in: tenantIds } }
-        },
+        // GH-1520 (Option D): hard delete via native REST is super-admin only. Tenant-owners
+        // soft-delete (deletedAt) through the dashboard action, which uses `update` access.
+        delete: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
     },
     fields: [
         {
@@ -361,7 +394,6 @@ export const Products: CollectionConfig = {
             name: 'slug',
             type: 'text',
             required: true,
-            unique: true,
             index: true,
             hooks: {
                 beforeValidate: [formatSlug('name')],
@@ -381,8 +413,7 @@ export const Products: CollectionConfig = {
         {
             name: 'shortDescription',
             type: 'textarea',
-            maxLength: 300,
-            admin: { description: 'Short description for cards and SEO (max 300 chars)' },
+            admin: { description: 'Short description for cards and SEO' },
         },
         {
             name: 'price',
@@ -418,7 +449,8 @@ export const Products: CollectionConfig = {
         {
             name: 'images',
             type: 'array',
-            maxRows: 5,
+            maxRows: MAX_PRODUCT_IMAGES,
+            validate: validateProductImages,
             fields: [
                 {
                     name: 'image',
@@ -432,7 +464,7 @@ export const Products: CollectionConfig = {
                     admin: { description: 'Alt text for accessibility and SEO' },
                 },
             ],
-            admin: { description: 'Product images (Max 5, <= 5MB each)' },
+            admin: { description: 'Product images (Max 5 new images, <= 5MB each; existing larger galleries are preserved)' },
         },
         {
             name: 'category',

@@ -109,6 +109,7 @@ export interface LocalSeoPayload {
         where: Record<string, unknown>
         page?: number
         limit: number
+        pagination?: boolean
         depth: number
         sort: string | string[]
         select: Record<string, boolean>
@@ -174,11 +175,13 @@ async function findAll(
 ): Promise<DocumentRecord[]> {
     const docs: DocumentRecord[] = []
     for (let page = 1; ; page += 1) {
+        // 100-row pages without Payload's COUNT per page: a short page is the last one (TC-PERF-069)
         const result = await payload.find({
             collection,
             where,
             page,
             limit: PAGE_SIZE,
+            pagination: false,
             depth: 0,
             sort: ['createdAt', 'id'],
             select: COLLECTION_SCORE_SELECT[collection],
@@ -192,9 +195,7 @@ async function findAll(
         if (docs.length > MAX_RECORDS_PER_COLLECTION) {
             throw new Error(`Local SEO ${collection} safety ceiling exceeded`)
         }
-        if (result.hasNextPage === false || result.docs.length < PAGE_SIZE)
-            break
-        if (result.hasNextPage !== true && result.docs.length === 0) break
+        if (result.docs.length < PAGE_SIZE) break
     }
     return docs
 }
@@ -255,6 +256,7 @@ async function loadSnapshot(
             where: publicDiscoverySiteWhere(tenantId),
             page: 1,
             limit: PUBLIC_DISCOVERY_SITE_LIMIT,
+            pagination: false,
             depth: 0,
             sort: PUBLIC_DISCOVERY_SITE_SORT,
             select: PUBLIC_ROUTE_SITE_SELECT,

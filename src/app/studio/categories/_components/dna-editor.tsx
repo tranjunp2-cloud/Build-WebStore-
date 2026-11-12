@@ -7,6 +7,7 @@
 import { useState, useCallback } from 'react'
 import { ArrowRight, Ban, ChevronRight, Plus, Star } from 'lucide-react'
 import { toast } from 'sonner'
+import { useStudioCan } from '../../_components/studio-permissions-context'
 import { DnaBlockListField } from './dna-block-list-field'
 import type { CategoryDNA } from '@/lib/admin/dna-compliance'
 
@@ -39,6 +40,7 @@ function textToTags(text: string): string[] {
 }
 
 export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Props) {
+    const canEdit = useStudioCan()('category.edit')
     const [form, setForm] = useState({
         signatureBlocks:    tagsToText(initialDna?.signatureBlocks),
         recommendedBlocks:  tagsToText(initialDna?.recommendedBlocks),
@@ -102,7 +104,8 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
     const mandatoryChips = form.mandatoryOrder.split(',').map((s) => s.trim()).filter(Boolean)
 
     return (
-        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        // A disabled fieldset turns every field below read-only for seats without category.edit.
+        <fieldset disabled={!canEdit} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 20, border: 0, margin: 0, minWidth: 0 }}>
 
             {/* AI prompt hint */}
             {(form.aiPromptHint || true) && (
@@ -224,16 +227,18 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
             </div>
 
             {/* Save */}
-            <div className="dna-save-row">
-                <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={handleSave}
-                    disabled={saving}
-                >
-                    {saving ? 'Saving…' : 'Save DNA'}
-                </button>
-            </div>
-        </div>
+            {canEdit && (
+                <div className="dna-save-row">
+                    <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleSave}
+                        disabled={saving}
+                    >
+                        {saving ? 'Saving…' : 'Save DNA'}
+                    </button>
+                </div>
+            )}
+        </fieldset>
     )
 }

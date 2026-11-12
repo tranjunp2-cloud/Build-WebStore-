@@ -15,6 +15,7 @@ const { bulkCreateProps, mockRouterPush } = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(() => ({ push: mockRouterPush, refresh: vi.fn() })),
+    usePathname: vi.fn(() => '/products'),
 }))
 
 vi.mock('next/link', () => ({
@@ -45,10 +46,19 @@ vi.mock('@/hooks/use-auto-resize-textarea', () => ({
     useAutoResizeTextarea: vi.fn(),
 }))
 
-vi.mock('@/app/(dashboard)/products/actions', () => ({
-    getProductsAction: vi.fn(),
-    updateProductFieldAction: vi.fn(),
-}))
+vi.mock('@/app/(dashboard)/products/actions', async () => {
+    const { selectProductPage, productPageInputSchema } = await import('@/lib/products/dashboard-product-pagination')
+    const getProductsAction = vi.fn()
+    return {
+        getProductsAction,
+        getProductsPageAction: async (input: unknown) => {
+            const docs = await getProductsAction() as Array<{ id: string; name: string; status: string; createdAt: string }>
+            const selected = selectProductPage(docs.map((doc, index) => ({ ...doc, id: index + 1 })), productPageInputSchema.parse(input))
+            return { ...selected, docs: selected.ids.map(id => docs[id - 1]) }
+        },
+        updateProductFieldAction: vi.fn(),
+    }
+})
 
 vi.mock('@/app/(dashboard)/products/categories/actions', () => ({
     getCategoriesAction: vi.fn(),
@@ -76,14 +86,17 @@ import {
 } from '@/app/(dashboard)/products/categories/actions'
 import { I18nProvider } from '@/i18n'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { DashboardQueryProvider, resetQueryCache } from '../../helpers/query-provider'
 import { toast } from 'sonner'
 
 function renderPage() {
     return render(
         <I18nProvider>
-            <TooltipProvider>
-                <ProductsPage />
-            </TooltipProvider>
+            <DashboardQueryProvider>
+                <TooltipProvider>
+                    <ProductsPage />
+                </TooltipProvider>
+            </DashboardQueryProvider>
         </I18nProvider>,
     )
 }
@@ -104,6 +117,7 @@ function makeProduct(id: string, name: string) {
 describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        resetQueryCache()
         bulkCreateProps.length = 0
         vi.mocked(getProductsAction).mockReset().mockResolvedValue([])
         vi.mocked(getCategoriesAction).mockReset().mockResolvedValue([])
@@ -172,13 +186,13 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
             status: 'ready',
             categories: [excludedCategory],
         })
-        vi.mocked(getProductsAction)
-            .mockResolvedValueOnce([
-                makeProduct('existing', 'Existing draft'),
-            ] as unknown as Awaited<ReturnType<typeof getProductsAction>>)
-            .mockResolvedValueOnce([
-                visibleDraft,
-            ] as unknown as Awaited<ReturnType<typeof getProductsAction>>)
+        // Answer by state, not by call order: the 250ms search debounce can fire a
+        // filtered reload before onSuccess on a busy machine, which would consume a
+        // second mockResolvedValueOnce and leave the post-create refresh empty.
+        let draftCreated = false
+        vi.mocked(getProductsAction).mockImplementation(async () => (
+            draftCreated ? [visibleDraft] : [makeProduct('existing', 'Existing draft')]
+        ) as unknown as Awaited<ReturnType<typeof getProductsAction>>)
         renderPage()
 
         await waitFor(() => expect(getCategoriesAction).toHaveBeenCalledOnce())
@@ -202,12 +216,14 @@ describe('ProductsPage — AI category preparation (GH-1588 Scope 02)', () => {
         await waitFor(() => expect(screen.getByTestId('bulk-create-modal')).toBeInTheDocument())
 
         // Act
+        const callsBeforeSuccess = vi.mocked(getProductsAction).mock.calls.length
         act(() => {
+            draftCreated = true
             bulkCreateProps.at(-1)?.onSuccess()
         })
 
         // Assert
-        await waitFor(() => expect(getProductsAction).toHaveBeenCalledTimes(2))
+        await waitFor(() => expect(vi.mocked(getProductsAction).mock.calls.length).toBeGreaterThan(callsBeforeSuccess))
         await waitFor(() => expect(screen.getAllByText('Visible AI draft').length).toBeGreaterThan(0))
         for (const searchInput of screen.getAllByPlaceholderText(/search by name or sku/i)) {
             expect(searchInput).toHaveValue('')

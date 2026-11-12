@@ -23,10 +23,14 @@ import {
   History,
   FolderTree,
   Sparkles,
+  Zap,
+  Play,
 } from "lucide-react";
+import { useStudioCan } from "../_components/studio-permissions-context";
 import { ManualRunPanel } from "./ManualRunPanel";
 import { TestCaseDirectoryTab } from "./TestCaseDirectoryTab";
 import { VisualCmsReviewClient } from "./visual-review/VisualCmsReviewClient";
+import { SystemRunModal } from "./SystemRunModal";
 import { ALL_TEST_CASES_DIRECTORY } from "@/lib/admin/qa/test-case-directory";
 
 interface ProjectHealthClientProps {
@@ -151,10 +155,13 @@ function formatDate(value?: string) {
 function FeatureHealthDetail({
   detail,
   onClose,
+  onNavigateToRuns,
 }: {
   detail: QaFeatureDetail;
   onClose: () => void;
+  onNavigateToRuns?: () => void;
 }) {
+  const canRun = useStudioCan()("qa.run");
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -173,6 +180,7 @@ function FeatureHealthDetail({
   }, [onClose]);
 
   const result = detail.result;
+  const [retestProfile, setRetestProfile] = useState<"smoke" | "regression" | "user_flow" | "impact" | "security">("smoke");
   const [retestStatus, setRetestStatus] = useState("");
   const [retestPending, setRetestPending] = useState(false);
   const [retestConfirming, setRetestConfirming] = useState(false);
@@ -181,17 +189,30 @@ function FeatureHealthDetail({
     setRetestStatus("");
     try {
       const response = await fetch(
-        `/api/admin/qa/targets/${encodeURIComponent(detail.target.targetId)}/retest`,
+        `/api/admin/qa/targets/${encodeURIComponent(detail.target.targetId)}/retest?profile=${retestProfile}`,
         { method: "POST", credentials: "same-origin" },
       );
-      const body = (await response.json()) as {
-        data?: { id?: string | number };
-        error?: string;
-      };
+      const text = await response.text();
+      let body: { data?: { id?: string | number; runId?: string | number }; error?: string } = {};
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = { error: text || "Không thể dispatch retest." };
+      }
       if (!response.ok)
         throw new Error(body.error ?? "Không thể dispatch retest.");
+      const profileName =
+        retestProfile === "regression"
+          ? "Regression"
+          : retestProfile === "user_flow"
+            ? "User Flows & Logic"
+            : retestProfile === "impact"
+              ? "Functional Impact"
+              : retestProfile === "security"
+                ? "Security"
+                : "Smoke";
       setRetestStatus(
-        `✓ Đã kích hoạt chạy test thành công (Dispatch #${body.data?.id ?? "1"}). Kết quả đã được đồng bộ vào 'Lịch sử chạy'.`,
+        `✓ Đã kích hoạt chạy ${profileName} test thành công (Dispatch #${body.data?.id ?? "1"}). Kết quả đã được đồng bộ vào 'Lịch sử chạy'.`,
       );
     } catch (error) {
       setRetestStatus(
@@ -383,7 +404,7 @@ function FeatureHealthDetail({
             <div className="border-b border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-4 py-2.5 font-bold uppercase tracking-wider text-xs text-zinc-700 dark:text-zinc-200 flex items-center justify-between">
               <span id="qa-coverage-gap-title">
                 {detail.retest.available
-                  ? "🎯 Sẵn sàng Thực thi Kiểm thử Smoke"
+                  ? "🎯 Sẵn sàng Thực thi Kiểm thử Target"
                   : "⚠️ Coverage QA Chưa Sẵn Sàng"}
               </span>
               <span className="rounded bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
@@ -398,13 +419,13 @@ function FeatureHealthDetail({
                   </td>
                   <td className="p-3.5 text-zinc-800 dark:text-zinc-200 font-semibold">
                     {detail.retest.available
-                      ? "Đã map theo Smoke Contract v1 (Certified Executable)"
+                      ? "Đã map theo Multi-Profile QA Contract (Smoke, Regression, User Flows, Impact, Security)"
                       : "Chưa được QA map"}
                   </td>
                 </tr>
                 <tr className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
                   <td className="w-48 border-r border-zinc-200 dark:border-zinc-800 p-3.5 font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/30">
-                    Gói Smoke Pack
+                    Gói Test Pack
                   </td>
                   <td className="p-3.5 text-zinc-800 dark:text-zinc-200 font-mono">
                     {detail.retest.available
@@ -418,7 +439,7 @@ function FeatureHealthDetail({
                   </td>
                   <td className="p-3.5 text-zinc-800 dark:text-zinc-200">
                     {detail.retest.available
-                      ? "Target đã sẵn sàng. Bấm 'Kích hoạt Retest Smoke' bên dưới để thực thi và cập nhật trạng thái Health."
+                      ? "Target đã sẵn sàng. Chọn 1 trong 5 profile và bấm 'Retest Ngay' bên dưới để thực thi và cập nhật trạng thái Health."
                       : "Bổ sung TC, fixture và pack trước khi chạy"}
                   </td>
                 </tr>
@@ -478,15 +499,24 @@ function FeatureHealthDetail({
                 <td className="border-r border-zinc-200 dark:border-zinc-800 p-3">
                   <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] font-bold">
                     <span className="rounded bg-blue-50 dark:bg-blue-950 px-2 py-0.5 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-                      smoke (nhanh)
+                      🚀 smoke (nhanh)
+                    </span>
+                    <span className="rounded bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                      🛡️ regression (toàn diện)
                     </span>
                     <span className="rounded bg-purple-50 dark:bg-purple-950 px-2 py-0.5 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-                      regression (toàn diện)
+                      🔄 user_flow (luồng e2e)
+                    </span>
+                    <span className="rounded bg-pink-50 dark:bg-pink-950 px-2 py-0.5 text-pink-600 dark:text-pink-400 border border-pink-200 dark:border-pink-800">
+                      🎯 impact (ảnh hưởng)
+                    </span>
+                    <span className="rounded bg-rose-50 dark:bg-rose-950 px-2 py-0.5 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                      🔐 security (bảo mật)
                     </span>
                   </div>
                 </td>
                 <td className="p-3 text-zinc-600 dark:text-zinc-400">
-                  Hỗ trợ cả chạy nhanh trên Web lẫn chạy toàn diện {ALL_TEST_CASES_DIRECTORY.length} kịch bản trong CI/CD.
+                  Hỗ trợ đầy đủ 5 profile kiểm thử (Smoke, Regression, User Flows, Impact, Security) với {ALL_TEST_CASES_DIRECTORY.length} kịch bản trong CI/CD & Web.
                 </td>
               </tr>
             </tbody>
@@ -507,8 +537,63 @@ function FeatureHealthDetail({
               </p>
             </div>
 
-            {detail.retest.available && (
-              <div className="flex items-center gap-2">
+            {detail.retest.available && canRun && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 p-1">
+                  <button
+                    type="button"
+                    aria-pressed={retestProfile === "smoke"}
+                    onClick={() => {
+                      setRetestProfile("smoke");
+                      setRetestConfirming(false);
+                    }}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${retestProfile === "smoke" ? "bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm border border-zinc-200 dark:border-zinc-600" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"}`}
+                  >
+                    🚀 Smoke
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={retestProfile === "regression"}
+                    onClick={() => {
+                      setRetestProfile("regression");
+                      setRetestConfirming(false);
+                    }}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${retestProfile === "regression" ? "bg-white dark:bg-zinc-700 text-indigo-600 dark:text-indigo-400 shadow-sm border border-zinc-200 dark:border-zinc-600" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"}`}
+                  >
+                    🛡️ Regression
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRetestProfile("user_flow");
+                      setRetestConfirming(false);
+                    }}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${retestProfile === "user_flow" ? "bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-400 shadow-sm border border-zinc-200 dark:border-zinc-600" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"}`}
+                  >
+                    🔄 User Flows
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRetestProfile("impact");
+                      setRetestConfirming(false);
+                    }}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${retestProfile === "impact" ? "bg-white dark:bg-zinc-700 text-pink-600 dark:text-pink-400 shadow-sm border border-zinc-200 dark:border-zinc-600" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"}`}
+                  >
+                    🎯 Impact
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRetestProfile("security");
+                      setRetestConfirming(false);
+                    }}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${retestProfile === "security" ? "bg-white dark:bg-zinc-700 text-rose-600 dark:text-rose-400 shadow-sm border border-zinc-200 dark:border-zinc-600" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"}`}
+                  >
+                    🔐 Security
+                  </button>
+                </div>
+
                 {retestConfirming ? (
                   <div className="flex items-center gap-2">
                     <button
@@ -534,7 +619,7 @@ function FeatureHealthDetail({
                       ) : (
                         <>
                           <span>✓</span>
-                          <span>Xác nhận chạy ngay</span>
+                          <span>Xác nhận chạy {retestProfile.toUpperCase()}</span>
                         </>
                       )}
                     </button>
@@ -545,10 +630,10 @@ function FeatureHealthDetail({
                     data-testid="qa-retest"
                     disabled={retestPending || Boolean(retestStatus)}
                     onClick={() => setRetestConfirming(true)}
-                    className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-5 py-2 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-60"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 px-5 py-2.5 text-xs font-black text-white shadow-md transition-all active:scale-95 disabled:opacity-60"
                   >
-                    <span>🚀</span>
-                    <span>Retest Smoke Ngay</span>
+                    <span>{retestProfile === "regression" ? "🛡️" : retestProfile === "user_flow" ? "🔄" : retestProfile === "impact" ? "🎯" : retestProfile === "security" ? "🔐" : "🚀"}</span>
+                    <span>Retest {retestProfile.replace("_", " ").toUpperCase()} Ngay</span>
                   </button>
                 )}
               </div>
@@ -566,8 +651,34 @@ function FeatureHealthDetail({
           )}
 
           {retestStatus && (
-            <div role="status" className="rounded-lg bg-blue-50 dark:bg-blue-950/60 p-3 text-xs font-semibold text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-              {retestStatus}
+            <div
+              role="status"
+              className={`mt-3 flex flex-col gap-2 rounded-xl p-4 text-xs shadow-sm border ${
+                retestStatus.startsWith("✓")
+                  ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800"
+                  : "bg-rose-50 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 border-rose-300 dark:border-rose-800"
+              }`}
+            >
+              <div className="flex items-center gap-2 font-bold">
+                <span
+                  className={`flex size-5 items-center justify-center rounded-full text-white text-[11px] ${
+                    retestStatus.startsWith("✓") ? "bg-emerald-600" : "bg-rose-600"
+                  }`}
+                >
+                  {retestStatus.startsWith("✓") ? "✓" : "✕"}
+                </span>
+                <span>{retestStatus}</span>
+              </div>
+              {retestStatus.startsWith("✓") && onNavigateToRuns && (
+                <button
+                  type="button"
+                  onClick={onNavigateToRuns}
+                  className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow transition-all active:scale-95"
+                >
+                  <span>⏱️ Xem kết quả chi tiết trong Lịch sử chạy</span>
+                  <span>→</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -651,6 +762,7 @@ function VisualComparison({
   detail: NonNullable<NonNullable<QaFeatureDetail["result"]>["visual"]>;
   resultId: string;
 }) {
+  const canReviewVisual = useStudioCan()("qa.visual");
   const [status, setStatus] = useState(detail.reviewStatus);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -724,7 +836,7 @@ function VisualComparison({
           ),
         )}
       </div>
-      {status === "pending_review" && (
+      {status === "pending_review" && canReviewVisual && (
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
@@ -765,6 +877,9 @@ function FindingReviewDialog({
   onClose: () => void;
   onPromoted: (finding: QaFindingSummary) => void;
 }) {
+  const can = useStudioCan();
+  const canPromote = can("qa.promote");
+  const canTriage = can("qa.triage");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [confirming, setConfirming] = useState(false);
   const [promoting, setPromoting] = useState(false);
@@ -902,7 +1017,7 @@ function FindingReviewDialog({
                 : ""}
             </a>
           </section>
-        ) : confirming ? (
+        ) : confirming && canPromote ? (
           <section
             data-testid="qa-finding-promotion-confirmation"
             className="mt-4 rounded-[var(--radius)] border border-[var(--warn)] bg-[var(--bg-sunk)] p-4"
@@ -932,14 +1047,14 @@ function FindingReviewDialog({
               </button>
             </div>
           </section>
-        ) : (
+        ) : canPromote || canTriage ? (
           <section className="mt-4 rounded-[var(--radius)] border border-[var(--border)] p-4">
             <h3 className="font-bold">Tạo GitHub ticket</h3>
             <p className="mt-1 text-sm text-[var(--text-2)]">
               Finding nội bộ được giữ nguyên cho đến khi tester xác nhận tạo
               ticket.
             </p>
-            <button
+            {canPromote && <button
               type="button"
               data-testid="qa-finding-open-promotion"
               disabled={finding.lifecycle === "verify_fix"}
@@ -947,8 +1062,8 @@ function FindingReviewDialog({
               className="mt-3 min-h-11 rounded-[var(--radius)] border border-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent)] disabled:opacity-60"
             >
               Tạo GitHub ticket
-            </button>
-            <button
+            </button>}
+            {canTriage && <button
               type="button"
               data-testid="qa-finding-dismiss"
               disabled={promoting || finding.lifecycle === "github_created"}
@@ -956,9 +1071,9 @@ function FindingReviewDialog({
               className="ml-2 mt-3 min-h-11 rounded-[var(--radius)] border border-[var(--border)] px-4 text-sm font-semibold disabled:opacity-60"
             >
               Đóng finding
-            </button>
+            </button>}
           </section>
-        )}
+        ) : null}
         {error && (
           <p role="alert" className="mt-3 text-sm text-[var(--danger)]">
             {error}
@@ -1587,9 +1702,15 @@ function RunHistory() {
           meta: { nextCursor?: string };
         };
         if (active) {
-          setRuns((current) =>
-            cursor === "0" ? body.data : [...current, ...body.data],
-          );
+          setRuns((current) => {
+            const combined = cursor === "0" ? body.data : [...current, ...body.data];
+            return [...combined].sort((a, b) => {
+              const timeA = a.finishedAt ? Date.parse(a.finishedAt) : 0;
+              const timeB = b.finishedAt ? Date.parse(b.finishedAt) : 0;
+              if (timeA !== timeB) return timeB - timeA;
+              return String(b.id).localeCompare(String(a.id));
+            });
+          });
           setHasMore(Boolean(body.meta.nextCursor));
           setNextCursor(body.meta.nextCursor);
         }
@@ -2230,6 +2351,7 @@ function ProjectHealthMap({
 }
 
 export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
+  const canRunTests = useStudioCan()("qa.run");
   const [activeTab, setActiveTab] = useState<"inbox" | "health" | "runs" | "testcases" | "visual_review">(
     () => {
       if (typeof window === "undefined") return "inbox";
@@ -2243,6 +2365,7 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
   const [loadError, setLoadError] = useState("");
   const [selected, setSelected] = useState<QaFeatureDetail | null>(null);
   const [findings, setFindings] = useState(initialData.findings?.items ?? []);
+  const [systemRunModalOpen, setSystemRunModalOpen] = useState(false);
   const [findingsLoaded, setFindingsLoaded] = useState(
     Boolean(initialData.findings),
   );
@@ -2379,33 +2502,113 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
     }
   };
 
+  const totalTargets = initialData.targets.length;
+  const criticalCount = initialData.targets.filter((t) => t.state === "Critical").length;
+  const nonCriticalCount = totalTargets - criticalCount;
+  const healthPercent = totalTargets > 0 ? Math.round((nonCriticalCount / totalTargets) * 100) : 100;
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 text-[var(--text)]">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      {/* ── Header Command Bar ── */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-zinc-200 dark:border-slate-800/80 pb-5">
         <div>
-          <h1 className="text-[26px] font-extrabold tracking-[-0.035em]">
-            QA Control Center
-          </h1>
-          <p className="mt-1 text-[14px] text-[var(--text-2)]">
-            Quan sát sức khỏe CMS PrimeWeb và xử lý tín hiệu cần kiểm tra.
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-3 rounded-full bg-cyan-500 dark:bg-cyan-400 animate-pulse ring-4 ring-cyan-500/20" />
+            <h1 className="text-[26px] font-black tracking-[-0.035em] text-zinc-900 dark:bg-gradient-to-r dark:from-white dark:via-slate-100 dark:to-slate-400 dark:bg-clip-text dark:text-transparent">
+              QA Control Center
+            </h1>
+            <span className="rounded-md border border-zinc-300 dark:border-slate-700/80 bg-zinc-100 dark:bg-slate-800/60 px-2 py-0.5 text-[10px] font-mono font-bold text-zinc-700 dark:text-slate-300 shadow-sm">
+              MISSION CONTROL v2.0
+            </span>
+          </div>
+          <p className="mt-1 text-[13px] text-zinc-600 dark:text-slate-400 flex items-center gap-2">
+            <span>Giám sát thời gian thực sức khỏe CMS PrimeWeb và điều phối kiểm thử tự động.</span>
+            <span className="hidden sm:inline text-zinc-400 dark:text-slate-600">·</span>
+            <span className="hidden sm:inline font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">● Staging Revision Active</span>
           </p>
         </div>
-        <button
-          ref={manualRunTrigger}
-          type="button"
-          onClick={() => {
-            setActiveTab("runs");
-            setManualRunRequest((current) => current + 1);
-          }}
-          className="min-h-11 shrink-0 rounded-[var(--radius)] bg-[var(--text)] px-4 text-[13px] font-bold text-[var(--bg)] shadow-[0_4px_10px_color-mix(in_srgb,var(--text)_20%,transparent)] transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 sm:min-h-10"
-        >
-          Chạy test thủ công
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {canRunTests && <button
+            type="button"
+            data-testid="qa-run-all-system-button"
+            onClick={() => setSystemRunModalOpen(true)}
+            className="min-h-11 sm:min-h-10 flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 px-4 text-[13px] font-black text-white shadow-lg shadow-amber-500/25 transition-all duration-200 active:scale-95 border border-amber-400/30"
+          >
+            <Zap className="size-4 shrink-0 fill-current animate-pulse" />
+            <span>Chạy Toàn Bộ Hệ Thống (Run All)</span>
+          </button>}
+          {canRunTests && <button
+            ref={manualRunTrigger}
+            type="button"
+            onClick={() => {
+              setActiveTab("runs");
+              setManualRunRequest((current) => current + 1);
+            }}
+            className="min-h-11 sm:min-h-10 flex items-center gap-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border-2 border-zinc-400/90 dark:border-slate-500 hover:border-zinc-500 dark:hover:border-slate-400 px-4 text-[13px] font-black text-zinc-900 dark:text-white shadow-sm transition-all duration-200 active:scale-95"
+          >
+            <Play className="size-3.5 shrink-0 fill-current text-zinc-800 dark:text-slate-200" />
+            <span>Chạy test theo target</span>
+          </button>}
+        </div>
       </header>
+
+      {/* ── Telemetry Health Ribbon ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="flex items-center gap-3.5 rounded-2xl border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-4 shadow-sm backdrop-blur-md">
+          <div className="flex size-11 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+            <Activity className="size-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-slate-400">Sức Khỏe Hệ Thống</span>
+              <span className="inline-block size-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
+            </div>
+            <p className="mt-0.5 font-mono text-xl font-black text-zinc-900 dark:text-white">
+              {healthPercent}% <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 font-sans">Khỏe mạnh</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3.5 rounded-2xl border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-4 shadow-sm backdrop-blur-md">
+          <div className="flex size-11 items-center justify-center rounded-xl bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/20 text-cyan-600 dark:text-cyan-400">
+            <FolderTree className="size-5" />
+          </div>
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-slate-400">CMS Targets</span>
+            <p className="mt-0.5 font-mono text-xl font-black text-zinc-900 dark:text-white">
+              {totalTargets}/{totalTargets} <span className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 font-sans">(100% Phủ Sóng)</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3.5 rounded-2xl border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-4 shadow-sm backdrop-blur-md">
+          <div className="flex size-11 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+            <Sparkles className="size-5" />
+          </div>
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-slate-400">Test Directory</span>
+            <p className="mt-0.5 font-mono text-xl font-black text-zinc-900 dark:text-white">
+              {ALL_TEST_CASES_DIRECTORY.length} <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 font-sans">Test Cases</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3.5 rounded-2xl border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-4 shadow-sm backdrop-blur-md">
+          <div className={`flex size-11 items-center justify-center rounded-xl ${items.length > 0 ? "bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400" : "bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400"}`}>
+            <InboxIcon className="size-5" />
+          </div>
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-slate-400">Hộp Việc Cần Xử Lý</span>
+            <p className="mt-0.5 font-mono text-xl font-black text-zinc-900 dark:text-white">
+              {items.length} <span className={`text-xs font-semibold font-sans ${items.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>{items.length > 0 ? "Mục cần kiểm tra" : "Hoàn hảo"}</span>
+            </p>
+          </div>
+        </div>
+      </div>
       <div
         role="tablist"
         aria-label="QA Control Center"
-        className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-900/70 dark:bg-slate-900/90 rounded-2xl border border-slate-800 shadow-sm"
+        className="flex flex-wrap items-center gap-2 p-1.5 bg-zinc-100 dark:bg-slate-900/90 rounded-2xl border border-zinc-200 dark:border-slate-800 shadow-sm"
       >
         <button
           ref={(element) => {
@@ -2421,14 +2624,14 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           onClick={() => setActiveTab("inbox")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
             activeTab === "inbox"
-              ? "bg-slate-800 text-white shadow border border-slate-700"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+              ? "bg-white text-zinc-950 shadow-sm border border-zinc-300 dark:bg-slate-800 dark:text-white dark:border-slate-700"
+              : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/40"
           }`}
         >
           <InboxIcon className="size-4 shrink-0" />
           <span>Việc cần xử lý</span>
           {items.length > 0 && (
-            <span className="ml-1 rounded-full bg-red-500/20 border border-red-500/40 px-2 py-0.5 text-xs text-red-400 font-extrabold">
+            <span className="ml-1 rounded-full bg-red-100 text-red-700 border border-red-200 dark:bg-red-500/20 dark:border-red-500/40 dark:text-red-400 px-2 py-0.5 text-xs font-extrabold">
               {items.length}
             </span>
           )}
@@ -2448,8 +2651,8 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           onClick={() => setActiveTab("health")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
             activeTab === "health"
-              ? "bg-slate-800 text-white shadow border border-slate-700"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+              ? "bg-white text-zinc-950 shadow-sm border border-zinc-300 dark:bg-slate-800 dark:text-white dark:border-slate-700"
+              : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/40"
           }`}
         >
           <Activity className="size-4 shrink-0" />
@@ -2470,8 +2673,8 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           onClick={() => setActiveTab("runs")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
             activeTab === "runs"
-              ? "bg-slate-800 text-white shadow border border-slate-700"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+              ? "bg-white text-zinc-950 shadow-sm border border-zinc-300 dark:bg-slate-800 dark:text-white dark:border-slate-700"
+              : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/40"
           }`}
         >
           <History className="size-4 shrink-0" />
@@ -2492,13 +2695,13 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           onClick={() => setActiveTab("testcases")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
             activeTab === "testcases"
-              ? "bg-slate-800 text-white shadow border border-slate-700"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+              ? "bg-white text-zinc-950 shadow-sm border border-zinc-300 dark:bg-slate-800 dark:text-white dark:border-slate-700"
+              : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/40"
           }`}
         >
           <FolderTree className="size-4 shrink-0" />
           <span>Danh mục Test Cases</span>
-          <span className="ml-1 rounded-full bg-cyan-950 border border-cyan-700/80 px-2 py-0.5 text-xs text-cyan-300 font-bold font-mono">
+          <span className="ml-1 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-300 dark:bg-cyan-950 dark:border-cyan-700/80 dark:text-cyan-300 px-2 py-0.5 text-xs font-bold font-mono">
             {ALL_TEST_CASES_DIRECTORY.length}
           </span>
         </button>
@@ -2515,18 +2718,18 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           aria-controls="qa-visual-review-panel"
           onKeyDown={(event) => onTabKeyDown(event, 4)}
           onClick={() => setActiveTab("visual_review")}
-          className={`relative ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-extrabold transition-all duration-200 ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-extrabold transition-all duration-200 ${
             activeTab === "visual_review"
               ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 shadow-lg shadow-cyan-500/25 ring-2 ring-cyan-300"
-              : "bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 border border-cyan-500/50 shadow-sm"
+              : "bg-cyan-100 dark:bg-cyan-950/40 hover:bg-cyan-200/60 dark:hover:bg-cyan-900/50 text-cyan-800 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-500/50 shadow-sm"
           }`}
         >
-          <Sparkles className={`size-4 shrink-0 ${activeTab === "visual_review" ? "text-slate-950" : "text-cyan-400 animate-pulse"}`} />
+          <Sparkles className={`size-4 shrink-0 ${activeTab === "visual_review" ? "text-slate-950" : "text-cyan-600 dark:text-cyan-400 animate-pulse"}`} />
           <span>Visual CMS Review</span>
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider uppercase ${
             activeTab === "visual_review"
               ? "bg-slate-950 text-cyan-300"
-              : "bg-cyan-500 text-slate-950"
+              : "bg-cyan-600 text-white dark:bg-cyan-500 dark:text-slate-950"
           }`}>
             100% UI
           </span>
@@ -2588,6 +2791,7 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
         >
           <ManualRunPanel
             openRequest={manualRunRequest}
+            onConsumeOpenRequest={() => setManualRunRequest(0)}
             externalOpenButton={manualRunTrigger}
             targets={initialData.targets.map((target) => ({
               id: target.targetId,
@@ -2623,7 +2827,14 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
         </section>
       )}
       {selected && (
-        <FeatureHealthDetail detail={selected} onClose={closeDetail} />
+        <FeatureHealthDetail
+          detail={selected}
+          onClose={closeDetail}
+          onNavigateToRuns={() => {
+            closeDetail();
+            setActiveTab("runs");
+          }}
+        />
       )}
       {selectedFinding && (
         <FindingReviewDialog
@@ -2632,6 +2843,13 @@ export function ProjectHealthClient({ initialData }: ProjectHealthClientProps) {
           onPromoted={promotedFinding}
         />
       )}
+      <SystemRunModal
+        isOpen={systemRunModalOpen && canRunTests}
+        onClose={() => setSystemRunModalOpen(false)}
+        onNavigateToRuns={() => {
+          setActiveTab("runs");
+        }}
+      />
     </div>
   );
 }

@@ -26,14 +26,21 @@ vi.mock('payload', () => {
     }
 })
 
+// The caller's session (getCurrentUser is unit-tested in session-fast-path / auth tests): each test sets what it
+// resolves to as `{ user }`.
+const session = vi.fn()
+vi.mock('@/lib/auth', () => ({
+    getCurrentUser: vi.fn(async () => (await session())?.user ?? null),
+}))
+
 describe('PUT /api/v1/sso/reset-password', () => {
     let mockPayload: any
 
     beforeEach(() => {
         vi.clearAllMocks()
+        session.mockReset()
 
         mockPayload = {
-            auth: vi.fn(),
             find: vi.fn(),
             update: vi.fn(),
         }
@@ -57,7 +64,7 @@ describe('PUT /api/v1/sso/reset-password', () => {
     })
 
     it('rejects if token is invalid', async () => {
-        mockPayload.auth.mockResolvedValue({ user: null })
+        session.mockResolvedValue({ user: null })
         const req = createMockRequest({ authorization: 'Bearer bad_token' }, {})
         const res = await PUT(req) as unknown as { data: any, status: number }
 
@@ -66,7 +73,7 @@ describe('PUT /api/v1/sso/reset-password', () => {
     })
 
     it('rejects if user is not super-admin', async () => {
-        mockPayload.auth.mockResolvedValue({
+        session.mockResolvedValue({
             user: { roles: ['editor'] }
         })
         const req = createMockRequest({ authorization: 'Bearer token123' }, {})
@@ -77,7 +84,7 @@ describe('PUT /api/v1/sso/reset-password', () => {
     })
 
     it('rejects if missing required fields', async () => {
-        mockPayload.auth.mockResolvedValue({
+        session.mockResolvedValue({
             user: { roles: ['super-admin'] }
         })
         const req = createMockRequest({ authorization: 'Bearer token123' }, {
@@ -91,7 +98,7 @@ describe('PUT /api/v1/sso/reset-password', () => {
     })
 
     it('returns 404 if user not found', async () => {
-        mockPayload.auth.mockResolvedValue({
+        session.mockResolvedValue({
             user: { roles: ['super-admin'] }
         })
         mockPayload.find.mockResolvedValue({ docs: [] })
@@ -107,7 +114,7 @@ describe('PUT /api/v1/sso/reset-password', () => {
     })
 
     it('successfully updates user password', async () => {
-        mockPayload.auth.mockResolvedValue({
+        session.mockResolvedValue({
             user: { roles: ['super-admin'] }
         })
         mockPayload.find.mockResolvedValue({ docs: [{ id: 50, email: 'user@test.com' }] })
@@ -134,7 +141,7 @@ describe('PUT /api/v1/sso/reset-password', () => {
     })
 
     it('returns 500 on internal errors', async () => {
-        mockPayload.auth.mockResolvedValue({
+        session.mockResolvedValue({
             user: { roles: ['super-admin'] }
         })
 

@@ -1,6 +1,6 @@
 /**
  * PATCH /api/admin/categories/[id]/dna
- * Updates the DNA JSON field on a category. Super-admin only.
+ * Updates the DNA JSON field on a category. Needs category.edit.
  */
 export const dynamic = 'force-dynamic'
 
@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
-import { withSuperAdmin } from '@/lib/admin/api-utils'
+import { withStudioPermission } from '@/lib/admin/api-utils'
 
 const PERSONALITY_VALUES = [
     'warm-traditional', 'warm-homestyle', 'bold-dark', 'soft-feminine',
@@ -27,7 +27,7 @@ const DnaSchema = z.object({
 
 type RouteContext = { params: Promise<{ id: string }> }
 
-export const PATCH = withSuperAdmin(async (req: NextRequest, _ctx) => {
+export const PATCH = withStudioPermission('category.edit', async (req: NextRequest, _ctx) => {
     // Extract dynamic param from the URL path directly (workaround for withSuperAdmin wrapper)
     const segments = req.nextUrl.pathname.split('/')
     // path: /api/admin/categories/[id]/dna → id at index -2

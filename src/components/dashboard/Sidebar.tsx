@@ -10,7 +10,7 @@
  *   (no fake data — nothing renders until the layout wires real counts), hidden when 0/undefined.
  * - Active item: teal highlight via --primary token (theme-aware: light #00D3D4 / dark #2DD4BF, GH-1192).
  * - Footer (language switch) and mobile drawer behavior are unchanged from F18 v1.
- * - Collapse/mini mode (phase-02): desktop aside shrinks to 64px icon-only with EN tooltips
+ * - Collapse/mini mode (phase-02): desktop aside shrinks to 64px icon-only with localized tooltips
  *   and dot badges; the mobile drawer always renders full. State lives in CMSLayoutClient.
  *
  * Decisions locked 2026-06-11 (Duy Linh): Media stays OUT of the nav (old-version parity);
@@ -19,7 +19,7 @@
 
 import { useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Globe, ChevronsRight, ChevronsLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -62,6 +62,10 @@ type SidebarProps = {
 
 export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', permissions = [], isSuperAdmin = false, mobileOpen, setMobileOpen, badgeCounts, collapsed = false, animateCollapse = false, isProduction = false, onToggleCollapsed }: SidebarProps) {
     const pathname = usePathname()
+    const router = useRouter()
+    // Prefetch a page when the merchant reaches for its link (hover, focus, touch), not when the link is on screen:
+    // viewport prefetch asked the server for every sidebar page on each page load (~30 RSC requests per load).
+    const prefetchOnIntent = (href: string) => () => router.prefetch(href)
     const { locale, toggleLocale, setLocale } = useI18n()
 
     // Filter sections per role + custom permissions (shared 5-tier gate — same rules for both sidebars)
@@ -106,11 +110,16 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
         const isActive = isPathActive(pathname, leaf.href)
         const count = leaf.badgeKey ? badgeCounts?.[leaf.badgeKey] : undefined
         const hasCount = count != null && count > 0
+        const badgeHint = leaf.badgeHint ? (locale === 'ms' ? leaf.badgeHint.ms : leaf.badgeHint.en) : undefined
 
         const link = (
             <Link
                 key={leaf.href}
                 href={leaf.href}
+                prefetch={false}
+                onMouseEnter={prefetchOnIntent(leaf.href)}
+                onFocus={prefetchOnIntent(leaf.href)}
+                onTouchStart={prefetchOnIntent(leaf.href)}
                 className={cn(
                     // Responsive height: 34px on large screens (≥1536px / 1920), tighter on smaller laptops.
                     // Label is 12px on the mobile/tablet drawer (< lg) and 13px on the desktop sidebar (lg+).
@@ -142,13 +151,17 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                         <span className="flex-1">{label}</span>
                         {/* Badge — cyan when item active, neutral otherwise; hidden when 0/undefined */}
                         {hasCount && (
-                            <span className={cn(
+                            <span
+                                title={badgeHint}
+                                className={cn(
                                 'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none',
                                 isActive
                                     ? 'bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]'
                                     : 'bg-dash-surface-hover text-dash-text-muted'
                             )}>
                                 {formatBadgeCount(count)}
+                                {/* Screen readers hear what the number counts: "175 Pending orders" */}
+                                {badgeHint && <span className="sr-only"> {badgeHint}</span>}
                             </span>
                         )}
                     </>
@@ -162,7 +175,10 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
         return (
             <Tooltip key={leaf.href}>
                 <TooltipTrigger asChild>{link}</TooltipTrigger>
-                <TooltipContent side="right">{leaf.label.en}</TooltipContent>
+                <TooltipContent side="right">
+                    {/* Mini mode hides the number, so the hint carries it: "Orders · 175 Pending orders" */}
+                    {hasCount && badgeHint ? `${label} · ${count} ${badgeHint}` : label}
+                </TooltipContent>
             </Tooltip>
         )
     }

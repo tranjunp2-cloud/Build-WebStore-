@@ -19,13 +19,7 @@
  * matching pre-fix behavior exactly (see route.ts imagePoolPromise IIFE).
  */
 
-import OpenAI from 'openai'
-
-function getOpenAI(): OpenAI | null {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
-    return new OpenAI({ apiKey: key })
-}
+import { completeComposed, currentAiActor } from '@/lib/ai-platform/actor-scope'
 
 export interface ExtractImageKeywordsInput {
     businessName?: string
@@ -62,8 +56,7 @@ function capWords(term: string, max: number): string {
 export async function extractImageKeywords(
     input: ExtractImageKeywordsInput,
 ): Promise<string[]> {
-    const openai = getOpenAI()
-    if (!openai) return []
+    if (!currentAiActor()) return []
 
     const { businessName, industry, shortDescription, products, language } = input
     const hasContent = [businessName, industry, shortDescription, products].some(
@@ -84,24 +77,15 @@ export async function extractImageKeywords(
         .join('\n')
 
     try {
-        const completion = await openai.chat.completions.create(
-            {
-                model: 'gpt-4.1-nano',
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: userPrompt },
-                ],
-                temperature: 0.4,
-                max_tokens: 120,
-                response_format: { type: 'json_object' },
-            },
-            // fail-fast — falls back to [] on timeout. maxRetries: 0 disables
-            // the SDK's default 2 retries; without it a degraded OpenAI turns
-            // the "10s" budget into ~30s+ at the head of the pool chain.
-            { timeout: 10000, maxRetries: 0 },
-        )
+        // fail-fast — falls back to [] on timeout (the task allows one 10s attempt).
+        const completion = await completeComposed('sitegen.image-keywords', {
+            system: SYSTEM_PROMPT,
+            user: userPrompt,
+            temperature: 0.4,
+            maxOutputTokens: 120,
+        })
 
-        const content = completion.choices[0]?.message?.content
+        const content = completion.content
         if (!content) return []
 
         const parsed: unknown = JSON.parse(content)

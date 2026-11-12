@@ -75,6 +75,12 @@ test.describe('GH-1611 bakery gallery image relevance', () => {
         test.setTimeout(360_000)
 
         await page.goto('/builder/new')
+        await page.waitForLoadState('networkidle')
+        // GH-2154: an account that already owns a site is redirected away from the builder.
+        if (new URL(page.url()).pathname.startsWith('/dashboard')) {
+            test.skip(true, 'GH-2154: account already owns a site; needs a no-site e2e account')
+            return
+        }
         await expect(page.locator('form input').first()).toBeVisible()
 
         await page.locator('form input').first().fill(`GH1611 Bakery ${Date.now()}`)

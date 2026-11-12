@@ -3,14 +3,15 @@
  * Bulk actions: publish | archive | schedule | delete | re-score
  *
  * re-score: max 20 templates per call (Vercel 60s timeout constraint).
- * Rate-limited: 10 req/min/IP.
+ * Rate-limited: 10 req/min per user, so one person's refused calls do not use up the office's shared IP.
  */
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { withSuperAdmin, BulkActionSchema, checkRateLimit } from '@/lib/admin/api-utils'
+import { studioForbidden, withStudioSeat, BulkActionSchema, checkRateLimit } from '@/lib/admin/api-utils'
+import { canSetTemplateStatus, hasStudioPermission } from '@/lib/admin/studio-permissions'
 import { scoreFixture, loadRubric, DEFAULT_RUBRIC_VERSION } from '@/lib/ai-quality/scorer'
 import type { RubricVersion } from '@/lib/ai-quality/scorer'
 import type { HarnessBlock } from '../../../../../../scripts/test-harness/types'
@@ -47,9 +48,8 @@ function extractTemplateBlocks(template: Record<string, unknown>): HarnessBlock[
         : []
 }
 
-export const POST = withSuperAdmin(async (req: NextRequest) => {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-    if (!checkRateLimit(`bulk:${ip}`)) {
+export const POST = withStudioSeat(async (req: NextRequest, { user }) => {
+    if (!checkRateLimit(`bulk:${user.id}`)) {
         return NextResponse.json({ error: 'Rate limit exceeded. Try again in a minute.' }, { status: 429 })
     }
 
@@ -67,6 +67,10 @@ export const POST = withSuperAdmin(async (req: NextRequest) => {
     }
 
     const { ids, action, scheduledFor, rubricVersion } = parsed.data
+
+    // Each action has its own owner. Archive is checked per template below because it depends on the status.
+    const requiredPermission = action === 're-score' ? 'template.score' : action === 'publish' || action === 'schedule' ? 'template.review' : null
+    if (requiredPermission && !hasStudioPermission(user.roles, requiredPermission)) return studioForbidden()
 
     if (action === 'schedule' && !scheduledFor) {
         return NextResponse.json({ error: 'scheduledFor is required for schedule action' }, { status: 422 })
@@ -155,6 +159,11 @@ export const POST = withSuperAdmin(async (req: NextRequest) => {
 
     for (const id of ids) {
         try {
+            const current = await payload.findByID({ collection: 'templates', id: id as string, depth: 0 })
+            if (!canSetTemplateStatus(user.roles, current.status, newStatus)) {
+                results.push({ id, ok: false, error: 'Forbidden' })
+                continue
+            }
             const updateData: Record<string, unknown> = { status: newStatus }
             if (action === 'schedule' && scheduledFor) {
                 updateData.scheduledFor = scheduledFor

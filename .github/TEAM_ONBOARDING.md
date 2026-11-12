@@ -68,7 +68,7 @@ Rule: dòng đầu ≤ 72 ký tự; dùng thể mệnh lệnh ("add", "fix"); c�
 | 1 | Lấy code mới: `git checkout main` → `git pull origin main` (hoặc `staging` nếu làm từ staging). |
 | 2 | Tạo branch: `git checkout -b feature/PROJ-123-mô-tả` (hoặc fix/..., chore/...). |
 | 3 | Code và commit: `git add .` → `git commit -m "type(scope): mô tả"`. |
-| 4 | **Trước khi push:** Chạy local: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`. Chỉ push khi cả 4 pass. |
+| 4 | **Trước khi push:** `npm run verify` (husky `pre-push` tự chạy — không dùng `--no-verify`). |
 | 5 | Push và tạo PR: `git push -u origin <branch>` → GitHub: Compare & pull request, **base = staging**, điền đủ template, assign reviewer. |
 | 6 | Cập nhật branch với base: Nếu staging/main có commit mới → rebase/merge base vào branch → push lại. |
 | 7 | Sau khi merge: Xóa branch (trên GitHub hoặc local). |
@@ -91,7 +91,9 @@ Chi tiết từng bước: [GIT_AND_CI_RULES.md §10](.github/GIT_AND_CI_RULES.m
 
 ## 5. CI — Giữ pipeline xanh
 
-Workflow: [.github/workflows/ci.yml](.github/workflows/ci.yml). Chạy trên mọi **push** và **pull_request** vào `main`, `staging`.
+Workflow: [.github/workflows/ci.yml](.github/workflows/ci.yml). Trên PR, CI chỉ chạy phần liên quan file đã sửa (chi tiết: [GIT_AND_CI_RULES.md §5.1](GIT_AND_CI_RULES.md)); full test suite chạy khi PR vào `main` và sau khi merge vào `staging`.
+
+Local trước khi push:
 
 | Bước | Lệnh |
 |------|------|
@@ -100,7 +102,7 @@ Workflow: [.github/workflows/ci.yml](.github/workflows/ci.yml). Chạy trên m�
 | 3 | `npm run test` |
 | 4 | `npm run build` |
 
-**Trách nhiệm dev:** Trước khi push/tạo PR, chạy đủ 4 lệnh trên local. Chỉ push khi pass. Nếu CI đỏ → sửa trên branch (lint/type/test/build) rồi push lại.
+**Trách nhiệm dev:** hook `pre-commit` / `pre-push` chạy các bước trên tự động (chi tiết: [GIT_AND_CI_RULES.md §5.1](GIT_AND_CI_RULES.md)). Nếu CI vẫn đỏ → sửa trên branch rồi push lại.
 
 ---
 

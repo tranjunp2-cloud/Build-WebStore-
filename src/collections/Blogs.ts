@@ -1,4 +1,5 @@
 import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload'
+import { runAfterResponse } from '@/lib/runtime/run-after-response'
 
 function unwrapRelationId(
     value: string | number | { id: string | number } | null | undefined,
@@ -12,7 +13,7 @@ function getActorTenantId(user: unknown) {
     return unwrapRelationId(typedUser?.tenants?.[0]?.tenant)
 }
 
-const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation, originalDoc }) => {
+const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation, originalDoc, context }) => {
     const isSuperAdmin = Boolean(req.user?.roles?.includes('super-admin'))
     const actorTenantId = getActorTenantId(req.user)
     const originalTenantId = unwrapRelationId(originalDoc?.tenant)
@@ -32,6 +33,7 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
         const requestedSiteId = unwrapRelationId(data.site)
         if (requestedSiteId != null && String(requestedSiteId) !== String(originalSiteId ?? '')) {
             const siteCheck = await req.payload.find({
+                req,
                 collection: 'sites',
                 where: { id: { equals: requestedSiteId }, tenant: { equals: safeTenantId } },
                 limit: 1,
@@ -56,6 +58,7 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
         (categoryWasProvided || tenantWasProvided || operation === 'create')
     ) {
         const categoryDoc = await req.payload.findByID({
+            req,
             collection: 'blog_categories',
             id: finalCategoryId,
             overrideAccess: true,
@@ -76,6 +79,7 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
         }
         if (!data.site && data.tenant) {
             const siteRes = await req.payload.find({
+                req,
                 collection: 'sites',
                 where: { tenant: { equals: data.tenant } },
                 limit: 1,
@@ -84,6 +88,19 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
                 data.site = siteRes.docs[0].id
             }
         }
+    }
+
+    // #2103 M1: an owner who changes the status of a generator-seeded post has made their own call about it
+    // (publish, unpublish, schedule). Clear the marker so a later site publish never overrules them.
+    // The site publish promotes with `context.promoteAiSeeded`, which is the system's change, not the owner's.
+    if (
+        operation === 'update' &&
+        originalDoc?.aiSeeded === true &&
+        data.status !== undefined &&
+        data.status !== originalDoc.status &&
+        !context?.promoteAiSeeded
+    ) {
+        data.aiSeeded = false
     }
 
     return data
@@ -99,6 +116,9 @@ export function validateBlogSlug(value: unknown): true | string {
 
 export const Blogs: CollectionConfig = {
     slug: 'blogs',
+    // "Delete" moves a post to the trash (deletedAt); reads skip trashed posts and it can be restored
+    trash: true,
+    indexes: [{ fields: ['tenant', 'slug'], unique: true }],
     hooks: {
         beforeChange: [beforeChangeHook],
         afterChange: [
@@ -106,19 +126,19 @@ export const Blogs: CollectionConfig = {
                 const isPublishing = doc.status === 'published' && previousDoc?.status !== 'published'
                 if (!isPublishing) return doc
                 if (context?.skipPublishNotify) return doc
-                // Fire-and-forget: notify tenant owners of published blog
-                import('@/lib/notifications/notify-tenant-owners')
-                    .then(({ notifyTenantOwners }) => {
-                        const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
-                        return notifyTenantOwners(req.payload, tenantId, {
-                            type: 'BLOG_PUBLISHED',
-                            title: 'Blog Published',
-                            message: `${doc.title} has been published`,
-                            actionUrl: '/blog',
-                            metadata: { blogTitle: doc.title },
-                        })
+                // Notify tenant owners of published blog after the response is sent
+                const payload = req.payload
+                const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+                runAfterResponse('Notification BLOG_PUBLISHED', async () => {
+                    const { notifyTenantOwners } = await import('@/lib/notifications/notify-tenant-owners')
+                    await notifyTenantOwners(payload, tenantId, {
+                        type: 'BLOG_PUBLISHED',
+                        title: 'Blog Published',
+                        message: `${doc.title} has been published`,
+                        actionUrl: '/blog',
+                        metadata: { blogTitle: doc.title },
                     })
-                    .catch((err) => console.error('[Notification] BLOG_PUBLISHED hook failed', err))
+                })
                 return doc
             },
         ],
@@ -193,7 +213,6 @@ export const Blogs: CollectionConfig = {
             name: 'slug',
             type: 'text',
             required: true,
-            unique: true,
             index: true,
             validate: validateBlogSlug,
         },
@@ -242,6 +261,31 @@ export const Blogs: CollectionConfig = {
             type: 'relationship',
             relationTo: 'users',
             required: true,
+        },
+        {
+            // The copilot change that created this draft: its replay key (a retried approval finds this post
+            // instead of making a second one). Set by the server only (saveBlogForUser), never by a request.
+            name: 'aiChangeSetId',
+            type: 'text',
+            index: true,
+            admin: { hidden: true },
+            access: {
+                create: () => false,
+                update: () => false,
+            },
+        },
+        {
+            // Set when the site generator seeded this draft; the site's first publish takes it live and clears
+            // it. An explicit marker (not a slug prefix) so an owner draft like `10-tips-for-…` is never caught.
+            name: 'aiSeeded',
+            type: 'checkbox',
+            defaultValue: false,
+            index: true,
+            admin: { hidden: true },
+            access: {
+                create: () => false,
+                update: () => false,
+            },
         },
         {
             name: 'seo',

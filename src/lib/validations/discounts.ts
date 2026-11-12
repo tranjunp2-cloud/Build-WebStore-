@@ -58,5 +58,8 @@ const discountBaseObject = z.object({
 export const createDiscountSchema = withDiscountRefinements(discountBaseObject)
 
 // For updates: all fields optional, protected fields excluded
-const updateBaseObject = discountBaseObject.partial()
+const updateBaseObject = discountBaseObject.partial().extend({
+    // the `updatedAt` the form loaded: a discount changed since is refused (409 VERSION_CONFLICT). Not a stored field.
+    expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
+})
 export const updateDiscountSchema = withDiscountRefinements(updateBaseObject)

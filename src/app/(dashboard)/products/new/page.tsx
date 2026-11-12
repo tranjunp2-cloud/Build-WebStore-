@@ -6,6 +6,8 @@ import { ProductForm } from '@/components/dashboard/product-form/ProductForm'
 import { ProductFormValues } from '@/components/dashboard/product-form/schema'
 import { useI18n } from '@/i18n'
 import { saveProductAction } from '../actions'
+import { isFieldErrorsResult } from '@/lib/products/server-errors'
+import { useInvalidateDomain } from '@/hooks/queries/use-invalidate-domain'
 
 function slugify(text: string) {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -33,6 +35,7 @@ const textToLexical = (text: string) => {
 export default function NewProductPage() {
     const router = useRouter()
     const { t } = useI18n()
+    const invalidateDomain = useInvalidateDomain()
 
     const handleSave = async (data: ProductFormValues) => {
         const body = {
@@ -77,7 +80,9 @@ export default function NewProductPage() {
         }
 
         try {
-            await saveProductAction(body)
+            const saved = await saveProductAction(body)
+            if (isFieldErrorsResult(saved)) return { fieldErrors: saved.fieldErrors }
+            void invalidateDomain('products')
             toast.success(t.dashboard.products.form.draftSaved)
             setTimeout(() => {
                 router.push('/products')

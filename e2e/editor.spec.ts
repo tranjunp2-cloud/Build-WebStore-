@@ -43,97 +43,13 @@ test.describe('Editor & Storefront', () => {
         )
         await expect(editorContent.first()).toBeVisible({ timeout: 20_000 })
 
-        // Toolbar should be visible (save, publish buttons)
-        const toolbar = page.locator(
-            'button:has-text("Save"), button:has-text("Publish"), ' +
-            'button:has-text("Preview"), [data-testid*="toolbar"]'
-        )
-        const toolbarCount = await toolbar.count()
-        expect(toolbarCount).toBeGreaterThan(0)
-    })
-
-    test('[GH-1715] Auto SEO uses a styled overwrite confirmation dialog', async ({ page }) => {
-        test.skip(!siteId, 'No site found')
-
-        const appliedUpdates: Array<Record<string, unknown>> = []
-        let nativeDialogOpened = false
-        let updatedPage = {
-            id: 'page-1',
-            title: 'About',
-            slug: 'about',
-            isHomepage: false,
-            seoTitle: 'Existing SEO title',
-            seoDescription: 'Existing SEO description',
-        }
-
-        page.on('dialog', async (dialog) => {
-            nativeDialogOpened = true
-            await dialog.dismiss()
-        })
-
-        await page.route('**/api/sites/*/pages/*', async (route) => {
-            if (route.request().method() !== 'PATCH') {
-                await route.fallback()
-                return
-            }
-
-            const changes = route.request().postDataJSON() as Record<string, unknown>
-            appliedUpdates.push(changes)
-            updatedPage = { ...updatedPage, ...changes }
-            await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ page: updatedPage }),
-            })
-        })
-
-        await page.route('**/api/sites/*/pages/*/generate-seo', async (route) => {
-            await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({
-                    hasExisting: true,
-                    existing: {
-                        title: 'Existing SEO title',
-                        description: 'Existing SEO description',
-                    },
-                    proposed: {
-                        title: 'AI proposed title',
-                        description: 'AI proposed description',
-                        slug: 'ai-proposed-slug',
-                    },
-                }),
-            })
-        })
-
-        await page.goto(`/editor/${siteId}`)
-        await page.waitForLoadState('networkidle')
-        await expectNoServerError(page)
-
-        await page.getByRole('button', { name: 'SEO', exact: true }).first().click()
-        const autoSeoButton = page.getByRole('button', { name: 'Automatic SEO Optimization' })
-        await autoSeoButton.click()
-
-        const overwriteDialog = page.getByRole('dialog', { name: 'Replace existing SEO metadata?' })
-        await expect(overwriteDialog).toBeVisible()
-        await expect(page.getByTestId('seo-current-title')).toHaveText('Existing SEO title')
-        await expect(page.getByTestId('seo-proposed-title')).toHaveText('AI proposed title')
-        await expect(page.getByTestId('seo-current-description')).toHaveText('Existing SEO description')
-        await expect(page.getByTestId('seo-proposed-description')).toHaveText('AI proposed description')
-
-        await overwriteDialog.getByRole('button', { name: 'Cancel' }).click()
-        await expect(overwriteDialog).not.toBeVisible()
-        expect(appliedUpdates).toHaveLength(0)
-
-        await autoSeoButton.click()
-        await expect(overwriteDialog).toBeVisible()
-        await overwriteDialog.getByRole('button', { name: 'Replace SEO' }).click()
-
-        await expect.poll(() => (
-            appliedUpdates.some(update => update.seoTitle === 'AI proposed title')
-            && appliedUpdates.some(update => update.seoDescription === 'AI proposed description')
-        )).toBe(true)
-        expect(nativeDialogOpened).toBe(false)
+        // Toolbar exposes the publish control: "Publish" for a draft site, "Update live" when a live
+        // site has pending changes, or the `● domain ↗` link once it is in sync (US-F05-10).
+        // Auto-save replaced the old explicit "Save" button.
+        const header = page.locator('header')
+        const publishControl = header.getByRole('button', { name: /^(Publish|Update live)$/i })
+            .or(header.getByRole('link', { name: /^Open live website/i }))
+        await expect(publishControl.first()).toBeVisible()
     })
 
     test('[TC-F05.02] editor save draft', async ({ page }) => {

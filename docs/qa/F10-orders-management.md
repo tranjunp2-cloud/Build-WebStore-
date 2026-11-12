@@ -40,8 +40,11 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **TC-F10-01-03** | `[Positive]` | Gui Email thong bao Merchant khi co don moi | 1. Khach dat hang thanh cong. | - Email gui toi Email dang ky cua Merchant.<br>- Noi dung: Ma don, ten khach, tong tien, phuong thuc thanh toan. | High | [ ] |
 | **TC-F10-01-04** | `[UI State]` | Empty State — Chua co don hang nao | 1. Admin vao `/orders` khi chua co don nao. | - Hien thi minh hoa dung theo UI Design ("Chua co don hang nao").<br>- Layout khong bi lech. Co nut huong dan chia se link store. | Low | [x] |
 | **TC-F10-01-05** | `[UI State]` | Loading Skeleton khi trang Orders dang fetch | 1. Lam cham mang (Devtools Throttle).<br>2. Mo trang `/orders`. | - Hien thi skeleton loader (Table skeleton lines).<br>- Khong trang trang, khong flash layout. | Medium | [ ] |
-| **TC-F10-01-06** | `[Positive]` | Stats Bar hien thi dung so lieu theo trang thai | 1. Co san cac don o nhieu trang thai Pending, Confirmed, Shipped.<br>2. Mo trang `/orders`. | - Thanh Stats Bar hien thi dung so luong don moi trang thai.<br>- Click vao tung o loc dung theo trang thai do. | High | [ ] |
+| **TC-F10-01-06** | `[Positive]` | Stats Bar hien thi dung so lieu theo trang thai | 1. Co san cac don o nhieu trang thai Pending, Confirmed, Shipped.<br>2. Mo trang `/orders`. | - Thanh Stats Bar hien thi dung so luong don moi trang thai.<br>- Click vao tung o loc dung theo trang thai do (click lai o dang chon thi bo loc; chip Status dong bo). _AUTO chi phu tuong tac component (Vitest, `orders-metrics-filter.test.tsx`); chua co E2E xac minh danh sach/trang 1 doi thuc te — kiem tay._ | High | [x] |
 | **TC-F10-01-07** | `[Perf]` | Stats Bar render nhanh voi 1,000+ don | 1. Them 1,000 don ao vao staging.<br>2. Reload trang Orders. | - 4 the thong ke render dung va nhanh.<br>- Dung Cache Layer, khong bi N+1 Query goi tung don. | Medium | [ ] |
+| **TC-GH2364-01** | `[Tenant]` | Metrics va badge chi dem workspace hien tai | 1. Dang nhap user thuoc tenant A va B, A dung dau danh sach membership.<br>2. Tao don Pending o ca A va B.<br>3. Mo Orders. | - O Pending chi dem don A va bang badge Orders cua sidebar.<br>- Cac nhom status khac cung chi dem A. | High | [x] |
+| **TC-GH2364-02** | `[Tenant]` | Danh sach va chip cho kiem chung chi lay workspace A | 1. Voi user A+B, loc status, tim kiem va xem danh sach.<br>2. Goi `/api/orders?limit=0` voi bo loc payment. | - Khong co don B trong danh sach/ket qua tim kiem.<br>- `totalDocs` cua count chi tinh A; phan trang va ETag van dung. | High | [x] |
+| **TC-GH2364-03** | `[Security]` | Chi tiet va super-admin theo workspace | 1. User A+B mo URL chi tiet va poll don B.<br>2. Super-admin co membership A xem Orders.<br>3. Super-admin khong co membership mo Orders. | - URL chi tiet va poll don B tra 404; don A van mo duoc.<br>- Super-admin co A chi xem A; khong co tenant thi API tra 403 `NO_WORKSPACE` va giao dien bao chua duoc gan cua hang. | High | [x] |
 
 #### Nhom 1B — State Machine Luong Trang Thai Don Hang
 
@@ -90,6 +93,13 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **TC-F10.R10b** | `[Idempotent]` | Stripe: charge_already_refunded → 200 idempotent success, restock van goi, refundId null | 1. stripe.refunds.create throw err.code='charge_already_refunded'.<br>2. Refund. | - HTTP 200 success.<br>- restockItem duoc goi 1 lan.<br>- `data.refundId` = null. | High | [x] |
 | **TC-F10.R12** | `[Error]` | Stripe: restock null_inventory → logger.warn, refund van 200, logger.error KHONG goi | 1. restockItem tra ve skipped reason='null_inventory'.<br>2. Refund. | - `payload.logger.warn` duoc goi (tracking disabled).<br>- `payload.logger.error` KHONG goi.<br>- Response 200, refund thanh cong. | High | [x] |
 | **TC-F10.R13** | `[Error]` | Stripe refund fails AND rollback UPDATE fails → 502, ca hai loi deu duoc log | 1. stripe.refunds.create throw loi (non-charge_already_refunded).<br>2. Rollback UPDATE orders throw loi DB. | - HTTP 502 REFUND_FAILED.<br>- `logger.error` goi voi '[Refund] Stripe refund failed'.<br>- `logger.error` goi voi '[Refund] Status rollback failed — DB state may be inconsistent' kem `rollbackErr`, `orderId`, `originalStatus`. | High | [x] |
+| **TC-F10.R14** | `[Positive]` | bank_transfer: CAS UPDATE refund co `updated_at = NOW()` de timestamp ORM nhat quan | 1. bank_transfer order completed.<br>2. POST refund. | - SQL cua CAS UPDATE chua `updated_at` va `NOW()`. | Medium | [x] |
+| **TC-F10.R15** | `[Unit]` | `normalizeRefundNote` giu chu tu do cua seller (GH-2158) | 1. Goi voi `'  UAT test refund  '`, `''`, `'   '`, `undefined`, object, chuoi > 500 ky tu. | - Tra ve chuoi da trim; `null` cho rong/blank/khong phai string; chuoi dai bi cat con 500 ky tu. | High | [x] |
+| **TC-F10.R16** | `[Positive]` | Refund luu ly do vao `orders.refund_reason` va dua vao email khach (GH-2158) | 1. COD order completed.<br>2. POST refund voi `{reason:'UAT test refund'}`. | - CAS UPDATE ghi `refund_reason='UAT test refund'`.<br>- `orderRefundedEmail` nhan `refundNote='UAT test refund'`.<br>- Chu tu do khong bi doi thanh `OTHERS` trong email (enum Xendit chi dung cho Xendit). | High | [x] |
+| **TC-F10.R17** | `[Edge]` | Refund khong co ly do → `refund_reason` NULL, email hien `—` (GH-2158) | 1. POST refund khong body. | - HTTP 200, CAS ghi `NULL`, `refundNote=null`. | Medium | [x] |
+| **TC-F10.R18** | `[Edge]` | Ly do > 500 ky tu bi cat truoc khi luu va gui email (GH-2158) | 1. POST refund voi ly do 550 ky tu. | - `refundNote` dai dung 500 ky tu. | Medium | [x] |
+| **TC-F10.R19** | `[Security]` | Email refund hien Refund note va escape HTML (GH-2158) | 1. Render `orderRefundedEmail` voi `refundNote` = `UAT test refund`, `<b>damaged</b>`, `null`. | - Hien dung ly do; `<b>` thanh `&lt;b&gt;`; null → `—`. | High | [x] |
+| **TC-F10.R20** | `[Error]` | Stripe refund fail → rollback xoa `refund_reason` (GH-2158) | 1. stripe.refunds.create throw.<br>2. POST refund voi ly do. | - HTTP 502.<br>- Rollback UPDATE dat `refund_reason = NULL`; khong gui email.<br>- Chua phu nhanh rollback Xendit (Xendit dang tam an, #2133). | High | [x] |
 
 #### Nhom 1E — Bulk Action Chinh Trang Thai Hang Loat
 
@@ -390,6 +400,31 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **TC-F10.responsive.05a** | `[Unit]` | Filter chip cho phep selected value wrap duoi `xl` | 1. Render `OrdersActionBar` voi locale MS.<br>2. Kiem tra className cua filter grid. | - Mobile dung 2 cot, tablet dung 4 cot.<br>- Trigger auto-height, min-height 44px tren mobile.<br>- Span/value cho phep wrap, khong co `truncate` duoi `xl`.<br>- `xl` reset ve height 40px va nowrap. | High | [x] |
 | **TC-F10.responsive.05b** | `[Manual/Mobile/Tablet]` | Selected value EN/MS khong bi cat | 1. Mo `/orders` tai 375, 640, 768 va 1279px.<br>2. Chon cac gia tri Date/Status/Payment/Sort dai nhat trong EN va MS. | - Toan bo selected value doc duoc, co the xuong dong.<br>- Khong co ellipsis, clip hoac scroll ngang trang.<br>- Icon an duoi 640px va hien tu 640px. | High | [ ] |
 | **TC-F10.responsive.05c** | `[Manual/Desktop]` | Desktop filter layout khong thay doi | 1. Mo `/orders` tai viewport ≥1280px.<br>2. Kiem tra ca EN va MS. | - Hien thi `Label : value`, auto-width flex layout, height 40px.<br>- Dropdown va filter behavior hoat dong binh thuong. | High | [ ] |
+
+
+## 4.4 Regression Tests — GH-2209 (Order Tracking Payment Badge)
+
+> Tests for the payment badge on the buyer order tracking page (`src/app/sites/[slug]/orders/[orderNumber]/order-tracking-payment-chip.ts`, rendered by `OrderTrackingClient`).
+> Before the fix, cancelled and refunded orders fell through to "Pending · COD". "Total Paid" / "Address Verified" wording is out of scope (waiting on PO).
+
+| ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10.tracking.01** | `[Unit]` | Badge thanh toan theo trang thai that | 1. Goi `getPaymentChip` / render `OrderTrackingClient` voi tung cap status + paymentStatus. | - Refunded (status hoac paymentStatus `refunded`) → "Refunded" (tim).<br>- Cancelled COD chua tra (`unpaid`) → "Cancelled" (do).<br>- `paid` → "Paid" (ke ca don da huy chua hoan tien).<br>- `failed` / `payment_failed` → "Payment Failed".<br>- Con lai → "Pending · <phuong thuc>". | High | [x] |
+| **TC-F10.tracking.02** | `[Manual]` | Track order: don COD da huy va don da hoan tien | 1. Huy 1 don COD trong CMS.<br>2. Complete roi Refund 1 don COD.<br>3. Shop → Track order, nhap ma tung don. | - Don huy: badge "CANCELLED" mau do, khong con "PENDING · COD".<br>- Don hoan tien: badge "REFUNDED" mau tim. | High | [ ] |
+
+## 4.5 Regression Tests — GH-2277 (Order Lookup Case-Insensitive)
+
+> Khach nhap ma don chu thuong (vd `ord-mw1xfsi3`) o Track order bi 404. Ma don he thong sinh luon chu HOA nen chuan hoa `trim().toUpperCase()` (`src/lib/orders/normalize-order-number.ts`) o form, page tracking, API track/stream. Khong dung `ilike`.
+
+| ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10.tracking.03** | `[Unit]` | `normalizeOrderNumber` | 1. Goi voi `ord-abc`, ` Ord-AbC `, `ORD-ABC`, chuoi trong. | - Ket qua `ORD-ABC` cho 3 ma dau; chuoi trong giu rong. | High | [x] |
+| **TC-F10.tracking.04** | `[Manual]` | Track order voi ma chu thuong | 1. Shop → Track order (nav va trang `/orders`), nhap `ord-<ma don that>`.<br>2. Truy cap truc tiep `/orders/ord-<ma don that>`.<br>3. Nhap ma khong ton tai. | - Mo dung trang theo doi don (URL `ORD-...`).<br>- URL chu thuong cung hien don.<br>- Ma khong ton tai van 404. | High | [ ] |
+| **TC-F10.tracking.05** | `[Unit]` | Nhan tong tien tracking theo paymentStatus (GH-2316) | 1. Render `OrderTrackingClient` voi paymentStatus paid / unpaid / awaiting_payment / pending_verification / failed / payment_failed / refunded.<br>2. Doi locale `ms`.<br>3. Kiem tra tag dia chi. | - Chi `paid` hien "Total paid" (ms "Jumlah dibayar"); con lai "Total" (ms "Jumlah").<br>- Khong con tag "Address Verified" o moi trang thai. | Medium | [x] |
+| **TC-F10.tracking.06** | `[Unit]` | `getPaymentChip` don COD da completed (GH-2316) | 1. Goi voi completed+cod+unpaid / awaiting_payment.<br>2. Goi voi completed+cod+paid / refunded / failed, pending+cod+unpaid. | - Chip "Cash on delivery" (class `neutral`, xam), khong chua "Pending".<br>- Cac truong hop con lai khong doi (Paid / Refunded / Payment Failed / "Pending · COD"). | Medium | [x] |
+| **TC-F10.tracking.07** | `[Manual]` | Track order: nhan tong tien, chip COD, bo Address Verified | 1. Mo trang tracking cua don pending+COD+unpaid, completed+COD+unpaid, paid (card).<br>2. Bat items panel; doi `prefer_lang=ms`. | - Don 1 va 2: tong tien ghi "Total"; chip lan luot "PENDING · COD" va "CASH ON DELIVERY" (xam).<br>- Don paid: "Total paid".<br>- Khong co tag "Address Verified". | Medium | [ ] |
+| **TC-F10.tracking.08** | `[Unit]` | Sinh ma don co >= 64 bit ngau nhien (GH-2081) | 1. Goi `generateOrderNumber()`; inject `now`/`rand`.<br>2. Sinh 1000 ma cung mili-giay. | - Ma dang `ORD-<ts36>-<16 hex HOA>`, <= 50 ky tu, `[A-Z0-9-]`.<br>- 8 byte ngau nhien; khong trung. | High | [x] |
+| **TC-F10.tracking.09** | `[Manual]` | Dat don COD/chuyen khoan/Stripe/Xendit voi ma moi (GH-2081) | 1. Dat 3 don COD lien tiep nhanh + 1 don chuyen khoan (Stripe/Xendit neu co).<br>2. Track order: dan ma chu thuong; xem o 375px.<br>3. Mo mot don cu (ma timestamp).<br>4. Tenant bat EasyParcel: tao label cho don moi. | - Ma moi dung format, khong tuan tu; ca 3 don tao thanh cong.<br>- Mo dung don, header khong vo layout.<br>- Don cu van hien thi.<br>- EP chap nhan `reference` (~29 ky tu). | High | [ ] |
 
 ---
 

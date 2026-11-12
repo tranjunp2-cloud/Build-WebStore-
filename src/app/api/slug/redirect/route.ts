@@ -1,12 +1,16 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getCachedSiteByTenant, getCachedTenantByPreviousSlug, getCachedTenantBySlug } from '@/lib/cache/tenant'
+import { storeUnavailableResponse } from '@/lib/storefront/cached-store-availability'
 
 /**
  * GET /api/slug/redirect?slug=old-slug
  * Internal endpoint called by middleware to check if a slug is in previousSlugs.
  * Returns { redirect: true, newSlug: "current-slug" } if found and not expired.
+ *
+ * The middleware calls this on every storefront request (subdomain), so it reads the same cached, per-shop-tagged
+ * lookups the storefront page reads (src/lib/cache/tenant.ts): no database work while the shop's entries are warm.
+ * It ran ~6 uncached statements per page view (tenant + site at depth 2, each with a COUNT) (TC-PERF-066).
  */
 export async function GET(req: NextRequest) {
     const slug = req.nextUrl.searchParams.get('slug')
@@ -15,24 +19,16 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const payload = await getPayload({ config })
-
         // First check if slug is a current tenant — no redirect needed
-        const currentTenant = await payload.find({
-            collection: 'tenants',
-            where: { slug: { equals: slug } },
-            limit: 1,
-        })
-        if (currentTenant.docs.length > 0) {
+        const currentTenant = await getCachedTenantBySlug(slug)
+        if (currentTenant) {
+            // #2179: a banned or expired store gets the 503 unavailable page (before maintenance).
+            const unavailable = await storeUnavailableResponse(currentTenant as { id: string | number; status?: unknown })
+            if (unavailable) return NextResponse.json({ redirect: false, ...unavailable })
             // BUG-F05-006: Also return site status for maintenance mode check
-            const tenantId = currentTenant.docs[0].id
-            const siteResult = await payload.find({
-                collection: 'sites',
-                where: { tenant: { equals: tenantId } },
-                limit: 1,
-                depth: 0,
-            })
-            const site = siteResult.docs[0]
+            const site = (await getCachedSiteByTenant(String(currentTenant.id))) as
+                | { status?: string | null; publishedAt?: string | null; name?: string | null }
+                | null
             const maintenance = site?.status === 'draft' && !!site?.publishedAt
             return NextResponse.json({
                 redirect: false,
@@ -42,20 +38,9 @@ export async function GET(req: NextRequest) {
         }
 
         // Check previousSlugs across all tenants
-        // Query tenants where previousSlugs array contains this slug
-        const tenantsWithOldSlug = await payload.find({
-            collection: 'tenants',
-            where: {
-                'previousSlugs.slug': { equals: slug },
-            },
-            limit: 1,
-        })
-
-        if (tenantsWithOldSlug.docs.length > 0) {
-            const tenant = tenantsWithOldSlug.docs[0]
-            const previousSlugs = (tenant.previousSlugs as Array<{ slug: string; expiresAt: string }>) || []
-            const match = previousSlugs.find((ps) => ps.slug === slug)
-
+        const tenant = await getCachedTenantByPreviousSlug(slug)
+        if (tenant) {
+            const match = (tenant.previousSlugs ?? []).find((ps) => ps.slug === slug)
             if (match && new Date(match.expiresAt) > new Date()) {
                 return NextResponse.json({ redirect: true, newSlug: tenant.slug })
             }

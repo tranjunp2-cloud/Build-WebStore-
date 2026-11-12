@@ -215,6 +215,31 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(body.data.cancelReason).toBe('Customer changed mind')
     })
 
+    it('[TC-PERF-135] cancel answers with the new state only: no tenant row, magicLinkSecret or buyer details', async () => {
+        // Arrange: the order read carries the populated tenant (payment secrets) and the buyer's magic-link secret
+        mockFindByID.mockResolvedValueOnce({
+            id: 'order-9',
+            status: 'pending',
+            items: [],
+            paymentMethod: 'qr_banking',
+            paymentStatus: 'unpaid',
+            customerEmail: 'buyer@test.com',
+            magicLinkSecret: 'mls-secret',
+            tenant: { id: 'tenant-1', xenditSecretKey: 'xnd_secret', easyParcelIntegration: { apiKey: 'ep-key' } },
+        })
+
+        // Act
+        const req = { json: () => Promise.resolve({ reason: 'Out of stock' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(body.data).toEqual({ id: 'order-9', status: 'cancelled', paymentStatus: 'cancelled', cancelReason: 'Out of stock' })
+        const text = JSON.stringify(body)
+        for (const secret of ['mls-secret', 'xnd_secret', 'ep-key', 'buyer@test.com']) expect(text).not.toContain(secret)
+    })
+
     it('[TC-F10-03-07] Idempotency: already-cancelled order returns success without re-restocking', async () => {
         mockFindByID.mockResolvedValueOnce({ id: 'order-4', status: 'cancelled', items: [{ product: 'prod-1', quantity: 1 }] })
 

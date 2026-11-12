@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { useStudioCan } from '../../_components/studio-permissions-context'
 import { ScoreBadge } from './score-badge'
 import { ScoreBreakdown11Dim } from './score-breakdown-11dim'
 import { RubricVersionPicker } from './rubric-version-picker'
@@ -34,6 +35,7 @@ type QualityState = {
 type Props = { templateId: string | number }
 
 export function QualityTab({ templateId }: Props) {
+    const canScore = useStudioCan()('template.score')
     const [state, setState] = useState<QualityState>({ latest: null, history: [] })
     const [loading, setLoading] = useState(true)
     const [scoring, setScoring] = useState(false)
@@ -95,15 +97,15 @@ export function QualityTab({ templateId }: Props) {
                 )}
 
                 <div className="flex items-center gap-2 ml-auto">
-                    <RubricVersionPicker value={version} onChange={setVersion} disabled={scoring} />
-                    <button
+                    {canScore && <RubricVersionPicker value={version} onChange={setVersion} disabled={scoring} />}
+                    {canScore && <button
                         onClick={handleRescore}
                         disabled={scoring || loading}
                         className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         <RefreshCw size={11} className={scoring ? 'animate-spin' : ''} />
                         {scoring ? 'Scoring…' : 'Re-score'}
-                    </button>
+                    </button>}
                 </div>
             </div>
 

@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { ImageOff, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { useStudioCan } from '../../_components/studio-permissions-context'
 import { RejectModal } from './reject-modal'
 import type { ReviewTemplate } from './review-queue'
 import type { ComplianceResult } from '@/lib/admin/dna-compliance'
@@ -41,6 +42,7 @@ function ComplianceBadge({ cache }: { cache: ComplianceResult | null | undefined
 }
 
 export function ReviewCard({ template, onResolved }: Props) {
+    const canDecide = useStudioCan()('template.review')
     const [approving, setApproving] = useState(false)
     const [showReject, setShowReject] = useState(false)
 
@@ -91,6 +93,7 @@ export function ReviewCard({ template, onResolved }: Props) {
                     )}
 
                     <div className="flex items-center gap-2 pt-1">
+                        {canDecide && <>
                         <Button
                             size="sm"
                             variant="outline"
@@ -110,6 +113,7 @@ export function ReviewCard({ template, onResolved }: Props) {
                         >
                             <XCircle size={12} /> Reject
                         </Button>
+                        </>}
                         <span className="ml-auto text-xs text-muted-foreground">
                             Updated {new Date(template.updatedAt).toLocaleDateString()}
                         </span>
@@ -117,7 +121,7 @@ export function ReviewCard({ template, onResolved }: Props) {
                 </div>
             </div>
 
-            {showReject && (
+            {showReject && canDecide && (
                 <RejectModal
                     templateId={template.id}
                     templateName={template.name}

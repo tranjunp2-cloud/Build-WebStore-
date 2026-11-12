@@ -14,6 +14,8 @@ import { QualityTab } from './quality-tab'
 import { IssuesTabEmbed } from '@/app/studio/_components/issues-tab-embed'
 import { VersionsTabEmbed } from './versions-tab-embed'
 import type { AdminTemplate } from '@/lib/admin/templates-query'
+import { canSetTemplateStatus } from '@/lib/admin/studio-permissions'
+import { useStudioCan, useStudioRoles } from '../../_components/studio-permissions-context'
 
 type Props = {
     template: AdminTemplate
@@ -35,6 +37,8 @@ type TabId = (typeof TABS)[number]['id']
 
 export function TemplateDrawer({ template, onClose, inline = false, onPublish }: Props) {
     const [tab, setTab] = useState<TabId>('overview')
+    const roles = useStudioRoles()
+    const can = useStudioCan()
 
     const categoryList = Array.isArray(template.category)
         ? template.category.join(', ')
@@ -187,14 +191,18 @@ export function TemplateDrawer({ template, onClose, inline = false, onPublish }:
 
     const foot = (
         <div className="drawer-foot">
-            <button className="btn btn-ghost" style={{ marginRight: 'auto' }}>
-                <X size={13} /> Delete
-            </button>
+            {canSetTemplateStatus(roles, template.status, 'archived') && (
+                <button className="btn btn-ghost" style={{ marginRight: 'auto' }}>
+                    <X size={13} /> Delete
+                </button>
+            )}
             <button className="btn" onClick={onClose}>Close</button>
-            <button className="btn">
-                <Copy size={13} /> Clone
-            </button>
-            {template.status !== 'live' && (
+            {can('template.create') && (
+                <button className="btn">
+                    <Copy size={13} /> Clone
+                </button>
+            )}
+            {template.status !== 'live' && can('template.review') && (
                 <button className="btn btn-primary" onClick={onPublish}>
                     <Rocket size={13} /> Publish
                 </button>

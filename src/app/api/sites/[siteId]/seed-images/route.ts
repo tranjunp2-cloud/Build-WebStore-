@@ -47,10 +47,10 @@ function deriveProductTerms(site: SiteWithGenerationMetadata): string | null {
 }
 
 export async function POST(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ siteId: string }> },
 ) {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { siteId } = await params

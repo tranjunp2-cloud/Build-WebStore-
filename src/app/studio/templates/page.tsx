@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 import type { Metadata } from 'next'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
-import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { requireStudioAccess } from '@/lib/admin/auth-guard'
 import { TemplatesListClient } from './_components/templates-list-client'
 import type { TemplatesFilter } from '@/lib/admin/templates-query'
 
@@ -23,7 +23,7 @@ function first(v: string | string[] | undefined): string {
 }
 
 export default async function TemplatesPage({ searchParams }: PageProps) {
-    await requireSuperAdmin()
+    await requireStudioAccess()
 
     const sp = await searchParams
     const status = first(sp.status)

@@ -8,11 +8,11 @@ export const metadata = { title: 'Versions' }
 
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { requireStudioAccess } from '@/lib/admin/auth-guard'
 import { VersionsTimeline, type VersionEntry } from './_components/versions-timeline'
 
 export default async function VersionsPage() {
-    await requireSuperAdmin()
+    await requireStudioAccess()
 
     const payload = await getPayload({ config })
 

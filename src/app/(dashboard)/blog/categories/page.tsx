@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import { BLOG_CATEGORY_DUPLICATE_CODE } from '@/lib/blog/blog-category-codes'
 import { deleteBlogCategoryAction, getCategoryPublishedPostCountAction } from '../actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -72,7 +73,7 @@ export default function BlogCategoriesPage() {
             })
             const json = await res.json()
             if (!res.ok) {
-                toast.error(cp.toastCreateFail)
+                toast.error(json?.error?.code === BLOG_CATEGORY_DUPLICATE_CODE ? cp.toastDuplicate : cp.toastCreateFail)
                 return
             }
             toast.success(cp.toastCreated.replace('{name}', newName.trim()))
@@ -103,7 +104,7 @@ export default function BlogCategoriesPage() {
             })
             const json = await res.json()
             if (!res.ok) {
-                toast.error(cp.toastUpdateFail)
+                toast.error(json?.error?.code === BLOG_CATEGORY_DUPLICATE_CODE ? cp.toastDuplicate : cp.toastUpdateFail)
                 return
             }
             toast.success(cp.toastUpdated)

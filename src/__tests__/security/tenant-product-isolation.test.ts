@@ -28,7 +28,7 @@ describe("[TC-SEC-01] Multi-tenant Product & Category Isolation", () => {
     expect(accessAnon).toBe(false);
   });
 
-  it("restricts product update and delete access to tenant owners", async () => {
+  it("restricts product update to own tenant and denies tenant-owner hard delete (GH-1520, TC-09.54)", async () => {
     // Arrange: Mock payload with active plan subscription and product_management feature
     const mockPayloadWithSub = {
       find: async ({ collection }: { collection: string }) => {
@@ -61,9 +61,9 @@ describe("[TC-SEC-01] Multi-tenant Product & Category Isolation", () => {
     const updateAlpha = typeof Products.access?.update === "function" ? await Products.access.update({ req: reqAlpha } as any) : undefined;
     const deleteAlpha = typeof Products.access?.delete === "function" ? await Products.access.delete({ req: reqAlpha } as any) : undefined;
 
-    // Assert: update and delete filter by the actor's tenant ID
+    // Assert: update filters by the actor's tenant ID; hard delete via REST is super-admin only
     expect(updateAlpha).toEqual({ tenant: { in: [TENANT_ALPHA.id] } });
-    expect(deleteAlpha).toEqual({ tenant: { in: [TENANT_ALPHA.id] } });
+    expect(deleteAlpha).toBe(false);
   });
 
   it("prevents cross-tenant re-homing during product updates (beforeChange hook)", async () => {

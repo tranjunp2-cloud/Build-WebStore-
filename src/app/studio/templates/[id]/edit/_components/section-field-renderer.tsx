@@ -10,6 +10,7 @@ interface Props {
     spec: FieldSpec
     value: unknown
     onChange: (value: unknown) => void
+    readOnly?: boolean
 }
 
 function parseArrayText(value: unknown): string {
@@ -22,7 +23,7 @@ function splitArrayText(raw: string): string[] {
     return raw.split('\n').map((s) => s.trim()).filter(Boolean)
 }
 
-export function SectionFieldRenderer({ spec, value, onChange }: Props) {
+export function SectionFieldRenderer({ spec, value, onChange, readOnly = false }: Props) {
     const baseInput = [
         'w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm',
         'placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring',
@@ -37,6 +38,7 @@ export function SectionFieldRenderer({ spec, value, onChange }: Props) {
                     className={baseInput}
                     placeholder={spec.placeholder}
                     value={typeof value === 'string' ? value : ''}
+                    readOnly={readOnly}
                     onChange={(e) => onChange(e.target.value)}
                 />
             </div>
@@ -51,6 +53,7 @@ export function SectionFieldRenderer({ spec, value, onChange }: Props) {
                     className={`${baseInput} min-h-[72px] resize-y`}
                     placeholder={spec.placeholder}
                     value={typeof value === 'string' ? value : ''}
+                    readOnly={readOnly}
                     onChange={(e) => onChange(e.target.value)}
                 />
             </div>
@@ -66,6 +69,7 @@ export function SectionFieldRenderer({ spec, value, onChange }: Props) {
                     className={`${baseInput} min-h-[88px] resize-y font-mono text-xs`}
                     placeholder={spec.placeholder ?? 'One item per line'}
                     value={parseArrayText(value)}
+                    readOnly={readOnly}
                     onChange={(e) => onChange(splitArrayText(e.target.value))}
                 />
             </div>

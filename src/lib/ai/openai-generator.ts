@@ -1,10 +1,15 @@
 /**
- * OpenAI GPT-4o Block Generator
- * Streams AI-generated blocks with SSE events for real-time preview.
- * Falls back to rule-based generator if OpenAI fails.
+ * AI site generator
+ * Streams AI-generated blocks with SSE events for real-time preview. Every
+ * model call is an ECH AI platform task (`sitegen.*`) run as the actor of the
+ * enclosing `runWithAiActor` scope; without one (or when the platform is
+ * unavailable) it falls back to the rule-based generator.
  */
 
-import OpenAI from 'openai'
+import type { AiSkipReason } from './generation-actor'
+import { aiQuotaHitInScope, completeComposed, currentAiActor } from '@/lib/ai-platform/actor-scope'
+import type { WebsiteBlueprint } from '@/lib/migration/pw1-contract'
+import { generateNativePw1WithAI } from '@/lib/migration/pw1-native-ai'
 import { blockRegistry } from '@/blocks/registry'
 import { sanitizeBusinessInfo } from './sanitize-user-input'
 import { buildSystemPrompt, buildPersonalizePrompt, type BusinessInfoInput } from './system-prompt'
@@ -13,8 +18,6 @@ import { buildUserPrompt } from './system-prompt'
 import { composeTemplateResult } from './fallback-adapter'
 import { loadDisabledVariants } from '@/lib/admin/block-variant-disabled-loader'
 import { isUnsupportedBlock, UNSUPPORTED_BLOCK_REPLACEMENTS, filterUnsupportedBlocks } from './unsupported-blocks'
-import { selectModel } from './config'
-import { logAiUsage } from './log-usage'
 import {
     backfillContentSections,
     enforceMinimumStructure,
@@ -34,10 +37,11 @@ import { computeGenSeed } from './gen-seed'
 import { pickRecipe } from './category-recipes'
 import { resolveBusinessCategory } from './composer-category-resolver'
 import { getCategoryRequirement } from './category-requirements'
-import { startCapture, finishCapture } from './capture-generation'
-import { countSnapshotFields } from './snapshot-field-counter'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
 import { mapBusinessInfo } from './business-info-mapper'
+import { runWithGenerationFacts } from './generation-facts-scope'
+import type { GenerationFacts } from './generation-facts'
+import { enforceGroundedBlocks } from './grounded-blocks'
 import {
     dedupePageSingletonBlocks,
     dedupeRepeatedServiceCardsAcrossPages,
@@ -61,12 +65,6 @@ import {
 } from './locale-structural-strings'
 import { runParallelPageSplit, syncFooterAcrossPages } from './gen-page-split'
 
-function getOpenAI(): OpenAI | null {
-    const key = process.env.OPENAI_API_KEY
-    if (!key) return null
-    return new OpenAI({ apiKey: key, timeout: 40_000, maxRetries: 0 })
-}
-
 export type SSEEvent = {
     event:
         | 'step'
@@ -81,22 +79,30 @@ export type SSEEvent = {
 }
 
 export interface GenerateSiteOptions {
+    /** Server-internal, public source projection; never accepted from HTTP input. */
+    sourceBlueprint?: WebsiteBlueprint
     /** Locale already selected by the user or accepted in the confirmation popup. */
     targetLocale?: string
     /** Request-local mode selected by the route's single credit pilot. */
     modeDecision?: SiteGenerationModeDecision
+    /** #2103 A1: merchant FACTS — the only source for claims on the generated site. */
+    facts?: GenerationFacts
 }
 
 export type SiteGenerationMode = 'ai-first' | 'template-first'
 export type SiteGenerationModeReason =
     | 'insufficient_quota'
     | 'missing_api_key'
+    /** The platform is configured, but no user/workspace could be billed for this run (see AiSkipReason). */
+    | 'no_ai_actor'
     | 'ai_generation_error'
 
 export type SiteGenerationModeDecision = {
     requestedGenMode: SiteGenerationMode
     effectiveGenMode: SiteGenerationMode
     modeReason?: SiteGenerationModeReason
+    /** Why there was no AI actor, when that is the reason (admin-visible; never user-facing copy). */
+    aiSkipReason?: AiSkipReason
 }
 
 export type GenerateSiteOutput = {
@@ -105,92 +111,37 @@ export type GenerateSiteOutput = {
     requestedGenMode: SiteGenerationMode
     effectiveGenMode: SiteGenerationMode
     modeReason?: SiteGenerationModeReason
+    /** Why there was no AI actor, when that is the reason (admin-visible; never user-facing copy). */
+    aiSkipReason?: AiSkipReason
 }
 
-function isInsufficientQuotaError(error: unknown): boolean {
-    if (!(error instanceof Error)) return false
-    const status = (error as { status?: unknown }).status
-    const code = (error as { code?: unknown }).code
-    return status === 429 && code === 'insufficient_quota'
+/**
+ * `missing_api_key` = the platform itself is off; `no_ai_actor` = it is on but nobody could be
+ * billed (no active workspace, staff outside the workspace, record without user/tenant).
+ */
+function noAiActorReason(skipReason?: AiSkipReason): Pick<SiteGenerationModeDecision, 'modeReason' | 'aiSkipReason'> {
+    if (!skipReason || skipReason === 'ai_unconfigured') return { modeReason: 'missing_api_key' }
+    return { modeReason: 'no_ai_actor', aiSkipReason: skipReason }
 }
 
-async function runSiteGenerationCreditPilot(openai: OpenAI): Promise<'available' | 'insufficient_quota'> {
-    const model = selectModel('site-generation')
-    const startedAt = Date.now()
-
-    try {
-        const completion = await openai.chat.completions.create({
-            model,
-            messages: [
-                { role: 'system', content: 'Return a minimal JSON health response.' },
-                { role: 'user', content: 'Return {"ok":true}.' },
-            ],
-            temperature: 0,
-            max_completion_tokens: 8,
-            response_format: { type: 'json_object' },
-        }, { timeout: 8_000 })
-        logAiUsage({
-            endpoint: 'site-generation',
-            model: completion.model,
-            tokensIn: completion.usage?.prompt_tokens ?? 0,
-            tokensOut: completion.usage?.completion_tokens ?? 0,
-            durationMs: Date.now() - startedAt,
-            success: true,
-        })
-        console.info(`[AI][CREDIT_PILOT] status=available model=${completion.model} duration=${Date.now() - startedAt}ms`)
-        return 'available'
-    } catch (error) {
-        const hardQuota = isInsufficientQuotaError(error)
-        logAiUsage({
-            endpoint: 'site-generation',
-            model,
-            tokensIn: 0,
-            tokensOut: 0,
-            durationMs: Date.now() - startedAt,
-            success: false,
-            errorCode: hardQuota ? 'insufficient_quota' : error instanceof Error ? error.name : 'unknown',
-        })
-        if (hardQuota) {
-            console.warn(`[AI][CREDIT_PILOT] status=insufficient_quota model=${model} duration=${Date.now() - startedAt}ms`)
-            return 'insufficient_quota'
-        }
-
-        // A timeout, transport failure, or transient rate limit does not prove
-        // that the account is out of credit. Preserve the configured AI-first
-        // path and let its existing per-scope fallback handling decide.
-        console.warn(
-            `[AI][CREDIT_PILOT] status=inconclusive model=${model} ` +
-            `duration=${Date.now() - startedAt}ms error=${error instanceof Error ? error.message : String(error)}`,
-        )
-        return 'available'
-    }
-}
-
-export async function resolveSiteGenerationMode(): Promise<SiteGenerationModeDecision> {
+export async function resolveSiteGenerationMode(skipReason?: AiSkipReason): Promise<SiteGenerationModeDecision> {
     const requestedGenMode: SiteGenerationMode = process.env.GEN_MODE?.trim() === 'ai-first'
         ? 'ai-first'
         : 'template-first'
+    // No AI for this run: the reason is recorded even in template-first mode, where it used to be silent.
+    if (!currentAiActor()) {
+        return {
+            requestedGenMode,
+            effectiveGenMode: 'template-first',
+            ...noAiActorReason(skipReason),
+        }
+    }
     if (requestedGenMode === 'template-first') {
         return { requestedGenMode, effectiveGenMode: 'template-first' }
     }
 
-    const openai = getOpenAI()
-    if (!openai) {
-        return {
-            requestedGenMode,
-            effectiveGenMode: 'template-first',
-            modeReason: 'missing_api_key',
-        }
-    }
-
-    const pilotStatus = await runSiteGenerationCreditPilot(openai)
-    return pilotStatus === 'insufficient_quota'
-        ? {
-            requestedGenMode,
-            effectiveGenMode: 'template-first',
-            modeReason: 'insufficient_quota',
-        }
-        : { requestedGenMode, effectiveGenMode: 'ai-first' }
+    // A used-up workspace quota surfaces per call (429) and each step falls back.
+    return { requestedGenMode, effectiveGenMode: 'ai-first' }
 }
 
 function countContentSections(blocks: Array<Record<string, unknown>>): number {
@@ -211,7 +162,7 @@ function backfillPagesAfterServiceDedupe(
         const previousPage = pagesBeforeDedupe[pageIndex]
         if (!previousPage) return page
 
-        const currentBlocks = page.blocks as Array<Record<string, unknown>>
+        const currentBlocks = page.blocks as unknown as Array<Record<string, unknown>>
         if (currentBlocks.length === previousPage.blocks.length) return page
 
         const structuralBlockCount = currentBlocks.filter(
@@ -241,7 +192,7 @@ function backfillPagesAfterServiceDedupe(
 }
 
 /**
- * Generate a complete website using OpenAI GPT-4o with streaming.
+ * Generate a complete website with the AI platform, streaming progress events.
  * Falls back to rule-based generation if API key missing or AI fails.
  *
  * @param blockPromptOverrides - Per-block prompt overrides from the admin template
@@ -249,7 +200,7 @@ function backfillPagesAfterServiceDedupe(
  *   Fetched by the caller (generate-site route) so this function stays DB-free.
  *   Merged into buildUserPrompt so GPT tailors per-block content accordingly.
  */
-export async function generateSiteWithAI(
+export function generateSiteWithAI(
     rawBusinessInfo: BusinessInfoInput,
     extraInstructions?: string,
     language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
@@ -258,6 +209,26 @@ export async function generateSiteWithAI(
     onEvent?: (e: SSEEvent) => void,
     options: GenerateSiteOptions = {},
 ): Promise<GenerateSiteOutput> {
+    // #2103 A1: every mapBusinessInfo() below (template-first, AI-first, page-split, fallback)
+    // reads the merchant FACTS from this scope.
+    return runWithGenerationFacts(options.facts, () =>
+        generateSiteWithAIScoped(rawBusinessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent, options),
+    )
+}
+
+async function generateSiteWithAIScoped(
+    rawBusinessInfo: BusinessInfoInput,
+    extraInstructions: string | undefined,
+    language: 'en' | 'ms' | 'vi' | 'auto',
+    referencePrompt: string | undefined,
+    blockPromptOverrides: Record<string, { prompt: string; updatedAt: string; updatedBy?: string }> | undefined,
+    onEvent: ((e: SSEEvent) => void) | undefined,
+    options: GenerateSiteOptions,
+): Promise<GenerateSiteOutput> {
+    if (options.sourceBlueprint) {
+        if (!currentAiActor()) throw new Error('The AI platform is required for source-aware generation')
+        return generateNativePw1WithAI(options.sourceBlueprint.nativeContract, onEvent)
+    }
     // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
     // intermittent "400 could not parse JSON body" from OpenAI when clipboard
     // carries broken Unicode (common from mobile emoji paste + Windows clip).
@@ -287,13 +258,6 @@ export async function generateSiteWithAI(
         businessInfo.products,
     ].join(' | ')
 
-    // Phase 05 monitoring — capture generation record (best-effort, never blocks)
-    const cap = await startCapture({
-        endpoint: 'site-generator',
-        prompt: promptText,
-        category: businessInfo.industry ?? undefined,
-    })
-
     const inputText = [businessInfo.businessName, businessInfo.shortDescription, businessInfo.products, businessInfo.industry]
         .filter(Boolean).join(' ')
     const { contentLang: detectedLang, gpLang, blockLang } = options.targetLocale
@@ -304,24 +268,18 @@ export async function generateSiteWithAI(
 
     const modeDecision = options.modeDecision ?? await resolveSiteGenerationMode()
     const { requestedGenMode } = modeDecision
-    const openai = getOpenAI()
-    if (!openai) {
+    if (!currentAiActor()) {
         if (!['en', 'ms', 'vi'].includes(blockLang)) {
-            throw new Error(`OpenAI is required to generate content in ${gpLang}`)
+            throw new Error(`AI is required to generate content in ${gpLang}`)
         }
-        console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
+        console.warn('[AI] AI platform unavailable for this run — using rule-based fallback')
         const fallbackResult = await generateWithFallback(promptText, events, detectedLang, businessInfo)
-        const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
-        await finishCapture(cap, {
-            status: 'success',
-            selectedBlocks: fallbackBlocks,
-            outputSnapshot: { path: 'fallback-no-key', siteName: fallbackResult.result.siteName },
-        })
         return {
             ...fallbackResult,
             requestedGenMode,
             effectiveGenMode: 'template-first',
-            modeReason: 'missing_api_key',
+            modeReason: modeDecision.modeReason ?? 'missing_api_key',
+            ...(modeDecision.aiSkipReason ? { aiSkipReason: modeDecision.aiSkipReason } : {}),
         }
     }
 
@@ -346,7 +304,6 @@ export async function generateSiteWithAI(
             businessInfo,
             detectedLang,
             promptText,
-            openai,
             events,
             { personalize: false },
         )
@@ -356,22 +313,6 @@ export async function generateSiteWithAI(
             detectedLang,
             businessInfo,
         )
-        const fallbackBlocks = quotaFallback.result.blocks.map(
-            (block: GeneratedBlock) => String((block as Record<string, unknown>).blockType ?? ''),
-        )
-        const fallbackFieldCounts = countSnapshotFields({
-            blocks: quotaFallback.result.blocks as Record<string, unknown>[],
-        })
-        await finishCapture(cap, {
-            status: 'success',
-            selectedBlocks: fallbackBlocks,
-            outputSnapshot: {
-                path: 'template-first-quota-fallback',
-                siteName: quotaFallback.result.siteName,
-            },
-            fieldsTotal: fallbackFieldCounts.fieldsTotal,
-            fieldsFilled: fallbackFieldCounts.fieldsFilled,
-        })
         return {
             ...quotaFallback,
             requestedGenMode,
@@ -387,24 +328,18 @@ export async function generateSiteWithAI(
     if (genMode === 'template-first' && !hasCustomInput) {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
+        // #2160: pass the resolved locale (builder sends language 'auto' + generationLocale),
+        // not the raw `language` — 'auto' collapses to 'en' inside and the template ships English.
         const templateResult = await generateTemplateFirst(
-            businessInfo, language, promptText, openai, events,
+            businessInfo, detectedLang, promptText, events,
         )
         if (templateResult) {
-            const tfBlocks = templateResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
-            // Phase 04: count fields from actual blocks for override-rate tracking
-            const tfFieldCounts = countSnapshotFields({ blocks: templateResult.result.blocks as Record<string, unknown>[] })
-            await finishCapture(cap, {
-                status: 'success',
-                selectedBlocks: tfBlocks,
-                outputSnapshot: { path: 'template-first', siteName: templateResult.result.siteName },
-                fieldsTotal: tfFieldCounts.fieldsTotal,
-                fieldsFilled: tfFieldCounts.fieldsFilled,
-            })
             return {
                 ...templateResult,
                 requestedGenMode,
                 effectiveGenMode: 'template-first',
+                // personalisation steps that hit the workspace quota / provider credit fell back on their own
+                ...(aiQuotaHitInScope() ? { modeReason: 'insufficient_quota' as const } : {}),
             }
         }
         // templateResult === null → composer failed, fall through to AI-first
@@ -462,11 +397,11 @@ export async function generateSiteWithAI(
             // Plan 260429-1032 Phase 5 — pass resolved category so buildUserPrompt
             // can inject preferred CTA labels for this industry.
             category: presetCategory,
+            facts: options.facts,
         })
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
 
-        const modelName = selectModel('site-generation')
         // Single source of truth for the split-path flag — used both to ACTIVATE
         // the parallel split below AND to run syncFooterAcrossPages in the shared
         // multi-page post-processing. These two MUST agree: a mismatch skips the
@@ -483,8 +418,6 @@ export async function generateSiteWithAI(
         // rollback; that path stays byte-identical to pre-Phase-05 behavior).
         if (useParallelSplit) {
             parsed = await runParallelPageSplit({
-                openai,
-                model: modelName,
                 systemPrompt,
                 userPromptText,
                 promptText,
@@ -495,75 +428,23 @@ export async function generateSiteWithAI(
             })
             events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
         } else {
-            const callStart = Date.now()
-            let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>
+            let content: string
             try {
-                completion = await openai.chat.completions.create({
-                    model: modelName,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPromptText },
-                    ],
+                const completion = await completeComposed('sitegen.site-plan', {
+                    system: systemPrompt,
+                    user: userPromptText,
                     temperature: 0.7,
-                    response_format: { type: 'json_object' },
                 })
+                content = completion.content
             } catch (err) {
-                logAiUsage({
-                    endpoint: 'site-generation',
-                    model: modelName,
-                    tokensIn: 0,
-                    tokensOut: 0,
-                    durationMs: Date.now() - callStart,
-                    success: false,
-                    errorCode: err instanceof Error ? err.name : 'unknown',
-                })
-                // Plan 260415 F01-gen-audit — surface OpenAI API error body so the
-                // outer route log captures the failure reason instead of a generic
-                // "fallback" message. Staging has been masking "400 could not parse
-                // the JSON body" failures inside the outer catch for weeks without
-                // a clear attribution.
-                if (err && typeof err === 'object') {
-                    const apiErr = err as { status?: number; message?: string; error?: unknown }
-                    // Plan 260417-0837 item 1.7 — structured logging for OpenAI 400
-                    // parse failures. Prior logs lacked biz name/desc/reqBytes which
-                    // are the three things we need to repro. No root-cause chase
-                    // here, just surface enough signal to diagnose next session.
-                    const bizName = (businessInfo.businessName ?? '').slice(0, 100)
-                    const bizDesc = (businessInfo.shortDescription ?? '').slice(0, 200)
-                    const reqBytes = systemPrompt.length + userPromptText.length
-                    console.error(
-                        `[AI-400] OpenAI FAIL status=${apiErr.status ?? 'unknown'} model=${modelName} durationMs=${Date.now() - callStart} reqBytes=${reqBytes} bizName="${bizName}" msg=${String(apiErr.message).slice(0, 300)}`,
-                    )
-                    if (bizDesc) {
-                        console.error(`[AI-400] bizDesc="${bizDesc}"`)
-                    }
-                    if (apiErr.error) {
-                        try {
-                            console.error(`[AI-400] body: ${JSON.stringify(apiErr.error).slice(0, 500)}`)
-                        } catch {
-                            // ignore serialization failures
-                        }
-                    }
-                }
+                // Status and request size only — business details stay out of the logs.
+                const status = (err as { status?: number } | null)?.status ?? 'unknown'
+                const reqBytes = systemPrompt.length + userPromptText.length
+                console.error(`[AI] site-plan task failed status=${status} reqBytes=${reqBytes} msg=${String((err as Error | null)?.message).slice(0, 300)}`)
                 throw err
             }
-
-            logAiUsage({
-                endpoint: 'site-generation',
-                model: completion.model,
-                tokensIn: completion.usage?.prompt_tokens ?? 0,
-                tokensOut: completion.usage?.completion_tokens ?? 0,
-                durationMs: Date.now() - callStart,
-                success: true,
-            })
-
-            const choice = completion.choices[0]
-            const content = choice?.message?.content
             if (!content) {
                 throw new Error('Empty AI response')
-            }
-            if (choice?.finish_reason === 'length') {
-                console.warn(`[AI] WARNING: AI response ended at the model output limit (${completion.usage?.completion_tokens} tokens used).`)
             }
 
             events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
@@ -753,7 +634,7 @@ export async function generateSiteWithAI(
                 // Pass 'business' as fallback so hydrateBiz always has a valid pack.
                 if (postSwapEnabled) {
                     const swapResult = postAISwapStep(
-                        pageBlocks as Record<string, unknown>[],
+                        pageBlocks as unknown as Record<string, unknown>[],
                         enforcerBizOverride,
                         detectedCategory ?? 'business',
                         themeMood,
@@ -765,7 +646,7 @@ export async function generateSiteWithAI(
                     swapTelemetry.push(...swapResult.telemetry)
                 }
                 pageBlocks = dedupePageSingletonBlocks(
-                    pageBlocks as Record<string, unknown>[],
+                    pageBlocks as unknown as Record<string, unknown>[],
                 ) as typeof pageBlocks
 
                 // Structure enforcement — homepage gets full `enforceMinimumStructure`
@@ -776,26 +657,32 @@ export async function generateSiteWithAI(
                 // other enforcers below (plan 1.3 B5 fix).
                 if (p === 0) {
                     pageBlocks = enforceMinimumStructure(
-                        pageBlocks as Record<string, unknown>[],
+                        pageBlocks as unknown as Record<string, unknown>[],
                         enforcerCategory,
                         enforcerCtx,
                     ) as typeof pageBlocks
                 } else {
                     pageBlocks = enforceSubpageStructure(
-                        pageBlocks as Record<string, unknown>[],
+                        pageBlocks as unknown as Record<string, unknown>[],
                         enforcerCategory,
                         enforcerCtx,
                         typeof rawPage.slug === 'string' ? rawPage.slug : undefined,
                     ) as typeof pageBlocks
                 }
                 pageBlocks = enforceMinItems(
-                    pageBlocks as Record<string, unknown>[],
+                    pageBlocks as unknown as Record<string, unknown>[],
                     enforcerCategory,
                     enforcerCtx,
                 ) as typeof pageBlocks
-                enforceGridAlignment(pageBlocks as Record<string, unknown>[], enforcerCategory, enforcerCtx)
+                enforceGridAlignment(pageBlocks as unknown as Record<string, unknown>[], enforcerCategory, enforcerCtx)
+                // #2103 A1: reviews, numbers, team, logos, FAQ and pricing come from FACTS only.
+                pageBlocks = enforceGroundedBlocks(
+                    pageBlocks as unknown as Record<string, unknown>[],
+                    enforcerBizOverride.facts,
+                    blockLang,
+                ) as typeof pageBlocks
                 pageBlocks = normalizeLocaleStructuralStrings(
-                    pageBlocks as Record<string, unknown>[],
+                    pageBlocks as unknown as Record<string, unknown>[],
                     blockLang,
                     enforcerBizOverride.name ?? businessInfo.businessName,
                     localeStructuralStrings,
@@ -832,7 +719,7 @@ export async function generateSiteWithAI(
                     `[design-quality] removed ${serviceDedupe.removedCount} repeated service-card block(s) across pages`,
                 )
             }
-            validBlocks = (generatedPages[0]?.blocks as Record<string, unknown>[] | undefined) ?? allBlocks
+            validBlocks = (generatedPages[0]?.blocks as unknown as Record<string, unknown>[] | undefined) ?? allBlocks
 
             // gen-perf phase-09: the structure enforcer above may restyle the
             // HOMEPAGE footer per its recipe — re-sync subpage footers so all
@@ -861,7 +748,7 @@ export async function generateSiteWithAI(
                 title: gp.title,
                 slug: gp.slug,
                 isHomepage: gp.isHomepage,
-                blocks: gp.blocks as unknown as Array<Record<string, unknown>>,
+                blocks: gp.blocks as unknown as unknown as Array<Record<string, unknown>>,
             }))
             const seoList = generateAllPageSeo(seoPages, {
                 biz: seoBiz,
@@ -872,14 +759,14 @@ export async function generateSiteWithAI(
                     title: seoList[i]!.title,
                     description: seoList[i]!.description,
                     ogImage: seoList[i]!.ogImage,
-                    jsonLd: seoList[i]!.jsonLd as unknown as Array<Record<string, unknown>>,
+                    jsonLd: seoList[i]!.jsonLd as unknown as unknown as Array<Record<string, unknown>>,
                 }
             }
 
             // Phase 04 — page-level guards: min block count + AIDA ordering.
             // Both log warnings only; they do not mutate pages or throw.
             for (const genPage of generatedPages) {
-                const pageBlocks = genPage.blocks as Record<string, unknown>[]
+                const pageBlocks = genPage.blocks as unknown as Record<string, unknown>[]
                 const stats = checkPageBlockCount(pageBlocks)
                 if (!stats.viable) {
                     console.warn(
@@ -903,7 +790,7 @@ export async function generateSiteWithAI(
             // Plan 260415 Phase 04 — post-AI swap on single-page path too.
             if (postSwapEnabled) {
                 const swapResult = postAISwapStep(
-                    validBlocks as Record<string, unknown>[],
+                    validBlocks as unknown as Record<string, unknown>[],
                     enforcerBizOverride,
                     detectedCategory ?? 'business',
                     themeMood,
@@ -916,7 +803,7 @@ export async function generateSiteWithAI(
             }
 
             validBlocks = dedupePageSingletonBlocks(
-                validBlocks as Record<string, unknown>[],
+                validBlocks as unknown as Record<string, unknown>[],
             ) as typeof validBlocks
 
             // Apply structure enforcer to ensure min block count + item counts
@@ -932,19 +819,24 @@ export async function generateSiteWithAI(
                     localeStrings: localeStructuralStrings,
                 }
                 validBlocks = enforceMinimumStructure(
-                    validBlocks as Record<string, unknown>[],
+                    validBlocks as unknown as Record<string, unknown>[],
                     detectedCategory,
                     enforcerCtx,
                 ) as typeof validBlocks
                 validBlocks = enforceMinItems(
-                    validBlocks as Record<string, unknown>[],
+                    validBlocks as unknown as Record<string, unknown>[],
                     detectedCategory,
                     enforcerCtx,
                 ) as typeof validBlocks
-                enforceGridAlignment(validBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
+                enforceGridAlignment(validBlocks as unknown as Record<string, unknown>[], detectedCategory, enforcerCtx)
             }
+            validBlocks = enforceGroundedBlocks(
+                validBlocks as unknown as Record<string, unknown>[],
+                enforcerBizOverride.facts,
+                blockLang,
+            ) as typeof validBlocks
             validBlocks = normalizeLocaleStructuralStrings(
-                validBlocks as Record<string, unknown>[],
+                validBlocks as unknown as Record<string, unknown>[],
                 blockLang,
                 enforcerBizOverride.name ?? businessInfo.businessName,
                 localeStructuralStrings,
@@ -1019,26 +911,17 @@ export async function generateSiteWithAI(
             },
         })
 
-        const aiBlocks = validBlocks.map((b) => String((b as Record<string, unknown>).blockType ?? ''))
-        // Phase 04: count fields for override-rate tracking
-        const aiFieldCounts = countSnapshotFields({ blocks: validBlocks as Record<string, unknown>[] })
-        await finishCapture(cap, {
-            status: 'success',
-            selectedBlocks: aiBlocks,
-            outputSnapshot: { path: 'ai-first', siteName: result.siteName, totalBlocks: validBlocks.length },
-            fieldsTotal: aiFieldCounts.fieldsTotal,
-            fieldsFilled: aiFieldCounts.fieldsFilled,
-        })
-
         return {
             result,
             events,
             requestedGenMode,
             effectiveGenMode: 'ai-first',
+            // steps that hit the workspace's AI quota fell back on their own; say so
+            ...(aiQuotaHitInScope() ? { modeReason: 'insufficient_quota' as const } : {}),
         }
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
-        console.error('[AI] OpenAI generation failed, falling back:', errMessage)
+        console.error('[AI] AI generation failed, falling back:', errMessage)
         // Curated fallback templates contain English item-level copy. Returning
         // them for any non-English locale creates a successfully persisted but
         // mixed-language site, so only English may use this fallback.
@@ -1046,14 +929,8 @@ export async function generateSiteWithAI(
         // Fallback succeeded — site will still be created via smart templates.
         // Don't emit 'error' event (would show error UI even though generation succeeds).
         // Keep warn log for ops visibility on fallback rate.
-        console.warn('[AI Generator] Falling back to smart templates (OpenAI unavailable)')
+        console.warn('[AI Generator] Falling back to smart templates (AI unavailable)')
         const fallbackResult = await generateWithFallback(promptText, events, detectedLang, businessInfo)
-        const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
-        await finishCapture(cap, {
-            status: 'success',
-            selectedBlocks: fallbackBlocks,
-            outputSnapshot: { path: 'ai-first-fallback', siteName: fallbackResult.result.siteName, error: errMessage.slice(0, 200) },
-        })
         return {
             ...fallbackResult,
             requestedGenMode,
@@ -1064,7 +941,7 @@ export async function generateSiteWithAI(
 }
 
 /**
- * Fallback path — runs when OpenAI errors out or no API key.
+ * Fallback path — runs when the AI errors out or is unavailable for this run.
  * Tier 1: call `composeFallbackResult` (rich composer path, 14 industries, Phase 04 validation).
  * Tier 2 (legacy safety net): fall through to `generateBlocks` skeleton if composer throws.
  *
@@ -1897,7 +1774,7 @@ export function sanitizeBlockData(
                 const secondaryLabel = isEnglishStructuralLocale
                     ? 'About Us'
                     : structuralStrings?.navigation.about
-                        ?? String(s.headline || (s.ctaButtons as Array<Record<string, unknown>>)[0]?.label || '')
+                        ?? String(s.headline || (s.ctaButtons as unknown as Array<Record<string, unknown>>)[0]?.label || '')
                 const ctaButtons = s.ctaButtons as Array<{ label: string; url: string; style: string }>
                 if (secondaryLabel) {
                     ctaButtons.push({
@@ -2478,48 +2355,28 @@ interface PersonalizeResult {
 }
 
 /**
- * GPT-4.1-nano personalizes 4 text fields. Timeout-guarded: if GPT
- * doesn't respond within 10s, returns null (caller uses template defaults).
+ * The fast tier personalizes 4 text fields (`sitegen.personalize`). Timeout-guarded:
+ * no answer within 10s (or no AI for this run) → null, caller uses template defaults.
  */
 async function personalizeWithGPT(
-    openai: OpenAI,
     businessInfo: BusinessInfoInput,
     category: string,
     language: 'en' | 'ms' | 'vi',
 ): Promise<PersonalizeResult | null> {
     const { system, user } = buildPersonalizePrompt(businessInfo, category, language)
-    const modelName = selectModel('personalize')
     const callStart = Date.now()
 
     try {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 10_000)
 
-        const completion = await openai.chat.completions.create(
-            {
-                model: modelName,
-                messages: [
-                    { role: 'system', content: system },
-                    { role: 'user', content: user },
-                ],
-                temperature: 0.8,
-                max_tokens: 300,
-                response_format: { type: 'json_object' },
-            },
+        const completion = await completeComposed(
+            'sitegen.personalize',
+            { system, user, temperature: 0.8, maxOutputTokens: 300 },
             { signal: controller.signal },
-        )
-        clearTimeout(timeout)
+        ).finally(() => clearTimeout(timeout))
 
-        logAiUsage({
-            endpoint: 'personalize',
-            model: completion.model,
-            tokensIn: completion.usage?.prompt_tokens ?? 0,
-            tokensOut: completion.usage?.completion_tokens ?? 0,
-            durationMs: Date.now() - callStart,
-            success: true,
-        })
-
-        const content = completion.choices[0]?.message?.content
+        const content = completion.content
         if (!content) return null
 
         const parsed = JSON.parse(content) as Record<string, unknown>
@@ -2532,15 +2389,6 @@ async function personalizeWithGPT(
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.warn(`[AI] personalizeWithGPT failed (${Date.now() - callStart}ms): ${msg}`)
-        logAiUsage({
-            endpoint: 'personalize',
-            model: modelName,
-            tokensIn: 0,
-            tokensOut: 0,
-            durationMs: Date.now() - callStart,
-            success: false,
-            errorCode: err instanceof Error ? err.name : 'unknown',
-        })
         return null
     }
 }
@@ -2554,7 +2402,6 @@ async function generateTemplateFirst(
     businessInfo: BusinessInfoInput,
     language: 'en' | 'ms' | 'vi' | 'auto',
     promptText: string,
-    openai: OpenAI,
     events: SSEEvent[],
     options: { personalize?: boolean } = {},
 ): Promise<{ result: GenerationResult; events: SSEEvent[] } | null> {
@@ -2582,7 +2429,7 @@ async function generateTemplateFirst(
         Promise.resolve().then(() => composeTemplateResult(promptText, themeSeed, resolvedLang, businessInfo, disabledSet)),
         // GPT: personalize 4 text fields (~3-8s, timeout 10s)
         shouldPersonalize
-            ? personalizeWithGPT(openai, businessInfo, presetCategory, resolvedLang)
+            ? personalizeWithGPT(businessInfo, presetCategory, resolvedLang)
             : Promise.resolve(null),
     ])
 
@@ -2644,7 +2491,7 @@ async function generateTemplateFirst(
     }
 
     // Enforce homepage blocks
-    let homepageBlocks = composerResult.blocks as Record<string, unknown>[]
+    let homepageBlocks = composerResult.blocks as unknown as Record<string, unknown>[]
     homepageBlocks = dedupePageSingletonBlocks(homepageBlocks) as typeof homepageBlocks
     homepageBlocks = enforceMinimumStructure(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
     homepageBlocks = enforceMinItems(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
@@ -2658,7 +2505,7 @@ async function generateTemplateFirst(
                 page.blocks = homepageBlocks as GeneratedBlock[]
                 continue
             }
-            let pageBlocks = page.blocks as unknown as Record<string, unknown>[]
+            let pageBlocks = page.blocks as unknown as unknown as Record<string, unknown>[]
             pageBlocks = dedupePageSingletonBlocks(pageBlocks) as typeof pageBlocks
             pageBlocks = enforceSubpageStructure(
                 pageBlocks,

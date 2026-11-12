@@ -11,6 +11,16 @@ vi.mock('@/lib/rateLimit', () => ({
 }))
 
 import { GET } from '@/app/api/storefront/categories/route'
+// #2179: store availability has its own tests (store-unavailable.test.ts); here a store is unavailable only when suspended.
+vi.mock('@/lib/storefront/store-availability', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/storefront/store-availability')>()),
+    isTenantUnavailable: vi.fn(async (_payload: unknown, tenant: { status?: unknown } | null) => tenant?.status === 'suspended'),
+    isTenantIdUnavailable: vi.fn(async () => false),
+}))
+// #2179: store availability has its own tests (store-unavailable.test.ts); available unless a test says otherwise.
+vi.mock('@/lib/storefront/cached-store-availability', () => ({ isCachedSiteUnavailable: vi.fn(async () => false) }))
+import { isCachedSiteUnavailable } from '@/lib/storefront/cached-store-availability'
+import { isTenantIdUnavailable, isTenantUnavailable } from '@/lib/storefront/store-availability'
 
 describe('GET /api/storefront/categories [TC-F09.242]', () => {
     beforeEach(() => {
@@ -88,6 +98,15 @@ describe('GET /api/storefront/categories [TC-F09.242]', () => {
         ])
         expect(mockFind).toHaveBeenNthCalledWith(1, expect.objectContaining({ page: 1, limit: 500 }))
         expect(mockFind).toHaveBeenNthCalledWith(2, expect.objectContaining({ page: 2, limit: 500 }))
+    })
+
+    it('[TC-F09.283] unavailable store returns empty categories', async () => {
+        vi.mocked(isCachedSiteUnavailable).mockResolvedValueOnce(true)
+
+        const res = await GET(new Request('http://localhost/api/storefront/categories?site=5'))
+
+        expect(await res.json()).toEqual({ docs: [] })
+        expect(mockFind).not.toHaveBeenCalled()
     })
 
     it('[TC-F09.252] missing site returns empty docs without calling Payload', async () => {

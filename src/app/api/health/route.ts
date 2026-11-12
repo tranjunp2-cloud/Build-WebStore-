@@ -2,11 +2,13 @@
  * Health check endpoint — 2 modes:
  *
  * GET /api/health        → lightweight 200 OK + deployed commit identity (no DB)
- * GET /api/health?deep=1 → full diagnostic (DB, env, version, uptime)
+ * GET /api/health?deep=1 → full diagnostic (DB, env, version, uptime, where rate limits / shared caches live)
  *
  * Deep mode is for dev team debugging — never expose secrets.
  */
 import { NextRequest } from "next/server";
+import { sharedCacheMode } from "@/lib/cache/shared-cache";
+import { rateLimitMode } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,11 @@ export async function GET(req: NextRequest) {
     },
   };
 
+  // ── Shared state: "memory (NOT shared)" on staging / production = UPSTASH_REDIS_REST_* missing ──
+  result.rateLimit = rateLimitMode();
+  result.sharedCache = sharedCacheMode();
+  result.readReplicas = process.env.DATABASE_URI_READ_REPLICA ? "configured" : "none";
+
   // ── DB check ──
   try {
     const { getPayload } = await import("payload");
@@ -67,7 +74,8 @@ export async function GET(req: NextRequest) {
     "STRIPE_SECRET_KEY",
     "S3_ENDPOINT",
     "S3_ACCESS_KEY_ID",
-    "OPENAI_API_KEY",
+    "AI_PLATFORM_URL",
+    "AI_PLATFORM_CONTEXT_SECRET",
   ];
   result.envCheck = requiredEnvs.reduce(
     (acc, key) => {

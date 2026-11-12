@@ -475,6 +475,7 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
   3. Đợi debounce 400ms
 - **Expected:** Badge hiển thị "Taken" (đỏ/cam); hiển thị suggestion slug thay thế; nút Continue/Submit bị disabled
 - **Test Data:** Slug của tenant đang active trong staging
+- **Unit test coverage (F01 builder form, `business-info-form.test.tsx`):** chỉ phủ phía form — slug "taken" chặn Generate và focus vào ô slug (nút không còn disabled sau #2159); xoá Business Name thì bỏ kết quả "taken" cũ. Badge "Taken" + suggestion do E2E phủ.
 
 ---
 

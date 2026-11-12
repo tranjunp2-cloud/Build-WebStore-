@@ -1,3 +1,4 @@
+// Literal required by Next.js; FIX_ALL_MAX_DURATION_S in fix-all-protocol mirrors it.
 export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
@@ -7,15 +8,26 @@ import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { z } from 'zod'
 import { parseRequest } from '@/lib/validations/helpers'
-import { generateAutoSEOMeta } from '@/lib/ai/generate-meta'
+import { runFixAllGeneration } from '@/lib/seo/fix-all-generation'
+import {
+    FIX_ALL_KEEPALIVE_FRAME,
+    FIX_ALL_KEEPALIVE_MS,
+    fixAllStreamBudgetMs,
+    type FixAllDoneEvent,
+    type FixAllItemFailedEvent,
+    type FixAllTimeoutEvent,
+} from '@/lib/seo/fix-all-protocol'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
+import { describeAiTaskFailure } from '@/lib/ai-platform/ai-tasks'
+import { isAiTasksEnabled } from '@/lib/ai-platform/config'
+import { type AgentActor, resolveActorForUser } from '@/lib/ai-platform/context'
+import type { PlatformUser } from '@/types/user'
 import {
     evaluateAuthoritativeLocalSeo,
     type LocalSeoPayload,
 } from '@/lib/seo/local-seo-evaluation'
 
 const MAX_AI_FIX_BATCH = 100
-const AI_FIX_CONCURRENCY = 4
 const REVISION_TOKEN_PATTERN = /^[a-f0-9]{64}$/
 
 type TenantRef = string | number | { id: string | number } | null | undefined
@@ -38,25 +50,6 @@ function activeTenantIds(user: unknown): Set<string> {
             const id = tenantId(membership.tenant)
             return membership.status === 'active' && id ? [id] : []
         }),
-    )
-}
-
-async function mapWithConcurrency<T>(
-    items: readonly T[],
-    concurrency: number,
-    signal: AbortSignal,
-    worker: (item: T) => Promise<void>,
-): Promise<void> {
-    let nextIndex = 0
-    const run = async () => {
-        while (nextIndex < items.length && !signal.aborted) {
-            const item = items[nextIndex]
-            nextIndex += 1
-            await worker(item)
-        }
-    }
-    await Promise.all(
-        Array.from({ length: Math.min(concurrency, items.length) }, run),
     )
 }
 
@@ -103,6 +96,7 @@ const fixAllSchema = z
  */
 export const POST = withFeatureGuard('content_management')(
     withAuth(async (_user, request) => {
+        const requestStartedAt = Date.now()
         try {
             const { data, errorResponse } = await parseRequest(
                 request,
@@ -239,7 +233,21 @@ export const POST = withFeatureGuard('content_management')(
                 )
             }
 
-            const siteName = site.businessName || site.name || 'Website'
+            // Platform task engine runs as the signed-in member of the active workspace.
+            let actor: AgentActor | undefined
+            if (isAiTasksEnabled()) {
+                try {
+                    actor = await resolveActorForUser(_user as unknown as PlatformUser, request, { tenantId: siteTenantId })
+                } catch (error) {
+                    const failure = describeAiTaskFailure(error)
+                    return NextResponse.json(
+                        { success: false, error: { code: 'AI_ERROR', message: failure.message } },
+                        { status: failure.status },
+                    )
+                }
+            }
+
+            const siteName = site.name || 'Website'
             const trackedKeywords =
                 (
                     site.seo as
@@ -253,17 +261,24 @@ export const POST = withFeatureGuard('content_management')(
                     .filter(Boolean) || []
 
             const encoder = new TextEncoder()
-            const FIX_ALL_TIMEOUT_MS = 15_000
             const generationController = new AbortController()
             const requestSignal = request.signal
             let streamController: ReadableStreamDefaultController<Uint8Array> | null = null
             let timeout: ReturnType<typeof setTimeout> | undefined
+            let keepAlive: ReturnType<typeof setInterval> | undefined
             let stopped = false
+            let succeeded = 0
+            let failed = 0
+            // Items that finished (generated or failed); the rest are "pending" on timeout.
+            const settled = new Set<string>()
+            const itemKey = (item: { collection: string; id: string | number }) =>
+                `${item.collection}:${String(item.id)}`
 
             const cleanup = () => {
                 if (stopped) return
                 stopped = true
                 if (timeout) clearTimeout(timeout)
+                if (keepAlive) clearInterval(keepAlive)
                 requestSignal?.removeEventListener('abort', cleanup)
                 generationController.abort()
                 try {
@@ -295,71 +310,82 @@ export const POST = withFeatureGuard('content_management')(
                     }
                     enqueue('retry: 3000\n\n')
 
-                    timeout = setTimeout(() => {
-                        enqueue(
-                            `data: ${JSON.stringify({
-                                error: 'timeout',
-                                message: 'AI Fix timed out after 15s',
-                            })}\n\n`,
-                        )
-                        cleanup()
-                    }, FIX_ALL_TIMEOUT_MS)
-
-                    await mapWithConcurrency(
-                        requestedItems,
-                        AI_FIX_CONCURRENCY,
-                        generationController.signal,
-                        async (item) => {
-                            if (generationController.signal.aborted || !item) return
-                            try {
-                                const { title, description } =
-                                    await generateAutoSEOMeta(
-                                        item.collection === 'products'
-                                            ? 'product'
-                                            : 'page',
-                                        item.title,
-                                        siteName,
-                                        item.context,
-                                        trackedKeywords,
-                                        generationController.signal,
-                                    )
-
-                                if (generationController.signal.aborted) return
-
-                                const result = {
-                                    id: item.id,
-                                    targetId: item.id,
-                                    collection: item.collection,
-                                    name: item.title,
-                                    proposedTitle: item.missingFields.includes(
-                                        'title',
-                                    )
-                                        ? title
-                                        : undefined,
-                                    proposedDescription:
-                                        item.missingFields.includes(
-                                            'description',
-                                        )
-                                            ? description
-                                            : undefined,
-                                    currentTitle: item.currentTitle,
-                                    currentDescription: item.currentDescription,
-                                }
-
-                                enqueue(
-                                    `data: ${JSON.stringify(result)}\n\n`,
-                                )
-                            } catch (error: unknown) {
-                                if (generationController.signal.aborted) return
-                                console.error(
-                                    '[AI Fix All Partial Error]',
-                                    error instanceof Error
-                                        ? error.name
-                                        : 'UnknownError',
-                                )
-                            }
-                        },
+                    keepAlive = setInterval(
+                        () => enqueue(FIX_ALL_KEEPALIVE_FRAME),
+                        FIX_ALL_KEEPALIVE_MS,
                     )
+
+                    // Counted from the request start: setup (cold start, evaluation) shares maxDuration.
+                    const streamStartedAt = Date.now()
+                    const streamBudgetMs = fixAllStreamBudgetMs(streamStartedAt - requestStartedAt)
+                    timeout = setTimeout(() => {
+                        const event: FixAllTimeoutEvent = {
+                            error: 'timeout',
+                            message: `AI Fix timed out after ${Math.round(streamBudgetMs / 1_000)}s`,
+                            pending: requestedItems.flatMap((item) =>
+                                item && !settled.has(itemKey(item))
+                                    ? [
+                                          {
+                                              targetId: item.id,
+                                              collection: item.collection,
+                                              name: item.title,
+                                          },
+                                      ]
+                                    : [],
+                            ),
+                        }
+                        enqueue(`data: ${JSON.stringify(event)}\n\n`)
+                        cleanup()
+                    }, streamBudgetMs)
+
+                    await runFixAllGeneration({
+                        items: requestedItems.flatMap((item) => (item ? [item] : [])),
+                        siteName,
+                        keywords: trackedKeywords,
+                        actor,
+                        signal: generationController.signal,
+                        deadlineAt: streamStartedAt + streamBudgetMs,
+                        onResult: (item, { title, description }) => {
+                            if (stopped) return
+                            const result = {
+                                id: item.id,
+                                targetId: item.id,
+                                collection: item.collection,
+                                name: item.title,
+                                proposedTitle: item.missingFields.includes('title')
+                                    ? title
+                                    : undefined,
+                                proposedDescription:
+                                    item.missingFields.includes('description')
+                                        ? description
+                                        : undefined,
+                                currentTitle: item.currentTitle,
+                                currentDescription: item.currentDescription,
+                            }
+                            settled.add(itemKey(item))
+                            succeeded += 1
+                            enqueue(`data: ${JSON.stringify(result)}\n\n`)
+                        },
+                        onFailure: (item, { reason }) => {
+                            if (stopped) return
+                            settled.add(itemKey(item))
+                            failed += 1
+                            const event: FixAllItemFailedEvent = {
+                                error: 'item_failed',
+                                targetId: item.id,
+                                collection: item.collection,
+                                name: item.title,
+                                reason,
+                            }
+                            enqueue(`data: ${JSON.stringify(event)}\n\n`)
+                        },
+                    })
+                    const done: FixAllDoneEvent = {
+                        done: true,
+                        succeeded,
+                        failed,
+                    }
+                    enqueue(`data: ${JSON.stringify(done)}\n\n`)
                     cleanup()
                 },
                 cancel() {

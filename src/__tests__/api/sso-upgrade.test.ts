@@ -22,6 +22,8 @@ vi.mock('payload', () => ({
   ),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
+const mockRevalidateTag = vi.hoisted(() => vi.fn())
+vi.mock('next/cache', () => ({ revalidateTag: mockRevalidateTag }))
 
 vi.mock('@/lib/auth', () => ({
   getCurrentUser: vi.fn(),
@@ -153,6 +155,19 @@ describe('PUT /api/v1/sso/upgrade [TC-SUB-020..022]', () => {
     const body = await res.json()
     expect(body.message).toBe('Subscription upgraded')
   })
+
+  it('[TC-F09.285] busts the shop main-subscription cache after the write, so an expired store reopens at once', async () => {
+    // Arrange
+    mockGetCurrentUser.mockResolvedValueOnce(superAdmin as any)
+    mockFind.mockResolvedValueOnce({ docs: [tenantUser] })
+
+    // Act
+    await upgradeHandler(makeRequest(validBody))
+
+    // Assert
+    expect(mockRevalidateTag).toHaveBeenCalledWith('plan-subscription:10', { expire: 0 })
+    expect(mockUpsert.mock.invocationCallOrder[0]).toBeLessThan(mockRevalidateTag.mock.invocationCallOrder[0])
+  })
 })
 
 // ── Downgrade Tests ───────────────────────────────────────────────────────────
@@ -174,6 +189,16 @@ describe('PUT /api/v1/sso/downgrade [TC-SUB-023]', () => {
     expect(mockUpsert).toHaveBeenCalled()
     const body = await res.json()
     expect(body.message).toBe('Subscription downgraded')
+  })
+
+  it('[TC-F09.285] downgrade busts the main-subscription cache after the write', async () => {
+    mockGetCurrentUser.mockResolvedValueOnce(superAdmin as any)
+    mockFind.mockResolvedValueOnce({ docs: [tenantUser] })
+
+    await downgradeHandler(makeRequest(validBody))
+
+    expect(mockRevalidateTag).toHaveBeenCalledWith('plan-subscription:10', { expire: 0 })
+    expect(mockUpsert.mock.invocationCallOrder[0]).toBeLessThan(mockRevalidateTag.mock.invocationCallOrder[0])
   })
 
   it('[TC-SUB-023b] returns 401 without token (same auth guard as upgrade)', async () => {

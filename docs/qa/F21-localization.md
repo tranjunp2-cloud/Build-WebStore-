@@ -118,6 +118,7 @@ Vet can toan bo AC cua F21, dac biet: Vi tri chinh xac Switcher (Auth vs CMS vs 
 | **TC-F21-05-07** | `[Edge]` | Safe Fallback khi thieu khoa dich BM | 1. Xoa khoa BM cua muc "Dashboard" khoi `bm.json`.<br>2. Mo CMS o BM. | - Hien text tieng Anh "Dashboard" (fallback).<br>- Khong hien trang trang, khong crash. | Blocker | [ ] |
 | **TC-F21-05-08** | `[Negative]` | Khong bao gio hien raw i18n key tren UI | 1. Kiem tra toan bo UI o ca EN va BM. | - Khong ton tai chuoi dang `sidebar.menu.products` hien tren man hinh.<br>- Moi key deu co gia tri hien thi. | High | [ ] |
 | **TC-F21-05-09** | `[Security]` | Khong XSS qua gia tri trong file JSON dich | 1. Them gia tri `<script>alert(1)</script>` vao 1 key trong `bm.json`.<br>2. Xem UI o che do BM. | - He thong escape HTML truoc khi render.<br>- Khong thuc thi JS bat ky. | Blocker | [ ] |
+| **TC-F21-05-10** | `[Positive]` | Customers: thoi gian tuong doi (Xd/Xmo/Xy ago) dich theo ngon ngu (GH-2280) | 1. Chuyen CMS sang BM.<br>2. Mo Semua Pelanggan, xem cot Pesanan terakhir voi don cu hon 30 ngay.<br>3. Mo chi tiet khach, xem dong "Updated". | - Hien "N hari/bulan/tahun lalu", "N minit/jam lalu".<br>- Khong con chuoi "ago" tieng Anh; EN giu "Nd/Nmo/Ny ago". | Low | [x] |
 
 ---
 

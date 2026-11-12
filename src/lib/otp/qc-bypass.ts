@@ -39,7 +39,9 @@ export function getQcBypassCode(): string {
 /** True iff the current runtime is the QC lane AND bypass is explicitly on. */
 export function isQcBypassEnabled(): boolean {
   return (
-    (process.env.APP_ENV === QC_APP_ENV || process.env.NEXT_PUBLIC_APP_ENV === QC_APP_ENV)
+    // Server-only APP_ENV: NEXT_PUBLIC_* is a build-time value shared with the browser bundle, not a lane stamp
+    // (TC-PERF-158).
+    process.env.APP_ENV === QC_APP_ENV
     && process.env.QC_OTP_BYPASS_ENABLED === 'true'
   )
 }
@@ -52,9 +54,11 @@ export function isQcBypassEnabled(): boolean {
 export function canBypassOtpForEmail(email: string | undefined): boolean {
   if (!email) return false
   if (!isQcBypassEnabled()) return false
-  const domain = process.env.QC_OTP_BYPASS_DOMAIN
+  const domain = process.env.QC_OTP_BYPASS_DOMAIN?.trim().toLowerCase()
   if (!domain) return false
-  return email.toLowerCase().endsWith(domain.toLowerCase())
+  // Exact mailbox domain: `@example.com`, never a bare suffix (`example.com` matched `x@evilexample.com`).
+  const suffix = domain.startsWith('@') ? domain : `@${domain}`
+  return email.trim().toLowerCase().endsWith(suffix)
 }
 
 /**

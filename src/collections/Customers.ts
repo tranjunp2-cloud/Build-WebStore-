@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { normalizePhone } from '@/lib/normalize-phone'
+import { ownTenantFieldAccess } from '@/lib/access/tenant-access'
 
 export const Customers: CollectionConfig = {
     slug: 'customers',
@@ -78,6 +79,8 @@ export const Customers: CollectionConfig = {
             required: true,
             index: true,
             admin: { description: 'The tenant/store this customer belongs to' },
+            // GH-2137: only the user's own workspace can be written here (create into / move to another shop).
+            access: { create: ownTenantFieldAccess, update: ownTenantFieldAccess },
         },
         {
             name: 'email',

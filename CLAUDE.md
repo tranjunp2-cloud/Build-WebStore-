@@ -70,6 +70,7 @@ These facts override any contradicting information elsewhere. If you touch these
 - PR title: `type(scope): lowercase description` (max 72 chars, commitlint gates)
 - Use `Relates to #N` — NEVER `Closes #N` (issues close after QA)
 - DO NOT use `--no-verify`; fix commitlint errors instead
+- Before every push run `npm run verify` (CI PR gates on the diff vs `origin/staging`: migrations, env manifests, oxlint, typecheck, related tests; CI additionally runs full ESLint). The husky `pre-push` hook runs it too
 
 ### Testing (see `.claude/rules/testing.md`)
 

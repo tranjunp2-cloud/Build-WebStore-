@@ -20,7 +20,7 @@ import Link from 'next/link'
 import { sql } from '@payloadcms/db-postgres/drizzle'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { requireStudioAccess } from '@/lib/admin/auth-guard'
 import { getAvgQualityScore } from '@/lib/admin/quality-metrics'
 
 export const dynamic = 'force-dynamic'
@@ -220,7 +220,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default async function StudioDashboardPage() {
-    await requireSuperAdmin()
+    await requireStudioAccess()
 
     const [stats, topTemplates, recentActivity, queue, qualityResult] = await Promise.all([
         fetchStats(),

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPayload } from "payload";
 import config from "@payload-config";
-import { withSuperAdmin } from "@/lib/admin/api-utils";
+import { withStudioPermission } from "@/lib/admin/api-utils";
 import {
   createGithubFindingIssue,
   findGithubFindingIssue,
@@ -116,7 +116,7 @@ async function markReconciliationRequired(
   });
 }
 
-export const POST = withSuperAdmin(async (_req: NextRequest, { params }) => {
+export const POST = withStudioPermission('qa.promote', async (_req: NextRequest, { params }) => {
   const id = params?.id;
   if (!id || !/^\d+$/.test(id))
     return NextResponse.json({ error: "Invalid finding ID" }, { status: 422 });

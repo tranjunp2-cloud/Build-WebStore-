@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getPayload } from 'payload';
 import config from '@payload-config';
-import { getCurrentUser } from '@/lib/auth';
+import { authUnavailableResponse, getCurrentUser, isAuthUnavailableError } from '@/lib/auth';
 import { isSubscriptionActive } from '@/lib/subscriptions/plan-subscription';
 
 export async function GET() {
@@ -47,22 +47,36 @@ export async function GET() {
             }
         }
 
-        // Subscription + ban checks run in parallel — both query independent collections.
-        // No row in plan-subscriptions = new/unprovisioned tenant still onboarding → let through.
+        // Subscription + ban checks. No row in plan-subscriptions = new/unprovisioned tenant still onboarding → let
+        // through. The tenant's `status` (ban) comes populated on the session user (depth 1, SESSION_USER_POPULATE),
+        // so only a membership the session did not populate reads the tenant row; the subscription read is one
+        // statement — no COUNT, no depth-2 tenant re-read (TC-PERF-054). Polled every 60 s by every dashboard tab.
+        const sessionTenant = tenants?.[0]?.tenant;
+        const populatedStatus =
+            sessionTenant && typeof sessionTenant === 'object' && String(sessionTenant.id) === String(resolvedTenantId)
+                ? (sessionTenant as { status?: string | null }).status
+                : undefined;
         const [subResult, tenantResult] = await Promise.all([
             payload.find({
                 collection: 'plan-subscriptions',
                 where: { and: [{ tenant: { equals: resolvedTenantId } }, { name: { equals: 'main' } }] },
                 sort: '-createdAt',
                 limit: 1,
-            }),
-            // Use find() instead of findByID() — findByID throws on missing doc → 500 on this polling endpoint
-            payload.find({
-                collection: 'tenants',
-                where: { id: { equals: resolvedTenantId } },
-                limit: 1,
+                pagination: false,
                 depth: 0,
+                select: { status: true, endsAt: true, canceledAt: true, canceledImmediately: true },
             }),
+            populatedStatus !== undefined
+                ? Promise.resolve({ docs: [{ status: populatedStatus }] })
+                // Use find() instead of findByID() — findByID throws on missing doc → 500 on this polling endpoint
+                : payload.find({
+                    collection: 'tenants',
+                    where: { id: { equals: resolvedTenantId } },
+                    limit: 1,
+                    pagination: false,
+                    depth: 0,
+                    select: { status: true },
+                }),
         ]);
 
         const subRow = subResult.docs[0];
@@ -103,6 +117,9 @@ export async function GET() {
         response.headers.set('Cache-Control', 'private, max-age=30');
         return response;
     } catch (error) {
+        // The session could not be checked (DB incident): 503 + Retry-After. The watcher keeps polling and never
+        // counts it as a signed-out answer, unlike `{ ok:false, retry:true }` (TC-PERF-011).
+        if (isAuthUnavailableError(error)) return authUnavailableResponse();
         console.error('[Session Check Error]:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }

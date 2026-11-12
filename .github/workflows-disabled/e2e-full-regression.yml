@@ -9,7 +9,7 @@ on:
       base_url:
         description: Staging URL to test
         required: false
-        default: https://web-cms-v2.dev.ecommercehub.my
+        default: https://web-v2.dev.ecommercehub.my
 
 permissions:
   contents: read
@@ -17,13 +17,20 @@ permissions:
 jobs:
   full-regression:
     name: Full regression on staging
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # Playwright run; follows CI_HEAVY_RUNNER like the heavy CI jobs.
+    runs-on: ${{ vars.CI_HEAVY_RUNNER || 'ubuntu-latest' }}
+    # 35 min was not enough on the self-hosted runner: the nightly run was cut off at
+    # the limit and reported as cancelled, never as passed or failed.
+    timeout-minutes: 75
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          # The schedule fires on main, but the specs must match what staging serves.
+          ref: ${{ github.event_name == 'schedule' && 'staging' || github.ref }}
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '24'
+          check-latest: true
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
@@ -34,7 +41,7 @@ jobs:
             -H "Authorization: Bearer $E2E_SETUP_SECRET" -H 'Content-Type: application/json' \
             --data "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\"}"
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
           E2E_SETUP_SECRET: ${{ secrets.E2E_SETUP_SECRET }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
@@ -44,10 +51,13 @@ jobs:
             smoke.spec.ts auth.setup.ts auth-flow.spec.ts dashboard.spec.ts builder.spec.ts editor.spec.ts \
             admin.spec.ts notifications.spec.ts products.spec.ts orders.spec.ts gh1573-easyparcel-oauth.spec.ts \
             tests/cart-drawer.spec.ts tests/gh-1734-self-delivery-complete.spec.ts tests/f40-qa-ingest.spec.ts \
+            tests/f07-template-search.spec.ts tests/gh-2284-checkout-email-length.spec.ts \
+            tests/f40-project-health.spec.ts \
             --project=smoke --project=setup --project=chromium --project=storefront-regression \
-            --project=gh-1734-self-delivery --project=f40-qa-ingest
+            --project=gh-1734-self-delivery --project=f40-qa-ingest --project=f07-template-search \
+            --project=gh-2284-checkout-email-length --project=f40-project-health
         env:
-          BASE_URL: ${{ inputs.base_url || 'https://web-cms-v2.dev.ecommercehub.my' }}
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
@@ -56,8 +66,20 @@ jobs:
           QA_INGEST_SECRET: ${{ secrets.QA_INGEST_SECRET }}
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: full-regression-playwright-report
           path: playwright-report/
           retention-days: 7
+      # Nobody watches the Actions tab at night: a red or timed-out run pings Lark.
+      - name: Notify regression failed
+        if: failure() || cancelled()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'ci_fail'
+          branch: 'staging'
+          author: ${{ github.actor }}
+          failed-step: 'E2E Full Regression (nightly)'
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

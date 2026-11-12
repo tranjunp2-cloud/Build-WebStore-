@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { ShoppingBag, WifiOff, RefreshCw, ChevronRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
@@ -16,6 +17,8 @@ import {
     TableCell,
 } from '@/components/ui/table'
 import { getCustomerOrdersAction } from '../actions'
+import { queryKeys } from '@/hooks/queries/query-keys'
+import { useQueryScope } from '@/providers/query-provider'
 
 type OrderRow = {
     id: number
@@ -71,30 +74,32 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
         payment_failed: ot.statusPaymentFailed,
         processing:     ot.statusProcessing,
     }
-    const [orders, setOrders]         = useState<OrderRow[]>([])
-    const [page, setPage]             = useState(1)
-    const [total, setTotal]           = useState(0)
-    const [totalPages, setTotalPages] = useState(1)
-    const [loading, setLoading]       = useState(true)
-    const [error, setError]           = useState(false)
+    const [page, setPage] = useState(1)
+    // a new customer starts on page 1, in the same render
+    const [pageOf, setPageOf] = useState(customerId)
+    if (pageOf !== customerId) {
+        setPageOf(customerId)
+        setPage(1)
+    }
 
-    const fetchOrders = useCallback(async (p: number) => {
-        setLoading(true)
-        setError(false)
-        try {
-            const res = await getCustomerOrdersAction(customerId, p)
-            setOrders(res.orders as OrderRow[])
-            setTotal(res.total as number)
-            setTotalPages(res.totalPages as number)
-        } catch {
-            setError(true)
-        } finally {
-            setLoading(false)
-        }
-    }, [customerId])
-
-    useEffect(() => { setPage(1) }, [customerId])
-    useEffect(() => { fetchOrders(page) }, [fetchOrders, page])
+    // Cached per customer + page, keyed under orders: a change to an order (cancel, ship, refund...) marks
+    // it stale, and the page on screen refetches in place; a failed background refetch keeps the rows.
+    const scope = useQueryScope()
+    const query = useQuery({
+        queryKey: queryKeys.customers.orders(scope, customerId, page),
+        queryFn: () => getCustomerOrdersAction(customerId, page),
+        placeholderData: keepPreviousData,
+    })
+    const orders = (query.data?.orders ?? []) as OrderRow[]
+    const total = (query.data?.total ?? 0) as number
+    const loading = query.isPending || query.isPlaceholderData
+    const error = query.isLoadingError
+    const { isRefetchError, errorUpdatedAt } = query
+    useEffect(() => {
+        if (isRefetchError) console.error('[Customer orders refresh]', query.error)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [errorUpdatedAt])
+    const fetchOrders = () => void query.refetch()
 
     if (loading) {
         return (
@@ -113,7 +118,7 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
                 <p className="text-[14px] mb-4" style={{ color: 'var(--dash-text-muted)' }}>{ot.loadFailed}</p>
                 <button
                     type="button"
-                    onClick={() => fetchOrders(page)}
+                    onClick={fetchOrders}
                     className="flex items-center gap-2 h-9 px-4 rounded-[8px] text-[13px] bg-transparent transition-colors cursor-pointer hover:bg-black/[0.05] dark:hover:bg-white/[0.05]"
                     style={{ color: 'var(--dash-text-muted)', border: '1px solid var(--dash-border)' }}
                 >

@@ -156,7 +156,15 @@ export async function addCustomDomain(rawDomain: string): Promise<DomainActionRe
             data: { customDomains: optimistic } as unknown as Record<string, unknown>,
         });
     } catch (err) {
-        console.error('[addCustomDomain] Payload optimistic write failed:', err);
+        // ValidationError keeps the failing field paths in err.data.errors (e.g.
+        // customDomains.2.domain) — log them so a bad existing row can be found.
+        const fieldErrors = (err as { data?: { errors?: Array<{ path?: string }> } }).data?.errors;
+        console.error('[addCustomDomain] Payload optimistic write failed:', err, JSON.stringify(fieldErrors ?? null));
+        // The DB unique index on customDomains.domain surfaces as a ValidationError on `domain`:
+        // the domain is held by a row the cross-tenant find above cannot see.
+        if (Array.isArray(fieldErrors) && fieldErrors.some((e) => e.path?.endsWith('domain'))) {
+            return { success: false, error: 'Domain already registered by another store.' };
+        }
         return {
             success: false,
             error: 'Unable to save domain. Please try again or contact support.',

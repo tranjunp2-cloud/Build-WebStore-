@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { upsertPlanSubscription, VALID_BASE_CODES } from '@/lib/subscriptions/plan-subscription'
+import { revalidatePlanSubscription } from '@/lib/cache/revalidate-storefront'
 
 /**
  * PUT /api/v1/sso/downgrade
@@ -71,6 +72,8 @@ export async function PUT(req: NextRequest) {
       startDate: start_date,
       endDate: end_date,
     })
+    // #2179: post-commit bust of the main subscription the storefront gate reads
+    revalidatePlanSubscription(tenantId)
 
     return NextResponse.json({ message: 'Subscription downgraded' }, { status: 200 })
   } catch (error) {

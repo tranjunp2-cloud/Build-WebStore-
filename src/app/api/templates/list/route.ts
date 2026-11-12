@@ -10,14 +10,28 @@ import { NextResponse } from 'next/server'
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url)
-        const limit = parseInt(searchParams.get('limit') || '100', 10)
+        const templateId = searchParams.get('templateId')
+        if (templateId !== null && (
+            !/^\d+$/.test(templateId)
+            || !Number.isSafeInteger(Number(templateId))
+            || Number(templateId) < 1
+        )) {
+            return NextResponse.json({ error: 'Invalid templateId' }, { status: 400 })
+        }
+        const requestedLimit = Number.parseInt(searchParams.get('limit') ?? '', 10)
+        const limit = Number.isFinite(requestedLimit)
+            ? Math.min(Math.max(requestedLimit, 1), 100)
+            : 100
         const sort = searchParams.get('sort') || '-createdAt'
 
         const payload = await getPayload({ config })
         const result = await payload.find({
             collection: 'templates',
-            limit,
+            limit: templateId === null ? limit : 1,
             sort,
+            where: templateId === null
+                ? { status: { equals: 'live' } }
+                : { and: [{ status: { equals: 'live' } }, { id: { equals: Number(templateId) } }] },
         })
 
         return NextResponse.json(result)

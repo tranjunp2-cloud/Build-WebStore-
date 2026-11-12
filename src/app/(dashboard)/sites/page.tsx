@@ -34,6 +34,19 @@ export default async function MySitesPage() {
             where: { tenant: { equals: tenantId } },
             sort: '-updatedAt',
             limit: 100,
+            // The cards' columns only: a default depth-2 read sent the whole site row with its populated tenant
+            // (Xendit / EasyParcel / ECH secrets) to the client component (TC-PERF-126).
+            depth: 0,
+            select: {
+                name: true,
+                domain: true,
+                status: true,
+                generationStatus: true,
+                siteType: true,
+                theme: { primaryColor: true },
+                updatedAt: true,
+                createdAt: true,
+            },
         })
         totalSites = result.totalDocs
         sites = result.docs as unknown as SiteDoc[]

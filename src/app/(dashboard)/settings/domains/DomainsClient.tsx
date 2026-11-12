@@ -4,6 +4,8 @@ import React, { useState, useTransition, useCallback, useRef, useEffect } from '
 import { createPortal } from 'react-dom';
 import { Globe, Plus, AlertCircle, AlertTriangle, Copy, Check, ChevronRight, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { WebsiteStatusCard } from './WebsiteStatusCard';
+import type { WebsiteStatus } from './website-status';
 import { useI18n } from '@/i18n';
 import { resolveApiError } from '@/lib/ui/resolve-api-error';
 import { Badge } from '@/components/ui/badge';
@@ -126,7 +128,7 @@ function SelectPrimaryPanel({
                                         )}
                                     </div>
                                     <span
-                                        className="text-[16px] font-normal leading-normal truncate"
+                                        className="min-w-0 text-left text-[16px] font-normal leading-normal whitespace-normal [overflow-wrap:anywhere]"
                                         style={{ color: isSelected ? 'var(--dash-text)' : 'var(--dash-text-muted)' }}
                                     >
                                         {opt.label}
@@ -309,10 +311,13 @@ export function DomainsClient({
     tenantId,
     tenantSlug,
     customDomains,
+    website,
 }: {
     tenantId: string;
     tenantSlug: string;
     customDomains: DomainEntry[];
+    /** US-F05-10: website publish status (absent when the tenant has no site yet). */
+    website?: { siteId: string; status: WebsiteStatus; siteUrl: string | null; canUnpublish: boolean } | null;
 }) {
     const { t } = useI18n();
     const sub = t.common.subscriptionErrors;
@@ -582,6 +587,15 @@ export function DomainsClient({
                 </div>
             </div>
 
+            {website && (
+                <WebsiteStatusCard
+                    siteId={website.siteId}
+                    status={website.status}
+                    siteUrl={website.siteUrl}
+                    canUnpublish={website.canUnpublish}
+                />
+            )}
+
             <div className="space-y-[16px]">
                 {/* Banner — Figma 30872:1455, height: 102px, padding: 25px 25px 1px */}
                 <div
@@ -624,10 +638,10 @@ export function DomainsClient({
                     style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                 >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px]">
-                        <div className="flex flex-col gap-2">
+                        <div className="flex min-w-0 flex-col gap-2">
                             {!isEditingSlug ? (
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{currentSlug}.{PLATFORM_DOMAIN}</h3>
+                                <div className="flex min-w-0 flex-wrap items-center gap-3">
+                                    <h3 className="min-w-0 text-[18px] font-semibold [overflow-wrap:anywhere]" style={{ color: 'var(--dash-text)' }}>{currentSlug}.{PLATFORM_DOMAIN}</h3>
                                     {!hasCustomPrimary && (
                                         <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[hsl(var(--info)/0.3)] bg-[hsl(var(--info)/0.2)]">
                                             <span className="text-[12px] font-semibold text-[hsl(var(--info))]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
@@ -788,7 +802,7 @@ export function DomainsClient({
                                 style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                             >
                                 <div className="flex flex-col gap-2">
-                                    <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{domain}</h3>
+                                    <h3 className="text-[18px] font-semibold [overflow-wrap:anywhere]" style={{ color: 'var(--dash-text)' }}>{domain}</h3>
                                     {/* Pending status — theme-aware warning badge */}
                                     <Badge variant="warning" dot className="h-[34px] px-3 rounded-[12px] text-[14px] font-medium w-fit">
                                         {t?.Domains?.pendingVerification || 'Pending Verification'}
@@ -913,8 +927,8 @@ export function DomainsClient({
                                     className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[16px] px-[16px] pb-[1px] sm:pt-[25px] sm:px-[25px] rounded-[16px] gap-[16px]"
                                     style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                                 >
-                                    <div className="flex flex-col gap-2 pb-[16px] sm:pb-[25px]">
-                                        <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{domain}</h3>
+                                    <div className="flex min-w-0 flex-col gap-2 pb-[16px] sm:pb-[25px]">
+                                        <h3 className="text-[18px] font-semibold [overflow-wrap:anywhere]" style={{ color: 'var(--dash-text)' }}>{domain}</h3>
                                         <div className="flex flex-wrap gap-2 items-center">
                                             {/* Active status — theme-aware success badge */}
                                             <Badge variant="success" dot className="h-[34px] px-3 rounded-[12px] text-[14px] font-medium">
@@ -928,7 +942,7 @@ export function DomainsClient({
                                         </div>
                                     </div>
                                     {/* Remove button — visible on all screen sizes */}
-                                    <div className="flex items-center gap-3 pb-[16px] sm:pb-[25px]">
+                                    <div className="flex shrink-0 items-center gap-3 pb-[16px] sm:pb-[25px]">
                                         {/* Shared <Button> dashSecondary, outline destructive (GH-1290 Bug 1) */}
                                         <TooltipProvider>
                                             <Tooltip>

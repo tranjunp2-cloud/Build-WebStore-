@@ -9,6 +9,8 @@ import { NotificationEmptyState } from './NotificationEmptyState'
 import type { NotificationsResponse, NotificationItem as NotificationItemType } from '@/types/notification'
 import { Loader2 } from 'lucide-react'
 
+const PAGE_SIZE = 20
+
 export function NotificationDropdown() {
   const { isDropdownOpen, setDropdownOpen, setUnreadCount, decrementUnreadCount, incrementUnreadCount, resetUnread } = useNotificationStore()
   const { t } = useI18n()
@@ -20,8 +22,21 @@ export function NotificationDropdown() {
   const [isLoading, setIsLoading] = useState(false)
   const [isError, setIsError] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState(false)
+  const loadingMoreRef = useRef(false)
+  // Bumped whenever the list is reset (close / refetch) so a late load-more response is discarded.
+  const generationRef = useRef(0)
+  // Offset of the next page = pages loaded × PAGE_SIZE (API pages by floor(offset / limit)).
+  const nextOffsetRef = useRef(PAGE_SIZE)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const fetchNotifications = async () => {
+    generationRef.current += 1
+    loadingMoreRef.current = false
+    setIsLoadingMore(false)
     setIsLoading(true)
     setIsError(false)
     try {
@@ -31,6 +46,9 @@ export function NotificationDropdown() {
       if (json.unreadCount !== undefined) {
          setUnreadCount(json.unreadCount)
       }
+      nextOffsetRef.current = PAGE_SIZE
+      setHasMore(json.hasMore ?? json.items.length >= PAGE_SIZE)
+      setLoadMoreError(false)
       setData(json)
     } catch (error) {
       setIsError(true)
@@ -39,12 +57,45 @@ export function NotificationDropdown() {
     }
   }
 
+  const fetchMore = useCallback(async () => {
+    if (loadingMoreRef.current) return
+    loadingMoreRef.current = true
+    const generation = generationRef.current
+    setIsLoadingMore(true)
+    setLoadMoreError(false)
+    try {
+      const res = await fetch(`/api/notifications?limit=${PAGE_SIZE}&offset=${nextOffsetRef.current}`)
+      if (!res.ok) throw new Error('Network response failure')
+      const json = await res.json() as NotificationsResponse
+      if (generation !== generationRef.current) return
+      nextOffsetRef.current += PAGE_SIZE
+      setHasMore(json.hasMore ?? json.items.length >= PAGE_SIZE)
+      setData((prev) => {
+        if (!prev) return prev
+        const seen = new Set(prev.items.map((item) => item.id))
+        return { ...prev, items: [...prev.items, ...json.items.filter((item) => !seen.has(item.id))] }
+      })
+    } catch {
+      if (generation === generationRef.current) setLoadMoreError(true)
+    } finally {
+      if (generation === generationRef.current) {
+        loadingMoreRef.current = false
+        setIsLoadingMore(false)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (isDropdownOpen && !data) {
       fetchNotifications()
     }
     if (!isDropdownOpen) {
       setIsExpanded(false)
+      setHasMore(false)
+      setLoadMoreError(false)
+      generationRef.current += 1
+      loadingMoreRef.current = false
+      setIsLoadingMore(false)
       setData(null)
       markingReadRef.current.clear()
     }
@@ -176,6 +227,22 @@ export function NotificationDropdown() {
   const visibleItems = isExpanded ? allItems : allItems.slice(0, PREVIEW_LIMIT)
   const hasMoreItems = allItems.length > PREVIEW_LIMIT
 
+  const canLoadMore = isExpanded && hasMore && !loadMoreError && !isLoadingMore && !isLoading
+
+  // Infinite scroll: when the sentinel at the bottom of the expanded list scrolls into view, load the next page.
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!canLoadMore || !sentinel || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void fetchMore()
+      },
+      { root: scrollRef.current },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [canLoadMore, fetchMore, data?.items.length])
+
   if (!isDropdownOpen) return null
 
   return (
@@ -194,7 +261,7 @@ export function NotificationDropdown() {
         </button>
       </div>
 
-      <div className={`flex-1 min-h-0 ${isExpanded ? 'max-h-[460px] overflow-y-auto custom-scrollbar' : ''} bg-[#1E293B] transition-all duration-300`}>
+      <div ref={scrollRef} className={`flex-1 min-h-0 ${isExpanded ? 'max-h-[460px] overflow-y-auto custom-scrollbar' : ''} bg-[#1E293B] transition-all duration-300`}>
         {isLoading && (
             <div className="flex items-center justify-center py-10 bg-[#1E293B]">
                 <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
@@ -222,6 +289,25 @@ export function NotificationDropdown() {
               {visibleItems.map((item) => (
                 <NotificationItem key={item.id} notification={item} onClick={handleItemClick} />
               ))}
+              {isExpanded && hasMore && <div ref={sentinelRef} data-testid="notification-load-more-sentinel" className="h-1" />}
+            </div>
+        )}
+
+        {isExpanded && isLoadingMore && (
+            <div className="flex items-center justify-center py-4" data-testid="notification-loading-more">
+                <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+            </div>
+        )}
+
+        {isExpanded && loadMoreError && (
+            <div className="flex flex-col items-center py-3 px-4 text-center">
+                <p className="text-[13px] text-red-400 mb-2">{t.notifications.loadError}</p>
+                <button
+                  onClick={() => void fetchMore()}
+                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white text-[13px] font-medium transition-colors border border-white/10"
+                >
+                  {t.notifications.retry}
+                </button>
             </div>
         )}
       </div>

@@ -10,7 +10,7 @@
  *   - template.defaultBlocks (JSON fallback for legacy templates)
  *
  * Rate-limited: 30 req/min per IP.
- * Auth: super-admin only.
+ * Auth: needs template.score.
  */
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
-import { withSuperAdmin, checkRateLimit } from '@/lib/admin/api-utils'
+import { withStudioPermission, checkRateLimit } from '@/lib/admin/api-utils'
 import { scoreFixture, loadRubric, DEFAULT_RUBRIC_VERSION } from '@/lib/ai-quality/scorer'
 import type { RubricVersion } from '@/lib/ai-quality/scorer'
 import type { HarnessBlock } from '../../../../../../../scripts/test-harness/types'
@@ -90,7 +90,7 @@ function extractBlocks(template: Record<string, unknown>): {
 type RouteContext = { params: Promise<{ id: string }> }
 
 export function POST(req: NextRequest, ctx: RouteContext) {
-    return withSuperAdmin(async (request) => {
+    return withStudioPermission('template.score', async (request) => {
         const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
         if (!checkRateLimit(`score:${ip}`, SCORE_RATE_LIMIT)) {
             return NextResponse.json({ error: 'Rate limit exceeded. Try again in a minute.' }, { status: 429 })

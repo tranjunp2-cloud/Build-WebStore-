@@ -11,9 +11,44 @@ vi.mock('@/lib/rateLimit', () => ({
 }))
 
 import { GET } from '@/app/api/storefront/products/route'
+// #2179: store availability has its own tests (store-unavailable.test.ts); here a store is unavailable only when suspended.
+vi.mock('@/lib/storefront/store-availability', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/storefront/store-availability')>()),
+    isTenantUnavailable: vi.fn(async (_payload: unknown, tenant: { status?: unknown } | null) => tenant?.status === 'suspended'),
+    isTenantIdUnavailable: vi.fn(async () => false),
+}))
+// #2179: store availability has its own tests (store-unavailable.test.ts); available unless a test says otherwise.
+vi.mock('@/lib/storefront/cached-store-availability', () => ({ isCachedSiteUnavailable: vi.fn(async () => false) }))
+import { isCachedSiteUnavailable } from '@/lib/storefront/cached-store-availability'
+import { isTenantIdUnavailable, isTenantUnavailable } from '@/lib/storefront/store-availability'
 
 describe('GET /api/storefront/products [TC-F08-831]', () => {
     beforeEach(() => vi.clearAllMocks())
+
+    it('[TC-F09-2378-06] summary (only with summary=1) falls back to the description text; shortDescription wins', async () => {
+        // Arrange
+        const lexicalDesc = { root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'text', text: 'From the form', mode: 'normal', style: '', detail: 0, format: 0, version: 1 }] }] } }
+        const base = { price: 10, currency: 'MYR', images: [], status: 'active', hasVariants: false, variants: [] }
+        mockFind.mockResolvedValue({
+            docs: [
+                { ...base, id: 1, name: 'A', slug: 'a', description: lexicalDesc },
+                { ...base, id: 2, name: 'B', slug: 'b', shortDescription: 'Short blurb', description: lexicalDesc },
+            ],
+            totalDocs: 2, page: 1, totalPages: 1,
+        })
+
+        // Act
+        const res = await GET(new Request('http://localhost/api/storefront/products?site=1&summary=1'))
+        const body = await res.json()
+        const plain = await (await GET(new Request('http://localhost/api/storefront/products?site=1'))).json()
+
+        // Assert
+        expect(body.docs[0].summary).toBe('From the form')
+        expect(body.docs[1].summary).toBe('Short blurb')
+        expect(body.docs[1].shortDescription).toBe('Short blurb')
+        // grids that do not ask for it skip the description rendering
+        expect(plain.docs[0]).not.toHaveProperty('summary')
+    })
 
     it('[TC-F08-831-05] non-numeric site param returns 200 empty without calling Payload', async () => {
         // Arrange
@@ -82,6 +117,19 @@ describe('GET /api/storefront/products [TC-F08-831]', () => {
                 overrideAccess: true,
             }),
         )
+    })
+
+    it('[TC-F09.283] unavailable store returns 200 empty without querying products', async () => {
+        // Arrange
+        vi.mocked(isCachedSiteUnavailable).mockResolvedValueOnce(true)
+
+        // Act
+        const res = await GET(new Request('http://localhost/api/storefront/products?site=5'))
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(await res.json()).toEqual({ docs: [], totalDocs: 0 })
+        expect(mockFind).not.toHaveBeenCalled()
     })
 
     it('[TC-F08-831-04] zero site param returns 200 empty without calling Payload', async () => {
